@@ -11,7 +11,8 @@ import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { saveableSections } from "@/components/sites/saveable-sections";
 import { withVariant } from "@/components/sites/section-fields/variant-field";
 import { syncEnquiryForms } from "@/components/sites/sync-enquiry-forms";
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { ensureFormForSection } from "@/lib/forms/actions";
 import { saveDraftSections } from "@/lib/sites/actions";
 import { insertPosition } from "@/lib/sites/editor-positions";
@@ -107,8 +108,8 @@ export function useEditorDraft({
         JSON.stringify(livePlan.toSend) === lastSavedJson;
 
     // Unfinished sections that were never saved live only in this tab, and the
-    // bar reads "Saved · …" for everything else (review of #328).
-    useLeaveGuard(dirty);
+    // bar reads "Saved · …" for everything else (review of #328): `dirty`
+    // and `onlyHeldBack` reach the leave guard through `use-editor-leave.ts`.
 
     /** Why the section at this position is not saved, if the last save held it back. */
     function heldBackAt(index: number): HeldBackSection | undefined {
@@ -228,11 +229,16 @@ export function useEditorDraft({
 
         // Keep every enquiry section's Form in sync first — this stamps the
         // returned formId into the content we then persist + publish.
-        const synced = await syncEnquiryForms(
-            sections,
-            { id: siteId, name: siteName },
-            ensureFormForSection,
-        );
+        const synced = (await runAction(
+            () =>
+                syncEnquiryForms(
+                    sections,
+                    { id: siteId, name: siteName },
+                    ensureFormForSection,
+                ),
+            // Said below, as any other failed sync is.
+            { quiet: true },
+        )) ?? { ok: false as const, index: 0, error: UNREACHED };
         if (!synced.ok) {
             setSaving(false);
             // Not saved, and the bar has to say so (#281). A failed form sync
@@ -292,7 +298,7 @@ export function useEditorDraft({
             revision,
         ).catch(() => ({
             ok: false as const,
-            error: "Could not reach Saroh — your work is still here. It will save again with your next edit.",
+            error: "Couldn't reach Saroh. Your work is still here. It will save again with your next edit.",
         }));
         setSaving(false);
         if (res.ok) {

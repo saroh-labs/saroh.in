@@ -1,3 +1,4 @@
+import { formatDay } from "@/lib/format/datetime";
 import type { CalendarRange, Edge } from "./range";
 import { inRange, monthEdges } from "./range";
 
@@ -49,36 +50,18 @@ export function weekDates(from: string): string[] {
     return Array.from({ length: 7 }, (_, i) => addDays(from, i));
 }
 
-const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-];
-
 /**
  * The design's title: "14–20 Sep 2026"; across two months "28 Sep–4 Oct
  * 2026"; across two years "29 Dec 2025–4 Jan 2026".
  */
 export function weekTitle(from: string): string {
     const to = addDays(from, 6);
-    const [y0, m0, d0] = from.split("-").map(Number);
-    const [y1, m1, d1] = to.split("-").map(Number);
-    const start =
-        y0 !== y1
-            ? `${d0} ${MONTHS[m0 - 1]} ${y0}`
-            : m0 !== m1
-              ? `${d0} ${MONTHS[m0 - 1]}`
-              : `${d0}`;
-    return `${start}–${d1} ${MONTHS[m1 - 1]} ${y1}`;
+    const sameYear = from.slice(0, 4) === to.slice(0, 4);
+    const sameMonth = sameYear && from.slice(5, 7) === to.slice(5, 7);
+    const start = sameMonth
+        ? String(Number(from.slice(8, 10)))
+        : formatDay(from, { year: sameYear ? "never" : "always" });
+    return `${start} to ${formatDay(to, { year: "always" })}`;
 }
 
 /**

@@ -1,4 +1,5 @@
-import { clock } from "@/lib/services/diary";
+import { formatClockRange } from "@/lib/format/datetime";
+import { plural } from "@/lib/format/plural";
 import type { WeeklyRange } from "@/lib/staff/types";
 
 /**
@@ -80,7 +81,7 @@ export function whollyOutside(
     );
 }
 
-const span = (r: Range) => `${clock(r.startMinute)}–${clock(r.endMinute)}`;
+const span = (r: Range) => formatClockRange(r.startMinute, r.endMinute);
 
 /** "a", "a and b", "a, b and c". */
 function list(items: string[]): string {
@@ -91,8 +92,8 @@ function list(items: string[]): string {
 
 /**
  * What a day's row says about opening hours, or null when they cut
- * nothing: "08:00–09:00 isn't bookable in person — you're open
- * 09:00–18:00." A day the business is closed says so.
+ * nothing: "8:00 to 9:00 am isn't bookable in person — you're open
+ * 9:00 am to 6:00 pm." A day the business is closed says so.
  */
 export function openingNote(
     ranges: readonly Range[],
@@ -104,8 +105,8 @@ export function openingNote(
     if (outside.length === 0) return null;
     const open = openOn(opening, day);
     if (open.length === 0) {
-        return `Not bookable in person — you're closed on ${DAY_NAMES[day]}.`;
+        return `Not bookable in person. You're closed on ${DAY_NAMES[day]}.`;
     }
-    const verb = outside.length === 1 ? "isn't" : "aren't";
-    return `${list(outside.map(span))} ${verb} bookable in person — you're open ${list(open.map(span))}.`;
+    const verb = plural(outside.length, "isn't", "aren't");
+    return `${list(outside.map(span))} ${verb} bookable in person. You're open ${list(open.map(span))}.`;
 }

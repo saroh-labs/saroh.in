@@ -1,17 +1,19 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { ShareCards } from "@saroh/ui/share-cards";
 import { Textarea } from "@saroh/ui/textarea";
 import { useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { updateSiteSettings } from "@/lib/sites/actions";
 import { settingsEditId } from "@/lib/sites/settings-edit";
 
-import { NOTE, SettingsSheetFrame } from "./settings-sheet";
+import { NOTE } from "./settings-sheet";
 import { ShareImageThumb } from "./share-image-thumb";
 import type { ShareImage } from "./use-share-image";
 import { useShareImage } from "./use-share-image";
@@ -92,8 +94,8 @@ export function TitleSheet({
     const { saved, open, pending, onClose } = props;
     const [title, setTitle] = useState(saved.seoTitle);
     return (
-        <SettingsSheetFrame
-            editId={settingsEditId("title")}
+        <FormSheet
+            returnFocusTo={settingsEditId("title")}
             title="Title"
             description="What search results and shared links call your site."
             open={open}
@@ -119,7 +121,7 @@ export function TitleSheet({
                     : `Left empty, your site's name is used: ${name}.`}
             </p>
             <Preview {...props} draft={{ seoTitle: title }} />
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -131,8 +133,8 @@ export function DescriptionSheet({
     const { saved, open, pending, onClose } = props;
     const [description, setDescription] = useState(saved.seoDescription);
     return (
-        <SettingsSheetFrame
-            editId={settingsEditId("description")}
+        <FormSheet
+            returnFocusTo={settingsEditId("description")}
             title="Description"
             description="A line or two under the title in search results and shared links."
             open={open}
@@ -158,7 +160,7 @@ export function DescriptionSheet({
                 {lengthLine(description.length, DESCRIPTION_GUIDE)}
             </p>
             <Preview {...props} draft={{ seoDescription: description }} />
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -178,8 +180,8 @@ export function ShareImageSheet({
     const { saved, open, pending, onClose } = props;
     const image = useShareImage(saved.image);
     return (
-        <SettingsSheetFrame
-            editId={settingsEditId("image")}
+        <FormSheet
+            returnFocusTo={settingsEditId("image")}
             title="Share image"
             description="The picture apps show beside your link when it is shared."
             open={open}
@@ -205,9 +207,11 @@ export function ShareImageSheet({
                             Remove image
                         </Button>
                     ) : (
-                        <p className="text-muted-foreground">
-                            None yet. 1200×630 works everywhere.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            title="No image yet"
+                            description="1200×630 works everywhere."
+                        />
                     )}
                 </div>
             </div>
@@ -228,6 +232,6 @@ export function ShareImageSheet({
                 {...props}
                 draft={{ image: { url: image.url, facts: image.facts } }}
             />
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

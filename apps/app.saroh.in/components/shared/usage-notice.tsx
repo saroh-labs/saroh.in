@@ -1,10 +1,12 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Notice } from "@saroh/ui/notice";
 import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { dismissUsageNotice } from "@/lib/usage-sharing/actions";
 import { markUsageNoticeOnScreen } from "@/lib/usage-sharing/notice-on-screen";
 import { USAGE_NOTICE } from "@/lib/usage-sharing/sharing";
@@ -35,8 +37,12 @@ export function UsageNotice() {
         if (pending) return;
         setGone(true);
         startTransition(async () => {
-            const result = await dismissUsageNotice();
-            if (result.ok) return;
+            // A save that never got there is the same to the person as
+            // one that was refused: one sentence for both.
+            const result = await runAction(() => dismissUsageNotice(), {
+                quiet: true,
+            });
+            if (result?.ok) return;
             // Not kept, so it would come back on the next page: say so now.
             setGone(false);
             showError("Couldn't save that", "Try again in a moment.");
@@ -44,13 +50,25 @@ export function UsageNotice() {
     };
 
     return (
-        <div
+        // The shared banner, as the plan banners under it are.
+        <Notice
+            layout="banner"
             role="status"
             data-ph-unmask=""
             data-testid="usage-notice"
-            className="flex flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-border/70 bg-muted/50 px-4 py-2.5 sm:px-6"
+            action={
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={dismiss}
+                >
+                    {USAGE_NOTICE.dismiss}
+                </Button>
+            }
         >
-            <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-foreground">
+            <p className="text-pretty text-[13px] leading-normal">
                 {USAGE_NOTICE.body} {USAGE_NOTICE.turnOff}{" "}
                 <Link
                     href={USAGE_NOTICE.href}
@@ -60,15 +78,6 @@ export function UsageNotice() {
                 </Link>
                 .
             </p>
-            <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="shrink-0"
-                onClick={dismiss}
-            >
-                {USAGE_NOTICE.dismiss}
-            </Button>
-        </div>
+        </Notice>
     );
 }

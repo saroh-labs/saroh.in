@@ -1,16 +1,19 @@
 "use client";
 
+import { formatDateTime } from "@/lib/format/datetime";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showInfo, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { FailedRead } from "@/components/shared/failed-read";
 import { AddDomainDialog } from "@/components/sites/add-domain-dialog";
 import { DomainRecords } from "@/components/sites/domain-records";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import { useSheetControl } from "@/components/sites/settings/settings-sheet";
 import { env } from "@/env";
+import { runAction } from "@/lib/api/run-action";
 import {
     claimDomain,
     listSiteDomains,
@@ -24,8 +27,8 @@ import {
     domainView,
 } from "@/lib/domains/domain-view";
 import type { SiteDomain } from "@/lib/domains/service";
-import { exactDate } from "@/lib/sites/format-date";
 import { SETTINGS_ROW_ID, settingsEditId } from "@/lib/sites/settings-edit";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * A merchant's own domain, on the site settings screen (#200, #861).
@@ -91,7 +94,9 @@ export function CustomDomain({
 }) {
     const zone = useBusinessZone();
     const [domains, setDomains] = useState<SiteDomain[] | null>(null);
-    const [loadError, setLoadError] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState(false);
+    // Try again reads the domains again, without leaving the page.
+    const [attempt, setAttempt] = useState(0);
     const own = useSheetControl();
     const adding = sheet ?? own;
     // The domain the open dialog added: it shows that one's records next.
@@ -110,15 +115,13 @@ export function CustomDomain({
             .catch(() => {
                 if (!cancelled) {
                     setDomains([]);
-                    setLoadError(
-                        "Could not load your domains. Reload to try again.",
-                    );
+                    setLoadError(true);
                 }
             });
         return () => {
             cancelled = true;
         };
-    }, [siteId]);
+    }, [siteId, attempt]);
 
     async function claim(hostname: string) {
         const res = await claimDomain(siteId, hostname);
@@ -133,9 +136,10 @@ export function CustomDomain({
     }
 
     async function check(domain: SiteDomain) {
-        setBusy(domain.id);
-        const res = await verifyDomain(domain.id);
-        setBusy(null);
+        const res = await runAction(() => verifyDomain(domain.id), {
+            setBusy: (on) => setBusy(on ? domain.id : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -149,10 +153,11 @@ export function CustomDomain({
     }
 
     async function remove(domain: SiteDomain) {
-        setBusy(domain.id);
-        const res = await removeDomain(domain.id);
-        setBusy(null);
+        const res = await runAction(() => removeDomain(domain.id), {
+            setBusy: (on) => setBusy(on ? domain.id : null),
+        });
         setConfirmRemove(null);
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -188,7 +193,13 @@ export function CustomDomain({
         <>
             {loadError ? (
                 <Block>
-                    <p className="text-sm text-destructive">{loadError}</p>
+                    <FailedRead
+                        things="your domains"
+                        onRetry={() => {
+                            setLoadError(false);
+                            setAttempt((n) => n + 1);
+                        }}
+                    />
                 </Block>
             ) : null}
 
@@ -214,7 +225,7 @@ export function CustomDomain({
                                     variant={view.badge.variant}
                                     title={
                                         domain.verifiedAt
-                                            ? `Verified ${exactDate(domain.verifiedAt, zone)}`
+                                            ? `Verified ${formatDateTime(domain.verifiedAt, zone, { year: "always" })}`
                                             : undefined
                                     }
                                 >
@@ -227,12 +238,11 @@ export function CustomDomain({
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        disabled={busy === domain.id}
                                         onClick={() => void check(domain)}
+                                        busy={busy === domain.id}
+                                        busyLabel="Checking…"
                                     >
-                                        {busy === domain.id
-                                            ? "Checking…"
-                                            : view.checkLabel}
+                                        {view.checkLabel}
                                     </Button>
                                 ) : null}
                                 {confirmRemove === domain.id ? null : (
@@ -254,14 +264,13 @@ export function CustomDomain({
                         {view.liveUrl ? (
                             <p className="text-sm">
                                 Live at{" "}
-                                <a
+                                <TextLink
                                     href={view.liveUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium underline underline-offset-2 [overflow-wrap:anywhere] hover:text-muted-foreground active:text-foreground"
+                                    external
+                                    className="[overflow-wrap:anywhere]"
                                 >
                                     {domain.hostname}
-                                </a>
+                                </TextLink>
                             </p>
                         ) : null}
 
@@ -277,7 +286,11 @@ export function CustomDomain({
                             <p
                                 className="text-xs text-muted-foreground"
                                 title={
-                                    lineAt ? exactDate(lineAt, zone) : undefined
+                                    lineAt
+                                        ? formatDateTime(lineAt, zone, {
+                                              year: "always",
+                                          })
+                                        : undefined
                                 }
                             >
                                 {line}
@@ -298,12 +311,11 @@ export function CustomDomain({
                                         type="button"
                                         size="sm"
                                         variant="destructive"
-                                        disabled={busy === domain.id}
                                         onClick={() => void remove(domain)}
+                                        busy={busy === domain.id}
+                                        busyLabel="Removing…"
                                     >
-                                        {busy === domain.id
-                                            ? "Removing…"
-                                            : `Remove ${domain.hostname}`}
+                                        {`Remove ${domain.hostname}`}
                                     </Button>
                                     <Button
                                         type="button"

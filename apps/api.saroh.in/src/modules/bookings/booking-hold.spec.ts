@@ -122,7 +122,7 @@ describe("what a hold is", () => {
                 new Date("2026-09-21T01:30:00.000Z"),
                 "Asia/Kolkata",
             ),
-        ).toBe("Personal training · Mon 21 Sep 2026, 07:00");
+        ).toBe("Personal training · Mon 21 Sep 2026, 7:00 am");
     });
 });
 
@@ -169,7 +169,7 @@ describe("createHoldInvoiceInTx", () => {
         const lines = tx.invoiceLine.createMany.mock.calls[0][0].data;
         expect(lines).toHaveLength(1);
         expect(lines[0]).toMatchObject({
-            description: "Personal training · Mon 21 Sep 2026, 07:00",
+            description: "Personal training · Mon 21 Sep 2026, 7:00 am",
             quantity: 1,
         });
     });

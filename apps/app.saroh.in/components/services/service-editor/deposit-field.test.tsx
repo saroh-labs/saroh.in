@@ -49,7 +49,7 @@ describe("DepositField on a plan without online payments", () => {
     it("locks the deposits, leaving nothing at booking, with the way up", () => {
         const html = render("NONE", "NONE", LOCK);
         expect(chips(html)).toEqual([
-            ["Nothing — they pay at the visit", false],
+            ["Nothing, they pay at the visit", false],
             ["25% deposit", true],
             ["50% deposit", true],
             ["The full price", true],
@@ -68,7 +68,7 @@ describe("DepositField on a plan without online payments", () => {
     it("shows a deposit the service already has as kept, but paused", () => {
         const html = render("PERCENT_50", "PERCENT_50", LOCK);
         expect(chips(html)).toEqual([
-            ["Nothing — they pay at the visit", false],
+            ["Nothing, they pay at the visit", false],
             ["25% deposit", true],
             ["50% deposit", false],
             ["The full price", true],

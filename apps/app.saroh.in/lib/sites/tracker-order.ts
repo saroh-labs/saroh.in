@@ -1,3 +1,4 @@
+import { count as countOf } from "@/lib/format/plural";
 import type { TrackerKind } from "@saroh/block-contract";
 import { TRACKER_KINDS } from "@saroh/block-contract";
 
@@ -32,5 +33,5 @@ export function splitTrackers(connected: ReadonlySet<TrackerKind>): {
 
 /** "4 more tools", "1 more tool". */
 export function moreToolsLine(count: number): string {
-    return count === 1 ? "1 more tool" : `${count} more tools`;
+    return countOf(count, "more tool");
 }

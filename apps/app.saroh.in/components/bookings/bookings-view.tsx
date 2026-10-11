@@ -13,7 +13,7 @@ import type {
 } from "@/components/shared/data-view/types";
 import { ShareLinkButton } from "@/components/sites/share-link-button";
 import { personHref } from "@/lib/contacts/person-href";
-import { formatDayHeading, formatTimeRange } from "@/lib/format/datetime";
+import { formatDate, formatTimeRange } from "@/lib/format/datetime";
 // From ./booking-state, NOT ./service: this is a client component, and the
 // service module reaches next/headers through the CRM HTTP plumbing.
 import { bookingStatus } from "@/lib/format/status";
@@ -39,8 +39,7 @@ import type { ShareLink } from "@/lib/sites/share-links";
  * explicitly and why the zone travels on every row.
  */
 
-const EMPTY_NOTE =
-    "Bookings appear here as visitors reserve slots on your services.";
+const EMPTY_NOTE = "They show here when a customer books, or when you add one.";
 
 const FILTERS: DataFilter<BookingWithService>[] = [
     // Upcoming leads, because the schedule is mostly read forwards. "Needs an
@@ -58,7 +57,11 @@ const FILTERS: DataFilter<BookingWithService>[] = [
         id: "today",
         label: "Today",
         predicate: (b) =>
-            formatDayHeading(b.startAt, b.timezone, new Date()) === "Today",
+            formatDate(b.startAt, b.timezone, {
+                weekday: "short",
+                relative: true,
+                now: new Date(),
+            }) === "Today",
     },
     {
         id: "week",
@@ -123,7 +126,11 @@ export function BookingsView({
             cell: (b) => (
                 <span className="block whitespace-nowrap">
                     <span className="block text-xs text-muted-foreground">
-                        {formatDayHeading(b.startAt, b.timezone, now)}
+                        {formatDate(b.startAt, b.timezone, {
+                            weekday: "short",
+                            relative: true,
+                            now,
+                        })}
                     </span>
                     <span className="block font-medium tabular-nums">
                         {formatTimeRange(b.startAt, b.endAt, b.timezone)}
@@ -231,20 +238,17 @@ export function BookingsView({
             rowHref={(b) => `/bookings/${b.id}`}
             modes={["table", "list"]}
             defaultMode="table"
+            noun={{ one: "booking", other: "bookings" }}
+            showTotal={false}
             filters={FILTERS}
             initialFilterId={initialView ?? "upcoming"}
             searchableColumnIds={["service", "booker"]}
-            empty={EMPTY_NOTE}
-            emptyState={
-                share
-                    ? {
-                          icon: <CalendarDays />,
-                          title: "No bookings yet",
-                          note: EMPTY_NOTE,
-                          action: <ShareLinkButton link={share} />,
-                      }
-                    : undefined
-            }
+            emptyState={{
+                icon: <CalendarDays />,
+                title: "No bookings yet",
+                note: EMPTY_NOTE,
+                action: share ? <ShareLinkButton link={share} /> : undefined,
+            }}
             rowActions={(b) =>
                 // Not for an appointment that already happened: cancelling one
                 // is meaningless, and the detail screen offers an outcome

@@ -1,3 +1,4 @@
+import { StatusBadge } from "@/components/shared/status-badge";
 import { formatMoney } from "@/lib/format/money";
 import { formatStatus } from "@/lib/format/status";
 import { providerName } from "@/lib/payments/providers";
@@ -21,7 +22,7 @@ export function OrderPayments({
         return (
             <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                 {paymentStatus === "PAID" || paymentStatus === "REFUNDED"
-                    ? "Settled outside a card provider — in cash or by transfer — and recorded by hand."
+                    ? "Settled outside a card provider, in cash or by transfer, and recorded by hand."
                     : "No card payment has been tried. A payment taken in cash or by transfer is recorded from the order's menu."}
             </p>
         );
@@ -36,9 +37,9 @@ export function OrderPayments({
                             {providerName(intent.provider)}
                         </span>
                         <span className="flex items-center gap-2">
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">
+                            <StatusBadge tone="neutral">
                                 {formatStatus(intent.status)}
-                            </span>
+                            </StatusBadge>
                             <span className="font-display font-semibold tabular-nums">
                                 {formatMoney(
                                     intent.amountCents,

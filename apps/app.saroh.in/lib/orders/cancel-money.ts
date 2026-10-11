@@ -62,7 +62,7 @@ export function cancelWords(input: {
         return {
             says:
                 paid === "online"
-                    ? `What's left goes back to ${refundTo}, in 3–5 days. ${stock}`
+                    ? `What's left goes back to ${refundTo}, in 3 to 5 days. ${stock}`
                     : `Give what's left back from the till. ${stock}`,
             confirm: "Cancel order",
         };
@@ -77,8 +77,8 @@ export function cancelWords(input: {
     const back =
         paid === "online"
             ? already > 0
-                ? `${format(already)} has already been refunded, so the ${money} left goes back to ${refundTo}, in 3–5 days.`
-                : `${money} goes back to ${refundTo}, in 3–5 days.`
+                ? `${format(already)} has already been refunded, so the ${money} left goes back to ${refundTo}, in 3 to 5 days.`
+                : `${money} goes back to ${refundTo}, in 3 to 5 days.`
             : already > 0
               ? `${format(already)} has already been refunded, so give the ${money} left back from the till.`
               : `Give ${money} back from the till.`;

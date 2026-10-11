@@ -1,5 +1,6 @@
 "use client";
 
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import {
@@ -22,7 +23,12 @@ import { useState } from "react";
  * the point. It stays a visible checkbox because signing every other device
  * out is a consequence the user should see coming.
  */
-export function ChangePasswordForm() {
+export function ChangePasswordForm({
+    justSet = false,
+}: {
+    /** The first password was set a moment ago, on this page. */
+    justSet?: boolean;
+} = {}) {
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -37,24 +43,31 @@ export function ChangePasswordForm() {
         setSuccess(false);
 
         if (newPassword !== confirmPassword) {
-            setError("New passwords do not match");
+            setError("Those two passwords don't match. Type them again.");
             return;
         }
         if (newPassword.length < 8) {
-            setError("Password must be at least 8 characters");
+            setError(authFailureCopy({ code: "PASSWORD_TOO_SHORT" }));
             return;
         }
 
         setIsLoading(true);
-        const { error: err } = await authClient.changePassword({
-            currentPassword,
-            newPassword,
-            revokeOtherSessions: revokeOthers,
-        });
+        const { error: err } = await settle(() =>
+            authClient.changePassword({
+                currentPassword,
+                newPassword,
+                revokeOtherSessions: revokeOthers,
+            }),
+        );
         setIsLoading(false);
 
         if (err) {
-            setError(err.message ?? "Could not change your password.");
+            setError(
+                authFailureCopy(
+                    err,
+                    "Couldn't change your password. Try again.",
+                ),
+            );
             return;
         }
         setSuccess(true);
@@ -76,6 +89,12 @@ export function ChangePasswordForm() {
                     {error && (
                         <p className="text-destructive text-sm">{error}</p>
                     )}
+                    {justSet && !success && !error ? (
+                        <p role="status" className="text-success text-sm">
+                            Password set. You can sign in with it or with a
+                            code.
+                        </p>
+                    ) : null}
                     {success && (
                         <p className="text-success text-sm">
                             Password updated.

@@ -20,6 +20,31 @@ export function optionSummary(
 }
 
 /**
+ * What a shop card's button reads when the product comes in more than one
+ * option: "Choose size", by the option's own name, or "Choose options"
+ * without one (an API before it) or with a long one. Null with one option
+ * or none: there is nothing to choose, and the card adds it to the bag
+ * itself.
+ *
+ * The card never picks for the customer: a size nobody chose is the wrong
+ * thing in the bag.
+ */
+export function chooseLabel(
+    titles: readonly string[],
+    optionName: string | null | undefined,
+): string | null {
+    if (titles.filter((t) => t.trim() !== "").length < 2) return null;
+    const name = optionName?.trim();
+    // A long name ("Gift wrap style") would run under the price beside it.
+    return name && name.length <= CHOOSE_NAME_MAX
+        ? `Choose ${lowerFirst(name)}`
+        : "Choose options";
+}
+
+/** The longest option name the card's button spells out. */
+export const CHOOSE_NAME_MAX = 10;
+
+/**
  * "Size" → "size", "Colour" → "colour"; an initialism stays as it is
  * ("UK size", "EU size").
  */

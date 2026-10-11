@@ -263,7 +263,9 @@ test.describe("phone reflow: Customer Detail", () => {
         });
         await page.setViewportSize(WIDTHS[0]);
         await page.goto(`/customers/${who.id}`);
-        await expect(page.getByText("Possible match — link?")).toBeVisible();
+        await expect(
+            page.getByText("Possible match. Link them?"),
+        ).toBeVisible();
         await noSidewaysScroll(page, "Customer Detail with a long email");
         await page.getByRole("button", { name: "Review and link" }).click();
         const dialog = page.getByRole("dialog", {
@@ -306,8 +308,7 @@ test.describe("phone reflow: Customer Detail", () => {
             name: "Merge with a duplicate",
         });
         const merge = dialog.getByRole("button", {
-            name: "Merge",
-            exact: true,
+            name: "Merge records",
         });
         await expect(merge).toBeEnabled();
         await fitsAtPhoneWidths(
@@ -416,13 +417,16 @@ test.describe("phone reflow: Order Detail", () => {
                 cancel.getByRole("button", {
                     name: /^(Refund |Cancel order$)/,
                 }),
-                cancel.getByRole("button", { name: "Cancel", exact: true }),
+                // Its way out says what it keeps, never "Cancel" beside
+                // the button that cancels.
+                cancel.getByRole("button", { name: "Keep order" }),
             ],
             "Cancel order",
         );
-        await cancel
-            .getByRole("button", { name: "Cancel", exact: true })
-            .click();
+        await expect(
+            cancel.getByRole("button", { name: "Cancel", exact: true }),
+        ).toHaveCount(0);
+        await cancel.getByRole("button", { name: "Keep order" }).click();
         // One sheet at a time: the page is out of reach until it is gone.
         await expect(cancel).toBeHidden();
 
@@ -509,7 +513,7 @@ test.describe("phone reflow: New order", () => {
 });
 
 test.describe("phone reflow: invoices", () => {
-    test("the send confirm keeps Send it and Not now on the screen with a long email", async ({
+    test("the send confirm keeps Issue and send and Keep draft on the screen with a long email", async ({
         page,
     }, testInfo) => {
         await signIn(page);
@@ -546,12 +550,12 @@ test.describe("phone reflow: invoices", () => {
                 page,
                 confirm,
                 [
-                    confirm.getByRole("button", { name: "Send it" }),
-                    confirm.getByRole("button", { name: "Not now" }),
+                    confirm.getByRole("button", { name: "Issue and send" }),
+                    confirm.getByRole("button", { name: "Keep draft" }),
                 ],
                 "Send invoice",
             );
-            await confirm.getByRole("button", { name: "Not now" }).click();
+            await confirm.getByRole("button", { name: "Keep draft" }).click();
             await expect(confirm).toHaveCount(0);
         } finally {
             // A draft has no number: deleting it leaves nothing behind.
@@ -601,8 +605,7 @@ test.describe("phone reflow: subscriptions", () => {
             const sheet = page.getByRole("dialog", { name: "Change plan" });
             await expect(sheet).toBeVisible();
             await sheet
-                .getByRole("radio")
-                .filter({ hasText: "Fortnightly celebration cakes" })
+                .getByRole("radio", { name: /Fortnightly celebration cakes/ })
                 .click();
             await fitsAtPhoneWidths(
                 page,

@@ -12,6 +12,7 @@ import {
 } from "@nestjs/common";
 
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -109,6 +110,21 @@ export class OrganizationMembersController {
         @Body() dto: SetExtraActionsDto,
     ) {
         return this.members.setExtraActions(ctx, userId, dto);
+    }
+
+    /**
+     * Leave this business: the caller's own membership. No permission is
+     * asked, only membership, which the guard has already proven; the
+     * organization is the context's, never a body's. Wind-down: it ends
+     * something already made, so a business that is closing still lets its
+     * people go.
+     */
+    @Post("organizations/:organizationId/leave")
+    @HttpCode(200)
+    @LifecycleWrite("wind-down")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    leave(@OrgContext() ctx: OrganizationContext) {
+        return this.members.leave(ctx);
     }
 
     @Delete("organizations/:organizationId/members/:userId")

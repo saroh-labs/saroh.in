@@ -7,6 +7,10 @@ import { useSession } from "../fixtures/sessions";
 /**
  * Settings › Plan and billing (plans catalogue U14), on desk and phone.
  *
+ * The owner's page: only the owner changes what the business pays Saroh
+ * (DEC-131, amended 2026-10-11), so every control here is the owner's. An
+ * Admin reads the same page with none of them (`role-admin.spec.ts`).
+ *
  * Read on Rye & Co. as its owner, which no test writes to: the page's cards
  * as the "Saroh Settings" design draws them, a plan row's change opening
  * its quote (a read) and closing again, and the same change opened from an
@@ -46,7 +50,7 @@ test("shows the plan, the picker and Saroh's invoices", async ({ page }) => {
     const picker = page.getByRole("region", { name: "Change plan" });
     await expect(
         picker.getByText(
-            "Monthly is autopay for 12 months and yearly is one payment; before either ends, we ask you to pay for the next term. Upgrades start today; downgrades from your next charge.",
+            "Monthly is autopay for 12 months and yearly is one payment. Before either ends, we ask you to pay for the next term. Upgrades start today, and downgrades from your next charge.",
         ),
     ).toBeVisible();
     // The plan it's on: "Current plan", or a plan given for a while (UX-044).
@@ -57,6 +61,19 @@ test("shows the plan, the picker and Saroh's invoices", async ({ page }) => {
     await expect(
         page.getByRole("region", { name: "Invoices from Saroh" }),
     ).toBeVisible();
+
+    // The owner's to change: nothing says it is someone else's, a plan
+    // has its button, and the coupon is offered.
+    await expect(page.getByText(/^Your role can read/)).toHaveCount(0);
+    await expect(
+        picker
+            .getByRole("button", {
+                name: /^(Upgrade|Switch|Start \d+-day trial|Start with the first month|Keep .+|Bill (yearly|monthly)): /,
+            })
+            .first(),
+    ).toBeVisible();
+    await expect(page.getByRole("region", { name: "Coupon" })).toBeVisible();
+    await expect(page.getByLabel("Coupon code")).toBeVisible();
     await noOverflow(page);
 });
 

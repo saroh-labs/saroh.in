@@ -1,5 +1,7 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { count, plural } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
     Interval,
@@ -61,10 +63,6 @@ export function screenTabFromQuery(value: string | undefined): ScreenTab {
     return value === "plans" ? "plans" : tabFromQuery(value);
 }
 
-export function money(amount: string | number, currency: string): string {
-    return formatMoneyMajor(amount, currency) ?? String(amount);
-}
-
 const PER: Record<Interval, { short: string; long: string }> = {
     WEEK: { short: "wk", long: "week" },
     MONTH: { short: "mo", long: "month" },
@@ -78,7 +76,7 @@ export function shortPrice(
     currency: string,
     interval: Interval,
 ): string {
-    return `${money(price, currency)}/${PER[interval].short}`;
+    return `${formatMoneyMajor(price, currency)}/${PER[interval].short}`;
 }
 
 /** "₹1,200 / month" — the price in a sentence or a card. */
@@ -87,7 +85,7 @@ export function longPrice(
     currency: string,
     interval: Interval,
 ): string {
-    return `${money(price, currency)} / ${PER[interval].long}`;
+    return `${formatMoneyMajor(price, currency)} / ${PER[interval].long}`;
 }
 
 /**
@@ -120,42 +118,6 @@ export function monthlyTotal(
     return { amount: Math.round(amount), currency };
 }
 
-/**
- * "20 Sep", "Sat 20 Sep", with the year when it is not this one. `at` is an
- * instant (read in `timeZone`) or a local date, YYYY-MM-DD.
- */
-export function dayText(
-    at: string,
-    timeZone: string,
-    now: Date,
-    withWeekday = false,
-): string {
-    const local = /^\d{4}-\d{2}-\d{2}$/.test(at);
-    const date = new Date(local ? `${at}T00:00:00Z` : at);
-    const zone = local ? "UTC" : timeZone;
-    const year = (d: Date, z: string) =>
-        new Intl.DateTimeFormat("en-GB", {
-            timeZone: z,
-            year: "numeric",
-        }).format(d);
-    const sameYear = year(date, zone) === year(now, timeZone);
-    const parts = new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone: zone,
-        day: "numeric",
-        month: "short",
-        ...(sameYear ? {} : { year: "numeric" }),
-    })
-        .format(date)
-        // ICU's en-GB says "Sept"; the design, like every other month, three letters.
-        .replace("Sept", "Sep");
-    if (!withWeekday) return parts;
-    const weekday = new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone: zone,
-        weekday: "short",
-    }).format(date);
-    return `${weekday} ${parts}`;
-}
-
 function daysLate(dueAt: string, now: Date): number {
     return Math.floor((now.getTime() - Date.parse(dueAt)) / DAY);
 }
@@ -170,14 +132,14 @@ export function failWhy(
 ): string {
     const charge = sub.failedCharge;
     if (!charge) return "The latest renewal isn't paid and is past due";
-    const amount = money(charge.total, sub.currency);
+    const amount = formatMoneyMajor(charge.total, sub.currency);
     if (charge.dueAt && Date.parse(charge.dueAt) > now.getTime()) {
         return `Renewal of ${amount} wasn't collected by autopay`;
     }
     const late = charge.dueAt ? daysLate(charge.dueAt, now) : 0;
     return late > 0
-        ? `Renewal of ${amount} isn't paid — ${late} ${late === 1 ? "day" : "days"} past due`
-        : `Renewal of ${amount} isn't paid — past due`;
+        ? `Renewal of ${amount} isn't paid, ${count(late, "day")} past due`
+        : `Renewal of ${amount} isn't paid, past due`;
 }
 
 /**
@@ -190,7 +152,7 @@ export function chargingText(
 ): string | null {
     const at = sub.autopayCharge?.at;
     return at
-        ? `Autopay charge in progress · ${dayText(at, sub.timezone, now)}`
+        ? `Autopay charge in progress · ${formatDate(at, sub.timezone, { now })}`
         : null;
 }
 
@@ -209,7 +171,7 @@ export function retryOffer(
     }
     // Absent: an API older than D13, where Retry is a pay link.
     if (sub.retryVia === null || !sub.failedCharge || !canPayLink) return null;
-    return { label: "Retry with a new pay link", via: "PAY_LINK" };
+    return { label: "Try again with a new pay link", via: "PAY_LINK" };
 }
 
 /**
@@ -222,13 +184,13 @@ export function pausedText(
     now: Date,
 ): string {
     if (sub.pausedUntil) {
-        const day = dayText(sub.pausedUntil, sub.timezone, now);
+        const day = formatDate(sub.pausedUntil, sub.timezone, { now });
         return pauseHasEnded(sub, now)
             ? `Pause ended ${day}`
             : `Paused until ${day}`;
     }
     return sub.pausedAt
-        ? `Paused since ${dayText(sub.pausedAt, sub.timezone, now)}`
+        ? `Paused since ${formatDate(sub.pausedAt, sub.timezone, { now })}`
         : "Paused";
 }
 
@@ -259,7 +221,7 @@ function pausedLine(
     now: Date,
 ): string {
     if (!sub.pausedUntil) return `${pausedText(sub, now)}.`;
-    const day = dayText(sub.pausedUntil, sub.timezone, now);
+    const day = formatDate(sub.pausedUntil, sub.timezone, { now });
     if (!pauseHasEnded(sub, now)) {
         return `Paused until ${day} · resumes on its own.`;
     }
@@ -282,7 +244,7 @@ export function rowWhen(
     if (tab === "cancelled") {
         return {
             text: sub.cancelledAt
-                ? `Ended ${dayText(sub.cancelledAt, tz, now)}`
+                ? `Ended ${formatDate(sub.cancelledAt, tz, { now })}`
                 : "Ended",
             danger: false,
         };
@@ -292,27 +254,30 @@ export function rowWhen(
     }
     if (sub.startsAt) {
         return {
-            text: `Starts ${dayText(sub.startsAt, tz, now)}`,
+            text: `Starts ${formatDate(sub.startsAt, tz, { now })}`,
             danger: false,
         };
     }
     if (sub.endsAt) {
-        return { text: `Ends ${dayText(sub.endsAt, tz, now)}`, danger: false };
+        return {
+            text: `Ends ${formatDate(sub.endsAt, tz, { now })}`,
+            danger: false,
+        };
     }
     if (sub.overdue && sub.overdueCount > 0) {
         const n = sub.overdueCount;
         return {
-            text: `${n} older ${n === 1 ? "invoice" : "invoices"} overdue · ${money(sub.unpaidTotal, sub.currency)}`,
+            text: `${n} older ${plural(n, "invoice")} overdue · ${formatMoneyMajor(sub.unpaidTotal, sub.currency)}`,
             danger: true,
         };
     }
     const badge = autopayBadgeText(sub.autopayOn);
     return {
         text: sub.nextRenewalAt
-            ? [`Next ${dayText(sub.nextRenewalAt, tz, now)}`, badge]
+            ? [`Next ${formatDate(sub.nextRenewalAt, tz, { now })}`, badge]
                   .filter(Boolean)
                   .join(" · ")
-            : "—",
+            : absentText(),
         danger: false,
     };
 }
@@ -352,11 +317,11 @@ export function initials(name: string): string {
 /** "8 classes a month", or "Unlimited classes" when the plan has no cap. */
 export function classesText(classesPerMonth: number | null): string {
     if (!classesPerMonth) return "Unlimited classes";
-    return `${classesPerMonth} ${classesPerMonth === 1 ? "class" : "classes"} a month`;
+    return `${count(classesPerMonth, "class", "classes")} a month`;
 }
 
 function people(n: number): string {
-    return `${n} ${n === 1 ? "person" : "people"}`;
+    return count(n, "person", "people");
 }
 
 /**
@@ -379,7 +344,7 @@ export function olderPriceNotes(plan: Pick<Plan, "byPrice">): string[] {
         .filter((b) => !b.current)
         .map(
             (b) =>
-                `${b.count} still on ${money(b.price, b.currency)} — they keep it`,
+                `${b.count} still on ${formatMoneyMajor(b.price, b.currency)}, and they keep it`,
         );
 }
 
@@ -416,7 +381,7 @@ export function headline(
 } {
     const tz = sub.timezone;
     const tab = listTab(sub);
-    const d = (at: string) => dayText(at, tz, now);
+    const d = (at: string) => formatDate(at, tz, { now });
     const ending = tab === "active" && sub.endsAt ? sub.endsAt : null;
     const pill = ending
         ? { tone: "accent" as const, label: `Ends ${d(ending)}` }
@@ -427,7 +392,10 @@ export function headline(
         const due = sub.failedCharge?.dueAt;
         return {
             pill,
-            big: money(sub.failedCharge?.total ?? sub.price, sub.currency),
+            big: formatMoneyMajor(
+                sub.failedCharge?.total ?? sub.price,
+                sub.currency,
+            ),
             when: due ? `failed ${d(due)}` : "failed",
             line: charging
                 ? `${charging}. Nothing else can be charged until the bank answers.`
@@ -437,7 +405,7 @@ export function headline(
     if (tab === "paused") {
         return {
             pill,
-            big: "—",
+            big: absentText(),
             when: "",
             line: `${pausedLine(sub, now)} Nothing is charged while paused.`,
         };
@@ -445,7 +413,7 @@ export function headline(
     if (tab === "cancelled") {
         return {
             pill,
-            big: "—",
+            big: absentText(),
             when: "",
             line: `Cancelled. Ended ${sub.cancelledAt ? d(sub.cancelledAt) : "at the end of its period"}. Nothing more is charged.`,
         };
@@ -453,30 +421,35 @@ export function headline(
     if (ending) {
         return {
             pill,
-            big: "—",
+            big: absentText(),
             when: "",
-            line: `Ends ${d(ending)}. No more charges — what's paid for still happens.`,
+            line: `Ends ${d(ending)}. No more charges. What's paid for still happens.`,
         };
     }
     if (sub.startsAt) {
         return {
             pill,
-            big: money(sub.price, sub.currency),
+            big: formatMoneyMajor(sub.price, sub.currency),
             when: `starts ${d(sub.startsAt)}`,
             line: `Starts ${d(sub.startsAt)}. Nothing is charged before then.`,
         };
     }
     if (!sub.nextRenewalAt) {
-        return { pill, big: "—", when: "", line: "Nothing is due to renew." };
+        return {
+            pill,
+            big: absentText(),
+            when: "",
+            line: "Nothing is due to renew.",
+        };
     }
     const on = d(sub.nextRenewalAt);
     return {
         pill,
-        big: money(next.price, next.currency),
+        big: formatMoneyMajor(next.price, next.currency),
         when: on,
         line: charging
-            ? `${charging} for this period. Next: ${money(next.price, next.currency)} on ${on}`
-            : `${money(next.price, next.currency)} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
+            ? `${charging} for this period. Next: ${formatMoneyMajor(next.price, next.currency)} on ${on}`
+            : `${formatMoneyMajor(next.price, next.currency)} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
     };
 }
 
@@ -505,7 +478,7 @@ export function collectionRows(sub: Subscription, now: Date): CollectionRow[] {
                     : "Collect";
         return {
             date: c.date,
-            label: dayText(c.date, sub.timezone, now, true),
+            label: formatDate(c.date, sub.timezone, { now, weekday: "short" }),
             state,
             tone:
                 state === "On hold"
@@ -579,26 +552,26 @@ export function chargeRow(
                     : ["Void", "off"];
     const period =
         c.periodStart && c.periodEnd
-            ? `${dayText(c.periodStart, timeZone, now)} – ${dayText(
+            ? `${formatDate(c.periodStart, timeZone, { now })} to ${formatDate(
                   // The period's end is the next one's start: say the last day.
                   new Date(Date.parse(c.periodEnd) - 1).toISOString(),
                   timeZone,
-                  now,
+                  { now },
               )}`
             : "";
     const how =
         c.standing === "PAID" && c.payment
             ? `paid by ${METHOD[c.payment.method] ?? "hand"}`
             : c.standing === "OVERDUE" && c.dueAt
-              ? `due ${dayText(c.dueAt, timeZone, now)}`
+              ? `due ${formatDate(c.dueAt, timeZone, { now })}`
               : "";
     return {
         id: c.id,
-        date: dayText(c.issuedAt ?? c.createdAt, timeZone, now),
+        date: formatDate(c.issuedAt ?? c.createdAt, timeZone, { now }),
         result,
         tone,
         note: [period, how].filter(Boolean).join(" · "),
-        amount: money(c.total, c.currency),
+        amount: formatMoneyMajor(c.total, c.currency),
         number: c.number,
     };
 }
@@ -641,13 +614,13 @@ const CHECK_STATE: Record<
 > = {
     REFUNDED: "refunded",
     REFUNDING: "being refunded",
-    NOT_REFUNDED: "not refunded — refund it from your payment provider",
+    NOT_REFUNDED: "not refunded, so refund it from your payment provider",
 };
 
 function autopayCheckText(
     check: NonNullable<SubscriptionAutopay["check"]>,
 ): string {
-    return `${money(check.amount, check.currency)} check ${CHECK_STATE[check.state]}`;
+    return `${formatMoneyMajor(check.amount, check.currency)} check ${CHECK_STATE[check.state]}`;
 }
 
 function autopayStateText(autopay: SubscriptionAutopay): string {
@@ -657,16 +630,16 @@ function autopayStateText(autopay: SubscriptionAutopay): string {
     switch (autopay.state) {
         case "ON": {
             const limit = autopay.limit
-                ? ` · limit ${money(autopay.limit, autopay.currency)}`
+                ? ` · limit ${formatMoneyMajor(autopay.limit, autopay.currency)}`
                 : "";
             return `${withHow("Autopay on")}${limit}`;
         }
         case "PAUSED":
-            return `${withHow("Autopay paused")} — paused in their UPI app`;
+            return `${withHow("Autopay paused")}, paused in their UPI app`;
         case "PENDING":
-            return `${withHow("Autopay pending")} — waiting for them to approve it`;
+            return `${withHow("Autopay pending")}, waiting for them to approve it`;
         case "FAILED":
-            return `${withHow("Autopay failed")} — ${
+            return `${withHow("Autopay failed")}: ${
                 AUTOPAY_FAILED[autopay.failure ?? ""] ??
                 AUTOPAY_FAILED.NOT_APPROVED
             }`;
@@ -693,8 +666,8 @@ export function gstNote(
     if (!issued.length) return "";
     if (issued.some((c) => c.gst)) return "Each renewal makes a GST invoice.";
     return where === "list"
-        ? "Not GST-registered — renewals make receipts."
-        : "Not GST-registered — receipts, not tax invoices.";
+        ? "Not GST-registered. Renewals make receipts."
+        : "Not GST-registered. Receipts, not tax invoices.";
 }
 
 // — Changes ————————————————————————————————————————————————————
@@ -713,31 +686,20 @@ export function ranLine(
 ): { text: string; late: boolean } {
     if (!r.lastCheckedAt) {
         return {
-            text: "Renewals haven't run yet — invoices go out when they do.",
+            text: "Renewals haven't run yet. Invoices go out when they do.",
             late: true,
         };
     }
     const dueBy = Date.parse(r.nextCheckAt ?? r.lastCheckedAt);
     const late = dueBy + 5 * 60_000 < now.getTime();
-    const last = new Date(r.lastCheckedAt);
-    const key = (d: Date) =>
-        new Intl.DateTimeFormat("en-CA", { timeZone }).format(d);
-    const time = new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).format(last);
-    const day =
-        key(last) === key(now)
-            ? "Today"
-            : key(last) === key(new Date(now.getTime() - DAY))
-              ? "Yesterday"
-              : dayText(r.lastCheckedAt, timeZone, now);
+    const when = formatDateTime(r.lastCheckedAt, timeZone, {
+        now,
+        relative: true,
+    });
     return {
         text: late
-            ? `Renewals last ran ${day}, ${time} — later than it should have; renewals wait until it runs again.`
-            : `Renewals last ran ${day}, ${time}.`,
+            ? `Renewals last ran ${when}, later than it should have. Renewals wait until it runs again.`
+            : `Renewals last ran ${when}.`,
         late,
     };
 }

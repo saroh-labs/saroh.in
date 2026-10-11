@@ -15,6 +15,7 @@ import type { Catalog } from "@saroh/pricing-catalog";
 import { diff, planRows, validateCatalog } from "@saroh/pricing-catalog";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { dayWords } from "../../common/words-format";
 import {
     AdminAuditOutcome,
     AdminAuditService,
@@ -105,15 +106,6 @@ function canonical(value: unknown): string {
         return v;
     };
     return JSON.stringify(sort(value));
-}
-
-function dayWords(at: Date): string {
-    return new Intl.DateTimeFormat("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: "Asia/Kolkata",
-    }).format(at);
 }
 
 /**
@@ -535,7 +527,7 @@ export class CatalogueWritesService {
         });
         if (scheduled) {
             throw new ConflictException(
-                `Version ${scheduled.version} is scheduled for ${dayWords(scheduled.goLiveAt)}. Cancel it before publishing another.`,
+                `Version ${scheduled.version} is scheduled for ${dayWords(scheduled.goLiveAt, "Asia/Kolkata", { year: true })}. Cancel it before publishing another.`,
             );
         }
         const live = await this.liveCatalog(tx, input.now);

@@ -44,6 +44,13 @@ vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
 }));
+vi.mock("@/lib/stores/storefront-actions", () => ({
+    updateStorefront: vi.fn(),
+}));
+// The business's own sheets open from Contact and social (DEC-128).
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveOrganizationSettings: vi.fn(),
+}));
 vi.mock("@/components/sites/custom-domain", () => ({
     CustomDomain: () => null,
 }));
@@ -359,7 +366,7 @@ describe("the Title sheet", () => {
         await press(edit("Edit title"));
         type(title(), "Rye bakery");
         await press(item("Save"));
-        expect(item("Saving…")?.disabled).toBe(true);
+        expect(item("Saving…")?.getAttribute("aria-busy")).toBe("true");
         expect(item("Cancel")?.disabled).toBe(true);
         await pressEscape();
         expect(sheetName()).toBe("Title");

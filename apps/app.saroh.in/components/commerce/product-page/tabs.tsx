@@ -1,9 +1,14 @@
 import type { ProductTab } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { shownCollections } from "@/lib/products/overview-words";
+import { TabStrip } from "@saroh/ui/tabs";
 
-import type { TabItem } from "./tab-row";
-import { TabRow } from "./tab-row";
+interface TabItem {
+    id: ProductTab;
+    label: string;
+    href: string;
+    badge?: { text: string; tone: "plain" | "attention" | "danger" };
+}
 
 /**
  * The product page's views (#522): Overview · Stock · Photos · Reviews ·
@@ -113,5 +118,25 @@ export function ProductTabs({
     const tabs = all.filter(
         (t) => t.id !== "stock" || counts || active === "stock",
     );
-    return <TabRow tabs={tabs} active={active} />;
+    return (
+        <TabStrip
+            label="Product sections"
+            idPrefix="tab"
+            value={active}
+            // The page's own gutter: its header and banners carry it too.
+            listClassName="px-4 pt-1.5 sm:px-[22px]"
+            tabs={tabs.map((t) => ({
+                value: t.id,
+                label: t.label,
+                href: t.href,
+                count: t.badge?.text,
+                countTone:
+                    t.badge?.tone === "attention"
+                        ? "strong"
+                        : t.badge?.tone === "danger"
+                          ? "danger"
+                          : "neutral",
+            }))}
+        />
+    );
 }

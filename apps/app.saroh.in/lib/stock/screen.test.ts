@@ -11,7 +11,6 @@ import {
     lastChangeWords,
     moveNote,
     moveProblem,
-    noRowsWords,
     parseCountKey,
     rowSub,
     stockSubline,
@@ -81,7 +80,7 @@ describe("the Levels table", () => {
                 TZ,
                 NOW,
             ),
-        ).toBe("Counted by Arjun, today at 07:12");
+        ).toBe("Counted by Arjun, today at 7:12 am");
         expect(
             lastChangeWords(
                 {
@@ -93,7 +92,7 @@ describe("the Levels table", () => {
                 TZ,
                 NOW,
             ),
-        ).toBe("Sold, Order #1016, yesterday at 16:20");
+        ).toBe("Sold, Order #1016, yesterday at 4:20 pm");
         // A role that can't see people or orders reads the change alone.
         expect(
             lastChangeWords(
@@ -101,7 +100,7 @@ describe("the Levels table", () => {
                 TZ,
                 NOW,
             ),
-        ).toBe("Wasted, 18 Sep at 07:10");
+        ).toBe("Wasted, 18 Sep at 7:10 am");
         expect(lastChangeWords(null, TZ, NOW)).toBe("No changes logged yet");
     });
 
@@ -122,19 +121,12 @@ describe("the Levels table", () => {
         ).toBe("Rye · 3 locations count separately · every change is logged");
     });
 
-    it("words the footer and the empty table", () => {
+    it("words the footer", () => {
         expect(untrackedLine(1)).toBe(
             "1 product isn't tracked and always sells:",
         );
         expect(untrackedLine(3)).toBe(
             "3 products aren't tracked and always sell:",
-        );
-        expect(noRowsWords({ needs: true, q: "" })).toMatch(/^Nothing needs/);
-        expect(noRowsWords({ needs: false, q: "", all: true })).toMatch(
-            /^No product counts stock yet/,
-        );
-        expect(noRowsWords({ needs: false, q: "rye" })).toBe(
-            'No products match "rye".',
         );
     });
 });
@@ -213,7 +205,7 @@ describe("Move stock", () => {
             "Pick two different locations.",
         );
         expect(moveProblem({ from: hill, to: online, units: "" })).toBe(
-            "How many to move — a whole number.",
+            "How many to move, as a whole number.",
         );
         expect(moveProblem({ from: hill, to: online, units: "11" })).toBe(
             "Only 10 can be moved from Hill Road. The rest are promised to orders there.",
@@ -252,13 +244,13 @@ describe("Move stock", () => {
 describe("entries", () => {
     it("says what was recorded", () => {
         expect(entrySaved("WASTED", 2, 10)).toBe(
-            "Recorded 2 wasted — 10 on hand now.",
+            "Recorded 2 wasted. 10 on hand now.",
         );
     });
 
     it("wants a whole number, and no more waste than the shelf holds", () => {
         expect(entryProblem({ kind: "RECEIVED", units: "0", onHand: 3 })).toBe(
-            "How many — a whole number, 1 or more.",
+            "How many, as a whole number, 1 or more.",
         );
         expect(entryProblem({ kind: "WASTED", units: "4", onHand: 3 })).toBe(
             "Only 3 on the shelf to waste.",

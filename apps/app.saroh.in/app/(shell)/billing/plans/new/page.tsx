@@ -1,13 +1,16 @@
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
-import { PaymentsCrumbs } from "@/components/subscriptions/payments-crumbs";
+import { whoCanChange } from "@/components/shared/who-can-change";
+
 import { PlanEditor } from "@/components/subscriptions/plan-editor/plan-editor";
 import { membershipPlansLock } from "@/lib/billing/access";
 import { permitsFor } from "@/lib/organizations/permits";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
@@ -33,8 +36,11 @@ export default async function NewPlanPage() {
     if (organization?.actions && !may("subscription:write")) {
         return (
             <AccessDenied
-                title="You can't make plans"
-                description={`Your role in ${organization.name} can't make or change plans. An owner or admin can change that in Team.`}
+                {...whoCanChange({
+                    thing: "New plan",
+                    business: organization.name,
+                    role: knownRoleName(organization),
+                })}
                 backHref={may("subscription:read") ? PLANS_HREF : "/"}
                 backLabel={
                     may("subscription:read") ? "Back to plans" : "Back to Home"
@@ -46,15 +52,18 @@ export default async function NewPlanPage() {
     const locked = membershipPlansLock(await billingAccessOrNull());
     if (locked) {
         return (
-            <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-                <PaymentsCrumbs
-                    here="New plan"
-                    trail={[{ href: PLANS_HREF, label: "Plans" }]}
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={[
+                        "Payments",
+                        <Link key="plans" href={PLANS_HREF}>
+                            Plans
+                        </Link>,
+                        "New plan",
+                    ]}
+                    title="New plan"
                 />
-                <div className="max-w-[640px] space-y-3 px-6 pb-[26px] pt-5">
-                    <h1 className="font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em]">
-                        New plan
-                    </h1>
+                <div className="max-w-[640px] space-y-3">
                     <LimitNoticeBlock
                         full={false}
                         title={locked.title}

@@ -1,5 +1,7 @@
+import { PartialRead } from "@/components/shared/failed-read";
 import { formatInr, offeredPlans } from "@saroh/pricing-catalog";
-import { PartialNotice, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PermissionDeniedState } from "@saroh/ui/data-state";
+import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
 
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
 import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
@@ -10,6 +12,9 @@ import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { whoCanChange } from "@/components/shared/who-can-change";
+import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { planSummary, usageLine } from "@/lib/saroh-billing/plan";
 import type { Cycle } from "@/lib/saroh-billing/plan-view";
@@ -39,9 +44,13 @@ import { requireSession } from "@/lib/session";
  * be on (changed through a quote, a confirm and the payment page), add-ons,
  * a coupon, and Saroh's invoices to it.
  *
- * The owner's alone, as the design has it — the tab is offered only to
- * them (`SETTINGS_PAGES`), and this page refuses anyone else who types the
- * address. The API's own `billing:read` / `billing:manage` is the backstop.
+ * Opened by whoever the API reads it to (`billing:read`: Owner and Admin
+ * by default), and changed by the Owner alone (`billing:manage`, DEC-131
+ * amended 2026-10-11). The tab (`SETTINGS_PAGES`), this page and every plan
+ * prompt ask the same two (`lib/billing/plan-access.ts`), so none sends a
+ * person to a page that turns them away. Someone who may read but not
+ * change (an Admin) sees the plan, the plans and the invoices with no
+ * button to press, and that only the owner can.
  *
  * Reads degrade per source: the plan and access are the page (a failure is
  * the section's boundary); the price list, invoices, add-ons and checkouts
@@ -50,11 +59,7 @@ import { requireSession } from "@/lib/session";
 export const metadata = { title: "Plan and billing" };
 
 const DENIED = (
-    <PermissionDeniedState
-        title="Plan and billing is the owner's"
-        description="What Saroh charges this business, and its invoices, are kept to the owner."
-        note="Ask the owner if you need to know which plan the business is on."
-    />
+    <PermissionDeniedState {...whoCanChange({ thing: "Plan and billing" })} />
 );
 
 /** A side read: its value, or null when it couldn't be had (said on the page). */
@@ -70,10 +75,12 @@ async function settle<T>(p: Promise<T>): Promise<T | null> {
 export default async function PlanBillingPage() {
     await requireSession();
     const org = await resolveActiveOrganization();
-    const owner = org === null || org.role === "OWNER";
+    // Unknown (no business resolved) opens, and the API decides.
+    const mayOpen = org === null || mayOpenPlan(org);
+    const canChange = org === null || mayChangePlan(org);
 
     const header = <SettingsPanelHeader title="Plan and billing" />;
-    if (!owner) {
+    if (!mayOpen) {
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
 
@@ -157,25 +164,23 @@ export default async function PlanBillingPage() {
 
     const addonList = addonsView ? addonRows(addonsView) : [];
     const missing = [
-        addons === null ? "Your add-ons" : null,
-        checkouts === null
-            ? addons === null
-                ? "a plan change waiting for payment"
-                : "A plan change waiting for payment"
-            : null,
+        addons === null ? "your add-ons" : null,
+        checkouts === null ? "any plan change waiting for payment" : null,
     ].filter((m): m is string => m !== null);
-    const partial =
-        missing.length === 0
-            ? null
-            : `${missing.join(" and any ")} couldn't be read just now, so ${
-                  addons === null ? "they aren't" : "it isn't"
-              } shown here. Nothing has changed.`;
+    const partial = missing.length === 0 ? null : missing.join(" and ");
 
     return (
         <SettingsPanel header={header}>
-            <div className="grid max-w-[760px] gap-4">
-                {partial ? <PartialNotice>{partial}</PartialNotice> : null}
-                <YourPlan {...plan} />
+            <div className="grid gap-4">
+                {partial ? (
+                    <PartialRead things={partial} so={NOTHING_CHANGED} />
+                ) : null}
+                {canChange ? null : (
+                    <ReadOnlyNote className="mb-0" ownerOnly>
+                        Your role can read the plan but not change it.
+                    </ReadOnlyNote>
+                )}
+                <YourPlan {...plan} canChange={canChange} />
                 <PlanChooser
                     rows={rows}
                     yearly={yearlyOffer(catalog)}
@@ -185,7 +190,7 @@ export default async function PlanBillingPage() {
                             ? (access.plan?.name ?? "Free")
                             : (subscription?.plan.name ?? "Free")
                     }
-                    canChange
+                    canChange={canChange}
                     addons={
                         addonList.length > 0 ? (
                             <AddonsCard
@@ -196,7 +201,9 @@ export default async function PlanBillingPage() {
                                         : ""
                                 }
                                 max={addonsView?.max ?? 0}
-                                canChange={addonsView?.canBuy ?? false}
+                                canChange={
+                                    canChange && (addonsView?.canBuy ?? false)
+                                }
                             />
                         ) : null
                     }

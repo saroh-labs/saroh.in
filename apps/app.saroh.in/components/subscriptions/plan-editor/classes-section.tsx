@@ -1,20 +1,15 @@
 "use client";
 
+import { Field, FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { useId } from "react";
 
 import type { EditorFields } from "@/components/editor-shell/editor-shell";
-import {
-    FIELD,
-    LABEL,
-    Section,
-} from "@/components/services/service-editor/fields";
+import { Section } from "@/components/services/service-editor/fields";
 import { Chip } from "@/components/shared/chip";
 import type { PlanForm } from "@/lib/subscriptions/plan-editor";
 import { CLASS_CHOICES } from "@/lib/subscriptions/plan-editor";
 
-import { FieldError } from "./details-section";
 import { CHIP } from "./price-section";
 
 /**
@@ -70,10 +65,7 @@ export function ClassesSection({
                 </Chip>
             </div>
             {custom ? (
-                <>
-                    <label htmlFor={ids.n} className={cn(LABEL, "mt-2.5")}>
-                        Classes a month
-                    </label>
+                <Field label="Classes a month" className="mt-2.5 space-y-[5px]">
                     <Input
                         id={ids.n}
                         inputMode="numeric"
@@ -86,11 +78,11 @@ export function ClassesSection({
                                 classes: e.target.value.replace(/[^0-9]/g, ""),
                             })
                         }
-                        className={cn(FIELD, "w-[88px] max-w-full")}
+                        className="w-[88px] max-w-full"
                     />
-                </>
+                </Field>
             ) : null}
-            <FieldError id={ids.err} message={errors.classes} />
+            <FieldError id={ids.err}>{errors.classes}</FieldError>
         </Section>
     );
 }

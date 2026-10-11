@@ -1,20 +1,19 @@
 "use client";
 
+import { formatTime } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
-import { FailedState } from "@saroh/ui/data-state";
+import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { productHref } from "@/lib/products/links";
 import type { LogKindId } from "@/lib/stock/log";
 import {
     allStorefrontsWords,
     entryNote,
     entryQuantity,
-    entryTime,
     entryTone,
     entryWho,
     groupByDay,
@@ -24,8 +23,14 @@ import {
 } from "@/lib/stock/log";
 import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
+import { OptionSelect } from "@saroh/ui/option-select";
 
-import { chipClass, pillClass, TEXT_TONE } from "./tones";
+import { chipClass } from "@/components/shared/chip";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
+import { TextLink } from "@saroh/ui/text-link";
+import { PILL_TONE, TEXT_TONE } from "./tones";
 
 /**
  * A log entry on a phone: a wrapping row whose `order`s put the time, the
@@ -133,7 +138,7 @@ export function LogList({
                 <OptionSelect
                     size="sm"
                     aria-label="Product"
-                    className="h-[30px] w-auto min-w-[160px] max-w-[260px] rounded-[8px] text-[12.5px] coarse:h-11"
+                    className="w-auto min-w-[160px] max-w-[260px]"
                     value={filter.product}
                     options={[
                         { value: "", label: "All products" },
@@ -162,17 +167,12 @@ export function LogList({
             <div>
                 {filters}
                 <FailedState
-                    title="The stock log couldn't be loaded"
-                    description="Nothing is lost — every change is still recorded. Saroh just couldn't read the log right now."
-                    action={
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => router.refresh()}
-                        >
-                            Try again
-                        </Button>
-                    }
+                    size="panel"
+                    title={couldntLoad("the stock log")}
+                    description={nothingChanged(
+                        "Every change is still recorded.",
+                    )}
+                    onRetry={() => router.refresh()}
                 />
             </div>
         );
@@ -192,15 +192,22 @@ export function LogList({
 
     const more = () =>
         start(async () => {
-            if (!loaded.next) return;
+            const cursor = loaded.next;
             setLoadError(null);
-            const res = await loadLogPage({
-                kind: logKinds(filter.kind),
-                storefront: filter.store === "all" ? undefined : filter.store,
-                product: filter.product || undefined,
-                cursor: loaded.next,
-                limit: pageSize,
-            });
+            if (!cursor) return;
+            const res = await runAction(
+                () =>
+                    loadLogPage({
+                        kind: logKinds(filter.kind),
+                        storefront:
+                            filter.store === "all" ? undefined : filter.store,
+                        product: filter.product || undefined,
+                        cursor,
+                        limit: pageSize,
+                    }),
+                { quiet: true, onUnreached: setLoadError },
+            );
+            if (!res) return;
             if (!res.ok) {
                 setLoadError(res.error);
                 return;
@@ -228,9 +235,7 @@ export function LogList({
                         aria-label={d.label}
                         className="min-w-0"
                     >
-                        <h3 className="pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                            {d.label}
-                        </h3>
+                        <h3 className="label pb-1.5">{d.label}</h3>
                         <div className="rounded-xl border border-border bg-card min-[760px]:overflow-x-auto">
                             <ul className={cn(grid, "px-4")}>
                                 {d.rows.map((e, i) => {
@@ -248,7 +253,7 @@ export function LogList({
                                             )}
                                         >
                                             <span className="text-[12px] tabular-nums text-muted-foreground max-[759px]:order-1 max-[759px]:shrink-0">
-                                                {entryTime(
+                                                {formatTime(
                                                     e.createdAt,
                                                     timezone,
                                                 )}
@@ -260,7 +265,7 @@ export function LogList({
                                                         e.productId,
                                                         "variants",
                                                     )}
-                                                    className="font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
+                                                    className="font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
                                                 >
                                                     {e.variantTitle
                                                         ? `${e.productName} ${e.variantTitle}`
@@ -275,15 +280,15 @@ export function LogList({
                                                 </span>
                                             </span>
                                             <span className="max-[759px]:order-6">
-                                                <span
-                                                    className={pillClass(
-                                                        entryTone(e),
-                                                    )}
+                                                <StatusBadge
+                                                    tone={
+                                                        PILL_TONE[entryTone(e)]
+                                                    }
                                                 >
                                                     {e.kind === "REVERSED"
                                                         ? "Undo"
                                                         : e.word}
-                                                </span>
+                                                </StatusBadge>
                                             </span>
                                             <span
                                                 className={cn(
@@ -305,12 +310,12 @@ export function LogList({
                                                 )}
                                             >
                                                 {e.order ? (
-                                                    <Link
+                                                    <TextLink
                                                         href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
-                                                        className="text-brand transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
+                                                        className="max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
                                                     >
                                                         {who}
-                                                    </Link>
+                                                    </TextLink>
                                                 ) : who ? (
                                                     <span className="text-foreground/80">
                                                         {who}
@@ -328,13 +333,28 @@ export function LogList({
                     </section>
                 ))}
                 {days.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border-strong px-4 py-7 text-center text-[13px] text-muted-foreground">
-                        {filter.kind === "all" &&
-                        filter.store === "all" &&
-                        !filter.product
-                            ? "No stock changes yet. Counts, sales, deliveries and moves show here as they happen."
-                            : "Nothing matches these filters."}
-                    </div>
+                    filter.kind === "all" &&
+                    filter.store === "all" &&
+                    !filter.product ? (
+                        <EmptyState
+                            size="panel"
+                            title="No stock changes yet"
+                            description="Counts, sales, deliveries and moves show here as they happen."
+                        />
+                    ) : (
+                        <EmptyState
+                            kind="no-results"
+                            size="panel"
+                            things="stock changes"
+                            cause="filters"
+                            title="No stock changes match these filters"
+                            clearHref={href({
+                                kind: undefined,
+                                store: undefined,
+                                product: undefined,
+                            })}
+                        />
+                    )
                 ) : null}
             </div>
             {loaded.next ? (
@@ -343,10 +363,11 @@ export function LogList({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pending}
                         onClick={more}
+                        busy={pending}
+                        busyLabel="Loading…"
                     >
-                        {pending ? "Loading…" : "Show older"}
+                        Show older
                     </Button>
                     {loadError ? (
                         <span

@@ -47,7 +47,7 @@ type Phase =
 export type OnlineStarted = CheckoutStarted & { payment: PaymentHandoff };
 
 /**
- * An order placed to be paid at the handover ("Pay when you collect", "Pay
+ * An order placed to be paid at the handover ("Pay at pick-up", "Pay
  * on delivery"): nothing to pay now, so the sheet says it is placed and
  * still to be paid, and leads to its confirmation page.
  */
@@ -62,7 +62,7 @@ export function OrderPlacedToPay({
     businessName: string;
     /** "Sold by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
-    /** "Pay when you collect" or "Pay on delivery", as the bag offered it. */
+    /** "Pay at pick-up" or "Pay on delivery", as the bag offered it. */
     toPay: string;
     onClose: () => void;
 }) {
@@ -257,7 +257,7 @@ export function CheckoutPay({
                       title: "Your money is on its way back",
                       lead:
                           s.message ??
-                          "Sorry, it sold out while you were paying — your money is on its way back.",
+                          "Sorry, it sold out while you were paying. Your money is on its way back.",
                   }
                 : s.state === "refunding"
                   ? {
@@ -289,7 +289,7 @@ export function CheckoutPay({
                 title="Confirming your payment"
                 lead={
                     phase.tries >= STANDING_POLL_TRIES
-                        ? `This is taking longer than usual. You can close this — ${businessName} gets your order as soon as the payment is confirmed.`
+                        ? `This is taking longer than usual. You can close this. ${businessName} gets your order as soon as the payment is confirmed.`
                         : "Hold on a moment while we confirm it with the payment provider."
                 }
                 onClose={onClose}
@@ -304,7 +304,7 @@ export function CheckoutPay({
     const status = phase.status;
     const problem =
         status === "failed"
-            ? "The payment didn't go through. Nothing was taken — try again."
+            ? "The payment didn't go through. Nothing was taken. Try again."
             : status === "unavailable"
               ? "We couldn't open the payment window. Try again in a moment."
               : status === "closed"

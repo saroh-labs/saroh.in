@@ -84,20 +84,20 @@ describe("usageLine", () => {
                 comingUp: 1,
             }),
         ).toBe(
-            "Staff only — not on the booking page · 0 booked this week · 1 still to come",
+            "Staff only, not on the booking page · 0 booked this week · 1 still to come",
         );
     });
 
     it("says a paused service keeps its bookings", () => {
         const paused = card({ status: "ARCHIVED" });
         expect(usageLine(paused, { thisWeek: 0, comingUp: 0 })).toBe(
-            "Paused — hidden from the booking page",
+            "Paused, hidden from the booking page",
         );
         expect(usageLine(paused, { thisWeek: 0, comingUp: 1 })).toBe(
-            "Paused — hidden from the booking page; its 1 booking still to come still happens",
+            "Paused, hidden from the booking page. Its 1 booking still to come still happens",
         );
         expect(usageLine(paused, { thisWeek: 0, comingUp: 2 })).toContain(
-            "its 2 bookings still to come still happen",
+            "Its 2 bookings still to come still happen",
         );
     });
 });
@@ -107,7 +107,7 @@ describe("the Stop / Take bookings again switch", () => {
         expect(takingLabel(true)).toBe("Stop taking bookings");
         expect(takingLabel(false)).toBe("Take bookings again");
         expect(takingToast("Yoga", true)).toBe(
-            "Yoga paused. It's off the booking page; bookings already made still happen.",
+            "Yoga paused. It's off the booking page. Bookings already made still happen.",
         );
         expect(takingToast("Yoga", false)).toBe("Yoga is bookable again.");
     });

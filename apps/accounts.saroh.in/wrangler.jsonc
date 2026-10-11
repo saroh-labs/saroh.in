@@ -74,9 +74,11 @@
             ],
             // Until early access opens (17 Oct), accounts.saroh.in admits
             // only browsers holding the prelaunch key (withDevAccess, the
-            // GitHub secret PRELAUNCH_ACCESS_KEY); anyone else lands on
-            // www.saroh.in. "off" here, and the next deploy takes the key
-            // off the Worker and opens it.
+            // GitHub secret PRELAUNCH_ACCESS_KEY); anyone else lands on the
+            // waitlist page (DEV_REDIRECT_PATH), which says when Saroh
+            // opens and takes their email, rather than on the marketing
+            // home with no word of why. "off" here, and the next deploy
+            // takes the key off the Worker and opens it.
             "vars": {
                 "VERCEL_ENV": "production",
                 "NEXT_PUBLIC_VERCEL_ENV": "production",
@@ -88,7 +90,7 @@
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "PRELAUNCH_GATE": "on",
                 "DEV_REDIRECT_ORIGIN": "https://www.saroh.in",
-                "DEV_REDIRECT_PATH": "/",
+                "DEV_REDIRECT_PATH": "/waitlist",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
                 "NEXT_PUBLIC_APP_URL": "https://app.saroh.in",
                 "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.in",

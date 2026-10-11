@@ -1,8 +1,12 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { PageSections, SiteTheme } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -10,11 +14,13 @@ import { useState } from "react";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import { env } from "@/env";
+import { runAction } from "@/lib/api/run-action";
 import { createComment } from "@/lib/sites/actions";
-import { shortDate } from "@/lib/sites/format-date";
 import type { ReviewableSection, SiteCommentView } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Field } from "@saroh/ui/field";
 
 /**
  * The class this reader's tokens are scoped to. A literal, for the same reason
@@ -91,10 +97,11 @@ export function SectionReview({
 
     if (sections.length === 0) {
         return (
-            <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                This page has no sections yet. There is nothing to read here
-                until someone adds one.
-            </p>
+            <EmptyState
+                size="panel"
+                title="No sections yet"
+                description="There is nothing to read here until someone adds one."
+            />
         );
     }
 
@@ -191,14 +198,17 @@ function SectionSlot({
         e.preventDefault();
         const text = body.trim();
         if (text.length === 0) return;
-        setSaving(true);
-        const res = await createComment(siteId, {
-            pageId,
-            sectionKey: section.key,
-            body: text,
-            ...(testReleaseId ? { testReleaseId } : {}),
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                createComment(siteId, {
+                    pageId,
+                    sectionKey: section.key,
+                    body: text,
+                    ...(testReleaseId ? { testReleaseId } : {}),
+                }),
+            { setBusy: setSaving },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -248,7 +258,7 @@ function SectionSlot({
                     ) : null}
                     {openNotes > 0 ? (
                         <span className="rounded bg-background/90 px-2 py-1 text-xs shadow-sm">
-                            {openNotes === 1 ? "1 note" : `${openNotes} notes`}
+                            {count(openNotes, "note")}
                         </span>
                     ) : null}
                     <Button
@@ -262,7 +272,7 @@ function SectionSlot({
                          * not using a mouse.
                          */
                         className={cn(
-                            "pointer-events-auto opacity-0 shadow-sm transition-opacity focus-visible:opacity-100 group-hover:opacity-100",
+                            "pointer-events-auto opacity-0 shadow-sm transition-opacity duration-fast focus-visible:opacity-100 group-hover:opacity-100",
                             open && "opacity-100",
                         )}
                         aria-expanded={open}
@@ -294,7 +304,7 @@ function SectionSlot({
                                             {note.author.name}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground">
-                                            {shortDate(note.createdAt, zone)}
+                                            {formatDate(note.createdAt, zone)}
                                             {note.resolvedAt === null
                                                 ? ""
                                                 : " · settled"}
@@ -308,33 +318,42 @@ function SectionSlot({
                         </ul>
                     ) : null}
 
-                    <form onSubmit={submit} className="grid gap-2">
-                        <label
-                            htmlFor={`note-${section.key}`}
-                            className="text-xs font-medium"
+                    <form
+                        onKeyDown={submitOnModEnter}
+                        onSubmit={submit}
+                        className="grid gap-2"
+                    >
+                        <Field
+                            holdsData
+                            label={
+                                <>
+                                    Your note about{" "}
+                                    {section.label ??
+                                        SECTION_NAME[section.type] ??
+                                        "this section"}
+                                </>
+                            }
                         >
-                            Your note about{" "}
-                            {section.label ??
-                                SECTION_NAME[section.type] ??
-                                "this section"}
-                        </label>
-                        <textarea
-                            id={`note-${section.key}`}
-                            autoFocus
-                            rows={3}
-                            value={body}
-                            onChange={(e) => setBody(e.target.value)}
-                            disabled={saving}
-                            placeholder="What should change here?"
-                            className="w-full rounded-md border border-input bg-background p-2 text-sm"
-                        />
+                            <Textarea
+                                id={`note-${section.key}`}
+                                autoFocus
+                                rows={3}
+                                value={body}
+                                onChange={(e) => setBody(e.target.value)}
+                                disabled={saving}
+                                placeholder="What should change here?"
+                                className="w-full"
+                            />
+                        </Field>
                         <div className="flex gap-2">
                             <Button
                                 type="submit"
                                 size="sm"
-                                disabled={saving || body.trim().length === 0}
+                                disabled={body.trim().length === 0}
+                                busy={saving}
+                                busyLabel="Adding…"
                             >
-                                {saving ? "Adding…" : "Add note"}
+                                Add note
                             </Button>
                             <Button
                                 type="button"

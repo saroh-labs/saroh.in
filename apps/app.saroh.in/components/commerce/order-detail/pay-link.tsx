@@ -1,29 +1,24 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, Link2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { reportFailure } from "@/components/billing/plan-refusal";
+import {
+    refusedResult,
+    reportFailure,
+} from "@/components/billing/plan-refusal";
 import { QrButton } from "@/components/qr/qr-button";
 import { BusinessDate } from "@/components/shared/business-zone";
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { makeOrderPayLink } from "@/lib/orders/actions";
+import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 
-import { actionClass } from "./parts";
-
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
+import { runAction } from "@/lib/api/run-action";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 
 /**
  * An order's pay link (B11), as the invoice's: the address is shown once,
@@ -53,23 +48,32 @@ export function usePayLink({
     const [confirming, setConfirming] = useState(false);
     const [busy, startTransition] = useTransition();
 
+    const made = async (address: string) => {
+        setUrl(address);
+        showSuccess(
+            (await copyText(address))
+                ? `Pay link copied. Send it to ${first}.`
+                : `Pay link ready. Copy it from ${shownIn}.`,
+            "Nothing is sent by Saroh. The order shows paid once they pay.",
+        );
+        router.refresh();
+    };
     const make = () => {
-        setConfirming(false);
         startTransition(async () => {
-            const res = await makeOrderPayLink(orderId);
+            const res = await runAction(() => makeOrderPayLink(orderId));
+            if (!res) return;
             if (!res.ok) {
                 reportFailure(res);
                 return;
             }
-            setUrl(res.data.url);
-            showSuccess(
-                (await copy(res.data.url))
-                    ? `Pay link copied. Send it to ${first}.`
-                    : `Pay link ready. Copy it from ${shownIn}.`,
-                "Nothing is sent by Saroh — the order shows paid once they pay.",
-            );
-            router.refresh();
+            await made(res.data.url);
         });
+    };
+    /** From the confirm, which waits and stays open on a refusal. */
+    const replaceNow = async (): Promise<ConfirmResult> => {
+        const res = await makeOrderPayLink(orderId);
+        if (!res.ok) return refusedResult(res);
+        await made(res.data.url);
     };
 
     /** Make one, or — with one already out — ask before replacing it. */
@@ -77,10 +81,10 @@ export function usePayLink({
         if (madeAt && !url) setConfirming(true);
         else if (!url) make();
         else
-            void copy(url).then((ok) =>
+            void copyText(url).then((ok) =>
                 ok
                     ? showSuccess("Pay link copied.")
-                    : showError("Couldn't copy. Select the link and copy it."),
+                    : showError(copyFailedMessage()),
             );
     };
 
@@ -89,11 +93,12 @@ export function usePayLink({
             open={confirming}
             onOpenChange={setConfirming}
             icon={Link2}
+            tone="neutral"
             title="Make a new pay link?"
-            description={`The link you sent before stops working straight away. Send ${first} the new one.`}
+            description={`The link you sent before stops working straight away. Send ${first} the new one. This cannot be undone.`}
             confirmLabel="Make a new link"
-            cancelLabel="Keep the old one"
-            onConfirm={make}
+            keepLabel="Keep the old link"
+            onConfirm={replaceNow}
         />
     );
 
@@ -121,17 +126,12 @@ export function PayLinkBlock({
 }) {
     if (!ready) {
         return (
-            <p className="mt-2 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                Connect a payment provider to send a pay link.{" "}
-                {canManage ? (
-                    <Link
-                        href="/settings/providers"
-                        className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
-                    >
-                        Connect one
-                    </Link>
-                ) : null}
-            </p>
+            <ProviderDisconnectedState
+                size="inline"
+                provider="payment"
+                canConnect={canManage}
+                className="mt-2"
+            />
         );
     }
     if (link.url) {
@@ -162,8 +162,8 @@ export function PayLinkBlock({
                     />
                 </div>
                 <p className="mt-1.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground">
-                    Shown this once — copy it now. Saroh doesn&apos;t send it;
-                    the order shows paid once they pay.
+                    Shown this once, so copy it now. Saroh doesn&apos;t send it.
+                    The order shows paid once they pay.
                 </p>
             </div>
         );
@@ -177,7 +177,6 @@ export function PayLinkBlock({
                 <Button
                     type="button"
                     variant="outline"
-                    className={actionClass("ghost")}
                     disabled={link.busy}
                     onClick={link.replace}
                 >
@@ -190,11 +189,12 @@ export function PayLinkBlock({
         <Button
             type="button"
             variant="outline"
-            className={cn(actionClass("ghost"), "mt-2")}
-            disabled={link.busy}
+            className="mt-2"
             onClick={link.ask}
+            busy={link.busy}
+            busyLabel="Making…"
         >
-            {link.busy ? "Making a link…" : "Make a pay link"}
+            Make a pay link
         </Button>
     );
 }

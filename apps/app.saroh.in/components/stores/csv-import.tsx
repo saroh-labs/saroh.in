@@ -1,9 +1,12 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Label } from "@saroh/ui/label";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import {
     Select,
     SelectContent,
@@ -17,6 +20,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { PlanWay } from "@/components/billing/plan-way";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { runAction } from "@/lib/api/run-action";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { importRoom } from "@/lib/billing/meter";
 import { applyImport, previewImport } from "@/lib/imports/actions";
@@ -28,6 +34,7 @@ import type {
     PreviewResult,
     RowIssue,
 } from "@/lib/imports/service";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * CSV import (#175) — pick a file, check the mapping, see what will happen,
@@ -135,6 +142,11 @@ export function CsvImport({
     const [error, setError] = useState<string | null>(null);
     const [fileIssues, setFileIssues] = useState<RowIssue[]>([]);
     const [pending, startTransition] = useTransition();
+    // A file checked and its columns matched, and nothing written yet.
+    const guard = useLeaveGuard({
+        dirty: phase === "review",
+        lost: `Nothing from ${fileName || "the file"} is imported yet, and the columns you matched will be lost.`,
+    });
 
     const runPreview = useCallback(
         (
@@ -143,11 +155,14 @@ export function CsvImport({
             next: DuplicatePolicy,
         ) => {
             startTransition(async () => {
-                const res = await previewImport(storeId, descriptor.entity, {
-                    csv: text,
-                    mapping: nextMapping,
-                    policy: next,
-                });
+                const res = await runAction(() =>
+                    previewImport(storeId, descriptor.entity, {
+                        csv: text,
+                        mapping: nextMapping,
+                        policy: next,
+                    }),
+                );
+                if (!res) return;
                 if (!res.ok) {
                     setError(res.error);
                     setPreview(null);
@@ -196,12 +211,15 @@ export function CsvImport({
 
     function onImport(createAtMost?: number) {
         startTransition(async () => {
-            const res = await applyImport(storeId, descriptor.entity, {
-                csv,
-                mapping,
-                policy,
-                ...(createAtMost === undefined ? {} : { createAtMost }),
-            });
+            const res = await runAction(() =>
+                applyImport(storeId, descriptor.entity, {
+                    csv,
+                    mapping,
+                    policy,
+                    ...(createAtMost === undefined ? {} : { createAtMost }),
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 // More rows than the plan's products limit (U13): its notice.
                 if (res.plan) showPlanRefusal(res.plan);
@@ -213,7 +231,7 @@ export function CsvImport({
             setResult(res.data);
             setPhase("done");
             showSuccess(
-                `Imported ${res.data.created + res.data.updated} ${descriptor.entity}`,
+                `Imported ${res.data.created + res.data.updated} ${descriptor.entity}.`,
             );
             router.refresh();
         });
@@ -285,10 +303,9 @@ export function CsvImport({
                     {result.failed > 0 ? (
                         <div className="space-y-2">
                             <p className="text-sm font-medium">
-                                {result.failed} row
-                                {result.failed === 1 ? "" : "s"} could not be
+                                {count(result.failed, "row")} could not be
                                 imported. Fix these in your file and import it
-                                again — rows that already succeeded will be
+                                again. Rows that already succeeded will be
                                 skipped or updated, not duplicated.
                             </p>
                             <IssueList
@@ -342,7 +359,7 @@ export function CsvImport({
                     {fileName ? (
                         <p className="text-sm text-muted-foreground">
                             {fileName}
-                            {plan ? ` — ${plan.totalRows} rows` : ""}
+                            {plan ? ` · ${plan.totalRows} rows` : ""}
                         </p>
                     ) : null}
                 </CardContent>
@@ -522,7 +539,7 @@ export function CsvImport({
                                         Rows that will not be imported
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                        The rest can still be imported — fix
+                                        The rest can still be imported. Fix
                                         these and run the file again.
                                     </p>
                                     <IssueList
@@ -534,35 +551,38 @@ export function CsvImport({
                             ) : null}
 
                             {room?.over && meter ? (
-                                <div
-                                    role="status"
-                                    className="flex flex-wrap items-center gap-3 rounded-[10px] border border-brand-300 bg-brand-subtle px-3.5 py-3 dark:border-brand-700"
-                                >
-                                    <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
-                                        {room.words}{" "}
-                                        {room.fits > 0
-                                            ? `Import the first ${room.fits}, or upgrade for more.`
-                                            : "Upgrade to bring them in."}
-                                    </p>
-                                    <Button asChild variant="outline" size="sm">
-                                        <Link href={meter.href}>
-                                            {meter.upgradeTo
-                                                ? `Upgrade to ${meter.upgradeTo}`
-                                                : "See plans"}
-                                        </Link>
-                                    </Button>
-                                </div>
+                                <Notice tone="info">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
+                                            {room.words}{" "}
+                                            {room.fits > 0
+                                                ? `Import the first ${room.fits}, or upgrade for more.`
+                                                : "Upgrade to bring them in."}
+                                        </p>
+                                        <PlanWay className="text-foreground/80">
+                                            <Button
+                                                asChild
+                                                variant="outline"
+                                                size="sm"
+                                            >
+                                                <Link href={meter.href}>
+                                                    {planLabel(meter.upgradeTo)}
+                                                </Link>
+                                            </Button>
+                                        </PlanWay>
+                                    </div>
+                                </Notice>
                             ) : null}
 
                             <div className="flex flex-wrap items-center gap-3 border-t pt-5">
                                 <Button
                                     variant="brand"
                                     onClick={() => onImport(fits ?? undefined)}
-                                    disabled={pending || willWrite === 0}
+                                    disabled={willWrite === 0}
+                                    busy={pending}
+                                    busyLabel="Importing…"
                                 >
-                                    {pending
-                                        ? "Working…"
-                                        : `Import ${willWrite} row${willWrite === 1 ? "" : "s"}`}
+                                    {`Import ${count(willWrite, "row")}`}
                                 </Button>
                                 <Button
                                     variant="outline"
@@ -572,15 +592,17 @@ export function CsvImport({
                                     Choose a different file
                                 </Button>
                                 {willWrite === 0 && !pending ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Nothing to import yet.
-                                    </p>
+                                    <EmptyState
+                                        size="inline"
+                                        title="Nothing to import yet"
+                                    />
                                 ) : null}
                             </div>
                         </CardContent>
                     </Card>
                 </>
             ) : null}
+            {guard.dialog}
         </div>
     );
 }

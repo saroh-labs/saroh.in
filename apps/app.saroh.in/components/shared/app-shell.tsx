@@ -4,30 +4,33 @@ import { cookies, headers } from "next/headers";
 import { PausedBanner } from "@/components/billing/paused-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
+import { PlanAccessProvider } from "@/components/billing/plan-way";
 import { ClosingBanner } from "@/components/organizations/closing-banner";
-import { AccessDenied } from "@/components/shared/access-denied";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
+import { JoinedNotice } from "@/components/shared/joined-notice";
+import { LiveRefresh } from "@/components/shared/live-refresh";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { navCan, NOTIFICATIONS_NAV } from "@/components/shared/nav-items";
 import {
     lockedNavHrefs,
     planLockedModuleKeys,
 } from "@/components/shared/nav-locks";
+import { PageContainer } from "@/components/shared/page-container";
 import { TabBar } from "@/components/shared/tab-bar";
 import {
     recordingSwitchedOn,
     UsageRecording,
 } from "@/components/shared/usage-recording";
 import { accountsUrl } from "@/lib/accounts";
+import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
-import { MEMBER_PAUSED_BODY } from "@/lib/organizations/choose";
 import { closingOrNull } from "@/lib/organizations/closing-service";
 import {
     listOrganizations,
@@ -38,6 +41,8 @@ import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
 import { usageSharingOrNull } from "@/lib/usage-sharing/service";
+import { Button } from "@saroh/ui/button";
+import { PausedState } from "@saroh/ui/data-state";
 
 /**
  * The authenticated app shell, rendered once in the root layout. It is the
@@ -73,18 +78,28 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
     // Every business they're in has paused their access (#800): the API
     // would refuse each read, so say why once instead of a page of denials.
+    // Paused, not denied: no role changed, and the way back is the plan.
     if (activeOrg?.paused) {
         return (
             <div className="flex min-h-screen flex-col">
                 <AppHeader onboarding user={session.user} />
                 <main id="main-content" className="flex-1">
-                    <AccessDenied
-                        title={`Your access to ${activeOrg.name} is paused`}
-                        description={MEMBER_PAUSED_BODY}
-                        note={null}
-                        backHref={`${accountsUrl}/apps`}
-                        backLabel="Your businesses"
-                    />
+                    <PageContainer>
+                        <PausedState
+                            business={activeOrg.name}
+                            action={
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="wk-press"
+                                >
+                                    <a href={`${accountsUrl}/apps`}>
+                                        Your businesses
+                                    </a>
+                                </Button>
+                            }
+                        />
+                    </PageContainer>
                 </main>
             </div>
         );
@@ -218,7 +233,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const roleKey = activeOrg?.roleKey ?? null;
 
     return (
-        <div className="flex min-h-screen flex-col">
+        <ShellFrame canChangePlan={mayChangePlan(activeOrg)}>
             {/*
              * Without this, reaching the page content by keyboard means tabbing
              * through the wordmark, search, every nav item, the org switcher,
@@ -227,7 +242,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              */}
             <a
                 href="#main-content"
-                className="sr-only bg-background text-foreground focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                className="sr-only bg-background text-foreground outline-none focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
                 Skip to content
             </a>
@@ -238,12 +253,26 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              * both (#313). It comes off the resolved active organization, so
              * switching workspaces changes it with everything else.
              */}
+            {/*
+             * The page reads again by itself, the unread count sits in the
+             * tab's title, and "signed out" gets its Sign in button (10 Oct
+             * 2026). Draws nothing.
+             */}
+            <LiveRefresh
+                unread={
+                    navCan({ role, actions }, NOTIFICATIONS_NAV.action)
+                        ? unread
+                        : null
+                }
+            />
             <CommandMenu
                 moduleKeys={moduleKeys}
                 role={role}
                 roleKey={roleKey}
                 actions={actions}
                 kind={activeOrg?.kind}
+                // What was opened in this business, not in another.
+                recentsScope={activeOrg?.id ?? ""}
                 sites={navSites}
                 stockTracked={stockTracked}
                 storefronts={storefronts}
@@ -324,6 +353,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                             <PlanEndingBanner ending={billing?.planEnding} />
                             {/* What a lower plan paused, or will (#800). */}
                             <PausedBanner view={paused} />
+                            {/* Just accepted an invitation: which business
+                                this is and what their role opens, once. */}
+                            <JoinedNotice />
                             {children}
                         </BusinessZoneProvider>
                     </div>
@@ -343,6 +375,26 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 storefronts={storefronts?.used ?? null}
                 kind={activeOrg?.kind ?? null}
             />
-        </div>
+        </ShellFrame>
+    );
+}
+
+/**
+ * The shell's outer box, which also says once whether this person may
+ * change the plan (`billing:manage`): every plan prompt under it offers the
+ * way to another plan to someone who may, and says who can to anyone else
+ * (`PlanWay`).
+ */
+function ShellFrame({
+    canChangePlan,
+    children,
+}: {
+    canChangePlan: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <PlanAccessProvider canChangePlan={canChangePlan}>
+            <div className="flex min-h-screen flex-col">{children}</div>
+        </PlanAccessProvider>
     );
 }

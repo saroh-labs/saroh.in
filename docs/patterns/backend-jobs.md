@@ -39,6 +39,18 @@
   `WHERE id = … AND status = 'PROCESSING' AND lockedBy = <worker>` and report
   whether they won; a new write to a claimed `Job` carries the same condition.
   Reclaim is anchored on `lockedAt` (the claim), never `createdAt`.
+- **Current** (10 Oct 2026) — **Every inbox notice names what it opens.**
+  A `Notification` is written with `noticeOf(type, target)`
+  (`notifications/notice-target.ts`), which makes the target required for
+  the type: an order's notice sets `orderId`, a booking's `bookingId`, a
+  failed payment's `invoiceId`, the website's `siteId`, and a notice about
+  a place (the team, the plan, the providers) sets none. `tellTeam` writes
+  what a worded alert carries through `noticeHeadOf`, which throws for a
+  type that isn't listed or a record that is missing, so the job fails
+  loudly instead of writing a row that opens nothing. A new notice type
+  adds its line to `NOTICE_KINDS`, and the app's `lib/notifications/href.ts`
+  its address when the kind is new. `notice-target.spec.ts` reads the
+  source and fails a `notification.create` that goes round it.
 - **Current** — **A job that does two independent things is two jobs.** An
   enquiry enqueues `enquiry.notify` and `automation.run` separately.
 - **Adopted** — **Never enqueue a job the handler will no-op on.** A
@@ -542,7 +554,10 @@ the Privacy Policy states both.
   publish, restore and go-live), a web-address change, a post published,
   unpublished or deleted, trackers saved or switched by Saroh, the business
   logo set or removed (it is the icon of a site with none of its own,
-  DEC-121), and the catalogue. **Stock is heard at its locks:** every flow that changes a
+  DEC-124), how the business is reached (its phone, contact email, social
+  links, the registered address, its choice or its map link, and a
+  location's name, address, map link, hours or kind: the footer reads them live, DEC-128; cause
+  `contact`, `enqueueBusinessSitesRevalidation`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
   stock row or how a product counts takes `lockStockLevels`, `lockProduct`
   or `lockProducts` (`products/stock-levels.ts`, the lock order), and those
   queue on the same transaction, once per row or product per transaction.

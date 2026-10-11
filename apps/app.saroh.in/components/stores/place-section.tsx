@@ -15,6 +15,7 @@ import { LOCATION_SECTIONS } from "@/lib/stores/location-readiness";
 import { hoursSummary } from "@/lib/stores/opening-hours-summary";
 import type { PlaceSheet } from "@/lib/stores/place-rows";
 import {
+    ABOUT_SHEETS,
     addressLine,
     KIND_ANSWER,
     KIND_FOLLOWS,
@@ -22,8 +23,9 @@ import {
     placeEditId,
 } from "@/lib/stores/place-rows";
 
+import { Notice } from "@saroh/ui/notice";
 import { LocationDetailsSheet } from "./location-details-sheet";
-import type { SectionProps } from "./location-save";
+import type { Saver, SectionProps } from "./location-save";
 import {
     PlaceAddressSheet,
     PlaceHoursSheet,
@@ -50,15 +52,31 @@ import type { PlaceSheets } from "./use-place-sheets";
 export function PlaceSection({
     store,
     canEdit,
+    canEditAbout = false,
     pending,
     save,
     setStore,
     details,
     sheets,
+    rename,
+    canUploadLogo = true,
 }: SectionProps & {
     /** Left out when they couldn't be read: then there is no row. */
     details?: LocationDetails;
     sheets: PlaceSheets;
+    /**
+     * Saves the name through the location's own route, with the
+     * description it also writes, for someone who can't reach the
+     * business's settings route (`canEditAbout`).
+     */
+    rename?: (
+        name: string,
+        description: string | null,
+        said: string,
+        onSaved?: () => void,
+    ) => void;
+    /** May add an image to the library (`media:write`). */
+    canUploadLogo?: boolean;
 }) {
     const router = useRouter();
     // What the description and logo's sheet last saved, until the page has
@@ -79,14 +97,18 @@ export function PlaceSection({
         if (!ways) return;
         const next = ways.filter((t) => t !== "PICKUP");
         setStore((s) => ({ ...s, fulfilmentTypes: next }));
-        save({ fulfilmentTypes: next }, "Pick-up turned off", () =>
+        save({ fulfilmentTypes: next }, "Pick-up turned off.", () =>
             setStore((s) => ({ ...s, fulfilmentTypes: ways })),
         );
     };
 
+    // The location's own route saves the description with the name, so
+    // only with the description read is it offered.
+    const aboutOk = canEditAbout && Boolean(about) && Boolean(rename);
+
     /** A row's one action; `name` says what it edits to a screen reader. */
     const edit = (sheet: PlaceSheet, label: string, name?: string) =>
-        canEdit ? (
+        canEdit || (aboutOk && ABOUT_SHEETS.includes(sheet)) ? (
             <Button
                 id={placeEditId(sheet)}
                 size="sm"
@@ -100,7 +122,19 @@ export function PlaceSection({
             </Button>
         ) : null;
 
-    const editing = canEdit ? sheets.editing : null;
+    const editing = canEdit || aboutOk ? sheets.editing : null;
+    // Someone the business's settings route refuses saves the name through
+    // the location's own, which writes the description with it.
+    const saveName: Saver =
+        canEdit || !rename
+            ? save
+            : (input, said, _onFail, _inline, onSaved) =>
+                  rename(
+                      input.name ?? store.name,
+                      about?.description ?? null,
+                      said,
+                      onSaved,
+                  );
     const shared = {
         store,
         pending,
@@ -146,24 +180,23 @@ export function PlaceSection({
                         // No counter, but Pick-up still on (just switched,
                         // or saved that way before): the way out, right
                         // here.
-                        <div
-                            role="status"
-                            className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted px-3 py-2.5 text-[12.5px] leading-[1.5]"
-                        >
-                            <span className="min-w-0 flex-[1_1_220px]">
-                                Pick-up is still on, but with no counter nobody
-                                can collect from here.
-                            </span>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={pending}
-                                onClick={turnPickupOff}
-                            >
-                                Turn Pick-up off
-                            </Button>
-                        </div>
+                        <Notice role="status" className="mt-2">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                                <span className="min-w-0 flex-[1_1_220px]">
+                                    Pick-up is still on, but with no counter
+                                    nobody can collect from here.
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={pending}
+                                    onClick={turnPickupOff}
+                                >
+                                    Turn Pick-up off
+                                </Button>
+                            </div>
+                        </Notice>
                     ) : null}
                 </Row>
                 {/* Only a place customers visit has a door: where it is
@@ -184,6 +217,14 @@ export function PlaceSection({
                         >
                             {address ?? <Absent>No address yet</Absent>}
                         </span>
+                        {address && store.mapUrl ? (
+                            <span
+                                data-testid="location-map-link-summary"
+                                className="block text-[12.5px] text-muted-foreground"
+                            >
+                                Get directions opens your Google Maps link
+                            </span>
+                        ) : null}
                     </Row>
                 ) : null}
                 {shop ? (
@@ -246,7 +287,11 @@ export function PlaceSection({
 
             {/* The open sheet, a fresh draft each time it opens. */}
             {editing?.which === "name" ? (
-                <PlaceNameSheet key={editing.opened} {...shared} />
+                <PlaceNameSheet
+                    key={editing.opened}
+                    {...shared}
+                    save={saveName}
+                />
             ) : null}
             {editing?.which === "kind" ? (
                 <PlaceKindSheet
@@ -280,6 +325,7 @@ export function PlaceSection({
                     storeId={store.id}
                     name={store.name}
                     details={about}
+                    canUploadLogo={canUploadLogo}
                     open={shared.open}
                     onClose={sheets.close}
                     onSaved={(next) => {

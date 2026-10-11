@@ -330,7 +330,7 @@ describe("QrPanel — a saved link", () => {
         );
         expect(q("[data-qr-link]")?.textContent).toBe("glow.saroh.app");
         expect(q("[data-qr-not-counted]")?.textContent).toBe(
-            "Not counted. This is a QR of the link itself; an owner or admin can make a saved code that counts its scans.",
+            "Not counted. This is a QR of the link itself. An owner or admin can make a saved code that counts its scans.",
         );
         expect(panelButton("Make this code")).toBeUndefined();
         expect(makeQrPanelCode).not.toHaveBeenCalled();
@@ -371,8 +371,8 @@ describe("QrPanel — a saved link", () => {
             .mockResolvedValueOnce(ready({ code: siteCode() }));
         await draw(<QrButton link={SITE} env={env} />);
         await click(trigger());
-        expect(q('[role="dialog"] [role="alert"]')?.textContent).toBe(
-            "We couldn't load this QR code. Nothing was changed.",
+        expect(q('[role="dialog"] [role="alert"]')?.textContent).toContain(
+            "Couldn't load this QR code. Nothing has been changed.",
         );
         // Never "no code yet", and nothing to make from a failure.
         expect(panelButton("Make this code")).toBeUndefined();

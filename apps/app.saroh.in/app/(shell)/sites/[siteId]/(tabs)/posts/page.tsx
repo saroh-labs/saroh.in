@@ -33,7 +33,7 @@ function postPill(post: Post): {
     if (post.status === "ARCHIVED") {
         return { label: "Archived", variant: "neutral" };
     }
-    if (post.live) return { label: "Published", variant: "success" };
+    if (post.live) return { label: "Live", variant: "success" };
     if (post.status === "DRAFT") return { label: "Draft", variant: "draft" };
     return { label: "Not live", variant: "warning" };
 }
@@ -72,13 +72,11 @@ export default async function SitePostsPage({
             <EmptyState
                 icon={<NotebookPen />}
                 title="No posts yet"
-                description="Posts are dated and listed newest first; pages are not. If this site never needs a journal, it never needs this tab."
+                description="Posts are dated and listed newest first, like a journal or news."
                 action={
                     site.can.edit ? (
                         <Button asChild>
-                            <Link href={`${base}/new`}>
-                                Write the first post
-                            </Link>
+                            <Link href={`${base}/new`}>New post</Link>
                         </Button>
                     ) : undefined
                 }
@@ -108,7 +106,9 @@ export default async function SitePostsPage({
                         >
                             <Link
                                 href={`${base}/${post.id}`}
-                                aria-label={`${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
+                                // A reader opens it to read (`PostReadView`),
+                                // and the row says so.
+                                aria-label={`${site.can.edit ? "" : "View "}${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
                                 className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
                                 <ListRow
@@ -144,10 +144,15 @@ export default async function SitePostsPage({
                                         </>
                                     }
                                     end={
-                                        <span className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
+                                        <span className="flex items-center gap-3 whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
                                             <ViewerDate
                                                 iso={postUpdatedIso(post)}
                                             />
+                                            {site.can.edit ? null : (
+                                                <span className="font-medium text-foreground">
+                                                    View
+                                                </span>
+                                            )}
                                         </span>
                                     }
                                 />

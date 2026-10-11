@@ -94,6 +94,12 @@ export interface CreateOrganizationInput {
      * served there. Absent, the API derives it from the name.
      */
     address?: string;
+    /**
+     * What they chose to do first on the setup screen (a goal's key from
+     * `lib/modules/goals.ts`). Only words follow from it: the welcome email
+     * leads with its next step. Absent: they will decide later.
+     */
+    goal?: string;
 }
 
 /** Discriminated result so the UI can surface field errors inline. */
@@ -188,7 +194,7 @@ export async function createOrganization(
         return { ok: true, data: { id: data.id, slug: data.slug } };
     }
     // The API's envelope is `{ error: { message, details } }`.
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return {
         ok: false,
         error: failure.error,

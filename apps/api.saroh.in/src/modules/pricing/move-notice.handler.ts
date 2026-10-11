@@ -2,7 +2,9 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { dayWords } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
+import { noticeOf } from "../notifications/notice-target";
 import type { MoveNoticePayload } from "./moves.service";
 
 /** The inbox notice a business gets ahead of its plan moving (KTD-4). */
@@ -28,14 +30,9 @@ function parsePayload(payload: unknown): MoveNoticePayload | null {
     };
 }
 
-/** "12 November 2026", in the business's own time zone. */
+/** "12 Nov 2026", in the business's own time zone. */
 export function moveDateWords(at: Date, zone: string): string {
-    return new Intl.DateTimeFormat("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: zone,
-    }).format(at);
+    return dayWords(at, zone, { year: true });
 }
 
 /**
@@ -96,7 +93,8 @@ export class MoveNoticeHandler {
             const notice = await tx.notification.create({
                 data: {
                     organizationId: sub.organizationId,
-                    type: PLAN_MOVE_NOTIFICATION_TYPE,
+                    // It opens Plan and billing.
+                    ...noticeOf(PLAN_MOVE_NOTIFICATION_TYPE, {}),
                     title: `Your ${planName} plan changes on ${when}`,
                     body: `Saroh has updated its plans. From ${when}, your business is on the latest ${planName} plan.`,
                 },

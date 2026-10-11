@@ -5,7 +5,7 @@
  * these only say it.
  */
 
-import { localDateKey } from "@/lib/format/datetime";
+import { formatDate, formatTime } from "@/lib/format/datetime";
 
 import type { LastChange, StockCell } from "./levels";
 import { readCount, signed } from "./levels";
@@ -17,7 +17,7 @@ export type Tone = "plain" | "ok" | "warn" | "danger" | "muted";
  * carries the same idempotency key, so it is never made twice.
  */
 export const STOCK_UNREACHABLE =
-    "Saroh couldn't be reached. Try again — it won't be done twice.";
+    "Saroh couldn't be reached. Try again. It won't be done twice.";
 
 // ---- Levels ----
 
@@ -69,55 +69,13 @@ export function rowName(row: {
         : row.productName;
 }
 
-const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-];
-
-/** "today", "yesterday" or "18 Sep" (with the year when not this one). */
-export function dayWords(
-    iso: string,
-    timeZone: string,
-    now: Date = new Date(),
-): string {
-    const key = localDateKey(iso, timeZone);
-    const today = localDateKey(now, timeZone);
-    if (key === today) return "today";
-    if (key === localDateKey(new Date(now.getTime() - 86_400_000), timeZone)) {
-        return "yesterday";
-    }
-    const [y, m, d] = key.split("-");
-    const day = `${Number(d)} ${MONTHS[Number(m) - 1]}`;
-    return y === today.slice(0, 4) ? day : `${day} ${y}`;
-}
-
-/** "07:12", 24-hour, in the business's zone. */
-export function timeWords(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    }).format(new Date(iso));
-}
-
 /** "today at 07:12". */
 export function atWords(
     iso: string,
     timeZone: string,
     now: Date = new Date(),
 ): string {
-    return `${dayWords(iso, timeZone, now)} at ${timeWords(iso, timeZone)}`;
+    return `${formatDate(iso, timeZone, { now, relative: "lower" })} at ${formatTime(iso, timeZone)}`;
 }
 
 const KIND_WORDS: Record<LastChange["kind"], string> = {
@@ -175,22 +133,6 @@ export function untrackedLine(n: number): string {
     return n === 1
         ? "1 product isn't tracked and always sells:"
         : `${n} products aren't tracked and always sell:`;
-}
-
-/** What an empty table says, by what narrowed it. */
-export function noRowsWords(view: {
-    needs: boolean;
-    q: string;
-    /** Nothing narrows the view: the business counts nothing yet. */
-    all?: boolean;
-}): string {
-    if (view.needs && !view.q) {
-        return "Nothing needs you. Every size has more than its warning level.";
-    }
-    if (view.q) return `No products match "${view.q}".`;
-    return view.all
-        ? "No product counts stock yet. Turn on Track stock in a product's editor to count it here."
-        : "No products match.";
 }
 
 // ---- Counting ----
@@ -302,7 +244,7 @@ export function moveProblem(input: {
     }
     const read = readCount(units);
     if (read.kind !== "count" || read.value < 1) {
-        return "How many to move — a whole number.";
+        return "How many to move, as a whole number.";
     }
     const spare = Math.max(0, from.onHand - Math.max(0, from.promised));
     if (read.value > spare) {
@@ -344,7 +286,7 @@ export function entrySaved(
     onHand: number,
 ): string {
     const label = ENTRY_KINDS.find((k) => k.kind === kind)?.label ?? kind;
-    return `Recorded ${units} ${label.toLowerCase()} — ${onHand} on hand now.`;
+    return `Recorded ${units} ${label.toLowerCase()}. ${onHand} on hand now.`;
 }
 
 /**
@@ -358,7 +300,7 @@ export function entryProblem(input: {
 }): string | null {
     const read = readCount(input.units);
     if (read.kind !== "count" || read.value < 1) {
-        return "How many — a whole number, 1 or more.";
+        return "How many, as a whole number, 1 or more.";
     }
     if (
         input.kind === "WASTED" &&

@@ -121,7 +121,7 @@ export function TrackSheet({
             {order.collectFrom && order.state === "open" ? (
                 <p className="text-site-body mt-3 text-[13.5px] leading-normal">
                     <span className="text-site-fg font-semibold">
-                        Collect from
+                        Pick-up from
                     </span>{" "}
                     {order.collectFrom.address}
                     {order.collectFrom.hours ? (

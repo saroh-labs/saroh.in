@@ -1,3 +1,5 @@
+import { formatMoney } from "@/lib/format/money";
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import { Badge } from "@saroh/ui/badge";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -13,14 +15,18 @@ import { MoveStageControl } from "@/components/crm/move-stage-control";
 import { DeleteLeadMenu } from "@/components/leads/delete-lead-menu";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { readOnlyLine } from "@/components/shared/who-can-change";
+import { canOrUnknown } from "@/lib/access/require-can";
 import { personHref } from "@/lib/contacts/person-href";
-import { contactName, formatValue, LEAD_STATUS } from "@/lib/crm/format";
+import { contactName, LEAD_STATUS } from "@/lib/crm/format";
 import { getLead } from "@/lib/leads/service";
 import { composerGate } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/service";
 import { listContactConsents, listLeadMessages } from "@/lib/messages/service";
 import { rolledOut } from "@/lib/modules/rollout";
 import { listModules } from "@/lib/modules/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCommsProviders } from "@/lib/providers/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
@@ -63,11 +69,29 @@ export default async function LeadDetailPage({
     const { leadId } = await params;
     await requireSession();
 
-    const lead = await getLead(leadId);
+    // A lead's Worth is in the business's currency (owner, 11 Oct).
+    const [lead, currency] = await Promise.all([
+        getLead(leadId),
+        readBusinessCurrency(),
+    ]);
     if (!lead) notFound();
 
+    /*
+     * Each control asks what the API asks of its write (`leads.service.ts`,
+     * `communications.service.ts`): editing, deleting, moving a stage and
+     * the status are `lead:write`, a note, a follow-up and marking one done
+     * `activity:write`, a message `message:write`, consent `consent:write`.
+     * Someone who reads the lead without them reads it: no button that would
+     * only be refused.
+     */
+    const organization = await resolveActiveOrganization();
+    const canWrite = canOrUnknown(organization, "lead:write");
+    const canLog = canOrUnknown(organization, "activity:write");
+    const canMessage = canOrUnknown(organization, "message:write");
+    const canConsent = canOrUnknown(organization, "consent:write");
+
     const stages = lead.pipeline?.stages ?? [];
-    const amount = formatValue(lead.value);
+    const amount = formatMoney(lead.value, currency, { decimals: "always" });
     // Timeline newest-first for reading; the API returns it oldest-first.
     const timeline = [...lead.activities].reverse();
 
@@ -110,6 +134,12 @@ export default async function LeadDetailPage({
     return (
         <PageContainer>
             <PageHeader
+                breadcrumb={[
+                    <Link key="leads" href="/leads">
+                        Leads
+                    </Link>,
+                    lead.title,
+                ]}
                 holdsData
                 title={lead.title}
                 description={
@@ -123,10 +153,10 @@ export default async function LeadDetailPage({
                             </Link>
                             {" · "}
                             {lead.contact.email}
-                            {amount ? ` · Value: ${amount}` : ""}
+                            {amount ? ` · Worth: ${amount}` : ""}
                         </>
                     ) : amount ? (
-                        `Value: ${amount}`
+                        `Worth: ${amount}`
                     ) : undefined
                 }
                 actions={
@@ -137,27 +167,40 @@ export default async function LeadDetailPage({
                         <Badge variant={LEAD_STATUS[lead.status].variant}>
                             {LEAD_STATUS[lead.status].label}
                         </Badge>
-                        <EditLeadDialog
-                            leadId={lead.id}
-                            title={lead.title}
-                            value={lead.value}
-                        />
-                        <DeleteLeadMenu
-                            leadId={lead.id}
-                            title={lead.title}
-                            contactName={
-                                lead.contact ? contactName(lead.contact) : null
-                            }
-                        />
+                        {canWrite ? (
+                            <>
+                                <EditLeadDialog
+                                    leadId={lead.id}
+                                    title={lead.title}
+                                    value={lead.value}
+                                    currency={currency}
+                                />
+                                <DeleteLeadMenu
+                                    leadId={lead.id}
+                                    title={lead.title}
+                                    contactName={
+                                        lead.contact
+                                            ? contactName(lead.contact)
+                                            : null
+                                    }
+                                />
+                            </>
+                        ) : null}
                     </>
                 }
             />
+
+            {canWrite ? null : (
+                <ReadOnlyNote>{readOnlyLine("this lead")}</ReadOnlyNote>
+            )}
 
             <LeadActions
                 leadId={lead.id}
                 contactId={contactId}
                 consent={consentByChannel}
                 gates={gates}
+                canLog={canLog}
+                canMessage={canMessage}
             />
 
             {lead.enquiries && lead.enquiries.length > 0 ? (
@@ -169,16 +212,20 @@ export default async function LeadDetailPage({
                 </div>
             ) : null}
 
-            <div className="mb-8 flex flex-wrap gap-4 rounded-lg border p-4">
-                {stages.length > 0 && (
-                    <MoveStageControl
-                        leadId={lead.id}
-                        currentStageId={lead.stageId}
-                        stages={stages}
-                    />
-                )}
-                <LeadStatusControl leadId={lead.id} status={lead.status} />
-            </div>
+            {/* Its stage and status are the badges in the header for
+                someone who can't move them. */}
+            {canWrite ? (
+                <div className="mb-8 flex flex-wrap gap-4 rounded-lg border p-4">
+                    {stages.length > 0 && (
+                        <MoveStageControl
+                            leadId={lead.id}
+                            currentStageId={lead.stageId}
+                            stages={stages}
+                        />
+                    )}
+                    <LeadStatusControl leadId={lead.id} status={lead.status} />
+                </div>
+            ) : null}
 
             <h2 className="mb-3 text-lg font-semibold">Messages</h2>
             <div className="mb-8">
@@ -187,7 +234,11 @@ export default async function LeadDetailPage({
 
             <h2 className="mb-3 text-lg font-semibold">Activity</h2>
             <div className="mb-8">
-                <ActivityTimeline leadId={lead.id} activities={timeline} />
+                <ActivityTimeline
+                    leadId={lead.id}
+                    activities={timeline}
+                    canWrite={canLog}
+                />
             </div>
 
             {/* Communications off: nothing can be sent or consented to
@@ -200,6 +251,7 @@ export default async function LeadDetailPage({
                     <ConsentToggle
                         contactId={contactId}
                         consent={consentByChannel}
+                        canWrite={canConsent}
                     />
                 </div>
             ) : null}

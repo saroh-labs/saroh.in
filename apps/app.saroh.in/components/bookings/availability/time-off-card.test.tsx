@@ -29,7 +29,7 @@ vi.mock("@saroh/ui/date-picker", () => ({
         <output id={id}>{value ? value.getDate() : ""}</output>
     ),
 }));
-vi.mock("@/components/shared/option-select", () => ({
+vi.mock("@saroh/ui/option-select", () => ({
     OptionSelect: ({
         id,
         value,
@@ -184,7 +184,7 @@ describe("Time off, read first", () => {
 
     it("says none are booked, and still offers the button", () => {
         draw();
-        expect(host.textContent).toContain("None booked.");
+        expect(host.textContent).toContain("No time off booked.");
         expect(button("Add time off", host)).toBeDefined();
     });
 
@@ -215,11 +215,11 @@ describe("Time off, read first", () => {
 });
 
 describe("Add time off", () => {
-    it("opens a sheet of that name, which says it isn't saved until Save changes", async () => {
+    it("opens a sheet of that name, which says it isn't saved until Save", async () => {
         draw();
         await press(button("Add time off", host));
-        expect(sheetName()).toBe("Add time off");
-        expect(sheet()?.textContent).toContain("until you press Save changes");
+        expect(sheetName()).toBe("New time off");
+        expect(sheet()?.textContent).toContain("until you press Save.");
         expect(button("Add day off", sheet() ?? undefined)).toBeDefined();
         expect(button("Cancel", sheet() ?? undefined)).toBeDefined();
         expect(onAdd).not.toHaveBeenCalled();
@@ -273,7 +273,7 @@ describe("Add time off", () => {
                 );
         });
         expect(onAdd).not.toHaveBeenCalled();
-        expect(sheetName()).toBe("Add time off");
+        expect(sheetName()).toBe("New time off");
         expect(labelled("Reason")?.value).toBe("Dentist");
 
         // Put right, it adds part of the day.

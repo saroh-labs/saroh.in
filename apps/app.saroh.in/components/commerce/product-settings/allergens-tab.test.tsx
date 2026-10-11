@@ -64,8 +64,7 @@ describe("the list", () => {
         expect(s.button("Add allergen")).toBeDefined();
         // One on a product can't be removed, and says why.
         expect(
-            s.button("Milk is on 3 products — take it off them first")
-                ?.disabled,
+            s.button("Milk is on 3 products. Take it off them first")?.disabled,
         ).toBe(true);
         expect(s.button("Remove Sesame")?.disabled).toBe(false);
     });
@@ -114,9 +113,9 @@ describe("Add allergen", () => {
         return s.inputs(s.dialog())[0];
     }
 
-    it("opens a dialog named Add allergen with the one field", () => {
+    it("opens a dialog named New allergen with the one field", () => {
         const input = open();
-        expect(s.title(s.dialog())).toBe("Add allergen");
+        expect(s.title(s.dialog())).toBe("New allergen");
         expect(s.inputs(s.dialog())).toHaveLength(1);
         expect(input.value).toBe("");
     });

@@ -812,13 +812,13 @@ export class CheckoutService {
             ) {
                 throw new ConflictException({
                     message:
-                        "That coupon can't be used with payments just now. Try without it.",
+                        "That coupon can't be used with payments right now. Try without it.",
                     details: { field: "coupon" },
                 });
             }
             if (error instanceof BillingProviderError) {
                 throw new ServiceUnavailableException(
-                    "We couldn't start the payment just now. Try again in a minute.",
+                    "We couldn't start the payment. Try again in a minute.",
                 );
             }
             throw error;

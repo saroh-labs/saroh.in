@@ -6,6 +6,7 @@ import type { RenderedJournal } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
 import type { ArchiveYear } from "./journal-archive";
 import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
@@ -412,14 +413,14 @@ export default function JournalSection({
                     </button>
                 }
             >
-                We couldn&apos;t load your posts just now.
+                We couldn&apos;t load your posts right now.
             </JournalNote>
         );
     }
     if (state.feed.posts.length === 0) {
         return (
             <JournalNote title={title}>
-                No posts yet. Publish a post and it shows here; until then this
+                No posts yet. Publish a post and it shows here. Until then this
                 section is left off your live site.
             </JournalNote>
         );
@@ -619,7 +620,7 @@ function JournalCards({
                                         <img
                                             src={image}
                                             alt=""
-                                            loading="lazy"
+                                            {...siteImage()}
                                             className={listPhoto}
                                         />
                                     ) : null}
@@ -664,7 +665,7 @@ function JournalCards({
                                     <img
                                         src={image}
                                         alt=""
-                                        loading="lazy"
+                                        {...siteImage()}
                                         className="mb-1.5 h-[130px] w-full object-cover"
                                     />
                                 ) : null}

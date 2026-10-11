@@ -2,7 +2,6 @@
 
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
@@ -19,8 +18,11 @@ import {
     updateField,
 } from "@/lib/products/settings-actions";
 
-import { chipBtn } from "./product-settings";
-import { PROBLEM, SettingsSheet } from "./settings-sheet";
+import { Chip } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
+import { FormSheet } from "@/components/shared/form-sheet";
+import { Segmented } from "@saroh/ui/segmented";
+import { PROBLEM } from "./product-settings";
 
 export const FIELD_TYPES: { type: FieldType; label: string }[] = [
     { type: "TEXT", label: "Text" },
@@ -125,11 +127,10 @@ export function FieldSheet({
         setOpen(false);
         router.refresh();
         if (!field) {
-            showUndo(`${nl} added.`, () => {
-                void removeField(before.id).then((undo) => {
-                    if (!undo.ok) showError(undo.error);
-                    router.refresh();
-                });
+            showUndo(`${nl} added.`, async () => {
+                const back = await removeField(before.id);
+                router.refresh();
+                return back;
             });
             return;
         }
@@ -141,36 +142,37 @@ export function FieldSheet({
                     ? `${nl} now shows on the shop.`
                     : `${nl} is team only now.`
                 : `${nl} saved.`,
-            () => {
-                void updateField(before.id, {
+            async () => {
+                const back = await updateField(before.id, {
                     name: before.name,
                     onShop: before.onShop,
                     categoryIds: before.categoryIds,
-                }).then((undo) => {
-                    if (!undo.ok) showError(undo.error);
-                    router.refresh();
                 });
+                router.refresh();
+                return back;
             },
         );
     }
 
     return (
-        <SettingsSheet
+        <FormSheet
             trigger={trigger}
             open={open}
-            onOpenChange={(o) => {
-                if (o) reset();
-                setOpen(o);
+            onOpen={() => {
+                reset();
+                setOpen(true);
             }}
-            title={field ? "Edit field" : "Add field"}
+            onClose={() => setOpen(false)}
+            fieldsClassName="gap-4"
+            title={field ? "Edit field" : "New field"}
             description={
                 field
                     ? "Change its name, who sees it and which products ask for it."
                     : "Something extra a product records, such as Skin type for serums or Fabric care for dresses."
             }
             pending={busy}
-            submitLabel={field ? "Save" : "Add field"}
-            busyLabel={field ? "Saving…" : "Adding…"}
+            saveLabel={field ? "Save" : "Add field"}
+            savingLabel={field ? "Saving…" : "Adding…"}
             onSubmit={(e) => {
                 e.preventDefault();
                 setTried(true);
@@ -210,25 +212,16 @@ export function FieldSheet({
                         added.
                     </p>
                 ) : (
-                    <div
-                        role="radiogroup"
-                        aria-labelledby={`${id}-type`}
-                        className="flex flex-wrap gap-[5px]"
-                    >
-                        {FIELD_TYPES.map((t) => (
-                            <button
-                                key={t.type}
-                                type="button"
-                                role="radio"
-                                aria-checked={type === t.type}
-                                disabled={busy}
-                                onClick={() => setType(t.type)}
-                                className={chipBtn(type === t.type)}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
-                    </div>
+                    <ChipGroup
+                        labelledBy={`${id}-type`}
+                        value={type}
+                        onChange={setType}
+                        disabled={busy}
+                        choices={FIELD_TYPES.map((t) => ({
+                            value: t.type,
+                            label: t.label,
+                        }))}
+                    />
                 )}
             </div>
 
@@ -236,33 +229,17 @@ export function FieldSheet({
                 <p id={`${id}-who`} className="text-sm font-medium">
                     Who sees it
                 </p>
-                <div
-                    role="radiogroup"
+                <Segmented
+                    label="Who sees it"
                     aria-labelledby={`${id}-who`}
-                    className="flex w-fit gap-0.5 rounded-[8px] bg-muted p-0.5"
-                >
-                    {WHO.map((o) => {
-                        const chosen = onShop === o.on;
-                        return (
-                            <button
-                                key={o.label}
-                                type="button"
-                                role="radio"
-                                aria-checked={chosen}
-                                disabled={busy}
-                                onClick={() => setOnShop(o.on)}
-                                className={cn(
-                                    "rounded-[6px] px-2.5 py-[5px] text-[12px] font-semibold disabled:cursor-not-allowed coarse:min-h-11",
-                                    chosen
-                                        ? "bg-card text-foreground shadow-[0_1px_3px_rgba(28,28,26,0.12)]"
-                                        : "text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                {o.label}
-                            </button>
-                        );
-                    })}
-                </div>
+                    value={onShop ? "shop" : "team"}
+                    onValueChange={(v) => setOnShop(v === "shop")}
+                    disabled={busy}
+                    options={WHO.map((o) => ({
+                        value: o.on ? "shop" : "team",
+                        label: o.label,
+                    }))}
+                />
                 <p className="text-[12px] text-muted-foreground">
                     {onShop
                         ? "Customers see it under the product's description."
@@ -288,10 +265,10 @@ export function FieldSheet({
                         {categories.map((c) => {
                             const on = categoryIds.includes(c.id);
                             return (
-                                <button
+                                <Chip
                                     key={c.id}
-                                    type="button"
-                                    aria-pressed={on}
+                                    as="toggle"
+                                    on={on}
                                     disabled={busy}
                                     onClick={() =>
                                         setCategoryIds(
@@ -302,23 +279,19 @@ export function FieldSheet({
                                                 : [...categoryIds, c.id],
                                         )
                                     }
-                                    className={chipBtn(on)}
                                 >
                                     {c.name}
-                                </button>
+                                </Chip>
                             );
                         })}
                     </div>
                 )}
                 {categoryIds.length === 0 && categories.length > 0 ? (
-                    <p
-                        role="status"
-                        className="text-[11.5px] text-brand-subtle-foreground"
-                    >
+                    <p role="status" className="text-[11.5px] text-foreground">
                         In no category, so no product will ask for it.
                     </p>
                 ) : null}
             </div>
-        </SettingsSheet>
+        </FormSheet>
     );
 }

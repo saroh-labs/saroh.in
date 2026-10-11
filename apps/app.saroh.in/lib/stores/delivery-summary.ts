@@ -75,7 +75,7 @@ export function savedFee(store: Store, type: Way): string | null {
 }
 
 const money = (amount: string, currency: string) =>
-    formatMoneyMajor(amount, currency) ?? amount;
+    formatMoneyMajor(amount, currency);
 
 function lateOf(store: Store, type: Way): number {
     return (store.lateAfterMinutes ?? DEFAULT_LATE_AFTER)[type];
@@ -275,19 +275,33 @@ export function wayInput(
     return input;
 }
 
+/**
+ * Whether the draft differs from what is saved, for the sheet's frame
+ * (`dirty`). A draft with something to fix has changed, though it would
+ * send nothing: `wayInput` leaves out a time it can't read (3 minutes), and
+ * a sheet told "nothing changed" closes on Save without a word, dropping
+ * what was typed and never saying what was wrong with it.
+ */
+export function wayChanged(store: Store, type: Way, draft: WayDraft): boolean {
+    return (
+        Object.keys(wayInput(store, type, draft)).length > 0 ||
+        Object.keys(draftProblems(store, type, draft)).length > 0
+    );
+}
+
 /** The toast for a save, in the words each change has always used. */
 export function waySaved(type: Way, input: StorefrontInput): string {
     const label = FULFILMENT_LABEL[type];
     const keys = Object.keys(input);
     if (keys.length === 1 && input.fulfilmentTypes) {
-        return `${label} turned ${input.fulfilmentTypes.includes(type) ? "on" : "off"}`;
+        return `${label} turned ${input.fulfilmentTypes.includes(type) ? "on" : "off"}.`;
     }
     const late = input.lateAfterMinutes?.[type];
     if (keys.length === 1 && late !== undefined) {
         const noun = ORDERS_NOUN[type];
-        return `${noun.charAt(0).toUpperCase()}${noun.slice(1)} now count as late after ${lateAfterWords(late)}`;
+        return `${noun.charAt(0).toUpperCase()}${noun.slice(1)} now count as late after ${lateAfterWords(late)}.`;
     }
-    return `${label} saved`;
+    return `${label} saved.`;
 }
 
 /**

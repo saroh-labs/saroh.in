@@ -61,7 +61,7 @@ describe("the Reviews tab", () => {
         expect(html).toContain("Crust like a dream");
         // A real link and real buttons: pointer, hover, focus and pressed.
         expect(html).toMatch(
-            /cursor-pointer[^"]*hover:[^"]*focus-visible:ring-2[^"]*active:/,
+            /cursor-pointer[^"]*focus-visible:ring-2[^"]*hover:[^"]*active:/,
         );
         expect(html).not.toContain("Hidden from the shop</span>");
     });
@@ -96,6 +96,6 @@ describe("the Reviews tab", () => {
         const html = render([review({ productId: null, body: null })]);
         expect(html).not.toContain("/commerce/products/");
         expect(html).toContain("Sourdough");
-        expect(html).toContain("No comment left — just a rating.");
+        expect(html).toContain("No comment left, only a rating.");
     });
 });

@@ -43,7 +43,7 @@ const TEMPLATES: Record<SelfTestTemplate, RenderedTemplate> = {
         label: "Order receipt preview",
         html: `<h2>Thanks for your order</h2>
   <p>This is a preview of the receipt email a customer receives after checkout.</p>
-  <p>Order #PREVIEW-1001 — Total: $42.00</p>`,
+  <p>Order #PREVIEW-1001. Total: ₹420</p>`,
     },
 };
 

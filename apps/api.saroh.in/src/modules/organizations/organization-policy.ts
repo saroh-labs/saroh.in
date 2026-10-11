@@ -124,7 +124,9 @@ const MEMBER_ACTIONS: readonly OrgAction[] = ["order:stage"];
  *  - OWNER  — full control of the tenant, including irreversible org deletion.
  *  - ADMIN  — day-to-day operator: manages members and stores, edits org
  *             settings, but MAY NOT perform the destructive org-level action
- *             `org:delete`. (Guarding the "last OWNER" — i.e. an ADMIN must not
+ *             `org:delete`, nor change what the business pays Saroh
+ *             (`billing:manage`; it reads Plan and billing with
+ *             `billing:read`). (Guarding the "last OWNER" — i.e. an ADMIN must not
  *             be able to demote/remove the final OWNER via member:role:update /
  *             member:remove — is a data-integrity invariant enforced at the
  *             write layer, S1-006; it is not expressible as a coarse
@@ -143,15 +145,21 @@ const MEMBER_ACTIONS: readonly OrgAction[] = ["order:stage"];
  * reference can't widen a role's capabilities.
  */
 /**
- * The powers only the built-in Owner holds: closing the business, and
- * changing its web address (DEC-069, plan L2). Not an Admin's, never an
- * extra, never grantable to an invented role (`ownerOnly` in the catalogue;
- * `capability-catalogue.spec.ts` keeps the two in step).
+ * The powers only the built-in Owner holds: closing the business, changing
+ * its web address (DEC-069, plan L2), and changing what the business pays
+ * Saroh (`billing:manage`: the plan, add-ons, a coupon, the payment method;
+ * DEC-131 as amended 2026-10-11). Not an Admin's, never an extra, never
+ * grantable to an invented role (`ownerOnly` in the catalogue;
+ * `capability-catalogue.spec.ts` keeps the two in step), and dropped from
+ * any stored list that names one (`roleCapabilities`).
  */
 export const OWNER_ONLY_ACTIONS: readonly OrgAction[] = [
     "org:delete",
     "org:address:update",
+    "billing:manage",
 ];
+
+const OWNER_ONLY: ReadonlySet<OrgAction> = new Set(OWNER_ONLY_ACTIONS);
 
 const CAPABILITIES: Record<OrgRole, ReadonlySet<OrgAction>> = {
     OWNER: new Set<OrgAction>(ORG_ACTIONS),
@@ -181,17 +189,62 @@ export function can(role: OrgRole, action: OrgAction): boolean {
     return CAPABILITIES[role].has(action);
 }
 
+/** `details.code` of a refusal by role, which the app reads (`toFailure`). */
+export const ROLE_DENIED = "ROLE_DENIED";
+
+/**
+ * What a person refused by their role reads. Never the role's key or the
+ * permission's: the permission travels in `details`, for the app to pick a
+ * closer sentence from, and neither is ever the message.
+ */
+export const ROLE_DENIED_MESSAGE =
+    "Your role can't do this. An owner or admin can change that in Settings › Team.";
+
+/**
+ * What someone refused an owner-only power reads. No role can be given one,
+ * so the line never points at Settings › Team. It starts "Only the owner
+ * can ", which the app reads as a refusal by role (`role-denied.ts`).
+ */
+export const OWNER_ONLY_MESSAGE = "Only the owner can do this.";
+
+/** Said for `billing:manage`: every change to what the business pays Saroh. */
+export const PLAN_OWNER_ONLY_MESSAGE = "Only the owner can change the plan.";
+
+/** The sentence a refusal of `action` carries. */
+export function roleDeniedMessage(action: OrgAction): string {
+    if (action === "billing:manage") return PLAN_OWNER_ONLY_MESSAGE;
+    return OWNER_ONLY.has(action) ? OWNER_ONLY_MESSAGE : ROLE_DENIED_MESSAGE;
+}
+
 /**
  * Enforce the policy for a resolved Organization context. Throws
  * `ForbiddenException` (mapped to 403 by the global filter) when the actor's
- * role does not permit `action`; returns silently when it does.
+ * role does not permit `action`. Returns silently when it does.
+ *
+ * The refusal is a sentence a person can read, with
+ * `details: { code: "ROLE_DENIED", action }` in the error envelope. An
+ * endpoint that says its own sentence (`requireBookingPower`,
+ * `customer-access.ts`) asks `allows` and throws its own.
  */
 export function authorize(ctx: OrganizationContext, action: OrgAction): void {
     if (!allows(ctx, action)) {
-        throw new ForbiddenException(
-            `Role "${ctx.roleKey ?? ctx.role}" may not perform "${action}"`,
-        );
+        throw new ForbiddenException(roleDenial(action));
     }
+}
+
+/**
+ * The body of a refusal by role, as the exception filter reads it. Exported
+ * so a spec can pin WHICH permission refused without reading the message:
+ * `rejects.toMatchObject({ response: roleDenial("site:update") })`.
+ */
+export function roleDenial(action: OrgAction): {
+    message: string;
+    details: { code: typeof ROLE_DENIED; action: OrgAction };
+} {
+    return {
+        message: roleDeniedMessage(action),
+        details: { code: ROLE_DENIED, action },
+    };
 }
 
 /**
@@ -245,7 +298,8 @@ export function withinReach(
  * 1. The business has a row for this role — its own list wins, filtered to
  *    actions that actually exist. An unknown string in the column is dropped
  *    rather than trusted; a role cannot gain a power by being saved with a
- *    typo, and cannot be broken by one either.
+ *    typo, and cannot be broken by one either. An owner-only power is
+ *    dropped the same way from every row but the Owner's.
  * 2. No row, and the key is a built-in — the shipped map. This is why no
  *    backfill was needed: a business that has invented nothing has no rows,
  *    and resolves exactly as it did before the table existed.
@@ -277,7 +331,17 @@ function roleCapabilities(
     stored?: readonly string[] | null,
 ): ReadonlySet<OrgAction> {
     if (stored) {
-        return withImplied(new Set(stored.filter(isKnownAction)));
+        // An owner-only power in a stored list is dropped, as an unknown
+        // string is: the write path never stores one, and the policy does
+        // not trust that it didn't. Only the Owner's own row keeps them.
+        const owner = roleKey === "OWNER";
+        return withImplied(
+            new Set(
+                stored
+                    .filter(isKnownAction)
+                    .filter((a) => owner || !OWNER_ONLY.has(a)),
+            ),
+        );
     }
     if (isBuiltInRole(roleKey)) return CAPABILITIES[roleKey];
     // A shipped role whose row isn't there (#868): its own narrow list,
@@ -297,14 +361,13 @@ function isKnownAction(action: string): action is OrgAction {
 
 /**
  * Never an extra, for anyone: the powers only the built-in Owner holds
- * (`ownerOnly` in the catalogue — closing the business). Written here as
+ * (`ownerOnly` in the catalogue: closing the business, its web address,
+ * what it pays Saroh). Written here as
  * well as there because the policy must not trust a stored list to have
  * been vetted by the write path; `capability-catalogue.spec.ts` keeps the
  * two in step.
  */
-const NEVER_EXTRA: ReadonlySet<OrgAction> = new Set<OrgAction>(
-    OWNER_ONLY_ACTIONS,
-);
+const NEVER_EXTRA: ReadonlySet<OrgAction> = OWNER_ONLY;
 
 /**
  * What a Reviewer may hold as an extra: the website review powers and

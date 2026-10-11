@@ -1,11 +1,11 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
 import type { ProductPageData, StockWord } from "@saroh/site-blocks";
 import { ProductPage, SiteThemeScope } from "@saroh/site-blocks";
-import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useState } from "react";
 
+import { SwitchRow } from "@/components/shared/check-row";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { EditorSection } from "@/lib/products/links";
 import { productEditHref, productHref } from "@/lib/products/links";
@@ -17,6 +17,7 @@ import {
     onTheShop,
 } from "@/lib/products/overview-rules";
 import { untrackedShort } from "@/lib/products/tracking";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * The Customer view: the product as its shop page shows it, drawn by the
@@ -41,7 +42,7 @@ export function CustomerView({
 }) {
     const [notes, setNotes] = useState(true);
     const { product, stock, price } = overview;
-    const money = (a: string) => formatMoneyMajor(a, product.currency) ?? a;
+    const money = (a: string) => formatMoneyMajor(a, product.currency);
     const edit = (s: EditorSection) => productEditHref(storeId, product.id, s);
     const data = toShopData(overview, counts);
     const live = product.status === "PUBLISHED";
@@ -88,7 +89,7 @@ export function CustomerView({
                 : variantLine ||
                   (stock.product
                       ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
-                      : "No stock count — the shop doesn't say how many are left."),
+                      : "No stock count. The shop doesn't say how many are left."),
             // The editor's Stock section counts a product that counts
             // stock; untracked, its Sold out is marked on the Overview.
             action:
@@ -113,7 +114,7 @@ export function CustomerView({
             body: product.howToUse
                 ? onTheShop(product.shopFields, "howToUse")
                     ? "One line under the price. Every variant shares it."
-                    : "Written, but Team only — so it isn't shown."
+                    : "Written, but Team only, so it isn't shown."
                 : "Not written yet.",
             action: { label: "Edit", href: edit("details") },
         },
@@ -139,34 +140,19 @@ export function CustomerView({
             <div className="flex flex-wrap items-center gap-2.5 border-b border-border py-3">
                 <p className="min-w-0 flex-[1_1_280px] text-[12.5px] text-muted-foreground">
                     {live
-                        ? "The shop page as a customer opens it. Try the variants — nothing is added to a basket."
+                        ? "The shop page as a customer opens it. Try the variants. Nothing is added to a basket."
                         : product.status === "ARCHIVED"
-                          ? "Archived — customers cannot see this page. This is how it looked."
-                          : "A draft — customers cannot see this yet. This is how it will look once it is published."}
+                          ? "Archived. Customers cannot see this page. This is how it looked."
+                          : "A draft. Customers cannot see this yet. This is how it will look once it is published."}
                 </p>
-                <button
-                    type="button"
-                    role="switch"
-                    aria-checked={notes}
-                    onClick={() => setNotes((v) => !v)}
-                    className="flex h-8 items-center gap-2 rounded-full border border-border bg-card pl-1.5 pr-3 text-[12.5px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                <SwitchRow
+                    side="start"
+                    checked={notes}
+                    onChange={setNotes}
+                    className="h-8 shrink-0 gap-2 rounded-full border border-border bg-card pl-1.5 pr-3 text-[12.5px] font-semibold hover:bg-muted coarse:h-11"
                 >
-                    <span
-                        aria-hidden
-                        className={cn(
-                            "relative inline-block h-[18px] w-[30px] rounded-full transition-colors",
-                            notes ? "bg-foreground" : "bg-border-strong",
-                        )}
-                    >
-                        <span
-                            className={cn(
-                                "absolute top-[2px] size-[14px] rounded-full bg-background transition-[left]",
-                                notes ? "left-[14px]" : "left-[2px]",
-                            )}
-                        />
-                    </span>
                     Team notes
-                </button>
+                </SwitchRow>
             </div>
             <div className="mt-[22px] flex flex-wrap items-start gap-[22px] rounded-[12px] bg-muted/60 p-4 sm:p-[22px]">
                 <div className="min-w-0 flex-[1_1_540px] overflow-hidden rounded-xl border border-border shadow-sm">
@@ -184,7 +170,7 @@ export function CustomerView({
                                 <div className="flex gap-2.5">
                                     <span
                                         aria-hidden
-                                        className="grid size-5 shrink-0 place-items-center rounded-full bg-highlight text-[11px] font-bold text-highlight-foreground"
+                                        className="grid size-5 shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-bold text-background"
                                     >
                                         {note.n}
                                     </span>
@@ -197,16 +183,16 @@ export function CustomerView({
                                                 {note.title}
                                             </p>
                                             {canWrite || note.n === 6 ? (
-                                                <Link
+                                                <TextLink
                                                     href={note.action.href}
-                                                    className="text-[12px] text-brand hover:text-foreground coarse:min-h-11"
+                                                    className="text-[12px] coarse:min-h-11"
                                                 >
                                                     {note.action.label}
                                                     <span className="sr-only">
                                                         {" "}
                                                         {note.title}
                                                     </span>
-                                                </Link>
+                                                </TextLink>
                                             ) : null}
                                         </div>
                                         <p className="mt-[3px] text-pretty text-[12px] leading-[1.5] text-foreground/75">
@@ -336,11 +322,7 @@ export function toShopData(
             reply: r.reply,
             // A day is a day wherever it is read; pinned so the server and
             // the browser render the same text.
-            dateLabel: new Date(r.createdAt).toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-                timeZone: "UTC",
-            }),
+            dateLabel: formatDate(r.createdAt, "UTC"),
         })),
     };
 }

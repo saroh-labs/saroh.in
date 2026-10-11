@@ -4,18 +4,46 @@ import { cn } from "../../lib/utils";
 /**
  * 38px, the brand file's control height — the same as `Button`, so a field and
  * the button beside it sit on one line rather than two heights pretending to
- * be one. `coarse:` restores the 44px touch target on a phone.
+ * be one. `coarse:` restores the 44px touch target on a phone, and sets the
+ * text at 16px there: iOS Safari zooms the page when a smaller field takes
+ * focus and leaves it zoomed. A call site never sets a field's type size.
+ *
+ * The states a field can be in, each with a look of its own:
+ * - hover: the edge moves one step (Ink 400 to Ink 500), as a Select's does;
+ * - focus: the one ring every primitive draws (`fieldFocus`);
+ * - invalid (`aria-invalid`): the destructive edge on its tint;
+ * - disabled: the disabled fill, label and edge, never an opacity;
+ * - read-only: a hairline, no fill, the value at full contrast. It is a
+ *   value to read and copy, so it must not look like a box to type in, nor
+ *   like a disabled one.
  */
+export const fieldFocus =
+    "ring-offset-background focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
-export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+export const fieldStates =
+    "transition-colors duration-fast hover:border-muted-foreground disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle [&[readonly]]:border-border [&[readonly]]:bg-transparent [&[readonly]]:text-foreground";
+
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    /**
+     * 32px, for a field inside a table row or a dense list, where the 38px
+     * box would make every row taller. Still 44px and 16px under a finger.
+     * A call site never sets a field's height: it is this or the default.
+     */
+    dense?: boolean;
+}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-    ({ className, type, ...props }, ref) => {
+    ({ className, type, dense = false, ...props }, ref) => {
         return (
             <input
                 type={type}
                 className={cn(
-                    "flex h-[38px] w-full rounded-md border border-input bg-field px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle coarse:h-11",
+                    "flex w-full rounded-md border border-input bg-field py-2 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground coarse:h-11 coarse:text-base",
+                    dense
+                        ? "h-8 px-2.5 text-[0.8125rem]"
+                        : "h-[38px] px-3 text-sm",
+                    fieldFocus,
+                    fieldStates,
                     className,
                 )}
                 ref={ref}

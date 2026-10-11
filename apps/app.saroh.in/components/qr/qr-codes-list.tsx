@@ -1,5 +1,6 @@
 "use client";
 
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -14,8 +15,7 @@ import {
     placeWords,
 } from "@/lib/qr/words";
 
-const HEAD =
-    "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+const HEAD = "label";
 
 /** A cell's name: said to a screen reader at the desk, shown on a phone. */
 function CellName({ children }: { children: React.ReactNode }) {
@@ -72,8 +72,8 @@ export function QrCodesList({
                 title="No QR codes yet"
                 description={
                     canChange
-                        ? "Choose what a code opens and where it goes, then make it. It is listed here with its scans."
-                        : "An owner or admin makes them. They are listed here once there are some."
+                        ? "Choose what a code opens and where it goes, and it is listed here with its scans."
+                        : "They are listed here with their scans once there are some."
                 }
             />
         );
@@ -163,7 +163,9 @@ export function QrCodesList({
                                                     data-qr-bookings=""
                                                     className="font-mono tabular-nums"
                                                 >
-                                                    {made.bookings}
+                                                    <AbsentOr says="None">
+                                                        {made.bookings}
+                                                    </AbsentOr>
                                                 </span>
                                                 {made.orders ? (
                                                     <span className="text-[11.5px] text-muted-foreground">
@@ -180,7 +182,7 @@ export function QrCodesList({
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-[13px] text-brand"
+                                                    className="text-foreground"
                                                     aria-label={`Change the ${placeWords(code)} code`}
                                                     onClick={() =>
                                                         onChange(code)
@@ -192,7 +194,6 @@ export function QrCodesList({
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-[13px]"
                                                     aria-label={`Retire the ${placeWords(code)} code`}
                                                     onClick={() =>
                                                         onRetire(code)
@@ -206,7 +207,7 @@ export function QrCodesList({
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-[13px] text-brand"
+                                                className="text-foreground"
                                                 aria-label={`View the ${placeWords(code)} code`}
                                                 onClick={() => onView(code)}
                                             >

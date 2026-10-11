@@ -1,18 +1,18 @@
 "use client";
 
+import { Refusal } from "@/components/shared/refusal";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { Textarea } from "@saroh/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import type { FormEventHandler, ReactNode } from "react";
 import { useState } from "react";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import {
-    ADDRESS_FIELD_ID,
-    KIND_FIELD_ID,
-} from "@/lib/stores/location-readiness";
+    addressDraftOf,
+    addressPatch,
+    mapLinkProblem,
+} from "@/lib/stores/location-address";
+import { KIND_FIELD_ID } from "@/lib/stores/location-readiness";
 import { hoursBackwards } from "@/lib/stores/opening-hours-summary";
 import type { PlaceSheet } from "@/lib/stores/place-rows";
 import {
@@ -27,6 +27,8 @@ import type {
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
 
+import { Segmented } from "@saroh/ui/segmented";
+import { LocationAddressFields } from "./location-address-fields";
 import type { Saver } from "./location-save";
 import { DEFAULT_WEEK, OpeningHoursFields } from "./opening-hours";
 import { Note } from "./storefront-section";
@@ -36,7 +38,7 @@ const PROBLEM =
 
 /**
  * The frame every Edit sheet in The place shares: the settings rows' own
- * (`components/shared/settings-sheet-frame.tsx`, which says how it saves,
+ * (`components/shared/form-sheet.tsx`, which says how it saves,
  * closes and hands the keyboard back), named by the row it edits.
  */
 export function PlaceSheetFrame({
@@ -55,7 +57,7 @@ export function PlaceSheetFrame({
     children: ReactNode;
 }) {
     return (
-        <SettingsSheetFrame
+        <FormSheet
             id={`${PLACE_ROW_ID[sheet]}-panel`}
             returnFocusTo={placeEditId(sheet)}
             {...frame}
@@ -102,7 +104,7 @@ export function PlaceNameSheet({
                 }
                 save(
                     { name: trimmed },
-                    "Name saved",
+                    "Name saved.",
                     undefined,
                     undefined,
                     onClose,
@@ -120,7 +122,7 @@ export function PlaceNameSheet({
             />
             {missing ? (
                 <p id="storefront-name-note" role="alert" className={PROBLEM}>
-                    Name is required
+                    Add a name.
                 </p>
             ) : (
                 <Note id="storefront-name-note">
@@ -189,38 +191,26 @@ export function PlaceKindSheet({
                 );
             }}
         >
-            <ToggleGroup
-                type="single"
-                value={kind}
-                // Radix clears a single group when the pressed item is
-                // pressed again; a location is always one or the other.
-                onValueChange={(v) => {
-                    if (v !== "SHOP" && v !== "ONLINE") return;
-                    setKind(v);
-                    setError(null);
-                }}
-                disabled={pending}
+            <Segmented
                 id={KIND_FIELD_ID}
-                aria-label="Do customers come here?"
+                label="Do customers come here?"
                 aria-describedby={
                     error
                         ? "location-kind-error location-kind-note"
                         : "location-kind-note"
                 }
-                className={SEGMENTED}
-            >
-                <ToggleGroupItem value="SHOP" className={SEGMENT}>
-                    {KIND_ANSWER.SHOP}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="ONLINE" className={SEGMENT}>
-                    {KIND_ANSWER.ONLINE}
-                </ToggleGroupItem>
-            </ToggleGroup>
-            {error ? (
-                <p id="location-kind-error" role="alert" className={PROBLEM}>
-                    {error}
-                </p>
-            ) : null}
+                value={kind}
+                onValueChange={(v) => {
+                    setKind(v);
+                    setError(null);
+                }}
+                disabled={pending}
+                options={[
+                    { value: "SHOP", label: KIND_ANSWER.SHOP },
+                    { value: "ONLINE", label: KIND_ANSWER.ONLINE },
+                ]}
+            />
+            <Refusal id="location-kind-error">{error}</Refusal>
             <Note id="location-kind-note">
                 {KIND_FOLLOWS[kind]}
                 {before === "SHOP" && kind === "ONLINE"
@@ -231,7 +221,13 @@ export function PlaceKindSheet({
     );
 }
 
-/** Where customers come: the address, with its limit and its note. */
+/**
+ * Where customers come: the address and its Google Maps link (DEC-128),
+ * in the fields Website settings edits in place too
+ * (`location-address-fields.tsx`). A link that isn't Google's own is said
+ * under its field and holds Save; a refusal from the API is said in the
+ * sheet, which stays open with what was typed.
+ */
 export function PlaceAddressSheet({
     store,
     open,
@@ -239,8 +235,10 @@ export function PlaceAddressSheet({
     save,
     onClose,
 }: SheetProps) {
-    const saved = store.address ?? "";
-    const [address, setAddress] = useState(saved);
+    const [draft, setDraft] = useState(() => addressDraftOf(store));
+    const [tried, setTried] = useState(false);
+    const [left, setLeft] = useState(false);
+    const [refusal, setRefusal] = useState<string | null>(null);
 
     return (
         <PlaceSheetFrame
@@ -252,31 +250,33 @@ export function PlaceAddressSheet({
             onClose={onClose}
             onSubmit={(e) => {
                 e.preventDefault();
-                if (address.trim() === saved) {
+                setTried(true);
+                if (mapLinkProblem(draft.mapUrl)) return;
+                const patch = addressPatch(draft, store);
+                if (Object.keys(patch).length === 0) {
                     onClose();
                     return;
                 }
+                setRefusal(null);
                 save(
-                    { address: address.trim() || null },
-                    "Location address saved",
+                    patch,
+                    "Location address saved.",
                     undefined,
-                    undefined,
+                    setRefusal,
                     onClose,
                 );
             }}
         >
-            <Label htmlFor={ADDRESS_FIELD_ID}>Location address</Label>
-            <Textarea
-                id={ADDRESS_FIELD_ID}
-                value={address}
-                rows={4}
-                maxLength={500}
-                aria-describedby="storefront-address-note"
-                onChange={(e) => setAddress(e.target.value)}
+            <LocationAddressFields
+                draft={draft}
+                onChange={(next) => {
+                    setRefusal(null);
+                    setDraft(next);
+                }}
+                showProblems={tried || left}
+                onLeaveLink={() => setLeft(true)}
+                refusal={refusal}
             />
-            <Note id="storefront-address-note">
-                Printed on receipts, and where pick-up orders are collected.
-            </Note>
         </PlaceSheetFrame>
     );
 }
@@ -313,7 +313,7 @@ export function PlaceHoursSheet({
                 }
                 save(
                     { openingHours: week },
-                    "Opening hours saved",
+                    "Opening hours saved.",
                     undefined,
                     undefined,
                     onClose,

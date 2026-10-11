@@ -52,9 +52,9 @@ describe("toFailure", () => {
     });
 
     it("falls back to a readable sentence for an unreadable body", () => {
-        expect(toFailure(null, "Could not save that code.")).toEqual({
+        expect(toFailure(null, "Couldn't save that code.")).toEqual({
             ok: false,
-            error: "Could not save that code.",
+            error: "Couldn't save that code.",
         });
         expect(toFailure({ error: { details: ["x"] } }, "Nope.")).toEqual({
             ok: false,

@@ -60,7 +60,7 @@ const handoff = (over: Partial<PaymentHandoff> = {}): PaymentHandoff => ({
 const request = (over: Partial<PaymentHandoff> = {}): CheckoutRequest => ({
     handoff: handoff(over),
     business: "Kavi Dental",
-    description: "Check-up · Sun 20 Sep at 07:00",
+    description: "Check-up · Sun 20 Sep at 7:00 am",
     booker: {
         name: "Asha Rao",
         email: "asha@example.in",

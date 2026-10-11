@@ -162,7 +162,7 @@ describe("sending an invoice (real database)", () => {
         });
         expect(message?.subject).toContain("Rye & Co.");
         expect(message?.body).toContain(SECRET_LINK_SLOT);
-        expect(message?.body).toContain("₹2,400.00");
+        expect(message?.body).toContain("₹2,400");
 
         const job = await jobFor(message!.id);
         const fake = new FakeCommsProvider("EMAIL");
@@ -462,7 +462,7 @@ describe("sending an invoice (real database)", () => {
                     thread: { contactId: accountContact },
                 });
                 expect(posts[0].body).toMatch(
-                    /^Invoice .+ for ₹2,400\.00 is ready to pay\./,
+                    /^Invoice .+ for ₹2,400 is ready to pay\./,
                 );
                 // The pay link is never in a message that is kept.
                 expect(posts[0].body).not.toMatch(/pay\//);

@@ -1,8 +1,10 @@
+import { FailedRead } from "@/components/shared/failed-read";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { HistoryRow } from "@/lib/subscriptions/plan-detail";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Plan Detail's History (D4): every recorded change, newest first, who made
@@ -27,13 +29,9 @@ export function PlanHistory({
     if (!rows) {
         return (
             <FailedState
-                title="History could not be loaded"
-                description="This tab couldn't read the plan's changes. Nothing has changed — the plan is as it was."
-                action={
-                    <Button variant="outline" onClick={onRetry}>
-                        Try again
-                    </Button>
-                }
+                size="panel"
+                title={couldntLoad("this plan's history")}
+                onRetry={onRetry}
             />
         );
     }
@@ -71,19 +69,14 @@ export function PlanHistory({
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                     <Button
                         variant="outline"
-                        className="h-[38px] rounded-[9px] px-4 text-[14px] font-semibold coarse:h-11"
-                        disabled={loadingMore}
                         onClick={onMore}
+                        busy={loadingMore}
+                        busyLabel="Loading…"
                     >
-                        {loadingMore ? "Loading…" : "Show earlier changes"}
+                        Show earlier changes
                     </Button>
                     {moreFailed ? (
-                        <p
-                            role="alert"
-                            className="text-[12.5px] text-destructive"
-                        >
-                            Earlier changes couldn&apos;t be loaded. Try again.
-                        </p>
+                        <FailedRead things="earlier changes" onRetry={onMore} />
                     ) : null}
                 </div>
             ) : null}

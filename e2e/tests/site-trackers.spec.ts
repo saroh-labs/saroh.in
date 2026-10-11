@@ -1,4 +1,4 @@
-// @covers site:/ site:/[slug] site:/checkout/[orderId] site:/cookie-notice api:sites pkg:site-blocks
+// @covers site:/ site:/[slug] site:/checkout/[orderId] site:/shop/order/[orderId] site:/cookie-notice api:sites pkg:site-blocks
 import type { APIRequestContext, Page, Request } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -134,9 +134,14 @@ test.describe("a merchant's own trackers (DEC-108)", { tag: "@serial" }, () => {
                 )
                 .toBe(true);
 
-            // A checkout page loads nothing, even having accepted.
+            // A checkout page loads nothing, even having accepted. The old
+            // checkout address forwards to the order's page: both are
+            // private, and neither loads a tracker.
             const before = asked.length;
             await site.goto(`${LIVE}/checkout/e2e-no-such-order`);
+            await expect
+                .poll(() => new URL(site.url()).pathname)
+                .toBe("/shop/order/e2e-no-such-order");
             await site.waitForLoadState("networkidle");
             expect(asked.slice(before), "no tracker on checkout").toEqual([]);
 

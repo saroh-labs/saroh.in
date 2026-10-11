@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/format/datetime";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
@@ -12,8 +13,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { FailedRead } from "@/components/shared/failed-read";
+import { runAction } from "@/lib/api/run-action";
 import { restorePublication } from "@/lib/sites/actions";
-import { exactDate } from "@/lib/sites/format-date";
 import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";
 import {
     releaseTitle,
@@ -24,6 +26,7 @@ import {
 import type { SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import { Notice } from "@saroh/ui/notice";
 
 const BADGE: Record<
     VersionBadgeTone,
@@ -107,7 +110,7 @@ export function SiteVersions({
                 {upcoming}
                 <EmptyState
                     icon={<History />}
-                    title="Never published"
+                    title="No versions yet"
                     description="Once you publish this site, every version is kept here and you can put an earlier one back."
                 />
             </div>
@@ -119,11 +122,10 @@ export function SiteVersions({
     function onRestore(publicationId: string) {
         const override = gate.kind === "override";
         startTransition(async () => {
-            const res = await restorePublication(
-                siteId,
-                publicationId,
-                override,
+            const res = await runAction(() =>
+                restorePublication(siteId, publicationId, override),
             );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 // The setting was turned on since this page was read: the
@@ -154,7 +156,9 @@ export function SiteVersions({
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="text-sm font-medium">
-                                            {exactDate(when, zone)}
+                                            {formatDateTime(when, zone, {
+                                                year: "always",
+                                            })}
                                         </span>
                                         {/*
                                          * Live is marked, not implied by
@@ -169,7 +173,6 @@ export function SiteVersions({
                                             <Badge
                                                 key={b.label}
                                                 variant={BADGE[b.tone]}
-                                                className="whitespace-nowrap"
                                             >
                                                 {b.label}
                                             </Badge>
@@ -227,16 +230,14 @@ export function SiteVersions({
                                                         ? "destructive"
                                                         : "brand"
                                                 }
-                                                disabled={pending}
                                                 onClick={() => onRestore(p.id)}
+                                                busy={pending}
+                                                busyLabel="Restoring…"
                                             >
-                                                {pending
-                                                    ? "Restoring…"
-                                                    : gate.kind ===
-                                                            "override" ||
-                                                        changesRequested
-                                                      ? "Restore without approval"
-                                                      : "Yes, restore"}
+                                                {gate.kind === "override" ||
+                                                changesRequested
+                                                    ? "Restore without approval"
+                                                    : "Yes, restore"}
                                             </Button>
                                             <Button
                                                 size="sm"
@@ -302,9 +303,9 @@ function RestoreConfirm({
             <p className="text-sm text-muted-foreground">
                 This replaces what visitors see now
                 {current
-                    ? ` (published ${exactDate(current.publishedAt, zone)})`
+                    ? ` (published ${formatDateTime(current.publishedAt, zone, { year: "always" })})`
                     : ""}
-                . Nothing is deleted — this version is published again as a new
+                . Nothing is deleted. This version is published again as a new
                 entry, so you can undo it from this same list. Your unpublished
                 draft is left alone.
                 {changesRequested && gate.kind !== "override"
@@ -312,12 +313,9 @@ function RestoreConfirm({
                     : null}
             </p>
             {gate.kind === "override" ? (
-                <p
-                    role="note"
-                    className="rounded-lg bg-destructive-subtle px-3.5 py-3 text-[12.5px] leading-normal text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" role="note">
                     {RESTORE_OVERRIDE_LINE}
-                </p>
+                </Notice>
             ) : null}
         </div>
     );
@@ -338,9 +336,10 @@ function ScheduledList({
     if (scheduled === null) return null;
     if (scheduled.state === "failed") {
         return (
-            <p className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
-                Couldn&apos;t check for scheduled go-lives. Reload to try again.
-            </p>
+            <FailedRead
+                things="scheduled go-lives"
+                className="rounded-lg border bg-muted px-4 py-3"
+            />
         );
     }
     const upcoming = scheduled.releases.filter(
@@ -364,10 +363,7 @@ function ScheduledList({
                                         <span className="text-sm font-medium [overflow-wrap:anywhere]">
                                             {releaseTitle(release)}
                                         </span>
-                                        <Badge
-                                            variant="info"
-                                            className="whitespace-nowrap"
-                                        >
+                                        <Badge variant="info">
                                             {status.label}
                                         </Badge>
                                     </div>

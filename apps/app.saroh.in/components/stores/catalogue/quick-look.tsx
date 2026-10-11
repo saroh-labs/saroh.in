@@ -1,5 +1,6 @@
 "use client";
 
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -22,6 +23,8 @@ import { productEditHref, productHref } from "@/lib/products/links";
 import { position } from "@/lib/products/quick-look";
 import type { ProductStatus } from "@/lib/products/service";
 
+import { IconButton } from "@saroh/ui/icon-button";
+import { Tip } from "@saroh/ui/tooltip";
 import { ProductThumb } from "./product-thumb";
 import { StockBlock } from "./quick-look-stock";
 import { STATUS_LABEL, STATUS_VARIANT } from "./tones";
@@ -109,16 +112,13 @@ export function QuickLook({
                         <div className="flex items-center gap-2.5 border-b border-muted px-[18px] py-4">
                             <Badge
                                 variant={STATUS_VARIANT[row.status]}
-                                className="px-[9px] py-[3px] text-[11px] font-medium"
+                                size="sm"
                             >
                                 {STATUS_LABEL[row.status]}
                             </Badge>
                             {row.paused ? (
                                 // Past the plan's products limit (#800).
-                                <Badge
-                                    variant="warning"
-                                    className="px-[9px] py-[3px] text-[11px] font-medium"
-                                >
+                                <Badge variant="warning" size="sm">
                                     Paused
                                 </Badge>
                             ) : null}
@@ -126,36 +126,29 @@ export function QuickLook({
                                 {position(index, total)}
                             </span>
                             <div className="ml-auto flex gap-0.5">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
-                                    onClick={() => onStep(-1)}
-                                    aria-label="Previous product (K)"
-                                    title="Previous (K)"
-                                >
-                                    <ChevronUp className="size-4" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
-                                    onClick={() => onStep(1)}
-                                    aria-label="Next product (J)"
-                                    title="Next (J)"
-                                >
-                                    <ChevronDown className="size-4" />
-                                </Button>
+                                <Tip label="Previous (K)">
+                                    <IconButton
+                                        label="Previous product (K)"
+                                        icon={<ChevronUp />}
+                                        variant="ghost"
+                                        onClick={() => onStep(-1)}
+                                    />
+                                </Tip>
+                                <Tip label="Next (J)">
+                                    <IconButton
+                                        label="Next product (J)"
+                                        icon={<ChevronDown />}
+                                        variant="ghost"
+                                        onClick={() => onStep(1)}
+                                    />
+                                </Tip>
                             </div>
                             <SheetClose asChild>
-                                <Button
+                                <IconButton
+                                    label="Close (Esc)"
+                                    icon={<X />}
                                     variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-600 coarse:size-11 dark:text-foreground"
-                                    aria-label="Close (Esc)"
-                                >
-                                    <X className="size-4" strokeWidth={2.1} />
-                                </Button>
+                                />
                             </SheetClose>
                         </div>
                         <div className="flex-1 overflow-y-auto p-[18px]">
@@ -202,15 +195,10 @@ export function QuickLook({
                                 </Line>
                                 <Line label="Updated" center last>
                                     <span className="font-mono text-[12px]">
-                                        {new Date(row.updatedAt).toLocaleString(
-                                            "en-GB",
-                                            {
-                                                day: "numeric",
-                                                month: "short",
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                            },
-                                        )}
+                                        <ViewerDate
+                                            iso={row.updatedAt}
+                                            variant="datetime"
+                                        />
                                     </span>
                                 </Line>
                             </dl>
@@ -259,7 +247,7 @@ function SellToggle({
         <Button
             variant="ghost"
             className={cn(
-                "ml-auto px-3",
+                "ml-auto",
                 selling
                     ? "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
                     : "text-foreground",
@@ -272,12 +260,12 @@ function SellToggle({
 }
 
 function PriceBlock({ row }: { row: CatalogueRow }) {
-    const money = (v: string) => formatMoneyMajor(v, row.currency) ?? "—";
+    const money = (v: string) => formatMoneyMajor(v, row.currency);
     return (
         <div className="min-w-0">
             <div className="font-display text-[14px] font-semibold tabular-nums tracking-[-0.02em]">
                 {row.priceRange
-                    ? `${money(row.priceRange.low)} – ${money(row.priceRange.high)}`
+                    ? `${money(row.priceRange.low)} to ${money(row.priceRange.high)}`
                     : money(row.price)}
             </div>
             {row.priceRange ? (

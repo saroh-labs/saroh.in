@@ -68,7 +68,7 @@ describe("the screen's words", () => {
     });
 
     it("shows a dash until a booking is counted, then the number", () => {
-        expect(madeWords(code())).toEqual({ bookings: "–", orders: null });
+        expect(madeWords(code())).toEqual({ bookings: "—", orders: null });
         expect(madeWords(code({ bookings: 11, orders: 1 }))).toEqual({
             bookings: "11",
             orders: "1 order",

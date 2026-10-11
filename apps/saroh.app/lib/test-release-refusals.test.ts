@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
     isBookResult,
@@ -75,26 +75,5 @@ describe("a test host's write, refused by the API", () => {
         expect(refusalMessage(409, REFUSED, "fallback")).toBe(
             TEST_RELEASE_MESSAGE,
         );
-    });
-});
-
-describe("the order page's Pay, refused by the API", () => {
-    afterEach(() => {
-        vi.unstubAllGlobals();
-    });
-
-    it("says it is a test release", async () => {
-        vi.stubGlobal(
-            "fetch",
-            vi.fn(() =>
-                Promise.resolve(
-                    new Response(JSON.stringify(REFUSED), { status: 409 }),
-                ),
-            ),
-        );
-        const { createPaymentIntent } = await import("./checkout");
-        expect(
-            await createPaymentIntent("ord_1", { idempotencyKey: "k" }),
-        ).toEqual({ ok: false, error: TEST_RELEASE_MESSAGE });
     });
 });

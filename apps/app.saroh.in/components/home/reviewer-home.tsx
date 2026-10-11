@@ -1,4 +1,4 @@
-import { PartialNotice } from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -7,6 +7,7 @@ import { formatList } from "@/lib/home/needs";
 import type { ReviewRow } from "@/lib/home/reviews";
 import { liveSites, reviewRows } from "@/lib/home/reviews";
 import type { HomeModel } from "@/lib/home/service";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** Where a merchant's subdomain lives, as the Website screen reads it. */
 const ROOT_DOMAIN = env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app";
@@ -33,21 +34,19 @@ export function ReviewerHome({ home }: { home: HomeModel }) {
     return (
         <div className="grid min-w-0 gap-5">
             {failed ? (
-                <PartialNotice>
-                    {formatList(home.unavailable.map((part) => part.label))}{" "}
-                    could not be loaded, so this may not be everything sent to
-                    you.
-                </PartialNotice>
+                <PartialRead
+                    things={formatList(
+                        home.unavailable.map((part) => part.label),
+                    )}
+                    so="This may not be everything sent to you."
+                />
             ) : null}
 
             <section
                 aria-labelledby="home-reviews"
                 className="grid min-w-0 gap-[9px]"
             >
-                <h2
-                    id="home-reviews"
-                    className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                >
+                <h2 id="home-reviews" className="label">
                     Sent to you for review
                 </h2>
                 {rows.length > 0 ? (
@@ -62,17 +61,16 @@ export function ReviewerHome({ home }: { home: HomeModel }) {
                     </ul>
                 ) : null}
                 {live.map((site) => (
-                    <a
+                    <TextLink
                         key={site.id}
                         href={site.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="justify-self-start rounded text-[13px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground coarse:min-h-11 coarse:content-center"
+                        external
+                        className="justify-self-start text-[13px] coarse:min-h-11 coarse:content-center"
                     >
                         {live.length > 1
                             ? `See ${site.name} live`
                             : "See the live site"}
-                    </a>
+                    </TextLink>
                 ))}
             </section>
         </div>
@@ -96,7 +94,7 @@ function ReviewItem({ row, first }: { row: ReviewRow; first: boolean }) {
                     className="flex items-center gap-3 bg-card px-4 py-3.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active"
                 >
                     {words}
-                    <span className="shrink-0 text-[12.5px] font-semibold text-brand-subtle-foreground">
+                    <span className="shrink-0 text-[12.5px] font-semibold text-foreground">
                         Open
                     </span>
                 </Link>

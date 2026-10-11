@@ -1,12 +1,14 @@
+import { count as countOf } from "@/lib/format/plural";
 import {
     describePendingChanges,
     pendingChangeCount,
 } from "@/lib/sites/pending";
 import type { SiteDetail, SitePage } from "@/lib/sites/service";
+import { notPublished } from "@saroh/ui/lib/state-copy";
 
 /**
  * The words and rules of a site's Settings tab (Website › Settings audit,
- * 9 Oct 2026): its six groups, the "Before you share your site" checklist,
+ * 9 Oct 2026): its seven groups, the "Before you share your site" checklist,
  * the values the live site actually uses when nothing is written, and the
  * one bar that says what waits for the next publish. Pure, so the editable
  * view and the read-only one say the same thing.
@@ -17,6 +19,7 @@ export const SETTINGS_GROUPS = [
     { id: "address", label: "Address" },
     { id: "search-and-sharing", label: "Search and sharing" },
     { id: "menu-and-footer", label: "Menu and footer" },
+    { id: "contact", label: "Contact and social" },
     { id: "shop", label: "Shop" },
     { id: "tracking", label: "Tracking" },
     { id: "advanced", label: "Advanced" },
@@ -202,7 +205,7 @@ export function publishWaiting(
 ): PublishWaiting | null {
     if (!site.currentPublication) {
         return {
-            line: "Your site isn't published yet. Nobody can reach it until you publish.",
+            line: `${notPublished.line} Nobody can reach it until you publish.`,
         };
     }
     const count = pendingChangeCount(
@@ -215,7 +218,7 @@ export function publishWaiting(
     );
     if (count > 0 && what) {
         return {
-            line: `${count === 1 ? "1 change waits" : `${count} changes wait`} for your next publish: ${what}.`,
+            line: `${countOf(count, "change waits", "changes wait")} for your next publish: ${what}.`,
         };
     }
     if (site.hasUnpublishedChanges) {

@@ -246,7 +246,7 @@ describe("QrMaker — a sample until the code is made", () => {
         expect(host.textContent).toContain("opens Booking page");
         expect(onSaved).toHaveBeenCalledTimes(1);
         expect(showSuccess).toHaveBeenCalledWith(
-            "Code made",
+            "Code made.",
             "glow.saroh.app/q/h7c",
         );
         expect(button("Copy link")?.disabled).toBe(false);
@@ -344,7 +344,7 @@ describe("QrMaker — never a duplicate by accident", () => {
         await draw({ codes: [mirror] });
         await click(radio("Mirror"));
         await click(radio("Colour #5c2a48"));
-        expect(button("Save changes")).toBeTruthy();
+        expect(button("Save")).toBeTruthy();
         await click(button("Download PNG"));
         expect(updateQrCode).toHaveBeenCalledWith("site_1", "qr_m2r", {
             color: "#5c2a48",
@@ -368,7 +368,7 @@ describe("QrMaker — a colour a phone can't read", () => {
         await click(radio("Ink"));
         expect(q('[role="alert"]')).toBeNull();
         expect(button("Download PNG")?.disabled).toBe(false);
-        expect(button("Save changes")?.disabled).toBe(false);
+        expect(button("Save")?.disabled).toBe(false);
     });
 
     it("says the API's refusal by the colour", async () => {
@@ -652,7 +652,7 @@ describe("QrMaker — Change re-points a code", () => {
         await click(radio("Website"));
         // Still that code: the pickers re-point it rather than re-match.
         expect(q("[data-qr-link]")?.textContent).toBe("glow.saroh.app/q/h7c");
-        await click(button("Save changes"));
+        await click(button("Save"));
         expect(updateQrCode).toHaveBeenCalledWith("site_1", "qr_h7c", {
             targetKind: "SITE",
             targetRef: null,

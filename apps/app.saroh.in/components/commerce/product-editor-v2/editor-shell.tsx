@@ -1,5 +1,8 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
+import { Button } from "@saroh/ui/button";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronLeft } from "lucide-react";
@@ -8,13 +11,13 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { pausedWords, PLAN_AND_BILLING_HREF } from "@/lib/billing/paused";
-import { currencySymbol } from "@/lib/format/money";
 import { createProduct } from "@/lib/products/actions";
 import { readOnlyBanner, sectionJumps } from "@/lib/products/editor-labels";
 import type { SectionKey } from "@/lib/products/editor-sections";
 import {
+    joinAnd,
     partitionSections,
     saveHint,
     SECTION_ORDER,
@@ -30,16 +33,15 @@ import type { EffectiveDefaults } from "@/lib/products/settings";
 import { effectiveDefaults } from "@/lib/products/settings-actions";
 import { trackingControl } from "@/lib/products/tracking";
 
+import { PlanWay } from "@/components/billing/plan-way";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { UNREACHED } from "@/lib/api/unreached";
+import { TextLink } from "@saroh/ui/text-link";
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
 import { DescriptionSection } from "./description-section";
 import { DetailsSection } from "./details-section";
-import {
-    LeaveDialog,
-    NextSteps,
-    ReadOnlyNote,
-    StatusPill,
-} from "./editor-parts";
+import { NextSteps, ReadOnlyNote } from "./editor-parts";
 import { ProductEditorProvider, useEditor } from "./editor-state";
 import { MadeBySection } from "./made-by-section";
 import { PhotosSection } from "./photos-section";
@@ -52,6 +54,8 @@ export interface ProductEditorProps {
     storeId: string;
     storeName: string;
     currency: string;
+    /** The business is GST-registered: Basics asks for a rate and HSN. */
+    gstRegistered: boolean;
     categories: CategoryChoice[];
     categoriesHref: string;
     options: ProductOptionView[];
@@ -117,6 +121,7 @@ function EditorBody({
     storeId,
     storeName,
     currency,
+    gstRegistered,
     categories,
     categoriesHref,
     options,
@@ -145,10 +150,8 @@ function EditorBody({
     const canEdit = canWrite || canStock;
     const jumpNames = sectionJumps(allergens.length > 0);
     const creating = mode === "create";
-    const symbol = currencySymbol(currency);
     const [createStatus, setCreateStatus] = useState<ProductStatus>("DRAFT");
     const [creatingNow, setCreatingNow] = useState(false);
-    const [leaving, setLeaving] = useState(false);
     // Creating: what the chosen category starts a product with. Sections
     // take it for the fields the merchant hasn't touched.
     const [defaults, setDefaults] = useState(initialDefaults);
@@ -175,7 +178,12 @@ function EditorBody({
     const createBad = SECTION_ORDER.some((k) => problems[k]);
     const firstBad = SECTION_ORDER.map((k) => problems[k]).find(Boolean) ?? "";
 
-    useLeaveGuard(canEdit && dirty.length > 0 && !creatingNow);
+    const guard = useLeaveGuard({
+        dirty: canEdit && dirty.length > 0 && !creatingNow,
+        lost: creating
+            ? "The product isn't created yet, so nothing you've entered will be kept."
+            : `Your changes to ${joinAnd(dirty.map((k) => names[k]))} will be lost.`,
+    });
 
     async function create() {
         if (!canWrite || createBad || creatingNow) return;
@@ -192,9 +200,7 @@ function EditorBody({
             });
         } catch {
             setCreatingNow(false);
-            showError(
-                "Couldn't create it — the connection dropped. Everything you entered is still here.",
-            );
+            showError(UNREACHED);
             return;
         }
         if (!res.ok) {
@@ -211,7 +217,7 @@ function EditorBody({
                     ? "Created and live on the shop."
                     : "Created as a draft."
             } Add variants and stock on the right if it needs them.${
-                photosOk ? "" : " The photos didn't save — add them again."
+                photosOk ? "" : " The photos didn't save. Add them again."
             }`,
         );
         router.replace(productEditHref(storeId, res.data.id));
@@ -224,12 +230,18 @@ function EditorBody({
                 : firstBad
             : createStatus === "PUBLISHED"
               ? "Goes live as soon as it is created."
-              : "It will be created as a draft — only the team will see it."
+              : "It will be created as a draft. Only the team will see it."
         : saveHint(dirty, stuck, names);
     const showHeaderSave = canWrite && (creating || dirty.length > 1);
     const headerOff = creating
         ? createBad || creatingNow
         : savable.length === 0 || saving.length > 0;
+    // Cmd/Ctrl+S: what the header's button does, when it could be pressed.
+    useSaveShortcut(() => {
+        if (headerOff) return;
+        if (creating) void create();
+        else void saveSections(savable);
+    }, canWrite);
 
     const jumps = SECTION_ORDER.filter(
         (k) =>
@@ -246,19 +258,9 @@ function EditorBody({
                 <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
                     <Link
                         href={PRODUCTS_HREF}
-                        onClick={(e) => {
-                            if (canEdit && dirty.length > 0) {
-                                e.preventDefault();
-                                setLeaving(true);
-                            }
-                        }}
                         className="flex items-center gap-[7px] rounded-[8px] px-[9px] py-1.5 text-[12.5px] text-foreground/75 hover:bg-muted hover:text-foreground"
                     >
-                        <ChevronLeft
-                            aria-hidden
-                            className="size-[15px]"
-                            strokeWidth={2}
-                        />
+                        <ChevronLeft aria-hidden className="size-[15px]" />
                         Products
                     </Link>
                     <span
@@ -274,7 +276,13 @@ function EditorBody({
                               ? product.name
                               : "Untitled product"}
                     </span>
-                    <StatusPill status={product?.status ?? null} />
+                    {/* A fact about what customers can see, so it follows
+                        the SAVED status. */}
+                    {product ? (
+                        <StatusBadge thing="product" status={product.status} />
+                    ) : (
+                        <StatusBadge tone="draft">Not created yet</StatusBadge>
+                    )}
                     <div className="ml-auto flex flex-wrap items-center gap-2.5 max-[480px]:ml-0">
                         <span
                             role="status"
@@ -288,7 +296,8 @@ function EditorBody({
                             {hint}
                         </span>
                         {showHeaderSave ? (
-                            <button
+                            <Button
+                                size="sm"
                                 type="button"
                                 disabled={headerOff}
                                 onClick={() =>
@@ -296,7 +305,6 @@ function EditorBody({
                                         ? void create()
                                         : void saveSections(savable)
                                 }
-                                className="h-[34px] rounded-[9px] bg-foreground px-3.5 text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground coarse:h-11"
                             >
                                 {creating
                                     ? creatingNow
@@ -307,7 +315,7 @@ function EditorBody({
                                     : saving.length > 0
                                       ? "Saving…"
                                       : "Save all"}
-                            </button>
+                            </Button>
                         ) : null}
                     </div>
                 </div>
@@ -317,12 +325,11 @@ function EditorBody({
                     // everyone, and why, not "you're viewing as …".
                     <ReadOnlyNote>
                         {pausedWords("product")}{" "}
-                        <Link
-                            href={PLAN_AND_BILLING_HREF}
-                            className="font-medium underline underline-offset-2"
-                        >
-                            See Plan and billing
-                        </Link>
+                        <PlanWay fallback={null}>
+                            <TextLink href={PLAN_AND_BILLING_HREF}>
+                                {planLabel()}
+                            </TextLink>
+                        </PlanWay>
                     </ReadOnlyNote>
                 ) : !canWrite ? (
                     <ReadOnlyNote>
@@ -332,7 +339,7 @@ function EditorBody({
 
                 <nav
                     aria-label="Sections"
-                    className="flex flex-wrap gap-1 border-b border-border px-4 py-2 max-[760px]:flex-nowrap max-[760px]:overflow-x-auto"
+                    className="flex flex-wrap gap-1 border-b border-border px-4 py-2 max-desk:flex-nowrap max-desk:overflow-x-auto"
                 >
                     {jumps.map((k) => (
                         <a
@@ -350,7 +357,7 @@ function EditorBody({
                                         "size-[7px] rounded-full",
                                         problems[k]
                                             ? "bg-destructive"
-                                            : "bg-highlight",
+                                            : "bg-foreground",
                                     )}
                                 />
                             ) : null}
@@ -359,13 +366,13 @@ function EditorBody({
                 </nav>
             </div>
 
-            <div className="flex flex-wrap items-stretch max-[760px]:flex-col">
+            <div className="flex flex-wrap items-stretch max-desk:flex-col">
                 <div className="flex min-w-0 flex-[1_1_440px] flex-col gap-4 px-5 pb-[30px] pt-5 max-[480px]:px-4">
                     <BasicsSection
                         product={product}
                         storeId={storeId}
                         currency={currency}
-                        symbol={symbol}
+                        gstRegistered={gstRegistered}
                         categories={categories}
                         manageCategoriesHref={categoriesHref}
                         onCategoryChange={(id) => void categoryChanged(id)}
@@ -385,7 +392,7 @@ function EditorBody({
                     />
                     <PhotosSection product={product} />
                 </div>
-                <div className="flex min-w-[300px] flex-[1_1_380px] flex-col gap-4 border-l border-border px-5 pb-[30px] pt-5 max-[760px]:min-w-0 max-[760px]:border-l-0 max-[760px]:border-t max-[480px]:px-4">
+                <div className="flex min-w-[300px] flex-[1_1_380px] flex-col gap-4 border-l border-border px-5 pb-[30px] pt-5 max-desk:min-w-0 max-desk:border-l-0 max-desk:border-t max-[480px]:px-4">
                     <VisibilitySection
                         product={product}
                         storeId={storeId}
@@ -397,7 +404,7 @@ function EditorBody({
                             <VariantsSection
                                 product={product}
                                 storeId={storeId}
-                                symbol={symbol}
+                                currency={currency}
                                 options={options}
                                 sku={sku}
                                 stores={stores}
@@ -426,13 +433,7 @@ function EditorBody({
                 </div>
             </div>
 
-            <LeaveDialog
-                open={leaving}
-                onOpenChange={setLeaving}
-                href={PRODUCTS_HREF}
-                creating={creating}
-                sections={dirty.map((k) => names[k])}
-            />
+            {guard.dialog}
         </main>
     );
 }

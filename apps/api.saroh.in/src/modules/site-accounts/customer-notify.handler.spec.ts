@@ -133,7 +133,7 @@ describe("customer.notify — what it writes", () => {
             organizationId: ORG,
             contactId: "ct_1",
             author: "SYSTEM",
-            body: "Your order ORD-1019 is ready to collect.",
+            body: "Your order ORD-1019 is ready for pick-up.",
             event: "ORDER_READY",
             now: NOW,
         });
@@ -455,7 +455,7 @@ describe("customer.notify — once, and only what still stands", () => {
             NOW,
         );
         expect(append.mock.calls[0][1].body).toBe(
-            "You moved your Check-up to Tue 6 Oct at 11:00.",
+            "You moved your Check-up to Tue 6 Oct at 11:00 am.",
         );
         expect(tx.customerNotice.update.mock.calls[0][0].data).toMatchObject({
             bookingId: "bk_1",
@@ -553,7 +553,7 @@ describe("customer.notify — a website order placed (UX-042)", () => {
         expect(append.mock.calls[0][1]).toMatchObject({
             contactId: "ct_1",
             author: "SYSTEM",
-            body: "We have your order ORD-1019. You pay when you collect it. We'll tell you when it's ready to collect.",
+            body: "We have your order ORD-1019. You pay at pick-up. We'll tell you when it's ready for pick-up.",
             event: "ORDER_PLACED",
         });
         expect(queueTransactional.mock.calls[0][2]).toMatchObject({

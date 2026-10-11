@@ -206,7 +206,7 @@ export function BusinessWeek({
 
             <p className="!mt-3 text-[11.5px] text-muted-foreground">
                 Everything here is read from orders, subscriptions, invoices and
-                bookings — nothing is entered on the calendar itself. Open a day
+                bookings. Nothing is entered on the calendar itself. Open a day
                 from its date to see all of it.
                 {cash
                     ? " Each day's money is what came in (+) and went out (−) that day."

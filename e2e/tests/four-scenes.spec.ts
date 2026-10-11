@@ -389,9 +389,19 @@ test.describe("Home's Today (F5)", () => {
         const times = await rows.evaluateAll((items) =>
             items
                 .map((li) => (li.firstElementChild?.textContent ?? "").trim())
-                .filter((t) => /^\d\d:\d\d$/.test(t)),
+                .filter((t) => /^\d{1,2}:\d\d [ap]m$/.test(t)),
         );
-        expect(times).toEqual([...times].sort());
+        // "9:30 am" is on the 12-hour clock, so it is ordered by its minutes.
+        const minutes = (t: string) => {
+            const [clock = "", period] = t.split(" ");
+            const [h = "0", m = "0"] = clock.split(":");
+            return (
+                ((Number(h) % 12) + (period === "pm" ? 12 : 0)) * 60 + Number(m)
+            );
+        };
+        expect(times.map(minutes)).toEqual(
+            [...times].map(minutes).sort((a, b) => a - b),
+        );
 
         const short = await rows.evaluateAll((items) =>
             items

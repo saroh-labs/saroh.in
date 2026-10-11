@@ -10,14 +10,22 @@ import type { QrStyle } from "@/lib/qr/types";
 import { QR_LABEL_MAX } from "@/lib/qr/types";
 import { QR_LABELS } from "@/lib/qr/words";
 
-import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
+import { PlanWay } from "@/components/billing/plan-way";
+import {
+    ChoiceGroup,
+    Eyebrow,
+    pillClass,
+} from "@/components/shared/choice-group";
+import { FailedRead } from "@/components/shared/failed-read";
+import { Field } from "@saroh/ui/field";
+import { Notice } from "@saroh/ui/notice";
 import { QrAddLogo } from "./qr-add-logo";
 import type { QrStyleLock } from "./qr-style-lock";
 
 const CUSTOM = "__custom__";
 
 const linkClass =
-    "rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
+    "rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
 
 /**
  * The maker's third column, above its buttons ("Saroh QR Codes" design):
@@ -109,13 +117,15 @@ export function QrLookControls({
                     >
                         {keptBranded ? `${lock.kept} ` : null}
                         {lock.line}{" "}
-                        <Link
-                            href={lock.href}
-                            aria-label={lock.cta}
-                            className={linkClass}
-                        >
-                            {lock.plan}
-                        </Link>
+                        <PlanWay fallback={lock.plan}>
+                            <Link
+                                href={lock.href}
+                                aria-label={lock.cta}
+                                className={linkClass}
+                            >
+                                {lock.plan}
+                            </Link>
+                        </PlanWay>
                         .
                     </p>
                 ) : null}
@@ -133,10 +143,10 @@ export function QrLookControls({
                     </p>
                 ) : null}
                 {style === "BRANDED" && logo.has && !logo.read ? (
-                    <p className="text-[13px] text-foreground/80">
-                        Your logo couldn&apos;t be read just now, so your
-                        initials stand in. Reload to try again.
-                    </p>
+                    <FailedRead
+                        things="your logo"
+                        reassurance="Your initials stand in for now."
+                    />
                 ) : null}
             </div>
 
@@ -167,12 +177,7 @@ export function QrLookControls({
                     }
                 />
                 {colorProblem ? (
-                    <p
-                        role="alert"
-                        className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[13px] text-destructive-subtle-foreground"
-                    >
-                        {colorProblem}
-                    </p>
+                    <Notice tone="error">{colorProblem}</Notice>
                 ) : null}
             </div>
 
@@ -197,19 +202,17 @@ export function QrLookControls({
                     itemClassName={(on) => pillClass(on)}
                 />
                 {custom ? (
-                    <label className="flex flex-col gap-1.5 text-[13px] font-semibold">
-                        Your label
+                    <Field
+                        label="Your label"
+                        hint="Leave it empty for no label."
+                    >
                         <Input
                             value={label}
                             maxLength={QR_LABEL_MAX}
                             onChange={(e) => onLabel(e.target.value)}
                             placeholder="Scan for today's menu"
-                            className="font-normal"
                         />
-                        <span className="font-normal text-muted-foreground">
-                            Leave it empty for no label.
-                        </span>
-                    </label>
+                    </Field>
                 ) : null}
             </div>
         </>

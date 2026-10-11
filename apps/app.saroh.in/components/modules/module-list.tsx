@@ -1,13 +1,18 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Switch } from "@saroh/ui/switch";
 import { showError, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { navRowsForModule } from "@/components/shared/nav-items";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import {
     readModuleImpactAction,
     setModuleStatusAction,
@@ -26,6 +31,7 @@ import {
     setupActionLabel,
 } from "@/lib/modules/switch-plan";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * Settings → Modules ("Saroh Settings" design): one bordered list, a switch
@@ -67,7 +73,7 @@ export function ModuleList({
     // Turning one on asks for its minimum first, in the one sheet (DEC-068).
     const [turningOn, setTurningOn] = useState<string[] | null>(null);
     return (
-        <div className="max-w-[760px]">
+        <div>
             <TurnOnSheet
                 picked={turningOn}
                 modules={all}
@@ -90,7 +96,7 @@ export function ModuleList({
             </div>
             <p className="mt-2.5 text-pretty text-[11.5px] leading-normal text-muted-foreground">
                 {canManage
-                    ? "Turning one off removes its section from the rail at once. Nothing is deleted — the data waits for it to come back on."
+                    ? "Turning one off removes its section from the rail at once. Nothing is deleted. The data waits for it to come back on."
                     : // Shown disabled rather than hidden: knowing what this
                       // business runs on is part of working here, even for
                       // someone who cannot change it.
@@ -118,7 +124,7 @@ const DISPLAY: Partial<Record<string, { note: string }>> = {
         note: "A number of visits bought up front and used over time.",
     },
     COMMUNICATIONS: {
-        note: "Email and WhatsApp to your customers and leads. Works in the background — no new menu item.",
+        note: "Email and WhatsApp to your customers and leads. Works in the background, with no new menu item.",
     },
     AUTOMATIONS: {
         note: "Follow-ups that run on their own. No new menu item.",
@@ -136,7 +142,7 @@ function noteOf(modules: ModuleView[], module: ModuleView): string {
         DISPLAY[module.key]?.note ??
         (rows.length > 0
             ? `${listWords(rows)} in the rail.`
-            : "Works in the background — no new menu item.");
+            : "Works in the background, with no new menu item.");
     // "Needs Appointments." from the API's dependencies, not the copy, so
     // it is said of every module that has one — only the ones shown: a
     // module Saroh hasn't rolled out is never named (DEC-057).
@@ -232,7 +238,10 @@ function ModuleRow({
     ) => {
         startTransition(async () => {
             for (const [key, status] of changes) {
-                const result = await setModuleStatusAction(key, status);
+                const result = await runAction(() =>
+                    setModuleStatusAction(key, status),
+                );
+                if (!result) return;
                 if (!result.ok) {
                     // A refusal is the safe-guard talking (open orders, say).
                     // Say what it said — the switch springing back with no
@@ -253,7 +262,7 @@ function ModuleRow({
             offOrder.map((k) => [k, "DISABLED"]),
             () =>
                 showUndo(
-                    `${label} off${dependentLabels.length > 0 ? `, and ${listWords(dependentLabels)} with it` : ""}${leaving.length > 0 ? ` — ${listWords(leaving)} ${leaving.length === 1 ? "has" : "have"} left the rail` : ""}. Nothing is deleted.`,
+                    `${label} off${dependentLabels.length > 0 ? `, and ${listWords(dependentLabels)} with it` : ""}${leaving.length > 0 ? `. ${listWords(leaving)} ${plural(leaving.length, "has", "have")} left the rail` : ""}. Nothing is deleted.`,
                     // Undo in the order the API accepts: needed before needing.
                     () =>
                         run(
@@ -272,7 +281,11 @@ function ModuleRow({
      */
     const askFirst = () => {
         startTransition(async () => {
-            const read = await readModuleImpactAction(module.key);
+            const answer = await runAction(async () => ({
+                read: await readModuleImpactAction(module.key),
+            }));
+            if (!answer) return;
+            const read = answer.read;
             const text = offImpact({
                 rows: leaving,
                 dependents: dependentLabels,
@@ -333,51 +346,55 @@ function ModuleRow({
                     {noteOf(modules, module)}
                 </p>
                 {asking && (impact || refusal) ? (
-                    <div
+                    <Notice
+                        tone="warning"
                         role="alert"
+                        icon={false}
+                        className="mt-2.5"
                         onKeyDown={(e) => {
                             if (e.key === "Escape") keepOn();
                         }}
-                        className="mt-2.5 grid gap-2 rounded-[9px] border border-highlight-border bg-brand-subtle px-3 py-2.5"
                     >
-                        <p className="text-pretty text-[12.5px] leading-[1.45] text-foreground">
-                            <strong>Turn off {label}?</strong>{" "}
-                            {refusal
-                                ? refusals.map(blockerSentence).join(" ")
-                                : impact}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                            {refusal ? (
-                                // Something refuses it (open orders): no
-                                // Turn off to press, only the way to clear it.
-                                refusalAction && refusal.actionHref ? (
-                                    <Button asChild size="sm">
-                                        <Link href={refusal.actionHref}>
-                                            {refusalAction}
-                                        </Link>
+                        <div className="grid gap-2">
+                            <p className="text-pretty text-[12.5px] leading-[1.45] text-foreground">
+                                <strong>Turn off {label}?</strong>{" "}
+                                {refusal
+                                    ? refusals.map(blockerSentence).join(" ")
+                                    : impact}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {refusal ? (
+                                    // Something refuses it (open orders): no
+                                    // Turn off to press, only the way to clear it.
+                                    refusalAction && refusal.actionHref ? (
+                                        <Button asChild size="sm">
+                                            <Link href={refusal.actionHref}>
+                                                {refusalAction}
+                                            </Link>
+                                        </Button>
+                                    ) : null
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={pending}
+                                        onClick={turnOff}
+                                    >
+                                        Turn off
                                     </Button>
-                                ) : null
-                            ) : (
+                                )}
                                 <Button
+                                    ref={keepRef}
                                     type="button"
+                                    variant="outline"
                                     size="sm"
-                                    disabled={pending}
-                                    onClick={turnOff}
+                                    onClick={keepOn}
                                 >
-                                    Turn off
+                                    Keep it on
                                 </Button>
-                            )}
-                            <Button
-                                ref={keepRef}
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={keepOn}
-                            >
-                                Keep it on
-                            </Button>
+                            </div>
                         </div>
-                    </div>
+                    </Notice>
                 ) : null}
                 {blocked && module.canManage ? (
                     <Button
@@ -396,9 +413,11 @@ function ModuleRow({
                         <span className="text-pretty text-[12.5px] text-foreground/80">
                             {planLock.line}
                         </span>
-                        <Button asChild variant="outline" size="sm">
-                            <Link href={planLock.href}>{planLock.cta}</Link>
-                        </Button>
+                        <PlanWay>
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={planLock.href}>{planLock.cta}</Link>
+                            </Button>
+                        </PlanWay>
                     </div>
                 ) : null}
                 {step ? (
@@ -458,45 +477,28 @@ function ModuleSwitch({
 }) {
     const whyId = useId();
     return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            aria-disabled={locked || busy}
-            aria-busy={busy || undefined}
-            aria-labelledby={why ? `${labelledBy} ${whyId}` : labelledBy}
-            aria-describedby={describedBy}
-            onClick={onFlip}
-            className={cn(
-                "shrink-0 rounded-full p-1 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
-                locked ? "cursor-not-allowed" : "cursor-pointer",
-                locked && !on && "opacity-50",
-                busy && "cursor-progress",
-            )}
-        >
+        <>
             {why ? (
                 <span id={whyId} className="sr-only">
                     , {why}
                 </span>
             ) : null}
-            <span
+            {/* Locked is said, not `disabled`: the switch stays reachable
+                so the reason beside it is read with it. */}
+            <Switch
+                checked={on}
+                aria-disabled={locked || busy}
+                aria-busy={busy || undefined}
+                aria-labelledby={why ? `${labelledBy} ${whyId}` : labelledBy}
+                aria-describedby={describedBy}
+                onCheckedChange={onFlip}
                 className={cn(
-                    "relative block h-6 w-[42px] rounded-full transition-colors duration-fast",
-                    on
-                        ? locked
-                            ? "bg-muted-foreground/50"
-                            : "bg-foreground"
-                        : "bg-border",
+                    locked &&
+                        "cursor-not-allowed !bg-disabled shadow-[inset_0_0_0_1px_hsl(var(--disabled-border))] [&>span]:bg-disabled-foreground",
+                    busy && "cursor-progress",
                 )}
-            >
-                <span
-                    className={cn(
-                        "absolute top-[3px] size-[18px] rounded-full bg-card transition-[left] duration-fast",
-                        on ? "left-[21px]" : "left-[3px]",
-                    )}
-                />
-            </span>
-        </button>
+            />
+        </>
     );
 }
 
@@ -507,18 +509,7 @@ function ModuleSwitch({
  */
 function StateTag({ module, needs }: { module: ModuleView; needs?: string }) {
     const tag = (text: string, tone: "accent" | "quiet" | "error") => (
-        <span
-            className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                tone === "accent" &&
-                    "bg-highlight-subtle text-highlight-subtle-foreground",
-                tone === "quiet" && "bg-muted text-foreground/80",
-                tone === "error" &&
-                    "bg-destructive-subtle text-destructive-subtle-foreground",
-            )}
-        >
-            {text}
-        </span>
+        <StatusBadge tone={tone}>{text}</StatusBadge>
     );
     if (module.lifecycle === "ENABLED") {
         if (module.readiness === "ATTENTION_REQUIRED") {

@@ -1,3 +1,4 @@
+import { dayWords, isTimeZone, timeWords } from "../../common/words-format";
 import type {
     NoticeTemplate,
     RenderedMessage,
@@ -31,6 +32,11 @@ export interface BookingNoticeVars {
     timeZone: string;
     /** The customer did it themselves, from their account or the site. */
     byCustomer: boolean;
+    /**
+     * Their bookings on the business's own site, where they can move or
+     * cancel it (`notice-link.ts`); null or absent: the email has no link.
+     */
+    link?: string | null;
 }
 
 /** The order steps a customer is told about. */
@@ -42,7 +48,7 @@ export interface OrderNoticeVars {
     /** The order's number as the business shows it ("ORD-1019"). */
     number: string;
     stage: NoticeStage;
-    /** Collected by the customer: Ready means "ready to collect". */
+    /** Collected by the customer: Ready means "ready for pick-up". */
     pickup: boolean;
     courier: string | null;
     trackingNumber: string | null;
@@ -58,6 +64,11 @@ export interface PlacedOrderVars {
     fulfilment: string;
     /** Paid when it is handed over, not online. */
     payOnHandover: boolean;
+    /**
+     * The order's own page on the business's site (`notice-link.ts`); null
+     * or absent: the email has no link.
+     */
+    link?: string | null;
 }
 
 export interface WaitlistNoticeVars {
@@ -88,33 +99,14 @@ export function orderNoticeKind(stage: string): NoticeKind | null {
     return null;
 }
 
-/** "Tue 6 Oct at 11:00", in the business's zone. */
+/** "Tue 6 Oct at 11:00 am", in the business's zone. */
 export function noticeWhen(at: Date, timeZone: string): string {
     const zone = safeZone(timeZone);
-    const day = new Intl.DateTimeFormat("en-GB", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        timeZone: zone,
-    })
-        .format(at)
-        .replace(",", "");
-    const time = new Intl.DateTimeFormat("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-        timeZone: zone,
-    }).format(at);
-    return `${day} at ${time}`;
+    return `${dayWords(at, zone, { weekday: true })} at ${timeWords(at, zone)}`;
 }
 
 function safeZone(timeZone: string): string {
-    try {
-        new Intl.DateTimeFormat("en-GB", { timeZone });
-        return timeZone;
-    } catch {
-        return "Asia/Kolkata";
-    }
+    return isTimeZone(timeZone) ? timeZone : "Asia/Kolkata";
 }
 
 /** The sentence the customer's thread gets. Plain text. */
@@ -165,13 +157,13 @@ function placedSentence(p: PlacedOrderVars): string {
         p.fulfilment === "LOCAL_DELIVERY" || p.fulfilment === "SHIPPING";
     // Only the steps they are told about are promised (`orderNoticeKind`).
     const next = pickup
-        ? " We'll tell you when it's ready to collect."
+        ? " We'll tell you when it's ready for pick-up."
         : delivered
           ? " We'll tell you when it's on its way."
           : "";
     if (p.payOnHandover) {
         const pay = pickup
-            ? "You pay when you collect it."
+            ? "You pay at pick-up."
             : delivered
               ? "You pay when it's delivered."
               : "You pay when you get it.";
@@ -186,7 +178,7 @@ function orderSentence(
 ): string {
     if (kind === "ORDER_READY") {
         return o.pickup
-            ? `Your order ${o.number} is ready to collect.`
+            ? `Your order ${o.number} is ready for pick-up.`
             : `Your order ${o.number} is packed and ready to go.`;
     }
     if (o.stage === "OUT_FOR_DELIVERY") {
@@ -212,7 +204,7 @@ function noticeSubject(vars: NoticeVars): string {
             return `Your order ${vars.placed.number} from ${vars.placed.business}`;
         case "ORDER_READY":
             return vars.order.pickup
-                ? `Your order ${vars.order.number} from ${vars.order.business} is ready to collect`
+                ? `Your order ${vars.order.number} from ${vars.order.business} is ready for pick-up`
                 : `Your order ${vars.order.number} from ${vars.order.business} is ready`;
         case "ORDER_HANDED_OVER":
             return `Your order ${vars.order.number} from ${vars.order.business} is on its way`;
@@ -262,6 +254,24 @@ function safeLink(url: string | null): string | null {
     }
 }
 
+/**
+ * The link back from an email to what it is about, with the words above
+ * it; null for a notice that has none, or whose address isn't a web one.
+ */
+export function backLink(
+    vars: NoticeVars,
+): { lead: string; url: string } | null {
+    if (vars.kind === "ORDER_PLACED") {
+        const url = safeLink(vars.placed.link ?? null);
+        return url ? { lead: "See your order:", url } : null;
+    }
+    if (vars.kind === "BOOKING_CONFIRMED" || vars.kind === "BOOKING_MOVED") {
+        const url = safeLink(vars.booking.link ?? null);
+        return url ? { lead: "See, move or cancel your booking:", url } : null;
+    }
+    return null;
+}
+
 /** The email: subject and HTML body, everything typed escaped. */
 export function renderNotice(vars: NoticeVars): RenderedMessage {
     const firstName = firstNameOf(vars);
@@ -271,11 +281,17 @@ export function renderNotice(vars: NoticeVars): RenderedMessage {
         vars.order.stage === "HANDED_TO_COURIER"
             ? safeLink(vars.order.trackingUrl)
             : null;
+    // The way back to it on the business's own site: the order's page, or
+    // their bookings.
+    const back = backLink(vars);
     const body = [
         `<p>${greeting}</p>`,
         `<p>${escapeHtml(noticeSentence(vars))}</p>`,
         link
             ? `<p>Track it here:<br><a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>`
+            : "",
+        back
+            ? `<p>${escapeHtml(back.lead)}<br><a href="${escapeHtml(back.url)}">${escapeHtml(back.url)}</a></p>`
             : "",
         `<p>${escapeHtml(businessOf(vars))}</p>`,
     ]

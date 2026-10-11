@@ -76,7 +76,7 @@ describe("Customer OrdersTab on a phone", () => {
 
     it("says so when the filter leaves nothing, on the phone too", () => {
         const { phone } = render([{ ...order, status: "CANCELLED" }], "open");
-        expect(phone).toContain("Nothing open — every order is done.");
+        expect(phone).toContain("Nothing open.</span> Every order is done.");
         expect(phone).not.toContain("<ul");
     });
 });

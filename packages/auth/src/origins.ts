@@ -63,9 +63,9 @@ export function isTrustedOrigin(origin: string): boolean {
  * trusted first-party origin.
  *
  * Null rather than a default, because callers disagree about the fallback: a
- * sign-in lands at the app launcher, a freshly verified account lands in
- * onboarding. Collapsing both here would send a new user to a grid of
- * products that all bounce them back.
+ * sign-in lands on the app, whose front door picks Home or which business,
+ * and a freshly verified account lands in onboarding. Each caller names its
+ * own.
  *
  * SERVER-SIDE, like everything else in this module: the trusted list comes
  * from an env var the browser never sees.

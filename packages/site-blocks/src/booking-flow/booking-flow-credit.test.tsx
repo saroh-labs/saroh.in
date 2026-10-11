@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SignedInCustomer } from "../account/api";
+import { viewport } from "../test-viewport";
 import type { CreditFor, Result, SignedInBookRequest } from "./api";
 import { resultOf } from "./api";
 import type { BookingAccount } from "./booking-flow";
@@ -182,7 +183,9 @@ function account(over: Partial<BookingAccount> = {}): BookingAccount {
 async function pickSession() {
     fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
     fireEvent.click(
-        await screen.findByRole("radio", { name: /18:30.*4 places left/ }),
+        await screen.findByRole("radio", {
+            name: /6:30 to 7:15 pm.*4 places left/,
+        }),
     );
 }
 
@@ -250,7 +253,7 @@ describe("a class credit online (A10)", () => {
 
         expect(
             await screen.findByText(
-                "Used 1 credit from your 5 classes pack — 3 left, use by 12 Nov.",
+                "Used 1 credit from your 5 classes pack. 3 left, use by 12 Nov.",
             ),
         ).toBeInTheDocument();
         const [body] = bookBodies();
@@ -284,7 +287,7 @@ describe("a class credit online (A10)", () => {
 
         expect(
             await screen.findByText(
-                "Used 1 credit from your membership — 2 left in October.",
+                "Used 1 credit from your membership. 2 left in October.",
             ),
         ).toBeInTheDocument();
         expect(bookBodies()[0]).toMatchObject({
@@ -306,7 +309,7 @@ describe("a class credit online (A10)", () => {
         await screen.findByRole("radio", { name: /Use 1 credit/ });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
 
         await screen.findByRole("heading", { name: "You're booked, Asha." });
@@ -373,7 +376,9 @@ describe("a class credit online (A10)", () => {
         expect(credit).toHaveBeenCalledTimes(2);
         // The time is still chosen, and paying is back to the other ways.
         expect(
-            screen.getByRole("radio", { name: /18:30.*4 places left/ }),
+            screen.getByRole("radio", {
+                name: /6:30 to 7:15 pm.*4 places left/,
+            }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
             screen.getByRole("radio", { name: /Pay ₹500 for this class/ }),
@@ -391,9 +396,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         // Signed out, no credit is offered: paying is the only way.
         expect(
             screen.queryByRole("radio", { name: /Use 1 credit/ }),
@@ -411,7 +413,6 @@ describe("a class credit online (A10)", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
         expect(
             await screen.findByText(
@@ -433,11 +434,7 @@ describe("a class credit online (A10)", () => {
     });
 
     it("on a phone, the credit found after signing in is a note, not the red error (P2)", async () => {
-        window.matchMedia = vi.fn(() => ({
-            matches: true,
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-        })) as unknown as typeof window.matchMedia;
+        viewport("phone");
         serve();
         const credit = creditReads(PACK);
         render(
@@ -448,9 +445,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
         );
@@ -464,7 +458,6 @@ describe("a class credit online (A10)", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
         const found =
             "You have a class credit for this, so we've picked it. Book with 1 credit, or choose another way to pay.";
@@ -493,9 +486,6 @@ describe("a class credit online (A10)", () => {
             />,
         );
         await pickSession();
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
             screen.getByRole("button", { name: "Continue to sign in" }),
@@ -510,7 +500,6 @@ describe("a class credit online (A10)", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
         await screen.findByRole("heading", { name: "You're booked, Asha." });
         expect(bookBodies()[0]).toMatchObject({ pay: "DESK" });

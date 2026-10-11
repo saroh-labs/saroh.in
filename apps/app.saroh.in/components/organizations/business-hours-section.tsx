@@ -1,8 +1,8 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { BusinessHoursSheet } from "@/components/organizations/business-hours-sheet";
@@ -73,11 +73,17 @@ export function BusinessHoursSection({
     /** Says the save landed, with Undo while the week can be put back (F12). */
     offerUndo: OfferUndo;
 }) {
-    const router = useRouter();
     // What the API last said, so the row reads a save at once.
     const [stores, setStores] = useState<StorefrontHours[]>(
         hours.state === "ok" ? hours.storefronts : [],
     );
+    // Hours that couldn't be read and then arrive (Try again reads the
+    // page again) start the row from them, or it would stay empty.
+    const [arrived, setArrived] = useState(hours.state === "ok");
+    if (hours.state === "ok" && !arrived) {
+        setArrived(true);
+        setStores(hours.storefronts);
+    }
     const first = stores.at(0);
     const week = first?.openingHours ?? null;
     const differ = stores.some((s) => !sameWeek(s.openingHours, week));
@@ -92,20 +98,10 @@ export function BusinessHoursSection({
                 </Link>
             </>
         ) : hours.state === "unavailable" ? (
-            <>
-                Your locations&apos; hours couldn&apos;t be read, so they
-                can&apos;t be changed here right now.{" "}
-                <button
-                    type="button"
-                    onClick={() => router.refresh()}
-                    className={cn(
-                        LINK,
-                        "cursor-pointer rounded-sm hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70",
-                    )}
-                >
-                    Try again
-                </button>
-            </>
+            <FailedRead
+                things="your locations' hours"
+                reassurance="They can't be changed here until they load."
+            />
         ) : !first ? (
             <>
                 Hours are kept on a location, and this business has none yet.{" "}

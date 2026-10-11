@@ -189,7 +189,7 @@ const edit = (name: string) =>
 const says = (row: string) =>
     host.querySelector(`[data-testid="location-${row}-summary"]`)?.textContent;
 const card = () =>
-    host.querySelector<HTMLElement>('[data-testid="location-readiness"]');
+    host.querySelector<HTMLElement>('[data-setup-checklist="location"]');
 
 /** The open sheet, and the name a screen reader gives it. */
 const sheet = () => document.querySelector<HTMLElement>('[role="dialog"]');
@@ -258,7 +258,7 @@ describe("The place's rows", () => {
         expect(says("name")).toBe("Hill Road");
         expect(says("kind")).toBe("Yes, they visit");
         expect(says("address")).toBe("12 Hill Road, Bandra");
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon to Sat · 9:00 am to 6:00 pm");
         expect(says("details")).toBe("No description yet · no logo yet");
         expect(sheet()).toBeNull();
         expect(host.querySelector("input, textarea, form")).toBeNull();
@@ -304,7 +304,7 @@ describe("the Name sheet", () => {
         await press(item("Save"));
         expect(update).toHaveBeenCalledTimes(1);
         expect(update).toHaveBeenCalledWith(hill.id, { name: "Linking Road" });
-        expect(showSuccess).toHaveBeenCalledWith("Name saved");
+        expect(showSuccess).toHaveBeenCalledWith("Name saved.");
         expect(sheet()).toBeNull();
         expect(says("name")).toBe("Linking Road");
         // The title and the list show the name: the page reads again.
@@ -344,7 +344,7 @@ describe("the Name sheet", () => {
         await press(item("Save"));
         expect(update).not.toHaveBeenCalled();
         expect(sheet()?.querySelector('[role="alert"]')?.textContent).toBe(
-            "Name is required",
+            "Add a name.",
         );
         expect(name()?.getAttribute("aria-invalid")).toBe("true");
     });
@@ -358,12 +358,12 @@ describe("the Name sheet", () => {
     });
 
     it("a refusal keeps the sheet open with what was typed", async () => {
-        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        update.mockResolvedValue({ ok: false, error: "Couldn't save that." });
         draw();
         await press(edit("Edit name"));
         type(name(), "Linking Road");
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
         expect(sheetName()).toBe("Name");
         expect(name()?.value).toBe("Linking Road");
         expect(says("name")).toBe("Hill Road");
@@ -376,7 +376,7 @@ describe("the Name sheet", () => {
         await press(edit("Edit name"));
         type(name(), "Linking Road");
         await press(item("Save"));
-        expect(item("Saving…")?.disabled).toBe(true);
+        expect(item("Saving…")?.getAttribute("aria-busy")).toBe("true");
         await pressEscape();
         expect(sheetName()).toBe("Name");
         await act(async () => {
@@ -462,9 +462,66 @@ describe("the Address sheet", () => {
         expect(update).toHaveBeenCalledWith(hill.id, {
             address: "7 Linking Road\nKhar",
         });
-        expect(showSuccess).toHaveBeenCalledWith("Location address saved");
+        expect(showSuccess).toHaveBeenCalledWith("Location address saved.");
         expect(sheet()).toBeNull();
         expect(says("address")).toBe("7 Linking Road, Khar");
+    });
+
+    const link = () => field("storefront-map-link");
+
+    it("takes an optional Google Maps link, and says where Get directions opens", async () => {
+        draw();
+        await press(edit("Edit address"));
+        expect(link()?.value).toBe("");
+        expect(link()?.placeholder).toBe(
+            "maps.app.goo.gl/… or g.page/yourname",
+        );
+        expect(sheet()?.textContent).toContain(
+            "Optional. Get directions on your website opens it. Without one, it searches for the address.",
+        );
+        type(link(), "https://www.google.co.in/maps/place/Hill+Road");
+        expect(sheet()?.textContent).toContain(
+            "Get directions opens google.com/maps/place/Hill+Road",
+        );
+        update.mockResolvedValue({
+            ok: true,
+            data: {
+                ...hill,
+                mapUrl: "https://www.google.com/maps/place/Hill+Road",
+            },
+        });
+        await press(item("Save"));
+        // Only the link changed, sent as typed for the API to keep.
+        expect(update).toHaveBeenCalledWith(hill.id, {
+            mapUrl: "https://www.google.co.in/maps/place/Hill+Road",
+        });
+        expect(sheet()).toBeNull();
+        expect(
+            host.querySelector('[data-testid="location-map-link-summary"]')
+                ?.textContent,
+        ).toBe("Get directions opens your Google Maps link");
+    });
+
+    it("holds Save on a link that isn't Google Maps, and sends nothing", async () => {
+        draw();
+        await press(edit("Edit address"));
+        type(link(), "https://evil.example/maps");
+        await press(item("Save"));
+        expect(update).not.toHaveBeenCalled();
+        expect(sheetName()).toBe("Address");
+        expect(sheet()?.textContent).toContain(
+            "That isn't a Google Maps link. In Google Maps, press Share and paste the link here.",
+        );
+        expect(link()?.getAttribute("aria-invalid")).toBe("true");
+    });
+
+    it("clears a saved link left empty", async () => {
+        draw({ mapUrl: "https://g.page/hill-road" });
+        await press(edit("Edit address"));
+        expect(link()?.value).toBe("g.page/hill-road");
+        type(link(), "");
+        await press(item("Save"));
+        expect(update).toHaveBeenCalledWith(hill.id, { mapUrl: null });
     });
 
     it("with none saved the row says so and offers Add address", async () => {
@@ -493,12 +550,14 @@ describe("the Address sheet", () => {
         expect(update).not.toHaveBeenCalled();
         expect(says("address")).toBe("12 Hill Road, Bandra");
 
-        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        update.mockResolvedValue({ ok: false, error: "Couldn't save that." });
         await press(edit("Edit address"));
         expect(box()?.value).toBe("12 Hill Road\nBandra");
         type(box(), "7 Linking Road");
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        // Said in the sheet, which stays open.
+        expect(sheet()?.textContent).toContain("Couldn't save that.");
+        expect(showError).not.toHaveBeenCalled();
         expect(sheetName()).toBe("Address");
         expect(box()?.value).toBe("7 Linking Road");
     });
@@ -516,7 +575,7 @@ describe("the Opening hours sheet", () => {
         expect(t).toContain(
             "Shown on the receipt, in the location's own time.",
         );
-        expect(item("Mon–Sat")?.getAttribute("data-state")).toBe("on");
+        expect(item("Mon to Sat")?.getAttribute("data-state")).toBe("on");
         // One Save, the sheet's: the editor has none of its own.
         expect(item("Save hours")).toBeUndefined();
         expect(sheet()?.querySelectorAll('button[type="submit"]')).toHaveLength(
@@ -527,7 +586,7 @@ describe("the Opening hours sheet", () => {
     it("a change of days is sent by Save, as the full seven days", async () => {
         draw();
         await press(edit("Edit opening hours"));
-        await press(item("Mon–Fri"));
+        await press(item("Mon to Fri"));
         expect(update).not.toHaveBeenCalled();
         await press(item("Save"));
         expect(update).toHaveBeenCalledWith(hill.id, {
@@ -535,9 +594,9 @@ describe("the Opening hours sheet", () => {
                 d.day === "SAT" ? { ...d, closed: true } : d,
             ),
         });
-        expect(showSuccess).toHaveBeenCalledWith("Opening hours saved");
+        expect(showSuccess).toHaveBeenCalledWith("Opening hours saved.");
         expect(sheet()).toBeNull();
-        expect(says("hours")).toBe("Mon–Fri · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon to Fri · 9:00 am to 6:00 pm");
     });
 
     it("never saved: Set hours starts from a week, and Save keeps it as it stands", async () => {
@@ -549,7 +608,7 @@ describe("the Opening hours sheet", () => {
         );
         await press(item("Save"));
         expect(update).toHaveBeenCalledWith(hill.id, { openingHours: WEEK });
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon to Sat · 9:00 am to 6:00 pm");
     });
 
     it("Cancel saves nothing; Save with nothing changed sends nothing", async () => {
@@ -557,22 +616,22 @@ describe("the Opening hours sheet", () => {
         await press(edit("Edit opening hours"));
         await press(item("Every day"));
         await press(item("Cancel"));
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon to Sat · 9:00 am to 6:00 pm");
         expect(document.activeElement).toBe(edit("Edit opening hours"));
         await press(edit("Edit opening hours"));
-        expect(item("Mon–Sat")?.getAttribute("data-state")).toBe("on");
+        expect(item("Mon to Sat")?.getAttribute("data-state")).toBe("on");
         await press(item("Save"));
         expect(update).not.toHaveBeenCalled();
         expect(sheet()).toBeNull();
     });
 
     it("a refusal keeps it open with the days picked", async () => {
-        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        update.mockResolvedValue({ ok: false, error: "Couldn't save that." });
         draw();
         await press(edit("Edit opening hours"));
         await press(item("Every day"));
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
         expect(sheetName()).toBe("Opening hours");
         expect(item("Every day")?.getAttribute("data-state")).toBe("on");
     });
@@ -724,7 +783,7 @@ describe("the Description and logo sheet", () => {
             description: "Sourdough since 2019",
             logoMediaId: OWN.mediaId,
         });
-        expect(showSuccess).toHaveBeenCalledWith("Details saved");
+        expect(showSuccess).toHaveBeenCalledWith("Details saved.");
         expect(sheet()).toBeNull();
         expect(says("details")).toBe("Description added · own logo");
         expect(refresh).toHaveBeenCalled();
@@ -806,7 +865,7 @@ describe("the Description and logo sheet", () => {
         draw();
         await open();
         expect(item("Save")?.disabled).toBe(true);
-        expect(item("Uploading…")?.disabled).toBe(true);
+        expect(item("Uploading…")?.getAttribute("aria-busy")).toBe("true");
     });
 
     it("Cancel saves nothing, even after an upload, and returns to the row's Edit", async () => {
@@ -850,10 +909,10 @@ describe("the Description and logo sheet", () => {
 
         updateDetails.mockResolvedValue({
             ok: false,
-            error: "Could not save that.",
+            error: "Couldn't save that.",
         });
         await press(item("Save"));
-        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(showError).toHaveBeenCalledWith("Couldn't save that.");
         expect(sheetName()).toBe("Description and logo");
         expect(says("details")).toBe("No description yet · no logo yet");
     });

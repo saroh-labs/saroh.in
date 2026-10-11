@@ -1,3 +1,5 @@
+import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 import type {
     QrCodeView,
     QrPlace,
@@ -69,11 +71,8 @@ export function madeWords(code: Pick<QrCodeView, "bookings" | "orders">): {
     orders: string | null;
 } {
     return {
-        bookings: code.bookings > 0 ? String(code.bookings) : "–",
-        orders:
-            code.orders > 0
-                ? `${code.orders} ${code.orders === 1 ? "order" : "orders"}`
-                : null,
+        bookings: code.bookings > 0 ? String(code.bookings) : absentText(),
+        orders: code.orders > 0 ? count(code.orders, "order") : null,
     };
 }
 
@@ -97,7 +96,7 @@ const BY_REASON: Partial<Record<QrRefusalReason, string>> = {
     retired: "This code is retired, so it can't be changed.",
     "too-many":
         "This site has as many QR codes as it can hold. Point one you no longer use somewhere new.",
-    "no-free-code": "We couldn't make a code just now. Try again.",
+    "no-free-code": "We couldn't make a code. Try again.",
 };
 
 /** The design's alert for a colour a phone can't read. */

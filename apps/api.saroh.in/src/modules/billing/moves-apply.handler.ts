@@ -3,8 +3,9 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { dayWords } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
-import { paperDay } from "../invoices/invoice-paper-view";
+import { noticeOf } from "../notifications/notice-target";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { planEndingNotice } from "./billing-emails";
 import { isOneTime } from "./billing-term";
@@ -274,7 +275,7 @@ export class MovesApplyHandler {
             stage,
         );
         const zone = await businessTimezone(prisma, organizationId);
-        const endsOn = paperDay(ending.endsAt.toISOString(), zone);
+        const endsOn = dayWords(ending.endsAt, zone, { year: true });
         // What the end pauses (#801), read as the business will be then.
         const measure = await this.paused.previewAt(
             organizationId,
@@ -309,7 +310,8 @@ export class MovesApplyHandler {
             const notice = await tx.notification.create({
                 data: {
                     organizationId,
-                    type: PLAN_ENDING_NOTIFICATION_TYPE,
+                    // It opens Plan and billing.
+                    ...noticeOf(PLAN_ENDING_NOTIFICATION_TYPE, {}),
                     title: words.title,
                     body: words.body,
                 },

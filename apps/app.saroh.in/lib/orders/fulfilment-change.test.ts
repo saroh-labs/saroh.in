@@ -75,14 +75,14 @@ describe("differenceNote — what saving does to the money", () => {
     it("paid by hand: the counter takes it or gives it back", () => {
         expect(
             differenceNote({ ...base, differenceCents: 4000, paid: "by-hand" }),
-        ).toBe("₹40 more to pay — take it at the counter.");
+        ).toBe("₹40 more to pay. Take it at the counter.");
         expect(
             differenceNote({
                 ...base,
                 differenceCents: -4000,
                 paid: "by-hand",
             }),
-        ).toBe("₹40 back to them — give it back from the till.");
+        ).toBe("₹40 back to them. Give it back from the till.");
     });
 
     it("not paid yet: the total moves", () => {
@@ -94,7 +94,7 @@ describe("differenceNote — what saving does to the money", () => {
     it("no difference says so", () => {
         expect(
             differenceNote({ ...base, differenceCents: 0, paid: "online" }),
-        ).toBe("Same charge — nothing to take or give back.");
+        ).toBe("Same charge. Nothing to take or give back.");
     });
 });
 
@@ -179,7 +179,7 @@ describe("changeAccess — whether B9's buttons open, for this viewer", () => {
                 },
                 owner,
             ).cancel,
-        ).toBe("Cancelling — waiting for the refund to be confirmed");
+        ).toBe("Cancelling. Waiting for the refund to be confirmed");
     });
 
     it("a cancel needs order:refund, paid or not; a change of way order:edit (B16)", () => {

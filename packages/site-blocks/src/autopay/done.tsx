@@ -143,7 +143,7 @@ export function AutopayDone({
             } else {
                 title = "Autopay isn't on";
                 body = o.paid
-                    ? `Your payment went through — ${o.plan} is paid. Autopay didn't turn on, so your next payment comes as a link to pay.${check}`
+                    ? `Your payment went through, and ${o.plan} is paid. Autopay didn't turn on, so your next payment comes as a link to pay.${check}`
                     : `Your payment hasn't gone through, and autopay isn't on for ${o.plan}.${check}`;
                 live = "alert";
                 actions = (

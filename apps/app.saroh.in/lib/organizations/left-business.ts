@@ -43,5 +43,5 @@ export function leftBusinessNotice({
     if (!activeId || memberOf.includes(activeId)) return null;
     if (!activeUser || activeUser !== userId) return null;
     const which = activeName?.trim() ? activeName.trim() : "that business";
-    return `You're no longer in ${which} — someone there removed you, or it closed. Your account is still yours: set one up of your own below, or ask them to invite you again.`;
+    return `You're no longer in ${which}. Someone there removed you, or it closed. Your account is still yours: set one up of your own below, or ask them to invite you again.`;
 }

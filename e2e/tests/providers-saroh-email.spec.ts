@@ -69,7 +69,7 @@ async function openProviders(page: Page, b: OwnBusiness) {
     await page.goto(`/open/${b.id}`);
     await page.goto("/settings/providers");
     await expect(
-        page.getByRole("heading", { name: "Providers", level: 2 }),
+        page.getByRole("heading", { name: "Providers", level: 1 }),
     ).toBeVisible();
 }
 
@@ -235,13 +235,13 @@ test.describe("with Saroh sending a business's booking emails", () => {
         await expect(confirm).toContainText(
             "Booking emails switch to Saroh's email straight away and count against your plan's monthly allowance. All other email stops being sent.",
         );
-        await confirm.getByRole("button", { name: "Disconnect" }).click();
+        await confirm.getByRole("button", { name: /^Disconnect/ }).click();
 
         // Disconnected: the row says Saroh sends booking emails, and the
         // block is back.
         await expect(block(page)).toBeVisible();
         await expect(connected).toContainText(
-            "Disconnected — Saroh sends your booking emails for now, counted against your plan",
+            "Disconnected. Saroh sends your booking emails for now, counted against your plan",
         );
     });
 });

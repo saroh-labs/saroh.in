@@ -1,4 +1,4 @@
-import { Badge } from "@saroh/ui/badge";
+import { PageContainer } from "@/components/shared/page-container";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -12,8 +12,15 @@ import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
 import { TakePayment } from "@/components/bookings/take-payment";
 import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { readOnlyLine } from "@/components/shared/who-can-change";
 import { personHref } from "@/lib/contacts/person-href";
-import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
+import {
+    formatDate,
+    formatDateTime,
+    formatTimeRange,
+} from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { bookingStatus } from "@/lib/format/status";
 import {
@@ -40,12 +47,22 @@ export function BookingDetailView({
     booking,
     past,
     packs,
+    canWrite = false,
     canRefund = false,
     canReadOrder = false,
     desk,
     waitlist,
 }: {
     booking: BookingDetail;
+    /**
+     * `booking:write`: may move, cancel or say how it went. A Member reads
+     * bookings without it, and was shown all three as live buttons the API
+     * then refused. Without it none is drawn and the page says it is
+     * read-only. A calendar-only person holds it, and the API sends them
+     * only their own bookings (`own-diary.ts`), so every booking they can
+     * open here is one they may change.
+     */
+    canWrite?: boolean;
     /** `payment:manage`: may refund money a late cancel keeps (E8). */
     canRefund?: boolean;
     /** `order:read`: a treatment's visit links to its order (E9). */
@@ -106,7 +123,7 @@ export function BookingDetailView({
             (packs.canWrite && packs.usable.length > 0));
 
     return (
-        <main className="mx-auto w-full max-w-4xl p-6 sm:p-8">
+        <PageContainer width="default">
             <PageHeader
                 holdsData
                 // Where it sits (UX-083): Bookings › All bookings › this one.
@@ -138,7 +155,7 @@ export function BookingDetailView({
                         <Button asChild variant="ghost" size="sm">
                             <Link href="/bookings">All bookings</Link>
                         </Button>
-                        {cancelled ? null : past ? (
+                        {cancelled || !canWrite ? null : past ? (
                             // A past appointment cannot be moved and does not
                             // need cancelling — the only thing left to say
                             // about it is how it went.
@@ -174,6 +191,12 @@ export function BookingDetailView({
                 }
             />
 
+            {canWrite ? null : (
+                <ReadOnlyNote className="mb-0 mt-6">
+                    {readOnlyLine("this booking")}
+                </ReadOnlyNote>
+            )}
+
             <div className="mt-6 grid gap-6 sm:grid-cols-2">
                 <section className="rounded-lg border border-border p-5">
                     <h2 className="text-sm font-medium">When</h2>
@@ -185,7 +208,10 @@ export function BookingDetailView({
                         )}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        {formatDayLabel(booking.startAt, timezone)} · {timezone}
+                        {formatDate(booking.startAt, timezone, {
+                            weekday: "short",
+                        })}{" "}
+                        · {timezone}
                     </p>
                     {/* The one fact a moved booking must not hide. Without it
                         a merchant looking at the current time has no way to
@@ -194,7 +220,11 @@ export function BookingDetailView({
                         <p className="mt-3 text-sm text-muted-foreground">
                             Moved from{" "}
                             <span className="text-foreground">
-                                {shortTime(firstMove.fromStartAt, timezone)}
+                                {formatDateTime(
+                                    firstMove.fromStartAt,
+                                    timezone,
+                                    { weekday: "short" },
+                                )}
                             </span>
                             {moved.length > 1
                                 ? ` · moved ${moved.length} times`
@@ -203,7 +233,7 @@ export function BookingDetailView({
                         </p>
                     ) : null}
                     <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <StatusBadge status={booking.status} />
+                        <BookingStatus status={booking.status} />
                         {booking.outcome ? (
                             <OutcomeBadge outcome={booking.outcome} />
                         ) : past && !cancelled ? (
@@ -252,12 +282,10 @@ export function BookingDetailView({
                         // Shown, disabled, with why (FB-1, DEC-098).
                         <TakePaymentLocked
                             className="mt-3"
-                            amount={
-                                formatMoney(
-                                    booking.money.take.cents,
-                                    booking.money.currency,
-                                ) ?? null
-                            }
+                            amount={formatMoney(
+                                booking.money.take.cents,
+                                booking.money.currency,
+                            )}
                             triggerClassName="h-9"
                         />
                     ) : null}
@@ -274,7 +302,7 @@ export function BookingDetailView({
                             {policy}
                         </p>
                     ) : null}
-                    {retired && !cancelled && !past ? (
+                    {retired && !cancelled && !past && canWrite ? (
                         // A missing button with no explanation reads as a bug.
                         <p className="mt-3 text-sm text-muted-foreground">
                             {service.name} is archived, so this booking cannot
@@ -357,7 +385,9 @@ export function BookingDetailView({
                                 {eventTitle(event, timezone)}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                {formatDayLabel(event.createdAt, timezone)}
+                                {formatDate(event.createdAt, timezone, {
+                                    weekday: "short",
+                                })}
                                 {/* Null actor means the booker did it through
                                     the public form — the difference between
                                     "they booked" and "we moved it". */}
@@ -375,7 +405,7 @@ export function BookingDetailView({
                     ) : null}
                 </ol>
             </section>
-        </main>
+        </PageContainer>
     );
 }
 
@@ -390,10 +420,11 @@ function Row({ label, value }: { label: string; value: string | null }) {
     );
 }
 
-function StatusBadge({ status }: { status: BookingDetail["status"] }) {
+function BookingStatus({ status }: { status: BookingDetail["status"] }) {
     return (
-        <Badge
-            variant={
+        <StatusBadge
+            size="default"
+            tone={
                 status === "CONFIRMED"
                     ? "success"
                     : status === "CANCELLED"
@@ -402,15 +433,18 @@ function StatusBadge({ status }: { status: BookingDetail["status"] }) {
             }
         >
             {bookingStatus(status)}
-        </Badge>
+        </StatusBadge>
     );
 }
 
 function OutcomeBadge({ outcome }: { outcome: "ATTENDED" | "NO_SHOW" }) {
     return (
-        <Badge variant={outcome === "ATTENDED" ? "success" : "warning"}>
+        <StatusBadge
+            size="default"
+            tone={outcome === "ATTENDED" ? "success" : "warning"}
+        >
             {outcome === "ATTENDED" ? "Attended" : "No-show"}
-        </Badge>
+        </StatusBadge>
     );
 }
 
@@ -422,23 +456,12 @@ function eventTitle(event: BookingEvent, timeZone: string): string {
     if (event.type === "NO_SHOW") return "Marked as a no-show";
     if (event.type === "PAID_AT_DESK") return "Paid at the desk";
     const from = event.fromStartAt
-        ? shortTime(event.fromStartAt, timeZone)
+        ? formatDateTime(event.fromStartAt, timeZone, { weekday: "short" })
         : null;
-    const to = event.toStartAt ? shortTime(event.toStartAt, timeZone) : null;
+    const to = event.toStartAt
+        ? formatDateTime(event.toStartAt, timeZone, { weekday: "short" })
+        : null;
     return from && to ? `Moved from ${from} to ${to}` : "Moved";
-}
-
-/** "Mon, 20 Jul, 9:00 AM" — a whole instant, short enough for a history line. */
-function shortTime(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    }).format(new Date(iso));
 }
 
 /** "Asha" from "Asha Rao"; an email stays whole. */

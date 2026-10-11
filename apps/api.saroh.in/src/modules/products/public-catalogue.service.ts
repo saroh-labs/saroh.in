@@ -142,6 +142,8 @@ const CARD_SELECT = {
             mrp: true,
             currency: true,
             stockTracked: true,
+            // The product's own category, for the shop's chips.
+            category: { select: { name: true } },
             option: { select: { name: true } },
             images: {
                 orderBy: { position: "asc" },
@@ -360,6 +362,9 @@ export class PublicCatalogueService {
                 variantTitles: offered.map((v) => v.title),
                 optionName: p.option?.name ?? null,
                 blurb: blurbOf(p.description),
+                categoryName: p.category?.name.trim()
+                    ? p.category.name.trim()
+                    : null,
                 soldOut: words.every((w) => w === "SOLD_OUT"),
                 listingId: listing.id,
                 // What the card's Add to bag puts in the bag (the design's

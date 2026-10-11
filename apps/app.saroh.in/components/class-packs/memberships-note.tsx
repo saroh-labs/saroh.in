@@ -1,7 +1,7 @@
-import Link from "next/link";
-
 import type { MembershipPlan } from "@/lib/class-packs/packs-page";
+import { count } from "@/lib/format/plural";
 import { classesText } from "@/lib/subscriptions/view";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * "Memberships include classes too" (round-2 E15, after "Saroh Packs"):
@@ -21,12 +21,12 @@ export function MembershipsNote({ plans }: { plans: MembershipPlan[] }) {
                 >
                     Memberships include classes too
                 </h2>
-                <Link
+                <TextLink
                     href="/billing/subscriptions?tab=plans"
-                    className="rounded-sm text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
+                    className="text-[12.5px]"
                 >
                     Change in Plans
-                </Link>
+                </TextLink>
             </div>
             <p className="mt-[3px] text-pretty text-[12.5px] text-muted-foreground">
                 Given at each renewal and not carried over. Members use these
@@ -46,7 +46,7 @@ export function MembershipsNote({ plans }: { plans: MembershipPlan[] }) {
                         </span>
                         <span className="min-w-0 flex-[1_1_140px] text-[12.5px] text-muted-foreground">
                             {p.subscriberCount > 0
-                                ? `${p.subscriberCount} ${p.subscriberCount === 1 ? "member" : "members"}`
+                                ? count(p.subscriberCount, "member")
                                 : "No members yet"}
                         </span>
                     </li>

@@ -9,6 +9,7 @@ import { businessEditHref } from "@/lib/organizations/business-rows";
 import { businessTypeOf } from "@/lib/organizations/business-types";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import type { ReadyAside, ReadyChecklist, ReadyItem, ReadyStep } from "./ready";
 import {
@@ -144,7 +145,7 @@ function businessType(
     return {
         key: "businessType",
         label: "Choose your business type",
-        why: "Sole proprietor, partnership, LLP, private limited or another — so your business details are complete.",
+        why: "Sole proprietor, partnership, LLP, private limited or another, so your business details are complete.",
         cta: "Choose type",
         // Straight to the Type row's sheet, not the top of the tab.
         href: businessEditHref("type"),
@@ -208,7 +209,7 @@ export function emailAside(input: {
         label: "Email your customers",
         why: EMAIL_PROMPT_MISSED,
         comesWith: "Comes with a paid plan",
-        cta: "See plans",
+        cta: planLabel(),
         href: SEE_PLANS_HREF,
     };
 }

@@ -98,10 +98,10 @@ describe("stock words", () => {
 
     it("Track stock refuses to go off while units are promised (#515)", () => {
         expect(promisedRefusal(3)).toBe(
-            "3 are promised to open orders — fulfil or cancel them first.",
+            "3 are promised to open orders. Fulfil or cancel them first.",
         );
         expect(promisedRefusal(1)).toBe(
-            "1 is promised to open orders — fulfil or cancel them first.",
+            "1 is promised to open orders. Fulfil or cancel them first.",
         );
     });
 });
@@ -110,9 +110,9 @@ describe("a refusal names the size (UX-026)", () => {
     it("says which variant ran out", () => {
         expect(
             sellRefusal(sellLineName("Linen kurta", "L"), 0, "Hill Road"),
-        ).toBe("Linen kurta (L) — Sold out");
+        ).toBe("Linen kurta (L): Sold out");
         expect(sellRefusal(sellLineName("Tee", "S"), 2, "Hill Road")).toBe(
-            "Tee (S) — Only 2 left at Hill Road",
+            "Tee (S): Only 2 left at Hill Road",
         );
     });
 

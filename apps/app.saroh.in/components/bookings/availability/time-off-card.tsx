@@ -10,6 +10,7 @@ import type { LocalDate } from "@/lib/services/diary";
 import type { OffLine } from "@/lib/staff/time-off";
 import { dayCount, offLineLabel, offLines } from "@/lib/staff/time-off";
 import type { Closure, StaffView } from "@/lib/staff/types";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { ADD_TIME_OFF_ID, AddTimeOffSheet } from "./add-time-off-sheet";
 
@@ -21,7 +22,7 @@ const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
  * person's time off and the business's closures as one line each, and
  * "Add time off" by the heading, which opens the sheet with the fields
  * (`add-time-off-sheet.tsx`). Adds and removals are part of the screen's
- * draft until "Save changes"; a line added and not saved yet says so.
+ * draft until the page's "Save"; a line added and not saved yet says so.
  */
 export function TimeOffCard({
     me,
@@ -71,9 +72,10 @@ export function TimeOffCard({
                 </h2>
                 {canEdit ? (
                     <Button
+                        size="sm"
                         id={ADD_TIME_OFF_ID}
                         variant="outline"
-                        className="h-[30px] shrink-0 rounded-[8px] px-[11px] text-[12px] coarse:h-11"
+                        className="shrink-0"
                         onClick={() => {
                             setOpening((n) => n + 1);
                             setOpen(true);
@@ -111,9 +113,7 @@ export function TimeOffCard({
                 ))}
             </ul>
             {!saved.length && !pending.length ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    None booked.
-                </p>
+                <EmptyState size="inline" title="No time off booked." />
             ) : null}
             {canEdit ? (
                 <AddTimeOffSheet
@@ -152,9 +152,7 @@ export function OffRow({
                     <div
                         className={cn(
                             "text-[12px]",
-                            warn
-                                ? "text-brand-subtle-foreground"
-                                : "text-muted-foreground",
+                            warn ? "text-foreground" : "text-muted-foreground",
                         )}
                     >
                         {why}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
 
 /**
  * The one way this app says "your role does not reach this" (#177, §30).
@@ -18,16 +19,23 @@ import { PageContainer } from "@/components/shared/page-container";
  * told a MEMBER that Website was switched off (#274).
  *
  * There is no retry. Nothing failed, and trying again does the same thing
- * forever. What helps is knowing who can change it — which the workspace
+ * forever. What helps is knowing who can change it, which the workspace
  * design sets apart in its own block rather than trailing it on the end of the
  * explanation, because it is the only line here anyone can act on.
+ *
+ * The words are `whoCanChange()`'s (`who-can-change.ts`): pass its three
+ * lines for a named thing, or nothing for a denial that only knows it was
+ * one. Never a wording of a screen's own.
  */
+const STANDARD = whoCanChange();
+
 export function AccessDenied({
-    title = "You do not have access to this",
-    description = "This section is limited to certain roles in this organization. An owner or admin can change what you can reach.",
-    note = "The rail does not offer this row to your role, so you have reached it by address. An owner or admin of this business can change that.",
+    title = STANDARD.title,
+    description = STANDARD.description,
+    note = STANDARD.note,
     backHref = "/",
     backLabel = "Back to Home",
+    bare = false,
 }: {
     title?: ReactNode;
     description?: ReactNode;
@@ -35,20 +43,23 @@ export function AccessDenied({
     note?: ReactNode;
     backHref?: string;
     backLabel?: string;
+    /** The card alone, for a page that draws its own frame around it. */
+    bare?: boolean;
 }) {
-    return (
-        <PageContainer>
-            <PermissionDeniedState
-                data-ph-mask=""
-                title={title}
-                description={description}
-                note={note}
-                action={
-                    <Button asChild variant="outline" className="wk-press">
-                        <Link href={backHref}>{backLabel}</Link>
-                    </Button>
-                }
-            />
-        </PageContainer>
+    const card = (
+        <PermissionDeniedState
+            // The caller's own sentences, which may name a record: masked
+            // in a session recording.
+            data-ph-mask=""
+            title={title}
+            description={description}
+            note={note}
+            action={
+                <Button asChild variant="outline" className="wk-press">
+                    <Link href={backHref}>{backLabel}</Link>
+                </Button>
+            }
+        />
     );
+    return bare ? card : <PageContainer>{card}</PageContainer>;
 }

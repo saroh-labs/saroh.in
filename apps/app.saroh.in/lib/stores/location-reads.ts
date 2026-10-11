@@ -2,6 +2,8 @@ import { apiFetch } from "@/lib/api/http";
 import { listInvitations, listMembers } from "@/lib/members/service";
 import type { Organization } from "@/lib/organizations/service";
 
+import type { LocationAbilities, OrderPlace } from "./abilities";
+import { abilitiesOf, orderPlaces } from "./abilities";
 import type { LocationDetails, StoreLogos } from "./location-details";
 import { detailsOf } from "./location-details";
 import type { LocationPeople } from "./people";
@@ -35,6 +37,40 @@ export async function readLocationDetails(
     } catch {
         return undefined;
     }
+}
+
+/**
+ * What this person may do at a location, from the same read. `null` when
+ * it couldn't be read or the API said nothing: then nothing more is
+ * offered than the business role gives.
+ */
+export async function readLocationAbilities(
+    storeId: string,
+): Promise<LocationAbilities | null> {
+    try {
+        const res = await apiFetch(`/stores/${encodeURIComponent(storeId)}`);
+        if (!res.ok) return null;
+        const body = (await res.json()) as { abilities?: unknown };
+        return abilitiesOf(body.abilities);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The locations among these where this person may take a new order, each
+ * asked of its own read. For someone whose business role takes none.
+ */
+export async function readOrderPlaces(
+    storeIds: readonly string[],
+): Promise<OrderPlace[]> {
+    const reads = await Promise.all(
+        storeIds.map(async (id) => ({
+            id,
+            abilities: await readLocationAbilities(id),
+        })),
+    );
+    return orderPlaces(reads);
 }
 
 /**

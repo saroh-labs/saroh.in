@@ -6,6 +6,7 @@ import type {
     CheckoutQuote,
     CheckoutStanding,
     CheckoutStarted,
+    DeliveryAddress,
     ShopResult,
 } from "@saroh/site-blocks";
 import { TEST_RELEASE_MESSAGE, TEST_RELEASE_REASON } from "@saroh/site-blocks";
@@ -19,6 +20,7 @@ import {
     isStarted,
     quoteBody,
     resultOf,
+    savedAddressOf,
     SHOP_TROUBLE,
     startBody,
 } from "@/lib/shop-checkout-shape";
@@ -59,8 +61,7 @@ const INVALID: Refusal = {
 const OFFLINE: Refusal = {
     ok: false,
     reason: "error",
-    message:
-        "We couldn't reach the shop — check your connection and try again.",
+    message: "We couldn't reach the shop. Check your connection and try again.",
 };
 const SIGNED_OUT: Refusal = {
     ok: false,
@@ -137,4 +138,25 @@ export async function checkoutStanding(
         await call.res.json().catch(() => null),
         isStanding,
     );
+}
+
+/**
+ * Where the signed-in customer's last delivery went, for the bag to read
+ * out instead of asking again. Null when they have had none. Never a
+ * reason to hold the bag: any failure reads as "ask for the address".
+ */
+export async function savedDeliveryAddress(): Promise<
+    ShopResult<DeliveryAddress | null>
+> {
+    if (!(await siteOrigin())) return TROUBLE;
+    const siteId = await hostSiteId();
+    if (!siteId) return TROUBLE;
+    const call = await accountSitesFetch(
+        `${encodeURIComponent(siteId)}/checkout/address`,
+    );
+    if (!call) return SIGNED_OUT;
+    if (!call.ok) return OFFLINE;
+    if (!call.res.ok) return TROUBLE;
+    const answer = savedAddressOf(await call.res.json().catch(() => null));
+    return answer ? { ok: true, data: answer.address } : TROUBLE;
 }

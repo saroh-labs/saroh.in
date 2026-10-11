@@ -1,16 +1,14 @@
+import { formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
 import type { LayerStyle, Off } from "@/lib/calendar/layers";
-import {
-    dayCount,
-    dayTitle,
-    describeItem,
-    itemsTotal,
-} from "@/lib/calendar/layers";
+import { dayCount, describeItem, itemsTotal } from "@/lib/calendar/layers";
 import type { CalendarCash } from "@/lib/calendar/money";
 import {
     dayMoney,
@@ -96,7 +94,7 @@ export function DayPanel({
     return (
         <>
             {heading(
-                dayTitle(day.date, today) +
+                formatDay(day.date, { today, weekday: "short" }) +
                     (day.date === today ? " · today" : ""),
             )}
             {offLine ? (
@@ -106,7 +104,7 @@ export function DayPanel({
             ) : null}
             <p className="mb-2.5 mt-0.5 min-h-[1lh] text-[12.5px] text-muted-foreground">
                 {n > 0
-                    ? `${n} ${n === 1 ? "thing" : "things"}${ahead ? " coming up" : ""}`
+                    ? `${count(n, "thing")}${ahead ? " coming up" : ""}`
                     : ""}
             </p>
             {cash ? (
@@ -146,14 +144,10 @@ export function DayPanel({
                             asChild
                             variant="outline"
                             size="sm"
-                            className="gap-1.5 px-3 text-[12.5px] font-semibold"
+                            className="gap-1.5"
                         >
                             <Link href={s.href}>
-                                <Plus
-                                    aria-hidden
-                                    className="size-3"
-                                    strokeWidth={2.2}
-                                />
+                                <Plus aria-hidden className="size-3" />
                                 {s.label}
                             </Link>
                         </Button>
@@ -161,13 +155,17 @@ export function DayPanel({
                 </div>
             ) : null}
             {groups.length === 0 ? (
-                <p className="py-2.5 text-[13px] text-muted-foreground">
-                    {hidden
-                        ? "Nothing on this day for the layers you have on."
-                        : day.date >= today
-                          ? "Nothing on this day yet."
-                          : "Nothing happened on this day."}
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="py-2.5"
+                    title={
+                        hidden
+                            ? "Nothing on this day for the layers you have on"
+                            : day.date >= today
+                              ? "Nothing on this day yet"
+                              : "Nothing happened on this day"
+                    }
+                />
             ) : null}
             {groups.map((layer) => {
                 const cell = day.layers[layer.key];
@@ -188,7 +186,7 @@ export function DayPanel({
                     cell.count - Math.min(cell.items.length, PER_GROUP);
                 return (
                     <section key={layer.key} className="mt-2">
-                        <h3 className="mb-1 flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        <h3 className="label mb-1 flex items-center gap-[7px]">
                             <span
                                 aria-hidden
                                 className={cn(
@@ -246,13 +244,14 @@ export function DayPanel({
                                                             ? "error"
                                                             : "draft"
                                                     }
-                                                    className="shrink-0 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
+                                                    size="sm"
+                                                    className="shrink-0"
                                                 >
                                                     {line.flag.label}
                                                 </Badge>
                                             ) : null}
                                             {action ? (
-                                                <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-brand underline underline-offset-2">
+                                                <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-foreground underline decoration-border-strong underline-offset-4">
                                                     {action}
                                                 </span>
                                             ) : null}
@@ -273,9 +272,9 @@ export function DayPanel({
                         {more > 0 ? (
                             <Link
                                 href={LAYER_HOME[layer.key]}
-                                className="mt-1 block text-[12px] font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="mt-1 block text-[12px] font-medium text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                             >
-                                {more} more — open {layer.label}
+                                {more} more. Open {layer.label}
                             </Link>
                         ) : null}
                     </section>

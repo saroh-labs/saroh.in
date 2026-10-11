@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format/datetime";
 import { describe, expect, it } from "vitest";
 
 import type { Plan, Subscription, SubscriptionCharge } from "./service";
@@ -8,7 +9,6 @@ import {
     chargingText,
     classesText,
     collectionRows,
-    dayText,
     failWhy,
     gstNote,
     headline,
@@ -124,7 +124,7 @@ describe("rowWhen", () => {
             },
         });
         expect(rowWhen(failed, NOW)).toEqual({
-            text: "Renewal of ₹1,200 isn't paid — 3 days past due",
+            text: "Renewal of ₹1,200 isn't paid, 3 days past due",
             danger: true,
         });
     });
@@ -213,7 +213,7 @@ describe("a plan's words (D1)", () => {
 
     it("notes only the older prices on a card", () => {
         expect(olderPriceNotes({ byPrice })).toEqual([
-            "1 still on ₹1,200 — they keep it",
+            "1 still on ₹1,200, and they keep it",
         ]);
     });
 });
@@ -260,7 +260,7 @@ describe("charges", () => {
             date: "1 Sep",
             result: "Paid",
             tone: "ok",
-            note: "1 Sep – 30 Sep · paid by UPI",
+            note: "1 Sep to 30 Sep · paid by UPI",
             amount: "₹1,200",
         });
     });
@@ -285,7 +285,7 @@ describe("charges", () => {
             "Each renewal makes a GST invoice.",
         );
         expect(gstNote([charge()])).toBe(
-            "Not GST-registered — receipts, not tax invoices.",
+            "Not GST-registered. Receipts, not tax invoices.",
         );
         expect(gstNote([])).toBe("");
     });
@@ -303,7 +303,7 @@ describe("ranLine", () => {
                 TZ,
                 NOW,
             ),
-        ).toEqual({ text: "Renewals last ran Today, 06:00.", late: false });
+        ).toEqual({ text: "Renewals last ran Today, 6:00 am.", late: false });
     });
 
     it("warns when the next run is late, or none has run", () => {
@@ -317,7 +317,7 @@ describe("ranLine", () => {
             NOW,
         );
         expect(late.late).toBe(true);
-        expect(late.text).toMatch(/^Renewals last ran 16 Sep, 06:00 — later/);
+        expect(late.text).toMatch(/^Renewals last ran 16 Sep, 6:00 am, later/);
         expect(
             ranLine(
                 { lastCheckedAt: null, nextCheckAt: null, issuedToday: 0 },
@@ -330,7 +330,9 @@ describe("ranLine", () => {
 
 describe("dayText", () => {
     it("adds the year only when it is not this one", () => {
-        expect(dayText("2027-01-02", TZ, NOW, true)).toBe("Sat 2 Jan 2027");
+        expect(
+            formatDate("2027-01-02", TZ, { now: NOW, weekday: "short" }),
+        ).toBe("Sat 2 Jan 2027");
     });
 });
 
@@ -430,7 +432,7 @@ describe("headline", () => {
         expect(h.pill).toEqual({ tone: "bad", label: "Payment failed" });
         expect(h.when).toBe("failed 15 Sep");
         expect(h.line).toBe(
-            "Renewal of ₹1,200 isn't paid — 3 days past due. Nothing is collected until it's paid.",
+            "Renewal of ₹1,200 isn't paid, 3 days past due. Nothing is collected until it's paid.",
         );
     });
 
@@ -463,7 +465,7 @@ describe("autopayLine (D12)", () => {
 
     it("says a set-up is waiting for the customer", () => {
         expect(autopayLine({ ...base, state: "PENDING", hint: null })).toBe(
-            "Autopay pending · UPI — waiting for them to approve it",
+            "Autopay pending · UPI, waiting for them to approve it",
         );
     });
 
@@ -476,7 +478,7 @@ describe("autopayLine (D12)", () => {
                 hint: null,
                 failure: "EXPIRED",
             }),
-        ).toBe("Autopay failed · card — they didn't approve it in time");
+        ).toBe("Autopay failed · card: they didn't approve it in time");
         expect(
             autopayLine({
                 ...base,
@@ -484,7 +486,7 @@ describe("autopayLine (D12)", () => {
                 hint: null,
                 failure: "PROVIDER_REFUSED",
             }),
-        ).toBe("Autopay failed · UPI — the payment provider didn't accept it");
+        ).toBe("Autopay failed · UPI: the payment provider didn't accept it");
     });
 
     it("is nothing without autopay", () => {
@@ -511,7 +513,7 @@ describe("autopayLine (D12)", () => {
                 check: { ...check, state: "REFUNDING" },
             }),
         ).toBe(
-            "Autopay pending · UPI — waiting for them to approve it · ₹1 check being refunded",
+            "Autopay pending · UPI, waiting for them to approve it · ₹1 check being refunded",
         );
         expect(
             autopayLine({
@@ -522,7 +524,7 @@ describe("autopayLine (D12)", () => {
                 check: { ...check, state: "NOT_REFUNDED" },
             }),
         ).toBe(
-            "Autopay failed · UPI — they didn't approve it · ₹1 check not refunded — refund it from your payment provider",
+            "Autopay failed · UPI: they didn't approve it · ₹1 check not refunded, so refund it from your payment provider",
         );
         expect(autopayLine({ ...base, state: "ON", check: null })).toBe(
             "Autopay on · UPI · mo•••@okicici · limit ₹1,500",
@@ -566,7 +568,7 @@ describe("autopay's retry (D13)", () => {
                 sub({ failedCharge: failed, retryVia: "PAY_LINK" }),
                 true,
             ),
-        ).toEqual({ label: "Retry with a new pay link", via: "PAY_LINK" });
+        ).toEqual({ label: "Try again with a new pay link", via: "PAY_LINK" });
         expect(
             retryOffer(
                 sub({ failedCharge: failed, retryVia: "PAY_LINK" }),

@@ -3,6 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { arrivalProps } from "@/components/shared/arrival-props";
 import { BusinessDate } from "@/components/shared/business-zone";
 import type { RowAttention } from "@/lib/orders/attention";
 import { rowAttention } from "@/lib/orders/attention";
@@ -18,6 +19,7 @@ import {
 } from "@/lib/orders/list-row";
 import { onlinePaymentLine } from "@/lib/orders/online-payment";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { AgeText, StepBar, StepPill } from "./step-pill";
 
 /**
@@ -72,7 +74,7 @@ export function OrderGridHead({
         <div
             className={cn(
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
-                "h-10 rounded-t-[11px] border-b border-border bg-muted text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                "label h-10 rounded-t-[11px] border-b border-border bg-muted",
             )}
         >
             {select ? (
@@ -109,7 +111,7 @@ function Avatar({ row }: { row: OrderRow }) {
             className={cn(
                 "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-neutral-700 dark:text-foreground",
                 returning &&
-                    "ring-[1.5px] ring-highlight ring-offset-[1.5px] ring-offset-card",
+                    "ring-[1.5px] ring-foreground ring-offset-[1.5px] ring-offset-card",
             )}
         >
             {rowInitials(row)}
@@ -166,18 +168,14 @@ function OnlinePaymentText({
 function AttentionTag({ attention }: { attention: RowAttention }) {
     if (attention.state === "none") return null;
     return (
-        <span
-            role="img"
-            aria-label={attention.name}
-            title={attention.state === "shown" ? attention.title : undefined}
-            className={cn(
-                "max-w-[180px] flex-none truncate rounded-full px-1.5 py-px text-[11px] font-bold",
-                attention.state === "shown"
-                    ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                    : "bg-muted text-muted-foreground",
-            )}
-        >
-            {attention.text}
+        <span role="img" aria-label={attention.name} className="min-w-0">
+            <StatusBadge
+                tone={attention.state === "shown" ? "error" : "neutral"}
+                hint={attention.state === "shown" ? attention.title : undefined}
+                className="max-w-[180px] [&]:shrink"
+            >
+                <span className="truncate">{attention.text}</span>
+            </StatusBadge>
         </span>
     );
 }
@@ -195,6 +193,8 @@ function PaidWord({ paid }: { paid: string | null }) {
     );
 }
 
+const NO_TOUCH = () => undefined;
+
 /** A link whose hit area is the whole (relative) row around it. */
 const ROW_LINK =
     "rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring";
@@ -206,9 +206,15 @@ export function OrderGridRow({
     onOpen,
     menu,
     select,
+    arrived = false,
+    onTouch,
 }: {
     row: OrderRow;
     showStore: boolean;
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     /** Its selection box (B6); absent without `order:stage`. */
     select?: RowSelect;
     /** Whether its quick view is the one open (B5). */
@@ -219,13 +225,16 @@ export function OrderGridRow({
     menu?: ReactNode;
 }) {
     const v = rowView(row, showStore);
+    const arrival = arrivalProps(arrived, onTouch ?? NO_TOUCH);
     return (
         <li
+            {...arrival}
             className={cn(
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
                 "relative border-b border-border py-[11px] transition-colors duration-fast last:rounded-b-[11px] last:border-b-0 hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
                 (open === true || select?.checked === true) &&
-                    "bg-brand-subtle hover:bg-brand-subtle",
+                    "bg-muted hover:bg-muted",
+                arrival.className,
             )}
         >
             {select ? (
@@ -320,7 +329,13 @@ export function OrderCardFrame({
     footer,
     lead,
     highlighted = false,
+    arrived = false,
+    onTouch,
 }: {
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     title: ReactNode;
     /** Where the card goes; ignored when `onOpen` is given. */
     href: string;
@@ -340,12 +355,14 @@ export function OrderCardFrame({
     // positioned here, the truncated link clips them. Left to the card,
     // their place past a long title widened the page on a phone.
     const words = <span className="relative">{title}</span>;
+    const arrival = arrivalProps(arrived, onTouch ?? NO_TOUCH);
     return (
         <li
+            {...arrival}
             className={cn(
                 "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
-                highlighted &&
-                    "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
+                highlighted && "border-border-strong bg-muted hover:bg-muted",
+                arrival.className,
             )}
         >
             {lead}
@@ -386,9 +403,15 @@ export function OrderCard({
     select,
     open,
     onOpen,
+    arrived = false,
+    onTouch,
 }: {
     row: OrderRow;
     showStore: boolean;
+    /** It came in while the list was open: it enters, with an edge. */
+    arrived?: boolean;
+    /** Pressed or focused: the edge goes. */
+    onTouch?: () => void;
     /** Its selection box (B6), the design's 24px one; absent without `order:stage`. */
     select?: RowSelect;
     /** Whether its quick view is the one open (B5). */
@@ -402,6 +425,8 @@ export function OrderCard({
             title={v.customer}
             href={v.href}
             onOpen={onOpen}
+            arrived={arrived}
+            onTouch={onTouch}
             highlighted={open === true || select?.checked === true}
             lead={
                 select ? (

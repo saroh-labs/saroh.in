@@ -128,9 +128,9 @@ describe("paging", () => {
     });
 
     it("says where the page sits in the tab's count", () => {
-        expect(pageRange(first, 50, 312, true)).toBe("1–50 of 312");
+        expect(pageRange(first, 50, 312, true)).toBe("1 to 50 of 312");
         const page2 = readOrdersQuery({ cursor: "c1" });
-        expect(pageRange(page2, 50, 312, true)).toBe("51–100 of 312");
+        expect(pageRange(page2, 50, 312, true)).toBe("51 to 100 of 312");
         // One page says nothing: the tab's count already does.
         expect(pageRange(first, 12, 12, false)).toBeNull();
     });
@@ -186,7 +186,7 @@ describe("ordersEmptyCopy", () => {
     it("says No orders yet only for an empty business", () => {
         expect(ordersEmptyCopy(first, "Hill Road")).toMatchObject({
             title: "No orders yet",
-            note: "The first order in Hill Road appears here the moment someone checks out.",
+            note: "Orders from your website and counter show here.",
             action: null,
         });
     });

@@ -3,10 +3,14 @@ import {
     unfinishedPhrase,
 } from "@/components/sites/held-back-copy";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import {
+    formatDateTime,
+    formatTime,
+    viewerTimeZone,
+} from "@/lib/format/datetime";
+import { plural } from "@/lib/format/plural";
 import type { EditorStatus, EditorStatusTone } from "@/lib/sites/editor-status";
 import { editorStatus } from "@/lib/sites/editor-status";
-import { exactDate } from "@/lib/sites/format-date";
 import type { ApprovalOutcome, ReviewState } from "@/lib/sites/service";
 
 /**
@@ -29,7 +33,7 @@ export const APPROVAL_BADGE: Record<
 > = {
     REQUESTED: {
         approved: () => false,
-        text: (by) => `In review — asked by ${by}`,
+        text: (by) => `In review, asked by ${by}`,
     },
     APPROVED: {
         approved: (stale) => !stale,
@@ -66,10 +70,10 @@ export const NEEDS_APPROVAL_HINT =
 /** The status pill's colour, by what it means (#335). */
 export const STATUS_BADGE: Record<
     EditorStatusTone,
-    "error" | "draft" | "neutral" | "success"
+    "error" | "warning" | "neutral" | "success"
 > = {
     danger: "error",
-    attention: "draft",
+    attention: "warning",
     quiet: "neutral",
     done: "success",
 };
@@ -155,7 +159,7 @@ export function statusReadout({
     const detail = [
         scheduled,
         lastSavedAt && !dirty
-            ? `Saved at ${lastSavedAt.toLocaleTimeString(DISPLAY_LOCALE, { hour: "2-digit", minute: "2-digit" })}`
+            ? `Saved at ${formatTime(lastSavedAt, viewerTimeZone())}`
             : null,
         pendingSummary
             ? `${pendingSummary} changed since the last publish`
@@ -164,16 +168,14 @@ export function statusReadout({
             ? `${APPROVAL_BADGE[review.latestApproval.outcome].text(
                   review.latestApproval.by,
                   review.approvalIsStale,
-              )} · ${exactDate(review.latestApproval.at, zone)}`
+              )} · ${formatDateTime(review.latestApproval.at, zone, { year: "always" })}`
             : null,
         // What they asked to change, in their words (UX-043).
         review.latestApproval?.outcome === "CHANGES_REQUESTED" &&
         review.latestApproval.reason
             ? `“${review.latestApproval.reason}”`
             : null,
-        openNotes > 0
-            ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
-            : null,
+        openNotes > 0 ? `${openNotes} open ${plural(openNotes, "note")}` : null,
     ]
         .filter(Boolean)
         .join("\n");
@@ -188,9 +190,7 @@ export function statusReadout({
                   review.approvalIsStale,
               )
             : null,
-        openNotes > 0
-            ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
-            : null,
+        openNotes > 0 ? `${openNotes} open ${plural(openNotes, "note")}` : null,
     ]
         .filter(Boolean)
         .join(" · ");
@@ -235,12 +235,12 @@ export function publishTitle({
         return `Finish or remove ${unfinishedPhrase(heldBack)} before publishing`;
     }
     if (dirty && saveError) {
-        return "Not saved — publish waits until your changes save";
+        return "Not saved. Publish waits until your changes save";
     }
-    if (dirty) return "Saving your changes — publish is available in a moment";
+    if (dirty) return "Saving your changes. Publish is available in a moment";
     if (needsApproval) {
         return canOverride
-            ? `${NEEDS_APPROVAL_HINT} As an owner you can still publish without approval; it's recorded.`
+            ? `${NEEDS_APPROVAL_HINT} As an owner you can still publish without approval, and it's recorded.`
             : `${NEEDS_APPROVAL_HINT} Make a test release and ask for a review.`;
     }
     if (neverPublished) return "Put this site live";

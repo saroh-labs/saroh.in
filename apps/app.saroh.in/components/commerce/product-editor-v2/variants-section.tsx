@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
@@ -17,6 +18,7 @@ import {
     sameRows,
     variantProblem,
 } from "@/lib/products/variant-rows";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
@@ -36,7 +38,7 @@ import { DROPPED, saveVariantList } from "./variant-save";
 export function VariantsSection({
     product,
     storeId,
-    symbol,
+    currency,
     options,
     sku,
     stores,
@@ -44,7 +46,7 @@ export function VariantsSection({
 }: {
     product: ProductDetail;
     storeId: string;
-    symbol: string;
+    currency: string;
     options: ProductOptionView[];
     /** Settings → SKUs, and this product's number for {N}. */
     sku: { pattern: string; suggest: boolean; n: number };
@@ -108,8 +110,7 @@ export function VariantsSection({
     const productPrice = isMoney(product.price) ? trimMoney(product.price) : "";
     // Said in a sentence with its separators ("₹1,299", UX-082); the field's
     // placeholder keeps the plain figure it would type.
-    const shown = (m: string) =>
-        formatMoneyMajor(m, product.currency) ?? `${symbol}${m}`;
+    const shown = (m: string) => formatMoneyMajor(m, product.currency);
     const shownPrice = productPrice ? shown(productPrice) : "";
     const cents = (m: string) => Math.round(Number(m) * 100);
     // The API refuses a price over the MRP customers see struck through;
@@ -198,7 +199,7 @@ export function VariantsSection({
         {
             dirty,
             problem: bad
-                ? "A variant needs a fix — see the row marked in red."
+                ? "A variant needs a fix. See the row marked in red."
                 : "",
             note: failed ? `${failed} Your changes are still here.` : undefined,
             noteIsError: !!failed,
@@ -243,7 +244,7 @@ export function VariantsSection({
     function remove(r: VariantRow) {
         const kept = rows;
         setRows(rows.filter((x) => x.key !== r.key));
-        showUndo(`${titleOf(r) || "Variant"} removed from the list`, () =>
+        showUndo(`${titleOf(r) || "Variant"} removed from the list.`, () =>
             setRows(kept),
         );
     }
@@ -260,31 +261,28 @@ export function VariantsSection({
                     <p className="mb-3 text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
                         Sold as itself
                         {shownPrice ? ` at ${shownPrice}` : ""}. Add variants if
-                        it comes in sizes, shades or colours — each keeps the
+                        it comes in sizes, shades or colours. Each keeps the
                         product&apos;s description and category, and gets its
                         own stock count.
                     </p>
-                    <button
+                    <Button
+                        variant="outline"
                         type="button"
                         disabled={locked}
                         onClick={() => setAdding(true)}
-                        className="inline-flex h-[38px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-4 text-[12.5px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11"
+                        className="gap-[7px]"
                     >
-                        <Plus
-                            aria-hidden
-                            className="size-3.5"
-                            strokeWidth={2.2}
-                        />
+                        <Plus aria-hidden className="size-3.5" />
                         Add variants
-                    </button>
+                    </Button>
                 </>
             ) : (
                 <>
                     <FieldHelp className="mb-[11px]">
-                        Each variant is the same product — same description and
-                        category. Its value comes from Settings → Options; SKU,
-                        price and photo can differ; a grey price is the
-                        product&apos;s {shownPrice}.
+                        Each variant is the same product, with the same
+                        description and category. Its value comes from Settings
+                        → Options. SKU, price and photo can differ. A grey price
+                        is the product&apos;s {shownPrice}.
                     </FieldHelp>
                     <OptionChoice
                         options={options}
@@ -318,7 +316,7 @@ export function VariantsSection({
                             <div
                                 className={cn(
                                     VARIANT_GRID,
-                                    "pb-[5px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
+                                    "label pb-[5px] text-muted-foreground/80",
                                 )}
                             >
                                 <span>{optName}</span>
@@ -343,7 +341,7 @@ export function VariantsSection({
                                                 skuKey(x) === skuKey(r),
                                         )}
                                         error={errOf(r)}
-                                        symbol={symbol}
+                                        currency={currency}
                                         productPrice={productPrice}
                                         photos={photos}
                                         stores={sellAt}
@@ -359,10 +357,13 @@ export function VariantsSection({
                             </ol>
                         </>
                     ) : (
-                        <div className="mb-3 text-pretty rounded-[10px] border border-dashed border-border-strong p-3.5 text-[12px] leading-[1.5] text-foreground/75">
-                            No variants. It is sold as itself, at the price in
-                            Basics. Add one for each {opt}.
-                        </div>
+                        <EmptyState
+                            data-ph-mask=""
+                            size="inline"
+                            className="mb-3"
+                            title="No variants yet"
+                            description={`It is sold as itself, at the price in Basics. Add one for each ${opt}.`}
+                        />
                     )}
 
                     <VariantAddRow
@@ -373,7 +374,7 @@ export function VariantsSection({
                         sku={newSku}
                         suggested={suggested}
                         price={newPrice}
-                        symbol={symbol}
+                        currency={currency}
                         productPrice={productPrice}
                         skuBad={dupSku || newSkuValue.length > LIMITS.sku}
                         priceBad={newPriceBad}
@@ -382,7 +383,7 @@ export function VariantsSection({
                         noteBad={dupSku || newPriceBad}
                         note={
                             values.length === 0
-                                ? `No values for ${opt} yet — add them above.`
+                                ? `No values for ${opt} yet. Add them above.`
                                 : allTaken
                                   ? `Every ${opt} is already a variant. Add another value above.`
                                   : dupSku

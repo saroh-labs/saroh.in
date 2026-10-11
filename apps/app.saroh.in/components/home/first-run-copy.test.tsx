@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { HomeModel } from "@/lib/home/service";
 import type { ModuleView } from "@/lib/modules/schema";
 
+import { PlanAccessProvider } from "@/components/billing/plan-way";
+
 import { HomeDashboard } from "./home-dashboard";
 
 /**
@@ -25,9 +27,12 @@ const mod = (over: Partial<ModuleView> = {}): ModuleView => ({
     ...over,
 });
 
-const render = (modules: ModuleView[]) =>
+/** `canChangePlan` is the shell's answer (`billing:manage`). */
+const render = (modules: ModuleView[], canChangePlan = true) =>
     renderToStaticMarkup(
-        <HomeDashboard home={HOME} modules={modules} businessName="Rye" />,
+        <PlanAccessProvider canChangePlan={canChangePlan}>
+            <HomeDashboard home={HOME} modules={modules} businessName="Rye" />
+        </PlanAccessProvider>,
     );
 
 describe("Home's first run copy", () => {
@@ -39,7 +44,9 @@ describe("Home's first run copy", () => {
     });
 
     it("tells someone who can't change the plan who can", () => {
-        const html = render([mod({ canManage: false })]);
+        // Turning modules on and changing the plan are two permissions:
+        // someone who manages modules but not billing reads who can.
+        const html = render([mod()], false);
         expect(html).toContain("The owner can change the plan");
         expect(html).not.toContain("See plans");
     });

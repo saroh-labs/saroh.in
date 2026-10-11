@@ -1,10 +1,11 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { Pill } from "@/components/subscriptions/pill";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import type { UseRow } from "@/lib/class-packs/pack-activity";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 const H2 = "m-0 font-display text-[15px] font-semibold tracking-[-0.015em]";
 
@@ -39,9 +40,8 @@ export function UsedTab({
             <>
                 {head}
                 <PermissionDeniedState
-                    title="You can't see what this pack paid for"
-                    description="Your role doesn't reach the bookings paid with packs."
-                    note="An owner or admin can change what your role reaches in Team."
+                    size="panel"
+                    {...whoCanChange({ thing: "what this pack paid for" })}
                 />
             </>
         );
@@ -51,13 +51,12 @@ export function UsedTab({
             <>
                 {head}
                 <FailedState
-                    title="Used this week could not be loaded"
-                    description="This tab couldn't read the classes paid with the pack. Nothing has changed — every booking and credit is as it was."
-                    action={
-                        <Button variant="outline" onClick={onRetry}>
-                            Try again
-                        </Button>
-                    }
+                    size="panel"
+                    title={couldntLoad("what this pack paid for")}
+                    description={nothingChanged(
+                        "Every booking and credit is as it was.",
+                    )}
+                    onRetry={onRetry}
                 />
             </>
         );
@@ -100,7 +99,9 @@ export function UsedTab({
                             <span className="min-w-0 flex-[1_1_140px] text-foreground/80">
                                 {u.who}
                             </span>
-                            <Pill tone={u.state.tone}>{u.state.label}</Pill>
+                            <StatusBadge tone={u.state.tone}>
+                                {u.state.label}
+                            </StatusBadge>
                         </li>
                     ))}
                 </ul>

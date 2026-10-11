@@ -71,9 +71,9 @@ export function usageLine(
 ): string {
     if (service.status !== "ACTIVE") {
         const n = usage?.comingUp ?? 0;
-        return `Paused — hidden from the booking page${
+        return `Paused, hidden from the booking page${
             n
-                ? `; ${n === 1 ? "its 1 booking still to come still happens" : `its ${n} bookings still to come still happen`}`
+                ? `. ${n === 1 ? "Its 1 booking still to come still happens" : `Its ${n} bookings still to come still happen`}`
                 : ""
         }`;
     }
@@ -82,7 +82,7 @@ export function usageLine(
         : "Bookings couldn't be counted";
     return service.showOnBookingPage
         ? counted
-        : `Staff only — not on the booking page · ${counted}`;
+        : `Staff only, not on the booking page · ${counted}`;
 }
 
 /** The switch on a card and in the editor's header. */
@@ -93,6 +93,6 @@ export function takingLabel(taking: boolean): string {
 /** What the card's switch says it did, with Undo beside it. */
 export function takingToast(name: string, wasTaking: boolean): string {
     return wasTaking
-        ? `${name} paused. It's off the booking page; bookings already made still happen.`
+        ? `${name} paused. It's off the booking page. Bookings already made still happen.`
         : `${name} is bookable again.`;
 }

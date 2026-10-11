@@ -1,7 +1,8 @@
+import { clockValue, formatClockRange } from "@/lib/format/datetime";
 import type { Band } from "./hour-layout";
-import { hhmm, minutesOf, placeBlocks, workBands } from "./hour-layout";
+import { minutesOf, placeBlocks, workBands } from "./hour-layout";
 import type { FlagTone, LayerStyle, LayerTone, Off } from "./layers";
-import { clock, describeItem } from "./layers";
+import { describeItem } from "./layers";
 import type {
     CalendarDay,
     CalendarItem,
@@ -83,7 +84,7 @@ export interface HourDay {
 }
 
 /** A day's time, dropped from the front of a title the block times itself. */
-const LEADING_TIME = /^\d{2}:\d{2} /;
+const LEADING_TIME = /^\d{1,2}:\d{2} [ap]m /;
 
 /** A thing with a start and a length is drawn by the hour. */
 export function isTimed(item: CalendarItem): boolean {
@@ -150,7 +151,7 @@ export function dayHours(
         if (off[layer.key]) continue;
         for (const item of day.layers[layer.key]?.items ?? []) {
             if (item.at && isTimed(item)) {
-                const start = minutesOf(clock(item.at, timeZone));
+                const start = minutesOf(clockValue(item.at, timeZone));
                 timed.push({
                     start,
                     end: start + Math.max(0, item.durationMinutes ?? 0),
@@ -180,7 +181,7 @@ export function dayHours(
         const struck = cancelled(item);
         const flag =
             line.flag ?? (struck ? { label: "Cancelled", tone: "bad" } : null);
-        const time = `${hhmm(start)}–${hhmm(end)}`;
+        const time = formatClockRange(start, end);
         const title = line.title.replace(LEADING_TIME, "");
         return {
             key: `${layer.key}:${item.id}`,

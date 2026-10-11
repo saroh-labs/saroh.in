@@ -104,7 +104,7 @@ async function createForm(
     }
     return {
         ok: false,
-        error: toFailure(data, "Could not create the form").error,
+        error: toFailure(data, "Couldn't create the form.").error,
     };
 }
 
@@ -128,7 +128,7 @@ async function patchForm(
     }
     return {
         ok: false,
-        error: toFailure(data, "Could not update the form").error,
+        error: toFailure(data, "Couldn't update the form.").error,
     };
 }
 
@@ -150,7 +150,11 @@ export async function ensureFormForSection(
     input: EnsureFormInput,
 ): Promise<FormsResult<{ formId: string }>> {
     const base = await formsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     if (input.fields.length === 0) {
         return {
             ok: false,

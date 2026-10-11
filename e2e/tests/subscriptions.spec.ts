@@ -151,10 +151,10 @@ test.describe("subscriptions", () => {
     test("a subscription that isn't there says so", async ({ page }) => {
         await page.goto("/billing/subscriptions/no-such-subscription");
         await expect(
-            page.getByRole("heading", { name: "No subscription here" }),
+            page.getByRole("heading", { name: "Subscription not found" }),
         ).toBeVisible();
         await expect(
-            page.getByRole("link", { name: "Back to subscriptions" }),
+            page.getByRole("link", { name: "Back to Subscriptions" }),
         ).toBeVisible();
     });
 });
@@ -201,11 +201,16 @@ test.describe("a subscription's page, on Northwind", () => {
         await expect(sheet).toBeVisible();
         // Its own other plan: every other on offer is some other test's,
         // which may be archived while this one is open.
-        const choice = sheet
-            .getByRole("radio")
-            .filter({ hasText: own.other.name });
-        const text = (await choice.textContent()) ?? "";
+        // A row's words are its label's ("Plan · ₹1,200/month"): the radio
+        // is named by them and holds none itself.
+        const choice = sheet.getByRole("radio", { name: own.other.name });
+        const text =
+            (await sheet
+                .locator("label")
+                .filter({ hasText: own.other.name })
+                .textContent()) ?? "";
         const [planName = "", price = ""] = text.split(" · ");
+        expect(price).toMatch(/^₹/);
         await choice.click();
         await sheet
             .getByRole("button", { name: "Change from next renewal" })
@@ -225,8 +230,10 @@ test.describe("a subscription's page, on Northwind", () => {
     test("pause, then resume", async ({ page }) => {
         await page.goto(`/billing/subscriptions/${own.subscription}`);
         await page.getByRole("button", { name: "Pause", exact: true }).click();
-        const sheet = page.getByRole("dialog", { name: "Pause" });
-        await sheet.getByRole("button", { name: "Pause", exact: true }).click();
+        const sheet = page.getByRole("dialog", { name: "Pause subscription" });
+        await sheet
+            .getByRole("button", { name: "Pause subscription", exact: true })
+            .click();
         await expect(
             page.getByRole("button", { name: "Resume now" }),
         ).toBeVisible();
@@ -301,7 +308,7 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
             page.getByRole("heading", { level: 1, name: PLAN }),
         ).toBeVisible();
         await expect(
-            page.getByRole("main").getByText("Open", { exact: true }),
+            page.getByRole("main").getByText("Live", { exact: true }),
         ).toBeVisible();
         await expect(
             page.getByRole("heading", { name: "Who pays what" }),
@@ -338,21 +345,21 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         ).toBeVisible();
         await page.getByRole("button", { name: "Archive" }).click();
         await expect(
-            page.getByText(/^Archived — nobody new can join/),
+            page.getByText(/^Archived. Nobody new can join/),
         ).toBeVisible();
         await expect(
             page.getByRole("button", { name: "Open to sign-ups" }),
         ).toBeVisible();
         await page.getByRole("tab", { name: "History" }).click();
         await expect(
-            page.getByText("Archived — closed to new sign-ups").first(),
+            page.getByText("Archived, closed to new sign-ups").first(),
         ).toBeVisible();
         await undo(page);
         await expect(
             page.getByRole("button", { name: "Archive" }),
         ).toBeVisible();
         await expect(
-            page.getByText(/^Archived — nobody new can join/),
+            page.getByText(/^Archived. Nobody new can join/),
         ).toHaveCount(0);
         await archivePlan(page, plan.id);
     });
@@ -361,10 +368,10 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await signIn(page);
         await page.goto("/billing/plans/no-such-plan");
         await expect(
-            page.getByRole("heading", { name: "That plan isn't here" }),
+            page.getByRole("heading", { name: "Plan not found" }),
         ).toBeVisible();
         await expect(
-            page.getByRole("link", { name: "Back to plans" }),
+            page.getByRole("link", { name: "Back to Plans" }),
         ).toHaveAttribute("href", "/billing/subscriptions?tab=plans");
     });
 
@@ -373,7 +380,7 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await page.goto("/billing/subscriptions?tab=plans");
         await expect(
             page.getByRole("heading", {
-                name: /You do not have access to Payments|You can't open subscriptions|Only owners and admins see payments/,
+                name: /You can't open (Payments|Subscriptions)/,
             }),
         ).toBeVisible();
         await expect(page.getByRole("tab", { name: /^Plans/ })).toHaveCount(0);
@@ -387,7 +394,7 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await page.goto("/billing/plans/any-plan");
         await expect(
             page.getByRole("heading", {
-                name: /You do not have access to Payments|You can't open this plan|Only owners and admins see payments/,
+                name: /You can't open (Payments|Plans)/,
             }),
         ).toBeVisible();
         await expect(page.getByRole("main")).not.toContainText("₹");
@@ -417,7 +424,7 @@ test.describe("the Plan Editor (D7)", () => {
         await page.getByRole("link", { name: "New plan" }).click();
         await expect(page).toHaveURL(/\/billing\/plans\/new$/);
         await expect(
-            page.getByText("Not saved yet — start with a name"),
+            page.getByText("Not saved yet. Start with a name"),
         ).toBeVisible();
         // The editor shell is the page's one main landmark; the page used
         // to wrap it in a second <main> (axe: landmark-no-duplicate-main).
@@ -425,7 +432,7 @@ test.describe("the Plan Editor (D7)", () => {
 
         await page.getByLabel("Name").fill(name);
         await expect(
-            page.getByText(/^Saved as a draft — nobody can join it yet/),
+            page.getByText(/^Saved as a draft. Nobody can join it yet/),
         ).toBeVisible();
         // The address waits while you type, and moves once you leave the
         // field (UX-080), so the page never jumps under the cursor.
@@ -441,7 +448,7 @@ test.describe("the Plan Editor (D7)", () => {
 
         await page.getByRole("textbox", { name: /^Price/ }).fill("999");
         await expect(
-            page.getByText("Draft · saved — nobody can join it yet"),
+            page.getByText("Draft · saved, nobody can join it yet"),
         ).toBeVisible();
         const editAddress = page.url();
         try {
@@ -491,7 +498,7 @@ test.describe("the Plan Editor (D7)", () => {
             await page.goto(editAddress.replace(/\/edit$/, ""));
             await page.getByRole("button", { name: "Archive" }).click();
             await expect(
-                page.getByText(/^Archived — nobody new can join/),
+                page.getByText(/^Archived. Nobody new can join/),
             ).toBeVisible();
         }
     });
@@ -550,7 +557,7 @@ test.describe("the Plan Editor (D7)", () => {
             .getByLabel("Name")
             .fill(`E2E draft ${ownStamp(test.info())}`);
         await expect(
-            page.getByText(/^Saved as a draft — nobody can join it yet/),
+            page.getByText(/^Saved as a draft. Nobody can join it yet/),
         ).toBeVisible();
         await page
             .getByRole("button", { name: "Delete draft" })

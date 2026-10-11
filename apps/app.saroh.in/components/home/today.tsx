@@ -1,6 +1,8 @@
 "use client";
 
+import { clockValue, formatClock } from "@/lib/format/datetime";
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -8,11 +10,13 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useId, useMemo, useState } from "react";
 
-import { useHeld } from "@/components/bookings/calendar/use-held";
+import { useHold } from "@/components/shared/use-hold";
 import type { HomeToday, HomeTodayItem } from "@/lib/home/service";
 import type { TodayRow } from "@/lib/home/today";
-import { clockNow, todayView } from "@/lib/home/today";
+import { todayView } from "@/lib/home/today";
 import { recordBookingOutcome } from "@/lib/services/actions";
+import { EmptyState } from "@saroh/ui/data-state";
+import { TextLink } from "@saroh/ui/text-link";
 
 type Outcome = "ATTENDED" | "NO_SHOW";
 type Marked = Pick<HomeTodayItem, "outcome" | "outcomeTime">;
@@ -25,7 +29,7 @@ type Marked = Pick<HomeTodayItem, "outcome" | "outcomeTime">;
  *
  * Arrived and No-show write the booking's own outcome (#241) for someone
  * who holds `booking:write`, and are held for Undo first, as the calendar
- * holds them (`useHeld`): the row reads "Arrived 09:32" at once, and Undo
+ * holds them (`useHold`): the row reads "Arrived 09:32" at once, and Undo
  * drops it before anything is written. Without `booking:write` the states
  * show and nothing can be marked. A refusal (a booking cancelled meanwhile)
  * puts the row back and says why.
@@ -33,7 +37,7 @@ type Marked = Pick<HomeTodayItem, "outcome" | "outcomeTime">;
 export function Today({ today, now }: { today: HomeToday; now: string }) {
     const headingId = useId();
     const router = useRouter();
-    const { hold } = useHeld();
+    const { hold } = useHold();
     const [marked, setMarked] = useState<Partial<Record<string, Marked>>>({});
 
     const view = useMemo(() => {
@@ -60,7 +64,7 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
             outcome,
             outcomeTime:
                 outcome === "ATTENDED"
-                    ? clockNow(new Date(), today.zone)
+                    ? clockValue(new Date(), today.zone)
                     : null,
         });
         const who = row.person?.split(" ")[0] ?? "They";
@@ -84,27 +88,27 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
     return (
         <section aria-labelledby={headingId} className="grid min-w-0 gap-[9px]">
             <div className="flex flex-wrap items-baseline gap-[9px]">
-                <h2
-                    id={headingId}
-                    className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                >
+                <h2 id={headingId} className="label">
                     Today
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
                     {view.count}
                 </span>
-                <Link
+                <TextLink
                     href={today.bookings ? "/bookings" : "/commerce/orders"}
-                    className="ml-auto rounded text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="ml-auto text-[12.5px]"
                 >
                     {today.bookings ? "Open the calendar" : "All orders"}
-                </Link>
+                </TextLink>
             </div>
 
             <ul className="overflow-hidden rounded-xl border border-border bg-card">
                 {view.empty ? (
-                    <li className="px-4 py-3.5 text-[13.5px] text-muted-foreground">
-                        Nothing booked today.
+                    <li className="px-4 py-3.5">
+                        <EmptyState
+                            size="inline"
+                            title="Nothing booked today."
+                        />
                     </li>
                 ) : null}
                 {view.rows.map((row, i) => (
@@ -135,17 +139,17 @@ function TodayLine({
             className={cn(
                 // The whole row is the link (its title's overlay), as the
                 // design draws it; the marks sit above that overlay.
-                "relative grid grid-cols-[56px_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/60 active:bg-muted",
+                "relative grid grid-cols-[76px_minmax(0,1fr)_auto] items-start gap-3 px-4 py-3 transition-colors duration-fast hover:bg-muted/60 active:bg-muted",
                 !first && "border-t border-border",
             )}
         >
             <span
                 className={cn(
                     "font-display text-[15px] font-semibold tabular-nums",
-                    first ? "text-brand" : "text-foreground",
+                    first ? "text-foreground" : "text-foreground",
                 )}
             >
-                {row.time}
+                {formatClock(row.time)}
             </span>
             <span className="grid min-w-0 gap-0.5">
                 <Link
@@ -163,7 +167,8 @@ function TodayLine({
                     <Badge
                         key={flag}
                         variant="error"
-                        className="mt-[3px] justify-self-start px-2 py-0.5 text-[11.5px] font-semibold"
+                        size="sm"
+                        className="mt-[3px] justify-self-start"
                     >
                         {flag}
                     </Badge>
@@ -198,12 +203,8 @@ function MarkButton({
     children: ReactNode;
 }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="h-[34px] rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-neutral-700 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:min-h-11 dark:text-neutral-300"
-        >
+        <Button variant="outline" size="sm" type="button" onClick={onClick}>
             {children}
-        </button>
+        </Button>
     );
 }

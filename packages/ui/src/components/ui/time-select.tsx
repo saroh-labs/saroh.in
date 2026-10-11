@@ -11,11 +11,14 @@ import {
     SelectValue,
 } from "./select";
 
-/** "13:30" → "1:30 PM". Pure string work, so server and client agree. */
+/**
+ * "13:30" → "1:30 pm": the 12-hour clock every screen writes a time in
+ * (lowercase, no leading zero). Pure string work, so server and client agree.
+ */
 export function formatTime(value: string): string {
     const [h = "0", m = "00"] = value.split(":");
     const hour = Number(h);
-    const suffix = hour < 12 ? "AM" : "PM";
+    const suffix = hour < 12 ? "am" : "pm";
     const twelve = hour % 12 === 0 ? 12 : hour % 12;
     return `${twelve}:${m.padStart(2, "0")} ${suffix}`;
 }

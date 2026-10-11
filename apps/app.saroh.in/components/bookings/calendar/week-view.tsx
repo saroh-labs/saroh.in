@@ -1,9 +1,11 @@
 "use client";
 
+import { formatClock } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { Block, LocalDate, Span } from "@/lib/services/diary";
-import { blockTitle, clock, laneOf, liveSeats } from "@/lib/services/diary";
+import { blockTitle, laneOf, liveSeats } from "@/lib/services/diary";
 
 import { blockColour, blockLabel, HourRail, PX } from "./day-by-person";
 
@@ -50,7 +52,7 @@ export function WeekView({
                             key={d.date}
                             type="button"
                             onClick={() => onDay(d.date)}
-                            aria-label={`${d.label}, ${n} ${n === 1 ? "booking" : "bookings"} — open the day`}
+                            aria-label={`${d.label}, ${count(n, "booking")}. Open the day`}
                             className={cn(
                                 "border-b border-l border-b-border border-l-border/60 px-2.5 py-2 text-left transition-colors duration-fast hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted",
                                 d.selected ? "bg-muted/60" : "bg-transparent",
@@ -60,7 +62,7 @@ export function WeekView({
                                 {d.label}
                             </div>
                             <div className="text-[11px] text-muted-foreground">
-                                {n} {n === 1 ? "booking" : "bookings"}
+                                {count(n, "booking")}
                             </div>
                         </button>
                     );
@@ -71,7 +73,7 @@ export function WeekView({
                         key={d.date}
                         className={cn(
                             "relative border-l border-border/60",
-                            d.today && "bg-brand-subtle",
+                            d.today && "bg-muted",
                         )}
                         style={{ height: `${(to - from) * PX}px` }}
                     >
@@ -87,7 +89,7 @@ export function WeekView({
                                         "absolute z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[5px] py-0.5 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
                                         blockColour(b),
                                         selected === b.key &&
-                                            "ring-2 ring-highlight",
+                                            "ring-2 ring-foreground",
                                         b.state === "cancelled" &&
                                             "line-through",
                                     )}
@@ -103,7 +105,7 @@ export function WeekView({
                                     }}
                                 >
                                     <span className="block truncate text-[12px] font-bold">
-                                        {clock(b.start)} {blockTitle(b)}
+                                        {formatClock(b.start)} {blockTitle(b)}
                                     </span>
                                     <span className="block truncate text-[11px]">
                                         {b.kind === "class"

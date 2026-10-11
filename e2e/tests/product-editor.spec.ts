@@ -74,7 +74,7 @@ test.describe("product editor", () => {
                 .click();
             await expect(
                 page.getByText(
-                    "It will be created as a draft — only the team will see it.",
+                    "It will be created as a draft. Only the team will see it.",
                 ),
             ).toBeVisible();
 
@@ -173,9 +173,7 @@ test.describe("product editor", () => {
             await visibility
                 .getByRole("button", { name: /^Status: Draft/ })
                 .click();
-            await page
-                .getByRole("menuitemradio", { name: /^Published/ })
-                .click();
+            await page.getByRole("menuitemradio", { name: /^Live/ }).click();
             await expect(
                 visibility.getByText(/Saving publishes it for the first time/),
             ).toBeVisible();
@@ -196,7 +194,7 @@ test.describe("product editor", () => {
                 page.getByRole("heading", { name, level: 1 }),
             ).toBeVisible();
             await expect(
-                page.getByText(/₹649\s*–\s*₹1,599/).first(),
+                page.getByText(/₹649\s*to\s*₹1,599/).first(),
             ).toBeVisible();
         } finally {
             await removeProducts(page.request, LEELA, name);
@@ -347,7 +345,9 @@ test.describe("product editor", () => {
             await expect(
                 basics.getByText("That slug is already taken"),
             ).toBeVisible();
-            await expect(page.getByText("Something went wrong")).toHaveCount(0);
+            await expect(
+                page.getByText("That didn't go through. Try again."),
+            ).toHaveCount(0);
         } finally {
             await removeProducts(page.request, LEELA, name);
             await removeProducts(page.request, LEELA, taken);

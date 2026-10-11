@@ -1,9 +1,11 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { METHOD_WORD } from "@/lib/payments/method-words";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackStanding } from "./balance";
 import type { PackKind } from "./pack-cards";
-import { money, packKind, unitWord } from "./pack-cards";
+import { packKind, unitWord } from "./pack-cards";
 
 /**
  * The sell dialog's words and rules (round-2 E15, after "Saroh Packs"):
@@ -38,7 +40,7 @@ const PAID_BY_LABEL: Record<PaidBy, string> = {
 
 /** How a sale was paid, in a list: "UPI"; "—" when nobody recorded it. */
 export function paidByLabel(paidBy: PaidBy | null | undefined): string {
-    return paidBy ? PAID_BY_LABEL[paidBy] : "—";
+    return paidBy ? PAID_BY_LABEL[paidBy] : absentText();
 }
 
 /** The pack as the dialog reads it. */
@@ -57,18 +59,18 @@ const DAY_MS = 86_400_000;
 
 /** "12 January 2027": the day a pack sold at `now` runs out. */
 export function lastDayFor(validityDays: number, now: number): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        day: "numeric",
+    // No zone is given, so the day is read where the page is open.
+    return formatDate(now + validityDays * DAY_MS, viewerTimeZone(), {
         month: "long",
-        year: "numeric",
-    }).format(new Date(now + validityDays * DAY_MS));
+        year: "always",
+    });
 }
 
 /** Under the title: "₹1,500 · 10 classes · use by 12 January 2027". */
 export function sellTerms(pack: SellPack, now: number): string {
     const kind = packKind(pack);
     return [
-        money(pack.price, pack.currency),
+        formatMoneyMajor(pack.price, pack.currency),
         `${pack.credits} ${unitWord(kind, pack.credits)}`,
         `use by ${lastDayFor(pack.validityDays, now)}`,
     ].join(" · ");
@@ -160,7 +162,7 @@ export function sellNote(pack: SellPack, invoicesOnSale: boolean): string {
     const kind = packKind(pack);
     const theirs = `The ${unitWord(kind, 2)} are on their account straight away.`;
     return invoicesOnSale
-        ? `Books nothing · invoice ${money(pack.price, pack.currency)}. ${theirs} Saroh doesn't send the invoice — open it from Invoices to print it or mark it paid.`
+        ? `Books nothing · invoice ${formatMoneyMajor(pack.price, pack.currency)}. ${theirs} Saroh doesn't send the invoice. Open it from Invoices to print it or mark it paid.`
         : `Books nothing. ${theirs}`;
 }
 
@@ -171,7 +173,7 @@ export function sellLabel(
     invoicesOnSale: boolean,
 ): string {
     if (pack && paidBy && paidBy !== "NONE") {
-        return `Take ${money(pack.price, pack.currency)}`;
+        return `Take ${formatMoneyMajor(pack.price, pack.currency)}`;
     }
     return invoicesOnSale ? "Sell and invoice" : "Sell";
 }

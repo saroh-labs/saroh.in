@@ -7,7 +7,9 @@
  */
 
 import type { CustomerPick } from "@/lib/customers/picker";
+import { count } from "@/lib/format/plural";
 import { METHOD_WORD } from "@/lib/payments/method-words";
+import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /** How it is paid, as the API takes it. */
 export type NewOrderPay = "CASH" | "UPI" | "CARD" | "LINK" | "LATER";
@@ -102,8 +104,23 @@ export function payOptions(input: {
      * the counter ways are the choices (R33). Absent: yes.
      */
     online?: boolean;
+    /**
+     * May record a payment with the order (the location's `takePayments`).
+     * Someone who takes orders at a location and not its money (a location
+     * Admin, Manager or Editor, DEC-106) is offered the one way with no
+     * money in it: the API refuses the rest. Absent: yes.
+     */
+    money?: boolean;
 }): { key: NewOrderPay; label: string; off: string | null }[] {
     const reach = reachOf(input.pick);
+    const later = {
+        key: "LATER" as const,
+        label: "Pay on collection",
+        off: goesToAddress(input.way)
+            ? "Deliveries are paid before they go"
+            : null,
+    };
+    if (input.money === false) return [later];
     return [
         // One word each (UX-078); where it's taken is the note's to say.
         { key: "CASH", label: METHOD_WORD.CASH, off: null },
@@ -116,21 +133,36 @@ export function payOptions(input: {
                       key: "LINK" as const,
                       label: "Send a payment link",
                       off: !input.canLink
-                          ? "Connect a payment provider to send a link"
+                          ? providerDisconnected.title("payment")
                           : !reach
                             ? "Needs a customer with a phone or email"
                             : null,
                   },
               ]),
-        {
-            key: "LATER",
-            label: "Pay on collection",
-            off: goesToAddress(input.way)
-                ? "Deliveries are paid before they go"
-                : null,
-        },
+        later,
     ];
 }
+
+/**
+ * The chip in force: the one chosen, unless it went off (a delivery
+ * chosen, the phone removed) or isn't offered to this person. Then, as the
+ * design does, pay later hands over to card and anything else to cash,
+ * where those are offered. Where they aren't, the off chip stays and its
+ * reason stops the button.
+ */
+export function payInForce(
+    options: readonly { key: NewOrderPay; off: string | null }[],
+    chosen: NewOrderPay,
+): NewOrderPay {
+    const chip = options.find((o) => o.key === chosen);
+    if (!chip) return options[0]?.key ?? chosen;
+    if (!chip.off) return chosen;
+    const next = chosen === "LATER" ? "CARD" : "CASH";
+    return options.some((o) => o.key === next) ? next : chosen;
+}
+
+/** Why only one way to pay is offered, said under it. */
+export const NO_PAYMENTS_HERE = "Your role can't record payments.";
 
 /**
  * Whether "Handed over now" applies (UX-059): paid at the counter, now,
@@ -151,14 +183,19 @@ export function payNote(
     pay: NewOrderPay,
     total: string,
     reach: string | null,
+    /** May record a payment with the order. Absent: yes. */
+    money = true,
 ): string {
+    if (!money) {
+        return `Nothing taken now. It shows as unpaid until they pay at the counter. ${NO_PAYMENTS_HERE}`;
+    }
     switch (pay) {
         case "CASH":
             return "Paid now. It goes in the till, not a payout.";
         case "UPI":
             return `Show the counter QR. Create once ${total} shows on your UPI app.`;
         case "CARD":
-            return `Key ${total} into the machine; create once it approves.`;
+            return `Key ${total} into the machine, and create once it approves.`;
         case "LINK":
             return `You get the link to send to ${reach ?? "the customer"}. The order waits unpaid, and nobody starts it until it's paid.`;
         case "LATER":
@@ -258,7 +295,7 @@ export function clashText(
 export function itemCount(lines: readonly CartLine[]): string {
     const n = lines.reduce((sum, l) => sum + l.quantity, 0);
     if (n === 0) return "Nothing yet";
-    return `${n} ${n === 1 ? "item" : "items"}`;
+    return count(n, "item");
 }
 
 /** Add one of a thing, or take one away; a line at 0 goes. */

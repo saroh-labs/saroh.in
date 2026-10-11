@@ -1,3 +1,4 @@
+import { count, plural } from "@/lib/format/plural";
 /**
  * Settings › Your data, as it reads (DEC-120). The API decides what an
  * export is and holds (`GET organizations/:org/data-exports`); this only
@@ -108,7 +109,7 @@ export function dataExportLine(
     const parts = [
         fileSize(view.sizeBytes),
         left > 0
-            ? `${left} ${left === 1 ? "file was" : "files were"} too big to fit; media.csv inside lists ${left === 1 ? "it" : "them"}`
+            ? `${count(left, "file was", "files were")} too big to fit, and media.csv inside lists ${plural(left, "it", "them")}`
             : null,
     ].filter((part): part is string => Boolean(part));
     return {

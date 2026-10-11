@@ -1,10 +1,10 @@
-import { Badge } from "@saroh/ui/badge";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Card, CardContent } from "@saroh/ui/card";
 
 /**
  * The site settings screen's building blocks (Website › Settings audit):
  *
- * - `Group` — one of the six groups, the content of its tab (its h2 is
+ * - `Group` — one of the seven groups, the content of its tab (its h2 is
  *   for a screen reader: the tab already says it on screen).
  * - `Section` — a titled card of rows inside a group (h3), shared with the
  *   rows that live in their own files (`sells-from-row.tsx`,
@@ -83,13 +83,9 @@ export function Section({
 /** The quiet mark on a row whose change waits for the next publish. */
 export function NextPublishPill() {
     return (
-        <Badge
-            variant="neutral"
-            data-saves="publish"
-            className="shrink-0 px-2 py-0 text-[11px]"
-        >
-            {NEXT_PUBLISH}
-        </Badge>
+        <span data-saves="publish" className="contents">
+            <StatusBadge tone="neutral">{NEXT_PUBLISH}</StatusBadge>
+        </span>
     );
 }
 
@@ -129,7 +125,15 @@ export function Row({
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
                     <div className="min-w-0">{children}</div>
-                    {action ? <div className="shrink-0">{action}</div> : null}
+                    {/* On a phone the actions may be narrower than they
+                        would like, so a row of four wraps inside the card:
+                        held to their own width they ran out of it, and past
+                        the screen's edge on a wider font. */}
+                    {action ? (
+                        <div className="min-w-0 max-w-full sm:shrink-0">
+                            {action}
+                        </div>
+                    ) : null}
                 </div>
             </div>
         );

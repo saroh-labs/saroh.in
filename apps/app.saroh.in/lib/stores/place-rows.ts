@@ -23,6 +23,14 @@ export const PLACE_SHEETS = [
 export type PlaceSheet = (typeof PLACE_SHEETS)[number];
 
 /**
+ * The sheets the location's own route saves (`PUT /stores/:id`): its name,
+ * and its description and logo. A location Admin, Manager or Editor may
+ * change these and nothing else on the page, which the business's
+ * settings route saves.
+ */
+export const ABOUT_SHEETS: readonly PlaceSheet[] = ["name", "details"];
+
+/**
  * The query a link opens a sheet with (`?edit=details`), as the old
  * details page's address does. Read once on arrival and taken out of the
  * address when the sheet closes, so a reload doesn't open it again.
@@ -79,13 +87,23 @@ export const KIND_FOLLOWS: Record<StorefrontKind, string> = {
  * The sheet a request really opens. A place nobody visits has no address
  * or hours to edit, so asking for either asks whether customers come here
  * first; the description and logo have no sheet when they couldn't be
- * read; and someone who can't edit opens none.
+ * read; and someone who can't edit opens none. Someone who may change
+ * only what the location's own route saves (`canEditAbout`: a location
+ * Admin, Manager or Editor) opens its name and its description and logo.
  */
 export function placeSheetToOpen(
     which: PlaceSheet,
-    page: { canEdit: boolean; kind: StorefrontKind; hasDetails: boolean },
+    page: {
+        canEdit: boolean;
+        kind: StorefrontKind;
+        hasDetails: boolean;
+        canEditAbout?: boolean;
+    },
 ): PlaceSheet | null {
-    if (!page.canEdit) return null;
+    if (!page.canEdit) {
+        if (!page.canEditAbout || !ABOUT_SHEETS.includes(which)) return null;
+        return which === "details" && !page.hasDetails ? null : which;
+    }
     if (which === "details") return page.hasDetails ? which : null;
     if ((which === "address" || which === "hours") && page.kind !== "SHOP") {
         return "kind";

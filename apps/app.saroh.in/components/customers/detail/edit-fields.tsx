@@ -1,60 +1,19 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type {
     DetailsDraft,
     DetailsKey,
 } from "@/lib/customer-workspace/details";
 import { countryOptions } from "@/lib/customer-workspace/details";
 import { GST_STATES } from "@/lib/invoices/gst";
-
-const INPUT = "h-[38px] rounded-[9px] text-[14px]";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const STATES: readonly { value: string; label: string }[] = GST_STATES;
-
-/** One labelled field of the edit sheet, its note or its refusal below. */
-export function Field({
-    id,
-    label,
-    error,
-    note,
-    children,
-}: {
-    id: string;
-    label: string;
-    error?: string;
-    note?: ReactNode;
-    children: ReactNode;
-}) {
-    return (
-        <div className="grid min-w-0 gap-1.5">
-            <Label htmlFor={id} className="text-[12.5px] font-medium">
-                {label}
-            </Label>
-            {children}
-            {error ? (
-                <span
-                    id={`${id}-note`}
-                    className="text-[11.5px] text-destructive-subtle-foreground"
-                >
-                    {error}
-                </span>
-            ) : note ? (
-                <span
-                    id={`${id}-note`}
-                    className="text-[11.5px] text-muted-foreground"
-                >
-                    {note}
-                </span>
-            ) : null}
-        </div>
-    );
-}
 
 /** A text input wired to one key of the draft. */
 export function TextField({
@@ -82,7 +41,7 @@ export function TextField({
 }) {
     const fid = `${id}-${k}`;
     return (
-        <Field id={fid} label={label} error={error} note={note}>
+        <Field htmlFor={fid} label={label} error={error} hint={note}>
             <Input
                 id={fid}
                 type={type}
@@ -92,7 +51,6 @@ export function TextField({
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error || note ? `${fid}-note` : undefined}
                 onChange={(e) => set(k, e.target.value)}
-                className={INPUT}
             />
         </Field>
     );
@@ -163,7 +121,7 @@ export function AddressFields({
             <div className="grid gap-3 sm:grid-cols-2">
                 {india ? (
                     <Field
-                        id={`${id}-state`}
+                        htmlFor={`${id}-state`}
                         label="State"
                         error={errors.state}
                     >
@@ -174,7 +132,7 @@ export function AddressFields({
                             options={STATES}
                             placeholder="Choose a state"
                             aria-invalid={errors.state ? true : undefined}
-                            className={cn(INPUT, "w-full")}
+                            className={cn("w-full")}
                         />
                     </Field>
                 ) : (
@@ -188,7 +146,7 @@ export function AddressFields({
                     />
                 )}
                 <Field
-                    id={`${id}-country`}
+                    htmlFor={`${id}-country`}
                     label="Country"
                     error={errors.country}
                 >
@@ -202,7 +160,7 @@ export function AddressFields({
                         }}
                         options={countryOptions(draft.country)}
                         aria-invalid={errors.country ? true : undefined}
-                        className={cn(INPUT, "w-full")}
+                        className={cn("w-full")}
                     />
                 </Field>
             </div>

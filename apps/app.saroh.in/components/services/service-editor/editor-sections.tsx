@@ -1,29 +1,33 @@
 "use client";
 
-import { Checkbox } from "@saroh/ui/checkbox";
+import { FailedRead } from "@/components/shared/failed-read";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
 import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import type { PlanLock } from "@/lib/billing/access";
-import { currencySymbol } from "@/lib/format/money";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
-import type { ServiceDraft } from "@/lib/services/service-editor";
 import {
     bookingPageNote,
     draftVisits,
     staffNote,
     timeNote,
     toMinor,
+    TREATMENT_NEEDS_STOREFRONT,
     wholeNumber,
 } from "@/lib/services/service-editor";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
+import { CheckRow } from "@/components/shared/check-row";
+import { ChipGroup } from "@/components/shared/choice-group";
+import { Field, FieldError } from "@saroh/ui/field";
 import { DepositField } from "./deposit-field";
-import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
+import type { Edit } from "./fields";
+import { HELP, NumberField, Section } from "./fields";
 import { VisitsField, VisitsStorefrontNote } from "./visits-field";
 import { WhereField } from "./where-field";
 
@@ -33,69 +37,54 @@ import { WhereField } from "./where-field";
  * booking page in the side one. Each edits the draft through `set`.
  */
 
-interface Edit {
-    draft: ServiceDraft;
-    set: (patch: Partial<ServiceDraft>) => void;
-}
-
-const CHIP = "h-[34px] text-[13px]";
+const CHIP = "";
 
 /**
  * Name, what to tell customers, and Kind — one-to-one or a class — up
  * front, since it decides how everything below works (UX-056).
  */
-export function WhatItIs({ draft, set }: Edit) {
-    const ids = { name: useId(), desc: useId(), kind: useId() };
+export function WhatItIs({ draft, set, problem, leave }: Edit) {
+    const ids = { kind: useId() };
     return (
         <Section title="What it is">
-            <label htmlFor={ids.name} className={LABEL}>
-                Name
-            </label>
-            <Input
-                id={ids.name}
-                value={draft.name}
-                maxLength={128}
-                autoComplete="off"
-                placeholder="e.g. Personal training"
-                onChange={(e) => set({ name: e.target.value })}
-                className={FIELD}
-            />
-            <label htmlFor={ids.desc} className={cn(LABEL, "mt-3")}>
-                What to tell customers
-            </label>
-            <Textarea
-                id={ids.desc}
-                rows={3}
-                maxLength={2000}
-                value={draft.description}
-                placeholder="e.g. One-to-one session built around your goals."
-                onChange={(e) => set({ description: e.target.value })}
-                className="mt-[5px] rounded-[8px] text-[14px]"
-            />
-            <p className={HELP}>Shown on the booking page under the name.</p>
+            <Field
+                label="Name"
+                error={problem("name")}
+                onBlur={() => leave("name")}
+            >
+                <Input
+                    value={draft.name}
+                    maxLength={128}
+                    autoComplete="off"
+                    placeholder="e.g. Personal training"
+                    onChange={(e) => set({ name: e.target.value })}
+                />
+            </Field>
+            <Field
+                label="What to tell customers"
+                className="mt-3"
+                hint="Shown on the booking page under the name."
+            >
+                <Textarea
+                    rows={3}
+                    maxLength={2000}
+                    value={draft.description}
+                    placeholder="e.g. One-to-one session built around your goals."
+                    onChange={(e) => set({ description: e.target.value })}
+                />
+            </Field>
             <Eyebrow id={ids.kind} className="mt-3">
                 Kind
             </Eyebrow>
-            <div
-                role="radiogroup"
-                aria-labelledby={ids.kind}
-                className="flex flex-wrap gap-1.5"
-            >
-                <Chip
-                    on={draft.kind === "one"}
-                    className={CHIP}
-                    onClick={() => set({ kind: "one" })}
-                >
-                    One-to-one
-                </Chip>
-                <Chip
-                    on={draft.kind === "class"}
-                    className={CHIP}
-                    onClick={() => set({ kind: "class" })}
-                >
-                    Class
-                </Chip>
-            </div>
+            <ChipGroup
+                labelledBy={ids.kind}
+                value={draft.kind}
+                onChange={(kind) => set({ kind })}
+                choices={[
+                    { value: "one", label: "One-to-one" },
+                    { value: "class", label: "Class" },
+                ]}
+            />
             <p className={HELP}>
                 A class runs at set times with a number of places.
             </p>
@@ -106,6 +95,8 @@ export function WhatItIs({ draft, set }: Edit) {
 export function TimeSection({
     draft,
     set,
+    problem,
+    leave,
     hasStaff,
     noStorefront,
 }: Edit & {
@@ -121,17 +112,28 @@ export function TimeSection({
                     value={draft.minutes}
                     onChange={(minutes) => set({ minutes })}
                     width="w-[120px]"
+                    error={problem("minutes")}
+                    onLeave={() => leave("minutes")}
                 />
                 <NumberField
                     label="Gap after (min)"
                     value={draft.gap}
                     onChange={(gap) => set({ gap })}
                     width="w-[120px]"
+                    error={problem("gap")}
+                    onLeave={() => leave("gap")}
                 />
                 {draft.kind === "one" ? (
                     <VisitsField
                         value={draft.visits}
                         onChange={(visits) => set({ visits })}
+                        // No storefront is said under the row, with its way out.
+                        error={
+                            problem("visits") === TREATMENT_NEEDS_STOREFRONT
+                                ? null
+                                : problem("visits")
+                        }
+                        onLeave={() => leave("visits")}
                     />
                 ) : null}
                 {draft.kind === "class" ? (
@@ -140,6 +142,8 @@ export function TimeSection({
                         value={draft.places}
                         onChange={(places) => set({ places })}
                         width="w-[90px]"
+                        error={problem("places")}
+                        onLeave={() => leave("places")}
                     />
                 ) : null}
             </div>
@@ -158,6 +162,8 @@ export function TimeSection({
                 where={draft.where}
                 meetingUrl={draft.meetingUrl}
                 onChange={set}
+                error={problem("meetingUrl")}
+                onLeave={() => leave("meetingUrl")}
             />
         </Section>
     );
@@ -166,6 +172,8 @@ export function TimeSection({
 export function PriceSection({
     draft,
     set,
+    problem: fieldProblem,
+    leave,
     currency,
     savedDeposit,
     paymentsLock = null,
@@ -192,16 +200,19 @@ export function PriceSection({
         : null;
     return (
         <Section title="Price">
-            <label htmlFor={id} className={LABEL}>
-                Price ({currencySymbol(currency)})
-            </label>
-            <Input
-                id={id}
-                inputMode="decimal"
-                value={draft.price}
-                onChange={(e) => set({ price: e.target.value })}
-                className={cn(FIELD, "w-[160px] max-w-full")}
-            />
+            <Field
+                label="Price"
+                className="w-[160px] max-w-full"
+                error={fieldProblem("price")}
+                onBlur={() => leave("price")}
+            >
+                <MoneyInput
+                    id={id}
+                    currency={currency}
+                    value={draft.price}
+                    onValueChange={(price) => set({ price })}
+                />
+            </Field>
             <DepositField
                 deposit={draft.deposit}
                 price={draft.price}
@@ -220,6 +231,7 @@ export function PriceSection({
 export function WhoTakesIt({
     draft,
     set,
+    problem,
     staff,
     people,
 }: Edit & {
@@ -238,10 +250,10 @@ export function WhoTakesIt({
     return (
         <Section title="Who takes it">
             {staff === null ? (
-                <p role="alert" className={cn(HELP, "mt-0")}>
-                    Who takes it couldn&apos;t be loaded. Saving leaves it as it
-                    is.
-                </p>
+                <FailedRead
+                    things="who takes it"
+                    reassurance="Saving leaves it as it is."
+                />
             ) : people.length ? (
                 <>
                     <span id={id} className="sr-only">
@@ -265,7 +277,15 @@ export function WhoTakesIt({
                             </Chip>
                         ))}
                     </div>
-                    <p className={HELP}>{staffNote(draft.staffIds, people)}</p>
+                    {problem("staffIds") ? (
+                        <FieldError className="mt-1.5">
+                            {problem("staffIds")}
+                        </FieldError>
+                    ) : (
+                        <p className={HELP}>
+                            {staffNote(draft.staffIds, people)}
+                        </p>
+                    )}
                 </>
             ) : (
                 <p className={cn(HELP, "mt-0")}>
@@ -282,21 +302,19 @@ export function BookingPageCard({
     set,
     hasPage,
     hasHours = true,
-}: Edit & {
+}: Pick<Edit, "draft" | "set"> & {
     hasPage: boolean | null;
     /** It has times to offer (UX-024); true when unknown. */
     hasHours?: boolean;
 }) {
     return (
         <Section title="Booking page">
-            <label className="flex cursor-pointer items-start gap-[9px] text-[13px]">
-                <Checkbox
-                    checked={draft.showOnBookingPage}
-                    onCheckedChange={(on) =>
-                        set({ showOnBookingPage: on === true })
-                    }
-                    className="mt-0.5"
-                />
+            <CheckRow
+                checked={draft.showOnBookingPage}
+                onChange={(showOnBookingPage) => set({ showOnBookingPage })}
+                className="items-start gap-[9px]"
+                boxClassName="mt-0.5"
+            >
                 <span>
                     Show on the booking page
                     <span className="mt-0.5 block text-[12px] text-muted-foreground">
@@ -307,7 +325,7 @@ export function BookingPageCard({
                         )}
                     </span>
                 </span>
-            </label>
+            </CheckRow>
         </Section>
     );
 }

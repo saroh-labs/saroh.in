@@ -1,6 +1,8 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -56,6 +58,7 @@ import { useEffect, useState } from "react";
 
 import { MediaPicker } from "@/components/sites/media-picker";
 import { editorKey } from "@/lib/tiptap/editor-key";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * Write copy without typing markup (#208).
@@ -184,7 +187,7 @@ export function RichTextEditor({
             attributes: {
                 // The merchant's own prose styles, so what they write here
                 // reads like it will on the page.
-                class: "prose prose-sm max-w-none min-h-40 px-3 py-2 focus:outline-none dark:prose-invert",
+                class: "prose prose-sm max-w-none min-h-40 px-3 py-2 outline-none dark:prose-invert",
             },
         },
         onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -364,7 +367,7 @@ function EditorSurface({
                     }}
                 >
                     <SelectTrigger
-                        className="h-7 w-[7.5rem] text-xs"
+                        className="h-7 w-[7.5rem]"
                         aria-label="Text style"
                     >
                         <SelectValue />
@@ -385,10 +388,7 @@ function EditorSurface({
                             : chain().setFontFamily(v).run()
                     }
                 >
-                    <SelectTrigger
-                        className="h-7 w-24 text-xs"
-                        aria-label="Font"
-                    >
+                    <SelectTrigger className="h-7 w-24" aria-label="Font">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -410,10 +410,7 @@ function EditorSurface({
                             : chain().setFontSize(v).run()
                     }
                 >
-                    <SelectTrigger
-                        className="h-7 w-24 text-xs"
-                        aria-label="Size"
-                    >
+                    <SelectTrigger className="h-7 w-24" aria-label="Size">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -573,15 +570,11 @@ function EditorSurface({
                 />
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            aria-label="Insert image"
-                        >
-                            <ImagePlus className="size-4" />
-                        </Button>
+                        <IconButton
+                            label="Insert image"
+                            icon={<ImagePlus className="size-4" />}
+                            size="xs"
+                        />
                     </PopoverTrigger>
                     <PopoverContent align="start" className="w-80">
                         <MediaPicker
@@ -644,7 +637,7 @@ function EditorSurface({
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     rows={10}
-                    className="rounded-none border-0 font-mono text-xs focus-visible:ring-0"
+                    className="rounded-none border-0 font-mono focus-visible:ring-0"
                     aria-label="HTML source"
                 />
             ) : (
@@ -674,18 +667,19 @@ function Tool({
     children: React.ReactNode;
 }) {
     return (
-        <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 [&>svg]:size-4"
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            onClick={onClick}
-        >
-            {children}
-        </Button>
+        <Tip label={label}>
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="[&>svg]:size-4"
+                aria-label={label}
+                disabled={disabled}
+                onClick={onClick}
+            >
+                {children}
+            </Button>
+        </Tip>
     );
 }
 
@@ -730,16 +724,17 @@ function Swatches({
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 [&>svg]:size-4"
-                    aria-label={label}
-                    title={label}
-                >
-                    {icon}
-                </Button>
+                <Tip label={label}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        className="[&>svg]:size-4"
+                        aria-label={label}
+                    >
+                        {icon}
+                    </Button>
+                </Tip>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-auto p-2">
                 <div className="grid grid-cols-5 gap-1">
@@ -751,7 +746,7 @@ function Swatches({
                             aria-pressed={current === c}
                             onClick={() => onPick(c)}
                             className={cn(
-                                "size-6 rounded border transition-transform",
+                                "size-6 rounded border transition-transform duration-fast",
                                 current === c &&
                                     "ring-2 ring-ring ring-offset-1",
                             )}
@@ -762,8 +757,8 @@ function Swatches({
                 <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    className="mt-2 h-7 w-full text-xs"
+                    size="xs"
+                    className="mt-2 w-full"
                     onClick={() => onPick(null)}
                 >
                     None
@@ -798,6 +793,7 @@ function LinkTool({
             </PopoverTrigger>
             <PopoverContent align="start" className="w-72">
                 <form
+                    onKeyDown={submitOnModEnter}
                     className="grid gap-2"
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -805,22 +801,21 @@ function LinkTool({
                     }}
                 >
                     <Input
+                        dense
                         value={href}
                         onChange={(e) => setHref(e.target.value)}
                         placeholder="https://… or /about"
-                        className="h-8"
                         aria-label="Link address"
                     />
                     <div className="flex gap-2">
-                        <Button type="submit" size="sm" className="h-7 text-xs">
+                        <Button type="submit" size="xs">
                             Apply
                         </Button>
                         {active ? (
                             <Button
                                 type="button"
-                                size="sm"
+                                size="xs"
                                 variant="ghost"
-                                className="h-7 text-xs"
                                 onClick={() => onSet("")}
                             >
                                 Remove

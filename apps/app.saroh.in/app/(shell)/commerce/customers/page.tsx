@@ -40,7 +40,7 @@ export default async function CustomersPage({
     if (!may("contact:read")) {
         return (
             <PageContainer width="full">
-                <div className="max-w-[1100px]">
+                <div>
                     <ListLocked />
                 </div>
             </PageContainer>

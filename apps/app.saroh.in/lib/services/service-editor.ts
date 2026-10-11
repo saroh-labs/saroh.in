@@ -10,8 +10,10 @@
  */
 
 import { formatMoney } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { rateOption } from "@/lib/invoices/gst";
 import type { BookingPayment } from "@/lib/staff/types";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
     CreateServiceInput,
@@ -20,6 +22,8 @@ import type {
     Service,
     UpdateServiceInput,
 } from "./service";
+import type { HoursRow } from "./service-hours-draft";
+import { hoursProblems, sameHours } from "./service-hours-draft";
 import type { ServiceUsage } from "./usage";
 
 export type ServiceKind = "one" | "class";
@@ -65,6 +69,11 @@ export interface ServiceDraft {
     bufferBefore: string;
     gstRate: string;
     sacCode: string;
+    /**
+     * Its own weekly hours, saved with the page's one Save in a call of
+     * their own (`service-hours-draft.ts`).
+     */
+    hours: HoursRow[];
 }
 
 /** Whole minutes from a field, or 0. */
@@ -119,6 +128,8 @@ export function draftOf(
     service: Service | null,
     staffIds: string[],
     timezone: string,
+    /** Its saved hours, or what a new one starts with (`startingHours`). */
+    hours: readonly HoursRow[] = [],
 ): ServiceDraft {
     if (!service) {
         return {
@@ -133,13 +144,15 @@ export function draftOf(
             meetingUrl: "",
             price: "",
             deposit: "NONE",
-            staffIds: [],
+            // The one person on the diary, when there is only one.
+            staffIds: [...staffIds],
             showOnBookingPage: true,
             taking: true,
             timezone,
             bufferBefore: "0",
             gstRate: "",
             sacCode: "",
+            hours: [...hours],
         };
     }
     const isClass = service.capacity > 1;
@@ -162,6 +175,7 @@ export function draftOf(
         bufferBefore: String(service.bufferBeforeMinutes),
         gstRate: rateOption(service.gstRate),
         sacCode: service.sacCode ?? "",
+        hours: [...hours],
     };
 }
 
@@ -173,69 +187,133 @@ function isHttps(link: string): boolean {
     }
 }
 
+/** The field a problem is about: where its sentence is shown. */
+export type ServiceField =
+    | "name"
+    | "minutes"
+    | "gap"
+    | "visits"
+    | "places"
+    | "meetingUrl"
+    | "price"
+    | "staffIds"
+    | "bufferBefore"
+    | "timezone"
+    | "sacCode"
+    | "hours";
+
+export interface ServiceProblem {
+    field: ServiceField;
+    message: string;
+    /** For `hours`: which row, from 0. */
+    row?: number;
+}
+
+/**
+ * The same problems as {@link serviceProblems}, each with the field it is
+ * about, so the page can say it under that field and put the keyboard on
+ * the first one when Save is pressed.
+ */
+export function serviceFieldProblems(
+    draft: ServiceDraft,
+    hasStaff: boolean,
+    /** No storefront to sell a treatment from (E10). */
+    noStorefront = false,
+    /** Exactly one person is on the diary. */
+    onePerson = false,
+): ServiceProblem[] {
+    const problems: ServiceProblem[] = [];
+    const say = (field: ServiceField, message: string) =>
+        problems.push({ field, message });
+    if (!draft.name.trim()) say("name", "Add a name.");
+    const minutes = strictWhole(draft.minutes);
+    if (!(minutes >= 5)) {
+        say("minutes", "Each visit needs a length of at least 5 minutes.");
+    } else if (minutes > 1440) {
+        say("minutes", "A visit can be 24 hours at most.");
+    }
+    if (!(strictWhole(draft.gap) <= 1440)) {
+        say("gap", "The gap after has to be a number of minutes.");
+    }
+    if (draft.kind === "one") {
+        const visits = strictWhole(draft.visits);
+        if (!(visits >= 1 && visits <= 12)) {
+            say("visits", "Visits has to be between 1 and 12.");
+        } else if (visits > 1 && noStorefront) {
+            say("visits", TREATMENT_NEEDS_STOREFRONT);
+        }
+    }
+    if (draft.kind === "class" && !(strictWhole(draft.places) >= 2)) {
+        say("places", "A class needs at least 2 places.");
+    }
+    const link = draft.meetingUrl.trim();
+    if (needsMeetingLink(draft.where) && !link) {
+        say("meetingUrl", "Paste the link people join by.");
+    } else if (needsMeetingLink(draft.where) && !isHttps(link)) {
+        say(
+            "meetingUrl",
+            "The link has to be a full https:// link, like https://meet.google.com/abc-defg-hij.",
+        );
+    }
+    const price = toMinor(draft.price);
+    if (price === null) say("price", "Add a price (0 if it's free).");
+    else if (Number.isNaN(price)) {
+        say("price", "Write the price as a number, like 1200.");
+    } else if (draft.deposit !== "NONE" && price === 0) {
+        // The API's own sentence (E8): a deposit is a share of a price.
+        say(
+            "price",
+            "A deposit is part of the price. Set a price first, or take nothing at booking.",
+        );
+    }
+    if (hasStaff && !onePerson && draft.staffIds.length === 0) {
+        say("staffIds", "Pick who takes it.");
+    }
+    if (!(strictWhole(draft.bufferBefore) <= 1440)) {
+        say("bufferBefore", "The buffer before has to be a number of minutes.");
+    }
+    if (!draft.timezone.trim()) say("timezone", "Pick a time zone.");
+    const sac = draft.sacCode.replace(/\s+/g, "");
+    if (sac && !/^\d{4,8}$/.test(sac)) {
+        say("sacCode", "A SAC code is 4 to 8 digits.");
+    }
+    for (const row of hoursProblems(draft.hours)) {
+        problems.push({ field: "hours", message: row.message, row: row.index });
+    }
+    return problems;
+}
+
 /**
  * Everything that stops the draft being saved, in the order the page reads,
  * each as a sentence. Nobody taking it is refused only when the business
  * has people on the diary; with none, a service keeps its own weekly hours.
+ * With exactly one person there is nobody to choose between, so it is not
+ * asked for: a new service starts with them on it (`draftOf`).
  */
 export function serviceProblems(
     draft: ServiceDraft,
     hasStaff: boolean,
     /** No storefront to sell a treatment from (E10). */
     noStorefront = false,
+    /** Exactly one person is on the diary. */
+    onePerson = false,
 ): string[] {
-    const problems: string[] = [];
-    if (!draft.name.trim()) problems.push("Add a name.");
-    const minutes = strictWhole(draft.minutes);
-    if (!(minutes >= 5)) {
-        problems.push("Each visit needs a length of at least 5 minutes.");
-    } else if (minutes > 1440) {
-        problems.push("A visit can be 24 hours at most.");
-    }
-    if (!(strictWhole(draft.gap) <= 1440)) {
-        problems.push("The gap after has to be a number of minutes.");
-    }
-    if (draft.kind === "one") {
-        const visits = strictWhole(draft.visits);
-        if (!(visits >= 1 && visits <= 12)) {
-            problems.push("Visits has to be between 1 and 12.");
-        } else if (visits > 1 && noStorefront) {
-            problems.push(TREATMENT_NEEDS_STOREFRONT);
-        }
-    }
-    if (draft.kind === "class" && !(strictWhole(draft.places) >= 2)) {
-        problems.push("A class needs at least 2 places.");
-    }
-    const link = draft.meetingUrl.trim();
-    if (needsMeetingLink(draft.where) && !link) {
-        problems.push("Paste the link people join by.");
-    } else if (needsMeetingLink(draft.where) && !isHttps(link)) {
-        problems.push(
-            "The link has to be a full https:// link, like https://meet.google.com/abc-defg-hij.",
-        );
-    }
-    const price = toMinor(draft.price);
-    if (price === null) problems.push("Add a price (0 if it's free).");
-    else if (Number.isNaN(price)) {
-        problems.push("Write the price as a number, like 1200.");
-    } else if (draft.deposit !== "NONE" && price === 0) {
-        // The API's own sentence (E8): a deposit is a share of a price.
-        problems.push(
-            "A deposit is part of the price. Set a price first, or take nothing at booking.",
-        );
-    }
-    if (hasStaff && draft.staffIds.length === 0) {
-        problems.push("Pick who takes it.");
-    }
-    if (!(strictWhole(draft.bufferBefore) <= 1440)) {
-        problems.push("The buffer before has to be a number of minutes.");
-    }
-    if (!draft.timezone.trim()) problems.push("Pick a time zone.");
-    const sac = draft.sacCode.replace(/\s+/g, "");
-    if (sac && !/^\d{4,8}$/.test(sac)) {
-        problems.push("A SAC code is 4 to 8 digits.");
-    }
-    return problems;
+    return serviceFieldProblems(draft, hasStaff, noStorefront, onePerson).map(
+        (p) => p.message,
+    );
+}
+
+/** The first problem for a field (or a row of the hours), if it has one. */
+export function problemFor(
+    problems: readonly ServiceProblem[],
+    field: ServiceField,
+    row?: number,
+): string | null {
+    return (
+        problems.find(
+            (p) => p.field === field && (row === undefined || p.row === row),
+        )?.message ?? null
+    );
 }
 
 /** How many visits the draft is: one for a class, else as typed (1–12). */
@@ -286,6 +364,9 @@ export function serviceUpdate(
     };
 }
 
+/** The hours' own section name: they save in a call of their own. */
+export const HOURS_SECTION = "Its weekly hours";
+
 /** The editor's sections, as the leave dialog names them. */
 const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["What it is", ["name", "description", "kind"]],
@@ -295,15 +376,37 @@ const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["Booking page", ["showOnBookingPage"]],
     ["Taking bookings", ["taking"]],
     ["More settings", ["timezone", "bufferBefore", "gstRate", "sacCode"]],
+    [HOURS_SECTION, ["hours"]],
 ];
 
 function same(a: ServiceDraft, b: ServiceDraft, key: keyof ServiceDraft) {
+    if (key === "hours") return sameHours(a.hours, b.hours);
     const x = a[key];
     const y = b[key];
     if (Array.isArray(x) && Array.isArray(y)) {
         return [...x].sort().join() === [...y].sort().join();
     }
     return x === y;
+}
+
+/**
+ * What a Save has to send, by the call it goes in: the service's own
+ * fields (one call), who takes it (a call per person) and its weekly hours
+ * (one call). After a Save that got part of the way, only what is left
+ * differs from `saved`, so Try again sends only that.
+ */
+export function changedParts(
+    saved: ServiceDraft,
+    draft: ServiceDraft,
+): { fields: boolean; who: boolean; hours: boolean } {
+    const keys = Object.keys(draft) as (keyof ServiceDraft)[];
+    return {
+        fields: keys.some(
+            (k) => k !== "staffIds" && k !== "hours" && !same(saved, draft, k),
+        ),
+        who: !same(saved, draft, "staffIds"),
+        hours: !same(saved, draft, "hours"),
+    };
 }
 
 /** The sections whose fields differ from the saved draft, in page order. */
@@ -317,7 +420,7 @@ export function changedSections(
 }
 
 function bookingsCount(n: number): string {
-    return n === 1 ? "1 booking" : `${n} bookings`;
+    return count(n, "booking");
 }
 
 /** The line under the title: unsaved, new, or what is still to come. */
@@ -327,7 +430,7 @@ function bookingsCount(n: number): string {
  * E26): its fields are disabled, and it says why in plain words.
  */
 export const VIEW_ONLY =
-    "View only — your role can't change services, hours or booking rules.";
+    "View only. Your role can't change services, hours or booking rules.";
 
 export function stateLine({
     isNew,
@@ -351,11 +454,13 @@ export function stateLine({
 export function statePill(
     isNew: boolean,
     taking: boolean,
-): { label: string; tone: "neutral" | "success" } {
+): { label: string; tone: "neutral" | "success" | "warning"; hint?: string } {
     if (isNew) return { label: "New", tone: "neutral" };
+    // "Live" and "Paused", as every kind of thing says it; the service's
+    // own sentence is the hint.
     return taking
-        ? { label: "Taking bookings", tone: "success" }
-        : { label: "Not taking bookings", tone: "neutral" };
+        ? { label: "Live", tone: "success", hint: "Taking bookings." }
+        : { label: "Paused", tone: "warning", hint: "Not taking bookings." };
 }
 
 /**
@@ -370,6 +475,7 @@ export function savedMessage({
     kind,
     comingUp,
     hasPerson = false,
+    hasHours = false,
 }: {
     isNew: boolean;
     name: string;
@@ -377,8 +483,13 @@ export function savedMessage({
     comingUp: number | null;
     /** Someone on the diary takes it. */
     hasPerson?: boolean;
+    /** It was added with weekly hours of its own. */
+    hasHours?: boolean;
 }): string {
     if (isNew) {
+        if (hasHours && (kind === "class" || !hasPerson)) {
+            return `${name} added. Customers can book it in its weekly hours.`;
+        }
         if (kind === "class") {
             return `${name} added. Set its weekly times under More settings so customers can book it.`;
         }
@@ -388,14 +499,28 @@ export function savedMessage({
     }
     if (!comingUp) {
         return comingUp === 0
-            ? "Saved. New bookings use it; nothing already booked changes."
-            : "Saved. New bookings use it; bookings already made keep their details.";
+            ? "Saved. New bookings use it. Nothing already booked changes."
+            : "Saved. New bookings use it. Bookings already made keep their details.";
     }
-    return `Saved. New bookings use it; ${
+    return `Saved. New bookings use it, and ${
         comingUp === 1
             ? "1 booking already made keeps"
             : `${comingUp} bookings already made keep`
     } the old details.`;
+}
+
+/**
+ * The note over a service's own weekly hours. They go with the page's Save;
+ * a new service that started from the opening hours says so.
+ */
+export function hoursNote(
+    timezone: string,
+    startedFromOpening: boolean,
+): string {
+    const zone = `Weekly windows in ${timezone}, saved with the rest of the page.`;
+    return startedFromOpening
+        ? `${zone} They start from your opening hours: change them if this runs at other times.`
+        : `${zone} With people on the diary, their free time inside these windows is what customers can book.`;
 }
 
 /** The note under Time. */
@@ -406,7 +531,7 @@ export function timeNote(
     minutes = 0,
 ): string {
     if (kind === "class")
-        return "A class runs at set times; people book a place.";
+        return "A class runs at set times, and people book a place.";
     if (visits > 1) {
         return `${visits} visits of ${minutes || "?"} min, booked one at a time. The order is fulfilled after the last visit.`;
     }
@@ -440,12 +565,12 @@ export function depositNote(
 ): string {
     const minor = toMinor(price);
     const cents = minor === null || Number.isNaN(minor) ? 0 : minor;
-    const money = (n: number) => formatMoney(n, currency) ?? "";
+    const money = (n: number) => formatMoney(n, currency);
     if (deposit === "NONE") {
         // Online only: nothing at the visit, it is all paid when booking.
         return way === "ONLINE" && cents > 0
             ? `They pay ${money(cents)} online when booking: your booking rules take payment online only.`
-            : "No card needed to book. No-shows cost you the slot.";
+            : "No card needed to book. No-shows cost you the time.";
     }
     if (way === "DESK" && cents > 0) {
         return `They pay ${money(cents)} ${visits > 1 ? "over the visits" : "at the visit"}.`;
@@ -532,10 +657,10 @@ export function glance(
     const gap = wholeNumber(draft.gap);
     const priceText =
         price === null || Number.isNaN(price)
-            ? "—"
+            ? absentText()
             : price === 0
               ? "Free"
-              : (formatMoney(price, currency) ?? "—");
+              : formatMoney(price, currency);
     const counted = (n: number | undefined) =>
         usage ? String(n ?? 0) : "Couldn't count";
     // A treatment (E10): its price is for every visit, and so is its time.
@@ -548,8 +673,7 @@ export function glance(
                 ? [
                       [
                           "Per visit",
-                          formatMoney(Math.round(price / visits), currency) ??
-                              "—",
+                          formatMoney(Math.round(price / visits), currency),
                       ] as [string, string],
                   ]
                 : []),

@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Inbox } from "lucide-react";
@@ -9,8 +10,6 @@ import { listForms } from "@/lib/forms/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Forms · Website" };
-
-const entriesWord = (n: number) => (n === 1 ? "1 entry" : `${n} entries`);
 
 /**
  * The Forms tab (#385): the forms on this site, and how much has come
@@ -34,8 +33,8 @@ export default async function SiteFormsPage({
         return (
             <EmptyState
                 icon={<Inbox />}
-                title="No forms on this site"
-                description="Add an enquiry section to a page in the editor, and its form appears here with everything people send through it."
+                title="No forms yet"
+                description="Add an enquiry section to a page in the editor and its form shows here."
             />
         );
     }
@@ -62,7 +61,7 @@ export default async function SiteFormsPage({
                                     <Badge variant="neutral">Closed</Badge>
                                 )
                             }
-                            sub={`${entriesWord(form.submissionCount)} · asks for ${form.fields
+                            sub={`${count(form.submissionCount, "entry", "entries")} · asks for ${form.fields
                                 .map((f) => f.label.toLowerCase())
                                 .join(", ")}`}
                             end={

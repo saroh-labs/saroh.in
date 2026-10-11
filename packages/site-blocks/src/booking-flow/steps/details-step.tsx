@@ -12,10 +12,12 @@ import { WhereAndNote } from "./where-and-note";
  *
  * Sign-in is always on (A9, ADR-011): nobody types an email here. A
  * signed-in customer reads "Booking as ‹name› · Not you?"; a visitor who
- * isn't signed in yet gives their name, and confirms their email with a
- * code at the last step. A name is asked for only while the account has
- * none, so the team never gets a booking without one. A phone is optional
- * (UX-049): the business can call them, and paying online starts with it.
+ * isn't signed in yet confirms their email with a code at the last step.
+ * A name is asked for only after signing in, and only while the account
+ * has none: the team never gets a booking without one, and a returning
+ * customer who is signed out never types a name that is then thrown away.
+ * A phone is optional (UX-049): the business can call them, and paying
+ * online starts with it.
  */
 export function DetailsStep({
     ids,
@@ -63,7 +65,7 @@ export function DetailsStep({
      */
     forWaitlist?: boolean;
 }) {
-    const asksName = !customer?.name;
+    const asksName = customer !== null && !customer.name;
     return (
         <div className={card}>
             <StepHead n={3} title="Your details" />
@@ -112,6 +114,7 @@ export function DetailsStep({
                     id={`${ids}-phone`}
                     label="Phone (optional)"
                     type="tel"
+                    inputMode="tel"
                     autoComplete="tel"
                     placeholder={`So ${business} can call you about it`}
                     value={phone}

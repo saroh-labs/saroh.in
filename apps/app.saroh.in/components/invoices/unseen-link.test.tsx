@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UnseenLinkNote } from "./unseen-link";
 
@@ -9,6 +9,10 @@ import { UnseenLinkNote } from "./unseen-link";
  * a new link ends the old one, before anything is pressed.
  */
 describe("UnseenLinkNote", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it("says the address is shown only when made, and a new link ends the old one", () => {
         const html = renderToStaticMarkup(<UnseenLinkNote sendable={false} />);
         expect(html).toContain("A pay link is out and still works.");
@@ -29,6 +33,11 @@ describe("UnseenLinkNote", () => {
     });
 
     it("names the day the link was made when the API says (#870)", () => {
+        // A day this year is written without the year.
+        vi.useFakeTimers({
+            now: new Date("2026-10-10T06:00:00.000Z"),
+            toFake: ["Date"],
+        });
         const html = renderToStaticMarkup(
             <UnseenLinkNote
                 sendable={false}
@@ -37,7 +46,7 @@ describe("UnseenLinkNote", () => {
         );
         // The server snapshot writes it in UTC; the browser corrects it.
         expect(html).toContain(
-            'A pay link was made on <time dateTime="2026-10-08T09:00:00.000Z">8 Oct 2026</time> and still works.',
+            'A pay link was made on <time dateTime="2026-10-08T09:00:00.000Z">8 Oct</time> and still works.',
         );
         expect(html).toContain("shown only once, when it&#x27;s made");
         expect(html).toContain("Making a new link ends the old one.");

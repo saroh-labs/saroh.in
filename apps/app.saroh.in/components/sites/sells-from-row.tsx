@@ -2,18 +2,19 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { RadioCards } from "@/components/shared/choice-group";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { Row, Section } from "@/components/sites/settings-rows";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import {
     PROBLEM,
-    SettingsSheetFrame,
     useSheetControl,
 } from "@/components/sites/settings/settings-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { updateSiteSettings } from "@/lib/sites/actions";
 import {
     SELLS_FROM_ANCHOR,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/sites/sells-from";
 import type { SellsFrom } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
+import { Notice } from "@saroh/ui/notice";
 
 /** The question the sheet asks. */
 export const SELLS_FROM_QUESTION =
@@ -74,9 +76,12 @@ export function SellsFromRow({
     function save(picked: string) {
         const choice = sellsFrom.choices.find((c) => c.id === picked);
         startTransition(async () => {
-            const res = await updateSiteSettings(siteId, {
-                storefrontId: picked,
-            });
+            const res = await runAction(() =>
+                updateSiteSettings(siteId, {
+                    storefrontId: picked,
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -107,12 +112,9 @@ export function SellsFromRow({
                 }
             >
                 {waiting ? (
-                    <p
-                        role="note"
-                        className="bg-warning-subtle px-4 py-3 text-sm text-warning-subtle-foreground"
-                    >
+                    <Notice tone="warning" role="note">
                         {SHOP_AWAITS_SELLS_FROM}
-                    </p>
+                    </Notice>
                 ) : null}
                 <Row
                     label="Sells from"
@@ -185,8 +187,8 @@ function SellsFromSheet({
     const [picked, setPicked] = useState(current);
     const [tried, setTried] = useState(false);
     return (
-        <SettingsSheetFrame
-            editId={settingsEditId("sells-from")}
+        <FormSheet
+            returnFocusTo={settingsEditId("sells-from")}
             title="Sells from"
             description="The location whose products your online shop lists at /shop. It applies as soon as you save."
             open={open}
@@ -207,41 +209,25 @@ function SellsFromSheet({
                 >
                     {SELLS_FROM_QUESTION}
                 </legend>
-                <RadioGroup
-                    aria-labelledby={`${id}-legend`}
-                    value={picked ?? ""}
-                    onValueChange={setPicked}
-                    className="grid gap-2"
-                >
-                    {sellsFrom.choices.map((choice) => (
-                        <label
-                            key={choice.id}
-                            htmlFor={`${id}-${choice.id}`}
-                            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2 text-sm transition-colors duration-fast hover:bg-muted active:bg-accent-active"
-                        >
-                            <RadioGroupItem
-                                id={`${id}-${choice.id}`}
-                                value={choice.id}
-                            />
-                            <span className="min-w-0 flex-1">
-                                <span className="block font-medium">
-                                    {choice.name}
-                                </span>
-                                <span className="block text-xs text-muted-foreground">
-                                    {choice.products === 1
-                                        ? "1 product"
-                                        : `${choice.products} products`}
-                                </span>
-                            </span>
-                        </label>
-                    ))}
-                </RadioGroup>
+                <RadioCards
+                    labelledBy={`${id}-legend`}
+                    value={picked}
+                    onChange={setPicked}
+                    options={sellsFrom.choices.map((choice) => ({
+                        value: choice.id,
+                        label: choice.name,
+                        note:
+                            choice.products === 1
+                                ? "1 product"
+                                : `${choice.products} products`,
+                    }))}
+                />
             </fieldset>
             {tried && !picked ? (
                 <p role="alert" className={PROBLEM}>
                     Choose a location
                 </p>
             ) : null}
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

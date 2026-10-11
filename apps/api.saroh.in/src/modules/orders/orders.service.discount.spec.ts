@@ -477,7 +477,7 @@ describe("OrdersService.create — discount codes", () => {
                 ...DTO,
                 discountCode: "MARKETDAY",
             }),
-        ).rejects.toThrow(/MARKETDAY was just used by another order/);
+        ).rejects.toThrow(/MARKETDAY was used by another order a moment ago/);
     });
 
     it("refuses a code at a storefront with no business, rather than charging full price", async () => {

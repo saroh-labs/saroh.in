@@ -124,7 +124,9 @@ describe("Contact's rows and sheets", () => {
         expect(save).toHaveBeenCalledWith({
             profile: { phone: "+91 98450 12345" },
         });
-        expect(showUndo.mock.calls[0]?.[0]).toBe("Phone on your website saved");
+        expect(showUndo.mock.calls[0]?.[0]).toBe(
+            "Phone on your website saved.",
+        );
         expect(sheet()).toBeNull();
         expect(edit("Edit phone")).not.toBeNull();
     });

@@ -15,6 +15,10 @@ vi.mock("@/lib/publication", () => ({
     getSiteForHost: vi.fn(() => Promise.resolve(site.resolved)),
     getMovedTo: vi.fn(),
     shareImages: vi.fn(() => undefined),
+    siteOriginFor: (
+        resolved: { primaryHost?: string | null } | null,
+        host: string,
+    ) => `https://${resolved?.primaryHost ?? host}`,
 }));
 vi.mock("@/lib/site-head", () => ({
     NO_HEAD: { verifications: [], trackers: [], privacyUrl: null },
@@ -62,6 +66,7 @@ vi.mock("@/lib/request-path", () => ({
 }));
 vi.mock("@/lib/shop-checkout", () => ({ getCheckoutOptions: vi.fn() }));
 vi.mock("@/lib/sign-in", () => ({ getSignInOptions: vi.fn() }));
+vi.mock("@/lib/site-contact", () => ({ getSiteContact: vi.fn() }));
 vi.mock("@/lib/site-footer", () => ({ getFooterFacts: vi.fn() }));
 vi.mock("@/lib/site-relay", () => ({ relayFor: vi.fn() }));
 vi.mock("@/lib/test-release-chrome", () => ({ HEADER_BELOW_BAR: "" }));

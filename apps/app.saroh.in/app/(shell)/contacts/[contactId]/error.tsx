@@ -5,19 +5,19 @@ import { SectionError } from "@/components/shared/section-error";
 /** A read that failed is not a missing person: nothing about them changed. */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load this person"
-            description="The connection dropped. Nothing about them has changed."
+            retry={retry}
+            heading="Contact"
+            things="this person"
             backHref="/contacts"
-            backLabel="Back to contacts"
+            place="Contacts"
         />
     );
 }

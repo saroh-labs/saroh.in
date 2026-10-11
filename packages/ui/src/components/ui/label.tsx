@@ -6,8 +6,12 @@ import { cva } from "class-variance-authority";
 import * as React from "react";
 import { cn } from "../../lib/utils";
 
+/**
+ * A field's label: 12.5px Geist 500, above its control. That is the one
+ * size, so a call site never sets one (labels had been drawn at five).
+ */
 const labelVariants = cva(
-    "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:text-disabled-foreground",
+    "text-[0.78125rem] font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:text-disabled-foreground",
 );
 
 const Label = React.forwardRef<

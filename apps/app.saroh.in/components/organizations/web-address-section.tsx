@@ -16,6 +16,7 @@ import {
 } from "@/lib/organizations/web-address";
 
 import { QrButton } from "@/components/qr/qr-button";
+import { FailedRead } from "@/components/shared/failed-read";
 import { WebAddressDialog } from "./web-address-dialog";
 
 /**
@@ -55,13 +56,10 @@ export function WebAddressSection({
             ) : (
                 <>
                     <Header />
-                    <p
-                        role="status"
-                        className="px-[18px] py-[11px] text-[13px] text-muted-foreground"
-                    >
-                        Couldn&apos;t load your web address. Reload the page to
-                        try again.
-                    </p>
+                    <FailedRead
+                        things="your web address"
+                        className="px-[18px] py-[11px]"
+                    />
                 </>
             )}
         </section>
@@ -116,7 +114,7 @@ function Loaded({ view, zone }: { view: WebAddressView; zone: string }) {
                                     <span className="font-mono">
                                         {view.customDomain}
                                     </span>
-                                    ;{" "}
+                                    , and{" "}
                                     <span className="font-mono">
                                         {hostOf(view.platformOrigin)}
                                     </span>{" "}

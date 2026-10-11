@@ -22,10 +22,14 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
+        // jsdom answers `:modal` slowly enough to time a test out.
+        setupFiles: ["./vitest.setup.ts"],
         // Plus the editor's pure helpers that sit beside the component using
         // them, such as what a save can send (`saveable-sections.ts`).
         include: [
             "lib/**/*.test.ts",
+            // What a page draws for a role, read as markup (`lib/access`).
+            "lib/**/*.test.tsx",
             "components/**/*.test.ts",
             // The editor's shell, pinned while it was split (#260). It opts
             // into jsdom itself; everything else stays on `node`.

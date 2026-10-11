@@ -1,9 +1,10 @@
+import { formatMoney } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
 import Link from "next/link";
 
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import type { ContactDetail } from "@/lib/contacts/service";
-import { formatValue, LEAD_STATUS } from "@/lib/crm/format";
+import { LEAD_STATUS } from "@/lib/crm/format";
 import type { LeadStatus } from "@/lib/leads/service";
 
 import { ContactPanelSection } from "./contact-panel";
@@ -19,12 +20,15 @@ export function LeadsPanel({
     person,
     leads,
     stages,
+    currency,
 }: {
     person: { id: string; name: string; email: string };
     /** Null when they could not be read. */
     leads: ContactDetail["leads"] | null;
     /** Stages for "Add a lead"; null when this viewer may not add one. */
     stages: { id: string; name: string }[] | null;
+    /** The business's currency: what a lead's Worth is in (owner, 11 Oct). */
+    currency: string;
 }) {
     return (
         <ContactPanelSection
@@ -38,6 +42,7 @@ export function LeadsPanel({
                         // Only this person: the lead is theirs.
                         contacts={[person]}
                         stages={stages}
+                        currency={currency}
                         variant="outline"
                         size="sm"
                     />
@@ -46,7 +51,9 @@ export function LeadsPanel({
         >
             <ul>
                 {(leads ?? []).map((lead) => {
-                    const amount = formatValue(lead.value);
+                    const amount = formatMoney(lead.value, currency, {
+                        decimals: "always",
+                    });
                     const status =
                         lead.status in LEAD_STATUS
                             ? LEAD_STATUS[lead.status as LeadStatus]

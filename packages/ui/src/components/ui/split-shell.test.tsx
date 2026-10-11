@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { SplitPanel, SplitShell } from "./split-shell";
+import { SplitFooter, SplitPanel, SplitShell } from "./split-shell";
 
 /**
  * What these assert is the ONE rule the shell exists to keep: the panel is a
@@ -19,17 +19,17 @@ describe("SplitShell", () => {
     it("renders the form it is given", () => {
         render(
             <SplitShell>
-                <button type="button">Log in</button>
+                <button type="button">Sign in</button>
             </SplitShell>,
         );
 
-        expect(screen.getByRole("button", { name: "Log in" })).toBeVisible();
+        expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
     });
 
     it("renders the panel beside the form when there is one", () => {
         render(
             <SplitShell panel={<SplitPanel heading="One account" />}>
-                <button type="button">Log in</button>
+                <button type="button">Sign in</button>
             </SplitShell>,
         );
 
@@ -39,7 +39,7 @@ describe("SplitShell", () => {
     it("takes the panel away with display, not with a visually-hidden class", () => {
         const { container } = render(
             <SplitShell panel={<SplitPanel heading="One account" />}>
-                <button type="button">Log in</button>
+                <button type="button">Sign in</button>
             </SplitShell>,
         );
         const aside = container.querySelector("aside");
@@ -52,7 +52,7 @@ describe("SplitShell", () => {
     it("gives the form the whole width when there is no panel", () => {
         const { container } = render(
             <SplitShell>
-                <button type="button">Log in</button>
+                <button type="button">Sign in</button>
             </SplitShell>,
         );
 
@@ -62,7 +62,7 @@ describe("SplitShell", () => {
     it("names Saroh once, so a screen reader does not hear it twice", () => {
         render(
             <SplitShell>
-                <button type="button">Log in</button>
+                <button type="button">Sign in</button>
             </SplitShell>,
         );
 
@@ -70,7 +70,91 @@ describe("SplitShell", () => {
     });
 });
 
+/**
+ * Privacy, Terms and Help had no link anywhere from signing up to Home (UX
+ * audit, 10 Oct). The line sits in the FORM's column, because the panel is
+ * gone on a phone.
+ */
+describe("SplitShell's footer line", () => {
+    it("links to Privacy, Terms and Help under the form", () => {
+        const { container } = render(
+            <SplitShell panel={<SplitPanel heading="One account" />}>
+                <button type="button">Sign in</button>
+            </SplitShell>,
+        );
+        const nav = screen.getByRole("navigation", { name: "Legal and help" });
+
+        // Help always has a page; Privacy and Terms from their days.
+        expect(
+            screen.getByRole("link", { name: "Help" }).getAttribute("href"),
+        ).toMatch(/^https:\/\/(www|help)\.saroh\.in/);
+        // Not in the half that disappears below 760px.
+        expect(container.querySelector("aside")?.contains(nav)).toBe(false);
+        expect(nav.closest(".hidden")).toBeNull();
+    });
+
+    it("draws the links it is given, in order", () => {
+        render(
+            <SplitFooter
+                links={[
+                    { label: "Privacy", href: "https://www.saroh.in/privacy" },
+                    { label: "Terms", href: "https://www.saroh.in/terms" },
+                    { label: "Help", href: "https://www.saroh.in/help" },
+                ]}
+            />,
+        );
+
+        expect(
+            screen
+                .getAllByRole("link")
+                .map((a) => [a.textContent, a.getAttribute("href")]),
+        ).toEqual([
+            ["Privacy", "https://www.saroh.in/privacy"],
+            ["Terms", "https://www.saroh.in/terms"],
+            ["Help", "https://www.saroh.in/help"],
+        ]);
+    });
+
+    it("draws nothing when there is no page to link to", () => {
+        const { container } = render(<SplitFooter links={[]} />);
+
+        expect(container).toBeEmptyDOMElement();
+    });
+
+    it("can be left off a screen that must not link out", () => {
+        render(
+            <SplitShell footer={null}>
+                <button type="button">Sign in</button>
+            </SplitShell>,
+        );
+
+        expect(screen.queryByRole("navigation")).toBeNull();
+    });
+});
+
 describe("SplitPanel", () => {
+    it("numbers the plan and marks the step the person is on", () => {
+        render(
+            <SplitPanel
+                heading="Sell, take bookings, bill and run your website in one place."
+                steps={[
+                    "Make your account",
+                    "Name your business",
+                    "Pick what to do first",
+                ]}
+                currentStep={2}
+            />,
+        );
+        const steps = screen.getAllByRole("listitem");
+
+        expect(steps).toHaveLength(3);
+        expect(steps[0]).toHaveTextContent("Done: Make your account");
+        expect(steps[1]).toHaveTextContent("Now: Name your business");
+        expect(steps[1]).toHaveAttribute("aria-current", "step");
+        expect(steps[2]).toHaveTextContent("Next: Pick what to do first");
+        expect(steps[2]).not.toHaveAttribute("aria-current");
+    });
+
     it("renders each point it is given", () => {
         render(
             <SplitPanel
@@ -85,6 +169,11 @@ describe("SplitPanel", () => {
         );
 
         expect(screen.getByText("Welcome back")).toBeVisible();
+        // The panel's own colour, not `.label`'s muted Ink: on the Ink
+        // panel that was dark on dark (contrast 2.1).
+        expect(screen.getByText("Welcome back").className).toContain(
+            "text-inherit",
+        );
         expect(screen.getAllByRole("listitem")).toHaveLength(2);
     });
 

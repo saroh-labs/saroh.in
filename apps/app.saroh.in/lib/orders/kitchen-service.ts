@@ -302,7 +302,7 @@ export function retryOrderRefund(
         path(orderId, `/refunds/${encodeURIComponent(refundId)}/retry`),
         "POST",
         {},
-        "We couldn't check on the refund. Nothing was sent twice — try again in a minute.",
+        "We couldn't check on the refund. Nothing was sent twice. Try again in a minute.",
     );
 }
 

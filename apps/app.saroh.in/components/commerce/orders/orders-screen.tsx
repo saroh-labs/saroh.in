@@ -1,12 +1,13 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Plus } from "lucide-react";
+import { countLabel } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
 import { SinceNotice } from "@/components/shared/since-notice";
+import { useArrivals } from "@/components/shared/use-arrivals";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { useNarrow } from "@/lib/hooks/use-narrow";
@@ -21,8 +22,10 @@ import {
     pageRange,
     previousPageHref,
 } from "@/lib/orders/list-query";
+import { newOrderStores } from "@/lib/orders/new-order-stores";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import type { ShareLink } from "@/lib/sites/share-links";
+import type { OrderPlace } from "@/lib/stores/abilities";
 
 import { NewOrderSheet } from "../new-order/new-order-sheet";
 import { BulkBar } from "./bulk-bar";
@@ -131,6 +134,14 @@ export function OrdersScreen({
          * order arrives with `?new=1&contactId=`. Null starts it empty.
          */
         initialPick?: CustomerPick | null;
+        /**
+         * For someone whose business role takes no orders and whose
+         * location role does (a location Admin, Manager or Editor): the
+         * locations whose own read says they may, and whether their money
+         * too. New order is then offered there, in the kitchen's view as
+         * well. Absent: the business role decides, at every location.
+         */
+        places?: readonly OrderPlace[];
     } | null;
 }) {
     const router = useRouter();
@@ -143,15 +154,25 @@ export function OrdersScreen({
     const money = !kitchen && rows.some((r) => r.total !== undefined);
     // The row whose quick view is open (B5).
     const [peekId, setPeekId] = useState<string | null>(null);
+    // Where New order may be taken: every location for someone the business
+    // role lets (never in the kitchen's view), else the ones whose own read
+    // says so (`newOrder.places`, a location Admin, Manager or Editor).
+    const orderStores = newOrderStores(stores, kitchen, newOrder?.places);
     const [newOpen, setNewOpen] = useState(
         newOrder?.openOnArrival === true &&
             !newOrder.blocked &&
-            stores.length > 0 &&
-            !kitchen,
+            orderStores.length > 0,
     );
     const peek = rows.find((r) => r.id === peekId) ?? null;
     // Bulk moves (B6): whoever moves kitchen steps; the API decides again.
     const pick = useOrderSelection(rows, ordersHref(query, {}));
+    // An order that came in while the list was open (live refresh): it
+    // enters, and wears an edge until touched. A change of tab, filter or
+    // page is the person's own doing, so nothing in it is new.
+    const arrivals = useArrivals(
+        rows.map((r) => r.id),
+        ordersHref(query, {}),
+    );
     const selectable = can.stage;
 
     const go = useCallback(
@@ -180,10 +201,24 @@ export function OrdersScreen({
     return (
         <div className="min-w-0">
             <OrdersHeading
+                count={countLabel(page.counts.all, {
+                    one: "order",
+                    other: "orders",
+                })}
                 actions={
-                    stores.length > 0 && !kitchen ? (
+                    stores.length > 0 &&
+                    (!kitchen || orderStores.length > 0) ? (
                         <>
-                            {newOrder ? (
+                            {/* A file of every order leaves Saroh: its own
+                                power (`order:export`, B16). */}
+                            {can.export ? (
+                                <OrderExport
+                                    query={query}
+                                    total={page.counts[query.tab]}
+                                    storeName={store?.name}
+                                />
+                            ) : null}
+                            {newOrder && orderStores.length > 0 ? (
                                 <>
                                     {newOrder.blocked ? (
                                         <span
@@ -204,19 +239,9 @@ export function OrdersScreen({
                                         }
                                         className="cursor-pointer active:scale-[0.98]"
                                     >
-                                        <Plus className="mr-1.5 size-4" />
                                         New order
                                     </Button>
                                 </>
-                            ) : null}
-                            {/* A file of every order leaves Saroh: its own
-                                power (`order:export`, B16). */}
-                            {can.export ? (
-                                <OrderExport
-                                    query={query}
-                                    total={page.counts[query.tab]}
-                                    storeName={store?.name}
-                                />
                             ) : null}
                         </>
                     ) : undefined
@@ -240,7 +265,7 @@ export function OrdersScreen({
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2.5 pt-3.5">
-                <SearchField query={query} go={go} />
+                <SearchField query={query} go={go} searching={navigating} />
                 {/* A phone: the filters are behind one button (B5). */}
                 <OrderFiltersSheet
                     query={query}
@@ -264,7 +289,7 @@ export function OrdersScreen({
                         onChange={(storefront) => go({ storefront })}
                         noun={{ one: "open order", other: "open orders" }}
                         label="Show orders taken at"
-                        note={`A filter, not a scope. The order book belongs to ${businessName}; this narrows it to one location.`}
+                        note={`A filter, not a scope. The order book belongs to ${businessName}, and this narrows it to one location.`}
                     />
                 ) : null}
                 {range ? (
@@ -292,6 +317,13 @@ export function OrdersScreen({
                         options={filterOptions}
                         go={go}
                         share={share}
+                        onNew={
+                            newOrder &&
+                            !newOrder.blocked &&
+                            orderStores.length > 0
+                                ? () => setNewOpen(true)
+                                : undefined
+                        }
                     />
                 ) : (
                     <>
@@ -314,6 +346,8 @@ export function OrdersScreen({
                                         }
                                         open={row.id === peekId}
                                         onOpen={() => setPeekId(row.id)}
+                                        arrived={arrivals.isNew(row.id)}
+                                        onTouch={() => arrivals.touch(row.id)}
                                         menu={
                                             <OrderRowMenu row={row} can={can} />
                                         }
@@ -336,6 +370,8 @@ export function OrdersScreen({
                                     }
                                     open={row.id === peekId}
                                     onOpen={() => setPeekId(row.id)}
+                                    arrived={arrivals.isNew(row.id)}
+                                    onTouch={() => arrivals.touch(row.id)}
                                 />
                             ))}
                         </ul>
@@ -355,7 +391,7 @@ export function OrdersScreen({
                 }}
             />
 
-            {newOrder && stores.length > 0 && !kitchen ? (
+            {newOrder && orderStores.length > 0 ? (
                 <NewOrderSheet
                     open={newOpen}
                     onOpenChange={(open) => {
@@ -368,9 +404,15 @@ export function OrdersScreen({
                             });
                         }
                     }}
-                    stores={stores}
+                    stores={orderStores}
                     // The storefront in view, else the first.
-                    initialStoreId={store?.id ?? stores[0].id}
+                    initialStoreId={
+                        orderStores.find((s) => s.id === store?.id)?.id ??
+                        orderStores[0].id
+                    }
+                    noMoneyAt={newOrder.places
+                        ?.filter((p) => !p.money)
+                        .map((p) => p.id)}
                     // A new order's pay link is `order:create`'s (B16).
                     canLink={can.create}
                     online={newOrder.online ?? true}

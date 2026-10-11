@@ -6,8 +6,11 @@ import type {
     DetailPack,
 } from "@/lib/customer-workspace/detail";
 
+import { pinClock } from "@/lib/format/test-clock";
 import { Overview } from "./overview";
 import { PacksTab } from "./packs-tab";
+
+pinClock();
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),
@@ -185,7 +188,8 @@ describe("the Classes left card", () => {
                 unavailable: [{ source: "packs", label: "Class packs" }],
             }),
         );
-        expect(html).toContain("Classes left couldn&#x27;t be read just now.");
+        expect(html).toContain("Couldn&#x27;t load classes left.");
+        expect(html).toContain("Try again");
     });
 
     it("draws no card with Class packs or Appointments off", () => {

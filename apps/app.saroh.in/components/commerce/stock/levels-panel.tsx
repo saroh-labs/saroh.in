@@ -1,18 +1,22 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 
 import { productHref } from "@/lib/products/links";
-import { noRowsWords, untrackedLine } from "@/lib/stock/screen";
+import { untrackedLine } from "@/lib/stock/screen";
 import { loadLevelsPage } from "@/lib/stock/screen-actions";
 import type { StockLevels } from "@/lib/stock/service";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Boxes } from "lucide-react";
 
+import { chipClass } from "@/components/shared/chip";
+import { runAction } from "@/lib/api/run-action";
+import { ListSearch } from "@saroh/ui/list-search";
+import { TextLink } from "@saroh/ui/text-link";
 import { LevelsTable } from "./levels-table";
-import { chipClass } from "./tones";
 
 /**
  * Levels (#527): the chips (All, Needs you, a storefront), the search, the
@@ -46,7 +50,6 @@ export function LevelsPanel({
     pageSize: number;
 }) {
     const router = useRouter();
-    const [search, setSearch] = useState(q);
     const [loaded, setLoaded] = useState({
         from: levels,
         rows: levels.rows,
@@ -64,17 +67,13 @@ export function LevelsPanel({
     }
 
     // The search follows typing into the address, a beat behind.
-    const typed = useRef(q);
-    useEffect(() => {
-        if (search.trim() === typed.current) return;
-        const t = setTimeout(() => {
-            typed.current = search.trim();
-            router.replace(href({ q: search.trim() || undefined }), {
-                scroll: false,
-            });
-        }, 300);
-        return () => clearTimeout(t);
-    }, [search, href, router]);
+    const [searching, startSearch] = useTransition();
+    const search = (term: string) => {
+        if (term === q) return;
+        startSearch(() =>
+            router.replace(href({ q: term || undefined }), { scroll: false }),
+        );
+    };
 
     const storefrontView = allStorefronts.some((s) => s.id === show);
     // One storefront's view: what it sells or still holds.
@@ -107,15 +106,21 @@ export function LevelsPanel({
 
     const more = () =>
         start(async () => {
-            if (!loaded.next) return;
+            const cursor = loaded.next;
             setLoadError(null);
-            const res = await loadLevelsPage({
-                storefront: storefrontView ? show : undefined,
-                q: q || undefined,
-                needs: show === "needs",
-                cursor: loaded.next,
-                limit: pageSize,
-            });
+            if (!cursor) return;
+            const res = await runAction(
+                () =>
+                    loadLevelsPage({
+                        storefront: storefrontView ? show : undefined,
+                        q: q || undefined,
+                        needs: show === "needs",
+                        cursor,
+                        limit: pageSize,
+                    }),
+                { quiet: true, onUnreached: setLoadError },
+            );
+            if (!res) return;
             if (!res.ok) {
                 setLoadError(res.error);
                 return;
@@ -129,6 +134,13 @@ export function LevelsPanel({
 
     return (
         <div>
+            <ListSearch
+                placeholder="Search stock by product or SKU"
+                defaultValue={q}
+                searching={searching}
+                onSearch={search}
+                className="mb-3"
+            />
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <div
                     role="group"
@@ -149,14 +161,6 @@ export function LevelsPanel({
                         </Link>
                     ))}
                 </div>
-                <Input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Find a product or SKU"
-                    aria-label="Find a product or SKU"
-                    className="ml-auto h-8 w-[220px] max-w-full rounded-[8px] bg-card px-[11px] text-[12.5px] coarse:h-11"
-                />
             </div>
 
             <LevelsTable
@@ -166,11 +170,45 @@ export function LevelsPanel({
                 counting={counting}
                 values={values}
                 onValue={onValue}
-                empty={noRowsWords({
-                    needs: show === "needs",
-                    q,
-                    all: show === "all" && !q,
-                })}
+                empty={
+                    show === "needs" && !q ? (
+                        <EmptyState
+                            size="panel"
+                            title="Nothing needs you"
+                            description="Every size has more than its warning level."
+                        />
+                    ) : q ? (
+                        <EmptyState
+                            kind="no-results"
+                            size="panel"
+                            things="products"
+                            query={q}
+                            onClear={() => search("")}
+                        />
+                    ) : show === "all" ? (
+                        <EmptyState
+                            size="panel"
+                            icon={<Boxes />}
+                            title="No stock counted yet"
+                            description="Turn on “Track stock” on a product and it shows here."
+                            action={
+                                <Button asChild variant="outline">
+                                    <Link href="/commerce/products">
+                                        Go to Products
+                                    </Link>
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        <EmptyState
+                            kind="no-results"
+                            size="panel"
+                            things="products"
+                            cause="view"
+                            clearHref={href({ show: undefined })}
+                        />
+                    )
+                }
             />
 
             {loaded.next ? (
@@ -179,10 +217,11 @@ export function LevelsPanel({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pending}
                         onClick={more}
+                        busy={pending}
+                        busyLabel="Loading…"
                     >
-                        {pending ? "Loading…" : "Show more"}
+                        Show more
                     </Button>
                     <span className="text-[12px] text-muted-foreground">
                         {`${new Set(loaded.rows.map((r) => r.productId)).size} products shown`}
@@ -206,12 +245,11 @@ export function LevelsPanel({
                         return (
                             <Fragment key={p.productId}>
                                 <span>
-                                    <Link
+                                    <TextLink
                                         href={productHref(null, p.productId)}
-                                        className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                     >
                                         {p.name}
-                                    </Link>
+                                    </TextLink>
                                     {soldOut ? (
                                         <span className="text-destructive">
                                             {` · ${soldOut}`}

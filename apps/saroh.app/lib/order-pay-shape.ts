@@ -1,5 +1,7 @@
 import type { PayInstructions } from "@saroh/site-blocks";
 
+import type { PayContact } from "./invoice-pay-shape";
+
 /**
  * The public order an order pay link shows (plan B, B11), and the check that
  * narrows it. Kept apart from `order-pay.ts`, which reads the app's env, so
@@ -42,6 +44,11 @@ export interface PayOrder {
      * directly". Absent (an older API): as before, Pay is offered.
      */
     payOnline?: boolean;
+    /**
+     * The business's public phone and contact email, shown under Pay for a
+     * question before paying. Null or absent: nothing to show.
+     */
+    businessContact?: PayContact | null;
     /**
      * "How to pay us" (R32): the business's UPI ID, bank details and note,
      * while the order is due. Null or absent: none set.

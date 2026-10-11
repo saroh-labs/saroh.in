@@ -3,6 +3,8 @@ import { Module } from "@nestjs/common";
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
 import { MediaModule } from "../media/media.module";
+import { MomentsController } from "./moments.controller";
+import { MomentsService } from "./moments.service";
 import { OrganizationContextModule } from "./organization-context.module";
 import { OrganizationMembersController } from "./organization-members.controller";
 import { OrganizationMembersService } from "./organization-members.service";
@@ -44,6 +46,8 @@ import { WebAddressService } from "./web-address.service";
         OrganizationRolesController,
         // DEC-069 (L2): the web address, its links, and changing it.
         WebAddressController,
+        // Wave G: the moments a business has seen, each told once.
+        MomentsController,
     ],
     providers: [
         OrganizationOnboardingService,
@@ -52,6 +56,7 @@ import { WebAddressService } from "./web-address.service";
         OrganizationRolesService,
         StorefrontTeamNoticeService,
         WebAddressService,
+        MomentsService,
     ],
     // The members service is exported for the admin console, whose operators
     // change a person's place in a business under the business's own rules.

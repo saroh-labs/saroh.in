@@ -386,6 +386,10 @@ export async function checkShowcase(
         await prisma.$queryRaw<Row[]>`
             SELECT b.id FROM "Booking" b
             WHERE b."organizationId" = ANY(${orgs}) AND b."staffId" IS NOT NULL
+              -- Someone no longer on the diary keeps the bookings they took
+              -- and is on no service (the Calendar only login, Tara).
+              AND NOT EXISTS (SELECT 1 FROM "StaffMember" m
+                  WHERE m.id = b."staffId" AND m.status = 'ARCHIVED')
               AND NOT EXISTS (SELECT 1 FROM "StaffService" x
                   WHERE x."staffId" = b."staffId" AND x."serviceId" = b."serviceId"
                     AND x."organizationId" = b."organizationId")`,

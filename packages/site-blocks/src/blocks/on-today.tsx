@@ -7,8 +7,10 @@ import type { RenderedHero } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import { dateText } from "../booking-flow/model";
+import { clockWords } from "../lib/clock";
 import type { OpeningHoursDay } from "../lib/opening-hours";
 import { isOpeningWeek, openState, openStateText } from "../lib/opening-hours";
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { useQrSource, withQrSource } from "../qr-source";
 import { CtaButton } from "./cta";
@@ -343,6 +345,7 @@ function SplitHero({
                         alt={content.image.alt ?? ""}
                         width={content.image.width}
                         height={content.image.height}
+                        {...siteImage()}
                         className="absolute inset-0 size-full rounded-[calc(var(--site-radius)*1.6)] object-cover"
                     />
                 </div>
@@ -386,8 +389,8 @@ function Row({ item, bookHref }: { item: PublicTodayItem; bookHref?: string }) {
     const tag = tagOf(item);
     const body = (
         <>
-            <span className="font-site-heading text-[15px] font-semibold tabular-nums">
-                {item.time}
+            <span className="font-site-heading whitespace-nowrap text-[15px] font-semibold tabular-nums">
+                {clockWords(item.time)}
             </span>
             <span className="min-w-0">
                 <span className="block truncate text-[14.5px] font-semibold">
@@ -408,7 +411,7 @@ function Row({ item, bookHref }: { item: PublicTodayItem; bookHref?: string }) {
         </>
     );
     const rowClass =
-        "border-site-border text-site-fg grid w-full grid-cols-[58px_minmax(0,1fr)_auto] items-center gap-3 border-t px-1 py-[11px] text-left";
+        "border-site-border text-site-fg grid w-full grid-cols-[76px_minmax(0,1fr)_auto] items-center gap-3 border-t px-1 py-[11px] text-left";
     if (!bookHref) return <div className={rowClass}>{body}</div>;
     return (
         <Link

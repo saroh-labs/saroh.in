@@ -8,6 +8,7 @@ import { readPurchasesFor } from "@/lib/class-packs/service";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import {
@@ -74,6 +75,10 @@ export default async function BookingPage({
             booking={booking}
             past={hasEnded(booking)}
             packs={await packsFor(booking)}
+            // Moving, cancelling and the outcome are `booking:write`
+            // (`booking-access.ts`), asked of the resolved permissions as
+            // the diary asks for New booking.
+            canWrite={permits(organization, "booking:write")}
             canRefund={canRefundPayments(organization)}
             canReadOrder={canReadOrders(organization)}
             desk={desk}

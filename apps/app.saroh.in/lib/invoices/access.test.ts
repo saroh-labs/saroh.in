@@ -63,20 +63,22 @@ describe("mayRead — who opens Payments' screens (D18)", () => {
     });
 });
 
-describe("paymentsLockedCopy — the locked card's words", () => {
-    it("a Member gets the design's sentences", () => {
+describe("paymentsLockedCopy, the locked card's words", () => {
+    const WHO = "An owner or admin can change this in Settings › Team.";
+
+    it("a Member is told their role and what it doesn't include", () => {
         expect(
             paymentsLockedCopy({ role: "MEMBER", roleKey: "MEMBER" }),
         ).toEqual({
-            title: "Only owners and admins see payments",
-            text: "Your role is Member — money stays with owners and admins. An owner or admin can change that in Team.",
+            title: "You can't open Payments",
+            text: `Your role is Member. It doesn't include Payments. ${WHO}`,
         });
     });
 
-    it("a Reviewer is told what their role does cover", () => {
+    it("a Reviewer reads the same sentence, with their role", () => {
         expect(paymentsLockedCopy({ role: "REVIEWER" })).toEqual({
-            title: "You can't open payments",
-            text: "Your role is Reviewer, which can see the website but not payments. An owner or admin can change that in Team.",
+            title: "You can't open Payments",
+            text: `Your role is Reviewer. It doesn't include Payments. ${WHO}`,
         });
     });
 
@@ -92,36 +94,61 @@ describe("paymentsLockedCopy — the locked card's words", () => {
                 "invoices",
             ),
         ).toEqual({
-            title: "You can't open invoices",
-            text: "Your role is Front desk, which doesn't include invoices. An owner or admin can change that in Team.",
+            title: "You can't open Invoices",
+            text: `Your role is Front desk. It doesn't include Invoices. ${WHO}`,
         });
     });
 
-    it("a Member the business let see payments isn't told money stays with owners", () => {
-        const copy = paymentsLockedCopy(
-            {
-                role: "MEMBER",
-                roleKey: "MEMBER",
-                roleLabel: "Member",
-                actions: ["payment:read"],
-            },
-            "invoices",
-        );
-        expect(copy.title).toBe("You can't open invoices");
-        expect(copy.text).not.toMatch(/owners and admins\b.*money|money stays/);
+    it("never says money stays with owners: any role can be given it", () => {
+        for (const what of ["payments", "invoices", "subscriptions"] as const) {
+            const copy = paymentsLockedCopy(
+                { role: "MEMBER", roleKey: "MEMBER", roleLabel: "Member" },
+                what,
+            );
+            expect(copy.title).toMatch(/^You can't open [A-Z]/);
+            expect(copy.text).not.toMatch(/money stays|Only owners/);
+        }
     });
 
-    it("never shows a code, even with no name for the role", () => {
+    it("a built-in role outside Payments is told Payments, on any of its screens", () => {
+        for (const role of ["MEMBER", "REVIEWER"] as const) {
+            expect(
+                paymentsLockedCopy({ role, roleKey: role }, "invoices").title,
+            ).toBe("You can't open Payments");
+        }
+    });
+
+    it("a Member the business let see payments is told the one screen", () => {
+        expect(
+            paymentsLockedCopy(
+                {
+                    role: "MEMBER",
+                    roleKey: "MEMBER",
+                    roleLabel: "Member",
+                    actions: ["payment:read"],
+                },
+                "invoices",
+            ),
+        ).toEqual({
+            title: "You can't open Invoices",
+            text: `Your role is Member. It doesn't include Invoices. ${WHO}`,
+        });
+    });
+
+    it("never shows a code or guesses a name, with no name for the role", () => {
         const copy = paymentsLockedCopy({
             role: "MEMBER",
             roleKey: "role_8f2c",
             roleLabel: " ",
         });
-        expect(copy.text).toBe(
-            "Your role doesn't include payments. An owner or admin can change that in Team.",
-        );
+        expect(copy.text).toBe(`Your role doesn't include Payments. ${WHO}`);
         expect(`${copy.title} ${copy.text}`).not.toMatch(
             /role_8f2c|[A-Z]{2,}_/,
         );
+    });
+
+    it("has no em dash or semicolon in it", () => {
+        const copy = paymentsLockedCopy({ role: "REVIEWER" });
+        expect(`${copy.title} ${copy.text}`).not.toMatch(/[—;]/);
     });
 });

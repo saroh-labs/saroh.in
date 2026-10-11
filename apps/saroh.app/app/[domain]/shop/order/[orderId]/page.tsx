@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { OrderConfirmation } from "@saroh/site-blocks";
+import { AccountEntry, OrderConfirmation } from "@saroh/site-blocks";
+
+import {
+    loadSignInOptions,
+    requestSignInCode,
+    verifySignInCode,
+} from "@/app/[domain]/account/actions";
 
 import { accountAreaOn } from "@/lib/account-area";
 import { getSiteForHost } from "@/lib/publication";
@@ -19,6 +25,10 @@ import { getFooterFacts, soldByFor } from "@/lib/site-footer";
  * the customer's session, so it shows only to whoever placed the order.
  * With the account area on (`SITE_ACCOUNT_AREA`), it links to that order
  * in their Orders.
+ *
+ * Opened signed out (the link from another browser, a session that ended),
+ * it offers the site's own sign-in, which stays on this page: signed in,
+ * the same address shows the order.
  */
 
 export const metadata: Metadata = {
@@ -46,12 +56,28 @@ export default async function ShopOrderPage({
             ? `/account/orders?order=${encodeURIComponent(orderId)}`
             : null;
 
+    const businessName = resolved.snapshot.site.name;
+
     return (
         <OrderConfirmation
             lookup={lookup}
-            businessName={resolved.snapshot.site.name}
-            soldBy={soldByFor(facts, resolved.snapshot.site.name, true)}
+            businessName={businessName}
+            soldBy={soldByFor(facts, businessName, true)}
             ordersHref={ordersHref}
+            signIn={
+                !lookup.ok && lookup.reason === "signed-out" ? (
+                    <AccountEntry
+                        variant="page"
+                        customer={null}
+                        businessName={businessName}
+                        api={{
+                            requestCode: requestSignInCode,
+                            verifyCode: verifySignInCode,
+                        }}
+                        loadOptions={loadSignInOptions}
+                    />
+                ) : null
+            }
         />
     );
 }

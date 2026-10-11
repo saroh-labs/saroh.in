@@ -1,9 +1,11 @@
 "use client";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { showUndo } from "@saroh/ui/toast";
 import { ArrowLeft, ArrowRight, ImagePlus, Link2, Star, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
@@ -21,6 +23,9 @@ import {
     mediaCounts,
     mediaFileProblem,
 } from "@/lib/products/editor-sections";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Label } from "@saroh/ui/label";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * A product's photos and videos, in the order customers see them (the
@@ -77,8 +82,8 @@ export function PhotosField({
     return (
         <div className="flex flex-col gap-3">
             <p className="text-[12.5px] text-muted-foreground">
-                {mediaCounter(value)}. The first photo is the cover — on the
-                shop and in lists. Every variant shows the same photos unless it
+                {mediaCounter(value)}. The first photo is the cover, on the shop
+                and in lists. Every variant shows the same photos unless it
                 picks one of its own.
             </p>
 
@@ -132,7 +137,6 @@ export function PhotosField({
                                         }
                                         placeholder="What it shows, for people who can't see it"
                                         aria-label={`Description of ${noun} ${i + 1}`}
-                                        className="h-9"
                                     />
                                 </div>
                                 <div className="flex shrink-0 gap-1">
@@ -175,14 +179,15 @@ export function PhotosField({
                     })}
                 </ol>
             ) : (
-                <div className="rounded-[10px] border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    No photos yet. Add up to {LIMITS.photos} photos and{" "}
-                    {LIMITS.videos} videos.
-                </div>
+                <EmptyState
+                    size="panel"
+                    title="No photos yet"
+                    description={`Add up to ${LIMITS.photos} photos and ${LIMITS.videos} videos.`}
+                />
             )}
 
             {allFull ? (
-                <p className="text-[12.5px] text-brand-subtle-foreground">
+                <p className="text-[12.5px] text-foreground">
                     Full: {LIMITS.photos} photos and {LIMITS.videos} videos is
                     the most. Take one off to add another.
                 </p>
@@ -287,21 +292,22 @@ function IconButton({
     children: React.ReactNode;
 }) {
     return (
-        <button
-            type="button"
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            onClick={onClick}
-            className={cn(
-                "grid size-8 place-items-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 coarse:size-11 [&_svg]:size-4",
-                danger
-                    ? "text-destructive hover:bg-destructive-subtle"
-                    : "hover:bg-muted",
-            )}
-        >
-            {children}
-        </button>
+        <Tip label={label}>
+            <button
+                type="button"
+                aria-label={label}
+                disabled={disabled}
+                onClick={onClick}
+                className={cn(
+                    "grid size-8 place-items-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-disabled-foreground coarse:size-11 [&_svg]:size-4",
+                    danger
+                        ? "text-destructive hover:bg-destructive-subtle"
+                        : "hover:bg-muted",
+                )}
+            >
+                {children}
+            </button>
+        </Tip>
     );
 }
 
@@ -317,7 +323,8 @@ function LibraryPanel({
     const [items, setItems] = useState<LibraryItem[] | null | "loading">(
         "loading",
     );
-    // Read once, when the panel opens.
+    // Read when the panel opens, and again on Try again.
+    const [attempt, setAttempt] = useState(0);
     useEffect(() => {
         let live = true;
         void listLibrary().then((list) => {
@@ -326,7 +333,7 @@ function LibraryPanel({
         return () => {
             live = false;
         };
-    }, []);
+    }, [attempt]);
     return (
         <div className="rounded-[10px] bg-muted p-3">
             <div className="mb-2 flex items-center justify-between">
@@ -343,22 +350,27 @@ function LibraryPanel({
                 </Button>
             </div>
             {items === "loading" ? (
-                <p
-                    role="status"
-                    className="text-[12.5px] text-muted-foreground"
-                >
-                    Loading your photos…
-                </p>
+                <div role="status" aria-busy="true" className="flex gap-2">
+                    <span className="sr-only">Loading your photos</span>
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                </div>
             ) : items === null ? (
-                <p role="alert" className="text-[12.5px] text-destructive">
-                    Couldn&apos;t load your photos. Close this and try again, or
-                    add one by address.
-                </p>
+                <FailedRead
+                    things="your photos"
+                    reassurance="You can still add one by address."
+                    onRetry={() => {
+                        setItems("loading");
+                        setAttempt((n) => n + 1);
+                    }}
+                />
             ) : items.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    No photos in your library yet — upload one, or add one by
-                    address.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No photos in your library yet"
+                    description="Upload one, or add one by address."
+                />
             ) : (
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2">
                     {items.map((item) => {
@@ -374,7 +386,7 @@ function LibraryPanel({
                                             ? `${item.filename}, already on this product`
                                             : `${item.filename}. Add it.`
                                     }
-                                    className="w-full overflow-hidden rounded-md border border-border disabled:opacity-45"
+                                    className="w-full overflow-hidden rounded-md border border-border disabled:text-disabled-foreground"
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos */}
                                     <img
@@ -428,9 +440,7 @@ export function AddressPanel({
     const problem = photoAddressProblem(url);
     return (
         <div className="flex flex-col gap-2 rounded-[10px] bg-muted p-3">
-            <label htmlFor={`${id}-url`} className="text-[12.5px] font-medium">
-                Photo address
-            </label>
+            <Label htmlFor={`${id}-url`}>Photo address</Label>
             <Input
                 id={`${id}-url`}
                 value={url}
@@ -439,13 +449,11 @@ export function AddressPanel({
                     setCheck("idle");
                 }}
                 placeholder="https://images.example.com/photo.jpg"
-                className="font-mono text-[12px]"
+                className="font-mono"
                 aria-invalid={problem ? true : undefined}
                 aria-describedby={`${id}-url-hint`}
             />
-            <label htmlFor={`${id}-alt`} className="text-[12.5px] font-medium">
-                What it shows
-            </label>
+            <Label htmlFor={`${id}-alt`}>What it shows</Label>
             <Input
                 id={`${id}-alt`}
                 value={alt}
@@ -469,7 +477,7 @@ export function AddressPanel({
                 <Button
                     type="button"
                     size="sm"
-                    disabled={!valid || check === "checking"}
+                    disabled={!valid}
                     onClick={() => {
                         // What's stored is the address rebuilt behind https://,
                         // never the text as typed (release #772).
@@ -483,8 +491,10 @@ export function AddressPanel({
                         img.onerror = () => setCheck("broken");
                         img.src = safe;
                     }}
+                    busy={check === "checking"}
+                    busyLabel="Checking…"
                 >
-                    {check === "checking" ? "Checking…" : "Add photo"}
+                    Add photo
                 </Button>
                 {check === "broken" && safe?.startsWith("https://") ? (
                     <Button

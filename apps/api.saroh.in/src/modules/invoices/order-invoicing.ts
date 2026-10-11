@@ -876,7 +876,7 @@ export async function invoiceSupersededPayment(
         intent.amountCents,
     );
     const written = await writeCorrection(tx, original, "SUPPLEMENTARY", doc, {
-        note: "Paid on a replaced charge; owed back",
+        note: "Paid on a replaced charge, owed back",
         status: "PAID",
         at: input.at ?? new Date(),
         method: ONLINE_PAYMENT_METHOD,

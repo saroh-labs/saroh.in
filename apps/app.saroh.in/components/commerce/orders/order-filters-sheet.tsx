@@ -10,6 +10,7 @@ import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import { filtersOn, NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 
+import { CountBadge } from "@saroh/ui/count-badge";
 import { OrderFilters } from "./order-filters";
 
 /**
@@ -49,7 +50,7 @@ export function OrderFiltersSheet({
                 aria-label={on > 0 ? `Filters, ${on} on` : "Filters"}
                 onClick={() => setOpen(true)}
                 className={cn(
-                    "h-11 cursor-pointer gap-1.5 rounded-[9px] px-3 text-[13.5px] font-medium active:scale-[0.98]",
+                    "cursor-pointer gap-1.5 font-medium active:scale-[0.98]",
                     on > 0 && "border-foreground",
                     className,
                 )}
@@ -57,12 +58,12 @@ export function OrderFiltersSheet({
                 <SlidersHorizontal aria-hidden className="size-4" />
                 Filters
                 {on > 0 ? (
-                    <span
+                    <CountBadge
+                        count={on}
+                        tone="strong"
                         aria-hidden
-                        className="ml-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-[11px] font-bold tabular-nums text-background"
-                    >
-                        {on}
-                    </span>
+                        className="ml-0.5"
+                    />
                 ) : null}
             </Button>
             <QuickLook
@@ -78,7 +79,7 @@ export function OrderFiltersSheet({
                                 type="button"
                                 variant="outline"
                                 onClick={() => go({ ...NO_FILTERS })}
-                                className="mr-auto h-11 cursor-pointer rounded-[9px] px-3.5 text-[13.5px] font-semibold active:scale-[0.98]"
+                                className="mr-auto cursor-pointer active:scale-[0.98]"
                             >
                                 Clear filters
                             </Button>
@@ -86,7 +87,7 @@ export function OrderFiltersSheet({
                         <Button
                             type="button"
                             onClick={() => setOpen(false)}
-                            className="ml-auto h-11 cursor-pointer rounded-[9px] px-5 text-[13.5px] font-semibold active:scale-[0.98]"
+                            className="ml-auto cursor-pointer active:scale-[0.98]"
                         >
                             Done
                         </Button>

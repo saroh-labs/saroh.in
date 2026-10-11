@@ -7,110 +7,73 @@ import { cn } from "../lib/utils";
 
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import { daysUrl } from "../booking-flow/api";
+import { zoneName } from "../booking-flow/flow-helpers";
+import {
+    dateIn,
+    dateText,
+    DAYS_WINDOW,
+    isBookingDays,
+    timeIn,
+} from "../booking-flow/model";
+import { timeWords } from "../lib/clock";
 import { useQrSource, withQrSource } from "../qr-source";
+import type { BusinessReach } from "../reach-links";
+import { ReachLinks } from "../reach-links";
 import { ctaClasses } from "./cta";
 
 /**
- * `booking` v1 — a service's next free times on a page (S4-003), and the way
- * to the site's booking page to book one. Given `content.serviceId` it reads
- * open slots from the guardless public availability endpoint:
+ * `booking` v1 — a service's next free times on a page (S4-003), each one a
+ * link straight into the site's booking page with that service, day and
+ * time chosen. Given `content.serviceId` it reads the very days the booking
+ * page draws its times from, so a time shown here is one that page offers:
  *
- *   GET  ${NEXT_PUBLIC_API_URL}/public/services/${serviceId}/availability?from=&to=
+ *   GET  ${NEXT_PUBLIC_API_URL}/public/services/${serviceId}/days
  *
  * It books nothing itself. Sign-in is always on (A9, ADR-011): a customer
- * books on the booking page (`/book?service=`), where they confirm their
- * email with a code at the last step. The details form this block used to
- * draw — name, email, phone, posted to the anonymous book route — is gone,
- * so no page on a merchant's site asks a guest for details. The section's
- * `submitLabel` and `successMessage` are no longer drawn.
+ * books on the booking page (`/book?service=&date=&start=`), where they
+ * confirm their email with a code at the last step. The details form this
+ * block used to draw — name, email, phone, posted to the anonymous book
+ * route — is gone, so no page on a merchant's site asks a guest for
+ * details. The section's `submitLabel` and `successMessage` are no longer
+ * drawn.
  *
  * A section with no `serviceId` (never picked in the editor) renders nothing
  * rather than hit a broken URL.
  *
- * TIMEZONE: the availability endpoint returns absolute-UTC instants only and the
- * section carries no service timezone, so slots are displayed in the VISITOR's
- * own resolved timezone (shown in the heading).
+ * TIMEZONE: times are the business's own, as the booking page's are, and
+ * the heading says which. A link names the day and the time on the wall
+ * there, which is what the booking page opens on. (Sample slots, in a
+ * preview, are drawn in the visitor's zone and link nowhere.)
  *
- * A 404 or 410 on availability means the service is gone, archived, or its
- * business switched Appointments off — retrying cannot help, so the section
- * says booking isn't open and offers no retry. Any other failure keeps the
- * error and its Try again.
+ * A 404 or 410 means the service is gone, archived, or its business
+ * switched Appointments off — retrying cannot help, so the section says
+ * booking isn't open and offers no retry. Any other failure keeps the error
+ * and its Try again. With nothing free, or booking closed, it offers a
+ * call and a WhatsApp message where the business has them (`reach`).
  */
 
-/** How far ahead to offer slots. */
-const WINDOW_DAYS = 14;
-
-/** A bookable slot as returned by the public availability endpoint (UTC ISO). */
+/** A free time (UTC ISO): a sample for a preview, or one of the days read's. */
 export interface Slot {
     startAt: string;
     endAt: string;
 }
 
-/**
- * Narrow the availability response instead of casting it (#264). A 200 in the
- * wrong shape used to reach `groupByDay` and throw during render, taking the
- * merchant's page down with it; now it lands in the same error state as a
- * failed request. `null` means "not a list of slots".
- */
-function parseSlots(value: unknown): Slot[] | null {
-    if (!Array.isArray(value)) return null;
-    const slots: Slot[] = [];
-    for (const item of value) {
-        if (typeof item !== "object" || item === null) return null;
-        const { startAt, endAt } = item as Record<string, unknown>;
-        if (typeof startAt !== "string" || typeof endAt !== "string") {
-            return null;
-        }
-        // The formatters below throw a RangeError on an invalid date.
-        if (Number.isNaN(Date.parse(startAt))) return null;
-        slots.push({ startAt, endAt });
-    }
-    return slots;
-}
-
 type SlotsState =
     | { kind: "loading" }
-    | { kind: "ready"; slots: Slot[] }
+    /** `zone` is the business's; null for sample slots (the visitor's). */
+    | { kind: "ready"; slots: Slot[]; zone: string | null }
     /** 404/410: the service can't be booked online. Retrying won't change it. */
     | { kind: "closed" }
     | { kind: "error"; message: string };
 
-/** The visitor's resolved IANA timezone, for the "times shown in …"note. */
+/** The visitor's resolved IANA timezone, for sample slots. */
 function visitorTimezone(): string {
     try {
-        return (
-            Intl.DateTimeFormat().resolvedOptions().timeZone ||
-            "your local time"
-        );
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     } catch {
-        return "your local time";
+        return "UTC";
     }
-}
-
-/** "YYYY-MM-DD" of an instant in the visitor's local timezone (for grouping). */
-function localDateKey(iso: string): string {
-    return new Intl.DateTimeFormat("en-CA", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    }).format(new Date(iso));
-}
-
-/** A day heading like "Mon, 21 Jul". */
-function formatDayLabel(iso: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-    }).format(new Date(iso));
-}
-
-/** A slot's start time like "9:00 AM". */
-function formatSlotTime(iso: string): string {
-    return new Intl.DateTimeFormat("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-    }).format(new Date(iso));
 }
 
 interface DayGroup {
@@ -119,30 +82,30 @@ interface DayGroup {
     slots: Slot[];
 }
 
-/** Group chronologically-sorted slots by their local calendar day. */
-function groupByDay(slots: Slot[]): DayGroup[] {
+/** Group chronologically-sorted slots by their calendar day in `zone`. */
+function groupByDay(slots: Slot[], zone: string): DayGroup[] {
     const groups: DayGroup[] = [];
     for (const slot of slots) {
-        const key = localDateKey(slot.startAt);
+        const key = dateIn(slot.startAt, zone);
         const last = groups.at(-1);
         if (last?.key === key) {
             last.slots.push(slot);
         } else {
-            groups.push({
-                key,
-                label: formatDayLabel(slot.startAt),
-                slots: [slot],
-            });
+            groups.push({ key, label: dateText(key, true), slots: [slot] });
         }
     }
     return groups;
 }
+
+const NOT_LOADED =
+    "We couldn't load available times right now. Please try again shortly.";
 
 export default function BookingSection({
     content,
     apiUrl = DEFAULT_API_URL,
     slots: givenSlots,
     bookHref,
+    reach = null,
 }: {
     content: RenderedBooking;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
@@ -158,12 +121,19 @@ export default function BookingSection({
      * healthy block as broken because a request it never needed failed.
      */
     slots?: Slot[];
+    /**
+     * How to reach the business (the public contact read), for when no
+     * time is free or booking is closed. Null draws no link.
+     */
+    reach?: BusinessReach | null;
 }) {
     // On a page a QR code's scan opened, the link to the booking page
     // carries the scan's tag on (`qr-source.ts`).
     const source = useQrSource();
     const [slotsState, setSlotsState] = useState<SlotsState>(
-        givenSlots ? { kind: "ready", slots: givenSlots } : { kind: "loading" },
+        givenSlots
+            ? { kind: "ready", slots: givenSlots, zone: null }
+            : { kind: "loading" },
     );
 
     const serviceId = content.serviceId;
@@ -172,21 +142,15 @@ export default function BookingSection({
     // state itself, so it's safe to call from an effect (state is only ever set
     // in the resolving `.then`, never synchronously in the effect body).
     const fetchSlots = useCallback(async (): Promise<SlotsState> => {
-        if (!serviceId) return { kind: "ready", slots: [] };
-        const from = new Date();
-        const to = new Date(from.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
+        if (!serviceId) return { kind: "ready", slots: [], zone: null };
         const couldNotLoad: SlotsState = {
             kind: "error",
-            message:
-                "We couldn't load available times right now — please try again shortly.",
+            message: NOT_LOADED,
         };
         try {
-            const res = await fetch(
-                `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/availability` +
-                    `?from=${encodeURIComponent(from.toISOString())}` +
-                    `&to=${encodeURIComponent(to.toISOString())}`,
-                { headers: { accept: "application/json" } },
-            );
+            const res = await fetch(daysUrl(apiUrl, serviceId), {
+                headers: { accept: "application/json" },
+            });
             if (!res.ok) {
                 // A 404 or 410 means booking is closed (the service is gone
                 // or the business switched Appointments off); retrying cannot
@@ -196,16 +160,30 @@ export default function BookingSection({
                 }
                 return couldNotLoad;
             }
-            // The server answered, so a body that isn't JSON or isn't a list
-            // of slots is "couldn't load times", not "couldn't reach".
+            // The server answered, so a body that isn't JSON or isn't the
+            // days read is "couldn't load times", not "couldn't reach".
+            // Narrowed, never cast (#264): a 200 in the wrong shape lands
+            // in the error state rather than throwing during render.
             const body: unknown = await res.json().catch(() => null);
-            const slots = parseSlots(body);
-            return slots ? { kind: "ready", slots } : couldNotLoad;
+            if (!isBookingDays(body)) return couldNotLoad;
+            return {
+                kind: "ready",
+                zone: body.timezone,
+                // A class lists its full sessions too; only one with a
+                // place left is a time to offer here.
+                slots: body.days
+                    .flatMap((day) => day.starts)
+                    .filter(
+                        (start) =>
+                            start.placesLeft === null || start.placesLeft > 0,
+                    )
+                    .map(({ startAt, endAt }) => ({ startAt, endAt })),
+            };
         } catch {
             return {
                 kind: "error",
                 message:
-                    "We couldn't reach the server — please check your connection and try again.",
+                    "We couldn't reach the server. Please check your connection and try again.",
             };
         }
     }, [serviceId, apiUrl]);
@@ -231,15 +209,34 @@ export default function BookingSection({
     // No service picked → nothing to book against. Render nothing.
     if (!serviceId) return null;
 
-    const timezone = visitorTimezone();
+    const zone =
+        slotsState.kind === "ready"
+            ? (slotsState.zone ?? visitorTimezone())
+            : null;
     const groups =
-        slotsState.kind === "ready" ? groupByDay(slotsState.slots) : [];
+        slotsState.kind === "ready" && zone
+            ? groupByDay(slotsState.slots, zone)
+            : [];
     const bookUrl = bookHref
         ? withQrSource(
               `${bookHref}?service=${encodeURIComponent(serviceId)}`,
               source,
           )
         : undefined;
+    // One time's own address on the booking page: its day and its time on
+    // the wall in the business's zone, which is what that page opens on.
+    // Only for the business's own times, and only where there is a page.
+    const timeUrl = (slot: Slot): string | undefined =>
+        bookHref && slotsState.kind === "ready" && slotsState.zone
+            ? withQrSource(
+                  `${bookHref}?service=${encodeURIComponent(serviceId)}` +
+                      `&date=${dateIn(slot.startAt, slotsState.zone)}` +
+                      `&start=${encodeURIComponent(timeIn(slot.startAt, slotsState.zone))}`,
+                  source,
+              )
+            : undefined;
+    const chip =
+        "border-site-border text-site-fg coarse:min-h-11 inline-flex min-h-9 items-center rounded-[var(--site-radius)] whitespace-nowrap border px-3 text-sm tabular-nums";
 
     return (
         <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
@@ -261,9 +258,11 @@ export default function BookingSection({
                     <h3 className="text-site-fg text-sm font-semibold">
                         Next free times
                     </h3>
-                    <p className="text-site-muted text-xs">
-                        Times shown in {timezone}
-                    </p>
+                    {zone ? (
+                        <p className="text-site-muted text-xs">
+                            Times are in {zoneName(zone)}
+                        </p>
+                    ) : null}
                 </div>
 
                 {slotsState.kind === "loading" ? (
@@ -271,10 +270,13 @@ export default function BookingSection({
                         Loading available times…
                     </p>
                 ) : slotsState.kind === "closed" ? (
-                    <p className="text-site-muted mt-4 text-sm">
-                        Online booking isn't open right now — please contact the
-                        business directly.
-                    </p>
+                    <div className="mt-4">
+                        <p className="text-site-body text-sm">
+                            Online booking isn&apos;t open right now. Please get
+                            in touch to book.
+                        </p>
+                        <ReachLinks reach={reach} className="mt-1" />
+                    </div>
                 ) : slotsState.kind === "error" ? (
                     <div className="mt-4">
                         <p role="alert" className={destructiveAlertClasses}>
@@ -289,10 +291,13 @@ export default function BookingSection({
                         </button>
                     </div>
                 ) : groups.length === 0 ? (
-                    <p className="text-site-muted mt-4 text-sm">
-                        No open times in the next {WINDOW_DAYS} days — please
-                        check back soon.
-                    </p>
+                    <div className="mt-4">
+                        <p className="text-site-body text-sm">
+                            Nothing free in the next {DAYS_WINDOW} days. Get in
+                            touch and we&apos;ll find you a time.
+                        </p>
+                        <ReachLinks reach={reach} className="mt-1" />
+                    </div>
                 ) : (
                     <ul className="mt-4 grid gap-[var(--site-grid-gap)]">
                         {groups.map((group) => (
@@ -301,14 +306,33 @@ export default function BookingSection({
                                     {group.label}
                                 </p>
                                 <ul className="mt-2 flex flex-wrap gap-2">
-                                    {group.slots.map((slot) => (
-                                        <li
-                                            key={slot.startAt}
-                                            className="border-site-border text-site-fg rounded-[var(--site-radius)] border px-3 py-1.5 text-sm"
-                                        >
-                                            {formatSlotTime(slot.startAt)}
-                                        </li>
-                                    ))}
+                                    {group.slots.map((slot) => {
+                                        const time = timeWords(
+                                            slot.startAt,
+                                            zone ?? "UTC",
+                                        );
+                                        const href = timeUrl(slot);
+                                        return (
+                                            <li key={slot.startAt}>
+                                                {href ? (
+                                                    <a
+                                                        href={href}
+                                                        aria-label={`Book ${group.label} at ${time}`}
+                                                        className={cn(
+                                                            chip,
+                                                            "hover:border-site-fg focus-visible:ring-site-fg focus-visible:ring-offset-site-bg active:bg-site-surface cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                                                        )}
+                                                    >
+                                                        {time}
+                                                    </a>
+                                                ) : (
+                                                    <span className={chip}>
+                                                        {time}
+                                                    </span>
+                                                )}
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             </li>
                         ))}
@@ -331,7 +355,7 @@ export default function BookingSection({
                     >
                         Book a time
                     </a>
-                    <p className="text-site-muted mt-2 text-xs">
+                    <p className="text-site-body mt-2 text-sm">
                         You&apos;ll pick your time and confirm your email with a
                         code.
                     </p>

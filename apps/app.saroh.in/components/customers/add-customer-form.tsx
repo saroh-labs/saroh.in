@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import {
@@ -18,10 +19,13 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { personHref } from "@/lib/contacts/person-href";
 import { addCustomerAction } from "@/lib/customer-workspace/actions";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 import { trimmedOr } from "@/lib/forms/values";
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
+import { TextLink } from "@saroh/ui/text-link";
 
 const formSchema = z.object({
     email: z
@@ -47,9 +51,14 @@ export function AddCustomerForm() {
     const [holder, setHolder] = useState<EmailHolder | null>(null);
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: { email: "", firstName: "", lastName: "", phone: "" },
     });
-    const { isSubmitting } = form.formState;
+    const { isSubmitting, isDirty } = form.formState;
+    const guard = useLeaveGuard({
+        dirty: isDirty,
+        lost: "The customer isn't added yet, so nothing you've entered will be kept.",
+    });
 
     async function onSubmit(values: FormValues) {
         setHolder(null);
@@ -70,13 +79,17 @@ export function AddCustomerForm() {
         const name = [input.firstName, input.lastName]
             .filter(Boolean)
             .join(" ");
-        showSuccess(`${name || input.email} added`);
+        showSuccess(`${name || input.email} added.`);
         router.push(personHref(res.contactId));
     }
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+            <form
+                onKeyDown={submitOnModEnter}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
+                className="grid gap-4"
+            >
                 <FormField
                     control={form.control}
                     name="email"
@@ -93,14 +106,14 @@ export function AddCustomerForm() {
                             </FormControl>
                             <FormMessage />
                             {holder ? (
-                                <Link
+                                <TextLink
                                     href={personHref(holder.contactId)}
-                                    className="w-fit rounded-[4px] text-[13px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70"
+                                    className="w-fit text-[13px]"
                                 >
                                     {holder.name
                                         ? `Open ${holder.name}`
                                         : "Open them"}
-                                </Link>
+                                </TextLink>
                             ) : null}
                         </FormItem>
                     )}
@@ -160,14 +173,19 @@ export function AddCustomerForm() {
                     )}
                 />
                 <div className="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? "Adding…" : "Add customer"}
+                    <Button
+                        type="submit"
+                        busy={isSubmitting}
+                        busyLabel="Adding…"
+                    >
+                        Add customer
                     </Button>
                     <Button asChild variant="outline">
                         <Link href="/commerce/customers">Cancel</Link>
                     </Button>
                 </div>
             </form>
+            {guard.dialog}
         </Form>
     );
 }

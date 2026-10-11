@@ -1,3 +1,4 @@
+import { count, plural } from "@/lib/format/plural";
 import type { OrderRow } from "./business-service";
 import { STAGE_LABEL } from "./lifecycle";
 import { rowCustomer } from "./list-row";
@@ -131,13 +132,13 @@ export function bulkActions(
     const note =
         unpaid === 0
             ? null
-            : `${unpaid} ${unpaid === 1 ? "isn't" : "aren't"} paid yet, so ${unpaid === 1 ? "it" : "they"} can't be started`;
+            : `${count(unpaid, "isn't", "aren't")} paid yet, so ${plural(unpaid, "it", "they")} can't be started`;
     return { actions, note };
 }
 
 /** "1 order selected", "4 orders selected". */
 export function selectionLabel(n: number): string {
-    return n === 1 ? "1 order selected" : `${n} orders selected`;
+    return count(n, "order selected", "orders selected");
 }
 
 /** The held batch's first line: "Marking 3 ready in 8s". */
@@ -151,7 +152,7 @@ export function holdTitle(count: number, seconds: number): string {
  */
 export function holdWho(names: string[], skipped: number): string {
     const left = skipped
-        ? ` ${skipped} not preparing ${skipped === 1 ? "was" : "were"} left alone.`
+        ? ` ${skipped} not preparing ${plural(skipped, "was", "were")} left alone.`
         : "";
     return `${names.join(", ")}.${left} It still goes ahead if you leave this page.`;
 }
@@ -187,12 +188,12 @@ export interface StageBatch {
     }[];
 }
 
-const orders = (n: number) => (n === 1 ? "order" : "orders");
+const orders = (n: number) => plural(n, "order");
 
 /** "moved by someone else", or each reason once: "moved by someone else; not paid yet". */
 function reasons(list: (string | null)[]): string {
     const words = list.map((r) => r ?? "try again");
-    return words.filter((w, i) => words.indexOf(w) === i).join("; ");
+    return words.filter((w, i) => words.indexOf(w) === i).join(", ");
 }
 
 /**
@@ -264,7 +265,7 @@ export function undoSummary(
         } else {
             const names = told.map((l) => nameOf(l.orderId));
             parts.push(
-                `${names.join(", ")} ${names.length === 1 ? "has" : "have"} already been told.`,
+                `${names.join(", ")} ${plural(names.length, "has", "have")} already been told.`,
             );
         }
     }

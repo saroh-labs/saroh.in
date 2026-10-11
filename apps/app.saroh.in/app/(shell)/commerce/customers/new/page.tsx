@@ -3,9 +3,10 @@ import Link from "next/link";
 
 import { AddCustomerForm } from "@/components/customers/add-customer-form";
 import { PageContainer } from "@/components/shared/page-container";
+import { requireCan } from "@/lib/access/require-can";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Add customer" };
+export const metadata = { title: "New customer" };
 
 /**
  * Sell → Customers → Add customer (DEC-056, C14). Someone who has not
@@ -15,6 +16,17 @@ export const metadata = { title: "Add customer" };
  */
 export default async function NewCustomerPage() {
     await requireSession();
+    // Asked before the form is drawn: `contact:write` is what the API asks of
+    // the save (`requireCan`).
+    const access = await requireCan("contact:write", {
+        thing: "New customer",
+        back: {
+            href: "/commerce/customers",
+            label: "Back to Customers",
+            needs: "contact:read",
+        },
+    });
+    if (access.denied) return access.denied;
 
     return (
         <PageContainer width="form">
@@ -28,10 +40,10 @@ export default async function NewCustomerPage() {
                     >
                         Customers
                     </Link>,
-                    "Add customer",
+                    "New customer",
                 ]}
-                title="Add customer"
-                description="An email is enough; the rest is whatever you know. They join your business, not one location, and show on Customers straight away."
+                title="New customer"
+                description="An email is enough. The rest is whatever you know. They join your business, not one location, and show on Customers straight away."
             />
             <AddCustomerForm />
         </PageContainer>

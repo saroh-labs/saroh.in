@@ -11,7 +11,13 @@ import {
     can,
     ORG_ACTIONS,
     outOfReach,
+    OWNER_ONLY_ACTIONS,
+    OWNER_ONLY_MESSAGE,
+    PLAN_OWNER_ONLY_MESSAGE,
     resolveCapabilities,
+    ROLE_DENIED,
+    ROLE_DENIED_MESSAGE,
+    roleDenial,
     withinReach,
 } from "./organization-policy";
 
@@ -19,10 +25,14 @@ import {
 // implementation so this test actually pins behavior rather than mirroring it.
 const EXPECTED: Record<OrgRole, OrgAction[]> = {
     OWNER: [...ORG_ACTIONS],
-    // Closing the business and changing its web address (DEC-069) are the
+    // Closing the business, changing its web address (DEC-069) and
+    // changing what it pays Saroh (DEC-131, amended 2026-10-11) are the
     // Owner's alone.
     ADMIN: ORG_ACTIONS.filter(
-        (action) => action !== "org:delete" && action !== "org:address:update",
+        (action) =>
+            action !== "org:delete" &&
+            action !== "org:address:update" &&
+            action !== "billing:manage",
     ),
     // audit:read is deliberately OWNER/ADMIN-only, so MEMBER (read-only floor)
     // does NOT include it. media:read IS in the floor; media:write is not.
@@ -74,10 +84,16 @@ describe("organization-policy: can()", () => {
         }
     });
 
-    it("ADMIN may do everything except org:delete and org:address:update", () => {
-        const ownerOnly = ["org:delete", "org:address:update"];
+    it("ADMIN may do everything except the three owner-only powers", () => {
+        const ownerOnly = [
+            "org:delete",
+            "org:address:update",
+            "billing:manage",
+        ];
+        expect([...OWNER_ONLY_ACTIONS].sort()).toEqual([...ownerOnly].sort());
         expect(can("ADMIN", "org:delete")).toBe(false);
         expect(can("ADMIN", "org:address:update")).toBe(false);
+        expect(can("ADMIN", "billing:manage")).toBe(false);
         for (const action of ORG_ACTIONS.filter(
             (a) => !ownerOnly.includes(a),
         )) {
@@ -180,10 +196,159 @@ describe("organization-policy: authorize()", () => {
         }
     });
 
-    it("names the role and action in the thrown message", () => {
-        expect(() => authorize(ctx("MEMBER"), "org:delete")).toThrow(
-            /MEMBER.*org:delete/,
+    /** What a refused `authorize` threw, as the exception filter reads it. */
+    function refused(run: () => void): {
+        status: number;
+        body: { message: string; details: unknown };
+    } {
+        try {
+            run();
+        } catch (error) {
+            if (error instanceof ForbiddenException) {
+                return {
+                    status: error.getStatus(),
+                    body: error.getResponse() as {
+                        message: string;
+                        details: unknown;
+                    },
+                };
+            }
+            throw error;
+        }
+        throw new Error("was not refused");
+    }
+
+    it("refuses in a sentence a person can read, never a role or a key", () => {
+        const { status, body } = refused(() =>
+            authorize(ctx("MEMBER"), "store:create"),
         );
+        expect(status).toBe(403);
+        expect(body.message).toBe(ROLE_DENIED_MESSAGE);
+        expect(body.message).toBe(
+            "Your role can't do this. An owner or admin can change that in Settings \u203a Team.",
+        );
+        expect(body.message).not.toMatch(/MEMBER|store:create|may not perform/);
+    });
+
+    it("says which permission was missing in details, for the app", () => {
+        expect(
+            refused(() => authorize(ctx("MEMBER"), "store:create")).body
+                .details,
+        ).toEqual({ code: ROLE_DENIED, action: "store:create" });
+        expect(ROLE_DENIED).toBe("ROLE_DENIED");
+    });
+
+    it("never names a role the business made up", () => {
+        const clerk: OrganizationContext = {
+            ...ctx("MEMBER"),
+            roleKey: "stock-clerk",
+            actions: new Set<OrgAction>(["order:read"]),
+        };
+        const { body } = refused(() => authorize(clerk, "order:refund"));
+        expect(body.message).toBe(ROLE_DENIED_MESSAGE);
+        expect(JSON.stringify(body)).not.toMatch(/stock-clerk/);
+        expect(body.details).toEqual({
+            code: "ROLE_DENIED",
+            action: "order:refund",
+        });
+    });
+});
+
+describe("Plan and billing (DEC-014, DEC-131 amended 2026-10-11)", () => {
+    // The app's Settings tab, its page and every plan prompt ask these two
+    // (`lib/billing/plan-access.ts` in app.saroh.in). Changing who holds
+    // them here changes who is offered the page and the way to a plan.
+    it("is read by Owner and Admin, and by nobody else", () => {
+        for (const role of ["OWNER", "ADMIN"] as const) {
+            expect(can(role, "billing:read")).toBe(true);
+        }
+        for (const role of ["MEMBER", "REVIEWER"] as const) {
+            expect(can(role, "billing:read")).toBe(false);
+        }
+    });
+
+    it("is changed by the Owner alone: an Admin reads it and changes nothing", () => {
+        expect(can("OWNER", "billing:manage")).toBe(true);
+        for (const role of ["ADMIN", "MEMBER", "REVIEWER"] as const) {
+            expect(can(role, "billing:manage")).toBe(false);
+        }
+        expect(() => authorize(ctx("OWNER"), "billing:manage")).not.toThrow();
+        expect(() => authorize(ctx("ADMIN"), "billing:read")).not.toThrow();
+    });
+
+    it("refuses an Admin in the owner-only sentence, with the permission in details", () => {
+        let thrown: unknown;
+        try {
+            authorize(ctx("ADMIN"), "billing:manage");
+        } catch (error) {
+            thrown = error;
+        }
+        expect(thrown).toBeInstanceOf(ForbiddenException);
+        const refusal = thrown as ForbiddenException;
+        expect(refusal.getStatus()).toBe(403);
+        expect(refusal.getResponse()).toEqual(roleDenial("billing:manage"));
+        expect(roleDenial("billing:manage")).toEqual({
+            message: "Only the owner can change the plan.",
+            details: { code: "ROLE_DENIED", action: "billing:manage" },
+        });
+        expect(PLAN_OWNER_ONLY_MESSAGE).toMatch(/^Only the owner can /);
+    });
+
+    it("never sends an owner-only refusal to Settings, where no role can be given it", () => {
+        for (const action of OWNER_ONLY_ACTIONS) {
+            const { message } = roleDenial(action);
+            expect(message).toMatch(/^Only the owner can /);
+            expect(message).not.toMatch(/admin|Team/);
+        }
+        expect(roleDenial("org:delete").message).toBe(OWNER_ONLY_MESSAGE);
+        expect(roleDenial("store:create").message).toBe(ROLE_DENIED_MESSAGE);
+    });
+
+    it("an invented role that lists it does not gain it: the stored list is stripped", () => {
+        const set = resolveCapabilities("finance", [
+            "billing:read",
+            "billing:manage",
+            "org:delete",
+            "org:address:update",
+        ]);
+        expect([...set]).toEqual(["billing:read"]);
+        const finance: OrganizationContext = {
+            ...ctx("MEMBER"),
+            roleKey: "finance",
+            actions: set,
+        };
+        expect(() => authorize(finance, "billing:manage")).toThrow(
+            ForbiddenException,
+        );
+        expect(() => authorize(finance, "billing:read")).not.toThrow();
+    });
+
+    it("a stored row for Admin that lists it does not gain it, and the Owner's keeps it", () => {
+        const stored = ["billing:read", "billing:manage"];
+        expect(resolveCapabilities("ADMIN", stored).has("billing:manage")).toBe(
+            false,
+        );
+        expect(resolveCapabilities("OWNER", stored).has("billing:manage")).toBe(
+            true,
+        );
+    });
+
+    it("an extra permission cannot grant it, to an Admin or anyone else", () => {
+        for (const role of ["ADMIN", "MEMBER", "finance"]) {
+            const set = resolveCapabilities(role, null, [
+                "billing:manage",
+                "invoice:read",
+            ]);
+            expect(set.has("billing:manage")).toBe(false);
+            expect(set.has("invoice:read")).toBe(true);
+        }
+    });
+
+    it("is beyond an Admin's reach, so an Admin can never hand it on", () => {
+        expect(outOfReach(ctx("ADMIN"), ["billing:manage"])).toEqual([
+            "billing:manage",
+        ]);
+        expect(withinReach(ctx("OWNER"), ["billing:manage"])).toBe(true);
     });
 });
 
@@ -288,13 +453,12 @@ describe("reach (F19): nobody grants what they don't hold", () => {
     });
 
     it("falls back to the shipped map for a context without resolved actions", () => {
-        // OWNER holds everything; ADMIN everything except closing the
-        // business, so a role holding that is beyond an Admin.
+        // OWNER holds everything; ADMIN everything except the owner-only
+        // powers, so a role holding one is beyond an Admin.
         expect(withinReach(ctx("OWNER"), ORG_ACTIONS)).toBe(true);
-        expect(outOfReach(ctx("ADMIN"), ORG_ACTIONS)).toEqual([
-            "org:delete",
-            "org:address:update",
-        ]);
+        expect(outOfReach(ctx("ADMIN"), ORG_ACTIONS).sort()).toEqual(
+            ["billing:manage", "org:address:update", "org:delete"].sort(),
+        );
         expect(withinReach(ctx("MEMBER"), ["payment:manage"])).toBe(false);
     });
 });

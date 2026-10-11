@@ -96,7 +96,7 @@ describe("Hours' row and sheet", () => {
     it("says the week in one line, and what is coming soon", () => {
         onTab("hours");
         draw(settings(), { hours: ONE_LOCATION, canEditHours: true });
-        expect(summary()).toBe("Mon–Sat 9:00 AM – 6:00 PM · Sun closed");
+        expect(summary()).toBe("Mon to Sat 9:00 am to 6:00 pm · Sun closed");
         expect(panel()?.textContent).toContain("No closures planned");
         expect(panel()?.textContent).toContain("Coming soon");
         expect(panel()?.querySelector("input")).toBeNull();
@@ -128,9 +128,9 @@ describe("Hours' row and sheet", () => {
         expect(updateStorefront.mock.calls[0]?.[0]).toBe("st_hill");
         expect(sheet()).toBeNull();
         expect(summary()).toBe(
-            "Mon–Sat 9:00 AM – 6:00 PM · Sun 10:00 AM – 4:00 PM",
+            "Mon to Sat 9:00 am to 6:00 pm · Sun 10:00 am to 4:00 pm",
         );
-        expect(showUndo.mock.calls[0]?.[0]).toBe("Hours saved");
+        expect(showUndo.mock.calls[0]?.[0]).toBe("Hours saved.");
     });
 
     it("a location that refuses is named, and the sheet stays open with what was typed", async () => {
@@ -144,11 +144,12 @@ describe("Hours' row and sheet", () => {
         await type(input("sun"), "10:00-16:00");
         await press(item("Save"));
         expect(showError).toHaveBeenCalledWith(
-            "Hill Road: A day has to close after it opens.",
+            "Hours weren't saved for Hill Road.",
+            "A day has to close after it opens.",
         );
         expect(sheetName()).toBe("Opening hours");
         expect(input("sun")?.value).toBe("10:00-16:00");
-        expect(summary()).toBe("Mon–Sat 9:00 AM – 6:00 PM · Sun closed");
+        expect(summary()).toBe("Mon to Sat 9:00 am to 6:00 pm · Sun closed");
     });
 
     it("Cancel saves nothing", async () => {
@@ -169,7 +170,7 @@ describe("Hours' row and sheet", () => {
         draw(settings(), { hours: ONE_LOCATION, canEditHours: false });
         expect(sheet()).toBeNull();
         expect(edit("Edit opening hours")).toBeNull();
-        expect(summary()).toBe("Mon–Sat 9:00 AM – 6:00 PM · Sun closed");
+        expect(summary()).toBe("Mon to Sat 9:00 am to 6:00 pm · Sun closed");
     });
 
     it("with no location, says where hours are kept and offers no Edit", () => {

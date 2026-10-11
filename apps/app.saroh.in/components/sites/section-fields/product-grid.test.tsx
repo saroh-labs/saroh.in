@@ -206,9 +206,9 @@ describe("the Product grid's fields (G12)", () => {
         );
         expect(rows).toEqual([
             "Sourdough",
-            "Old loafArchived — not shown on the site",
-            "Test cakeDraft — not shown until published",
-            "Unknown productDeleted — not shown on the site",
+            "Old loafArchived, not shown on the site",
+            "Test cakeDraft, not shown until published",
+            "Unknown productDeleted, not shown on the site",
         ]);
     });
 
@@ -235,9 +235,9 @@ describe("the Product grid's fields (G12)", () => {
 
     it("points to Sell › Products when there are no collections yet", () => {
         render({ source: "collection" }, { ...READY, collections: [] });
-        const link = byText("a", "Make one in Sell › Products");
+        const link = byText("a", "New collection");
         expect(link.getAttribute("href")).toBe(
-            "/commerce/products?view=collections",
+            "/commerce/products?tab=collections",
         );
     });
 

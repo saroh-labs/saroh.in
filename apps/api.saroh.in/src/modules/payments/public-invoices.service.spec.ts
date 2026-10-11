@@ -519,6 +519,21 @@ describe("PublicInvoicesService.createIntent", () => {
         });
         const withUpi = await makeService().service.read(TOKEN);
         expect(withUpi).not.toHaveProperty("businessContact");
+
+        // Payable online: the same contact sits under Pay, for a question
+        // before paying.
+        profileFindUnique.mockResolvedValue({
+            phone: "+919800000000",
+            contactEmail: "hello@lotus.example",
+        });
+        providerFindFirst.mockResolvedValue(connectedRow());
+        const online = await makeService().service.read(TOKEN);
+        expect(online.payOnline).toBe(true);
+        expect(online.businessContact).toEqual({
+            phone: "+919800000000",
+            email: "hello@lotus.example",
+        });
+        providerFindFirst.mockResolvedValue(null);
         profileFindUnique.mockResolvedValue(null);
     });
 

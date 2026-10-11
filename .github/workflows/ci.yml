@@ -101,7 +101,11 @@ jobs:
           # instead of reading as "nothing changed".)
           all=$(git diff --name-only "$base" HEAD)
           files=$(printf '%s\n' "$all" | grep -vE '^(docs/|.*\.md$)' || true)
-          has() { printf '%s\n' "$files" | grep -qE "$1"; }
+          # Not `| grep -q`: grep -q leaves at its first match, the writer
+          # behind it dies of a broken pipe once the list is longer than the
+          # pipe holds, and under pipefail that read as "no match". A batch
+          # of 2,000 files so ran no integration and no browser shard.
+          has() { grep -E "$1" <<<"$files" >/dev/null; }
           if has '^(\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|\.nvmrc$|tooling/)'; then
             everything
           fi
@@ -210,6 +214,18 @@ jobs:
       - name: One word each
         run: pnpm run check:words
 
+      # One formatter each: no Intl or toLocaleString outside the merchant
+      # app's lib/format, no plural built by hand, no "successfully" in a
+      # toast.
+      - name: One formatter each
+        run: pnpm run check:formats
+
+      # What a merchant reads in the workspace: no em dash, no semicolon, a
+      # range says "to", and none of the words the product never says
+      # (organization, workspace, storefront, inventory, Retry, …).
+      - name: The workspace's words
+        run: pnpm run check:copy
+
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.
       - name: Browser spec coverage keys
@@ -302,7 +318,7 @@ jobs:
               printf '%s\n' "$out"
               exit 0
             fi
-            if ! printf '%s' "$out" | grep -qE 'ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND|FetchError'; then
+            if ! grep -E 'ERR_SOCKET_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND|FetchError' <<<"$out" >/dev/null; then
               printf '%s\n' "$out"
               exit 1
             fi

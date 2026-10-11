@@ -55,7 +55,7 @@ export class OrganizationsController {
         @CurrentUser() user: AuthUser,
         @Body() dto: OnboardOrganizationDto,
     ) {
-        return this.onboarding.onboard(user.id, dto);
+        return this.onboarding.onboard(user.id, dto, { email: user.email });
     }
 
     @Get()
@@ -96,6 +96,18 @@ export class OrganizationsController {
     @UseGuards(BetterAuthGuard, OrganizationGuard)
     getSettings(@OrgContext() ctx: OrganizationContext) {
         return this.settings.get(ctx);
+    }
+
+    /**
+     * What the business's website shows of how to reach it (DEC-128): its
+     * public phone, contact email, where customers come and its social
+     * links, for the "Contact and social" rows of Website settings. Every
+     * value is already public on the site; `site:read`.
+     */
+    @Get(":organizationId/site-contact")
+    @UseGuards(BetterAuthGuard, OrganizationGuard)
+    siteContact(@OrgContext() ctx: OrganizationContext) {
+        return this.settings.siteContact(ctx);
     }
 
     /**

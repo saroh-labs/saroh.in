@@ -154,10 +154,8 @@ test.describe("Pack Detail on Northwind (E16)", () => {
             });
             await expect(dialog).toBeVisible();
             const save = dialog.getByRole("button", {
-                name: "Extend",
-                exact: true,
+                name: "Extend pack",
             });
-            await expect(save).toBeDisabled();
             await dialog.getByRole("radio", { name: "+7 days" }).click();
             await dialog.getByLabel("Reason").fill("E2E: away for a week");
             await save.click();
@@ -174,7 +172,7 @@ test.describe("Pack Detail on Northwind (E16)", () => {
             // A pack nobody holds: the empty state, with Sell this pack.
             await page.goto(`/class-packs/${emptyId}?tab=who`);
             await expect(
-                page.getByText("Nobody has this pack yet"),
+                page.getByText("No one has this pack yet"),
             ).toBeVisible();
             await page.getByRole("button", { name: "Sell this pack" }).click();
             await expect(

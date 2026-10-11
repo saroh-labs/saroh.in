@@ -128,7 +128,7 @@ fi
 SAME_CODE=$TREE
 if [ -n "$TREE" ]; then
     for c in $(git rev-list --first-parent --max-count=20 HEAD~1 2>/dev/null); do
-        git diff --name-only "$c" HEAD | grep -qvE '^(docs/|.*\.md$)' && break
+        git diff --name-only "$c" HEAD | grep -vE '^(docs/|.*\.md$)' >/dev/null && break
         SAME_CODE="$SAME_CODE $(git rev-parse "$c^{tree}")"
     done
 fi
@@ -220,7 +220,7 @@ affected() {
             # "Nothing affected" must agree with git: code changed under
             # apps/ or packages/ means the query is wrong, so run them all.
             if [ -z "$AFFECTED_LIST" ]; then
-                if git diff --name-only "$MB" HEAD | grep -qE '^(apps|packages)/'; then
+                if git diff --name-only "$MB" HEAD | grep -E '^(apps|packages)/' >/dev/null; then
                     AFFECTED_LIST="(all)"
                 else
                     AFFECTED_LIST="(none)"
@@ -230,7 +230,7 @@ affected() {
             AFFECTED_LIST="(all)"
         fi
     fi
-    [ "$AFFECTED_LIST" = "(all)" ] || echo "$AFFECTED_LIST" | grep -qx "$1"
+    [ "$AFFECTED_LIST" = "(all)" ] || echo "$AFFECTED_LIST" | grep -x "$1" >/dev/null
 }
 TURBO="pnpm -s exec turbo run --output-logs=errors-only $TURBO_FORCE"
 # Builds what the affected packages' tests import: the packages they depend
@@ -787,7 +787,7 @@ audit_critical() {
         out=$(audit_once 2>&1) && return 0
         rc=$?
         # 124: the attempt ran out its 60s, which is the registry not answering.
-        if [ "$rc" != 124 ] && ! printf '%s' "$out" | grep -qiE "$AUDIT_NET_ERRORS"; then
+        if [ "$rc" != 124 ] && ! printf '%s' "$out" | grep -iE "$AUDIT_NET_ERRORS" >/dev/null; then
             lines=$(printf '%s\n' "$out" | grep -E '│ (critical|Package|Vulnerable|Patched)|More info|Severity')
             if [ -n "$lines" ]; then
                 printf '%s\n' "$lines"
@@ -828,6 +828,8 @@ bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
 bg_step mktemp pnpm run check:mktemp
 bg_step words pnpm run check:words
+bg_step formats pnpm run check:formats
+bg_step copy pnpm run check:copy
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,
@@ -912,7 +914,7 @@ replay() {
         DATABASE_URL="$REPLAY_DATABASE_URL" DATABASE_TARGET_CONFIRM="$rdb" \
             pnpm --filter @saroh/database db:verify:replay
 }
-if echo "$CHANGED" | grep -q "^packages/database/prisma/"; then
+if echo "$CHANGED" | grep "^packages/database/prisma/" >/dev/null; then
     case "${REPLAY_DATABASE_URL:-}" in
         # Beside the integration run: its own database, mostly waiting on Postgres.
         *test*) bg_step db-replay replay ;;
@@ -1086,7 +1088,7 @@ int_rls_select() {
     all=$(cd apps/api.saroh.in && TEST_RLS=on SKIP_ENV_VALIDATION=1 pnpm -s exec jest \
         -c jest.integration.config.js --listTests --no-watchman 2>/dev/null) || return 1
     for p in $INT_PATHS; do
-        echo "$all" | grep -qxF "$p" && INT_RLS_PATHS="$INT_RLS_PATHS $p"
+        echo "$all" | grep -xF "$p" >/dev/null && INT_RLS_PATHS="$INT_RLS_PATHS $p"
     done
     return 0
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatClock, formatClockRange } from "@/lib/format/datetime";
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -13,7 +15,6 @@ import {
     rangeRefusal,
     WEEK,
 } from "@/lib/services/availability-rules";
-import { clock } from "@/lib/services/diary";
 import { openingNote, whollyOutside } from "@/lib/services/in-person-hours";
 import type { WeeklyRange } from "@/lib/staff/types";
 
@@ -65,8 +66,8 @@ export function WeeklyHours({
                 </h2>
                 {canEdit ? (
                     <Button
+                        size="sm"
                         variant="outline"
-                        className="h-[30px] rounded-[8px] px-[11px] text-[12px] coarse:h-11"
                         onClick={() => {
                             const monday = dayRanges(hours, 1);
                             onChange([
@@ -129,12 +130,14 @@ export function WeeklyHours({
                                                 : "px-[11px]",
                                         )}
                                     >
-                                        {clock(r.startMinute)}–
-                                        {clock(r.endMinute)}
+                                        {formatClockRange(
+                                            r.startMinute,
+                                            r.endMinute,
+                                        )}
                                         {canEdit ? (
                                             <button
                                                 type="button"
-                                                aria-label={`Remove ${clock(r.startMinute)} to ${clock(r.endMinute)} on ${name}`}
+                                                aria-label={`Remove ${formatClockRange(r.startMinute, r.endMinute)} on ${name}`}
                                                 onClick={() =>
                                                     onChange(
                                                         hours.filter(
@@ -195,6 +198,7 @@ export function WeeklyHours({
                                                 className="w-auto max-w-[calc(100vw-1.5rem)] rounded-[12px] p-3"
                                             >
                                                 <form
+                                                    onKeyDown={submitOnModEnter}
                                                     className="grid gap-2.5"
                                                     onSubmit={(e) => {
                                                         e.preventDefault();
@@ -251,8 +255,8 @@ export function WeeklyHours({
                                                     ) : null}
                                                     <div className="flex items-center gap-2">
                                                         <Button
+                                                            size="sm"
                                                             type="submit"
-                                                            className="h-8 rounded-[8px] px-3 text-[12.5px] coarse:h-11"
                                                             disabled={Boolean(
                                                                 bad,
                                                             )}
@@ -260,9 +264,9 @@ export function WeeklyHours({
                                                             Add hours
                                                         </Button>
                                                         <Button
+                                                            size="sm"
                                                             type="button"
                                                             variant="ghost"
-                                                            className="h-8 rounded-[8px] px-3 text-[12.5px] coarse:h-11"
                                                             onClick={() =>
                                                                 setAdding(null)
                                                             }
@@ -282,19 +286,19 @@ export function WeeklyHours({
                                 </p>
                             ) : null}
                             {out.length ? (
-                                <p className="basis-full text-[12px] text-brand-subtle-foreground">
+                                <p className="basis-full text-[12px] text-foreground">
                                     {out.length}{" "}
                                     {out.length === 1
                                         ? "booking this week falls"
                                         : "bookings this week fall"}{" "}
-                                    outside these hours —{" "}
+                                    outside these hours:{" "}
                                     {out
                                         .map(
                                             (b) =>
-                                                `${b.who.split(" ")[0]} ${clock(b.start)}`,
+                                                `${b.who.split(" ")[0]} ${formatClock(b.start)}`,
                                         )
                                         .join(", ")}
-                                    . They stay booked; move them if you need
+                                    . They stay booked. Move them if you need
                                     to.
                                 </p>
                             ) : null}

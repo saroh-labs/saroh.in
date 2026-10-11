@@ -2,14 +2,12 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
-import { cn } from "@saroh/ui/lib/utils";
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
 import { InvoiceRow } from "@/components/invoices/invoice-row";
 import { ScopeNotice, SourceChips } from "@/components/invoices/source-filter";
@@ -36,6 +34,8 @@ import {
 } from "@/lib/invoices/status";
 import { LIST_LIMIT } from "@/lib/lists/capped";
 import { withoutSince } from "@/lib/views/since";
+import { Notice } from "@saroh/ui/notice";
+import { TabStrip } from "@saroh/ui/tabs";
 
 /** The business's GST standing, for the line under the title. */
 export interface InvoiceBusinessTax {
@@ -44,7 +44,7 @@ export interface InvoiceBusinessTax {
 }
 
 const money = (amount: string | number, currency: string) =>
-    formatMoneyMajor(amount, currency) ?? String(amount);
+    formatMoneyMajor(amount, currency);
 
 /** "₹35,400", or "₹35,400 + $120" when a business bills in two currencies. */
 function sums(list: { currency: string; cents: number }[]): string {
@@ -118,7 +118,7 @@ export function InvoicesScreen({
 
     // The tab and the chip are part of the address, so a reload or a shared
     // link keeps them.
-    function remember(key: "view" | "source", value: string | null) {
+    function remember(key: "tab" | "source", value: string | null) {
         const q = new URLSearchParams(params.toString());
         if (value === null) q.delete(key);
         else q.set(key, value);
@@ -128,7 +128,7 @@ export function InvoicesScreen({
 
     function pick(next: InvoiceTab) {
         setTab(next);
-        remember("view", next === "all" ? null : next);
+        remember("tab", next === "all" ? null : next);
     }
 
     function pickChip(next: SourceChip) {
@@ -166,26 +166,30 @@ export function InvoicesScreen({
         // One block: the page container spaces its children apart, and the
         // design sets the title, note and tabs close together.
         <div>
-            <InvoiceCrumbs />
             <PageHeader
+                breadcrumb={["Payments", "Invoices"]}
                 title="Invoices"
+                count={countLabel(mine.length, {
+                    one: "invoice",
+                    other: "invoices",
+                })}
                 className="mb-1.5"
-                actions={
-                    <>
-                        <span className="text-[12.5px] text-muted-foreground">
+                // A summary, not a count of the list: before the button.
+                meta={
+                    mine.length > 0 ? (
+                        <span>
                             {sums(owed)} owed to you · {overdueCount} overdue
                         </span>
-                        {canWrite ? (
-                            <Button
-                                asChild
-                                className="h-[38px] px-4 text-[13px]"
-                            >
-                                <Link href="/billing/invoices/new">
-                                    New invoice
-                                </Link>
-                            </Button>
-                        ) : null}
-                    </>
+                    ) : undefined
+                }
+                actions={
+                    canWrite ? (
+                        <Button asChild>
+                            <Link href="/billing/invoices/new">
+                                New invoice
+                            </Link>
+                        </Button>
+                    ) : undefined
                 }
             />
             <p className="mb-3 text-[12px] text-muted-foreground">
@@ -195,48 +199,26 @@ export function InvoicesScreen({
                     : tax
                       ? tax.registered
                           ? ` GST tax invoices${tax.gstin ? `, GSTIN ${tax.gstin}` : ""}.`
-                          : " Not GST-registered — no tax is charged."
+                          : " Not GST-registered. No tax is charged."
                       : null}
             </p>
 
-            <div
-                role="tablist"
-                aria-label="Invoices"
-                className="flex flex-wrap gap-0.5 border-b border-border"
-            >
-                {INVOICE_TABS.map((t) => {
-                    const on = t.id === tab;
+            <TabStrip
+                label="Invoices"
+                idPrefix="invoices-tab"
+                value={tab}
+                onValueChange={pick}
+                tabs={INVOICE_TABS.map((t) => {
                     const n = mine.filter((i) => inTab(i, t.id)).length;
-                    const alarm = t.id === "overdue" && n > 0;
-                    return (
-                        <button
-                            key={t.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={on}
-                            onClick={() => pick(t.id)}
-                            className={cn(
-                                "inline-flex items-center px-3.5 py-2.5 text-[13px] transition-colors duration-fast coarse:min-h-11",
-                                on
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
-                            )}
-                        >
-                            {t.label}
-                            <span
-                                className={cn(
-                                    "ml-1.5 rounded-full px-1.5 py-px text-[11px] font-semibold",
-                                    alarm
-                                        ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                                        : "bg-muted text-muted-foreground",
-                                )}
-                            >
-                                {n}
-                            </span>
-                        </button>
-                    );
+                    return {
+                        value: t.id,
+                        label: t.label,
+                        count: n,
+                        countTone:
+                            t.id === "overdue" && n > 0 ? "danger" : "neutral",
+                    };
                 })}
-            </div>
+            />
 
             <div className="flex flex-col pb-[26px] pt-4">
                 {scope ? (
@@ -265,30 +247,30 @@ export function InvoicesScreen({
                     </div>
                 ) : null}
                 {overdueCount > 0 && tab !== "overdue" ? (
-                    <div
-                        role="alert"
-                        className="mb-3.5 flex flex-wrap items-center gap-3 rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3"
-                    >
-                        <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
-                            {overdueCount} overdue · {sums(overdue)} — worked
-                            out from the due date.
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => pick("overdue")}
-                            className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px]"
-                        >
-                            Show them
-                        </Button>
-                    </div>
+                    <Notice tone="error" className="mb-3.5">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
+                                {overdueCount} overdue · {sums(overdue)}, worked
+                                out from the due date.
+                            </span>
+                            <Button
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                                onClick={() => pick("overdue")}
+                                className="border-destructive-subtle-foreground"
+                            >
+                                Show them
+                            </Button>
+                        </div>
+                    </Notice>
                 ) : null}
 
                 {invoices.length === 0 && !scope ? (
                     <EmptyState
                         icon={<ReceiptText />}
                         title="No invoices yet"
-                        description="Orders and subscription renewals make their invoice themselves. For trade and one-off work, write one by hand."
+                        description="Orders and renewals are invoiced for you, and you can write one by hand."
                         action={
                             canWrite ? (
                                 <Button asChild>
@@ -300,11 +282,23 @@ export function InvoicesScreen({
                         }
                     />
                 ) : shown.length === 0 ? (
-                    <div className="rounded-[12px] border border-dashed border-border-strong px-5 py-10 text-center text-[13px] text-muted-foreground">
-                        {scope && mine.length === 0
+                    <EmptyState
+                        kind="no-results"
+                        things="invoices"
+                        cause="view"
+                        icon={<ReceiptText />}
+                        title={(scope && mine.length === 0
                             ? scopeEmptyLine(scope)
-                            : chipEmptyLine(tabLabel, scope ? "all" : chip)}
-                    </div>
+                            : chipEmptyLine(tabLabel, scope ? "all" : chip)
+                        ).replace(/\.$/, "")}
+                        onClear={
+                            tab !== "all"
+                                ? () => pick("all")
+                                : !scope && chip !== "all"
+                                  ? () => pickChip("all")
+                                  : undefined
+                        }
+                    />
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {shown.map((i) => (
@@ -323,7 +317,7 @@ export function InvoicesScreen({
                 {truncated ? (
                     <p className="mt-3 max-w-[68ch] text-[12px] text-muted-foreground">
                         Showing the newest {LIST_LIMIT} invoices and every
-                        unpaid one; older paid and cancelled invoices are not
+                        unpaid one. Older paid and cancelled invoices are not
                         listed.
                     </p>
                 ) : null}

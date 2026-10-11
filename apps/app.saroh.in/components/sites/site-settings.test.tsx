@@ -19,6 +19,13 @@ vi.mock("@/lib/sites/actions", () => ({
 }));
 // Each reads on its own once mounted; the words around them are what is
 // under test here.
+vi.mock("@/lib/stores/storefront-actions", () => ({
+    updateStorefront: vi.fn(),
+}));
+// The business's own sheets open from Contact and social (DEC-128).
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveOrganizationSettings: vi.fn(),
+}));
 vi.mock("@/components/sites/custom-domain", () => ({
     CustomDomain: () => null,
 }));
@@ -136,7 +143,7 @@ describe("the site's settings show whether publishing needs approval (T13)", () 
         expect(html).toContain('aria-label="Publishing needs approval"');
         const text = words(html);
         expect(text).toContain(
-            "Only an approved test release can go live. You can still go live without approval; it's recorded.",
+            "Only an approved test release can go live. You can still go live without approval, and it's recorded.",
         );
         expect(text).not.toContain("only the owner can change this");
     });
@@ -219,7 +226,7 @@ describe("the two save models, made visible (UX-081, the audit)", () => {
             ),
         );
         expect(draft).toContain(
-            "Your site isn't published yet. Nobody can reach it until you publish. Review and publish",
+            "Your website isn't live yet. Nobody can reach it until you publish. Review and publish",
         );
     });
 
@@ -317,7 +324,7 @@ describe("Before you share your site (the audit)", () => {
             <SiteSettings site={site} address={address} />,
         );
         const text = words(html);
-        expect(text).toContain("Before you share your site 1 of 3");
+        expect(text).toContain("Before you share your site 1 of 3 done");
         expect(text).toContain("Done: Search title · using Rye");
         expect(html).toContain('href="#settings-description"');
         expect(html).toContain('href="#settings-share-image"');
@@ -333,8 +340,11 @@ describe("Before you share your site (the audit)", () => {
         const html = renderToStaticMarkup(
             <SiteSettings site={ready} address={address} />,
         );
-        expect(html).toContain("data-share-ready");
-        expect(html).not.toContain("data-share-checklist");
+        expect(html).toContain(
+            'data-setup-checklist="share" data-state="folded"',
+        );
+        expect(html).toContain("Your site is ready to share.");
+        expect(html).not.toContain('data-state="open"');
     });
 });
 
@@ -342,7 +352,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
     const tabsOf = (html: string) =>
         Array.from(
             html.matchAll(
-                /role="tab" aria-selected="(true|false)"[^>]*>([^<]+)</g,
+                /role="tab" aria-selected="(true|false)"[^>]*>(?:<span[^>]*>)*([^<]+)</g,
             ),
             (m: RegExpMatchArray) => [m[2], m[1]],
         );
@@ -365,6 +375,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
             ["Address", "true"],
             ["Search and sharing", "false"],
             ["Menu and footer", "false"],
+            ["Contact and social", "false"],
             ["Shop", "false"],
             ["Tracking", "false"],
             ["Advanced", "false"],
@@ -382,7 +393,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
             ["address", "shown"],
         ]);
         // Every panel stays mounted, so a half-edited row survives a tab.
-        expect(panels).toHaveLength(6);
+        expect(panels).toHaveLength(7);
         const ids = Array.from(
             html.matchAll(/data-settings-group="([a-z-]+)"/g),
             (m: RegExpMatchArray) => m[1],
@@ -391,6 +402,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
             "address",
             "search-and-sharing",
             "menu-and-footer",
+            "contact",
             "shop",
             "tracking",
             "advanced",
@@ -410,6 +422,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
             "Address",
             "Search and sharing",
             "Menu and footer",
+            "Contact and social",
             "Tracking",
         ]);
     });

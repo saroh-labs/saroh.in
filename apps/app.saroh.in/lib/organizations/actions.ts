@@ -65,15 +65,22 @@ async function writeActiveOrgCookie(
  * when the caller is actually a member (verified against GET /organizations),
  * so a tampered/stale selection can't point the app at a foreign org.
  */
-export async function setActiveOrganization(
-    organizationId: string,
-): Promise<OrganizationResult<{ id: string }>> {
+export async function setActiveOrganization(organizationId: string): Promise<
+    OrganizationResult<{
+        id: string;
+        /** The business and the caller's place in it, as the API lists them. */
+        name: string;
+        role: string;
+        roleKey?: string;
+        roleLabel?: string | null;
+    }>
+> {
     const organizations = await listOrganizations();
     const chosen = organizations.find((o) => o.id === organizationId);
     if (!chosen) {
         return {
             ok: false,
-            error: "You are not a member of that organization.",
+            error: "You aren't in that business.",
         };
     }
     // Their access is paused (#800): the API would refuse every read.
@@ -81,7 +88,16 @@ export async function setActiveOrganization(
         return { ok: false, error: PAUSED_ERROR };
     }
     await writeActiveOrgCookie(organizationId, chosen.name);
-    return { ok: true, data: { id: organizationId } };
+    return {
+        ok: true,
+        data: {
+            id: organizationId,
+            name: chosen.name,
+            role: chosen.role,
+            roleKey: chosen.roleKey,
+            roleLabel: chosen.roleLabel,
+        },
+    };
 }
 
 /**

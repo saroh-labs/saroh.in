@@ -1,95 +1,171 @@
-import { VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth/constants";
+import {
+    VERIFICATION_OTP_EXPIRY_SECONDS,
+    VERIFICATION_OTP_LENGTH,
+} from "@saroh/auth/constants";
+import { SETUP_PLAN, SETUP_PLAN_COUNT_WORDS } from "@saroh/ui/lib/setup-plan";
+
+import { isJoining } from "@/lib/joining";
 
 /**
  * What the panel says, per page, in one file.
  *
  * Five pages each holding their own version of this is how five voices become
- * five products. The shape belongs to `SplitPanel`; the words belong here.
+ * five products. The shape belongs to `SplitPanel`. The words belong here.
  *
- * Every line has to be TRUE, which is why some of it departs from the design:
+ * The person reading is the hero, not the sign-in system (UX audit, 10 Oct):
+ * each panel says what Saroh does for them or where they are in the plan, and
+ * one line says what happens next. Nothing here explains sessions.
  *
- * - The reset panel's "ends every other session" was a false promise when
- *   this file was written; `revokeSessionsOnPasswordReset` is on now, so it
- *   is true and the design's wording stands. The same sentence appears ON the
- *   form, because this panel is gone below 760px and a consequence that size
- *   cannot live only in the half that disappears.
- * - The sign-up panel is drawn with a pricing claim. Billing is not settled
- *   here, and a claim about money on the page where an account is created is
- *   the worst place to be approximately right.
+ * Every line has to be TRUE:
  *
- * The code's lifetime is read from the constant rather than typed, so the
- * sentence cannot drift from the server's answer.
+ * - The plan's four steps are real. The account is made here, and setup
+ *   asks its three questions one at a time: what is being set up, its name
+ *   and web address, and what to do first. The list is `SETUP_PLAN` in
+ *   `@saroh/ui`, which setup's own stepper is built from.
+ * - Signing up and signing in take a code sent to the address, and no
+ *   password. One can be added from the account page.
+ * - Resetting a password signs every other device out
+ *   (`revokeSessionsOnPasswordReset`). The same sentence appears ON the form,
+ *   because this panel is gone below 760px and a consequence that size cannot
+ *   live only in the half that disappears.
+ * - No claim about price. Billing is not settled on this page.
+ *
+ * The code's length and lifetime are read from the constants rather than
+ * typed, so a sentence cannot drift from the server's answer. No em dashes
+ * and no semicolons in anything a person reads (`lib/copy.test.ts`).
  */
 
 const CODE_MINUTES = Math.round(VERIFICATION_OTP_EXPIRY_SECONDS / 60);
+
+/** What Saroh does, in one line. Said on the panel, and under the sign-up heading on a phone. */
+export const PROMISE =
+    "Sell, take bookings, bill and run your website in one place.";
+
+/** The plan from nothing to working, in the order it happens. */
+export const PLAN_STEPS: string[] = [...SETUP_PLAN];
 
 export interface PanelCopy {
     eyebrow: string;
     heading: string;
     body: string;
-    points: string[];
+    points?: string[];
+    /** The plan as numbered steps, with the one the person is on. */
+    steps?: string[];
+    currentStep?: number;
 }
 
 export const LOGIN_PANEL: PanelCopy = {
-    eyebrow: "Log in",
-    heading: "One login, every business you belong to.",
-    body: "Your account is yours. The businesses you can reach — your own, and any you have been invited to — all sit behind this one password.",
+    eyebrow: "Sign in",
+    heading: "Pick up where you left off.",
+    body: "Your orders, bookings, invoices and website are as you left them. One sign-in opens every business you belong to.",
     points: [
+        "Your own businesses, and any you were invited to",
         "Your role can differ in each business",
-        // True: log in answers a wrong email and a wrong password alike, and
+        // True: sign in answers a wrong email and a wrong password alike, and
         // forgot-password replies the same whether or not the address exists.
         "We never say whether an email is registered",
-        "Nothing is shared between businesses except you",
     ],
 };
 
 export const SIGNUP_PANEL: PanelCopy = {
     eyebrow: "Sign up",
-    heading: "An account, not a business.",
-    body: "This is you. What you do with Saroh comes after — and if you are here from an invitation, there is no business to create at all.",
+    heading: PROMISE,
+    body: `${SETUP_PLAN_COUNT_WORDS} and you are in, with no password to think up. Next, we email you a code to check the address is yours.`,
+    steps: PLAN_STEPS,
+    currentStep: 1,
+};
+
+/** Signing up from an invitation: there is no business to name. */
+export const SIGNUP_JOIN_PANEL: PanelCopy = {
+    eyebrow: "Invitation",
+    heading: "Make your account and you are in.",
+    body: "The business already exists, so there is nothing to set up. Next, we email you a code to check the address is yours.",
     points: [
-        "Eight characters or more, and nothing else demanded of the password",
-        // True: `requireEmailVerification` issues no session until the code
-        // is accepted.
-        "Signing up issues no session until the email is verified",
-        "Leaving before the code costs nothing — you cannot be signed in yet",
+        "Use the address the invitation was sent to",
+        "No password to think up",
+        "Whoever invited you decides what you can see and change",
     ],
 };
 
 export const VERIFY_PANEL: PanelCopy = {
-    eyebrow: "Verify",
-    heading: "The code comes before the session.",
-    body: "Saroh wants a verified email before anyone is signed in, and has already sent the code — so this is the next step, not a wall in front of a half-made account.",
+    eyebrow: "Check your email",
+    heading: "One code and your account is ready.",
+    body: `Type the ${VERIFICATION_OTP_LENGTH} digits we emailed you. Next, you set up your business.`,
+    steps: PLAN_STEPS,
+    currentStep: 1,
+};
+
+/** Checking the address on the way to an invitation. */
+export const VERIFY_JOIN_PANEL: PanelCopy = {
+    eyebrow: "Check your email",
+    heading: "One code and you are in.",
+    body: `Type the ${VERIFICATION_OTP_LENGTH} digits we emailed you. Next, you join the business that invited you.`,
     points: [
         `The code lasts ${CODE_MINUTES} minutes`,
-        "Asking for a new one retires the one before it",
-        "Paste all six at once — it spreads across the boxes",
+        "Asking for a new one replaces the one before it",
+        "Paste it in, or type it from the email",
     ],
 };
 
+/** Which page the code step is on: it decides what "next" can promise. */
+export type CodeFrom = "sign-up" | "sign-in";
+
+function settingUp(returnTo: string | null | undefined, from: CodeFrom) {
+    // Sign-up with nowhere else to go ends in setup. So does a link that
+    // carries a plan or an invite there.
+    return returnTo ? returnTo.includes("/onboarding") : from === "sign-up";
+}
+
+/**
+ * What the code step says comes after the code. `returnTo` is where the
+ * account lands (already vetted): an invitation, a page they were on their
+ * way to, or nothing. Signing in promises nothing about setup.
+ */
+export function codeNext(
+    returnTo: string | null | undefined,
+    from: CodeFrom,
+): string | undefined {
+    if (isJoining(returnTo)) {
+        return "Next, you join the business that invited you.";
+    }
+    if (settingUp(returnTo, from)) return "Next, you set up your business.";
+    return returnTo ? "Next, you carry on where you were going." : undefined;
+}
+
+/** The line under "You're signed in", while the page hands off. */
+export function doneLine(
+    returnTo: string | null | undefined,
+    from: CodeFrom,
+): string {
+    if (isJoining(returnTo))
+        return "Taking you to the business that invited you…";
+    if (settingUp(returnTo, from)) return "Taking you to set up your business…";
+    return "Taking you to Saroh…";
+}
+
 export const FORGOT_PANEL: PanelCopy = {
     eyebrow: "Forgot password",
-    heading: "We answer the same either way.",
-    body: "Whether or not that address has an account, this page says the same thing. Confirming it would turn the form into a way of checking who has an account here.",
+    heading: "Back in with one link.",
+    body: "Tell us the address you signed up with and we email you a link to set a new password. Next, open that email.",
     points: [
         "The link lasts an hour and works once",
-        "Using it signs you out on every other device",
         "Your old password keeps working until the new one is set",
+        // True, and why the page cannot be used to check who has an account.
+        "We reply the same whether or not the address has an account",
     ],
 };
 
 export const RESET_PANEL: PanelCopy = {
     eyebrow: "Reset password",
     heading: "Set it, and you are back in.",
-    body: "Choosing a new password ends every other session, which is the point if you are here because something felt wrong. Your current password works until the new one is saved.",
-    // Two of the three points this panel used to carry are now said on the
-    // form itself, where they belong: the length rule is the password field's
+    body: "A new password signs you out everywhere else, which is what you want if something felt wrong. Next, you sign in with the new one.",
+    // Two of the three points this panel used to carry are said on the form
+    // itself, where they belong: the length rule is the password field's
     // note, and the sign-out is the line above the button. The panel is gone
-    // below 760px, so a consequence cannot live only here — but once it lives
-    // on the form, repeating it here is just noise at desk width.
+    // below 760px, so a consequence cannot live only here.
     points: [
-        "The link works once, then it is spent",
-        "You will log in again with the new one",
+        "The link works once",
+        "Your current password works until the new one is saved",
         "Nothing else about your account changes",
     ],
 };
@@ -97,7 +173,7 @@ export const RESET_PANEL: PanelCopy = {
 export const SENT_PANEL: PanelCopy = {
     eyebrow: "Check your email",
     heading: "Nothing has changed yet.",
-    body: "Your current password still works. It only changes when you follow the link and set a new one — so a link requested by mistake costs you nothing.",
+    body: "Your current password still works. It only changes when you follow the link and set a new one, so a link asked for by mistake costs you nothing.",
     points: [
         "Sent to the address you typed, if it has an account",
         "Not there? Look in spam before asking for another",
@@ -108,18 +184,30 @@ export const SENT_PANEL: PanelCopy = {
 export const DONE_PANEL: PanelCopy = {
     eyebrow: "Done",
     heading: "Password changed.",
-    body: "Every other session has ended, so anything signed in as you elsewhere — including a device you no longer have — has been signed out.",
+    body: "You are signed out everywhere else, including on any device you no longer have. Next, sign in with the new password.",
     points: [
         "The link you used will not work again",
-        "Log in with the new password",
+        "Your old password no longer works",
         "Nothing else about your account changed",
+    ],
+};
+
+/** `/account`: the person's own details, in the frame every page wears. */
+export const ACCOUNT_PANEL: PanelCopy = {
+    eyebrow: "Your account",
+    heading: "How you sign in, in one place.",
+    body: "Your name, your email and your password are yours, not any one business's. Next, change what you need and go back to Saroh.",
+    points: [
+        "A code to your email always signs you in",
+        "A password is optional, and you can set or change it here",
+        "Signing out here signs you out of every Saroh app",
     ],
 };
 
 export const INVITE_PANEL: PanelCopy = {
     eyebrow: "Invitation",
     heading: "You are joining, not starting.",
-    body: "Someone has given you a role in their business. You make an account, and that is all — the business already exists, so there is nothing to set up.",
+    body: "Someone has given you a role in their business. It already exists, so there is nothing to set up. Next, make your account or sign in.",
     points: [
         "The role decides what you see and can change",
         "Whoever invited you can change or withdraw it later",
@@ -131,11 +219,11 @@ export const INVITE_PANEL: PanelCopy = {
 export const EXPIRED_PANEL: PanelCopy = {
     eyebrow: "Reset password",
     heading: "That link has run out.",
-    body: "Reset links last an hour and work once. This one is past that, or has already been used — either way nothing has changed and your old password still works.",
+    body: "Reset links last an hour and work once. This one is past that, or was already used. Nothing has changed and your old password still works.",
     points: [
         "Asking for a new one takes a moment",
         "The old password is untouched until a new one is set",
-        "If you did not ask for this, nobody got in — ignore it",
+        "If you did not ask for this, nobody got in and you can ignore it",
     ],
 };
 
@@ -143,10 +231,10 @@ export const EXPIRED_PANEL: PanelCopy = {
 export const MISSING_PANEL: PanelCopy = {
     eyebrow: "Reset password",
     heading: "This page needs a link.",
-    body: "Resetting a password only works from the link in the email, because that link is what proves the request came from the account's owner.",
+    body: "A password is reset from the link in the email, because that link is what shows the request came from you. Next, ask for one.",
     points: [
-        "Opening the page directly cannot work, by design",
         "Ask for a link and it arrives in a moment",
-        "Already have one? Open it from the email rather than typing the address",
+        "Open it from the email rather than typing the address",
+        "Your current password works until then",
     ],
 };

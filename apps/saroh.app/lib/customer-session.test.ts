@@ -141,11 +141,32 @@ describe("calls to the API", () => {
         await expect(getSignedInCustomer()).resolves.toEqual({
             email: "a@b.in",
             name: null,
+            phone: null,
         });
         const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
         expect(
             (init.headers as Record<string, string>)[CUSTOMER_SESSION_HEADER],
         ).toBe("tok");
+    });
+
+    it("passes on the phone the business has for them, and nothing else it was sent", async () => {
+        jar.value = "tok";
+        fetchMock.mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    email: "a@b.in",
+                    name: "Asha",
+                    phone: " 98450 12345 ",
+                    contactId: "c_1",
+                }),
+                { status: 200 },
+            ),
+        );
+        await expect(getSignedInCustomer()).resolves.toEqual({
+            email: "a@b.in",
+            name: "Asha",
+            phone: "98450 12345",
+        });
     });
 
     it("is signed out without asking the API when there is no cookie", async () => {

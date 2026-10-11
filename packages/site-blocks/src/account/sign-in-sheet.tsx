@@ -6,6 +6,11 @@ import { useEffect, useId, useRef, useState } from "react";
 import { destructiveAlertClasses } from "../alert";
 import { focusRing, quietFill } from "../booking-flow/styles";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
+import {
+    SHEET_CLOSE_SIZE,
+    SHEET_HEIGHT,
+    useScrollLock,
+} from "../lib/sheet-shell";
 import { cn } from "../lib/utils";
 import { useTestRelease } from "../test-release/context";
 import { SIGN_IN_OFF_TEXT } from "../test-release/words";
@@ -24,6 +29,11 @@ import {
     UNAVAILABLE_TEXT,
 } from "./api";
 import { ChallengeWidget } from "./challenge";
+import {
+    clearSignInDraft,
+    readSignInDraft,
+    writeSignInDraft,
+} from "./sign-in-draft";
 
 /**
  * The sign-in sheet on a merchant's site (ADR-011; round-2 plan A, A3), as
@@ -35,6 +45,12 @@ import { ChallengeWidget } from "./challenge";
  * Opened at the last step of booking (A9), it leads with "Last step: confirm
  * it's you". When the code can't be sent it says so, with the business's
  * phone when there is one, and nothing is booked: there is no guest path.
+ *
+ * The code is sent for checking as soon as its sixth digit is typed or
+ * pasted (the button stays, for a code a password manager fills). The
+ * email and the step are kept for the visit (`sign-in-draft.ts`), so a page
+ * loaded again on the way back from the email app opens on "Enter the
+ * code" with the email still there. The code itself is never kept.
  *
  * It takes focus, keeps Tab inside, closes on Escape and gives focus back
  * to whatever opened it. Drawn in the site's own tokens and type only (H1).
@@ -63,6 +79,7 @@ type Problem =
     | Exclude<CodeRequestResult, { ok: true }>
     | Exclude<VerifyResult, { ok: true }>;
 
+// 17px: under 16px, iOS Safari zooms the page when the field takes focus.
 const input = cn(
     "border-site-border bg-site-bg text-site-fg mt-1.5 block h-[50px] w-full rounded-[calc(var(--site-radius)+10px)] border px-3.5 text-[17px]",
     focusRing,
@@ -97,10 +114,24 @@ export function SignInSheet({
     const opener = useRef<Element | null>(null);
     const testRelease = useTestRelease() !== null;
 
-    const [step, setStep] = useState<"email" | "code">("email");
-    const [email, setEmail] = useState("");
+    // A change of sign-in email is its own errand: nothing of it is kept.
+    const keeps = purpose !== "change-email";
+    // What an earlier load of the page had got to. Nothing is drawn from
+    // it until the sheet opens, so the server's blank and the browser's
+    // draft can differ.
+    const [kept] = useState(() =>
+        keeps && typeof window !== "undefined" ? readSignInDraft() : null,
+    );
+    const [step, setStep] = useState<"email" | "code">(kept?.step ?? "email");
+    const [email, setEmail] = useState(kept?.email ?? "");
+    // When the code on its way was sent: what makes a restored "Enter the
+    // code" step worth showing.
+    const [sentAt, setSentAt] = useState<number | null>(kept?.sentAt ?? null);
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
+    // A check under way, from the moment it is asked: the sixth digit and
+    // a press of the button in the same breath are one check.
+    const checking = useRef(false);
     const [problem, setProblem] = useState<Problem | null>(null);
     const [token, setToken] = useState<string | null>(null);
     // When another code may be asked for, as the API said when it sent
@@ -138,6 +169,14 @@ export function SignInSheet({
         return () => clearInterval(timer);
     }, [open, step, resendAt]);
 
+    // Kept for the visit while the sheet is open; never the code.
+    useEffect(() => {
+        if (keeps && open) writeSignInDraft({ email, step, sentAt });
+    }, [keeps, open, email, step, sentAt]);
+
+    // The page behind stays still while the sheet is open.
+    useScrollLock(open);
+
     if (!open) return null;
 
     const { businessName, phone } = options;
@@ -162,6 +201,7 @@ export function SignInSheet({
             const at = Date.now();
             setResendAt(at + resendDelayMs(result.resendAfterSeconds));
             setNow(at);
+            setSentAt(at);
             setCode("");
             setStep("code");
             return;
@@ -170,24 +210,41 @@ export function SignInSheet({
         setProblem(result);
     }
 
-    async function verify() {
-        if (busy || !codeReady) return;
+    /** Check a code: the one in the field, or the one just typed. */
+    async function verify(typed: string = code) {
+        const digits = codeDigits(typed);
+        if (busy || checking.current || digits.length !== 6) return;
         if (testRelease) {
             setProblem({ ok: false, reason: "test-release" });
             return;
         }
+        checking.current = true;
         setBusy(true);
         setProblem(null);
         const result = await api
-            .verifyCode(email.trim(), codeDigits(code))
+            .verifyCode(email.trim(), digits)
             .catch((): VerifyResult => ({ ok: false, reason: "error" }));
+        checking.current = false;
         setBusy(false);
         if (result.ok) {
+            // Signed in: nothing of the sign-in is kept, here or stored.
+            if (keeps) clearSignInDraft();
+            setEmail("");
+            setCode("");
+            setStep("email");
             onSignedIn(result.customer);
             onClose();
             return;
         }
         setProblem(result);
+    }
+
+    /** The code as typed; its sixth digit sends it to be checked. */
+    function onCode(value: string) {
+        const digits = codeDigits(value);
+        const complete = digits.length === 6 && codeDigits(code).length < 6;
+        setCode(digits);
+        if (complete) void verify(digits);
     }
 
     function changeEmail() {
@@ -226,7 +283,7 @@ export function SignInSheet({
             ? "Enter the code"
             : changing
               ? "Change your sign-in email"
-              : `Sign in — ${businessName}`;
+              : `Sign in to ${businessName}`;
     const lead =
         step === "code"
             ? `We sent a 6-digit code to ${email.trim()}.`
@@ -264,7 +321,7 @@ export function SignInSheet({
                 tabIndex={-1}
                 onKeyDown={onKeyDown}
                 {...NO_CAPTURE_ATTRS}
-                className={`bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto max-h-[88vh] max-w-[560px] overflow-y-auto rounded-t-[calc(var(--site-radius)+18px)] px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-[18px] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${NO_CAPTURE_CLASS}`}
+                className={`bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto max-w-[560px] overflow-y-auto rounded-t-[calc(var(--site-radius)+18px)] px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-[18px] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${SHEET_HEIGHT} ${NO_CAPTURE_CLASS}`}
             >
                 <div className="flex items-center gap-2.5">
                     <h2
@@ -278,7 +335,8 @@ export function SignInSheet({
                         onClick={onClose}
                         aria-label="Close"
                         className={cn(
-                            "text-site-fg size-[34px] shrink-0 cursor-pointer rounded-full text-base",
+                            "text-site-fg shrink-0 cursor-pointer rounded-full text-base",
+                            SHEET_CLOSE_SIZE,
                             quietFill,
                             focusRing,
                         )}
@@ -324,9 +382,8 @@ export function SignInSheet({
                                 autoComplete="one-time-code"
                                 placeholder="• • • • • •"
                                 value={code}
-                                onChange={(e) =>
-                                    setCode(codeDigits(e.target.value))
-                                }
+                                maxLength={6}
+                                onChange={(e) => onCode(e.target.value)}
                                 className={cn(input, "tracking-[0.4em]")}
                             />
                         </label>

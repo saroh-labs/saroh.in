@@ -455,7 +455,7 @@ export class TestReleasesService {
             if (prismaErrorCode(err) === "P2002") {
                 throw new ConflictException({
                     message:
-                        "Another test release of this site was just scheduled to go live. Cancel it first.",
+                        "Another test release of this site is now scheduled to go live. Cancel it first.",
                     details: { reason: "otherScheduled" },
                 });
             }

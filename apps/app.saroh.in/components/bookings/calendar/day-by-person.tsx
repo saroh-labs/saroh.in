@@ -1,5 +1,6 @@
 "use client";
 
+import { formatClock, formatClockRange } from "@/lib/format/datetime";
 import { cn } from "@saroh/ui/lib/utils";
 import type { CSSProperties, MouseEvent } from "react";
 
@@ -7,7 +8,6 @@ import type { Block, Column, Span } from "@/lib/services/diary";
 import {
     blockLine,
     blockTitle,
-    clock,
     STATE_LABEL,
     UNASSIGNED,
 } from "@/lib/services/diary";
@@ -48,7 +48,7 @@ export function blockColour(block: Block): string {
 }
 
 export function blockLabel(block: Block): string {
-    return `${clock(block.start)}–${clock(block.end)} ${blockTitle(block)}, ${blockLine(block)}, ${STATE_LABEL[block.state]}`;
+    return `${formatClockRange(block.start, block.end)} ${blockTitle(block)}, ${blockLine(block)}, ${STATE_LABEL[block.state]}`;
 }
 
 /** The hour marks down the left edge. */
@@ -67,8 +67,8 @@ export function HourRail({ span }: { span: Span }) {
                     className="absolute inset-x-0 h-px"
                     style={{ top: at(m, span[0]) }}
                 >
-                    <span className="absolute -top-[7px] left-0 text-[11px] tabular-nums text-muted-foreground">
-                        {clock(m)}
+                    <span className="absolute -top-[7px] right-2 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+                        {formatClock(m, { short: true })}
                     </span>
                 </div>
             ))}
@@ -210,7 +210,7 @@ export function DayByPerson({
                                       }}
                                   >
                                       <span className="block text-[11px] font-semibold text-success-subtle-foreground">
-                                          Free {clock(f[0])}–{clock(f[1])}
+                                          Free {formatClockRange(f[0], f[1])}
                                       </span>
                                   </div>
                               ))
@@ -220,7 +220,7 @@ export function DayByPerson({
                                         key={`f${f[0]}`}
                                         type="button"
                                         onClick={() => onFree(c, f)}
-                                        aria-label={`Book ${c.name} at ${clock(f[0])}, free until ${clock(f[1])}`}
+                                        aria-label={`Book ${c.name} at ${formatClock(f[0])}, free until ${formatClock(f[1])}`}
                                         className="absolute inset-x-1 z-[1] box-border flex cursor-pointer flex-col items-start justify-start overflow-hidden rounded-[7px] border border-dashed border-success-subtle-foreground bg-success-subtle px-[7px] py-[3px] text-left transition-[filter,border-style] duration-fast hover:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-95"
                                         style={{
                                             top: at(f[0], from),
@@ -228,7 +228,7 @@ export function DayByPerson({
                                         }}
                                     >
                                         <span className="block text-[11px] font-semibold text-success-subtle-foreground">
-                                            Free {clock(f[0])}–{clock(f[1])}
+                                            Free {formatClockRange(f[0], f[1])}
                                         </span>
                                     </button>
                                 ))
@@ -247,7 +247,7 @@ export function DayByPerson({
                                         "absolute inset-x-1 z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[7px] py-1 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90 coarse:min-h-11",
                                         blockColour(b),
                                         selected === b.key &&
-                                            "ring-2 ring-highlight ring-offset-0",
+                                            "ring-2 ring-foreground ring-offset-0",
                                         b.state === "cancelled" &&
                                             "line-through",
                                     )}
@@ -279,7 +279,7 @@ export function DayByPerson({
                                         {blockTitle(b)}
                                     </span>
                                     <span className="block truncate text-[11px]">
-                                        {clock(b.start)}–{clock(b.end)} ·{" "}
+                                        {formatClockRange(b.start, b.end)} ·{" "}
                                         {blockLine(b)}
                                     </span>
                                 </button>
@@ -290,7 +290,7 @@ export function DayByPerson({
                         nowMinute <= to ? (
                             <div
                                 aria-hidden
-                                className="pointer-events-none absolute inset-x-0 z-[3] h-[2px] bg-highlight"
+                                className="pointer-events-none absolute inset-x-0 z-[3] h-[2px] bg-foreground"
                                 style={{ top: at(nowMinute, from) }}
                             />
                         ) : null}
@@ -305,9 +305,7 @@ export function DayByPerson({
 export function columnSub(c: Column): string {
     const hours = c.day
         ? c.day.windows.length
-            ? c.day.windows
-                  .map(([a, b]) => `${clock(a)}–${clock(b)}`)
-                  .join(", ")
+            ? c.day.windows.map(([a, b]) => formatClockRange(a, b)).join(", ")
             : "off today"
         : null;
     return [c.title, hours].filter(Boolean).join(" · ");

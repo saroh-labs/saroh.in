@@ -112,8 +112,10 @@ describe("booking.notify", () => {
             data: {
                 organizationId: ORG,
                 type: "booking.moved",
+                // The row opens the booking.
+                bookingId: "bk_1",
                 title: "Asha Rao moved their Check-up",
-                body: "Now Tue 6 Oct at 11:00. It was Mon 5 Oct at 10:00.",
+                body: "Now Tue 6 Oct at 11:00 am. It was Mon 5 Oct at 10:00 am.",
             },
             select: { id: true },
         });
@@ -157,7 +159,7 @@ describe("booking.notify", () => {
         expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
             type: "booking.cancelled",
             title: "Asha Rao cancelled their Check-up",
-            body: "It was Mon 5 Oct at 10:00.",
+            body: "It was Mon 5 Oct at 10:00 am.",
         });
         expect(notify.mock.calls[0][2]).toMatchObject({
             kind: "BOOKING_CANCELLED",
@@ -195,7 +197,7 @@ describe("booking.notify", () => {
         expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
             type: "booking.new",
             title: "Asha Rao booked Check-up",
-            body: "Tue 6 Oct at 11:00.",
+            body: "Tue 6 Oct at 11:00 am.",
         });
         expect(
             tx.customerNotice.createMany.mock.calls[0][0].data[0],

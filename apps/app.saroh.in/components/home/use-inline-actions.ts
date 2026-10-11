@@ -10,6 +10,7 @@ import {
 } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { replyAction } from "@/lib/customer-workspace/actions";
 import type { HoldSlot, HoldState } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
@@ -108,11 +109,14 @@ export function useInlineActions() {
     }
 
     async function markSent(need: HomeNeed, inline: HomeInline) {
-        setBusy(need.id);
-        const res = await moveStage(inline.target, {
-            to: inline.stage as KitchenStage,
-        });
-        setBusy(null);
+        const res = await runAction(
+            () =>
+                moveStage(inline.target, {
+                    to: inline.stage as KitchenStage,
+                }),
+            { setBusy: (on) => setBusy(on ? need.id : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(failedText(inline), res.error);
             return;
@@ -159,11 +163,8 @@ export function useInlineActions() {
             await takeBack();
             setDone(need.id, null);
             showSuccess(undoneText(inline, false));
-        } catch (error) {
-            showError(
-                "That couldn't be undone.",
-                error instanceof Error ? error.message : undefined,
-            );
+        } catch {
+            showError("That couldn't be undone.", "Try again.");
         }
     }
 
@@ -228,12 +229,11 @@ export function useInlineActions() {
     }
 
     async function retry(need: HomeNeed, inline: HomeInline) {
-        setBusy(need.id);
-        const res = await retrySubscription(
-            inline.target,
-            inline.via ?? "PAY_LINK",
+        const res = await runAction(
+            () => retrySubscription(inline.target, inline.via ?? "PAY_LINK"),
+            { setBusy: (on) => setBusy(on ? need.id : null) },
         );
-        setBusy(null);
+        if (!res) return;
         if (!res.ok) {
             showError(failedText(inline), res.error);
             return;
@@ -265,9 +265,10 @@ export function useInlineActions() {
      * refund is on its way; the order or invoice stays as it was.
      */
     async function refund(need: HomeNeed, inline: HomeInline) {
-        setBusy(need.id);
-        const res = await refundMismatch(inline.target);
-        setBusy(null);
+        const res = await runAction(() => refundMismatch(inline.target), {
+            setBusy: (on) => setBusy(on ? need.id : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(failedText(inline), res.error);
             return;

@@ -1,11 +1,13 @@
-import { Button } from "@saroh/ui/button";
-import { FailedState, PartialNotice } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { PartialRead } from "@/components/shared/failed-read";
+import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 
-import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { ServicesScreen } from "@/components/services/services-screen";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { knownRoleName } from "@/lib/organizations/role-name";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { alsoSellFeatures } from "@/lib/services/also-sell";
 import {
     businessCurrencyOf,
@@ -17,6 +19,7 @@ import { readServices } from "@/lib/services/service";
 import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
 import { readBookingPayment } from "@/lib/staff/service";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Bookings › Services (U16, E2): what people can book, as the design's
@@ -27,6 +30,16 @@ import { readBookingPayment } from "@/lib/staff/service";
  * pay (DEC-088) marks nothing when it can't.
  */
 export const metadata = { title: "Services" };
+
+/** What someone whose role can't read services is told. */
+async function servicesDenied() {
+    const organization = await resolveActiveOrganization();
+    return whoCanChange({
+        thing: "Services",
+        business: organization?.name,
+        role: organization ? knownRoleName(organization) : null,
+    });
+}
 
 export default async function ServicesPage() {
     await requireSession();
@@ -42,28 +55,23 @@ export default async function ServicesPage() {
 
     if (!read.ok) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Services" />
-                <div className="px-[22px] pb-6 pt-[18px]">
-                    <FailedState
-                        title={
-                            read.forbidden
-                                ? "Your role can't see services"
-                                : "Couldn't load your services"
-                        }
-                        description={
-                            read.forbidden
-                                ? "An owner or admin can change what your role reaches in Team."
-                                : "Nothing has been changed. Try again in a moment."
-                        }
-                        action={
-                            read.forbidden ? undefined : (
-                                <Button asChild variant="outline">
-                                    <Link href="/services">Try again</Link>
-                                </Button>
-                            )
-                        }
-                    />
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={["Bookings", "Services"]}
+                    title="Services"
+                />
+                <div>
+                    {read.forbidden ? (
+                        // A denial is not a failure: nothing broke and
+                        // trying again does the same thing. The denied
+                        // card, never the red one (`saroh-product-states`).
+                        <PermissionDeniedState {...await servicesDenied()} />
+                    ) : (
+                        <FailedState
+                            title={couldntLoad("services")}
+                            retryHref="/services"
+                        />
+                    )}
                 </div>
             </PageContainer>
         );
@@ -78,17 +86,19 @@ export default async function ServicesPage() {
     );
 
     return (
-        <PageContainer width="full" className={BARE}>
-            <BookingsTopBar page="Services" />
-            <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+        <PageContainer width="full">
+            <div>
                 {staffList && usage ? null : (
-                    <PartialNotice className="mb-3">
-                        {!staffList && !usage
-                            ? "Who takes each service and how each is used could not be loaded."
-                            : !staffList
-                              ? "Who takes each service could not be loaded."
-                              : "How much each service is booked could not be loaded."}
-                    </PartialNotice>
+                    <PartialRead
+                        className="mb-3"
+                        things={
+                            !staffList && !usage
+                                ? "who takes each service or how much each is booked"
+                                : !staffList
+                                  ? "who takes each service"
+                                  : "how much each service is booked"
+                        }
+                    />
                 )}
                 <ServicesScreen
                     services={services}

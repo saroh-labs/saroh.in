@@ -32,7 +32,7 @@ import type {
  */
 
 /** Said when the saved value has changed under the Undo. */
-export const CHANGED_SINCE = "Changed since — reload";
+export const CHANGED_SINCE = "Changed since. Reload";
 
 /** Said when an invoice was numbered since a tax or numbering change. */
 export const NUMBERED_SINCE =

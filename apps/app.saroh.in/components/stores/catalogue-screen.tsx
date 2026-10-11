@@ -1,5 +1,6 @@
 "use client";
 
+import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -32,6 +33,7 @@ import {
 import { step } from "@/lib/products/quick-look";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 
+import { runAction } from "@/lib/api/run-action";
 import { catalogueColumns, RowMenu } from "./catalogue/catalogue-columns";
 import { emptyState, NoStorefront } from "./catalogue/catalogue-empty";
 import { CatalogueHeader } from "./catalogue/catalogue-header";
@@ -160,9 +162,11 @@ export function CatalogueScreen({
     async function loadMore(): Promise<CatalogueRow[] | null> {
         const cursor = extraCursor ?? data.nextCursor;
         if (!cursor || loadingMore) return null;
-        setLoadingMore(true);
-        const res = await loadCataloguePage({ ...filter, cursor, limit: PAGE });
-        setLoadingMore(false);
+        const res = await runAction(
+            () => loadCataloguePage({ ...filter, cursor, limit: PAGE }),
+            { setBusy: setLoadingMore },
+        );
+        if (!res) return null;
         if (!res.ok) {
             showError("More products couldn't be loaded.", res.error);
             return null;
@@ -219,27 +223,35 @@ export function CatalogueScreen({
         const said =
             status === "ARCHIVED"
                 ? one
-                    ? `Stopped selling ${one.name} — it's hidden from ${many ? "every location" : "your location"} until you sell it again.`
+                    ? `Stopped selling ${one.name}. It's hidden from ${many ? "every location" : "your location"} until you sell it again.`
                     : `${targets.length} products archived.`
                 : one
                   ? `${one.name} is on sale.`
                   : `${targets.length} products published.`;
-        showUndo(said, () => {
-            void Promise.all(
+        showUndo(said, async () => {
+            const back = await Promise.all(
                 before.map((r) => setProductStatus(r.id, r.was)),
-            ).then(() => reload());
+            );
+            await reload();
+            return back.every((r) => r.ok);
         });
     }
 
+    /** From its confirm, which waits for it. */
     async function confirmDelete() {
         const targets = pendingDelete ?? [];
-        setPendingDelete(null);
         const results = await Promise.all(
             targets.map((r) => deleteProduct(r.id)),
         );
         const failed = results.filter((r) => !r.ok).length;
+        const gone = targets.length - failed;
         if (failed > 0) {
             showError(`${failed} of ${targets.length} could not be deleted.`);
+        }
+        if (gone > 0) {
+            showSuccess(
+                gone === 1 ? "Product deleted." : `${gone} products deleted.`,
+            );
         }
         setOpenId(null);
         await reload();
@@ -252,7 +264,7 @@ export function CatalogueScreen({
             else showError("It couldn't be duplicated.", res.error);
             return;
         }
-        showSuccess(`${res.data.name} is a draft — stock starts at 0.`);
+        showSuccess(`${res.data.name} is a draft. Stock starts at 0.`);
         router.push(productEditHref(res.data.storeId, res.data.id));
     }
 
@@ -297,7 +309,7 @@ export function CatalogueScreen({
         collectionCount,
     );
     const countLabel =
-        `${data.total} ${data.total === 1 ? "product" : "products"}` +
+        count(data.total, "product") +
         (store
             ? ` sold at ${store.name}`
             : many
@@ -312,6 +324,7 @@ export function CatalogueScreen({
                 canWrite={canWrite}
                 meter={meter}
                 bannerShown={limitBannerShown}
+                count={data.total > 0 ? countLabel : undefined}
             />
             <NeedsYou
                 needs={data.needs}
@@ -343,15 +356,16 @@ export function CatalogueScreen({
                     modes={["table", "list"]}
                     hideModeToggle
                     noun={{ one: "product", other: "products" }}
+                    showTotal={false}
                     toolbarExtra={
                         <CatalogueToolbar
                             query={query}
                             go={go}
                             storefronts={data.storefronts}
                             choices={choices}
+                            searching={navigating}
                         />
                     }
-                    countLabel={() => countLabel}
                     onRowClick={(r) => setOpenId(r.id)}
                     selectable={canWrite}
                     bulkActions={[
@@ -405,9 +419,10 @@ export function CatalogueScreen({
                     <Button
                         variant="outline"
                         onClick={() => void loadMore()}
-                        disabled={loadingMore}
+                        busy={loadingMore}
+                        busyLabel="Loading…"
                     >
-                        {loadingMore ? "Loading…" : "Show more"}
+                        Show more
                     </Button>
                 </div>
             ) : null}
@@ -432,16 +447,21 @@ export function CatalogueScreen({
                 }}
                 title={
                     pendingDelete?.length === 1
-                        ? `Delete “${pendingDelete[0]?.name ?? "this product"}”?`
+                        ? `Delete ${pendingDelete[0]?.name ?? "this product"}?`
                         : `Delete ${pendingDelete?.length ?? 0} products?`
                 }
-                description={`${pendingDelete?.length === 1 ? "It is" : "They are"} removed from ${many ? "every location that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
+                description={`${plural(pendingDelete?.length ?? 0, "It is", "They are")} removed from ${many ? "every location that sells it" : first.name} and from any collection it belongs to. Past orders keep their record. This cannot be undone.`}
                 confirmLabel={
                     pendingDelete?.length === 1
                         ? "Delete product"
                         : `Delete ${pendingDelete?.length ?? 0} products`
                 }
-                onConfirm={() => void confirmDelete()}
+                keepLabel={
+                    pendingDelete?.length === 1
+                        ? "Keep product"
+                        : "Keep products"
+                }
+                onConfirm={confirmDelete}
             />
         </div>
     );

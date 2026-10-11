@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
-import { navRoleCan } from "@/components/shared/nav-items";
+import { navCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { WebsiteHeader } from "@/components/sites/website-header";
 import { pausedSiteIds, pausedWords } from "@/lib/billing/paused";
@@ -117,8 +117,11 @@ export default async function WebsiteTabsLayout({
                     }
                     qrUrl={reached?.url ?? null}
                     canEdit={site.can.edit}
-                    mayCreate={navRoleCan(
-                        organization?.role ?? null,
+                    mayCreate={navCan(
+                        {
+                            role: organization?.role ?? null,
+                            actions: organization?.actions,
+                        },
                         "site:create",
                     )}
                     pageCount={site.pages.length}

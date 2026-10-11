@@ -1,9 +1,10 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useOptimistic, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { browserTracking } from "@/lib/error-tracking-browser";
 import { saveUsageSharing } from "@/lib/usage-sharing/actions";
 import {
@@ -33,15 +34,17 @@ export function UsageSharingCard({ on }: { on: boolean }) {
         if (!next) browserTracking?.stopReplay();
         startTransition(async () => {
             setShown(next);
-            const result = await saveUsageSharing(next);
+            const result = await runAction(() => saveUsageSharing(next));
+            // It never got there, and has been said: the switch goes back.
+            if (!result) return;
             if (!result.ok) {
                 showError(result.error, "Your choice is as it was.");
                 return;
             }
             showSuccess(
                 next
-                    ? "You're sharing how you use the workspace"
-                    : "You've stopped sharing how you use the workspace",
+                    ? "You're sharing how you use Saroh"
+                    : "You've stopped sharing how you use Saroh",
             );
         });
     };
@@ -66,43 +69,24 @@ export function UsageSharingCard({ on }: { on: boolean }) {
                         {USAGE_SHARING_HELP}
                     </p>
                 </div>
-                <button
-                    type="button"
-                    role="switch"
-                    aria-checked={shown}
+                {/* The shared switch, as the alerts above it are. A press
+                    while a save is out is dropped in `flip`, not disabled:
+                    the switch keeps the keyboard. */}
+                <Switch
+                    checked={shown}
                     aria-busy={pending || undefined}
                     aria-labelledby="usage-sharing-title"
                     aria-describedby="usage-sharing-help"
-                    onClick={flip}
-                    className={cn(
-                        "wk-press shrink-0 rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        pending
-                            ? "cursor-progress"
-                            : "cursor-pointer hover:bg-muted active:bg-border",
-                    )}
-                >
-                    <span
-                        className={cn(
-                            "relative block h-6 w-[42px] rounded-full transition-colors duration-fast",
-                            shown ? "bg-foreground" : "bg-border",
-                        )}
-                    >
-                        <span
-                            className={cn(
-                                "absolute top-[3px] size-[18px] rounded-full bg-card transition-[left] duration-fast",
-                                shown ? "left-[21px]" : "left-[3px]",
-                            )}
-                        />
-                    </span>
-                </button>
+                    onCheckedChange={flip}
+                    className="wk-press"
+                />
             </div>
             <p className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[12.5px] text-foreground/80">
-                Saroh records how the workspace is used, to find what is
-                confusing or broken. A recording shows Saroh&rsquo;s own
-                buttons, menus and labels. Your customers&rsquo; details, your
-                figures and anything you type are hidden, and pictures are left
-                out. Only for you, on every device; your team chooses for
-                themselves.
+                Saroh records how it is used, to find what is confusing or
+                broken. A recording shows Saroh&rsquo;s own buttons, menus and
+                labels. Your customers&rsquo; details, your figures and anything
+                you type are hidden, and pictures are left out. Only for you, on
+                every device. Your team chooses for themselves.
             </p>
         </section>
     );

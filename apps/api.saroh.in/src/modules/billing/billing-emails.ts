@@ -125,7 +125,7 @@ export function paymentFailedEmail(input: {
         subject: `Payment for ${input.businessName}'s plan didn't go through`,
         html: wrap("Your payment didn't go through", [
             `The payment for ${input.businessName}'s ${input.planName} plan didn't go through. We'll try again over the next few days.`,
-            "Check the card or UPI autopay you paid with. If every try fails, the business moves to the Free plan; nothing you made is lost.",
+            "Check the card or UPI autopay you paid with. If every try fails, the business moves to the Free plan. Nothing you made is lost.",
         ]),
     };
 }

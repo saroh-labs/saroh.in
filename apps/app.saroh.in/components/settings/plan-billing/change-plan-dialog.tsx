@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import {
     Dialog,
@@ -17,9 +18,7 @@ import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { formatShortDate } from "@/lib/format/datetime";
 import { GST_STATES } from "@/lib/invoices/gst";
 import {
     changePlanAction,
@@ -28,7 +27,9 @@ import {
 import type { ChangeQuote, Cycle } from "@/lib/saroh-billing/plan-view";
 import { quoteSummary } from "@/lib/saroh-billing/quote-words";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
+import { OptionSelect } from "@saroh/ui/option-select";
 
+import { runAction } from "@/lib/api/run-action";
 import { useCheckoutConfirm } from "./use-checkout-confirm";
 
 /** The plan picked: which, on which cycle, and what the row's button said. */
@@ -149,13 +150,16 @@ export function ChangePlanDialog({
             return;
         }
         start(async () => {
-            const res = await changePlanAction({
-                plan: picked.planId,
-                cycle: picked.cycle,
-                coupon: code || undefined,
-                billingState: billingState || undefined,
-                gstin: g || undefined,
-            });
+            const res = await runAction(() =>
+                changePlanAction({
+                    plan: picked.planId,
+                    cycle: picked.cycle,
+                    coupon: code || undefined,
+                    billingState: billingState || undefined,
+                    gstin: g || undefined,
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 if (res.field === "gstin") setGstinError(res.error);
                 else if (res.field === "coupon" && code) {
@@ -165,11 +169,11 @@ export function ChangePlanDialog({
                 return;
             }
             if (res.data.kind === "TO_FREE") {
-                const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const zone = viewerTimeZone();
                 const on = new Date(res.data.effectiveAt) > new Date();
                 showSuccess(
                     on
-                        ? `You'll move to ${picked.name} on ${formatShortDate(res.data.effectiveAt, zone)}. Everything stays until then.`
+                        ? `You'll move to ${picked.name} on ${formatDate(res.data.effectiveAt, zone)}. Everything stays until then.`
                         : `You're on ${picked.name} from today.`,
                 );
                 onClose();
@@ -227,16 +231,16 @@ export function ChangePlanDialog({
                     }
                 }}
             >
-                <DialogContent className="max-w-[480px]">
-                    <DialogHeader className="text-left">
-                        <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+                <DialogContent size="md">
+                    <DialogHeader>
+                        <DialogTitle>
                             {still
                                 ? "Razorpay hasn't told us yet"
                                 : "Confirming your payment…"}
                         </DialogTitle>
                         <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
                             {still
-                                ? `If you paid, ${picked?.name ?? "the plan"} switches on as soon as Razorpay tells us — you don't need to pay again. Your plan shows it while it's waiting.`
+                                ? `If you paid, ${picked?.name ?? "the plan"} switches on as soon as Razorpay tells us. You don't need to pay again. Your plan shows it while it's waiting.`
                                 : `Checking with Razorpay, then switching you to ${picked?.name ?? "the plan"}. This takes a few seconds.`}
                         </DialogDescription>
                     </DialogHeader>
@@ -254,7 +258,7 @@ export function ChangePlanDialog({
                         </div>
                     )}
                     {still ? (
-                        <DialogFooter className="gap-2 sm:space-x-0">
+                        <DialogFooter>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -286,9 +290,9 @@ export function ChangePlanDialog({
                 if (!open && !pending) onClose();
             }}
         >
-            <DialogContent className="max-w-[480px]">
-                <DialogHeader className="text-left">
-                    <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+            <DialogContent size="md">
+                <DialogHeader>
+                    <DialogTitle>
                         {summary?.title ?? `Change to ${picked?.name ?? ""}`}
                     </DialogTitle>
                     <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
@@ -398,7 +402,7 @@ export function ChangePlanDialog({
                     </details>
                 ) : null}
 
-                <DialogFooter className="gap-2 sm:space-x-0">
+                <DialogFooter>
                     <Button
                         type="button"
                         variant="outline"
@@ -418,13 +422,14 @@ export function ChangePlanDialog({
                         <Button
                             type="button"
                             onClick={confirm}
-                            disabled={pending}
-                        >
-                            {pending
-                                ? summary.toPayment
+                            busy={pending}
+                            busyLabel={
+                                summary.toPayment
                                     ? "Opening the payment…"
                                     : "Changing…"
-                                : summary.confirm}
+                            }
+                        >
+                            {summary.confirm}
                         </Button>
                     ) : null}
                 </DialogFooter>

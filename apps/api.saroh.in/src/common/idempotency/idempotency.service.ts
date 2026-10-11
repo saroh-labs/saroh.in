@@ -136,7 +136,7 @@ export class IdempotencyService {
 
             // Same request, still running. Deterministic, never a 500.
             throw new ConflictException(
-                "An identical request is already in progress. Retry shortly.",
+                "The same request is already in progress. Try again shortly.",
             );
         }
 

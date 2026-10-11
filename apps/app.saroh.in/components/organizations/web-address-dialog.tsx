@@ -1,15 +1,8 @@
 "use client";
 
+import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@saroh/ui/dialog";
 import {
     Form,
     FormControl,
@@ -71,25 +64,22 @@ export function WebAddressDialog({
     zone: string;
 }) {
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[480px]">
-                <DialogHeader>
-                    <DialogTitle>Change your web address</DialogTitle>
-                    <DialogDescription>
-                        Where customers find your website, your shop and your
-                        booking page.
-                    </DialogDescription>
-                </DialogHeader>
-                {/* Mounted only while open, so each opening starts afresh. */}
-                {open ? (
-                    <ChangeForm
-                        view={view}
-                        zone={zone}
-                        onDone={() => onOpenChange(false)}
-                    />
-                ) : null}
-            </DialogContent>
-        </Dialog>
+        <FormDialog
+            open={open}
+            size="md"
+            title="Change web address"
+            description="Where customers find your website, your shop and your booking page."
+            onClose={() => onOpenChange(false)}
+        >
+            {/* Mounted only while open, so each opening starts afresh. */}
+            {open ? (
+                <ChangeForm
+                    view={view}
+                    zone={zone}
+                    onDone={() => onOpenChange(false)}
+                />
+            ) : null}
+        </FormDialog>
     );
 }
 
@@ -123,12 +113,11 @@ function ChangeForm({
     const suggestion =
         (answer && !answer.ok ? answer.suggestion : null) ??
         (refused?.address === address ? refused.suggestion : null);
+    // The button waits only on the check that is running, or an address
+    // it has just been told is taken. Unchanged, it closes.
     const saveOff =
-        same ||
-        address === "" ||
-        isSubmitting ||
-        check.state === "checking" ||
-        (answer !== null && !answer.ok);
+        !same &&
+        (check.state === "checking" || (answer !== null && !answer.ok));
 
     function use(next: string) {
         form.setValue("address", next, { shouldDirty: true });
@@ -136,6 +125,7 @@ function ChangeForm({
     }
 
     async function onSubmit(values: Values) {
+        if (values.address === view.address) return onDone();
         const res = await saveWebAddress(values.address);
         if (!res.ok) {
             if (res.field === "address") {
@@ -152,7 +142,8 @@ function ChangeForm({
             return;
         }
         showSuccess(
-            `Your web address is now ${hostOf(res.data.platformOrigin)}`,
+            "Web address changed.",
+            `It is now ${hostOf(res.data.platformOrigin)}.`,
         );
         onDone();
         router.refresh();
@@ -160,16 +151,7 @@ function ChangeForm({
 
     return (
         <Form {...form}>
-            <form
-                onSubmit={(e) => {
-                    // The dialog is portalled but still inside the page's
-                    // React tree: keep its submit from reaching any form
-                    // around the section.
-                    e.stopPropagation();
-                    void form.handleSubmit(onSubmit)(e);
-                }}
-                className="grid gap-4"
-            >
+            <div className="grid gap-4">
                 <FormField
                     control={form.control}
                     name="address"
@@ -238,7 +220,7 @@ function ChangeForm({
                                         type="button"
                                         variant="link"
                                         size="sm"
-                                        className="h-auto p-0 text-[12px] font-medium"
+                                        className="h-auto p-0 font-medium"
                                         onClick={() => use(suggestion)}
                                     >
                                         Use {addressHost(suggestion, suffix)}
@@ -260,20 +242,14 @@ function ChangeForm({
                         ))}
                     </ul>
                 </div>
-                <DialogFooter>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={onDone}
-                        disabled={isSubmitting}
-                    >
-                        Cancel
-                    </Button>
-                    <Button type="submit" disabled={saveOff}>
-                        {isSubmitting ? "Changing…" : "Change web address"}
-                    </Button>
-                </DialogFooter>
-            </form>
+            </div>
+            <FormDialogFoot
+                saveLabel="Change web address"
+                savingLabel="Changing…"
+                pending={isSubmitting}
+                saveOff={saveOff}
+                onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
+            />
         </Form>
     );
 }

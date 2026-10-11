@@ -96,13 +96,6 @@ export const NOT_YOURS = "not-yours";
 /** Where `/open/:id` sends a link to a business the person isn't in. */
 export const NOT_YOURS_HREF = `/choose?notice=${NOT_YOURS}`;
 
-/**
- * What the workspace says when every business they're in has paused their
- * access (#800); the API's `MEMBER_PAUSED` refusal says the same.
- */
-export const MEMBER_PAUSED_BODY =
-    "Its plan includes fewer team members than it has, so the people who joined most recently are paused until it moves up again. Nothing of yours is lost. Ask the owner to choose a plan in Plan and billing.";
-
 /** What switching to a business whose door is paused says (#800). */
 export const PAUSED_ERROR =
     "Your access to that business is paused: its plan has no room for you right now. Nothing of yours is lost. Ask its owner to choose a plan.";

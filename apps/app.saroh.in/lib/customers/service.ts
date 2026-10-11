@@ -72,7 +72,7 @@ async function mutate(
     const data: unknown = await res.json().catch(() => null);
     const id = (data as { id?: unknown } | null)?.id;
     if (res.ok && typeof id === "string") return { ok: true, data: { id } };
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return {
         ok: false,
         error: failure.error,
@@ -111,6 +111,6 @@ export async function deleteCustomer(
     if (res.ok) return { ok: true, data: { id: customerId } };
     return {
         ok: false,
-        error: readError(data, "Could not delete the customer"),
+        error: readError(data, "Couldn't delete the customer."),
     };
 }

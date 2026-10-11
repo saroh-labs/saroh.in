@@ -4,11 +4,13 @@ import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
+import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
 import { createBlock, takesOnlinePayment } from "@/lib/billing/access";
 import { arrivalContactId } from "@/lib/customers/prefill";
 import { readCustomerPick } from "@/lib/customers/prefill-read";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { ordersListMoment } from "@/lib/moments/read";
 import {
     orderPowers,
     ordersAccess,
@@ -31,6 +33,7 @@ import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
+import { readOrderPlaces } from "@/lib/stores/location-reads";
 import { listBusinessStores } from "@/lib/stores/service";
 
 /**
@@ -97,7 +100,15 @@ export default async function OrdersPage({
     // in a business that sells things: one whose catalogue is only
     // appointments books them in Bookings. A read that fails keeps the
     // button.
-    const sells = powers.create ? sellsProducts() : Promise.resolve(false);
+    // Someone the business role gives no order to take may still take
+    // them at a location they were invited to (a location Admin, Manager
+    // or Editor): each of their locations says so in its own read.
+    const placesRead = powers.create
+        ? Promise.resolve(undefined)
+        : storesRead.then((all) => readOrderPlaces(all.map((s) => s.id)));
+    const sells = placesRead.then((places) =>
+        powers.create || places?.length ? sellsProducts() : false,
+    );
     // Opened from a person's page (#247): New order arrives with them
     // chosen, read only for someone who may take the order and search.
     const forContact = arrivalContactId(params);
@@ -113,6 +124,7 @@ export default async function OrdersPage({
         canPayOnline,
         sellsSomething,
         initialPick,
+        places,
     ] = await Promise.all([
         listOrderRows(orderListParams(query)),
         storesRead,
@@ -125,6 +137,7 @@ export default async function OrdersPage({
         payOnline,
         sells,
         pick,
+        placesRead,
     ]);
     // A page past the end, or a cursor from a list that has since changed
     // (an order the API can't find answers as an empty page): start again at
@@ -132,13 +145,19 @@ export default async function OrdersPage({
     if (query.cursor && page.rows.length === 0) {
         redirect(ordersHref(query, { cursor: null, back: [] }));
     }
+    // The business's first, 10th or 100th order (wave G), said once: only
+    // on the whole list's first page, where the count is every order.
+    const unnarrowed = ordersEmptyCopy(query, null).kind === "first-run";
+    const moment = await ordersListMoment(page, {
+        plain: unnarrowed && !query.storefront && !query.cursor,
+        viewer: organization,
+    });
     // No orders yet: share the online shop while it is live, else the
     // website (B7's first run; DEC-069, L8), on the business's own origin.
     // Only then is the web address read, and a read that fails (or a role
     // it isn't shown to) just leaves the button out.
     const share =
-        page.rows.length === 0 &&
-        ordersEmptyCopy(query, null).kind === "first-run"
+        page.rows.length === 0 && unnarrowed
             ? shareLink(await readWebAddressLinks(), ORDERS_FIRST_RUN)
             : null;
 
@@ -147,6 +166,7 @@ export default async function OrdersPage({
             {/* B17: storefronts still on the 2-hour Pick-up default. */}
             <LateRuleNotice />
             <PlanLimitNotice moduleId="orders" className="mb-4" />
+            {moment ? <Moment moment={moment} className="mb-4" /> : null}
             <OrdersScreen
                 query={query}
                 page={page}
@@ -176,6 +196,7 @@ export default async function OrdersPage({
                               blocked: createBlock(billing, "orders"),
                               // From a person's page (#247): them, chosen.
                               initialPick,
+                              places,
                           }
                         : null
                 }

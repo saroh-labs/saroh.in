@@ -1,5 +1,7 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
+import { Button } from "@saroh/ui/button";
 import { showError } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -23,6 +25,7 @@ import {
     untrackedLine,
 } from "@/lib/products/tracking";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
 import { SectionCard } from "./section-card";
@@ -135,7 +138,7 @@ export function StockSection({
               : belowPromised
                 ? `${belowPromised.promised} promised to open orders${
                       belowPromised.title ? ` for ${belowPromised.title}` : ""
-                  } — on hand can't go below that.`
+                  }. On hand can't go below that.`
                 : "";
 
     useSection(
@@ -255,15 +258,16 @@ export function StockSection({
                         ? `No stock count yet. Each of the ${product.variants.length} variants gets its own, so a small one can run out before a large one.`
                         : "No stock count yet. Add one to see how many you have and get a warning when it runs low."}
                 </p>
-                <button
+                <Button
+                    variant="outline"
                     type="button"
                     disabled={blocked}
                     onClick={() => setOpened(true)}
-                    className="inline-flex h-[38px] items-center gap-[7px] rounded-[9px] border border-border bg-card px-4 text-[12.5px] font-semibold hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11"
+                    className="gap-[7px]"
                 >
-                    <Plus aria-hidden className="size-3.5" strokeWidth={2.2} />
+                    <Plus aria-hidden className="size-3.5" />
                     Add stock
-                </button>
+                </Button>
                 {hasVariants && !canWrite && !ro ? (
                     <FieldHelp className="mt-2">{SPLIT_NEEDS_WRITE}</FieldHelp>
                 ) : null}
@@ -293,13 +297,12 @@ export function StockSection({
                     onChange={(patch) => setDraft({ ...draft, ...patch })}
                 />
                 {hasVariants && canWrite ? (
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={() => setOpened(true)}
-                        className="mt-2 text-[12px] font-semibold text-brand hover:text-foreground coarse:min-h-11"
+                        className="mt-2 text-[12px] coarse:min-h-11"
                     >
                         Count each variant instead
-                    </button>
+                    </TextLink>
                 ) : null}
                 {lowNow ? (
                     <LowNote>
@@ -307,7 +310,7 @@ export function StockSection({
                             ? product.status === "PUBLISHED"
                                 ? "Nothing on hand. The product stays published and cannot be bought."
                                 : "Nothing on hand yet. Set a quantity before you publish it."
-                            : `On hand has reached the alert level — ${qty} left, alerting at ${low}.`}
+                            : `On hand has reached the alert level: ${qty} left, alerting at ${low}.`}
                     </LowNote>
                 ) : null}
             </SectionCard>
@@ -322,15 +325,15 @@ export function StockSection({
             <FieldHelp className="mt-[9px]" tone={problem ? "bad" : "quiet"}>
                 {problem ||
                     (splitting && counting === "whole"
-                        ? "Saving counts each variant on its own. Each starts at what its open orders hold, and the first also at what was free to sell — nothing on the shelf is lost or counted twice."
+                        ? "Saving counts each variant on its own. Each starts at what its open orders hold, and the first also at what was free to sell. Nothing on the shelf is lost or counted twice."
                         : "Each variant has its own count, and the product's total is the sum. Promised updates itself as orders come in and are collected.")}
             </FieldHelp>
             {low.length > 0 && !problem ? (
                 <LowNote>
                     {low
                         .map((l) => `${l.title} has ${l.quantity} left`)
-                        .join(", ")}{" "}
-                    — at or under {low.length === 1 ? "its" : "their"} warning
+                        .join(", ")}
+                    , at or under {plural(low.length, "its", "their")} warning
                     level.
                 </LowNote>
             ) : null}

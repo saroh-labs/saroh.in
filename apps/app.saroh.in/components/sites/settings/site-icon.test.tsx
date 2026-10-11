@@ -42,6 +42,13 @@ vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
 }));
+vi.mock("@/lib/stores/storefront-actions", () => ({
+    updateStorefront: vi.fn(),
+}));
+// The business's own sheets open from Contact and social (DEC-128).
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveOrganizationSettings: vi.fn(),
+}));
 vi.mock("@/components/sites/custom-domain", () => ({
     CustomDomain: () => null,
 }));
@@ -294,7 +301,7 @@ describe("the Site icon sheet", () => {
         await press(edit("Add site icon"));
         expect(sheetName()).toBe("Site icon");
         expect(sheet()?.textContent).toContain(
-            "PNG, JPG or WebP, at least 192 × 192; square works best.",
+            "PNG, JPG or WebP, at least 192 × 192. Square works best.",
         );
         // Before a pick, the sheet draws what the site shows now.
         expect(preview("tab")).toMatch(/^data:image\/svg\+xml,/);

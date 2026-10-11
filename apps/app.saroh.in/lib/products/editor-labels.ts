@@ -1,3 +1,7 @@
+import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
+import { formatNumber } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
+
 import type { SectionKey } from "./editor-sections";
 import { LIMITS, SECTION_JUMPS, SECTION_NAMES } from "./editor-sections";
 
@@ -6,21 +10,8 @@ import { LIMITS, SECTION_JUMPS, SECTION_NAMES } from "./editor-sections";
  * sells (#525) — pure and client-safe; tested in `editor-labels.test.ts`.
  */
 
-const BUILT_IN_ROLES: Record<string, string> = {
-    OWNER: "Owner",
-    ADMIN: "Admin",
-    MEMBER: "Member",
-    REVIEWER: "Reviewer",
-};
-
-/** A role as the screen names it: the business's own label, else the built-in's. */
-export function roleName(org: {
-    role?: string | null;
-    roleLabel?: string | null;
-}): string {
-    if (org.roleLabel?.trim()) return org.roleLabel.trim();
-    return (org.role && BUILT_IN_ROLES[org.role]) ?? "Member";
-}
+/** Kept here for the editor's importers. The rule is `role-name.ts`. */
+export { roleName } from "@/lib/organizations/role-name";
 
 /**
  * The note under the header for someone who can't change the product, after
@@ -28,15 +19,10 @@ export function roleName(org: {
  * `store:write`) is told the one section it can change.
  */
 export function readOnlyBanner(role: string, stockOnly: boolean): string {
-    const line = `You're viewing as ${role}. You can read this product but not change it — an owner or admin can change your role in Team.`;
+    const line = `You're viewing as ${role}. You can read this product but not change it. ${WHO_CAN_CHANGE}`;
     return stockOnly
         ? `${line} Only the Stock section below can be changed.`
         : line;
-}
-
-/** Why a role that can't see products is stopped at the door. */
-export function noAccessLine(role: string, business: string): string {
-    return `You're signed in as ${role} in ${business}. That role doesn't include seeing products. An owner or admin can give you access in Team.`;
 }
 
 /** Whether this person can change a section: everything, or Stock alone. */
@@ -91,7 +77,7 @@ export function detailsCopy(sellsFood: boolean): DetailsCopy {
               materials: {
                   label: "Ingredients or material",
                   placeholder:
-                      "Aqua, Ethyl ascorbic acid, Glycerin… — or 100% linen",
+                      "Aqua, Ethyl ascorbic acid, Glycerin… or 100% linen",
                   field: "Ingredients or material",
               },
               saves: "Saves how to use it, what it is made of and how it's fulfilled.",
@@ -119,17 +105,17 @@ export function descriptionFootnote(over: boolean): string {
 
 /** The words a customer reads: "1 character", "240 characters". */
 export function readCount(n: number): string {
-    return `${n.toLocaleString("en-IN")} ${n === 1 ? "character" : "characters"}`;
+    return count(n, "character");
 }
 
 /** What the limit counts, the markup: "1,240 of 5,000 characters". */
 export function markupCount(n: number): string {
-    return `${n.toLocaleString("en-IN")} of ${LIMITS.description.toLocaleString("en-IN")} characters`;
+    return `${formatNumber(n)} of ${formatNumber(LIMITS.description)} characters`;
 }
 
 /** The line under the editor. */
 export function descriptionNote(over: boolean): string {
     return over
-        ? `Longer than the ${LIMITS.description.toLocaleString("en-IN")} characters a description can be.`
+        ? `Longer than the ${formatNumber(LIMITS.description)} characters a description can be.`
         : "Shown on the product page.";
 }

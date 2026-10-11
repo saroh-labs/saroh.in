@@ -40,7 +40,7 @@ describe("Activity — customer records", () => {
             }),
         );
         expect(line?.what).toBe(
-            "merged a duplicate customer record — 3 orders and 1 note moved",
+            "merged a duplicate customer record, 3 orders and 1 note moved",
         );
         expect(line?.where).toEqual({
             label: "Customer",
@@ -63,7 +63,7 @@ describe("Activity — customer records", () => {
                 }),
             )?.what,
         ).toBe(
-            "merged a duplicate customer record — 2 orders, 1 booking, 1 invoice and more moved",
+            "merged a duplicate customer record, 2 orders, 1 booking, 1 invoice and more moved",
         );
         expect(activityLine(event({ metadata: {} }))?.what).toBe(
             "merged a duplicate customer record",
@@ -150,7 +150,7 @@ describe("Activity — customer records", () => {
             }),
         );
         expect(line?.what).toBe(
-            "removed a customer's details (privacy request) — 1 booking to come cancelled",
+            "removed a customer's details (privacy request), 1 booking to come cancelled",
         );
         expect(line?.where).toEqual({
             label: "Customers",

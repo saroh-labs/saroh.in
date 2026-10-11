@@ -163,10 +163,10 @@ describe("QrCodesList", () => {
     });
 
     it("shows a dash, not a zero, where no booking has been counted", () => {
-        expect(
-            row(list(), "bbb")?.querySelector("[data-qr-bookings]")
-                ?.textContent,
-        ).toBe("–");
+        const cell = row(list(), "bbb")?.querySelector("[data-qr-bookings]");
+        // The eye sees the dash, and a screen reader hears the word.
+        expect(cell?.querySelector("[aria-hidden]")?.textContent).toBe("—");
+        expect(cell?.querySelector(".sr-only")?.textContent).toBe("None");
     });
 
     it("says a gone page is gone, and still offers Change", () => {
@@ -214,7 +214,7 @@ describe("QrCodesList", () => {
     it("says there are none yet, and who makes them", () => {
         expect(list({ codes: [] }).textContent).toContain("No QR codes yet");
         expect(list({ codes: [], canChange: false }).textContent).toContain(
-            "An owner or admin makes them.",
+            "They are listed here with their scans once there are some.",
         );
     });
 });
@@ -288,6 +288,8 @@ describe("QrShare", () => {
         await act(async () => {
             el?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
             for (let i = 0; i < 6; i++) await Promise.resolve();
+            // A confirm waits for its action before it says or closes.
+            await new Promise((r) => setTimeout(r, 0));
         });
     }
 
@@ -337,7 +339,7 @@ describe("QrShare", () => {
         await draw({ ...s, view: { ...s.view, live: false } });
         const note = host.querySelector("[data-qr-not-live]");
         expect(note?.textContent).toContain(
-            "You can make codes now; they open once it is.",
+            "Your website isn't live yet. Codes you make now open once it is.",
         );
         expect(note?.querySelector("a")?.getAttribute("href")).toBe(
             "/sites/site_1",
@@ -389,7 +391,7 @@ describe("QrShare", () => {
         expect(host.querySelector('[data-qr-retired="aaa"]')).toBeTruthy();
         expect(refresh).toHaveBeenCalled();
         expect(showSuccess).toHaveBeenCalledWith(
-            "Code retired",
+            "Code retired.",
             "A printed copy now opens your home page.",
         );
     });
@@ -402,9 +404,10 @@ describe("QrShare", () => {
         await draw(screen());
         await click(button("Retire the Counter code"));
         await click(button("Retire code"));
-        expect(showError).toHaveBeenCalledWith(
-            "We couldn't retire that code. Try again.",
-        );
+        // The refusal goes back to the confirm, which stays open and says
+        // it (`confirm-dialog.test.tsx`): no toast beside it.
+        expect(showError).not.toHaveBeenCalled();
+        expect(showSuccess).not.toHaveBeenCalled();
         expect(host.querySelector('[data-qr-row="aaa"]')).toBeTruthy();
     });
 });

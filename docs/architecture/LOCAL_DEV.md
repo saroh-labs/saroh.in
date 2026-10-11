@@ -41,7 +41,7 @@ looks equivalent and is not:
 
 **Set `BETTER_AUTH_TRUSTED_ORIGINS` when you run the stack yourself.** Unset, it
 falls back to the `*.saroh.in` production list, so a return-to on a `.localhost`
-origin is correctly refused and sign-in lands on the app launcher instead of the
+origin is correctly refused and sign-in lands on the app's front door instead of the
 page asked for (#222). The root `.env.example` has the value; an ad-hoc `turbo run dev`
 with your own env does not inherit it. A second copy of the app under another
 portless name (a worktree's `customers-app.saroh`, say) must add its own origin

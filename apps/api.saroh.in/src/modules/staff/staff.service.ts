@@ -8,6 +8,7 @@ import type { Prisma } from "@saroh/database";
 import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { clockWords } from "../../common/words-format";
 import { planMeter } from "../billing/metering.service";
 import type { AvailabilityRuleWindow } from "../bookings/availability";
 import { withinIntervals, workingIntervals } from "../bookings/availability";
@@ -460,7 +461,7 @@ export class StaffService {
         const clash = firstOverlap([...sameDay, dto]);
         if (clash) {
             refuse(
-                `${person.name} already has extra hours on ${dto.date} from ${formatMinute(clash[0].startMinute)} to ${formatMinute(clash[0].endMinute)}.`,
+                `${person.name} already has extra hours on ${dto.date} from ${clockWords(formatMinute(clash[0].startMinute))} to ${clockWords(formatMinute(clash[0].endMinute))}.`,
                 "startMinute",
             );
         }

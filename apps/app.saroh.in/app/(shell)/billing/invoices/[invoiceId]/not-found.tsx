@@ -8,11 +8,11 @@ export default function NotFoundPage() {
         <PageContainer width="full">
             <NotFound
                 variant="card"
-                title="No invoice at this address"
+                title="Invoice not found"
                 description="It may belong to another business, or the link is wrong."
                 primary={{
                     href: "/billing/invoices",
-                    label: "Back to invoices",
+                    label: "Back to Invoices",
                 }}
             />
         </PageContainer>

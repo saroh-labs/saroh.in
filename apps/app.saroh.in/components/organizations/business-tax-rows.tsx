@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import {
     gstStateOf,
     nextNumberOf,
@@ -20,6 +18,7 @@ import { formatOf, RESTART_LABEL } from "@/lib/invoices/invoice-number";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
+import { TextLink } from "@saroh/ui/text-link";
 import type { BusinessSheets } from "./use-business-sheets";
 
 export const TAX_TAB = {
@@ -57,13 +56,7 @@ export function BusinessTaxRows({
             note={
                 <>
                     The invoices you send, and their numbers, are in{" "}
-                    <Link
-                        href="/billing/invoices"
-                        className="font-medium text-foreground underline underline-offset-4 hover:decoration-2"
-                    >
-                        Invoices
-                    </Link>
-                    .
+                    <TextLink href="/billing/invoices">Invoices</TextLink>.
                 </>
             }
         >
@@ -118,7 +111,7 @@ export function BusinessTaxRows({
                     {/* India's financial year, which invoices are
                         numbered by. GST law fixes it for every
                         business, so it is said rather than offered. */}
-                    <span>April – March</span>
+                    <span>April to March</span>
                     <Locked>Set by GST law</Locked>
                 </span>
             </Row>

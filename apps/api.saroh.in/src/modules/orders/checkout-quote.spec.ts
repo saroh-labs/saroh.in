@@ -72,6 +72,38 @@ describe("quoteLines", () => {
         expect(large).toMatchObject({ unitCents: 25000, state: "ok" });
     });
 
+    it("carries the returns rule the product's page shows, and none for a line gone", () => {
+        const lines = quoteLines(
+            [line("l1"), line("l2"), line("l3"), line("missing")],
+            [
+                listing("l1", { returns: " Exchange within 7 days " }),
+                listing("l2", { returns: null }),
+                listing("l3", { returns: "  " }),
+            ],
+            [],
+            true,
+        );
+        expect(lines.map((l) => l.returns)).toEqual([
+            "Exchange within 7 days",
+            null,
+            null,
+            null,
+        ]);
+        const quote = buildQuote({
+            currency: "INR",
+            lines,
+            storefrontWays: ["PICKUP"],
+            fees: NO_FEES,
+            asked: "PICKUP",
+        });
+        expect(quote.lines.map((l) => l.returns)).toEqual([
+            "Exchange within 7 days",
+            null,
+            null,
+            null,
+        ]);
+    });
+
     it("joins the same listing and variant, capped at the most a line takes", () => {
         const lines = quoteLines(
             [line("l1", 60), line("l1", 60)],

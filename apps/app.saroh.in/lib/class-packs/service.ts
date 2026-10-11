@@ -143,7 +143,7 @@ export function createPack(input: PackInput) {
         "/class-packs",
         "POST",
         input,
-        "Could not save that pack.",
+        "Couldn't save that pack.",
     );
 }
 export function updatePack(id: string, input: PackInput) {
@@ -151,7 +151,7 @@ export function updatePack(id: string, input: PackInput) {
         packPath(id),
         "PATCH",
         input,
-        "Could not save that pack.",
+        "Couldn't save that pack.",
     );
 }
 export function setPackArchived(id: string, archived: boolean) {
@@ -160,8 +160,8 @@ export function setPackArchived(id: string, archived: boolean) {
         "POST",
         {},
         archived
-            ? "Could not archive that pack."
-            : "Could not put that pack back on sale.",
+            ? "Couldn't archive that pack."
+            : "Couldn't put that pack back on sale.",
     );
 }
 /**
@@ -177,7 +177,7 @@ export function sellPack(
         `${packPath(id)}/sell`,
         "POST",
         { contactId, ...(paidBy ? { paidBy } : {}) },
-        "Could not sell that pack.",
+        "Couldn't sell that pack.",
     );
 }
 
@@ -190,7 +190,7 @@ export function payBookingWithPack(bookingId: string, packPurchaseId: string) {
         bookingPack(bookingId),
         "POST",
         { packPurchaseId },
-        "Could not pay with that pack.",
+        "Couldn't pay with that pack.",
     );
 }
 /** Take the pack off a booking; its class goes back. */
@@ -199,6 +199,6 @@ export function removeFromBooking(bookingId: string) {
         bookingPack(bookingId),
         "DELETE",
         undefined,
-        "Could not take the pack off.",
+        "Couldn't take the pack off.",
     );
 }

@@ -13,6 +13,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
 import type { OrgAction } from "../organizations/organization-actions";
+import { roleDenial } from "../organizations/organization-policy";
 import { appendMessage } from "../site-accounts/thread-store";
 import { ThreadsService } from "../site-accounts/threads.service";
 import {
@@ -400,8 +401,8 @@ describe("ThreadsService.waitingOnTeam (DB)", () => {
             ...owner(),
             actions: new Set<OrgAction>(["contact:read"]),
         };
-        await expect(threads.waitingOnTeam(ctx, view)).rejects.toThrow(
-            /message:read/,
-        );
+        await expect(threads.waitingOnTeam(ctx, view)).rejects.toMatchObject({
+            response: roleDenial("message:read"),
+        });
     });
 });

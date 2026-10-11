@@ -7,6 +7,11 @@ import {
 } from "@/components/sites/site-search-tracking-section";
 import { SiteSettings } from "@/components/sites/site-settings";
 import { SiteSettingsRead } from "@/components/sites/site-settings-read";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
+import {
+    readOrganizationSettings,
+    readSiteContact,
+} from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
 import { readPublishApproval } from "@/lib/sites/publish-approval-read";
 import { getSite } from "@/lib/sites/service";
@@ -15,6 +20,7 @@ import {
     readWebAddressLinks,
     RENDERER_APEX,
 } from "@/lib/sites/share-links-read";
+import { listVisitedLocations } from "@/lib/stores/storefronts";
 
 export const metadata = { title: "Settings · Website" };
 
@@ -39,11 +45,31 @@ export default async function SiteSettingsPage({
     const { siteId } = await params;
     await requireSession();
 
-    const [site, webAddress] = await Promise.all([
+    const [site, webAddress, contact, settings] = await Promise.all([
         getSite(siteId),
         readWebAddressLinks(),
+        // What the website shows of how to reach the business (DEC-128),
+        // and the business's own settings for someone who may change them
+        // (owner or admin): the Contact and social rows then edit in
+        // place. Anyone else reads the rows.
+        readSiteContact(),
+        readOrganizationSettings().catch(() => null),
     ]);
     if (!site) notFound();
+    const business = settings?.ok ? settings.data : null;
+    // The Address sheet edits each visited location's address in place,
+    // through the location's own update, for whoever may change one. Read
+    // only for someone who can open that sheet.
+    const [visited, organization] = business
+        ? await Promise.all([
+              listVisitedLocations(),
+              resolveActiveOrganization().catch(() => null),
+          ])
+        : [null, null];
+    const locations = visited?.state === "ok" ? visited.locations : null;
+    const canEditLocations = organization?.actions
+        ? organization.actions.includes("store:write")
+        : organization?.role === "OWNER" || organization?.role === "ADMIN";
     // Where the site is reached, its verified domain first (DEC-069, L8).
     const address = siteAddressOf(site, webAddress, RENDERER_APEX);
     // "Publishing needs approval" (DEC-071, T13), or null to leave it out.
@@ -67,6 +93,10 @@ export default async function SiteSettingsPage({
             approval={approval}
             canChangeAddress={canChangeAddress}
             tracking={tracking}
+            contact={contact}
+            business={business}
+            locations={locations}
+            canEditLocations={canEditLocations}
         />
     ) : (
         // The values, and none of the controls the API would refuse (#275).
@@ -75,6 +105,7 @@ export default async function SiteSettingsPage({
             address={address}
             approval={approval}
             tracking={tracking}
+            contact={contact}
         />
     );
 }

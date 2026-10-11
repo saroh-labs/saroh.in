@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch } from "@/lib/api/http";
+import type { InvitationAccept } from "@/lib/invitations/outcome";
 
 /**
  * Members + invitations data access for app.saroh.in. Like the stores client,
@@ -65,7 +66,7 @@ async function mutate(
     });
     if (res.ok) return { ok: true, data: { ok: true } };
     const data: unknown = await res.json().catch(() => null);
-    const failure = toFailure(data, "Something went wrong");
+    const failure = toFailure(data, "That didn't go through. Try again.");
     return {
         ok: false,
         error: failure.error,
@@ -103,18 +104,47 @@ export function revokeInvitation(
     return mutate(`/stores/${storeId}/invitations/${invitationId}`, "DELETE");
 }
 
-/** Accept an invitation by token; returns the store id to redirect into. */
-export async function acceptInvitation(
-    token: string,
-): Promise<{ ok: true; storeId: string } | { ok: false; error: string }> {
-    const res = await apiFetch(`/invitations/${token}/accept`, {
-        method: "POST",
-    });
+/**
+ * Accept a location's invitation by token. Returns the store id to redirect
+ * into, or the failure with its status, which is what tells an API that did
+ * not answer from an invitation that is gone (`lib/invitations/outcome.ts`).
+ */
+export async function acceptInvitation(token: string): Promise<
+    InvitationAccept<{
+        storeId: string;
+        /**
+         * The location's business, which the workspace opens on arrival.
+         * Null from an API that doesn't say: the page then goes straight on.
+         */
+        organizationId: string | null;
+    }>
+> {
+    let res: Response;
+    try {
+        res = await apiFetch(
+            `/invitations/${encodeURIComponent(token)}/accept`,
+            { method: "POST" },
+        );
+    } catch {
+        return { ok: false, error: "", status: null };
+    }
     const data: unknown = await res.json().catch(() => null);
     const storeId = (data as { storeId?: unknown } | null)?.storeId;
-    if (res.ok && typeof storeId === "string") return { ok: true, storeId };
+    if (res.ok && typeof storeId === "string") {
+        const organizationId = (data as { organizationId?: unknown })
+            .organizationId;
+        return {
+            ok: true,
+            data: {
+                storeId,
+                organizationId:
+                    typeof organizationId === "string" ? organizationId : null,
+            },
+        };
+    }
     return {
         ok: false,
-        error: toFailure(data, "Could not accept invitation").error,
+        error: toFailure(data, "That invitation could not be accepted.").error,
+        status: res.status,
     };
 }

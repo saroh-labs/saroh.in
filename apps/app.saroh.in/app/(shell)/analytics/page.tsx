@@ -1,7 +1,6 @@
-import { Button } from "@saroh/ui/button";
-import { FailedState, PartialNotice } from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
+import { FailedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { forbidden } from "next/navigation";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
@@ -14,6 +13,8 @@ import {
 } from "@/lib/analytics/service";
 import { ApiError } from "@/lib/api/errors";
 import { requireSession } from "@/lib/session";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { Segmented } from "@saroh/ui/segmented";
 
 /** Supported quick date ranges (label → days back from today). */
 const RANGES: { key: string; label: string; days: number }[] = [
@@ -75,29 +76,26 @@ export default async function AnalyticsPage({
 
     const missing =
         takings?.status === "failed"
-            ? "Sales couldn't be loaded, so only your website's figures are shown."
+            ? {
+                  things: "sales",
+                  so: "Only your website's figures are shown.",
+              }
             : traffic.status === "failed"
-              ? "Your website's figures couldn't be loaded, so only sales are shown."
+              ? {
+                    things: "your website's figures",
+                    so: "Only sales are shown.",
+                }
               : null;
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <PageHeader
+                breadcrumb={["Insights"]}
                 title="Insights"
                 description="How this week is going, what the business took week by week, and how your website is doing."
             />
 
-            {missing ? (
-                <PartialNotice
-                    action={
-                        <Button asChild size="sm" variant="outline">
-                            <Link href="/analytics">Try again</Link>
-                        </Button>
-                    }
-                >
-                    {missing}
-                </PartialNotice>
-            ) : null}
+            {missing ? <PartialRead {...missing} /> : null}
 
             {takings ? <TakingsSection read={takings} /> : null}
 
@@ -115,31 +113,17 @@ export default async function AnalyticsPage({
                             paid orders. Updated every hour.
                         </p>
                     </div>
-                    <div className="flex items-center gap-1">
-                        {RANGES.map((r) => (
-                            <Button
-                                key={r.key}
-                                asChild
-                                size="sm"
-                                variant={
-                                    r.key === range.key ? "default" : "outline"
-                                }
-                            >
-                                <Link
-                                    href={`/analytics?range=${r.key}${
-                                        params.siteId
-                                            ? `&siteId=${params.siteId}`
-                                            : ""
-                                    }`}
-                                    aria-current={
-                                        r.key === range.key ? "true" : undefined
-                                    }
-                                >
-                                    {r.label}
-                                </Link>
-                            </Button>
-                        ))}
-                    </div>
+                    <Segmented
+                        label="Days shown"
+                        value={range.key}
+                        options={RANGES.map((r) => ({
+                            value: r.key,
+                            label: r.label,
+                            href: `/analytics?range=${r.key}${
+                                params.siteId ? `&siteId=${params.siteId}` : ""
+                            }`,
+                        }))}
+                    />
                 </div>
                 {traffic.status === "ok" ? (
                     <AnalyticsDashboard
@@ -152,12 +136,9 @@ export default async function AnalyticsPage({
                     />
                 ) : (
                     <FailedState
-                        title="Your website's figures could not be loaded"
-                        action={
-                            <Button asChild variant="outline">
-                                <Link href="/analytics">Try again</Link>
-                            </Button>
-                        }
+                        size="panel"
+                        title={couldntLoad("your website's figures")}
+                        retryHref="/analytics"
                     />
                 )}
             </section>

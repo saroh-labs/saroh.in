@@ -216,7 +216,7 @@ describe("the Bookings tab (A6)", () => {
         const up = screen.getByRole("region", { name: "Coming up" });
         expect(within(up).getByText("3")).toBeInTheDocument();
         expect(
-            within(up).getByText("Check-up · Mon 5 Oct, 10:00"),
+            within(up).getByText("Check-up · Mon 5 Oct, 10:00 am"),
         ).toBeTruthy();
         expect(
             within(up).getByRole("link", { name: "Book another" }),
@@ -224,7 +224,7 @@ describe("the Bookings tab (A6)", () => {
         // A class moves on the booking page.
         expect(
             within(up).getByRole("link", {
-                name: "Move Morning yoga · Mon 5 Oct, 10:00",
+                name: "Move Morning yoga · Mon 5 Oct, 10:00 am",
             }),
         ).toHaveAttribute("href", moveClassHref("bk_2"));
         const past = screen.getByRole("region", { name: "Past" });
@@ -260,7 +260,7 @@ describe("the Bookings tab (A6)", () => {
         const calls = draw();
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Move Check-up · Mon 5 Oct, 10:00",
+                name: "Move Check-up · Mon 5 Oct, 10:00 am",
             }),
         );
         const sheet = await screen.findByRole("dialog");
@@ -282,16 +282,16 @@ describe("the Bookings tab (A6)", () => {
             within(sheet).getByRole("radio", { name: "Wed 7 Oct: no times" }),
         ).toBeDisabled();
         expect(
-            within(sheet).getByRole("radio", { name: "12:00 with Dr. Rao" }),
+            within(sheet).getByRole("radio", { name: "12:00 pm with Dr. Rao" }),
         ).toBeInTheDocument();
         fireEvent.click(
             await within(sheet).findByRole("radio", {
-                name: "11:00 with Dr. Rao",
+                name: "11:00 am with Dr. Rao",
             }),
         );
         fireEvent.click(
             within(sheet).getByRole("button", {
-                name: "Move to Tue 6 Oct at 11:00",
+                name: "Move to Tue 6 Oct at 11:00 am",
             }),
         );
         await waitFor(() =>
@@ -301,7 +301,7 @@ describe("the Bookings tab (A6)", () => {
             ),
         );
         expect(
-            await screen.findByText("Moved to Tue 6 Oct at 11:00."),
+            await screen.findByText("Moved to Tue 6 Oct at 11:00 am."),
         ).toBeInTheDocument();
         expect(router.refresh).toHaveBeenCalled();
     });
@@ -319,24 +319,24 @@ describe("the Bookings tab (A6)", () => {
         );
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Move Check-up · Mon 5 Oct, 10:00",
+                name: "Move Check-up · Mon 5 Oct, 10:00 am",
             }),
         );
         const sheet = await screen.findByRole("dialog");
         fireEvent.click(
             await within(sheet).findByRole("radio", {
-                name: "11:00 with Dr. Rao",
+                name: "11:00 am with Dr. Rao",
             }),
         );
         fireEvent.click(
             within(sheet).getByRole("button", {
-                name: "Move to Tue 6 Oct at 11:00",
+                name: "Move to Tue 6 Oct at 11:00 am",
             }),
         );
         await waitFor(() => expect(calls.move).toHaveBeenCalled());
         expect(
             await screen.findByText(
-                "Moved to Tue 6 Oct at 11:00. Kavi Dental has been told.",
+                "Moved to Tue 6 Oct at 11:00 am. Kavi Dental has been told.",
             ),
         ).toBeInTheDocument();
     });
@@ -359,7 +359,7 @@ describe("the Bookings tab (A6)", () => {
         );
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Cancel Check-up · Mon 5 Oct, 10:00",
+                name: "Cancel Check-up · Mon 5 Oct, 10:00 am",
             }),
         );
         const sheet = await screen.findByRole("dialog");
@@ -388,7 +388,7 @@ describe("the Bookings tab (A6)", () => {
         );
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Move Check-up · Mon 5 Oct, 10:00",
+                name: "Move Check-up · Mon 5 Oct, 10:00 am",
             }),
         );
         const sheet = await screen.findByRole("dialog");
@@ -407,19 +407,19 @@ describe("the Bookings tab (A6)", () => {
             api({
                 move: vi.fn().mockResolvedValue({
                     ok: false,
-                    message: "That time just went. Pick another one.",
+                    message: "That time has gone. Pick another one.",
                 }),
             }),
         );
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Move Check-up · Mon 5 Oct, 10:00",
+                name: "Move Check-up · Mon 5 Oct, 10:00 am",
             }),
         );
         const sheet = await screen.findByRole("dialog");
         fireEvent.click(
             await within(sheet).findByRole("radio", {
-                name: "11:00 with Dr. Rao",
+                name: "11:00 am with Dr. Rao",
             }),
         );
         fireEvent.click(
@@ -427,7 +427,7 @@ describe("the Bookings tab (A6)", () => {
         );
         expect(
             await within(sheet).findByText(
-                "That time just went. Pick another one.",
+                "That time has gone. Pick another one.",
             ),
         ).toBeInTheDocument();
         await waitFor(() => expect(calls.moveTimes).toHaveBeenCalledTimes(2));
@@ -437,7 +437,7 @@ describe("the Bookings tab (A6)", () => {
         draw();
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Move Check-up · Sat 3 Oct, 10:00",
+                name: "Move Check-up · Sat 3 Oct, 10:00 am",
             }),
         );
         const sheet = await screen.findByRole("dialog");
@@ -455,7 +455,7 @@ describe("the Bookings tab (A6)", () => {
         const calls = draw();
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Cancel Check-up · Mon 5 Oct, 10:00",
+                name: "Cancel Check-up · Mon 5 Oct, 10:00 am",
             }),
         );
         const sheet = await screen.findByRole("dialog");
@@ -464,7 +464,7 @@ describe("the Bookings tab (A6)", () => {
         ).toBeInTheDocument();
         expect(
             within(sheet).getByText(
-                "Free to cancel until Sun 4 Oct, 10:00. What you paid online is refunded.",
+                "Free to cancel until Sun 4 Oct, 10:00 am. What you paid online is refunded.",
             ),
         ).toBeInTheDocument();
         fireEvent.click(
@@ -482,7 +482,7 @@ describe("the Bookings tab (A6)", () => {
         const calls = draw();
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Cancel Check-up · Mon 5 Oct, 10:00",
+                name: "Cancel Check-up · Mon 5 Oct, 10:00 am",
             }),
         );
         const sheet = await screen.findByRole("dialog");
@@ -525,12 +525,12 @@ describe("the Bookings tab (A6)", () => {
         ).toBeInTheDocument();
         fireEvent.click(
             await within(sheet).findByRole("radio", {
-                name: "11:00 with Dr. Mehta",
+                name: "11:00 am with Dr. Mehta",
             }),
         );
         fireEvent.click(
             within(sheet).getByRole("button", {
-                name: "Book Thu 8 Oct at 11:00",
+                name: "Book Thu 8 Oct at 11:00 am",
             }),
         );
         await waitFor(() =>
@@ -540,7 +540,9 @@ describe("the Bookings tab (A6)", () => {
             ),
         );
         expect(
-            await screen.findByText("Visit 2 booked for Thu 8 Oct at 11:00."),
+            await screen.findByText(
+                "Visit 2 booked for Thu 8 Oct at 11:00 am.",
+            ),
         ).toBeInTheDocument();
     });
 });
@@ -583,7 +585,7 @@ describe("the Bookings words (A6)", () => {
 
     it("the cancel sheet's note follows the terms, and never names a way to pay", () => {
         expect(cancelNote(LATE_TERMS, "Asia/Kolkata")).toBe(
-            "It's past the free-cancellation time (Sun 4 Oct, 10:00). What you paid online is kept.",
+            "It's past the free-cancellation time (Sun 4 Oct, 10:00 am). What you paid online is kept.",
         );
         expect(
             cancelNote(
@@ -661,14 +663,14 @@ describe("the Bookings words (A6)", () => {
         ).toBe(
             "Cancelled. The team has been told. ₹400 is being refunded to the way you paid.",
         );
-        expect(movedText("Tue 6 Oct at 11:00", "Kavi Dental", true)).toBe(
-            "Moved to Tue 6 Oct at 11:00. Kavi Dental has been told.",
+        expect(movedText("Tue 6 Oct at 11:00 am", "Kavi Dental", true)).toBe(
+            "Moved to Tue 6 Oct at 11:00 am. Kavi Dental has been told.",
         );
-        expect(movedText("Tue 6 Oct at 11:00", " ", true)).toBe(
-            "Moved to Tue 6 Oct at 11:00. The team has been told.",
+        expect(movedText("Tue 6 Oct at 11:00 am", " ", true)).toBe(
+            "Moved to Tue 6 Oct at 11:00 am. The team has been told.",
         );
-        expect(movedText("Tue 6 Oct at 11:00", "Kavi Dental", false)).toBe(
-            "Moved to Tue 6 Oct at 11:00.",
+        expect(movedText("Tue 6 Oct at 11:00 am", "Kavi Dental", false)).toBe(
+            "Moved to Tue 6 Oct at 11:00 am.",
         );
     });
 

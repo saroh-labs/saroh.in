@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,7 +8,6 @@ import {
     discountAmount,
     madeByLine,
     onTheShop,
-    plural,
     priceLabel,
     ratingBars,
     ratingLabel,
@@ -38,7 +38,7 @@ describe("product page display rules", () => {
                 },
                 rupees,
             ),
-        ).toBe("₹499 – ₹899");
+        ).toBe("₹499 to ₹899");
     });
 
     it("says what customers see for each stock word", () => {
@@ -53,9 +53,9 @@ describe("product page display rules", () => {
     });
 
     it("counts in words, singular and plural", () => {
-        expect(plural(0, "variant")).toBe("0 variants");
-        expect(plural(1, "variant")).toBe("1 variant");
-        expect(plural(2, "category", "categories")).toBe("2 categories");
+        expect(count(0, "variant")).toBe("0 variants");
+        expect(count(1, "variant")).toBe("1 variant");
+        expect(count(2, "category", "categories")).toBe("2 categories");
     });
 
     it("reads the rating, and nothing when nobody has reviewed it", () => {

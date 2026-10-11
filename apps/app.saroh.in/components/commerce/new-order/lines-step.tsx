@@ -1,7 +1,8 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
 import { Chip } from "@/components/shared/chip";
@@ -14,7 +15,8 @@ import {
 } from "@/lib/orders/new-order";
 import type { NewOrderProduct } from "@/lib/orders/new-order-service";
 
-import { FIELD, SMALL_BUTTON } from "./parts";
+import { Tip } from "@saroh/ui/tooltip";
+import { FIELD } from "./parts";
 
 /**
  * New order's Items (B13): the lines, each with − and +, its total and,
@@ -52,9 +54,7 @@ export function LinesStep({
             className="overflow-hidden rounded-xl border border-border bg-card"
         >
             <div className="flex items-baseline px-3.5 pb-2 pt-[13px]">
-                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Items
-                </h3>
+                <h3 className="label flex-1">Items</h3>
                 <span className="text-[12px] text-muted-foreground">
                     {itemCount(lines)}
                 </span>
@@ -86,40 +86,33 @@ export function LinesStep({
                                     </div>
                                 ) : null}
                             </div>
-                            <button
-                                type="button"
+                            <IconButton
+                                label={`One fewer ${title}`}
+                                icon={<span>−</span>}
+                                variant="outline"
                                 onClick={() => onBump(line.key, -1)}
-                                aria-label={`One fewer ${title}`}
-                                className={cn(
-                                    SMALL_BUTTON,
-                                    "size-8 text-[15px] font-normal coarse:size-11",
-                                )}
-                            >
-                                −
-                            </button>
+                            />
                             <span
                                 aria-label={`${line.quantity} of ${title}`}
                                 className="min-w-[22px] text-center font-semibold tabular-nums"
                             >
                                 {line.quantity}
                             </span>
-                            <button
-                                type="button"
-                                onClick={() => onBump(line.key, 1)}
-                                disabled={room === 0}
-                                title={
+                            <Tip
+                                label={
                                     room === 0
                                         ? `None left at ${storeName}`
                                         : undefined
                                 }
-                                aria-label={`One more ${title}`}
-                                className={cn(
-                                    SMALL_BUTTON,
-                                    "size-8 text-[15px] font-normal coarse:size-11",
-                                )}
                             >
-                                +
-                            </button>
+                                <IconButton
+                                    label={`One more ${title}`}
+                                    icon={<span>+</span>}
+                                    variant="outline"
+                                    onClick={() => onBump(line.key, 1)}
+                                    disabled={room === 0}
+                                />
+                            </Tip>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
                                 {format(s.priceCents * line.quantity)}
                             </span>
@@ -133,17 +126,27 @@ export function LinesStep({
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     aria-label="Add a product"
-                    placeholder="Add a product — type to find it"
+                    placeholder="Add a product: type to find it"
                     autoComplete="off"
                     className={FIELD}
                 />
                 <div className="mt-2 flex flex-col gap-1.5">
                     {shown.length === 0 ? (
-                        <p className="text-[12.5px] text-muted-foreground">
-                            {products.length === 0
-                                ? `Nothing is sold at ${storeName} yet.`
-                                : `Nothing called “${query.trim()}” here.`}
-                        </p>
+                        products.length === 0 ? (
+                            <EmptyState
+                                data-ph-mask=""
+                                size="inline"
+                                title={`Nothing is sold at ${storeName} yet`}
+                            />
+                        ) : (
+                            <EmptyState
+                                data-ph-mask=""
+                                size="inline"
+                                kind="no-results"
+                                things="products"
+                                title={`Nothing called “${query.trim()}” here`}
+                            />
+                        )
                     ) : null}
                     {shown.map((p) => (
                         <div
@@ -162,28 +165,31 @@ export function LinesStep({
                                     const room = roomFor(s, inCart(s.key));
                                     const out = room === 0;
                                     return (
-                                        <Chip
-                                            key={s.key}
-                                            role="button"
-                                            aria-checked={undefined}
-                                            on={false}
-                                            disabled={out}
-                                            onClick={() => onBump(s.key, 1)}
-                                            title={
+                                        <Tip
+                                            label={
                                                 out
                                                     ? `None left at ${storeName}`
                                                     : room === null
                                                       ? undefined
                                                       : `${room} left at ${storeName}`
                                             }
-                                            className="h-[30px] cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed coarse:h-11"
                                         >
-                                            {chipWords(
-                                                s.variantTitle,
-                                                format(s.priceCents),
-                                                room,
-                                            )}
-                                        </Chip>
+                                            <Chip
+                                                key={s.key}
+                                                role="button"
+                                                aria-checked={undefined}
+                                                on={false}
+                                                disabled={out}
+                                                onClick={() => onBump(s.key, 1)}
+                                                className="h-[30px] cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed coarse:h-11"
+                                            >
+                                                {chipWords(
+                                                    s.variantTitle,
+                                                    format(s.priceCents),
+                                                    room,
+                                                )}
+                                            </Chip>
+                                        </Tip>
                                     );
                                 })}
                             </div>

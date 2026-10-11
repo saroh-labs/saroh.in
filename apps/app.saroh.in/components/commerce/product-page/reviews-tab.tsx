@@ -1,3 +1,5 @@
+import { plural } from "@/lib/format/plural";
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Card } from "@saroh/ui/card";
 import { Star } from "lucide-react";
 
@@ -37,7 +39,7 @@ export function ProductReviewsTab({
                 description={
                     product.status === "PUBLISHED"
                         ? "Customers are asked after their order is delivered. Only people who bought it can review it."
-                        : "It isn't on the shop, so nobody can order it yet — reviews start after it is published."
+                        : "It isn't on the shop, so nobody can order it yet. Reviews start after it is published."
                 }
             />
         );
@@ -48,12 +50,14 @@ export function ProductReviewsTab({
             <Card className="flex-[1_1_250px] rounded-[12px] px-[18px] py-4">
                 <p className="flex items-baseline gap-2">
                     <span className="font-display text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
-                        {summary.average?.toFixed(1) ?? "—"}
+                        {summary.average?.toFixed(1) ?? (
+                            <AbsentValue says="None" />
+                        )}
                     </span>
                     {summary.average ? (
                         <span
                             aria-hidden
-                            className="tracking-[1px] text-highlight"
+                            className="tracking-[1px] text-foreground"
                         >
                             {"★".repeat(Math.round(summary.average))}
                             {"☆".repeat(5 - Math.round(summary.average))}
@@ -61,9 +65,8 @@ export function ProductReviewsTab({
                     ) : null}
                 </p>
                 <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-                    From {summary.count}{" "}
-                    {summary.count === 1 ? "customer" : "customers"} who ordered
-                    it
+                    From {summary.count} {plural(summary.count, "customer")} who
+                    ordered it
                     {hiddenCount > 0
                         ? ` · ${hiddenCount} hidden from the shop`
                         : ""}
@@ -80,7 +83,7 @@ export function ProductReviewsTab({
                             <span>{bar.stars}★</span>
                             <span className="h-1.5 overflow-hidden rounded-full bg-muted">
                                 <span
-                                    className="block h-full rounded-full bg-highlight"
+                                    className="block h-full rounded-full bg-foreground"
                                     style={{ width: `${bar.percent}%` }}
                                 />
                             </span>

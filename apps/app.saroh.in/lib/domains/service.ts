@@ -124,7 +124,11 @@ export async function claimDomain(
     hostname: string,
 ): Promise<DomainsResult<SiteDomain>> {
     const base = await domainsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(base, {
         method: "POST",
         body: JSON.stringify({ hostname, siteId }),
@@ -139,7 +143,7 @@ export async function claimDomain(
             data: { ...data.domain, dnsRecord: data.dnsRecord },
         };
     }
-    return { ok: false, ...readError(data, "Could not add this domain.") };
+    return { ok: false, ...readError(data, "Couldn't add this domain.") };
 }
 
 export interface VerifyOutcome {
@@ -152,22 +156,30 @@ export async function verifyDomain(
     domainId: string,
 ): Promise<DomainsResult<VerifyOutcome>> {
     const base = await domainsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${domainId}/verify`, {
         method: "POST",
     });
     const data = (await res.json().catch(() => null)) as VerifyOutcome | null;
     if (res.ok && data?.domain) return { ok: true, data };
-    return { ok: false, ...readError(data, "Could not check this domain.") };
+    return { ok: false, ...readError(data, "Couldn't check this domain.") };
 }
 
 export async function removeDomain(
     domainId: string,
 ): Promise<DomainsResult<{ id: string }>> {
     const base = await domainsBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${domainId}`, { method: "DELETE" });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, ...readError(data, "Could not remove this domain.") };
+    return { ok: false, ...readError(data, "Couldn't remove this domain.") };
 }

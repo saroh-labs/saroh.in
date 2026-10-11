@@ -19,11 +19,11 @@ import {
     fieldWidth,
     RegisteredAddressFields,
 } from "@/components/organizations/registered-address-fields";
-import { OptionSelect } from "@/components/shared/option-select";
 import { GST_RATE_OPTIONS, rateOption } from "@/lib/invoices/gst";
 import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import { formatOf, prefixOf } from "@/lib/invoices/invoice-number";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /** Delivery always carries a rate: no "Not set" row. */
 const DELIVERY_RATES = GST_RATE_OPTIONS.filter((o) => o.value !== "");
@@ -202,7 +202,7 @@ export function BusinessTaxFields({
                         at={at}
                     />
                     <p className="basis-full text-[11.5px] leading-normal text-muted-foreground">
-                        Invoices already numbered keep their numbers; a new
+                        Invoices already numbered keep their numbers. A new
                         format starts with the next one, and the count carries
                         on. The financial year runs April to March, as GST law
                         sets it.

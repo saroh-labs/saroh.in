@@ -154,10 +154,16 @@
         --ring: 60 4% 11%;
 
         /* ---- disabled: one treatment for every variant ----
-           Disabled text is not lighter text. Ink 500 on Sunken clears 4.76:1;
-           the WCAG exemption for disabled text is declined on purpose. */
-        --disabled: 42 22% 91%;
-        --disabled-foreground: 42 9% 39%;
+           Its own three tokens, not the muted pair. Disabled was Sunken with
+           the placeholder's colour, so a disabled button on a muted panel
+           had no edge and a disabled value read as an empty field. The fill
+           is a step below Sunken (#E4E1D8), the edge is Ink 300 (1.63:1 on
+           Sunken, so the control keeps its shape there) and the label is
+           darker than a placeholder: 5.47:1 on the fill. The WCAG exemption
+           for disabled text is declined on purpose. */
+        --disabled: 44 18% 87%;
+        --disabled-foreground: 42 9% 33%;
+        --disabled-border: 45 11% 71%;
 
         /* ---- brand: Saffron that can carry text ----
            `--brand` is the INTERACTIVE accent — links, emphasis, the active
@@ -334,6 +340,7 @@
            own step: #9E9A8F on #33332E, 4.52:1. */
         --disabled: 60 5% 19%;
         --disabled-foreground: 44 7% 59%;
+        --disabled-border: 51 5% 28%; /* 1.60:1 on Inset */
 
         --brand: 38 87% 55%; /* Saffron 400 */
         --brand-foreground: 60 4% 11%;
@@ -443,6 +450,27 @@
     /* Display face is optical-size aware; let it tighten as it grows. */
     .font-display {
         font-variation-settings: "opsz" 32;
+    }
+}
+
+/* ─── The label ──────────────────────────────────────────────────────────────
+   The one small-caps line: a table or list header, an eyebrow over a group,
+   a field group's name. 11px Geist 600, uppercase at 0.1em, in the secondary
+   text colour. This is the ONLY place the product sets `uppercase`: a
+   status, a button or a title is sentence case, always (a scan test in
+   app.saroh.in fails on `uppercase` anywhere else).
+
+   In `components`, so a utility on the same element (a colour, a margin)
+   still wins.
+   ─── */
+@layer components {
+    .label {
+        font-size: 11px;
+        line-height: 1.45;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: hsl(var(--muted-foreground));
     }
 }
 
@@ -775,6 +803,7 @@
     --field: var(--background);
     --disabled: var(--muted);
     --disabled-foreground: var(--muted-foreground);
+    --disabled-border: var(--input);
     --success-subtle: var(--muted);
     --success-subtle-foreground: var(--foreground);
     --destructive-subtle: var(--muted);

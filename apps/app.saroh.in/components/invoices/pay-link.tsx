@@ -1,10 +1,9 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
-
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { invoiceMoney } from "@/lib/invoices/money";
+import { formatMoneyMajor } from "@/lib/format/money";
 import type { InvoiceOnlinePayment } from "@/lib/invoices/service";
+import { Notice } from "@saroh/ui/notice";
 
 /** What a provider is called where a merchant reads it. */
 const PROVIDER: Record<string, string> = {
@@ -39,33 +38,26 @@ export function PaymentsToRefund({
         <div className="flex flex-col gap-2 print:hidden">
             {owed.map((p) => {
                 const name = providerName(p.provider);
-                const amount = invoiceMoney(p.amount, p.currency);
+                const amount = formatMoneyMajor(p.amount, p.currency, {
+                    decimals: "always",
+                });
                 return (
-                    <div
+                    <Notice
                         key={p.id}
-                        role={p.refund === "REFUNDED" ? undefined : "alert"}
-                        className={
-                            p.refund === "REFUNDED"
-                                ? "rounded-[12px] border border-border bg-muted/40 px-4 py-3.5 text-[13px] leading-[1.55] text-muted-foreground"
-                                : "flex items-start gap-3 rounded-[12px] bg-warning-subtle px-4 py-3.5 text-[13px] leading-[1.55] text-warning-subtle-foreground"
-                        }
+                        tone={p.refund === "REFUNDED" ? "neutral" : "warning"}
+                        role={p.refund === "REFUNDED" ? "note" : "alert"}
+                        icon={p.refund === "REFUNDED" ? false : undefined}
                     >
-                        {p.refund === "REFUNDED" ? null : (
-                            <AlertTriangle
-                                aria-hidden
-                                className="mt-0.5 size-4 shrink-0"
-                            />
-                        )}
                         <p className="text-pretty">
                             {amount} came in through {name} on{" "}
                             <ViewerDate iso={p.at} />, {after}.{" "}
                             {p.refund === "REFUNDED"
                                 ? `It has been refunded.`
                                 : p.refund === "PENDING"
-                                  ? `A refund is on its way; ${name} will confirm it.`
-                                  : `It wasn't applied to the invoice and is owed back. Refund it from your ${name} dashboard — Saroh records the refund when ${name} reports it.`}
+                                  ? `A refund is on its way. ${name} will confirm it.`
+                                  : `It wasn't applied to the invoice and is owed back. Refund it from your ${name} dashboard. Saroh records the refund when ${name} reports it.`}
                         </p>
-                    </div>
+                    </Notice>
                 );
             })}
         </div>

@@ -11,6 +11,8 @@ import type { ModuleStates } from "@/lib/sites/template-picker";
 import { moduleNote, shapeWord, usesLine } from "@/lib/sites/template-picker";
 import type { TemplateThumbnailImage } from "@/lib/sites/template-thumbnails";
 import { templateThumbnail } from "@/lib/sites/template-thumbnails";
+import { Label } from "@saroh/ui/label";
+import { Segmented } from "@saroh/ui/segmented";
 
 /**
  * The template picker (industry templates plan, U12): a grid of cards, one
@@ -71,33 +73,15 @@ export function TemplatePicker({
                     Template
                 </span>
                 {narrowed ? (
-                    <div
-                        role="group"
-                        aria-label="Templates shown"
-                        className="inline-flex rounded-md border border-border p-0.5"
-                    >
-                        {(
-                            [
-                                ["suggested", "Suggested"],
-                                ["all", `All ${templates.length}`],
-                            ] as const
-                        ).map(([key, label]) => (
-                            <button
-                                key={key}
-                                type="button"
-                                aria-pressed={show === key}
-                                onClick={() => setShow(key)}
-                                className={cn(
-                                    "cursor-pointer rounded-sm px-2.5 py-1 text-xs font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                    show === key
-                                        ? "bg-foreground text-background"
-                                        : "text-muted-foreground hover:bg-muted active:bg-accent-active",
-                                )}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
+                    <Segmented
+                        label="Templates shown"
+                        value={show}
+                        onValueChange={setShow}
+                        options={[
+                            { value: "suggested", label: "Suggested" },
+                            { value: "all", label: `All ${templates.length}` },
+                        ]}
+                    />
                 ) : null}
             </div>
             <RadioGroupPrimitive.Root
@@ -162,10 +146,11 @@ function TemplateCard({
         .filter(Boolean)
         .join(" ");
     return (
-        <label
+        <Label
+            data-ph-mask=""
             htmlFor={`${id}-radio`}
             className={cn(
-                "flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-card text-left transition-colors duration-fast",
+                "flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-card text-left text-sm font-normal leading-normal transition-colors duration-fast",
                 "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
                 selected
                     ? "border-foreground ring-1 ring-foreground"
@@ -184,7 +169,7 @@ function TemplateCard({
                         value={template.id}
                         aria-labelledby={`${id}-name`}
                         aria-describedby={described || undefined}
-                        className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full border border-primary text-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full border border-primary text-primary outline-none disabled:cursor-not-allowed disabled:text-disabled-foreground"
                     >
                         <RadioGroupPrimitive.Indicator className="size-2 rounded-full bg-current" />
                     </RadioGroupPrimitive.Item>
@@ -226,7 +211,7 @@ function TemplateCard({
                     </span>
                 ) : null}
             </span>
-        </label>
+        </Label>
     );
 }
 
@@ -346,7 +331,7 @@ function ColourwayChoice({
                             value={cw.id}
                             className={cn(
                                 "flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors duration-fast coarse:min-h-11",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:text-disabled-foreground",
                                 active
                                     ? "border-foreground ring-1 ring-foreground"
                                     : "border-border hover:bg-muted active:bg-accent-active",

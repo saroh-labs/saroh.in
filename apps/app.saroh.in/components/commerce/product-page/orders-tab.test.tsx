@@ -57,7 +57,7 @@ describe("ProductOrdersTab on a phone", () => {
         expect(phone).toContain("#1042");
         expect(phone).toContain("800g × 2");
         expect(phone).toContain("Hill Road");
-        expect(phone).toContain(">New</div>");
+        expect(phone).toContain(">New</span>");
         // When: the viewer's date renders a <time> for the order's moment.
         expect(phone).toContain("2026-09-27T09:00:00.000Z");
     });

@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@saroh/ui/button";
 import {
     Form,
     FormControl,
@@ -12,6 +11,8 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
+
+import { FormSheetBody, FormSheetFoot } from "@/components/shared/form-sheet";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -22,7 +23,7 @@ import type { Customer } from "@/lib/customers/service";
 import { trimmedOr } from "@/lib/forms/values";
 
 const formSchema = z.object({
-    email: z.string().trim().min(1, { message: "Email is required" }),
+    email: z.string().trim().min(1, { message: "Add their email address." }),
     firstName: z.string().optional(),
     lastName: z.string().optional(),
     phone: z.string().optional(),
@@ -38,14 +39,11 @@ export function CustomerForm({
     storeId,
     customer,
     onSaved,
-    onCancel,
 }: {
     storeId: string;
     customer?: Customer;
     /** After an edit is saved: the sheet that holds the form closes. */
     onSaved?: () => void;
-    /** Draws Cancel beside the button, for a form in a sheet. */
-    onCancel?: () => void;
 }) {
     const router = useRouter();
     const editing = Boolean(customer);
@@ -86,7 +84,7 @@ export function CustomerForm({
             else showError(res.error);
             return;
         }
-        showSuccess(editing ? "Saved" : `${input.email} added`);
+        showSuccess(editing ? "Details saved." : "Customer added.");
         // Editing stays on the customer; adding one opens them.
         if (editing) {
             router.refresh();
@@ -96,35 +94,18 @@ export function CustomerForm({
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
-                <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                                <Input
-                                    type="email"
-                                    autoComplete="email"
-                                    disabled={isSubmitting}
-                                    {...field}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <div className="grid grid-cols-2 gap-4">
+            <>
+                <FormSheetBody className="gap-4">
                     <FormField
                         control={form.control}
-                        name="firstName"
+                        name="email"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>First name</FormLabel>
+                                <FormLabel>Email</FormLabel>
                                 <FormControl>
                                     <Input
-                                        autoComplete="given-name"
+                                        type="email"
+                                        autoComplete="email"
                                         disabled={isSubmitting}
                                         {...field}
                                     />
@@ -133,15 +114,51 @@ export function CustomerForm({
                             </FormItem>
                         )}
                     />
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="firstName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>First name</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            autoComplete="given-name"
+                                            disabled={isSubmitting}
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="lastName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Last name</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            autoComplete="family-name"
+                                            disabled={isSubmitting}
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
                     <FormField
                         control={form.control}
-                        name="lastName"
+                        name="phone"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Last name</FormLabel>
+                                <FormLabel>Phone</FormLabel>
                                 <FormControl>
                                     <Input
-                                        autoComplete="family-name"
+                                        autoComplete="tel"
                                         disabled={isSubmitting}
                                         {...field}
                                     />
@@ -150,102 +167,79 @@ export function CustomerForm({
                             </FormItem>
                         )}
                     />
-                </div>
-                <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Phone</FormLabel>
-                            <FormControl>
-                                <Input
-                                    autoComplete="tel"
-                                    disabled={isSubmitting}
-                                    {...field}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="city"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>City</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            disabled={isSubmitting}
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="state"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>State</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            disabled={isSubmitting}
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="country"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Country</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            disabled={isSubmitting}
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="zipCode"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Zip</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            disabled={isSubmitting}
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                </FormSheetBody>
+                <FormSheetFoot
+                    saveLabel={editing ? "Save" : "Add customer"}
+                    pending={isSubmitting}
+                    onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
                 />
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="city"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>City</FormLabel>
-                                <FormControl>
-                                    <Input disabled={isSubmitting} {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="state"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>State</FormLabel>
-                                <FormControl>
-                                    <Input disabled={isSubmitting} {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="country"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Country</FormLabel>
-                                <FormControl>
-                                    <Input disabled={isSubmitting} {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="zipCode"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Zip</FormLabel>
-                                <FormControl>
-                                    <Input disabled={isSubmitting} {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <Button
-                        type="submit"
-                        className="wk-press"
-                        disabled={isSubmitting}
-                    >
-                        {isSubmitting
-                            ? "Saving…"
-                            : editing
-                              ? "Save changes"
-                              : "Create customer"}
-                    </Button>
-                    {onCancel ? (
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            disabled={isSubmitting}
-                            onClick={onCancel}
-                        >
-                            Cancel
-                        </Button>
-                    ) : null}
-                </div>
-            </form>
+            </>
         </Form>
     );
 }

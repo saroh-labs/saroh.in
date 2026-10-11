@@ -7,7 +7,6 @@ import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import { HOURS_FIELD_ID } from "@/lib/stores/location-readiness";
 import {
     hoursBackwards,
@@ -17,6 +16,7 @@ import {
 } from "@/lib/stores/opening-hours-summary";
 import type { OpeningHoursDay, Weekday } from "@/lib/stores/storefronts";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { Note } from "./storefront-section";
 
 const DAYS: { key: Weekday; label: string }[] = [
@@ -38,8 +38,8 @@ export const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
 }));
 
 const PRESETS: { label: string; days: Weekday[] }[] = [
-    { label: "Mon–Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },
-    { label: "Mon–Sat", days: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] },
+    { label: "Mon to Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },
+    { label: "Mon to Sat", days: ["MON", "TUE", "WED", "THU", "FRI", "SAT"] },
     { label: "Every day", days: DAYS.map((d) => d.key) },
 ];
 
@@ -158,7 +158,7 @@ export function OpeningHoursFields({
                                             aria-hidden
                                             className="text-muted-foreground"
                                         >
-                                            –
+                                            to
                                         </span>
                                         <TimeSelect
                                             value={d.close}
@@ -188,11 +188,11 @@ export function OpeningHoursFields({
                             chips only appear for Custom, so the common
                             answer is one click and the rare one is still
                             there. */}
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label="Open days"
+                            aria-labelledby="storefront-open-days"
                             value={daysChoice}
                             onValueChange={(v) => {
-                                if (!v) return;
                                 if (v === "CUSTOM") {
                                     setCustom(true);
                                     return;
@@ -203,22 +203,14 @@ export function OpeningHoursFields({
                                     setOpenDays(next.days);
                                 }
                             }}
-                            aria-labelledby="storefront-open-days"
-                            className={SEGMENTED}
-                        >
-                            {PRESETS.map((p) => (
-                                <ToggleGroupItem
-                                    key={p.label}
-                                    value={p.label}
-                                    className={SEGMENT}
-                                >
-                                    {p.label}
-                                </ToggleGroupItem>
-                            ))}
-                            <ToggleGroupItem value="CUSTOM" className={SEGMENT}>
-                                Custom
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                            options={[
+                                ...PRESETS.map((p) => ({
+                                    value: p.label,
+                                    label: p.label,
+                                })),
+                                { value: "CUSTOM", label: "Custom" },
+                            ]}
+                        />
                         {daysChoice === "CUSTOM" ? (
                             <ToggleGroup
                                 type="multiple"
@@ -255,7 +247,7 @@ export function OpeningHoursFields({
                                 }}
                             />
                             <span aria-hidden className="text-muted-foreground">
-                                –
+                                to
                             </span>
                             <TimeSelect
                                 value={shared.close}
@@ -277,7 +269,7 @@ export function OpeningHoursFields({
             <Button
                 type="button"
                 variant="link"
-                className="h-auto w-fit p-0 text-[12.5px] font-medium text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground"
+                className="h-auto w-fit p-0 font-medium text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground"
                 onClick={() => {
                     if (eachDay) {
                         // Back to one set of hours: every open day takes

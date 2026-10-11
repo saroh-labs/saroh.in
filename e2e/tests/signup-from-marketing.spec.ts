@@ -1,11 +1,12 @@
-// @covers accounts:/signup accounts:/verify-email accounts:/apps app:/onboarding app:/ api:organizations api:billing
+// @covers accounts:/signup app:/onboarding app:/ app:/choose api:organizations api:billing pkg:auth
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { stamp } from "../fixtures/own-data";
-import { useSession } from "../fixtures/sessions";
+import { people, useSession } from "../fixtures/sessions";
+import { answerFirst, answerKind, answerName } from "../fixtures/walk-setup";
 import { urls } from "../playwright.config";
-import { readSiteCode } from "./site-codes";
+import { lastCode, readSiteCode } from "./site-codes";
 
 /**
  * Open sign-up with plan intent (plan U27): what a visitor gets from a
@@ -24,9 +25,10 @@ import { readSiteCode } from "./site-codes";
  * plan-checkout.test.ts`).
  */
 
-const PASSWORD = "e2e-password-123";
-
-/** Sign up from the CTA's address, verify, and land on onboarding. */
+/**
+ * Sign up from the CTA's address with an email and the code sent to it (no
+ * name, no password: owner, 10 Oct 2026), and land on onboarding.
+ */
 async function signUp(
     page: Page,
     testInfo: TestInfo,
@@ -34,14 +36,17 @@ async function signUp(
 ): Promise<string> {
     const email = `u27-${stamp(testInfo)}@e2e.saroh.dev`.toLowerCase();
     await page.goto(`${urls.ACCOUNTS_URL}/signup?${query}`);
-    await page.getByLabel("Your name").fill("Asha Plan");
+    // The email is the whole form.
+    await expect(page.getByLabel("Your name")).toHaveCount(0);
+    await expect(page.getByLabel("Password")).toHaveCount(0);
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(PASSWORD);
-    await page.getByRole("button", { name: "Send the code" }).click();
-    await page.waitForURL(/\/verify-email\?/);
+    await page.getByRole("button", { name: "Email me a code" }).click();
+    await expect(
+        page.getByRole("heading", { name: "Check your email", level: 1 }),
+    ).toBeVisible();
     const code = await readSiteCode(email);
-    // A full code pasted into the first box fills them all and submits.
-    await page.getByLabel("Digit 1 of 6").fill(code);
+    // The sixth digit sends the code: nothing is pressed.
+    await page.getByLabel("Code").fill(code);
     await page.waitForURL((url) => url.pathname === "/onboarding", {
         timeout: 20_000,
     });
@@ -49,17 +54,24 @@ async function signUp(
     return email;
 }
 
-/** Set up a business, and wait to be in the workspace. */
+/**
+ * Set up a business through setup's three steps, and wait to be in the
+ * workspace. "A business" is chosen already, and an account made with a
+ * code is asked its name on the name step. The goal is left on the one
+ * chosen for a business (Sell): where it lands depends on what the stack
+ * has rolled out, so only "out of setup" is waited for.
+ */
 async function setUp(page: Page, name: string) {
-    await page.getByRole("radio", { name: /A business/ }).click();
-    await page.getByLabel("What is it called?").fill(name);
     await expect(
-        page.getByText("Available. Your website will live here."),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Create the business" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/onboarding"), {
-        timeout: 20_000,
-    });
+        page.getByRole("radio", { name: /A business/ }),
+    ).toHaveAttribute("aria-checked", "true");
+    // The plan sign-up started: the account was step 1 of its four.
+    await expect(page.getByText("Step 2 of 4", { exact: true })).toBeVisible();
+    await answerKind(page);
+    await expect(page.getByText("Step 3 of 4", { exact: true })).toBeVisible();
+    await answerName(page, { yourName: "Asha Plan", name });
+    await expect(page.getByText("Step 4 of 4", { exact: true })).toBeVisible();
+    await answerFirst(page);
 }
 
 /** The plan key the business is on, from the API. */
@@ -129,7 +141,55 @@ test.describe("sign-up from the marketing site (U27)", () => {
     }) => {
         await useSession(page, "founder");
         await page.goto(`${urls.ACCOUNTS_URL}/signup?plan=free&src=nav`);
-        await expect(page).toHaveURL(`${urls.ACCOUNTS_URL}/apps`);
+        // Saroh itself, whose front door picks Home or which business. It
+        // was accounts' `/apps`, a list of Saroh's own hosts.
+        await page.waitForURL((url) => url.origin === urls.APP_URL, {
+            timeout: 20_000,
+        });
+        expect(new URL(page.url()).pathname).not.toBe("/apps");
+        expect(new URL(page.url()).pathname).not.toMatch(/^\/login/);
+    });
+
+    /**
+     * An address that already has an account gets the same "Check your
+     * email" as a new one (the page must not say who is registered), and
+     * the same code email. The code signs that account in, and it lands in
+     * its own business, not in setup for another.
+     */
+    test("signing up with an address that has an account: the same page, and the code signs it in", async ({
+        page,
+    }, testInfo) => {
+        // Desk and phone run side by side, and a new code replaces the one
+        // before it: each uses a seeded person no other code test does.
+        const who = testInfo.project.name.startsWith("phone")
+            ? people.storefront
+            : people.desk;
+        await page.goto(`${urls.ACCOUNTS_URL}/signup`);
+        await page.getByLabel("Email").fill(who.email);
+        const before = lastCode(who.email);
+        await page.getByRole("button", { name: "Email me a code" }).click();
+        await expect(
+            page.getByRole("heading", { name: "Check your email", level: 1 }),
+        ).toBeVisible();
+        // Nothing on the step says an account was found.
+        await expect(page.getByText(/already have an account/)).toHaveCount(0);
+        await expect(
+            page.getByRole("button", { name: "Change email" }),
+        ).toBeVisible();
+        // Privacy, Terms and Help are one tap away on every one of these.
+        await expect(
+            page
+                .getByRole("navigation", { name: "Legal and help" })
+                .getByRole("link", { name: "Help" }),
+        ).toBeVisible();
+
+        await page
+            .getByLabel("Code")
+            .fill(await readSiteCode(who.email, before));
+        await page.waitForURL((url) => url.origin === urls.APP_URL, {
+            timeout: 30_000,
+        });
+        await expect(page).not.toHaveURL(/\/onboarding/);
     });
 
     test("signed in with a business, a plan link to onboarding goes to the workspace", async ({

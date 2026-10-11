@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import { northwind } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
-import { signInOnSheet } from "./site-codes";
+import { nameThenBook, signInOnSheet } from "./site-codes";
 
 /**
  * A QR code's short link on a live site, end to end: the owner makes a code
@@ -123,12 +123,14 @@ test("a QR code's short link counts the scan and opens the booking page", async 
         expect(head.headers().location).toBe(location);
         expect((await mine(made.id))?.scans.total).toBe(2);
 
-        // A code the site doesn't have is its 404, not a redirect.
+        // A code the site doesn't have still reaches the business: its
+        // home page, untagged, never a bare "Not found".
         const unknown = await request.get(`${LIVE}/q/zzzzzz`, {
             maxRedirects: 0,
             headers,
         });
-        expect(unknown.status()).toBe(404);
+        expect(unknown.status()).toBe(302);
+        expect(unknown.headers().location).toBe(`${LIVE}/`);
 
         // In a browser, the visitor lands on the booking page with the tag
         // on the address.
@@ -226,7 +228,7 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         const times = phone.locator(
             '[role="radiogroup"] button[role="radio"]',
             {
-                hasText: /^\d{2}:\d{2}$/,
+                hasText: /^\d{1,2}:\d{2} [ap]m$/,
             },
         );
         await expect(times.first()).toBeVisible({ timeout: 15_000 });
@@ -236,13 +238,14 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         await expect(time).toHaveAttribute("aria-checked", "true");
 
         // The steps never leave the address the scan opened.
-        await phone.getByLabel("Name").fill("Asha Rao");
         await phone.getByRole("radio", { name: /Pay at the desk/ }).click();
         await phone
             .getByRole("button", { name: "Continue to sign in" })
             .first()
             .click();
         await signInOnSheet(phone, email);
+        // A new account: its name is asked once signed in.
+        await nameThenBook(phone, "Asha Rao");
         await expect(
             phone.getByRole("heading", { name: "You're booked, Asha." }),
         ).toBeVisible({ timeout: 15_000 });

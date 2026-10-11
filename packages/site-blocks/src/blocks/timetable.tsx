@@ -6,6 +6,7 @@ import type { RenderedTimetable } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import { clockWords } from "../lib/clock";
 import type {
     PlacesWord,
     PublicTimetable,
@@ -364,15 +365,15 @@ function Session({
                     className={
                         show.accent
                             ? cn(
-                                  "font-site-mono text-[13px] tabular-nums",
+                                  "font-site-mono whitespace-nowrap text-[13px] tabular-nums",
                                   lit
                                       ? "text-site-accent-fg"
                                       : "text-site-muted",
                               )
-                            : "font-site-heading text-[15px] font-semibold tabular-nums"
+                            : "font-site-heading whitespace-nowrap text-[15px] font-semibold tabular-nums"
                     }
                 >
-                    {session.time}
+                    {clockWords(session.time)}
                 </span>
             ) : null}
             <span className="min-w-0">
@@ -396,7 +397,7 @@ function Session({
         </>
     );
     const layout = withTime
-        ? "grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3"
+        ? "grid grid-cols-[4.75rem_minmax(0,1fr)_auto] items-center gap-3"
         : "grid gap-1.5";
     const box = lit
         ? cn(
@@ -421,7 +422,7 @@ function Session({
         >
             {body}
             <span className="sr-only">
-                {`, book ${dayLabel(session.date, true)} at ${session.time}`}
+                {`, book ${dayLabel(session.date, true)} at ${clockWords(session.time)}`}
             </span>
         </a>
     );
@@ -491,7 +492,7 @@ function WeekGrid({
             </caption>
             <thead>
                 <tr>
-                    <td className="w-16" />
+                    <td className="w-20" />
                     {days.map((date) => (
                         <th
                             key={date}
@@ -510,11 +511,11 @@ function WeekGrid({
                             scope="row"
                             className={
                                 show.accent
-                                    ? "font-site-mono text-site-muted pr-1 pt-3 text-right align-top text-[12.5px] font-normal tabular-nums"
-                                    : "font-site-heading pr-1 align-top text-[15px] font-semibold tabular-nums"
+                                    ? "font-site-mono text-site-muted whitespace-nowrap pr-1 pt-3 text-right align-top text-[12.5px] font-normal tabular-nums"
+                                    : "font-site-heading whitespace-nowrap pr-1 align-top text-[15px] font-semibold tabular-nums"
                             }
                         >
-                            {time}
+                            {clockWords(time)}
                         </th>
                         {days.map((date) => {
                             const here = week.sessions.filter(

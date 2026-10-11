@@ -5,6 +5,7 @@ import {
     draftProblems,
     LATE_PRESETS,
     lateShort,
+    wayChanged,
     wayDraft,
     wayInput,
     waySaved,
@@ -282,6 +283,23 @@ describe("draftProblems", () => {
         );
     });
 
+    it("a draft with something to fix has changed, though it would send nothing", () => {
+        // Told "nothing changed", the sheet closed on Save: the 3 minutes
+        // typed were dropped and the bounds never said.
+        const draft = {
+            ...wayDraft(base, "PICKUP"),
+            preset: null,
+            amount: "3",
+            unit: "minutes" as const,
+        };
+        expect(wayInput(base, "PICKUP", draft)).toEqual({});
+        expect(wayChanged(base, "PICKUP", draft)).toBe(true);
+        // As saved: nothing changed, and Save just closes.
+        expect(wayChanged(base, "PICKUP", wayDraft(base, "PICKUP"))).toBe(
+            false,
+        );
+    });
+
     it("an off way has nothing to fix", () => {
         const draft = {
             ...wayDraft(base, "SHIPPING"),
@@ -299,16 +317,16 @@ describe("waySaved and checkoutLine", () => {
             waySaved("SHIPPING", {
                 fulfilmentTypes: ["PICKUP", "SHIPPING"],
             }),
-        ).toBe("Shipping turned on");
+        ).toBe("Shipping turned on.");
         expect(waySaved("PICKUP", { lateAfterMinutes: { PICKUP: 180 } })).toBe(
-            "Pick-up orders now count as late after 3 hours",
+            "Pick-up orders now count as late after 3 hours.",
         );
         expect(
             waySaved("LOCAL_DELIVERY", {
                 localDeliveryFee: "40",
                 lateAfterMinutes: { LOCAL_DELIVERY: 240 },
             }),
-        ).toBe("Local delivery saved");
+        ).toBe("Local delivery saved.");
     });
 
     it("shows what a customer will see, as it is typed", () => {

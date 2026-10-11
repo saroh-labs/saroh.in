@@ -1,4 +1,6 @@
 import { formatMoneyMajor } from "@/lib/format/money";
+import { count, plural } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackStanding } from "./balance";
 import type { ClassPack } from "./service";
@@ -46,20 +48,14 @@ export function packKind(p: { kind?: string | null }): PackKind {
 
 /** "class" / "classes", or "session" / "sessions" for a one-to-one pack. */
 export function unitWord(kind: PackKind, n: number): string {
-    if (kind === "ONE_TO_ONE") return n === 1 ? "session" : "sessions";
-    return n === 1 ? "class" : "classes";
-}
-
-const count = (n: number, one: string, other: string) =>
-    `${n} ${n === 1 ? one : other}`;
-
-/** A card's figure: "₹1,500", with no ".00" on a whole amount. */
-export function money(amount: number | string, currency: string): string {
-    return formatMoneyMajor(amount, currency) ?? String(amount);
+    if (kind === "ONE_TO_ONE") return plural(n, "session");
+    return plural(n, "class", "classes");
 }
 
 function moneyTotals(totals: readonly MoneyTotal[]): string {
-    return totals.map((t) => money(t.amount, t.currency)).join(" + ");
+    return totals
+        .map((t) => formatMoneyMajor(t.amount, t.currency))
+        .join(" + ");
 }
 
 export type BadgeTone = "off" | "accent";
@@ -158,21 +154,24 @@ export function packCard(p: PackListItem, canWrite: boolean): PackCardView {
         href: packHref(p, canWrite),
         openHref: draft ? null : detailHref(p.id),
         badges,
-        price: priced || !draft ? money(p.price, p.currency) : "No price yet",
+        price:
+            priced || !draft
+                ? formatMoneyMajor(p.price, p.currency)
+                : "No price yet",
         each:
             priced && p.credits > 0
-                ? `${money(Math.round(price / p.credits), p.currency)} a ${unitWord(kind, 1)}`
+                ? `${formatMoneyMajor(Math.round(price / p.credits), p.currency)} a ${unitWord(kind, 1)}`
                 : null,
         terms,
         sold: String(p.sold),
         takings,
-        stillToUse: left === undefined ? "—" : String(left),
+        stillToUse: left === undefined ? absentText() : String(left),
         stillToUseNote:
             people > 0
                 ? `across ${count(people, "person", "people")}`
                 : "Nobody has any left",
         why: draft
-            ? "Draft — not on sale until you publish it in the editor."
+            ? "Draft. Not on sale until you publish it in the editor."
             : archived
               ? "Archived, so it can't be sold. Sell again puts it back on sale."
               : null,
@@ -225,7 +224,9 @@ export function owedSummary(purchases: readonly OwedPurchase[]): string {
     }
     const value = Array.from(worth.entries())
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([currency, amount]) => money(Math.round(amount), currency))
+        .map(([currency, amount]) =>
+            formatMoneyMajor(Math.round(amount), currency),
+        )
         .join(" + ");
     const head = `${count(owed, "class", "classes")} still owed to ${count(people, "person", "people")}`;
     return value ? `${head} · ${value} sold and not yet used` : head;
@@ -245,6 +246,6 @@ export function rulesNote(freeCancelHours: number | null | undefined): string {
     const cancel =
         freeCancelHours === null
             ? "Cancel before it starts and the class comes back."
-            : `Cancel ${count(freeCancelHours, "hour", "hours")} or more before and the class comes back; later, it's used.`;
+            : `Cancel ${count(freeCancelHours, "hour", "hours")} or more before and the class comes back. Later, it's used.`;
     return `${spend} ${cancel} ${end}`;
 }

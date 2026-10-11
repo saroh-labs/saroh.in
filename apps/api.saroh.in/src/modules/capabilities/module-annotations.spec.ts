@@ -145,6 +145,8 @@ const NEVER: Record<string, string> = {
     // DEC-069 (L2): the web address is the business's whichever modules
     // are on, and share buttons across modules read its links.
     "organizations/web-address.controller.ts": "tenancy, not a capability",
+    // Wave G: which moments a business has seen, whichever modules are on.
+    "organizations/moments.controller.ts": "tenancy, not a capability",
     "organizations/organization-roles.controller.ts":
         "roles decide who may switch modules; a module switch must never lock the owner out of roles",
     "projects/projects.controller.ts": "tenancy",
@@ -258,6 +260,10 @@ const NEVER: Record<string, string> = {
     // already paid is shown to whoever placed it, Commerce on or off.
     "orders/checkout-confirmation.controller.ts":
         "a placed site order's confirmation — shown to its customer only",
+    // The bag's "deliver to your last address". Never module-gated: it
+    // reads the signed-in customer's own last order and writes nothing.
+    "orders/checkout-saved-address.controller.ts":
+        "a customer's own last delivery address, for the site's bag",
     // G9: a site's Plans block. Payments being off is checked by the
     // service (`paymentsOffered`), which answers 404, as a site with no plans.
     "subscriptions/public-plans.controller.ts":

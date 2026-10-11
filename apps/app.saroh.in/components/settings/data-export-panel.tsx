@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { getDataExportLink, startDataExport } from "@/lib/data-export/actions";
 import type { DataExportLine } from "@/lib/data-export/words";
 import {
@@ -15,6 +16,7 @@ import {
     DATA_EXPORT_KEPT,
     DATA_EXPORT_STARTED,
 } from "@/lib/data-export/words";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * Settings › Your data (DEC-120): what a download holds, the button that
@@ -38,14 +40,14 @@ export function DataExportPanel({
 
     const start = () =>
         startStarting(async () => {
-            const result = await startDataExport();
+            const result = await runAction(() => startDataExport());
+            if (!result) return;
             if (!result.ok) {
-                showError("Your data couldn't be prepared", result.error);
+                showError("Your data couldn't be prepared.", result.error);
                 return;
             }
             if (result.data.already) showInfo(DATA_EXPORT_ALREADY);
-            else
-                showSuccess("Your data is being prepared", DATA_EXPORT_STARTED);
+            else showSuccess("Export started.", DATA_EXPORT_STARTED);
             router.refresh();
         });
 
@@ -54,7 +56,7 @@ export function DataExportPanel({
         try {
             const result = await getDataExportLink(id);
             if (!result.ok) {
-                showError("The download couldn't start", result.error);
+                showError("The download couldn't start.", result.error);
                 router.refresh();
                 return;
             }
@@ -65,7 +67,7 @@ export function DataExportPanel({
     };
 
     return (
-        <div className="grid max-w-[760px] gap-5">
+        <div className="grid gap-5">
             <section
                 aria-labelledby="data-export-what"
                 className="grid gap-3 rounded-lg border border-border bg-card p-4"
@@ -85,10 +87,12 @@ export function DataExportPanel({
                     <Button
                         type="button"
                         onClick={start}
-                        disabled={inProgress || starting}
+                        disabled={inProgress}
+                        busy={starting}
+                        busyLabel="Starting…"
                     >
                         <Download aria-hidden className="size-4" />
-                        {starting ? "Starting…" : "Prepare a download"}
+                        Prepare a download
                     </Button>
                     {inProgress ? (
                         <>
@@ -103,12 +107,13 @@ export function DataExportPanel({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                disabled={checking}
                                 onClick={() =>
                                     startChecking(() => router.refresh())
                                 }
+                                busy={checking}
+                                busyLabel="Checking…"
                             >
-                                {checking ? "Checking…" : "Check again"}
+                                Check again
                             </Button>
                         </>
                     ) : null}
@@ -120,9 +125,11 @@ export function DataExportPanel({
                     Your downloads
                 </h3>
                 {lines.length === 0 ? (
-                    <p className="text-[13px] text-muted-foreground">
-                        None yet. Prepare one whenever you like.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No downloads yet."
+                        description="Prepare one whenever you like."
+                    />
                 ) : (
                     <ul className="grid divide-y divide-border rounded-lg border border-border bg-card">
                         {lines.map((line) => (
@@ -157,10 +164,10 @@ export function DataExportPanel({
                                         size="sm"
                                         disabled={opening !== null}
                                         onClick={() => void download(line.id)}
+                                        busy={opening === line.id}
+                                        busyLabel="Starting…"
                                     >
-                                        {opening === line.id
-                                            ? "Starting…"
-                                            : "Download"}
+                                        Download
                                     </Button>
                                 ) : null}
                             </li>

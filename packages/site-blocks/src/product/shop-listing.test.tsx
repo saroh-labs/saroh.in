@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { readBag } from "../shop/bag-store";
 import type { ShopListingCard } from "./shop-listing";
-import ShopListing from "./shop-listing";
+import ShopListing, { categoriesOf } from "./shop-listing";
 
 const sourdough: ShopListingCard = {
     slug: "sourdough",
@@ -70,13 +70,63 @@ describe("ShopListing (G11)", () => {
     describe("Add to bag on the card (the design's shop, G13)", () => {
         beforeEach(() => window.localStorage.clear());
 
+        // One option on offer: nothing to choose, so the card adds it.
         const offered: ShopListingCard = {
             ...sourdough,
+            variantTitles: ["Large"],
             listingId: "listing-sourdough",
             bagVariantId: "variant-large",
         };
+        // Two sizes on offer: the card can't know which is wanted.
+        const sized: ShopListingCard = {
+            ...sourdough,
+            listingId: "listing-sourdough",
+            bagVariantId: "variant-small",
+        };
 
-        it("adds the first option on offer, then says Add another and offers the bag", () => {
+        it("sends a product with several options to its page to choose, adding nothing", () => {
+            render(<ShopListing products={[sized]} bagSite="site-1" />);
+            const choose = screen.getByRole("link", {
+                name: "Choose size for Sourdough",
+            });
+            expect(choose).toHaveTextContent("Choose size");
+            expect(choose).toHaveAttribute("href", "/shop/sourdough");
+            // A link, not a button: nothing is added from the card.
+            expect(screen.queryByRole("button")).toBeNull();
+            expect(readBag("site-1")).toEqual([]);
+        });
+
+        it("says Choose options where the options have no name", () => {
+            render(
+                <ShopListing
+                    products={[{ ...sized, optionName: null }]}
+                    bagSite="site-1"
+                />,
+            );
+            expect(
+                screen.getByRole("link", {
+                    name: "Choose options for Sourdough",
+                }),
+            ).toHaveTextContent("Choose options");
+        });
+
+        it("keeps Add to bag for a product with no options at all", () => {
+            render(
+                <ShopListing
+                    products={[
+                        { ...offered, variantTitles: [], bagVariantId: null },
+                    ]}
+                    bagSite="site-1"
+                />,
+            );
+            expect(
+                screen.getByRole("button", {
+                    name: "Add Sourdough to your bag",
+                }),
+            ).toHaveTextContent("Add to bag");
+        });
+
+        it("adds the one option on offer, then says Add another and offers the bag", () => {
             render(<ShopListing products={[offered]} bagSite="site-1" />);
             fireEvent.click(
                 screen.getByRole("button", {
@@ -110,9 +160,7 @@ describe("ShopListing (G11)", () => {
         it("is off and says Sold out when nothing can be sold", () => {
             render(
                 <ShopListing
-                    products={[
-                        { ...offered, soldOut: true, bagVariantId: null },
-                    ]}
+                    products={[{ ...sized, soldOut: true, bagVariantId: null }]}
                     bagSite="site-1"
                 />,
             );
@@ -154,5 +202,80 @@ describe("ShopListing (G11)", () => {
             render(<ShopListing products={[offered]} />);
             expect(screen.queryByRole("button")).toBeNull();
         });
+    });
+});
+
+describe("browsing the shop by category", () => {
+    const card = (
+        slug: string,
+        categoryName: string | null,
+    ): ShopListingCard => ({
+        slug,
+        name: slug,
+        currency: "INR",
+        price: "100.00",
+        mrp: null,
+        priceFrom: false,
+        image: { url: `https://img.test/${slug}.jpg`, alt: slug },
+        variantTitles: [],
+        blurb: null,
+        categoryName,
+        soldOut: false,
+    });
+    const products = [
+        card("sourdough", "Bread"),
+        card("croissant", "Pastry"),
+        card("rye", " Bread "),
+        card("gift-card", null),
+    ];
+
+    it("offers the products' own categories as chips, All first, and narrows the list", () => {
+        render(<ShopListing products={products} />);
+        const chips = screen.getByRole("radiogroup", { name: "Category" });
+        expect(
+            Array.from(chips.querySelectorAll("button")).map(
+                (b) => b.textContent,
+            ),
+        ).toEqual(["All", "Bread", "Pastry"]);
+        expect(screen.getByRole("radio", { name: "All" })).toHaveAttribute(
+            "aria-checked",
+            "true",
+        );
+        expect(screen.getAllByRole("listitem")).toHaveLength(4);
+
+        fireEvent.click(screen.getByRole("radio", { name: "Bread" }));
+        expect(
+            screen.getAllByRole("listitem").map((li) => li.textContent),
+        ).toEqual([
+            expect.stringContaining("sourdough"),
+            expect.stringContaining("rye"),
+        ]);
+        fireEvent.click(screen.getByRole("radio", { name: "All" }));
+        expect(screen.getAllByRole("listitem")).toHaveLength(4);
+        // 44px under a finger.
+        expect(
+            screen.getByRole("radio", { name: "Pastry" }).className,
+        ).toContain("coarse:min-h-11");
+    });
+
+    it("offers no chips without a choice to make", () => {
+        render(
+            <ShopListing
+                products={[card("sourdough", "Bread"), card("rye", "Bread")]}
+            />,
+        );
+        expect(
+            screen.queryByRole("radiogroup", { name: "Category" }),
+        ).toBeNull();
+        expect(
+            categoriesOf([card("a", null), card("b", undefined as never)]),
+        ).toEqual([]);
+    });
+
+    it("draws each card's photo square", () => {
+        const { container } = render(<ShopListing products={products} />);
+        const photo = container.querySelector("img");
+        expect(photo?.parentElement?.className).toContain("aspect-square");
+        expect(photo?.parentElement?.className).not.toContain("h-[140px]");
     });
 });

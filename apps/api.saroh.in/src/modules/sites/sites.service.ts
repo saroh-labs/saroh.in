@@ -55,6 +55,7 @@ import {
     toPendingPages,
     toPublishableSection,
 } from "./pending-changes";
+import { primaryHostOf } from "./primary-host";
 import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
@@ -335,6 +336,15 @@ export interface PublicSiteView {
      * extra request.
      */
     icon?: PublicSiteIcon | null;
+    /**
+     * The host this site is primarily served at: its verified custom
+     * domain when it has one, else its Saroh address
+     * (`rye.saroh.app`). The same site answers on both; this is the one
+     * the renderer names as canonical to search engines, and the one a QR
+     * code's short link lands on, so a customer signed in there stays
+     * signed in. Null when it has neither.
+     */
+    primaryHost?: string | null;
 }
 
 /**
@@ -2263,6 +2273,7 @@ export class SitesService {
             select: {
                 id: true,
                 organizationId: true,
+                subdomain: true,
                 currentPublication: {
                     select: { snapshot: true, publishedAt: true },
                 },
@@ -2284,6 +2295,7 @@ export class SitesService {
             siteId: site.id,
             ...(modules ? { modules } : {}),
             icon: await publicSiteIcon(snapshot, site.organizationId),
+            primaryHost: await primaryHostOf(site),
         };
     }
 
@@ -3285,7 +3297,7 @@ export class SitesService {
         }
         if (page.isHome) {
             throw new BadRequestException(
-                "The home page cannot be deleted — it is what this site's address serves.",
+                "The home page can't be deleted. It is what this site's address serves.",
             );
         }
 

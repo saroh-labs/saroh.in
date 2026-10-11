@@ -73,7 +73,7 @@ export function AppHeader(props: AppHeaderProps) {
         <header className="sticky top-0 z-30 flex h-[61px] items-center gap-1 border-b bg-background px-2 py-[9px] sm:px-3.5 print:hidden">
             <Link
                 href="/"
-                aria-label="Saroh — go to Home"
+                aria-label="Saroh, go to Home"
                 className="flex shrink-0 items-center rounded-lg px-[7px] py-[5px] transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
                 <SarohSymbol size={22} />

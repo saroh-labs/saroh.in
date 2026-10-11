@@ -75,7 +75,7 @@ describe("the plan's aside on the setup checklists (DEC-092)", () => {
         expect(html).toContain('href="/settings/billing#change-plan"');
     });
 
-    it("Home's bar has a segment per counted step, none for the aside", () => {
+    it("Home's bar counts the steps, never the aside", () => {
         const early: Checklist = {
             ...list,
             steps: list.steps.map((s) => ({ ...s, done: false })),
@@ -86,17 +86,22 @@ describe("the plan's aside on the setup checklists (DEC-092)", () => {
         );
         expect(html).toContain("0 of 2 done");
         expect(html).toContain("Take payment online");
-        expect(html.match(/h-1 flex-1 rounded-sm/g)).toHaveLength(2);
+        // One bar for the counted steps, the aside outside it.
+        expect(html.match(/role="progressbar"/g)).toHaveLength(1);
+        expect(html).toContain('aria-valuemax="2"');
     });
 
-    it("draws nothing on Settings once every counted step is done", () => {
+    it("is one quiet line on Settings once every counted step is done", () => {
         const done: Checklist = {
             ...list,
             steps: list.steps.map((s) => ({ ...s, done: true })),
             left: [],
             done: 2,
         };
-        expect(renderToStaticMarkup(<ReadyChecklist list={done} />)).toBe("");
+        const html = renderToStaticMarkup(<ReadyChecklist list={done} />);
+        expect(html).toContain('data-state="folded"');
+        expect(html).toContain("You&#x27;re ready to take money.");
+        expect(html).not.toContain("Add your registered address");
     });
 });
 
@@ -117,7 +122,8 @@ describe("one checklist on Home and Settings (UX-019)", () => {
             <TakeMoneyChecklist list={list} businessId="org_1" slot="late" />,
         );
         for (const html of [settings, home]) {
-            expect(html).toContain("Get ready to take money");
+            expect(html).toContain(">Finish setup</h2>");
+            expect(html).toContain("What is left before you take money.");
             expect(html).toContain("1 of 2 done");
         }
         expect(settings).not.toContain("Ready to take payments");
@@ -132,9 +138,20 @@ describe("one checklist on Home and Settings (UX-019)", () => {
         expect(html).toContain("Add your logo");
     });
 
+    it("is one card, with Make it yours ruled off inside it", () => {
+        const html = renderToStaticMarkup(
+            <ReadyChecklist list={{ ...list, extras: [logo] }} />,
+        );
+        expect(html.match(/<section/g)).toHaveLength(1);
+        expect(html).toContain('data-setup-checklist="business"');
+        expect(html).toContain(">Finish setup</h2>");
+        expect(html).toContain('role="group" aria-label="Make it yours"');
+    });
+
     it("keeps Make it yours once the counted steps are done, and drops done suggestions", () => {
         const done: Checklist = {
             ...list,
+            steps: list.steps.map((s) => ({ ...s, done: true })),
             left: [],
             done: 2,
             extras: [
@@ -148,6 +165,9 @@ describe("one checklist on Home and Settings (UX-019)", () => {
             ],
         };
         const html = renderToStaticMarkup(<ReadyChecklist list={done} />);
+        // The counted steps are done: one quiet line, with no count.
+        expect(html).toContain("You&#x27;re ready to take money.");
+        expect(html).toContain('data-state="folded"');
         expect(html).not.toContain("of 2 done");
         expect(html).toContain("Add your logo");
         expect(html).not.toContain("Add your first lead");
@@ -185,6 +205,7 @@ describe("Free's How to pay us step (UX-007)", () => {
         const html = renderToStaticMarkup(<ReadyChecklist list={free} />);
         expect(html).toContain("0 of 1 done");
         expect(html).toContain('href="/settings/organization?section=pay"');
-        expect(html).toContain("Get ready to take money");
+        expect(html).toContain("Finish setup");
+        expect(html).toContain("What is left before you take money.");
     });
 });

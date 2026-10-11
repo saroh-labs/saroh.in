@@ -65,7 +65,7 @@ test.describe("customers list", () => {
         const someone = api.rows[0];
         const name = someone.name ?? someone.email ?? "";
         await page
-            .getByRole("searchbox", { name: /Search by name/ })
+            .getByRole("searchbox", { name: /Search customers by name/ })
             .fill(name);
         await expect(page).toHaveURL(/[?&]q=/);
         await expect(
@@ -110,9 +110,7 @@ test.describe("customers list", () => {
         await expect(
             page.getByText("No customers match “zzzz-nobody-zzzz”"),
         ).toBeVisible();
-        await page
-            .getByRole("button", { name: "Clear search and filters" })
-            .click();
+        await page.getByRole("button", { name: "Clear search" }).click();
         await expect(page).toHaveURL(/\/commerce\/customers$/);
     });
 

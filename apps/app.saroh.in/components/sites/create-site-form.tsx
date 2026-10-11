@@ -1,8 +1,9 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
 import {
     Form,
     FormControl,
@@ -20,6 +21,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { lostNew, useLeaveGuard } from "@/components/shared/use-leave-guard";
 import {
     cleanAddressInput,
     MAX_ADDRESS_LENGTH,
@@ -28,6 +30,8 @@ import { createSite } from "@/lib/sites/actions";
 import type { NewSiteDefaults, Template } from "@/lib/sites/service";
 import type { ModuleStates } from "@/lib/sites/template-picker";
 
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
+import { TextLink } from "@saroh/ui/text-link";
 import { TemplatePicker } from "./template-picker";
 
 /**
@@ -52,7 +56,7 @@ export function initialTemplateId(
 }
 
 const formSchema = z.object({
-    name: z.string().trim().min(1, { message: "Name is required" }),
+    name: z.string().trim().min(1, { message: "Add a name." }),
     subdomain: z
         .string()
         .trim()
@@ -107,6 +111,7 @@ export function CreateSiteForm({
     const listed = templates ?? [];
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             name: defaults?.siteName ?? "",
             subdomain: defaults?.address ?? "",
@@ -118,8 +123,8 @@ export function CreateSiteForm({
         },
     });
     const [suggestion, setSuggestion] = useState<string | null>(null);
-    const { isSubmitting } = form.formState;
-    const name = form.watch("name");
+    const { isSubmitting, isDirty } = form.formState;
+    const guard = useLeaveGuard({ dirty: isDirty, lost: lostNew("site") });
     const address = form.watch("subdomain");
 
     async function onSubmit(values: FormValues) {
@@ -155,7 +160,8 @@ export function CreateSiteForm({
     return (
         <Form {...form}>
             <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onKeyDown={submitOnModEnter}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
                 className="grid min-w-0 max-w-2xl gap-5"
             >
                 <div className="grid min-w-0 max-w-md gap-4">
@@ -167,7 +173,7 @@ export function CreateSiteForm({
                                 <FormLabel>Site name</FormLabel>
                                 <FormControl>
                                     <Input
-                                        placeholder="My Site"
+                                        placeholder="My site"
                                         maxLength={120}
                                         disabled={isSubmitting}
                                         {...field}
@@ -268,11 +274,13 @@ export function CreateSiteForm({
                 <Button
                     type="submit"
                     className="wk-press w-fit"
-                    disabled={isSubmitting || !name.trim()}
+                    busy={isSubmitting}
+                    busyLabel="Creating…"
                 >
-                    {isSubmitting ? "Creating…" : "Create site"}
+                    Create site
                 </Button>
             </form>
+            {guard.dialog}
         </Form>
     );
 }
@@ -291,22 +299,11 @@ export function NoTemplates({
 }) {
     if (failed) {
         return (
-            <PartialNotice
-                action={
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={onRetry}
-                    >
-                        Try again
-                    </Button>
-                }
-            >
-                The templates couldn&apos;t be loaded. You can still create the
-                site: it starts from the template for what you&apos;re setting
-                up.
-            </PartialNotice>
+            <PartialRead
+                things="the templates"
+                so="You can still create the site. It starts from the template for what you're setting up."
+                onRetry={onRetry}
+            />
         );
     }
     return (
@@ -332,12 +329,11 @@ export function UseSuggestedAddress({
 }) {
     if (!suggestion || suggestion === current) return null;
     return (
-        <button
-            type="button"
+        <TextLink
             onClick={() => onUse(suggestion)}
-            className="w-fit cursor-pointer rounded-sm text-left text-xs font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+            className="w-fit text-left text-xs coarse:min-h-11"
         >
             Use {suggestion}.saroh.app
-        </button>
+        </TextLink>
     );
 }

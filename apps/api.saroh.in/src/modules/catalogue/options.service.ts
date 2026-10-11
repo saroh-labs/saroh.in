@@ -119,7 +119,7 @@ export class OptionsService {
         const used = option._count.products;
         if (used > 0) {
             throw new ConflictException({
-                message: `Used by ${used} ${used === 1 ? "product" : "products"} — change their variants first.`,
+                message: `Used by ${used} ${used === 1 ? "product" : "products"}. Change their variants first.`,
                 field: "optionId",
             });
         }
@@ -185,7 +185,7 @@ export class OptionsService {
         if (!value) throw new NotFoundException("Value not found");
         if (value._count.variants > 0) {
             throw new ConflictException({
-                message: `${value.value} is used by a variant, so it can't be removed — change the variant first.`,
+                message: `${value.value} is used by a variant, so it can't be removed. Change the variant first.`,
                 field: "valueId",
             });
         }

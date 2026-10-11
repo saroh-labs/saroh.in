@@ -121,8 +121,23 @@ export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
 export { productCardsOf, productGridQuery } from "./lib/product-grid-read";
 // Server-safe (not in the "use client" block): saroh.app reads it for the
 // booking page's header on the server (E6).
+export {
+    NO_CONTACT,
+    hasContact,
+    isSocialLink,
+    publicContactOf,
+} from "./lib/public-contact";
+export type {
+    PublicContact,
+    PublicContactPlace,
+    PublicSocialLink,
+} from "./lib/public-contact";
+// A business's social links as icons, and the footer's contact group
+// (DEC-128).
 export { isPublicVisit } from "./lib/public-visit";
 export type { PublicVisit } from "./lib/public-visit";
+export { addressDirectionsHref, shownContact } from "./site-footer-contact";
+export { SocialIcon, SocialLinkRow } from "./social-icons";
 
 // The one rule for "Open now" (G8): Visit us, the hero's On today (G18) and
 // the booking page's header (E6) all say it through this.
@@ -140,6 +155,14 @@ export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 export { formatAmount } from "./lib/money";
 // A business's public phone as a visitor reads it (DEC-053).
 export { phoneText } from "./lib/phone";
+export { shopFactsLine } from "./lib/shop-facts";
+export type { ShopFactsInput } from "./lib/shop-facts";
+export { siteImage } from "./lib/site-image";
+export type { ImagePlace, SiteImageProps } from "./lib/site-image";
+export { emailed, reachOrNull, toldText } from "./lib/told";
+export type { NoticeReach } from "./lib/told";
+export { NO_REACH, ReachLinks, hasReach, reachOf } from "./reach-links";
+export type { BusinessReach } from "./reach-links";
 
 // Not a page block: a product as its shop page shows it (#465) — the
 // workspace's Customer view today, the storefront product page later.
@@ -419,7 +442,23 @@ export {
     autopayWith,
 } from "./autopay/words";
 export { openProviderCheckout } from "./booking-flow/checkout";
+export type { OpenCheckout } from "./booking-flow/checkout";
 export { PayOption } from "./booking-flow/steps/pay-option";
+// Paying from a pay link (an invoice's, an order's): the Pay button, the
+// provider's window and where the payment stands.
+export {
+    PayLinkHelp,
+    PayLinkPay,
+    PayLinkStatus,
+    payLinkButtonLabel,
+    usePayLink,
+} from "./pay-link/pay-link-pay";
+export type {
+    PayLinkContact,
+    PayLinkOptions,
+    PayLinkStart,
+    PayLinkState,
+} from "./pay-link/pay-link-pay";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
@@ -437,6 +476,7 @@ export type {
     FooterLayout,
     ModulePageStates,
     SiteContact,
+    SiteContactPlace,
     SiteCredit,
     SiteFooterContent,
 } from "./site-chrome";

@@ -63,6 +63,21 @@ a note saying so.
   from it rather than counting its own. The QR code maker's email
   (`tools/qr-maker-email.ts`) takes no input at all, because the API never
   receives what the visitor typed.
+- **Current** (10 Oct 2026) — **A sentence the API writes formats its
+  amount, day and time through `src/common/words-format.ts`**, the API's
+  twin of the app's `lib/format`: `moneyWords` and `moneyWordsMinor`
+  ("₹1,250", "₹1,250.50", Indian grouping, paise only when there are
+  some), `dayWords` ("12 Oct", "12 Oct 2025", "Mon 12 Oct"), `timeWords`
+  and `clockWords` ("9:30 am") and `whenWords` ("12 Oct, 9:30 am"). Every
+  caller passes its own time zone: the business's for its notices, India's
+  for Saroh's own billing mail. A notification, an email, a customer's
+  notice, a Home row or a refusal never calls `Intl`, `toLocale…` or
+  luxon's `toFormat` for words: `words-format.spec.ts` fails a file on the
+  email and notification paths that does. A printed invoice's own columns
+  (`paperMoney`, `paperDay`) are a document and stay with the paper, and a
+  field the app formats itself (Home's `time`, the timetable's "HH:mm")
+  stays a value. The words follow `saroh-product.md`: no long dash or
+  semicolon, business, location, a time (never a slot), Try again.
 - **Current** — **A stranger's host name is resolved off the thread pool.**
   Never `dns.lookup` (getaddrinfo on libuv's four threads) for an address a
   visitor typed: use `dns.promises.Resolver` with a short timeout and one
@@ -168,7 +183,13 @@ a note saying so.
   on its payment session. Razorpay's is set to UPI and
   card only; Cashfree's shows what the account has on. What the
   window says is a hint ("Paying…"); the API confirms the booking.
-  The invoice pay page still shows the handoff, not the window.
+  The pay link pages (`/pay/<token>` for an invoice, `/pay/o/<token>` for
+  an order) open the same window through the same helper
+  (`PayLinkPay`, `site-blocks/src/pay-link/`): Pay starts the intent on the
+  site's server, the window opens on it, and after "paid" the page re-reads
+  itself until the server says so. A new page that takes money opens
+  `openProviderCheckout`; never a second provider integration, and never
+  the handoff drawn on the page.
 - **Current** (P1, #710) — **A payment is confirmed by asking the
   provider, with the webhook as backup.** Every merchant-site window posts
   its return (`CheckoutRequest.apiUrl`) to `POST /public/payments/return`:

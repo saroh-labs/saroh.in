@@ -1,6 +1,14 @@
 "use client";
 
+import {
+    formatClock,
+    formatClockRange,
+    formatDay,
+} from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
+import { AbsentOr, AbsentValue } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Sheet,
@@ -32,12 +40,11 @@ import { canCheckIn, canMarkNoShow } from "@/lib/services/booking-state";
 import type { Block, LocalDate } from "@/lib/services/diary";
 import {
     bookingState,
-    clock,
-    dayLabel,
     liveSeats,
     localDateOf,
     localMinuteOf,
     paidText,
+    STATE_LABEL,
     whoFor,
 } from "@/lib/services/diary";
 import type { PeekPerson } from "@/lib/services/peek";
@@ -51,8 +58,11 @@ import {
     visitToBook,
 } from "@/lib/services/treatment";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { ProgressBar } from "@saroh/ui/progress-bar";
+import { TextLink } from "@saroh/ui/text-link";
 import { ClassSeats } from "./class-seats";
-import { Eyebrow, StatePill } from "./parts";
+import { Eyebrow, STATE_TONE } from "./parts";
 import type {
     HeldFor,
     QuickLookActions,
@@ -160,12 +170,17 @@ function Body({
                             {title}
                         </SheetTitle>
                         <SheetDescription className="text-[12px] text-muted-foreground">
-                            {dayLabel(date)} · {clock(block.start)}–
-                            {clock(block.end)}
+                            {formatDay(date, {
+                                weekday: "short",
+                                year: "never",
+                            })}{" "}
+                            · {formatClockRange(block.start, block.end)}
                             {staff ? ` · ${staff.name}` : ""}
                         </SheetDescription>
                     </div>
-                    <StatePill state={block.state} />
+                    <StatusBadge tone={STATE_TONE[block.state]}>
+                        {STATE_LABEL[block.state]}
+                    </StatusBadge>
                 </div>
             </SheetHeader>
             <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-[18px] py-4">
@@ -225,7 +240,7 @@ function OneToOne({
             "Paid online"
         )
     ) : b.paidWith === "DESK" ? (
-        "Not yet — pays at the session"
+        "Not yet. Pays at the session"
     ) : (
         paidText(b)
     );
@@ -320,10 +335,7 @@ function OneToOne({
                 key="take"
                 amount={
                     b.take
-                        ? (formatMoney(
-                              b.take.cents,
-                              b.service.currency ?? null,
-                          ) ?? null)
+                        ? formatMoney(b.take.cents, b.service.currency ?? null)
                         : null
                 }
                 variant="outline"
@@ -378,7 +390,7 @@ function OneToOne({
     const help =
         state === "cancelled"
             ? `Cancelled${b.cancelledLate ? " late" : ""}. To see ${first} again, book a free time.`
-            : `${open && rule !== null && rule !== undefined ? `Free to cancel until ${rule} ${rule === 1 ? "hour" : "hours"} before. ` : ""}${bookingChangeText(person?.reach, first)}`;
+            : `${open && rule !== null && rule !== undefined ? `Free to cancel until ${count(rule, "hour")} before. ` : ""}${bookingChangeText(person?.reach, first)}`;
 
     return (
         <>
@@ -390,13 +402,20 @@ function OneToOne({
                     ["Paid", paid],
                     [
                         "Phone",
-                        phoneText({
-                            bookerPhone: b.bookerPhone,
-                            hasContact: b.contact !== null,
-                            person: person ?? undefined,
-                        }),
+                        <AbsentOr says="Not known">
+                            {phoneText({
+                                bookerPhone: b.bookerPhone,
+                                hasContact: b.contact !== null,
+                                person: person ?? undefined,
+                            })}
+                        </AbsentOr>,
                     ],
-                    ["Email", b.contact?.email ?? b.bookerEmail ?? "—"],
+                    [
+                        "Email",
+                        b.contact?.email ?? b.bookerEmail ?? (
+                            <AbsentValue says="Not set" />
+                        ),
+                    ],
                     ...needsAttention(person),
                 ]}
             />
@@ -472,12 +491,7 @@ function OrderText({
 }) {
     if (!canRead) return <>{orderLabel(treatment)}</>;
     return (
-        <Link
-            href={orderHref(treatment)}
-            className="rounded-sm font-medium underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-            {orderLabel(treatment)}
-        </Link>
+        <TextLink href={orderHref(treatment)}>{orderLabel(treatment)}</TextLink>
     );
 }
 
@@ -561,14 +575,15 @@ function MovePanel({
                     Finding free times…
                 </p>
             ) : slots.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    Nothing free in the next week. Open more hours on the
-                    calendar, or move it from the full booking.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="Nothing free in the next week"
+                    description="Open more hours on the calendar, or move it from the full booking."
+                />
             ) : (
                 <div className="flex flex-wrap gap-1.5">
                     {slots.map((s) => {
-                        const label = `${dayLabel(localDateOf(s.startAt, ctx.timezone))} · ${clock(localMinuteOf(s.startAt, ctx.timezone))}`;
+                        const label = `${formatDay(localDateOf(s.startAt, ctx.timezone), { weekday: "short", year: "never" })} · ${formatClock(localMinuteOf(s.startAt, ctx.timezone))}`;
                         return (
                             <button
                                 key={s.startAt}
@@ -582,13 +597,15 @@ function MovePanel({
                     })}
                 </div>
             )}
-            <button
+            <Button
+                variant="link"
+                size="inline"
                 type="button"
                 onClick={onKeep}
-                className="mt-2 py-1 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground active:bg-accent-active"
+                className="mt-2 text-muted-foreground"
             >
                 Keep the current time
-            </button>
+            </Button>
         </div>
     );
 }
@@ -631,35 +648,23 @@ function ClassLook({
                         : []),
                     [
                         "Prepaid",
-                        `${onPrepaid} of ${live.length} ${live.length === 1 ? "place" : "places"} on a pack or membership`,
+                        `${onPrepaid} of ${count(live.length, "place")} on a pack or membership`,
                     ],
                 ]}
             />
             {!cancelled ? (
                 <Card>
                     <Eyebrow>Places</Eyebrow>
-                    <div
-                        role="progressbar"
-                        aria-label="Places booked"
-                        aria-valuemin={0}
-                        aria-valuemax={s.capacity}
-                        aria-valuenow={live.length}
-                        className="h-2 overflow-hidden rounded-full bg-muted"
-                    >
-                        <div
-                            className={cn(
-                                "h-full",
-                                full ? "bg-destructive" : "bg-success",
-                            )}
-                            style={{
-                                width: `${Math.min(100, (live.length / Math.max(1, s.capacity)) * 100)}%`,
-                            }}
-                        />
-                    </div>
+                    <ProgressBar
+                        value={live.length}
+                        max={s.capacity}
+                        tone={full ? "danger" : "success"}
+                        label={`${live.length} of ${s.capacity} places booked`}
+                    />
                     <p className="mt-1.5 text-[12.5px]">
                         {live.length} of {s.capacity} booked
                         {full
-                            ? " — full; cancelling a place frees one"
+                            ? " · full. Cancelling a place frees one."
                             : ` · ${s.capacity - live.length} free`}
                     </p>
                 </Card>

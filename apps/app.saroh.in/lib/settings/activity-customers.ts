@@ -1,6 +1,7 @@
 import { personHref } from "@/lib/contacts/person-href";
+import { count } from "@/lib/format/plural";
 
-import { counted, countOf, fieldsOf, record } from "./activity-changes";
+import { countOf, fieldsOf, record } from "./activity-changes";
 
 /**
  * Settings › Activity's words for a customer record (C10): a merge
@@ -47,7 +48,7 @@ export function mergedMoves(meta: Record<string, unknown>): string[] {
     const moved = record(meta.moved);
     return MOVED.flatMap(([key, one, many]) => {
         const n = countOf(moved[key]) ?? 0;
-        return n > 0 ? [counted(n, one, many)] : [];
+        return n > 0 ? [count(n, one, many)] : [];
     });
 }
 
@@ -64,7 +65,7 @@ export function mergedWhat(meta: Record<string, unknown>): string {
         moves.length > 3
             ? `${moves.slice(0, 3).join(", ")} and more`
             : list(moves);
-    const tail = said ? ` — ${said} moved` : "";
+    const tail = said ? `, ${said} moved` : "";
     return `merged a duplicate customer record${tail}`;
 }
 
@@ -106,7 +107,7 @@ export function removedWhat(meta: Record<string, unknown>): string {
     const cancelled = countOf(removed.bookingsCancelled) ?? 0;
     const base = "removed a customer's details (privacy request)";
     return cancelled > 0
-        ? `${base} — ${counted(cancelled, "booking to come", "bookings to come")} cancelled`
+        ? `${base}, ${count(cancelled, "booking to come", "bookings to come")} cancelled`
         : base;
 }
 

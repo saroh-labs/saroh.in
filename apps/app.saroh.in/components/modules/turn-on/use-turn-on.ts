@@ -1,9 +1,11 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import { blockerSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listWords } from "@/lib/modules/switch-plan";
@@ -48,10 +50,13 @@ export function useTurnOn({
     picked,
     modules,
     onClose,
+    firstRun = false,
 }: {
     picked: readonly string[];
     modules: readonly ModuleView[];
     onClose: () => void;
+    /** A first run (Home, the module picker): land on the thing itself. */
+    firstRun?: boolean;
 }) {
     const router = useRouter();
     const [loaded, setLoaded] = useState<SetupDefaults[] | null>(null);
@@ -62,6 +67,8 @@ export function useTurnOn({
     const [failure, setFailure] = useState<string | null>(null);
     // A free address the API offered for one that is taken (DEC-069).
     const [suggestion, setSuggestion] = useState<string | null>(null);
+    // The web address was refused once: it stays a field from then on.
+    const [addressUnlocked, setAddressUnlocked] = useState(false);
     const [saving, setSaving] = useState(false);
     // What the plan won't let the business connect (UX-006); null until
     // read, and unread locks nothing.
@@ -69,6 +76,8 @@ export function useTurnOn({
     // What is on already from an earlier press that stopped part-way: a
     // retry doesn't send it again.
     const done = useRef<{ key: string; view: ModuleView | null }[]>([]);
+    // The site Website made or kept, for a first run to open.
+    const siteId = useRef<string | undefined>(undefined);
 
     const pickedKey = picked.join(",");
     useEffect(() => {
@@ -154,6 +163,7 @@ export function useTurnOn({
         };
         const problems = problemsOf(sent, plan.order);
         setErrors(problems);
+        if (problems.WEBSITE?.address) setAddressUnlocked(true);
         setFailure(null);
         if (Object.keys(problems).length > 0) return;
 
@@ -165,7 +175,7 @@ export function useTurnOn({
                 setupFor(key, sent),
             ).catch(() => ({
                 ok: false as const,
-                error: "Saroh couldn't be reached. Try again.",
+                error: UNREACHED,
                 fields: {},
             }));
             if (!res.ok) {
@@ -190,6 +200,9 @@ export function useTurnOn({
                 const drawn = Object.values(next);
                 setErrors(next);
                 setSuggestion(res.suggestion ?? null);
+                if (next.WEBSITE?.address || res.suggestion) {
+                    setAddressUnlocked(true);
+                }
                 const refused = res.blockers?.[0];
                 const why =
                     drawn.length > 0 && loose.length === 0
@@ -202,7 +215,7 @@ export function useTurnOn({
                 );
                 setFailure(
                     onAlready.length > 0
-                        ? `${listWords(onAlready)} ${onAlready.length === 1 ? "is" : "are"} on, but ${moduleName(key, modules)} isn't yet.${why ? ` ${why}` : ""}`
+                        ? `${listWords(onAlready)} ${plural(onAlready.length, "is", "are")} on, but ${moduleName(key, modules)} isn't yet.${why ? ` ${why}` : ""}`
                         : why,
                 );
                 // What did turn on shows behind the sheet.
@@ -210,6 +223,7 @@ export function useTurnOn({
                 return;
             }
             done.current.push({ key, view: res.module });
+            if (res.siteId) siteId.current = res.siteId;
         }
         setSaving(false);
         onClose();
@@ -223,7 +237,12 @@ export function useTurnOn({
                 ),
             ),
         );
-        const href = landingHref(picked, plan, sent);
+        const href = landingHref(
+            picked,
+            plan,
+            sent,
+            firstRun ? { siteId: siteId.current } : undefined,
+        );
         if (href) router.push(href);
         else router.refresh();
     };
@@ -231,6 +250,11 @@ export function useTurnOn({
     // The template a new website starts from (DEC-070, K15), when said.
     const website = (loaded ?? []).find((d) => d.key === "WEBSITE");
     const websiteTemplate = website?.template ?? null;
+    // The web address was chosen when the business was set up, so it is
+    // said, not asked again (UX audit, 10 Oct). It turns back into a field
+    // only when the API refuses it, so it can be fixed.
+    const websiteAddressFixed =
+        website?.read === true && !!draft?.WEBSITE.address && !addressUnlocked;
     // The others suggested for this business (U12), what this sheet turns
     // on counted as on: Sell turned on with Website suggests a shop's.
     const websiteChoices =
@@ -249,6 +273,7 @@ export function useTurnOn({
         plan,
         websiteTemplate,
         websiteChoices,
+        websiteAddressFixed,
         apiDeps,
         hidden,
         errors,

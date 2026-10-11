@@ -36,6 +36,10 @@ vi.mock("next/navigation", () => ({
 const showSuccess = vi.fn();
 const showError = vi.fn();
 const showWarning = vi.fn();
+vi.mock(
+    "@/components/shared/use-hold",
+    () => import("@/components/shared/hold-now.test-kit"),
+);
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
     showError: (...args: unknown[]) => showError(...args) as unknown,
@@ -173,9 +177,11 @@ describe("the lead's actions", () => {
 
     it("opens a sheet named for each button", async () => {
         render();
+        // A sheet that makes a new thing is titled "New {thing}".
+        const titles: Record<string, string> = { "Add note": "New note" };
         for (const name of ["Add note", "Schedule follow-up", "Send message"]) {
             await press(button(name, host));
-            expect(dialogName()).toBe(name);
+            expect(dialogName()).toBe(titles[name] ?? name);
             // Cancel and the sheet's own button are both in it.
             expect(button("Cancel", dialog())).toBeDefined();
             await press(button("Cancel", dialog()));
@@ -202,7 +208,7 @@ describe("Add note", () => {
         expect(showError).toHaveBeenCalledWith(
             "Your role can't add notes to a lead.",
         );
-        expect(dialogName()).toBe("Add note");
+        expect(dialogName()).toBe("New note");
         expect(dialog()?.querySelector("textarea")?.value).toBe(
             "Called, wants a quote",
         );
@@ -217,18 +223,20 @@ describe("Add note", () => {
         await submit();
 
         expect(logActivity).toHaveBeenCalledWith("lead_1", "Called");
-        expect(showSuccess).toHaveBeenCalledWith("Note added");
+        expect(showSuccess).toHaveBeenCalledWith("Note added.");
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(dialog()).toBe(null);
         expect(document.activeElement).toBe(button("Add note", host));
     });
 
-    it("has nothing to send while the note is empty", async () => {
+    it("sends nothing while the note is empty, and says so", async () => {
         render();
         await press(button("Add note", host));
-        expect(button("Add note", dialog())?.disabled).toBe(true);
+        expect(button("Add note", dialog())?.disabled).toBe(false);
         type(dialog()?.querySelector("textarea"), "   ");
-        expect(button("Add note", dialog())?.disabled).toBe(true);
+        await submit();
+        expect(logActivity).not.toHaveBeenCalled();
+        expect(dialog()?.textContent).toContain("Write the note first.");
     });
 });
 
@@ -239,14 +247,17 @@ describe("Schedule follow-up", () => {
         await press(button("Pick a date", dialog()));
     }
 
-    it("needs what to do and a day before it can be added", async () => {
+    it("needs what to do and a day, and says which when pressed", async () => {
         render();
         await press(button("Schedule follow-up", host));
-        expect(button("Add follow-up", dialog())?.disabled).toBe(true);
-        type(dialog()?.querySelector("input"), "Send the quote");
-        expect(button("Add follow-up", dialog())?.disabled).toBe(true);
-        await press(button("Pick a date", dialog()));
         expect(button("Add follow-up", dialog())?.disabled).toBe(false);
+        await submit();
+        expect(createTask).not.toHaveBeenCalled();
+        expect(dialog()?.textContent).toContain("Say what to do.");
+        type(dialog()?.querySelector("input"), "Send the quote");
+        await submit();
+        expect(createTask).not.toHaveBeenCalled();
+        expect(dialog()?.textContent).toContain("Pick a due date.");
     });
 
     it("keeps the sheet open with what was filled in when it is refused", async () => {
@@ -271,7 +282,7 @@ describe("Schedule follow-up", () => {
             body: "Send the quote",
             dueAt: new Date(2099, 0, 5, 9, 0).toISOString(),
         });
-        expect(showSuccess).toHaveBeenCalledWith("Follow-up scheduled");
+        expect(showSuccess).toHaveBeenCalledWith("Follow-up added.");
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(dialog()).toBe(null);
         expect(document.activeElement).toBe(button("Schedule follow-up", host));
@@ -300,7 +311,7 @@ describe("Send message", () => {
         expect(dialog()?.querySelector("textarea")?.value).toBe("Here it is.");
     });
 
-    it("closes once the message is queued", async () => {
+    it("closes once the message is sent", async () => {
         sendMessage.mockResolvedValue({
             ok: true,
             data: { status: "QUEUED" },
@@ -310,7 +321,7 @@ describe("Send message", () => {
         type(dialog()?.querySelector("textarea"), "Here it is.");
         await submit();
 
-        expect(showSuccess).toHaveBeenCalledWith("Message queued");
+        expect(showSuccess).toHaveBeenCalledWith("Message sent.", undefined);
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(dialog()).toBe(null);
         expect(document.activeElement).toBe(button("Send message", host));
@@ -330,7 +341,7 @@ describe("Send message", () => {
         await submit();
 
         expect(showWarning).toHaveBeenCalledWith(
-            "Message suppressed: consent is revoked",
+            "Message not sent. Their consent is revoked.",
         );
         expect(showSuccess).not.toHaveBeenCalled();
         expect(dialog()).toBe(null);
@@ -381,9 +392,7 @@ describe("Send message", () => {
         const reason = document.getElementById(
             send?.getAttribute("aria-describedby") ?? "",
         );
-        expect(reason?.textContent).toContain(
-            "Messaging is off for your business.",
-        );
+        expect(reason?.textContent).toContain("Messaging is turned off.");
         expect(reason?.querySelector('a[href="/settings/modules"]')).not.toBe(
             null,
         );

@@ -22,9 +22,10 @@ import type {
     StartCheckout,
 } from "./api";
 import { SHOP_OFFLINE } from "./api";
+import { readBagDraft, writeBagDraft } from "./bag-draft-store";
 import type { BagDraft, BagPriced } from "./bag-sheet";
 import { BagSheet, EMPTY_DRAFT } from "./bag-sheet";
-import { bagCount, clearBag, onOpenBag, useBag } from "./bag-store";
+import { bagCount, bagShown, clearBag, onOpenBag, useBag } from "./bag-store";
 import type { OnlineStarted } from "./checkout-sheet";
 import {
     CheckoutPay,
@@ -41,7 +42,8 @@ import { readPendingCheckout, writePendingCheckout } from "./pending-checkout";
  * The header draws it only on a site that takes online orders (the site's
  * server asks the API first); it shows once something is in the bag, as
  * the design's round bag button with its count. Signing in is always on
- * and there is no guest checkout (A2, A9): "Continue" opens the sign-in
+ * and there is no guest checkout (A2, A9): signed out, the bag's button
+ * ("Sign in and pay", "Sign in and place order") opens the sign-in
  * sheet ("Last step: confirm it's you"), and placing the order goes on by
  * itself once the code checks. When the code can't be sent, the sheet says
  * so with the business's phone, and the bag is kept.
@@ -49,14 +51,16 @@ import { readPendingCheckout, writePendingCheckout } from "./pending-checkout";
  * The way, the address and the checkout's key live here, not in the bag
  * sheet, which closes whenever the checkout moves on: coming back to the
  * bag finds them as they were, and the same bag placed again is the same
- * order. A payment made but not yet confirmed when its sheet closes is
+ * order. They are kept for the visit too (`bag-draft-store.ts`), so a page
+ * loaded again during the email-code step loses nothing typed, and are
+ * cleared when the order is placed. A payment made but not yet confirmed when its sheet closes is
  * remembered (`pending-checkout.ts`) and asked about until the server
  * answers; the bag empties once the order is placed. An order paid at the
  * handover is placed when it starts: the bag empties, and the sheet says
  * it is still to be paid.
  *
  * On a test release (DEC-071, T6) the bag is priced as usual, and
- * "Continue" stops there: in place of the sign-in sheet it says what the
+ * its button stops there: in place of the sign-in sheet it says what the
  * live site would take for it. No order, no payment.
  */
 
@@ -104,7 +108,15 @@ export function ShopBag({
     const [step, setStep] = useState<Step>({ kind: "closed" });
     const [customer, setCustomer] = useState(account.customer);
     const [busy, setBusy] = useState(false);
-    const [draft, setDraft] = useState<BagDraft>(EMPTY_DRAFT);
+    // What was chosen and typed in the bag, kept for the visit
+    // (`bag-draft-store.ts`): a page loaded again on the way back from the
+    // email code finds the way, the address, the code and the checkout's
+    // key as they were. Never drawn until the bag opens, so the server's
+    // empty draft and the browser's kept one can differ.
+    const [draft, setDraft] = useState<BagDraft>(() =>
+        typeof window === "undefined" ? EMPTY_DRAFT : readBagDraft(site),
+    );
+    useEffect(() => writeBagDraft(site, draft), [site, draft]);
     // The QR code whose scan opened this page load, when the address it
     // loaded on carried the tag (`qr-source.ts`). The bag's sheet has no
     // address of its own, so the tag is held here, in memory, for as long
@@ -124,6 +136,11 @@ export function ShopBag({
     } | null>(null);
 
     useEffect(() => onOpenBag(() => setStep({ kind: "bag" })), []);
+    // Whoever said "added to your bag" takes it down once the bag is open.
+    const open = step.kind !== "closed";
+    useEffect(() => {
+        if (open) bagShown();
+    }, [open]);
 
     const close = useCallback(() => {
         setStep({ kind: "closed" });
@@ -208,7 +225,7 @@ export function ShopBag({
                     started,
                     toPay:
                         request.fulfilment === "PICKUP"
-                            ? "Pay when you collect"
+                            ? "Pay at pick-up"
                             : "Pay on delivery",
                 });
                 return;
@@ -281,6 +298,7 @@ export function ShopBag({
             {step.kind === "bag" ? (
                 <BagSheet
                     site={site}
+                    businessName={businessName}
                     items={items}
                     api={api}
                     signedIn={customer !== null}

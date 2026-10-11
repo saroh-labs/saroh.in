@@ -202,7 +202,7 @@ describe("/onboarding/modules", () => {
             c.closest("label")?.textContent.includes("Take bookings"),
         );
         click(bookings);
-        click(buttonNamed(/Set up my workspace/));
+        click(buttonNamed(/Set up my business/));
         expect(opened()).toBe("COMMERCE,APPOINTMENTS");
         expect(setModuleStatusAction).not.toHaveBeenCalled();
     });

@@ -1,10 +1,18 @@
 import { requestOrigin } from "@saroh/auth/origins";
 import { cookies, headers } from "next/headers";
-import { forbidden } from "next/navigation";
+import { forbidden, unstable_rethrow } from "next/navigation";
 import { cache } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { toFailure } from "@/lib/api/failure";
+import { roleDeniedMessage } from "@/lib/api/role-denied";
+import type { Said } from "@/lib/api/unreached";
+import {
+    SAID_HEADER,
+    SIGNED_OUT,
+    UNREACHED,
+    WRITE_TIMEOUT_MS,
+} from "@/lib/api/unreached";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
 import { pickActive } from "@/lib/organizations/choose";
@@ -47,6 +55,15 @@ export type CrmResult<T> =
           missing?: BusinessDetail[];
           /** Its plan refused it (U13); shown as the notice (`reportFailure`). */
           plan?: PlanRefusal;
+          /** Refused by role (`role-denied.ts`): a notice, not an error. */
+          denied?: true;
+          /**
+           * The session ended (a 401). `error` is the signed-out sentence,
+           * which the toast shows with its "Sign in" button (`unreached.ts`).
+           */
+          expired?: true;
+          /** It never got an answer: offline, or 20 seconds went by. */
+          unreached?: true;
       };
 
 /**
@@ -100,6 +117,46 @@ export async function orgBase(): Promise<string | null> {
     return orgId ? `/organizations/${orgId}` : null;
 }
 
+/**
+ * One of this file's own two answers to a write, shaped as the API shapes
+ * an error, so every caller's `readError` says the sentence unchanged.
+ */
+function said(what: Said): Response {
+    return new Response(
+        JSON.stringify({
+            message: what === "unreached" ? UNREACHED : SIGNED_OUT,
+        }),
+        {
+            status: what === "unreached" ? 503 : 401,
+            headers: {
+                "content-type": "application/json",
+                [SAID_HEADER]: what,
+            },
+        },
+    );
+}
+
+/** Which of the two a response is, or null for the API's own answer. */
+function saidBy(res: Response): Said | null {
+    const what = res.headers.get(SAID_HEADER);
+    return what === "unreached" || what === "signed-out" ? what : null;
+}
+
+/** Statuses that may not carry a body (the Fetch standard). */
+const NO_BODY = new Set([101, 204, 205, 304]);
+
+/**
+ * A read is sent as it always was: a failure rejects, and the page's
+ * failed state or boundary says so.
+ *
+ * A write (anything but GET or HEAD) never rejects (10 Oct 2026). It has
+ * 20 seconds; a network failure or that limit answers with the unreached
+ * sentence, and a 401 with the signed-out one, each as an ordinary error
+ * response. So every write in the app says the same two things, whether it
+ * goes through `mutate` or reads the response itself. The answer is read in
+ * full inside the limit, so a body cut off at 20 seconds can't pass as a
+ * save that returned nothing.
+ */
 export async function apiFetch(
     path: string,
     init?: RequestInit,
@@ -109,7 +166,7 @@ export async function apiFetch(
     // The API refuses a write with no Origin (#50); say where this came from.
     const origin = requestOrigin(incoming);
     const activeOrgId = await getActiveOrgId();
-    return fetch(`${API_URL}${path}`, {
+    const request: RequestInit = {
         ...init,
         headers: {
             "content-type": "application/json",
@@ -119,7 +176,31 @@ export async function apiFetch(
             ...(init?.headers ?? {}),
         },
         cache: "no-store",
-    });
+    };
+    const method = (init?.method ?? "GET").toUpperCase();
+    if (method === "GET" || method === "HEAD") {
+        return fetch(`${API_URL}${path}`, request);
+    }
+    const limit = AbortSignal.timeout(WRITE_TIMEOUT_MS);
+    try {
+        const res = await fetch(`${API_URL}${path}`, {
+            ...request,
+            signal: init?.signal
+                ? AbortSignal.any([init.signal, limit])
+                : limit,
+        });
+        if (res.status === 401) return said("signed-out");
+        const body = NO_BODY.has(res.status) ? null : await res.arrayBuffer();
+        return new Response(body, {
+            status: res.status,
+            statusText: res.statusText,
+            headers: res.headers,
+        });
+    } catch (error) {
+        // Next's own interrupts are not failures to reach the API.
+        unstable_rethrow(error);
+        return said("unreached");
+    }
 }
 
 /**
@@ -130,6 +211,9 @@ export async function apiFetch(
  * `{ error: { code, message, ... } }` (see AllExceptionsFilter). The last one
  * used to fall through and return the error OBJECT from a `string`-typed
  * function, so callers rendered "[object Object]" instead of the reason.
+ *
+ * A refusal by role (`details.code: "ROLE_DENIED"`) reads in
+ * `role-denied.ts`'s words, the closer sentence for the permission it names.
  */
 export function readError(
     data: {
@@ -138,6 +222,8 @@ export function readError(
     } | null,
     fallback: string,
 ): string {
+    const denied = roleDeniedMessage(data);
+    if (denied) return denied;
     if (typeof data?.message === "string") return data.message;
     const error = data?.error;
     if (typeof error === "string") return error;
@@ -190,6 +276,11 @@ export async function getList<T>(path: string): Promise<T[]> {
 /**
  * POST/PATCH helper returning a {@link CrmResult}. Forwards the session cookie
  * + active-org header; a non-2xx response becomes `{ ok: false, error }`.
+ *
+ * It never throws to the caller: a write that didn't reach the API, or
+ * wasn't answered in 20 seconds, is `{ ok: false, unreached: true }` with
+ * the one sentence for it, and a 401 is `{ ok: false, expired: true }`
+ * with the signed-out sentence (`unreached.ts`).
  */
 export async function mutate<T>(
     path: string,
@@ -197,24 +288,50 @@ export async function mutate<T>(
     body: unknown,
     fallback: string,
 ): Promise<CrmResult<T>> {
-    const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
-    const res = await apiFetch(`${base}${path}`, {
-        method,
-        body: JSON.stringify(body),
-    });
-    const data = (await res.json().catch(() => null)) as
-        (T & { message?: string; error?: string }) | null;
-    if (res.ok) {
-        return { ok: true, data: (data ?? {}) as T };
+    try {
+        const base = await orgBase();
+        if (!base)
+            return {
+                ok: false,
+                error: "No business is open. Choose one and try again.",
+            };
+        const res = await apiFetch(`${base}${path}`, {
+            method,
+            body: JSON.stringify(body),
+        });
+        const data = (await res.json().catch(() => null)) as
+            (T & { message?: string; error?: string }) | null;
+        if (res.ok) {
+            return { ok: true, data: (data ?? {}) as T };
+        }
+        const by = saidBy(res);
+        const { missing, plan, denied } = toFailure(data, fallback);
+        return {
+            ok: false,
+            error: readError(data, fallback),
+            ...(missing ? { missing } : {}),
+            ...(plan ? { plan } : {}),
+            ...(denied ? { denied } : {}),
+            ...(by === "signed-out" ? { expired: true as const } : {}),
+            ...(by === "unreached" ? { unreached: true as const } : {}),
+        };
+    } catch (error) {
+        return unreachedResult(error);
     }
-    const { missing, plan } = toFailure(data, fallback);
-    return {
-        ok: false,
-        error: readError(data, fallback),
-        ...(missing ? { missing } : {}),
-        ...(plan ? { plan } : {}),
-    };
+}
+
+/**
+ * What a write says when something on the way to the API threw (the read
+ * of which business is open, most likely): the unreached sentence. One of
+ * Next's own interrupts (a redirect, `forbidden()`) is passed on untouched.
+ */
+function unreachedResult(error: unknown): {
+    ok: false;
+    error: string;
+    unreached: true;
+} {
+    unstable_rethrow(error);
+    return { ok: false, error: UNREACHED, unreached: true };
 }
 
 /**
@@ -229,11 +346,28 @@ export async function destroy<T>(
     path: string,
     fallback: string,
 ): Promise<CrmResult<T>> {
-    const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
-    const res = await apiFetch(`${base}${path}`, { method: "DELETE" });
-    const data = (await res.json().catch(() => null)) as
-        (T & { message?: string }) | null;
-    if (res.ok) return { ok: true, data: (data ?? {}) as T };
-    return { ok: false, error: readError(data, fallback) };
+    try {
+        const base = await orgBase();
+        if (!base)
+            return {
+                ok: false,
+                error: "No business is open. Choose one and try again.",
+            };
+        const res = await apiFetch(`${base}${path}`, { method: "DELETE" });
+        const data = (await res.json().catch(() => null)) as
+            (T & { message?: string }) | null;
+        if (res.ok) return { ok: true, data: (data ?? {}) as T };
+        const by = saidBy(res);
+        const { denied } = toFailure(data, fallback);
+        return {
+            ok: false,
+            error: readError(data, fallback),
+            ...(denied ? { denied } : {}),
+            ...(by === "signed-out" ? { expired: true as const } : {}),
+            ...(by === "unreached" ? { unreached: true as const } : {}),
+        };
+    } catch (error) {
+        // Never thrown to the caller, as `mutate`.
+        return unreachedResult(error);
+    }
 }

@@ -65,7 +65,7 @@ test.describe("calendar week", () => {
             page.getByRole("heading", {
                 level: 1,
                 name: new RegExp(
-                    `^\\d{1,2}( (${MONTHS}))?( \\d{4})?–\\d{1,2} (${MONTHS}) \\d{4}$`,
+                    `^\\d{1,2}( (${MONTHS}))?( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
                 ),
             }),
         ).toBeVisible();
@@ -86,6 +86,13 @@ test.describe("calendar week", () => {
     test("‹ › step by week and This week comes back", async ({ page }) => {
         await page.goto("/calendar?view=week");
         const title = page.getByRole("heading", { level: 1 });
+        // The loading shell has a heading of its own ("Loading"): read the
+        // week's once the week is there.
+        await expect(title).toHaveText(
+            new RegExp(
+                `^\\d{1,2}( (${MONTHS}))?( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
+            ),
+        );
         const thisWeek = await title.textContent();
         await page.getByRole("link", { name: "Next week" }).click();
         await page.waitForURL(/view=week&day=/);
@@ -101,7 +108,7 @@ test.describe("calendar week", () => {
             page.getByRole("heading", {
                 level: 1,
                 name: new RegExp(
-                    `^\\d{1,2} (${MONTHS})( \\d{4})?–\\d{1,2} (${MONTHS}) \\d{4}$`,
+                    `^\\d{1,2} (${MONTHS})( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
                 ),
             }),
         ).toBeVisible();
@@ -161,7 +168,7 @@ test.describe("calendar week, hour grid", () => {
         await page.goto("/calendar?view=week");
         const grid = page.locator("#calendar-week");
         await expect(grid.getByText("All day")).toBeVisible();
-        await expect(grid.getByText("07:00", { exact: true })).toBeVisible();
+        await expect(grid.getByText("7 am", { exact: true })).toBeVisible();
         await expect(grid.locator("button[data-day]")).toHaveCount(7);
         // Every block and chip opens its record.
         const links = grid.locator("a[href]");

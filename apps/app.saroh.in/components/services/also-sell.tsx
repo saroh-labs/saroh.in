@@ -1,11 +1,13 @@
 "use client";
 
-import { Checkbox } from "@saroh/ui/checkbox";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
+import { CheckRow } from "@/components/shared/check-row";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { setModuleStatusAction } from "@/lib/modules/actions";
 import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -37,18 +39,23 @@ export function AlsoSell({
     const flip = (f: AlsoSellFeature) => {
         if (!f.on) return setPicked([f.key]);
         startTransition(async () => {
-            const res = await set(f.key, false);
+            const res = await runAction(() => set(f.key, false));
+            if (!res) return;
             if (!res.ok) {
                 // The API says why in a sentence.
                 showError(refusalSentence(res));
                 return;
             }
             router.refresh();
-            showUndo(alsoSellToast(f.label, false), () => {
-                void set(f.key, true).then((back) => {
-                    if (!back.ok) showError(refusalSentence(back));
-                    router.refresh();
+            showUndo(alsoSellToast(f.label, false), async () => {
+                const back = await runAction(() => set(f.key, true), {
+                    quiet: true,
                 });
+                if (!back) return { ok: false, error: UNREACHED };
+                router.refresh();
+                return back.ok
+                    ? true
+                    : { ok: false, error: refusalSentence(back) };
             });
         });
     };
@@ -62,23 +69,21 @@ export function AlsoSell({
         >
             <span className="text-[13px] font-semibold">Also sell</span>
             {features.map((f) => (
-                <label
+                <CheckRow
                     key={f.key}
-                    className="flex max-w-[300px] cursor-pointer items-start gap-[7px] text-[13px]"
+                    checked={f.on}
+                    disabled={pending}
+                    onChange={() => flip(f)}
+                    boxClassName="mt-0.5"
+                    className="max-w-[300px] items-start gap-[7px] coarse:min-h-0"
                 >
-                    <Checkbox
-                        checked={f.on}
-                        disabled={pending}
-                        onCheckedChange={() => flip(f)}
-                        className="mt-0.5"
-                    />
                     <span>
                         {f.label}
                         <span className="block text-[11.5px] text-muted-foreground">
                             {f.note}
                         </span>
                     </span>
-                </label>
+                </CheckRow>
             ))}
             <TurnOnSheet
                 picked={picked}

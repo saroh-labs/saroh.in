@@ -24,10 +24,6 @@ import { Note, Section } from "./storefront-section";
 export const LATE_AFTER_ANCHOR = "late-after";
 
 type Way = StorefrontFulfilmentType;
-
-const LINK =
-    "rounded-sm font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground";
-
 /**
  * Delivery, read first and edited one way at a time (the 9 Oct second
  * pass, after the owner turned down a grid of open fields): each way is a
@@ -77,7 +73,7 @@ export function FulfilmentSection(props: SectionProps) {
     const turnPickupOff = () => {
         const next = types.filter((t) => t !== "PICKUP");
         setStore((s) => ({ ...s, fulfilmentTypes: next }));
-        save({ fulfilmentTypes: next }, "Pick-up turned off", () =>
+        save({ fulfilmentTypes: next }, "Pick-up turned off.", () =>
             setStore((s) => ({ ...s, fulfilmentTypes: types })),
         );
     };
@@ -101,7 +97,8 @@ export function FulfilmentSection(props: SectionProps) {
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    disabled={pending}
+                                    busy={pending}
+                                    busyLabel="Turning off…"
                                     onClick={turnPickupOff}
                                 >
                                     Turn off
@@ -143,9 +140,10 @@ export function FulfilmentSection(props: SectionProps) {
                                         {canEdit && said.fix ? (
                                             <>
                                                 {" "}
-                                                <button
+                                                <Button
+                                                    variant="link"
+                                                    size="inline"
                                                     type="button"
-                                                    className={LINK}
                                                     onClick={() =>
                                                         // No counter: "Yes,
                                                         // they visit" asks
@@ -159,7 +157,7 @@ export function FulfilmentSection(props: SectionProps) {
                                                     }
                                                 >
                                                     Add an address
-                                                </button>
+                                                </Button>
                                             </>
                                         ) : null}
                                     </span>

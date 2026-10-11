@@ -13,6 +13,7 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { GoLiveHandler, SITE_GO_LIVE_TYPE } from "./go-live.handler";
 import { SITE_PAGES_REVALIDATE_TYPE } from "./page-cache-revalidate";
 import { PageCacheRevalidateHandler } from "./page-cache.job";
+import { PublicContactService } from "./public-contact.service";
 import { PublicFooterService } from "./public-footer.service";
 import { PublicHeadService } from "./public-head.service";
 import { PublicQrController } from "./public-qr.controller";
@@ -74,6 +75,7 @@ import { TestReleasesService } from "./test-releases.service";
         TestReleasesService,
         PublicVisitService,
         PublicFooterService,
+        PublicContactService,
         PublicHeadService,
         QrCodesService,
         QrPrintService,

@@ -1,4 +1,5 @@
 import { formatAmount } from "../lib/money";
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { optionSummary } from "../product/option-summary";
 import type { ShopListingCard } from "../product/shop-listing";
@@ -100,7 +101,7 @@ function LeadCard({
                     <img
                         src={p.image.url}
                         alt={p.image.alt}
-                        loading={lead ? "eager" : "lazy"}
+                        {...siteImage(lead ? "above" : "below")}
                         className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
                     />
                 ) : (

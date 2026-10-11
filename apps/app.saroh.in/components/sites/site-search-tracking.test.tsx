@@ -349,14 +349,16 @@ describe("connecting a tracker", () => {
         );
     });
 
-    it("says garbage is the wrong code and keeps Save off", () => {
+    it("says garbage is the wrong code and sends nothing", async () => {
         render(ok(viewOf()));
         typeInto(openSetup("ga4"), "hello there");
         const dialog = within('[role="dialog"]');
         expect(dialog.textContent).toContain(
             "This doesn't look like the right code for this tool.",
         );
-        expect(buttonIn(dialog, "Add to your site")?.disabled).toBe(true);
+        // The button is never off: pressed, nothing is sent.
+        await click(buttonIn(dialog, "Add to your site"));
+        expect(saveSearchTracking).not.toHaveBeenCalled();
     });
 
     it("refuses a secret on the spot and sends nothing", async () => {
@@ -367,7 +369,6 @@ describe("connecting a tracker", () => {
             "This looks like a private key. Never paste it here.",
         );
         const add = buttonIn(dialog, "Add to your site");
-        expect(add?.disabled).toBe(true);
         await click(add);
         expect(saveSearchTracking).not.toHaveBeenCalled();
     });
@@ -444,7 +445,7 @@ describe("verification codes", () => {
         );
         expect(
             row.querySelector('a[href="https://rye.saroh.app"]')?.textContent,
-        ).toBe("View your live page");
+        ).toBe("View your live page (opens in a new tab)");
         expect(row.textContent).not.toMatch(/\bVerified\b/);
         expect(buttonIn(row, "Edit")).toBeDefined();
     });
@@ -695,12 +696,12 @@ describe("switched off by Saroh", () => {
 });
 
 describe("states", () => {
-    it("draws a failed read as a failure with Retry, never an empty form", async () => {
+    it("draws a failed read as a failure with Try again, never an empty form", async () => {
         render({ ok: false });
         expect(host.querySelector('[role="alert"]')).not.toBe(null);
-        expect(text()).toContain("Tracking couldn't be loaded");
+        expect(text()).toContain("Couldn't load tracking");
         expect(host.querySelector("input, textarea")).toBe(null);
-        await click(buttonIn(host, "Retry"));
+        await click(buttonIn(host, "Try again"));
         expect(refresh).toHaveBeenCalled();
     });
 

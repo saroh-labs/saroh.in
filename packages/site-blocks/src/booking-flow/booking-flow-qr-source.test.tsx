@@ -134,7 +134,7 @@ function openAt(address: string) {
 async function chooseAndPay() {
     fireEvent.click(screen.getByRole("radio", { name: /Personal training/ }));
     fireEvent.click(
-        await screen.findByRole("radio", { name: "07:00 with Karan Mehta" }),
+        await screen.findByRole("radio", { name: "7:00 am with Karan Mehta" }),
     );
     const desk = screen.queryByRole("radio", { name: /Pay at the desk/ });
     if (desk) fireEvent.click(desk);
@@ -172,7 +172,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await screen.findByRole("heading", { name: "You're booked, Asha." });
         expect(sent).toHaveLength(1);
@@ -195,12 +195,9 @@ describe("the QR code a booking came from", () => {
         );
         fireEvent.click(
             await screen.findByRole("radio", {
-                name: "07:00 with Karan Mehta",
+                name: "7:00 am with Karan Mehta",
             }),
         );
-        fireEvent.change(screen.getByLabelText("Name"), {
-            target: { value: "Asha Rao" },
-        });
         const desk = screen.queryByRole("radio", { name: /Pay at the desk/ });
         if (desk) fireEvent.click(desk);
         fireEvent.click(
@@ -217,7 +214,6 @@ describe("the QR code a booking came from", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
         await waitFor(() => expect(sent).toHaveLength(1));
         expect(sent[0]?.source).toBe("qr-h7c");
@@ -231,7 +227,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await waitFor(() => expect(sent).toHaveLength(1));
         expect(sent[0]).not.toHaveProperty("source");
@@ -245,7 +241,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await waitFor(() => expect(sent).toHaveLength(1));
         expect(sent[0]).not.toHaveProperty("source");
@@ -259,7 +255,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await waitFor(() => expect(sent).toHaveLength(1));
 
@@ -279,7 +275,7 @@ describe("the QR code a booking came from", () => {
         );
         await chooseAndPay();
         fireEvent.click(
-            screen.getByRole("button", { name: "Book — pay at the desk" }),
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
         );
         await waitFor(() => expect(sent).toHaveLength(2));
         expect(sent[1]).not.toHaveProperty("source");

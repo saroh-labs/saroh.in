@@ -32,7 +32,11 @@ dispatches on section type:
 
 `hero` · `rich-text` · `gallery` · `cta` · `enquiry` · `booking`
 
-`app/[domain]/checkout/[orderId]/` handles storefront checkout.
+The bag (`ShopBag`, in `@saroh/site-blocks`) handles storefront checkout,
+and `app/[domain]/shop/order/[orderId]/` shows a placed order.
+`app/[domain]/checkout/[orderId]/` only forwards an old link there. Pay
+links are `app/pay/[token]/` (an invoice) and `app/pay/o/[token]/` (an
+order).
 
 The section-content types in `lib/publication.ts` are a **local replica** of
 `packages/database/src/cms/section-contract.ts` (v1) — Prisma and

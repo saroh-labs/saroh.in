@@ -56,7 +56,14 @@ test.describe("site shop: bag and checkout", () => {
         await page.route("https://checkout.razorpay.com/**", (route) =>
             route.abort(),
         );
-        await sheet.getByRole("button", { name: /^Continue · / }).click();
+        // Signed out, the button says what it does: the code is the last
+        // step, then paying. Never a bare "Continue".
+        await expect(
+            sheet.getByRole("button", { name: /^Continue/ }),
+        ).toHaveCount(0);
+        await sheet
+            .getByRole("button", { name: /^Sign in and pay · / })
+            .click();
         await signInOnSheet(page, `shop-${Date.now()}@example.in`);
 
         const pay = page.getByRole("dialog");

@@ -160,6 +160,8 @@ interface PublicSiteView {
     modules?: unknown;
     /** The icon to show (DEC-124); absent from an API that predates it. */
     icon?: unknown;
+    /** The host the site is primarily served at; absent from an older API. */
+    primaryHost?: unknown;
 }
 
 /**
@@ -184,6 +186,14 @@ export interface ResolvedSite {
     mode: SiteHostKind;
     /** The release a test host shows; null on a live host. */
     release: TestReleaseInfo | null;
+    /**
+     * The host the site is primarily served at: its verified custom domain
+     * when it has one, else its Saroh address. Every page names it as
+     * canonical, and a QR code's short link lands on it. Null or absent
+     * when the API didn't say (an older API, a test release): the host
+     * the request came on then stands.
+     */
+    primaryHost?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -697,7 +707,31 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
         icon: siteIconOf(body.icon),
         mode: "live",
         release: null,
+        primaryHost: hostOrNull(body.primaryHost),
     };
+}
+
+/** A bare host name ("ryeandco.example"), lower-cased, or null. */
+export function hostOrNull(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const host = value.trim().toLowerCase();
+    return /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
+        host,
+    )
+        ? host
+        : null;
+}
+
+/**
+ * The origin a site's pages belong to: its primary host over https, else
+ * the host the request came on. Local development serves plain names under
+ * `.localhost` over https too (portless).
+ */
+export function siteOriginFor(
+    site: Pick<ResolvedSite, "primaryHost"> | null | undefined,
+    requestHost: string,
+): string {
+    return `https://${site?.primaryHost ?? requestHost}`;
 }
 
 // ---------------------------------------------------------------------------

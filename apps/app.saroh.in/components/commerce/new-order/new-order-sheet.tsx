@@ -1,32 +1,31 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
-import {
-    Sheet,
-    SheetClose,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
+import { FailedRead } from "@/components/shared/failed-read";
 import { showSuccess } from "@saroh/ui/toast";
-import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { Chip } from "@/components/shared/chip";
+import {
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+    useFormSheetDirty,
+} from "@/components/shared/form-sheet";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
 import { orderHref } from "@/lib/orders/links";
 import { centsOf, createLabel, partyOf, payNote } from "@/lib/orders/new-order";
 import { makeNewOrder } from "@/lib/orders/new-order-actions";
 
+import { runAction } from "@/lib/api/run-action";
+import { Notice } from "@saroh/ui/notice";
 import { CustomerStep } from "./customer-step";
 import { LeavesStep } from "./leaves-step";
 import { LinesStep } from "./lines-step";
 import { LinkMade } from "./link-made";
-import { FOCUS } from "./parts";
 import { PayStep } from "./pay-step";
 import type { NewOrderState } from "./use-new-order";
 import { useNewOrder } from "./use-new-order";
@@ -42,7 +41,9 @@ interface Store {
  * a walk-in), the items with any allergy clash, how it leaves, and how it
  * is paid, then one button that says what it will do. Stock is promised
  * when it is made (DEC-032) and a paid order's invoice is written as today
- * (DEC-023). Each opening starts blank.
+ * (DEC-023). Each opening starts blank. It is the app's one sheet frame
+ * (`FormSheet`, wide): a press outside does nothing once the order is
+ * started, and Cancel, Escape and the close button drop it.
  */
 export function NewOrderSheet({
     open,
@@ -53,12 +54,15 @@ export function NewOrderSheet({
     online = true,
     canSearch,
     initialPick = null,
+    noMoneyAt,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     stores: Store[];
     initialStoreId: string;
     canLink: boolean;
+    /** Locations where the order is taken and its money isn't (DEC-106). */
+    noMoneyAt?: readonly string[];
     /** The plan takes payment online (R33); else no link is offered. */
     online?: boolean;
     canSearch: boolean;
@@ -69,67 +73,32 @@ export function NewOrderSheet({
     initialPick?: CustomerPick | null;
 }) {
     const [session, setSession] = useState(0);
-    const [dirty, setDirty] = useState(false);
-    const guard = (event: Event) => {
-        // A half-made order isn't dropped by a stray click or Esc; Close
-        // says it plainly.
-        if (dirty) event.preventDefault();
+    const close = () => {
+        onOpenChange(false);
+        setSession((n) => n + 1);
     };
     return (
-        <Sheet
+        <FormSheet
+            wide
             open={open}
-            onOpenChange={(next) => {
-                onOpenChange(next);
-                if (!next) {
-                    setSession((n) => n + 1);
-                    setDirty(false);
-                }
-            }}
+            title="New order"
+            description="At the counter or on the phone."
+            onClose={close}
         >
-            <SheetContent
-                closeButton={false}
-                onInteractOutside={guard}
-                onEscapeKeyDown={guard}
-                className="flex h-dvh w-full flex-col gap-0 bg-background p-0 sm:max-w-[560px]"
-            >
-                <div className="flex items-center gap-2.5 border-b border-border bg-card px-[18px] py-3.5">
-                    <div className="min-w-0 flex-1">
-                        <SheetTitle className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                            New order
-                        </SheetTitle>
-                        <SheetDescription className="text-[12px] text-muted-foreground">
-                            At the counter or on the phone
-                        </SheetDescription>
-                    </div>
-                    <SheetClose
-                        aria-label="Close"
-                        className={cn(
-                            FOCUS,
-                            "grid size-[34px] cursor-pointer place-items-center rounded-[9px] bg-muted text-muted-foreground transition-colors duration-fast hover:bg-border hover:text-foreground active:scale-95 coarse:size-11",
-                        )}
-                    >
-                        <X aria-hidden className="size-4" strokeWidth={2} />
-                    </SheetClose>
-                </div>
-                {open ? (
-                    <NewOrderBody
-                        key={session}
-                        stores={stores}
-                        initialStoreId={initialStoreId}
-                        canLink={canLink}
-                        online={online}
-                        canSearch={canSearch}
-                        initialPick={initialPick}
-                        onDirty={setDirty}
-                        onClose={() => {
-                            onOpenChange(false);
-                            setSession((n) => n + 1);
-                            setDirty(false);
-                        }}
-                    />
-                ) : null}
-            </SheetContent>
-        </Sheet>
+            {open ? (
+                <NewOrderBody
+                    key={session}
+                    stores={stores}
+                    initialStoreId={initialStoreId}
+                    canLink={canLink}
+                    online={online}
+                    canSearch={canSearch}
+                    initialPick={initialPick}
+                    noMoneyAt={noMoneyAt}
+                    onClose={close}
+                />
+            ) : null}
+        </FormSheet>
     );
 }
 
@@ -140,16 +109,16 @@ function NewOrderBody({
     online,
     canSearch,
     initialPick,
-    onDirty,
+    noMoneyAt,
     onClose,
 }: {
     stores: Store[];
     initialStoreId: string;
     canLink: boolean;
+    noMoneyAt?: readonly string[];
     online: boolean;
     canSearch: boolean;
     initialPick: CustomerPick | null;
-    onDirty: (dirty: boolean) => void;
     onClose: () => void;
 }) {
     const router = useRouter();
@@ -159,8 +128,11 @@ function NewOrderBody({
         online,
         canSearch,
         initialPick,
+        noMoneyAt,
     });
     const [saving, setSaving] = useState(false);
+    // What is missing is said once the button is pressed.
+    const [tried, setTried] = useState(false);
     const details = useBusinessDetailsStep({
         then: "make the order and its pay link",
         continueLabel: "Save and create order",
@@ -175,8 +147,7 @@ function NewOrderBody({
     const total = o.format(o.total);
 
     // Tell the sheet when there is something to lose.
-    const dirty = o.dirty && !made;
-    useEffect(() => onDirty(dirty), [dirty, onDirty]);
+    useFormSheetDirty(o.dirty && !made);
     // A refusal is about the order as it was sent: any change clears it.
     const sent = JSON.stringify([
         o.storeId,
@@ -191,14 +162,14 @@ function NewOrderBody({
     const refusal = failed?.key === sent ? failed.message : null;
 
     async function create() {
+        setTried(true);
         if (o.problem || saving || !o.pick || !o.way) return;
-        setSaving(true);
         // A pay link waits for the registered address (DEC-068): asked in
         // place, then the order is made.
-        const res = await details.run(() =>
-            makeNewOrder(o.storeId, request(o)),
+        const res = await runAction(
+            () => details.run(() => makeNewOrder(o.storeId, request(o))),
+            { setBusy: setSaving },
         );
-        setSaving(false);
         if (!res) return;
         if (!res.ok) {
             // At the plan's orders-a-month limit (U13): its notice too.
@@ -213,7 +184,7 @@ function NewOrderBody({
         }
         showSuccess(
             o.pay === "CASH" && o.change.kind === "change" && o.change.cents > 0
-                ? `Order created — give ${o.format(o.change.cents)} change.`
+                ? `Order created. Give ${o.format(o.change.cents)} change.`
                 : "Order created.",
         );
         onClose();
@@ -221,18 +192,19 @@ function NewOrderBody({
 
     if (made) {
         return (
-            <div className="flex-1 overflow-y-auto px-[18px] py-4">
+            <FormSheetBody>
                 <LinkMade
                     url={made.url}
                     reach={o.reach}
                     orderHref={orderHref(o.storeId, made.id)}
                     onDone={onClose}
                 />
-            </div>
+            </FormSheetBody>
         );
     }
 
-    const shownProblem = o.lines.length > 0 ? (refusal ?? o.problem) : null;
+    const shownProblem =
+        o.lines.length > 0 || tried ? (refusal ?? o.problem) : null;
     return (
         <>
             {details.step}
@@ -241,12 +213,10 @@ function NewOrderBody({
               (overflow-hidden), which lets a grid row shrink it to nothing
               once the steps outgrow a phone's height.
             */}
-            <div className="grid min-h-0 flex-1 auto-rows-max content-start gap-3.5 overflow-y-auto px-[18px] py-4">
+            <FormSheetBody className="auto-rows-max gap-3.5">
                 {stores.length > 1 ? (
                     <div>
-                        <div className="mb-[7px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Taken at
-                        </div>
+                        <div className="label mb-[7px]">Taken at</div>
                         <div
                             role="radiogroup"
                             aria-label="Location"
@@ -272,29 +242,14 @@ function NewOrderBody({
                     attention={o.attentionNote}
                 />
                 {o.loading ? (
-                    <p
-                        role="status"
-                        className="rounded-xl border border-border bg-card px-3.5 py-[13px] text-[12.5px] text-muted-foreground"
-                    >
+                    <Notice role="status">
                         Reading what {storeName} sells…
-                    </p>
+                    </Notice>
                 ) : !o.data ? (
-                    <p
-                        role="alert"
-                        className="rounded-xl border border-border bg-card px-3.5 py-[13px] text-[12.5px] text-destructive-subtle-foreground"
-                    >
-                        Couldn&apos;t read what {storeName} sells.{" "}
-                        <button
-                            type="button"
-                            onClick={o.retryCatalogue}
-                            className={cn(
-                                FOCUS,
-                                "cursor-pointer rounded-sm font-semibold underline underline-offset-2 hover:text-foreground",
-                            )}
-                        >
-                            Try again
-                        </button>
-                    </p>
+                    <FailedRead
+                        things={`what ${storeName} sells`}
+                        onRetry={o.retryCatalogue}
+                    />
                 ) : (
                     <LinesStep
                         products={o.data.products}
@@ -314,9 +269,11 @@ function NewOrderBody({
                     onAddress={o.setAddress}
                     format={o.format}
                     failed={o.waysFailed}
+                    onRetry={o.retryWays}
                     loading={o.waysLoading}
                 />
                 <PayStep
+                    currency={o.data?.currency ?? null}
                     options={o.options}
                     pay={o.pay}
                     onPay={o.setPay}
@@ -324,50 +281,40 @@ function NewOrderBody({
                     onGiven={o.setGiven}
                     change={o.change}
                     total={total}
-                    note={payNote(o.pay, total, o.reach)}
+                    note={payNote(o.pay, total, o.reach, o.money)}
                     format={o.format}
                     discount={o.discount}
                     onDiscount={o.setDiscount}
                     handedOver={o.handedOver}
                     onHandedOver={o.setHandedOver}
                 />
-            </div>
-            <div
-                role="group"
-                aria-label="Order total"
-                className="border-t border-border bg-card px-[18px] py-3"
-            >
-                <div className="mb-[9px] flex items-baseline gap-2.5">
-                    <span className="flex-1 text-[12.5px] text-muted-foreground">
-                        {sumLine(o, storeName)}
-                    </span>
-                    <span className="font-display text-[20px] font-semibold tabular-nums tracking-[-0.02em]">
-                        {total}
-                    </span>
-                </div>
-                {shownProblem ? (
-                    <div
-                        role="status"
-                        className="mb-2 text-[12px] text-destructive-subtle-foreground"
-                    >
-                        {shownProblem}
+            </FormSheetBody>
+            <FormSheetFoot
+                saveLabel={createLabel(o.pay, total, o.lines.length > 0)}
+                savingLabel="Creating…"
+                pending={saving}
+                note={
+                    <div role="group" aria-label="Order total">
+                        <div className="flex items-baseline gap-2.5">
+                            <span className="flex-1 text-[12.5px] text-muted-foreground">
+                                {sumLine(o, storeName)}
+                            </span>
+                            <span className="font-display text-[20px] font-semibold tabular-nums tracking-[-0.02em]">
+                                {total}
+                            </span>
+                        </div>
+                        {shownProblem ? (
+                            <div
+                                role="status"
+                                className="mt-2 text-[12px] text-destructive-subtle-foreground"
+                            >
+                                {shownProblem}
+                            </div>
+                        ) : null}
                     </div>
-                ) : null}
-                <button
-                    type="button"
-                    onClick={() => void create()}
-                    disabled={o.problem !== null || saving}
-                    aria-busy={saving}
-                    className={cn(
-                        FOCUS,
-                        "h-[46px] w-full cursor-pointer rounded-[10px] bg-primary text-[14.5px] font-semibold text-primary-foreground transition-[background-color,transform] duration-fast hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:active:scale-100 coarse:h-12",
-                    )}
-                >
-                    {saving
-                        ? "Creating…"
-                        : createLabel(o.pay, total, o.lines.length > 0)}
-                </button>
-            </div>
+                }
+                onSubmit={create}
+            />
         </>
     );
 }

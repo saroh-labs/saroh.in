@@ -9,7 +9,7 @@ import {
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
 export const metadata: Metadata = {
-    title: "Reset password | Saroh",
+    title: "Reset password · Saroh",
     description: "Set a new password for your Saroh account.",
 };
 

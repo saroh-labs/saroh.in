@@ -17,7 +17,7 @@ import { showError } from "@saroh/ui/toast";
 import { useForm, useWatch } from "react-hook-form";
 
 import { PayPreview } from "@/components/organizations/pay-preview";
-import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
+import { FormSheet } from "@/components/shared/form-sheet";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { sheetWords } from "@/lib/organizations/business-sheet-words";
 import type {
@@ -81,8 +81,7 @@ const FIELDS: {
     },
     {
         name: "bankName",
-        label: "Bank",
-        hint: "Optional.",
+        label: "Bank (optional)",
         width: "basis-full",
         autoCapitalize: "words",
     },
@@ -149,7 +148,7 @@ export function PayInstructionsSheet({
 
     return (
         <Form {...form}>
-            <SettingsSheetFrame
+            <FormSheet
                 id={`${BUSINESS_ROW_ID.pay}-panel`}
                 returnFocusTo={returnTo}
                 title={WORDS.title}
@@ -226,7 +225,7 @@ export function PayInstructionsSheet({
                     businessName={businessName}
                     preview={payPreviewOf(live)}
                 />
-            </SettingsSheetFrame>
+            </FormSheet>
         </Form>
     );
 }

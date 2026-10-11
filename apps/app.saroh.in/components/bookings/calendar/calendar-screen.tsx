@@ -1,8 +1,12 @@
 "use client";
 
+import { PartialRead } from "@/components/shared/failed-read";
+import { formatClock, formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
-import { PartialNotice } from "@saroh/ui/data-state";
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,9 +41,7 @@ import {
     addDays,
     blocksOnDay,
     bookedValue,
-    clock,
     dayColumns,
-    dayLabel,
     isLive,
     localDateOf,
     localMinuteOf,
@@ -50,7 +52,11 @@ import {
 } from "@/lib/services/diary";
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
+import { Users } from "lucide-react";
 
+import { useHold } from "@/components/shared/use-hold";
+import { Segmented } from "@saroh/ui/segmented";
+import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { BookingsViewSwitch } from "../bookings-view-switch";
 import { AgendaList, AgendaMonth } from "./agenda-month";
@@ -60,9 +66,7 @@ import type { GapTarget } from "./new-booking-from-gap";
 import { NewBookingFromGap } from "./new-booking-from-gap";
 import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
-import { BookingsTopBar } from "./parts";
 import type { QuickLookActions } from "./quick-look-types";
-import { useHeld } from "./use-held";
 import { WeekView } from "./week-view";
 
 // The calendar's address lives in a plain module so the server page can
@@ -162,7 +166,7 @@ export function CalendarScreen({
     serviceHours?: ServiceHours | null;
 }) {
     const router = useRouter();
-    const { hold, undo, pending } = useHeld();
+    const { hold, undo, pending } = useHold();
     const [overrides, setOverrides] = useState<Record<string, Override>>({});
     const [peek, setPeek] = useState<string | null>(null);
     const [gap, setGap] = useState<GapTarget | null>(null);
@@ -221,7 +225,7 @@ export function CalendarScreen({
             const byPerson = blocksOnDay(calendar, d, timezone);
             return {
                 date: d,
-                label: dayLabel(d),
+                label: formatDay(d, { weekday: "short", year: "never" }),
                 blocks: Array.from(byPerson.values())
                     .flat()
                     .sort((a, b) => a.start - b.start),
@@ -247,7 +251,7 @@ export function CalendarScreen({
         : null;
     // The week's totals cover all seven days, even on a phone, where the list
     // under them shows one day at a time.
-    const summary = `${live.length} ${live.length === 1 ? "booking" : "bookings"}${
+    const summary = `${count(live.length, "booking")}${
         layout === "week" ? " this week" : ""
     }${
         value !== null && currencyCode
@@ -343,9 +347,9 @@ export function CalendarScreen({
                 ? prepaid
                     ? late
                         ? `${who}'s place cancelled. Within ${rules?.freeCancelHours} hours, so the class is used.`
-                        : `${who}'s place cancelled — the class goes back to the ${b.paidWith === "PACK" ? "pack" : "membership"}.`
+                        : `${who}'s place cancelled. The class goes back to the ${b.paidWith === "PACK" ? "pack" : "membership"}.`
                     : `${who}'s place cancelled.`
-                : `Cancelled ${who}'s ${clock(localMinuteOf(b.startAt, timezone))}.`;
+                : `Cancelled ${who}'s ${formatClock(localMinuteOf(b.startAt, timezone))}.`;
             hold(
                 `cancel:${b.id}`,
                 message,
@@ -375,7 +379,7 @@ export function CalendarScreen({
             ).length;
             hold(
                 `class:${seats.map((b) => b.id).join(",")}`,
-                `${title} cancelled.${back ? ` ${back} ${back === 1 ? "class" : "classes"} given back.` : ""}`,
+                `${title} cancelled.${back ? ` ${count(back, "class", "classes")} given back.` : ""}`,
                 async () => {
                     let failed = 0;
                     for (const b of seats) {
@@ -390,7 +394,7 @@ export function CalendarScreen({
                     }
                     if (failed) {
                         showError(
-                            `${failed} ${failed === 1 ? "place" : "places"} could not be cancelled.`,
+                            `${count(failed, "place")} could not be cancelled.`,
                             "The rest are. Open the class to try those again.",
                         );
                     }
@@ -410,12 +414,11 @@ export function CalendarScreen({
                 }
                 setPeek(null);
                 router.refresh();
-                const to = `${dayLabel(localDateOf(slot.startAt, timezone))} at ${clock(localMinuteOf(slot.startAt, timezone))}`;
-                showUndo(`Moved ${firstName(b)} to ${to}.`, () => {
-                    void rescheduleBooking(b.id, b.startAt).then((back) => {
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    });
+                const to = `${formatDay(localDateOf(slot.startAt, timezone), { weekday: "short", year: "never" })} at ${formatClock(localMinuteOf(slot.startAt, timezone))}`;
+                showUndo(`Moved ${firstName(b)} to ${to}.`, async () => {
+                    const back = await rescheduleBooking(b.id, b.startAt);
+                    router.refresh();
+                    return back;
                 });
             });
         },
@@ -467,8 +470,8 @@ export function CalendarScreen({
     const step = layout === "week" ? 7 : 1;
     const heading =
         layout === "week"
-            ? `Week of ${dayLabel(weekStart).slice(4)}`
-            : `${dayLabel(date)}${date === today ? " · today" : ""}`;
+            ? `Week of ${formatDay(weekStart, { year: "never" })}`
+            : `${formatDay(date, { weekday: "short", year: "never" })}${date === today ? " · today" : ""}`;
 
     const freeRows =
         staff === null
@@ -515,53 +518,60 @@ export function CalendarScreen({
             empty={
                 date === today
                     ? "Nothing booked today."
-                    : `Nothing booked on ${dayLabel(date)}.`
+                    : `Nothing booked on ${formatDay(date, { weekday: "short", year: "never" })}.`
             }
         />
     );
 
     return (
-        <>
-            <BookingsTopBar page="Calendar">
-                <BookingsViewSwitch current="calendar" />
-                <div
-                    role="radiogroup"
-                    aria-label="Layout"
-                    className="ml-auto flex gap-0.5 rounded-[9px] bg-primary p-[3px]"
-                >
-                    {(
-                        [
-                            ["day", "Day by person", "Day"],
-                            ["week", "Week", "Week"],
-                            ["agenda", "Agenda", "Agenda"],
-                        ] as const
-                    ).map(([id, label, short]) => (
-                        <button
-                            key={id}
-                            type="button"
-                            role="radio"
-                            aria-checked={layout === id}
-                            onClick={() => go(id, date)}
-                            className={cn(
-                                "rounded-[7px] px-2.5 py-[5px] text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 coarse:min-h-11",
-                                layout === id
-                                    ? "bg-card text-foreground"
-                                    : "text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
-                                id === "week" && "max-[759px]:hidden",
-                            )}
-                        >
-                            <span className="max-[759px]:hidden">{label}</span>
-                            <span className="min-[760px]:hidden">{short}</span>
-                        </button>
-                    ))}
-                </div>
-            </BookingsTopBar>
-            <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+        <div>
+            {/* The date is the page's title; the two view switches sit
+                before New booking. */}
+            <PageHeader
+                holdsData={false}
+                className="mb-3"
+                breadcrumb={["Bookings", "Calendar"]}
+                title={heading}
+                actions={newBooking}
+                meta={
+                    <>
+                        <BookingsViewSwitch current="calendar" />
+                        <Segmented
+                            label="Layout"
+                            className="ml-auto"
+                            value={layout}
+                            onValueChange={(id) => go(id, date)}
+                            options={(
+                                [
+                                    ["day", "Day by person", "Day"],
+                                    ["week", "Week", "Week"],
+                                    ["agenda", "Agenda", "Agenda"],
+                                ] as const
+                            ).map(([id, label, short]) => ({
+                                value: id,
+                                label: (
+                                    <>
+                                        <span className="max-[759px]:hidden">
+                                            {label}
+                                        </span>
+                                        <span className="min-[760px]:hidden">
+                                            {short}
+                                        </span>
+                                    </>
+                                ),
+                                // A phone has no week grid.
+                                className:
+                                    id === "week"
+                                        ? "max-[759px]:hidden"
+                                        : undefined,
+                            }))}
+                        />
+                    </>
+                }
+            />
+            <div>
                 {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
                 <div className="mb-3 flex flex-wrap items-center gap-3">
-                    <h1 className="m-0 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-                        {heading}
-                    </h1>
                     <div className="flex gap-1">
                         <NavLink
                             href={calendarHref(layout, addDays(date, -step))}
@@ -593,14 +603,14 @@ export function CalendarScreen({
                     >
                         {summary}
                     </span>
-                    {newBooking}
                 </div>
                 <Legend classes={hasClasses} />
                 {staff === null ? (
-                    <PartialNotice className="mb-3">
-                        Hours and time off could not be loaded, so free times
-                        aren&apos;t shown. The bookings below are complete.
-                    </PartialNotice>
+                    <PartialRead
+                        className="mb-3"
+                        things="hours and time off"
+                        so="Free times aren't shown. The bookings below are complete."
+                    />
                 ) : null}
 
                 {staff !== null &&
@@ -611,48 +621,30 @@ export function CalendarScreen({
                             ? "Customers book each service in its own hours, shown here as free time. Add the people who take bookings to give each their own column."
                             : "Nobody is on the diary and no service has hours of its own yet, so customers have no free times to book."}{" "}
                         {can.hours ? (
-                            <button
-                                type="button"
+                            <TextLink
                                 onClick={() => setAddingPerson(true)}
-                                className="rounded-sm font-semibold text-brand underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+                                className="coarse:min-h-11"
                             >
                                 Add who takes bookings
-                            </button>
+                            </TextLink>
                         ) : null}
                     </p>
                 ) : null}
                 {layout === "day" ? (
                     <>
                         {columns.length > 1 ? (
-                            <div
-                                role="radiogroup"
-                                aria-label="Whose day"
-                                className="mb-2.5 flex gap-0.5 overflow-x-auto rounded-[10px] bg-muted p-[3px] min-[760px]:hidden"
-                            >
-                                {columns.map((c) => {
-                                    const on = c.key === phoneKey;
-                                    const n = c.blocks.filter(isLive).length;
-                                    return (
-                                        <button
-                                            key={c.key}
-                                            type="button"
-                                            role="radio"
-                                            aria-checked={on}
-                                            onClick={() =>
-                                                setPhonePerson(c.key)
-                                            }
-                                            className={cn(
-                                                "h-10 min-w-fit flex-1 whitespace-nowrap rounded-[8px] px-2.5 text-[13px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                                on
-                                                    ? "bg-card text-foreground shadow-sm"
-                                                    : "text-muted-foreground hover:text-foreground active:bg-card/60",
-                                            )}
-                                        >
-                                            {callName(c.name)} · {n}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <Segmented
+                                label="Whose day"
+                                block
+                                className="mb-2.5 flex-nowrap overflow-x-auto min-[760px]:hidden"
+                                value={phoneKey}
+                                onValueChange={setPhonePerson}
+                                options={columns.map((c) => ({
+                                    value: c.key,
+                                    label: callName(c.name),
+                                    count: c.blocks.filter(isLive).length,
+                                }))}
+                            />
                         ) : null}
                         {columns.length ? (
                             <DayByPerson
@@ -663,7 +655,10 @@ export function CalendarScreen({
                                 selected={peek}
                                 canBook={can.book}
                                 canOpenHours={can.hours}
-                                dayText={dayLabel(date)}
+                                dayText={formatDay(date, {
+                                    weekday: "short",
+                                    year: "never",
+                                })}
                                 onBlock={peekFromDay}
                                 onFree={bookGap}
                                 onClosed={openClosed}
@@ -757,7 +752,7 @@ export function CalendarScreen({
                     hoursHint="Set their hours in Availability."
                 />
             ) : null}
-        </>
+        </div>
     );
 }
 
@@ -836,7 +831,7 @@ export function rulesSentence(rules: BookingRules | null): string {
     if (rules?.bookAheadDays) {
         const d = rules.bookAheadDays;
         parts.push(
-            `up to ${d % 7 === 0 ? `${d / 7} ${d === 7 ? "week" : "weeks"}` : `${d} ${d === 1 ? "day" : "days"}`} ahead`,
+            `up to ${d % 7 === 0 ? `${d / 7} ${d === 7 ? "week" : "weeks"}` : count(d, "day")} ahead`,
         );
     }
     if (rules?.latestBookingMinutes) {
@@ -850,7 +845,7 @@ export function rulesSentence(rules: BookingRules | null): string {
         : "Customers can book any free time";
     const cancel =
         rules?.freeCancelHours !== null && rules?.freeCancelHours !== undefined
-            ? `, and cancel for free until ${rules.freeCancelHours} ${rules.freeCancelHours === 1 ? "hour" : "hours"} before`
+            ? `, and cancel for free until ${count(rules.freeCancelHours, "hour")} before`
             : "";
     return `${book}${cancel}. Free times are worked out from availability, minus bookings and the gap after each.`;
 }
@@ -874,22 +869,19 @@ function NoOneYet({
     onAdd: () => void;
 }) {
     return (
-        <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-            <p className="text-[14px] font-semibold">
-                Nobody is on the diary yet
-            </p>
-            <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                Add the people who take bookings and their hours, and each gets
-                a column here with their free times to book.
-            </p>
-            {canHours ? (
-                <Button
-                    className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
-                    onClick={onAdd}
-                >
-                    Add someone
-                </Button>
-            ) : null}
-        </div>
+        <EmptyState
+            icon={<Users />}
+            title="No one on the diary yet"
+            description={
+                canHours
+                    ? "Add the people who take bookings and their hours, and each gets a column here."
+                    : "The people who take bookings each get a column here."
+            }
+            action={
+                canHours ? (
+                    <Button onClick={onAdd}>Add someone</Button>
+                ) : undefined
+            }
+        />
     );
 }

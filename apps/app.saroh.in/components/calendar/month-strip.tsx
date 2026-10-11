@@ -1,5 +1,7 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showSuccess } from "@saroh/ui/toast";
@@ -53,7 +55,7 @@ export function MonthStrip({
         const { csv, lines } = monthCsv(cash.all, labelOf, at);
         download(csv, monthCsvName(month));
         showSuccess(
-            `Exported ${lines} ${lines === 1 ? "line" : "lines"} for ${monthTitle(month)} as a spreadsheet file.`,
+            `Exported ${count(lines, "line")} for ${monthTitle(month)} as a spreadsheet file.`,
         );
     };
 
@@ -80,9 +82,7 @@ export function MonthStrip({
                                     : "border-border hover:border-border-strong",
                             )}
                         >
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                                {part.label}
-                            </span>
+                            <span className="label">{part.label}</span>
                             <span
                                 className={cn(
                                     "font-display text-[18px] font-semibold tabular-nums tracking-[-0.02em]",
@@ -91,7 +91,7 @@ export function MonthStrip({
                                         : "text-foreground",
                                 )}
                             >
-                                {part.value}
+                                <AbsentOr says="Not yet">{part.value}</AbsentOr>
                             </span>
                         </button>
                     );
@@ -101,7 +101,7 @@ export function MonthStrip({
                     variant="outline"
                     size="sm"
                     onClick={exportMonth}
-                    className="ml-auto self-center px-3 text-[12.5px]"
+                    className="ml-auto self-center"
                 >
                     Export the month
                 </Button>

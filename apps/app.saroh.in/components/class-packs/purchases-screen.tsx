@@ -1,8 +1,10 @@
 "use client";
 
+import { formatMoneyMajor } from "@/lib/format/money";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { Ticket } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,8 +21,8 @@ import type { PackStanding } from "@/lib/class-packs/balance";
 import { paidByLabel } from "@/lib/class-packs/sell-words";
 import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
 import { personHref } from "@/lib/contacts/person-href";
-import { invoiceMoney } from "@/lib/invoices/money";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { ClassPacksTabs } from "./class-packs-tabs";
 import { SellPackDialog } from "./sell-pack-dialog";
 
@@ -121,7 +123,8 @@ export function PurchasesScreen({
             money: true,
             width: "118px",
             sortValue: (p) => Number(p.price),
-            cell: (p) => invoiceMoney(p.price, p.currency),
+            cell: (p) =>
+                formatMoneyMajor(p.price, p.currency, { decimals: "always" }),
         },
         {
             id: "paid-by",
@@ -130,7 +133,11 @@ export function PurchasesScreen({
             width: "118px",
             sortValue: (p) => paidByLabel(p.paidBy),
             cell: (p) => (
-                <span className="text-[12.5px]">{paidByLabel(p.paidBy)}</span>
+                <span className="text-[12.5px]">
+                    <AbsentOr says="Not recorded">
+                        {paidByLabel(p.paidBy)}
+                    </AbsentOr>
+                </span>
             ),
         },
         {
@@ -140,12 +147,12 @@ export function PurchasesScreen({
             width: "96px",
             cell: (p) =>
                 p.invoiceId ? (
-                    <Link
+                    <TextLink
                         href={`/billing/invoices/${p.invoiceId}`}
-                        className="text-[12.5px] font-medium underline underline-offset-4"
+                        className="text-[12.5px]"
                     >
                         Open
-                    </Link>
+                    </TextLink>
                 ) : (
                     <span className="text-[12.5px] text-muted-foreground">
                         None
@@ -157,7 +164,17 @@ export function PurchasesScreen({
     return (
         <>
             <PageHeader
+                breadcrumb={[
+                    <Link key="bookings" href="/bookings">
+                        Bookings
+                    </Link>,
+                    "Class packs",
+                ]}
                 title="Class packs"
+                count={countLabel(purchases.length, {
+                    one: "pack sold",
+                    other: "packs sold",
+                })}
                 className="mb-0"
                 actions={
                     canWrite ? (
@@ -179,11 +196,12 @@ export function PurchasesScreen({
                 filters={FILTERS}
                 initialFilterId={initialFilterId}
                 noun={{ one: "pack sold", other: "packs sold" }}
+                showTotal={false}
                 searchPlaceholder="Search people or packs"
                 searchableColumnIds={["who", "pack"]}
                 emptyState={{
                     icon: <Ticket />,
-                    title: "Nobody holds a pack yet",
+                    title: "No packs sold yet",
                     note: "Sell someone a pack and it shows here with the classes they have left and when it runs out.",
                     action: canWrite ? (
                         <Button onClick={() => setSelling(true)}>

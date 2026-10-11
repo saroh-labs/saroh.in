@@ -51,6 +51,7 @@ export default async function NewServicePage() {
             usage={{ thisWeek: 0, comingUp: 0 }}
             currency={currency}
             timezone={timezone}
+            openingHours={staff?.openingHours ?? null}
             canEdit={canEdit}
             hasPage={hasPage}
             hasStorefront={hasStorefront}

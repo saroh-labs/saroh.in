@@ -47,9 +47,9 @@ export function defaultPay(offerLink: boolean): PayChoice {
 export function payNote(choice: PayChoice): string {
     switch (choice) {
         case "LINK":
-            return "Booked now, and you get a pay link to send them. It shows unpaid until they pay; Saroh doesn't send it for you yet.";
+            return "Booked now, and you get a pay link to send them. It shows unpaid until they pay. Saroh doesn't send it for you yet.";
         case "DESK":
-            return "Booked now; the calendar shows they pay at the session.";
+            return "Booked now. The calendar shows they pay at the session.";
         case "PAID":
             return "Recorded as paid. Saroh takes no payment and makes no receipt for it.";
     }

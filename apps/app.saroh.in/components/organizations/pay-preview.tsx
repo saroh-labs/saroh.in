@@ -4,6 +4,7 @@ import { PayInstructionsCard, SiteThemeScope } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * "What customers see": the customer's card in a merchant site's default
@@ -38,11 +39,9 @@ export function PayPreview({
             )}
         >
             <div className="flex items-baseline gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    What customers see
-                </span>
+                <span className="label">What customers see</span>
                 {live ? (
-                    <span className="text-[11.5px] text-brand-subtle-foreground">
+                    <span className="text-[11.5px] text-foreground">
                         Showing your unsaved edit
                     </span>
                 ) : null}
@@ -56,12 +55,14 @@ export function PayPreview({
                     />
                 </SiteThemeScope>
             ) : (
-                <p className="rounded-xl border border-dashed border-border px-4 py-3 text-[12.5px] leading-normal text-muted-foreground">
-                    {/* One string: text split over lines here rendered with
-                        different whitespace on the server and the client,
-                        a hydration mismatch (UX-086). */}
-                    {`Nothing set yet. Customers see “Pay ${businessName} the way they've asked you to.”`}
-                </p>
+                <EmptyState
+                    data-ph-mask=""
+                    size="inline"
+                    // One string: text split over lines here rendered with
+                    // different whitespace on the server and the client, a
+                    // hydration mismatch (UX-086).
+                    title={`Nothing set yet. Customers see “Pay ${businessName} the way they've asked you to.”`}
+                />
             )}
         </aside>
     );

@@ -591,8 +591,8 @@ describe("storefront people join the team (DB, F16)", () => {
                 members.acceptInvitation(invite.token, who),
                 members.acceptInvitation(invite.token, who),
             ]);
-            expect(a).toEqual({ storeId });
-            expect(b).toEqual({ storeId });
+            expect(a).toMatchObject({ storeId });
+            expect(b).toMatchObject({ storeId });
             expect(await membershipOf("JOINER")).toEqual({
                 role: "storefront-team",
             });

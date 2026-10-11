@@ -22,7 +22,7 @@ const format = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 describe("Record as refunded", () => {
     it("asks how it went back", () => {
         expect(recordWords(true)).toMatchObject({
-            title: "Record a refund?",
+            title: "Record a refund",
             legend: "How did it go back?",
             verb: "Record as refunded",
         });

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
@@ -15,12 +15,16 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
-import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
-import { FOCUS } from "./parts";
-
-const FIELD =
-    "block h-8 w-full rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
+import { CheckRow } from "@/components/shared/check-row";
+import { ChipGroup } from "@/components/shared/choice-group";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 interface AddressDraft {
     line1: string;
     city: string;
@@ -70,6 +74,8 @@ interface FulfilmentProps {
     first: string;
     /** The delivery charge now, in major units. */
     shipping: number;
+    /** The order's currency, for the charge box. */
+    currency: string;
     address: DeliveryAddress | null;
     paid: PaidHow;
     /** Where money handed back goes: "Razorpay", "the till". */
@@ -90,6 +96,7 @@ function FulfilmentDraft({
     options,
     first,
     shipping,
+    currency,
     address,
     paid,
     refundTo,
@@ -109,6 +116,7 @@ function FulfilmentDraft({
         postalCode: address?.postalCode ?? "",
     });
     const [tell, setTell] = useState(canTell);
+    useOrderSheetDraft([pick, charge, addr, tell]);
 
     const choose = (type: FulfilmentType) => {
         setPick(type);
@@ -148,39 +156,22 @@ function FulfilmentDraft({
     return (
         <>
             <OrderSheetBody>
-                <div
-                    role="radiogroup"
-                    aria-label="Fulfilment"
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {options.map((o) => {
-                        const on = pick === o.type;
-                        return (
-                            <button
-                                key={o.type}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => choose(o.type)}
-                                className={cn(
-                                    FOCUS,
-                                    "h-8 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors active:scale-[0.98] coarse:h-11",
-                                    on
-                                        ? "border-foreground bg-foreground font-semibold text-background"
-                                        : "border-border bg-card font-medium text-neutral-700 hover:bg-muted dark:text-muted-foreground",
-                                )}
-                            >
-                                {o.label}
-                            </button>
-                        );
-                    })}
-                </div>
+                <ChipGroup
+                    label="Fulfilment"
+                    value={pick}
+                    onChange={choose}
+                    choices={options.map((o) => ({
+                        value: o.type,
+                        label: o.label,
+                    }))}
+                />
                 {moved && delivery ? (
                     <fieldset className="mt-2.5">
                         <legend className="text-[12px] font-medium">
                             Address
                         </legend>
-                        <input
+                        <Input
+                            dense
                             aria-label="Street and number"
                             value={addr.line1}
                             onChange={(e) =>
@@ -189,10 +180,11 @@ function FulfilmentDraft({
                                     line1: e.target.value,
                                 }))
                             }
-                            className={cn(FOCUS, FIELD, "mt-1")}
+                            className="mt-1 w-full"
                         />
                         <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px] gap-1.5">
-                            <input
+                            <Input
+                                dense
                                 aria-label="Town or city"
                                 placeholder="Town or city"
                                 value={addr.city}
@@ -202,9 +194,10 @@ function FulfilmentDraft({
                                         city: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
-                            <input
+                            <Input
+                                dense
                                 aria-label="State"
                                 placeholder="State"
                                 value={addr.state}
@@ -214,9 +207,10 @@ function FulfilmentDraft({
                                         state: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
-                            <input
+                            <Input
+                                dense
                                 aria-label="PIN code"
                                 placeholder="PIN"
                                 inputMode="numeric"
@@ -227,47 +221,74 @@ function FulfilmentDraft({
                                         postalCode: e.target.value,
                                     }))
                                 }
-                                className={cn(FOCUS, FIELD)}
+                                className="w-full"
                             />
                         </div>
                     </fieldset>
                 ) : null}
                 {moved ? (
-                    <label className="mt-2.5 grid w-[140px] gap-1 text-[12px] font-medium">
-                        Delivery charge
-                        <input
-                            type="text"
-                            inputMode="decimal"
+                    <Field label="Delivery charge" className="mt-2.5 w-[140px]">
+                        <MoneyInput
+                            dense
+                            currency={currency}
                             value={charge}
-                            onChange={(e) => setCharge(e.target.value)}
-                            placeholder="₹"
+                            onValueChange={setCharge}
                             aria-invalid={typed.kind === "bad" || undefined}
                             aria-describedby={`${ids}-note`}
-                            className={cn(FOCUS, FIELD, "tabular-nums")}
+                            className="w-full"
                         />
-                    </label>
+                    </Field>
                 ) : null}
                 {moved ? (
                     canTell ? (
-                        <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12.5px]">
-                            <input
-                                type="checkbox"
-                                checked={tell}
-                                onChange={(e) => setTell(e.target.checked)}
-                                className={cn(FOCUS, "size-4 cursor-pointer")}
-                            />
+                        <CheckRow
+                            checked={tell}
+                            onChange={setTell}
+                            className="mt-2 text-[12.5px]"
+                        >
                             Tell {first} in their messages
-                        </label>
+                        </CheckRow>
                     ) : (
                         <p className="mt-2 text-[12px] text-muted-foreground">
-                            Nothing is sent to {first} — let them know by email
+                            Nothing is sent to {first}. Let them know by email
                             or phone.
                         </p>
                     )
                 ) : null}
             </OrderSheetBody>
             <OrderSheetFoot
-                busy={busy}
+                saveLabel={
+                    moved && cents !== null
+                        ? saveLabel({
+                              differenceCents: difference,
+                              paid,
+                              linkable,
+                              format: money,
+                          })
+                        : "Save"
+                }
+                saveOff={off}
+                onSubmit={() => {
+                    if (cents === null) return;
+                    onSave({
+                        fulfilment: pick,
+                        shipping: typed.kind === "ok" ? typed.money : "0",
+                        ...(delivery
+                            ? {
+                                  address: {
+                                      line1: addr.line1.trim(),
+                                      city: addr.city.trim(),
+                                      state: addr.state.trim(),
+                                      postalCode: addr.postalCode.trim(),
+                                      line2: address?.line2 ?? null,
+                                      name: address?.name ?? null,
+                                      phone: address?.phone ?? null,
+                                  },
+                              }
+                            : {}),
+                        ...(canTell ? { tell } : {}),
+                    });
+                }}
                 note={
                     <p
                         id={`${ids}-note`}
@@ -282,43 +303,7 @@ function FulfilmentDraft({
                         {note}
                     </p>
                 }
-            >
-                <Button
-                    data-ph-unmask=""
-                    type="button"
-                    disabled={off}
-                    onClick={() => {
-                        if (cents === null) return;
-                        onSave({
-                            fulfilment: pick,
-                            shipping: typed.kind === "ok" ? typed.money : "0",
-                            ...(delivery
-                                ? {
-                                      address: {
-                                          line1: addr.line1.trim(),
-                                          city: addr.city.trim(),
-                                          state: addr.state.trim(),
-                                          postalCode: addr.postalCode.trim(),
-                                          line2: address?.line2 ?? null,
-                                          name: address?.name ?? null,
-                                          phone: address?.phone ?? null,
-                                      },
-                                  }
-                                : {}),
-                            ...(canTell ? { tell } : {}),
-                        });
-                    }}
-                >
-                    {moved && cents !== null
-                        ? saveLabel({
-                              differenceCents: difference,
-                              paid,
-                              linkable,
-                              format: money,
-                          })
-                        : "Save"}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

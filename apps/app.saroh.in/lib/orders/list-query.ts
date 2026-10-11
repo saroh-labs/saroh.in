@@ -163,7 +163,7 @@ export function pageRange(
 ): string | null {
     if (!query.cursor && !more) return null;
     const start = (pageNumber(query) - 1) * ORDERS_PAGE_SIZE + 1;
-    return shown === 0 ? null : `${start}–${start + shown - 1} of ${total}`;
+    return shown === 0 ? null : `${start} to ${start + shown - 1} of ${total}`;
 }
 
 /** The API request for `query`, leaving out what it doesn't narrow. */
@@ -242,7 +242,7 @@ export function ordersEmptyCopy(
     return {
         kind: "first-run",
         title: "No orders yet",
-        note: `The first order in ${storeName ?? "your locations"} appears here the moment someone checks out.`,
+        note: "Orders from your website and counter show here.",
         action: null,
     };
 }

@@ -1,9 +1,9 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -11,10 +11,10 @@ import type { CatalogueView } from "@/lib/products/settings";
 import { addOption, removeOption } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
+import { Tip } from "@saroh/ui/tooltip";
 import { OptionSheet } from "./option-sheet";
-import { bigBtn, rowBtn, TabIntro } from "./product-settings";
-
-const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
+import { TabIntro } from "./product-settings";
 
 /**
  * The ways customers choose between variants — Volume, Shade, Size — and
@@ -31,7 +31,11 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
 
     function run(work: () => Promise<void>) {
         start(async () => {
-            await work();
+            const reached = await runAction(async () => {
+                await work();
+                return true;
+            });
+            if (!reached) return;
             router.refresh();
         });
     }
@@ -39,10 +43,9 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
     const newOption = canWrite ? (
         <OptionSheet
             trigger={
-                <button type="button" className={bigBtn}>
-                    <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
+                <Button type="button" className="shrink-0">
                     New option
-                </button>
+                </Button>
             }
             options={options}
         />
@@ -62,6 +65,7 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
 
             {options.length === 0 ? (
                 <EmptyState
+                    size="panel"
                     title="No options yet"
                     description="Add one when a product comes in more than one kind, such as Size with 250g and 500g."
                     action={newOption}
@@ -70,7 +74,7 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                 <ul className="flex flex-col gap-3">
                     {options.map((o) => {
                         const used = o.productCount > 0;
-                        const usedLine = `Used by ${plural(o.productCount)} — change their variants first.`;
+                        const usedLine = `Used by ${count(o.productCount, "product")}. Change their variants first.`;
                         return (
                             <li
                                 key={o.id}
@@ -81,74 +85,82 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                         {o.name}
                                     </span>
                                     <span className="text-[12px] text-muted-foreground">
-                                        Used by {plural(o.productCount)}
+                                        Used by{" "}
+                                        {count(o.productCount, "product")}
                                     </span>
                                     {canWrite ? (
                                         <div className="flex shrink-0 gap-1.5">
                                             <OptionSheet
                                                 trigger={
-                                                    <button
+                                                    <Button
+                                                        variant="outline"
+                                                        size="xs"
                                                         type="button"
-                                                        className={rowBtn}
                                                         aria-label={`Edit ${o.name}`}
                                                     >
                                                         Edit
-                                                    </button>
+                                                    </Button>
                                                 }
                                                 option={o}
                                                 options={options}
                                             />
-                                            <button
-                                                type="button"
-                                                disabled={used || pending}
-                                                title={
+                                            <Tip
+                                                label={
                                                     used
                                                         ? usedLine
                                                         : `Delete ${o.name}`
                                                 }
-                                                aria-label={`Delete ${o.name}`}
-                                                className={cn(
-                                                    rowBtn,
-                                                    !used && "text-destructive",
-                                                )}
-                                                onClick={() =>
-                                                    run(async () => {
-                                                        const res =
-                                                            await removeOption(
-                                                                o.id,
-                                                            );
-                                                        if (!res.ok)
-                                                            return showError(
-                                                                res.error,
-                                                            );
-                                                        showUndo(
-                                                            `${o.name} deleted.`,
-                                                            () =>
-                                                                run(
-                                                                    async () => {
-                                                                        const undo =
-                                                                            await addOption(
-                                                                                res
-                                                                                    .data
-                                                                                    .name,
-                                                                                res
-                                                                                    .data
-                                                                                    .values,
-                                                                            );
-                                                                        if (
-                                                                            !undo.ok
-                                                                        )
-                                                                            showError(
-                                                                                undo.error,
-                                                                            );
-                                                                    },
-                                                                ),
-                                                        );
-                                                    })
-                                                }
                                             >
-                                                Delete
-                                            </button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="xs"
+                                                    type="button"
+                                                    disabled={used || pending}
+                                                    aria-label={`Delete ${o.name}`}
+                                                    className={
+                                                        used
+                                                            ? undefined
+                                                            : "text-destructive"
+                                                    }
+                                                    onClick={() =>
+                                                        run(async () => {
+                                                            const res =
+                                                                await removeOption(
+                                                                    o.id,
+                                                                );
+                                                            if (!res.ok)
+                                                                return showError(
+                                                                    res.error,
+                                                                );
+                                                            showUndo(
+                                                                `${o.name} deleted.`,
+                                                                () =>
+                                                                    run(
+                                                                        async () => {
+                                                                            const undo =
+                                                                                await addOption(
+                                                                                    res
+                                                                                        .data
+                                                                                        .name,
+                                                                                    res
+                                                                                        .data
+                                                                                        .values,
+                                                                                );
+                                                                            if (
+                                                                                !undo.ok
+                                                                            )
+                                                                                showError(
+                                                                                    undo.error,
+                                                                                );
+                                                                        },
+                                                                    ),
+                                                            );
+                                                        })
+                                                    }
+                                                >
+                                                    Delete
+                                                </Button>
+                                            </Tip>
                                         </div>
                                     ) : null}
                                 </div>
@@ -159,12 +171,16 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                 ) : null}
 
                                 {o.values.length === 0 ? (
-                                    <p className="mt-2.5 text-[12.5px] text-muted-foreground">
-                                        No values yet
-                                        {canWrite
-                                            ? ". Edit it to add some."
-                                            : "."}
-                                    </p>
+                                    <EmptyState
+                                        size="inline"
+                                        className="mt-2.5"
+                                        title="No values yet"
+                                        description={
+                                            canWrite
+                                                ? "Edit it to add some."
+                                                : undefined
+                                        }
+                                    />
                                 ) : (
                                     <ul
                                         aria-label={`${o.name} values`}

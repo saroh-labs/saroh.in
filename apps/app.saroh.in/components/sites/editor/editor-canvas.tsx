@@ -28,6 +28,7 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { Notice } from "@saroh/ui/notice";
 
 /** What the canvas draws around the blocks: the site's header and footer. */
 export interface CanvasChrome {
@@ -88,7 +89,7 @@ export function canvasChromeFor({
 
 /** What Preview's bar says while nothing has been tried. */
 const PREVIEW_NOTE =
-    "This is your site with the draft. Try it; nothing is live until you publish.";
+    "This is your site with the draft. Try it. Nothing is live until you publish.";
 
 /**
  * The canvas: the page, drawn with the real site blocks, in a window whose
@@ -251,10 +252,7 @@ export function EditorCanvas({
              * one, so it is offered, never done automatically.
              */}
             {conflict ? (
-                <div
-                    role="alert"
-                    className="mx-auto mb-4 max-w-xl rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-sm"
-                >
+                <Notice tone="error" className="mx-auto mb-4 max-w-xl">
                     <p className="font-medium">
                         Someone else saved this page while you were editing.
                     </p>
@@ -273,7 +271,7 @@ export function EditorCanvas({
                     >
                         Reload the latest
                     </Button>
-                </div>
+                </Notice>
             ) : null}
 
             {/*
@@ -288,8 +286,8 @@ export function EditorCanvas({
                     className="mx-auto mb-4 text-center text-xs text-muted-foreground"
                     style={{ maxWidth: DEVICE_WIDTH[device] }}
                 >
-                    Nothing&rsquo;s live yet — publish when you&rsquo;re ready,
-                    nobody can see this in the meantime.
+                    Nothing&rsquo;s live yet. Publish when you&rsquo;re ready.
+                    Nobody can see this in the meantime.
                 </p>
             ) : null}
             <div
@@ -407,7 +405,7 @@ function PreviewBar({
             <button
                 type="button"
                 onClick={onBack}
-                className="flex shrink-0 items-center gap-2 rounded text-[0.78125rem] font-semibold text-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex shrink-0 items-center gap-2 rounded text-[0.78125rem] font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Back to editing
                 <kbd className="rounded border border-brand-surface-foreground/30 px-[5px] py-px font-mono text-[0.6875rem] font-normal text-brand-surface-foreground/75">

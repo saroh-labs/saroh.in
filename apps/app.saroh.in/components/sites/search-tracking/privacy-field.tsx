@@ -7,14 +7,15 @@ import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useId, useState, useTransition } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import {
     NOTE,
     PROBLEM,
-    SettingsSheetFrame,
     useSheetControl,
 } from "@/components/sites/settings/settings-sheet";
 import { PRIVACY_NOTE, PRIVACY_URL_PROBLEM } from "@/lib/sites/search-tracking";
 
+import { runAction } from "@/lib/api/run-action";
 import type { SaveSection } from "./parts";
 import { LineRow } from "./parts";
 
@@ -40,7 +41,8 @@ export function PrivacyField({
 
     function submit(next: string | null) {
         startTransition(async () => {
-            const res = await save({ privacyUrl: next });
+            const res = await runAction(() => save({ privacyUrl: next }));
+            if (!res) return;
             if (!res.ok) {
                 if (res.field === "privacyUrl") setServerError(res.error);
                 return;
@@ -127,8 +129,8 @@ function PrivacySheet({
     const problem = typed && url === null ? PRIVACY_URL_PROBLEM : serverError;
 
     return (
-        <SettingsSheetFrame
-            editId={editId}
+        <FormSheet
+            returnFocusTo={editId}
             title="Your privacy page"
             description={`Optional. The cookie notice links to it. ${PRIVACY_NOTE}`}
             open={open}
@@ -165,6 +167,6 @@ function PrivacySheet({
                     </p>
                 )}
             </div>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

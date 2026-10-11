@@ -169,7 +169,7 @@ describe("the join sheet's autopay (D12)", () => {
         const options = within(payWith).getAllByRole("radio");
         expect(options.map((o) => o.textContent)).toEqual([
             expect.stringContaining("Pay ₹2,500 and turn on autopay"),
-            expect.stringContaining("Just pay for this month"),
+            expect.stringContaining("Pay for this month only"),
         ]);
         expect(options[0]).toHaveAttribute("aria-checked", "true");
         const how = within(sheet).getByRole("radiogroup", {
@@ -241,7 +241,7 @@ describe("the join sheet's autopay (D12)", () => {
         const { sheet, onJoined } = renderJoin(api);
         await press(
             within(sheet).getByRole("radio", {
-                name: /Just pay for this month/,
+                name: /Pay for this month only/,
             }),
         );
         expect(
@@ -386,7 +386,7 @@ function tabOf(
 
 const RUPEE = { amount: "1.00", currency: "INR" };
 const CHECK_BEFORE =
-    "To switch on autopay, your bank needs a ₹1 check. We refund the ₹1 straight away — it's back in your account in 5–7 working days.";
+    "To switch on autopay, your bank needs a ₹1 check. We refund the ₹1 straight away. It's back in your account in 5 to 7 working days.";
 
 function planApi(start?: PlanApi["startAutopay"]): PlanApi {
     return {
@@ -589,7 +589,7 @@ describe("the ₹1 check (D12B, DEC-064)", () => {
         });
         expect(
             screen.getByText(
-                "Autopay is on with UPI (mo•••@okicici). The ₹1 check is being refunded — it reaches you in 5–7 working days. Next payment ₹2,500 on 2 Nov 2026.",
+                "Autopay is on with UPI (mo•••@okicici). The ₹1 check is being refunded. It reaches you in 5 to 7 working days. Next payment ₹2,500 on 2 Nov 2026.",
             ),
         ).toBeInTheDocument();
     });
@@ -757,7 +757,7 @@ describe("the page after set-up (D12)", () => {
             screen.getByRole("heading", { name: "Autopay isn't on" }),
         ).toBeInTheDocument();
         expect(screen.getByRole("alert")).toHaveTextContent(
-            "Your payment went through — Monthly unlimited is paid.",
+            "Your payment went through, and Monthly unlimited is paid.",
         );
         expect(
             screen.getByRole("link", { name: "Try autopay again" }),

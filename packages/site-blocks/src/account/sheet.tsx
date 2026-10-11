@@ -5,6 +5,11 @@ import { useEffect, useId, useRef } from "react";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
+import {
+    SHEET_CLOSE_SIZE,
+    SHEET_HEIGHT,
+    useScrollLock,
+} from "../lib/sheet-shell";
 import { cn } from "../lib/utils";
 
 /**
@@ -29,6 +34,8 @@ export function Sheet({
     const ids = useId();
     const sheet = useRef<HTMLDivElement>(null);
     const opener = useRef<Element | null>(null);
+    // The page behind stays still while the sheet is open.
+    useScrollLock(open);
 
     useEffect(() => {
         if (!open) return;
@@ -84,7 +91,7 @@ export function Sheet({
                 tabIndex={-1}
                 onKeyDown={onKeyDown}
                 {...NO_CAPTURE_ATTRS}
-                className={`bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto max-h-[88vh] max-w-[560px] overflow-y-auto rounded-t-[calc(var(--site-radius)+18px)] px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-[18px] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${NO_CAPTURE_CLASS}`}
+                className={`bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto max-w-[560px] overflow-y-auto rounded-t-[calc(var(--site-radius)+18px)] px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-[18px] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${SHEET_HEIGHT} ${NO_CAPTURE_CLASS}`}
             >
                 <div className="flex items-center gap-2.5">
                     <h2
@@ -98,7 +105,8 @@ export function Sheet({
                         onClick={onClose}
                         aria-label="Close"
                         className={cn(
-                            "text-site-fg size-[34px] shrink-0 cursor-pointer rounded-full text-base hover:opacity-80",
+                            "text-site-fg shrink-0 cursor-pointer rounded-full text-base hover:opacity-80",
+                            SHEET_CLOSE_SIZE,
                             quietFill,
                             focusRing,
                         )}

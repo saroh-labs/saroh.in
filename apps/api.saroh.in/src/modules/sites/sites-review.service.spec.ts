@@ -40,7 +40,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
-import { can } from "../organizations/organization-policy";
+import { can, roleDenial } from "../organizations/organization-policy";
 import { SitesService } from "./sites.service";
 
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
@@ -174,7 +174,9 @@ describe("SitesService.createComment", () => {
                 pageId: "page_1",
                 sectionKey: "k",
             }),
-        ).rejects.toThrow(/MEMBER.*site:comment/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:comment"),
+        });
         expect(commentCreate).not.toHaveBeenCalled();
     });
 });
@@ -248,7 +250,9 @@ describe("SitesService.setCommentResolved", () => {
                 "c1",
                 true,
             ),
-        ).rejects.toThrow(/REVIEWER.*section:write/);
+        ).rejects.toMatchObject({
+            response: roleDenial("section:write"),
+        });
     });
 
     it("stamps who settled it, and clears both fields on reopen", async () => {
@@ -422,7 +426,9 @@ describe("SitesService.createApproval", () => {
             service.createApproval(ctx({ role: "MEMBER" }), "site_1", {
                 outcome: "APPROVED",
             }),
-        ).rejects.toThrow(/MEMBER.*site:approve/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:approve"),
+        });
     });
 });
 
@@ -563,7 +569,9 @@ describe("review on a test release (T8)", () => {
                     outcome: "APPROVED",
                     testReleaseId: "rel_2",
                 }),
-            ).rejects.toThrow(/MEMBER.*site:approve/);
+            ).rejects.toMatchObject({
+                response: roleDenial("site:approve"),
+            });
         });
     });
 

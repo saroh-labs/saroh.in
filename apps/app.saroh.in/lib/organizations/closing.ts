@@ -1,4 +1,5 @@
 import { formatMoney } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { membershipsWarning } from "@/lib/payments/memberships-warning";
 import { providerName } from "@/lib/payments/providers";
 
@@ -128,7 +129,7 @@ export function closingBanner(
                   lines: refunds.rows.map(refundLine),
                   more:
                       refunds.hidden > 0
-                          ? `${refunds.rows.length > 0 ? "And " : ""}${refunds.hidden} ${refunds.hidden === 1 ? "refund" : "refunds"} on orders or invoices an owner or admin can see.`
+                          ? `${refunds.rows.length > 0 ? "And " : ""}${count(refunds.hidden, "refund")} on orders or invoices an owner or admin can see.`
                           : null,
               }
             : null;

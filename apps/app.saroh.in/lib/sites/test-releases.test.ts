@@ -58,14 +58,16 @@ const OWNER: ReleaseAbilities = {
 describe("when, in the business's zone", () => {
     it("says today, tomorrow, a weekday this week, and a date further off", () => {
         expect(whenIn("2026-09-30T12:30:00Z", KOLKATA, NOW)).toBe(
-            "today, 6:00pm",
+            "today, 6:00 pm",
         );
         expect(whenIn("2026-10-01T12:30:00Z", KOLKATA, NOW)).toBe(
-            "tomorrow, 6:00pm",
+            "tomorrow, 6:00 pm",
         );
-        expect(whenIn("2026-10-02T12:30:00Z", KOLKATA, NOW)).toBe("Fri 6:00pm");
+        expect(whenIn("2026-10-02T12:30:00Z", KOLKATA, NOW)).toBe(
+            "Fri 6:00 pm",
+        );
         expect(whenIn("2026-10-20T12:30:00Z", KOLKATA, NOW)).toBe(
-            "Tue 20 Oct, 6:00pm",
+            "Tue 20 Oct, 6:00 pm",
         );
     });
 
@@ -73,10 +75,10 @@ describe("when, in the business's zone", () => {
         // 22:30 UTC on the 30th is already the 1st in Kolkata, and still
         // the 30th in London (BST).
         expect(whenIn("2026-09-30T22:30:00Z", KOLKATA, NOW)).toBe(
-            "tomorrow, 4:00am",
+            "tomorrow, 4:00 am",
         );
         expect(whenIn("2026-09-30T22:30:00Z", "Europe/London", NOW)).toBe(
-            "today, 11:30pm",
+            "today, 11:30 pm",
         );
     });
 
@@ -96,8 +98,8 @@ describe("a release's status copy", () => {
     it("ready: who made it and when", () => {
         expect(releaseStatusCopy(release(), KOLKATA, NOW)).toEqual({
             label: "Ready",
-            tone: "draft",
-            line: "Made today, 10:10am by Asha",
+            tone: "active",
+            line: "Made today, 10:10 am by Asha",
         });
     });
 
@@ -115,7 +117,7 @@ describe("a release's status copy", () => {
             NOW,
         );
         expect(copy.label).toBe("Scheduled");
-        expect(copy.line).toBe("Goes live Fri 6:00pm (Kolkata time) by Ravi");
+        expect(copy.line).toBe("Goes live Fri 6:00 pm (Kolkata time) by Ravi");
     });
 
     it("live and discarded say when", () => {
@@ -128,7 +130,7 @@ describe("a release's status copy", () => {
                 KOLKATA,
                 NOW,
             ),
-        ).toMatchObject({ label: "Live", line: "Went live today, 2:30pm" });
+        ).toMatchObject({ label: "Live", line: "Went live today, 2:30 pm" });
         expect(
             releaseStatusCopy(
                 release({
@@ -140,13 +142,13 @@ describe("a release's status copy", () => {
             ),
         ).toMatchObject({
             label: "Discarded",
-            line: "Discarded yesterday, 2:30pm. Its links no longer open it.",
+            line: "Discarded yesterday, 2:30 pm. Its links no longer open it.",
         });
     });
 
     it("a scheduled go-live that didn't happen says why, in the API's words", () => {
         const reason =
-            "The site was published at 3:10pm, after this was scheduled. Go live now, or schedule it again.";
+            "The site was published at 3:10 pm, after this was scheduled. Go live now, or schedule it again.";
         expect(
             releaseStatusCopy(
                 release({ lastGoLive: { outcome: "NOT_LIVE", reason } }),
@@ -169,14 +171,14 @@ describe("the top bar and publishing over a schedule", () => {
 
     it("says what is going live and when", () => {
         expect(scheduledReadout([release(), scheduled], KOLKATA, NOW)).toBe(
-            "Going live Fri 6:00pm · Diwali menu",
+            "Going live Fri 6:00 pm · Diwali menu",
         );
         expect(scheduledReadout([release()], KOLKATA, NOW)).toBeNull();
     });
 
     it("warns that a publish now stops the schedule (KTD-14)", () => {
         expect(publishOverScheduleWarning(scheduled, KOLKATA, NOW)).toMatch(
-            /^“Diwali menu” is scheduled to go live Fri 6:00pm\. If you publish now, it won't go live then/,
+            /^“Diwali menu” is scheduled to go live Fri 6:00 pm\. If you publish now, it won't go live then/,
         );
     });
 });
@@ -297,7 +299,7 @@ describe("links, going live and what stays live", () => {
 
     it("Go live says what it replaces, and the toast what it did", () => {
         expect(replacesLine("2026-09-30T09:40:00Z", KOLKATA, NOW)).toBe(
-            "It replaces the version that's been live since today, 3:10pm. Your draft is left as it is.",
+            "It replaces the version that's been live since today, 3:10 pm. Your draft is left as it is.",
         );
         expect(
             wentLiveToast(
@@ -315,7 +317,7 @@ describe("links, going live and what stays live", () => {
                 NOW,
             ),
         ).toBe(
-            "“Diwali menu” is live. It replaced the version published today, 3:10pm by Asha. Recorded as gone live without approval.",
+            "“Diwali menu” is live. It replaced the version published today, 3:10 pm by Asha. Recorded as gone live without approval.",
         );
     });
 

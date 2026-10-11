@@ -76,6 +76,7 @@ import { validationPipeOptions } from "../../common/validation";
 import { planMeter } from "../billing/metering.service";
 import { hashPayToken } from "../invoices/pay-token";
 import { BookServiceDto } from "./dto";
+import { daysSkipOf } from "./public-bookings.controller";
 import { PublicBookingsService } from "./public-bookings.service";
 import { FixedWindowRateLimiter } from "./rate-limiter";
 import type { BookInput } from "./reservation";
@@ -945,6 +946,27 @@ describe("the next two weeks (U19)", () => {
             staffName: "Karan Mehta",
         });
         expect(JSON.stringify(out)).not.toMatch(/timeOff|reason|off/i);
+    });
+});
+
+describe("later dates on the booking page", () => {
+    it("starts the two weeks as many days on as asked", async () => {
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW, {
+            skip: 14,
+        });
+        expect(out.days).toHaveLength(14);
+        expect(out.days[0]!.date).toBe("2026-10-02");
+        // A service with no people of its own names nobody to choose.
+        expect(out.staff).toEqual([]);
+    });
+
+    it("reads ?skip= as whole days, 0 to 70, and anything else as today", () => {
+        expect(daysSkipOf("14")).toBe(14);
+        expect(daysSkipOf("0")).toBe(0);
+        expect(daysSkipOf("999")).toBe(70);
+        for (const not of [undefined, "", "-14", "1.5", "two", ["14"], "1e2"]) {
+            expect(daysSkipOf(not)).toBe(0);
+        }
     });
 });
 

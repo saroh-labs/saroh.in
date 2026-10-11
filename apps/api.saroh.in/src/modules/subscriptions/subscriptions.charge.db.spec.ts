@@ -733,7 +733,7 @@ describe("a decline", () => {
         );
         expect(
             home?.evidence?.find((e) => e.id === who.subscriptionId)?.tag,
-        ).toBe("Autopay didn't charge — paying by link");
+        ).toBe("Autopay didn't charge, paying by link");
         await offHome(invoice.id);
     });
 

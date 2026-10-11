@@ -1,5 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// `FailedRead` reads the page again through the router.
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 import type { OrderAttention, OrderVisits } from "@/lib/orders/read";
 
@@ -135,7 +140,9 @@ describe("VisitsSection (B14)", () => {
 
     it("says so when the visits couldn't be read", () => {
         const html = render({ visits: null });
-        expect(html).toContain("couldn&#x27;t be read");
+        expect(html).toContain('role="alert"');
+        expect(html).toContain("Couldn&#x27;t load the visits.");
+        expect(html).toContain("Try again");
         expect(html).not.toContain("attended</span>");
     });
 });

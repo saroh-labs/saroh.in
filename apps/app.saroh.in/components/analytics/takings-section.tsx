@@ -1,3 +1,5 @@
+import { formatDay } from "@/lib/format/datetime";
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
@@ -13,7 +15,6 @@ import { takingsFigures } from "@/lib/analytics/takings-figures";
 import type { RowsLink } from "@/lib/analytics/takings-words";
 import {
     chartLabel,
-    dayMonth,
     HOW_TAKINGS_ARE_COUNTED,
     ordersHref,
     otherCurrencyNote,
@@ -29,7 +30,9 @@ import {
     weekReadout,
 } from "@/lib/analytics/takings-words";
 import { newOrderHref } from "@/lib/orders/links";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
+import { whoCanChange } from "@/components/shared/who-can-change";
 import type { ReadoutBar } from "./readout-bars";
 import { ReadoutBars } from "./readout-bars";
 import { barTone, PlaceSplit, SO_FAR, WeekSpark } from "./takings-marks";
@@ -68,9 +71,8 @@ function TakingsBody({ read }: { read: SourceRead<TakingsRead> }) {
         return (
             <PermissionDeniedState
                 className="mt-3"
-                title="Sales need access to payments"
-                description="Your role can open Insights but not the business's payments, so its sales aren't shown here. The website's figures below are still yours to see."
-                note="An owner or admin can add “See payments” to your role in Settings › Team."
+                size="panel"
+                {...whoCanChange({ thing: "sales" })}
             />
         );
     }
@@ -78,13 +80,9 @@ function TakingsBody({ read }: { read: SourceRead<TakingsRead> }) {
         return (
             <FailedState
                 className="mt-3"
-                title="Sales could not be loaded"
-                description="Something went wrong on our side, so this part of Insights is missing. Nothing has been changed."
-                action={
-                    <Button asChild variant="outline">
-                        <Link href="/analytics">Try again</Link>
-                    </Button>
-                }
+                size="panel"
+                title={couldntLoad("sales")}
+                retryHref="/analytics"
             />
         );
     }
@@ -94,8 +92,9 @@ function TakingsBody({ read }: { read: SourceRead<TakingsRead> }) {
             <EmptyState
                 className="mt-3"
                 icon={<Wallet />}
-                title="No money has come in yet"
-                description="Your first paid order or invoice shows here the week it's paid: what came in, where it was sold and how this week is going."
+                size="panel"
+                title="No takings yet"
+                description="Your first paid order or invoice shows here the week it's paid."
                 action={
                     <div className="flex flex-wrap justify-center gap-2">
                         <Button asChild>
@@ -201,7 +200,7 @@ function Answers({ figures }: { figures: TakingsFigures }) {
                         How sales are counted
                         <ChevronRight
                             aria-hidden
-                            className="size-4 transition-transform duration-150 group-open:rotate-90"
+                            className="size-4 transition-transform duration-base group-open:rotate-90"
                         />
                     </summary>
                     <ul className="mb-1 mt-1 max-w-[68ch] list-disc space-y-1 pl-4">
@@ -228,7 +227,9 @@ function Figures({ figures }: { figures: TakingsFigures }) {
                 href: ordersHref(bar.start, bar.end),
                 label: "Orders placed that week",
             },
-            ...(i === 0 ? { tick: dayMonth(bar.start) } : {}),
+            ...(i === 0
+                ? { tick: formatDay(bar.start, { year: "never" }) }
+                : {}),
         })),
         {
             key: "so-far",
@@ -253,17 +254,17 @@ function Figures({ figures }: { figures: TakingsFigures }) {
                     <li key={t.key} className="min-w-0">
                         <Link
                             href={t.href}
-                            className="group flex h-full flex-col rounded-[11px] border border-border px-[13px] py-3 transition-colors duration-150 hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="group flex h-full flex-col rounded-[11px] border border-border px-[13px] py-3 transition-colors duration-base hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
-                            <span className="flex items-center justify-between gap-1 text-[11px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
+                            <span className="label flex items-center justify-between gap-1">
                                 {t.label}
                                 <ChevronRight
                                     aria-hidden
-                                    className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+                                    className="size-3.5 shrink-0 opacity-60 transition-opacity duration-fast group-hover:opacity-100"
                                 />
                             </span>
                             <span className="mt-1.5 font-display text-[19px] font-semibold tabular-nums tracking-[-0.03em] text-foreground [overflow-wrap:anywhere] min-[380px]:text-[22px]">
-                                {t.value}
+                                <AbsentOr says="None">{t.value}</AbsentOr>
                             </span>
                             <span className="mt-[3px] text-xs leading-[1.45] text-muted-foreground">
                                 {t.note}

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { DeleteCustomerMenu } from "@/components/customers/delete-customer-menu";
 import { EditStoreCustomer } from "@/components/customers/edit-store-customer";
+import { FailedRead } from "@/components/shared/failed-read";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { personHref } from "@/lib/contacts/person-href";
@@ -24,9 +25,9 @@ export const metadata = { title: "Customer" };
 
 const STANDING: Record<
     OrderStanding,
-    { label: string; variant: "draft" | "success" | "neutral" }
+    { label: string; variant: "active" | "success" | "neutral" }
 > = {
-    UNFULFILLED: { label: "Unfulfilled", variant: "draft" },
+    UNFULFILLED: { label: "Unfulfilled", variant: "active" },
     FULFILLED: { label: "Fulfilled", variant: "success" },
     REFUNDED: { label: "Refunded", variant: "neutral" },
     CANCELLED: { label: "Cancelled", variant: "neutral" },
@@ -144,10 +145,11 @@ export default async function CustomerPage({
                     <div className="flex min-w-0 flex-col gap-4">
                         <Card title="Orders">
                             {orders === null ? (
-                                <p className="px-4 py-3.5 text-[12.5px] text-muted-foreground">
-                                    Their orders could not be read just now.
-                                    Nothing about them has changed.
-                                </p>
+                                <FailedRead
+                                    things="their orders"
+                                    reassurance="Nothing about them has changed."
+                                    className="px-4 py-3.5"
+                                />
                             ) : theirs.length === 0 ? (
                                 <p className="text-pretty px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
                                     No orders at {store.name} yet. An order
@@ -282,9 +284,7 @@ function Card({
     return (
         <section className="overflow-hidden rounded-[12px] border border-border bg-card">
             <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-muted px-4 py-1.5">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {title}
-                </h2>
+                <h2 className="label">{title}</h2>
                 {action}
             </div>
             {children}

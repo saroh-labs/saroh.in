@@ -6,6 +6,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { timeWords, whenWords } from "../../common/words-format";
 import { readVerdicts } from "./live-pointer";
 import { approvalApplies, approvalRequired } from "./publish-approval";
 import { ADDRESS_MISSING_MESSAGE } from "./site-flags";
@@ -97,16 +98,15 @@ export function assertScheduleWindow(at: Date, now: Date): void {
 }
 
 /**
- * A time as the merchant reads it, in their zone: "3:10pm" today,
- * "Fri 3 Oct, 3:10pm" on any other day.
+ * A time as the merchant reads it, in their zone: "3:10 pm" today,
+ * "Fri 3 Oct, 3:10 pm" on any other day.
  */
 export function localTime(at: Date, zone: string, now: Date): string {
     const when = DateTime.fromJSDate(at, { zone });
-    const clock = when.toFormat("h:mma").toLowerCase();
     const today = DateTime.fromJSDate(now, { zone });
     return when.hasSame(today, "day")
-        ? clock
-        : `${when.toFormat("ccc d LLL")}, ${clock}`;
+        ? timeWords(at, zone)
+        : whenWords(at, zone, { weekday: true });
 }
 
 type ScheduleTx = Pick<

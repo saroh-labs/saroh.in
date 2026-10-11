@@ -188,7 +188,7 @@ describe("rowAge", () => {
                     }),
                     now,
                 ),
-            ).toEqual({ text: "Next 19 Sep, 10:00", late: false });
+            ).toEqual({ text: "Next tomorrow, 10:00 am", late: false });
         });
 
         it("writes today in a sentence's case", () => {
@@ -200,7 +200,7 @@ describe("rowAge", () => {
                     }),
                     now,
                 )?.text,
-            ).toBe("Next today, 18:00");
+            ).toBe("Next today, 6:00 pm");
         });
 
         it("says when no visit is booked", () => {
@@ -230,7 +230,7 @@ describe("rowAge", () => {
                     },
                     now,
                 ),
-            ).toBe("Next yesterday, 10:00");
+            ).toBe("Next yesterday, 10:00 am");
         });
     });
 

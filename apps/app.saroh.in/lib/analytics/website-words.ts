@@ -1,6 +1,5 @@
-import { NUMBER_LOCALE } from "@/lib/format/locale";
-
-import { dayMonth, weekdayDayMonth } from "./takings-words";
+import { formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 
 /**
  * The words of Insights' website half (audit F3, F10): a day the way the
@@ -9,14 +8,9 @@ import { dayMonth, weekdayDayMonth } from "./takings-words";
  * `website-words.test.ts`.
  */
 
-/** "1 visit", "412 visits". */
-function count(n: number, one: string, many: string): string {
-    return `${n.toLocaleString(NUMBER_LOCALE)} ${n === 1 ? one : many}`;
-}
-
 /** The axis label under a day: "4 Sep". */
 export function dayTick(date: string): string {
-    return dayMonth(date);
+    return formatDay(date, { year: "never" });
 }
 
 /** A day's readout: "Thursday 1 Oct · 412 visits · 280 visitors". */
@@ -25,7 +19,7 @@ export function dayReadout(point: {
     views: number;
     uniques: number;
 }): string {
-    return `${weekdayDayMonth(point.date)} · ${count(point.views, "visit", "visits")} · ${count(point.uniques, "visitor", "visitors")}`;
+    return `${formatDay(point.date, { weekday: "long", year: "never" })} · ${count(point.views, "visit", "visits")} · ${count(point.uniques, "visitor", "visitors")}`;
 }
 
 /**
@@ -83,7 +77,7 @@ export function ordersLine({
             : `No paid orders in the last ${rangeLabel}.`;
     }
     return before
-        ? "Orders counts from October 2026, when Insights began recording paid orders; earlier ones aren't counted."
+        ? "Orders counts from October 2026, when Insights began recording paid orders. Earlier ones aren't counted."
         : null;
 }
 

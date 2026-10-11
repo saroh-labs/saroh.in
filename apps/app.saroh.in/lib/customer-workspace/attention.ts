@@ -1,4 +1,5 @@
-import { dayText } from "@/lib/subscriptions/view";
+import { formatDate, formatTime } from "@/lib/format/datetime";
+import { count as countOf, plural } from "@/lib/format/plural";
 
 /**
  * Needs attention on Customer Detail and the Customers list (DEC-040, C5):
@@ -98,7 +99,7 @@ export function tagTitle(
  */
 export function hiddenText(hidden: number, shown: number): string | null {
     if (hidden <= 0) return null;
-    const notes = hidden === 1 ? "note" : "notes";
+    const notes = plural(hidden, "note");
     return shown > 0
         ? `${hidden} more ${notes} you can't see`
         : `${hidden} ${notes} you can't see`;
@@ -132,7 +133,7 @@ export function entryMeta(
     timeZone: string,
     now: Date,
 ): string {
-    const day = dayText(e.createdAt, timeZone, now);
+    const day = formatDate(e.createdAt, timeZone, { now });
     const from = FROM[e.source];
     if (from) return `${from[0].toUpperCase()}${from.slice(1)} · ${day}`;
     const who =
@@ -260,7 +261,7 @@ export function rolesThatSeeSensitive(
  */
 export function sensitiveTickText(roles: string[] | null | undefined): string {
     const who = roles?.length ? ` (${roles.join(", ")})` : "";
-    return `Sensitive — only people who can see sensitive notes${who} can read it`;
+    return `Sensitive. Only people who can see sensitive notes${who} can read it`;
 }
 
 /** The allergen is picked from the list, when the business has one. */
@@ -299,7 +300,7 @@ export function draftProblem(
     } else if (draft.label.trim().length > LABEL_MAX) {
         return {
             field: "label",
-            message: `Keep it under ${LABEL_MAX} characters; add the rest as detail.`,
+            message: `Keep it under ${LABEL_MAX} characters. Add the rest as detail.`,
         };
     }
     if (draft.detail.trim().length > DETAIL_MAX) {
@@ -426,7 +427,7 @@ export function suggestionsTitle(
     entries: Pick<AttentionEntry, "source">[],
 ): string {
     const count = entries.length;
-    return `${count} ${count === 1 ? "note" : "notes"} ${suggestionPlace(entries.map((e) => e.source))}`;
+    return `${countOf(count, "note")} ${suggestionPlace(entries.map((e) => e.source))}`;
 }
 
 /**
@@ -441,18 +442,13 @@ export function suggestionWhen(
     timeZone: string,
     now: Date,
 ): string {
-    const time = new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).format(new Date(entry.createdAt));
+    const time = formatTime(entry.createdAt, timeZone);
     const who = name?.trim() ? name.trim() : "They";
     const how =
         entry.source === "CUSTOMER"
             ? "sent this from their account"
             : "wrote this when booking online";
-    return `${who} ${how}, ${dayText(entry.createdAt, timeZone, now)} at ${time}`;
+    return `${who} ${how}, ${formatDate(entry.createdAt, timeZone, { now })} at ${time}`;
 }
 
 /**

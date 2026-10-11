@@ -421,9 +421,9 @@ const HELP_SHOTS_B: Shot[] = [
                 click: 'section:has(h2:text-is("Price")) [role="radio"]:has-text("25% deposit")',
             },
         ],
-        mark: 'button:has-text("Save changes")',
-        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save changes at the top right",
-        caption: "A change to the root canal, waiting for Save changes",
+        mark: 'button:text-is("Save")',
+        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save at the top right",
+        caption: "A change to the root canal, waiting for Save",
     },
     {
         key: "help-take-deposit-4",
@@ -538,8 +538,8 @@ const HELP_SHOTS_B: Shot[] = [
         role: "owner",
         route: "/billing/subscriptions/seed_sc_rc_sub_arjun",
         viewport: { width: 1024, height: 560 },
-        mark: 'button:has-text("Retry with a new pay link")',
-        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Retry with a new pay link",
+        mark: 'button:has-text("Try again with a new pay link")',
+        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Try again with a new pay link",
         caption: "Arjun Mehta's renewal at Rye & Co., not paid yet",
     },
 
@@ -765,10 +765,16 @@ const HELP_SHOTS_B: Shot[] = [
 
 /* Create your business. */
 
-/** The setup form, answered as a florist would, never created. */
+/**
+ * The setup form, answered as a florist would, never created. Setup is a
+ * stepper since 11 Oct 2026 (DEC-130): Continue opens the name step. The
+ * shots below that clip "Its address on Saroh" and "Is it registered as a
+ * company?" predate DEC-130 and are retaken with the Help article.
+ */
 const SETUP_FILLED: Step[] = [
     { waitFor: 'text="What are you setting up?"' },
     { click: '[role="radio"]:has-text("A business")' },
+    { click: 'form button[type="submit"]' },
     { fill: 'input[autocomplete="organization"]', value: "Tulsi Florist" },
     { waitFor: 'text="Available. Your website will live here."' },
 ];

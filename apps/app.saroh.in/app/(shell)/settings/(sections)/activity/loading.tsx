@@ -1,9 +1,5 @@
-import { ListSkeleton } from "@/components/shared/list-skeleton";
+import { SettingsLoading } from "@/components/settings/settings-loading";
 
-/**
- * Loading skeleton for Settings → Activity: a heading and a column of change
- * lines, the shape the page below is, as the other settings tabs draw theirs.
- */
 export default function Loading() {
-    return <ListSkeleton rows={6} />;
+    return <SettingsLoading title="Activity" rows={6} />;
 }

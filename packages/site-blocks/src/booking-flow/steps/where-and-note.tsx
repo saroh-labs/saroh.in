@@ -107,7 +107,7 @@ export function WhereAndNote({
                     onChange={(e) => onNote(e.target.value)}
                     aria-describedby={`${noteId}-hint`}
                     className={cn(
-                        "border-site-border text-site-fg placeholder:text-site-muted mt-1.5 block w-full resize-y rounded-[calc(var(--site-radius)+7px)] border px-3.5 py-2.5 text-[15px]",
+                        "border-site-border text-site-fg placeholder:text-site-muted mt-1.5 block w-full resize-y rounded-[calc(var(--site-radius)+7px)] border px-3.5 py-2.5 text-base",
                         inputFill,
                         focusRing,
                     )}

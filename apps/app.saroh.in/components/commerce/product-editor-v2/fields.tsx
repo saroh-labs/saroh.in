@@ -1,3 +1,4 @@
+import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
@@ -24,42 +25,27 @@ export function boxClass({
 export function FieldLabel({
     htmlFor,
     children,
-    required,
     aside,
     className,
 }: {
     htmlFor?: string;
     children: ReactNode;
-    /** "Required" beside the label, while creating. */
-    required?: boolean;
     /** Right of the label: a shop switch, or a quiet note. */
     aside?: ReactNode;
     className?: string;
 }) {
     const label = htmlFor ? (
-        <label htmlFor={htmlFor} className="flex-1 text-[12.5px] font-medium">
+        <Label htmlFor={htmlFor} className="flex-1 leading-normal">
             {children}
-            {required ? <Required /> : null}
-        </label>
+        </Label>
     ) : (
-        <span className="flex-1 text-[12.5px] font-medium">
-            {children}
-            {required ? <Required /> : null}
-        </span>
+        <span className="flex-1 text-[12.5px] font-medium">{children}</span>
     );
     return (
         <div className={cn("mb-1.5 flex items-center gap-2.5", className)}>
             {label}
             {aside}
         </div>
-    );
-}
-
-function Required() {
-    return (
-        <span className="ml-1.5 text-[11px] font-medium text-muted-foreground">
-            Required
-        </span>
     );
 }
 
@@ -82,7 +68,7 @@ export function FieldHelp({
                 tone === "bad"
                     ? "text-destructive"
                     : tone === "warn"
-                      ? "text-brand-subtle-foreground"
+                      ? "text-foreground"
                       : "text-muted-foreground",
                 className,
             )}
@@ -103,32 +89,5 @@ export function Count({ value, max }: { value: number; max: number }) {
         >
             {value} / {max}
         </span>
-    );
-}
-
-/** The currency's sign ("₹") inside the left of a money box. */
-export function MoneyBox({
-    symbol,
-    children,
-    small = false,
-}: {
-    symbol: string;
-    children: ReactNode;
-    small?: boolean;
-}) {
-    return (
-        <div className="relative min-w-0">
-            <span
-                aria-hidden
-                className={cn(
-                    "pointer-events-none absolute left-2.5 top-0 flex items-center text-muted-foreground",
-                    small ? "h-8 text-[12.5px]" : "h-9 text-[13px]",
-                    "coarse:h-11",
-                )}
-            >
-                {symbol}
-            </span>
-            {children}
-        </div>
     );
 }

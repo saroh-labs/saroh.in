@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import type { NotePurchase } from "./pack-card-notes";
 import { cardNotes } from "./pack-card-notes";
+
+pinClock();
 
 const NOW = new Date("2026-09-18T06:30:00.000Z");
 const ZONE = "Asia/Kolkata";
@@ -62,7 +65,7 @@ describe("a pack card's notes (E15, after Saroh Packs)", () => {
         expect(notes).toEqual([
             { text: "Rohit Menon: 2 classes run out 22 Sep", tone: "accent" },
             { text: "Sneha Pillai: 1 class runs out 25 Sep", tone: "accent" },
-            { text: "3 bought at ₹2,000 — they keep it", tone: "quiet" },
+            { text: "3 bought at ₹2,000, and they keep it", tone: "quiet" },
             { text: "2 classes ran out unused", tone: "quiet" },
         ]);
     });

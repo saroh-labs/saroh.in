@@ -255,11 +255,10 @@ test.describe("flows stop short on a test release (T6)", () => {
             .getByRole("radio", { name: /Warehouse walkthrough/ })
             .click();
         const times = page.locator('[role="radiogroup"] button[role="radio"]', {
-            hasText: /^\d{2}:\d{2}$/,
+            hasText: /^\d{1,2}:\d{2} [ap]m$/,
         });
         await expect(times.first()).toBeVisible({ timeout: 15_000 });
         await times.first().click();
-        await page.getByLabel("Name").fill(`Tester ${mark}`);
         const bookWrites = watchWrites(page);
         await page
             .getByRole("button", { name: "Continue to sign in" })
@@ -323,7 +322,9 @@ test.describe("flows stop short on a test release (T6)", () => {
         ).toBeVisible();
         const pickUp = bag.getByRole("radio", { name: /Pick-up/ });
         if (await pickUp.isVisible()) await pickUp.click();
-        const cont = bag.getByRole("button", { name: /^Continue · / });
+        const cont = bag.getByRole("button", {
+            name: /^Sign in and (pay|place order) · /,
+        });
         await expect(cont).toBeEnabled({ timeout: 15_000 });
         const total = ((await cont.innerText()).split("·")[1] ?? "").trim();
 

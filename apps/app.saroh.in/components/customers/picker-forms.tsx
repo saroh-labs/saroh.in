@@ -5,6 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useId, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import type {
     CustomerSearchResult,
     NewCustomerDraft,
@@ -16,6 +17,7 @@ import {
     walkInCopy,
     walkInPhone,
 } from "@/lib/customers/picker";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The customer picker's small inline forms (E4): someone new, a walk-in
@@ -24,8 +26,7 @@ import {
  * a nested form would submit the dialog's.
  */
 
-const FIELD = "mt-1 h-9 text-[13px]";
-const LABEL = "text-[12.5px]";
+const FIELD = "mt-1";
 const BOX = "mb-3 grid gap-2 rounded-[10px] border border-border px-3 py-2.5";
 
 /** Name, phone and email for someone new; the email is needed. */
@@ -51,9 +52,7 @@ export function NewCustomerForm({
             return;
         }
         setError(null);
-        setChecking(true);
-        await onAdd(draft);
-        setChecking(false);
+        await runAction(() => onAdd(draft), { setBusy: setChecking });
     }
 
     return (
@@ -69,9 +68,7 @@ export function NewCustomerForm({
             }}
         >
             <div>
-                <Label htmlFor={ids.name} className={LABEL}>
-                    Name
-                </Label>
+                <Label htmlFor={ids.name}>Name</Label>
                 <Input
                     id={ids.name}
                     value={draft.name}
@@ -82,9 +79,7 @@ export function NewCustomerForm({
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
                 <div>
-                    <Label htmlFor={ids.phone} className={LABEL}>
-                        Phone
-                    </Label>
+                    <Label htmlFor={ids.phone}>Phone</Label>
                     <Input
                         id={ids.phone}
                         type="tel"
@@ -95,9 +90,7 @@ export function NewCustomerForm({
                     />
                 </div>
                 <div>
-                    <Label htmlFor={ids.email} className={LABEL}>
-                        Email
-                    </Label>
+                    <Label htmlFor={ids.email}>Email</Label>
                     <Input
                         id={ids.email}
                         type="email"
@@ -134,10 +127,11 @@ export function NewCustomerForm({
                 <Button
                     type="button"
                     size="sm"
-                    disabled={checking}
                     onClick={() => void submit()}
+                    busy={checking}
+                    busyLabel="Checking…"
                 >
-                    {checking ? "Checking…" : "Add customer"}
+                    Add customer
                 </Button>
             </div>
         </div>
@@ -189,9 +183,7 @@ export function WalkInForm({
         >
             <div className="grid gap-2 sm:grid-cols-2">
                 <div>
-                    <Label htmlFor={ids.name} className={LABEL}>
-                        Name
-                    </Label>
+                    <Label htmlFor={ids.name}>Name</Label>
                     <Input
                         id={ids.name}
                         value={name}
@@ -201,9 +193,7 @@ export function WalkInForm({
                     />
                 </div>
                 <div>
-                    <Label htmlFor={ids.phone} className={LABEL}>
-                        Phone (if they give one)
-                    </Label>
+                    <Label htmlFor={ids.phone}>Phone (if they give one)</Label>
                     <Input
                         id={ids.phone}
                         type="tel"
@@ -260,32 +250,31 @@ export function DuplicateWarning({
 }) {
     const who = resultLabel(match);
     return (
-        <div
-            role="alert"
-            className="mb-3 grid gap-2 rounded-[10px] bg-warning-subtle px-3 py-2.5 text-[12.5px] leading-[1.45] text-warning-subtle-foreground"
-        >
-            <p>
-                {who} already has this phone. Likely the same person — pick
-                them, or add someone new anyway.
-            </p>
-            <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={onAddAnyway}
-                >
-                    Add someone new
-                </Button>
-                <Button
-                    data-ph-mask=""
-                    type="button"
-                    size="sm"
-                    onClick={onPickThem}
-                >
-                    Pick {who}
-                </Button>
+        <Notice tone="warning" role="alert" className="mb-3">
+            <div className="grid gap-2">
+                <p>
+                    {who} already has this phone. Likely the same person. Pick
+                    them, or add someone new anyway.
+                </p>
+                <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={onAddAnyway}
+                    >
+                        Add someone new
+                    </Button>
+                    <Button
+                        data-ph-mask=""
+                        type="button"
+                        size="sm"
+                        onClick={onPickThem}
+                    >
+                        Pick {who}
+                    </Button>
+                </div>
             </div>
-        </div>
+        </Notice>
     );
 }

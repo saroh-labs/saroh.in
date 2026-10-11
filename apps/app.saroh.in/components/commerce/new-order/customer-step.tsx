@@ -1,13 +1,14 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { Button } from "@saroh/ui/button";
 
 import { CustomerPicker } from "@/components/customers/customer-picker";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
 import { pickMeta } from "@/lib/orders/new-order";
 
-import { SMALL_BUTTON, StepCard } from "./parts";
+import { Notice } from "@saroh/ui/notice";
+import { StepCard } from "./parts";
 
 /**
  * Who it is for (B13): E4's shared picker, with Walk-in turned on — search
@@ -62,25 +63,20 @@ export function CustomerStep({
                         {meta}
                     </div>
                 </div>
-                <button
+                <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     onClick={() => onPick(null)}
                     aria-label={`Change the customer, now ${pickName(pick)}`}
-                    className={cn(
-                        SMALL_BUTTON,
-                        "h-[30px] px-[11px] text-[12.5px] coarse:h-11",
-                    )}
                 >
                     Change
-                </button>
+                </Button>
             </div>
             {attention ? (
-                <div
-                    role="alert"
-                    className="mt-[9px] rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] font-semibold leading-[1.45] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" className="mt-[9px]">
                     {attention}
-                </div>
+                </Notice>
             ) : null}
         </StepCard>
     );

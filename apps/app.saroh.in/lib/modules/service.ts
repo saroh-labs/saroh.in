@@ -66,7 +66,11 @@ async function moduleMutation(
     fallback: string,
 ): Promise<ModuleMutationResult> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}${path}`, {
         method,
         body: body ? JSON.stringify(body) : undefined,
@@ -100,7 +104,7 @@ export function setModuleStatus(
         `/modules/${encodeURIComponent(moduleKey)}`,
         "PUT",
         { status, ...options },
-        "Could not update the module.",
+        "Couldn't update the module.",
     );
 }
 
@@ -113,7 +117,7 @@ export function selectProjectModule(
         `/projects/${encodeURIComponent(projectId)}/modules/${encodeURIComponent(moduleKey)}`,
         "PUT",
         null,
-        "Could not select the module for this project.",
+        "Couldn't select the module for this project.",
     );
 }
 
@@ -126,6 +130,6 @@ export function deselectProjectModule(
         `/projects/${encodeURIComponent(projectId)}/modules/${encodeURIComponent(moduleKey)}`,
         "DELETE",
         null,
-        "Could not deselect the module for this project.",
+        "Couldn't deselect the module for this project.",
     );
 }

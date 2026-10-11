@@ -66,7 +66,7 @@ describe("the line under Orders (#919)", () => {
         expect(
             ordersLine({ orders: 12, from: before, rangeLabel: "90 days" }),
         ).toBe(
-            "Orders counts from October 2026, when Insights began recording paid orders; earlier ones aren't counted.",
+            "Orders counts from October 2026, when Insights began recording paid orders. Earlier ones aren't counted.",
         );
     });
 

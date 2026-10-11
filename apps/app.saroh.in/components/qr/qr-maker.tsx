@@ -6,16 +6,14 @@ import { swatchesWith } from "@/lib/qr/colours";
 import { targetAddress } from "@/lib/qr/targets";
 import { linkWords, placeWords } from "@/lib/qr/words";
 
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { QrCodeCard } from "./qr-code-card";
 import { QrLookControls } from "./qr-look-controls";
 import { QrPrintSlot } from "./qr-print-slot";
 import { QrTargetPicker } from "./qr-target-picker";
 import type { UseQrMakerInput } from "./use-qr-maker";
 import { useQrMaker } from "./use-qr-maker";
-
-/** The design's buttons: 40px, 10px corners, 14px 600. */
-const BUTTON = "h-10 rounded-[10px] px-4 text-sm";
-
 /**
  * The QR code maker ("Saroh QR Codes" design, "01 In-app Share"): three
  * columns that stack on a phone. What it opens and where it goes; the code
@@ -48,28 +46,27 @@ export function QrMaker({
     return (
         <div data-qr-maker={m.isChanging ? "change" : "make"}>
             {m.isChanging && bound ? (
-                <p
-                    role="status"
-                    className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] bg-muted px-3.5 py-2.5 text-[13px] text-foreground"
-                >
-                    <span className="min-w-0 [overflow-wrap:anywhere]">
-                        Changing the code placed at{" "}
-                        <strong className="font-semibold">
-                            {placeWords(bound)}
-                        </strong>
-                        {bound.link ? (
-                            <>
-                                {" "}
-                                ·{" "}
-                                <span className="font-mono text-[12.5px]">
-                                    {linkWords(bound.link)}
-                                </span>
-                            </>
-                        ) : null}
-                        . Its link stays the same, so the printed one keeps
-                        working.
-                    </span>
-                </p>
+                <Notice role="status" className="mb-4">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                            Changing the code placed at{" "}
+                            <strong className="font-semibold">
+                                {placeWords(bound)}
+                            </strong>
+                            {bound.link ? (
+                                <>
+                                    {" "}
+                                    ·{" "}
+                                    <span className="font-mono text-[12.5px]">
+                                        {linkWords(bound.link)}
+                                    </span>
+                                </>
+                            ) : null}
+                            . Its link stays the same, so the printed one keeps
+                            working.
+                        </span>
+                    </div>
+                </Notice>
             ) : null}
             <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))]">
                 <QrTargetPicker
@@ -138,26 +135,21 @@ export function QrMaker({
                         {bound && !m.isChanging && !m.dirty ? (
                             <p className="text-[13px] text-foreground/80">
                                 You already have this code.{" "}
-                                <button
-                                    type="button"
-                                    onClick={m.makeAnother}
-                                    className="cursor-pointer rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground"
-                                >
+                                <TextLink onClick={m.makeAnother}>
                                     Make another
-                                </button>
+                                </TextLink>
                             </p>
                         ) : null}
                         <div className="flex flex-wrap gap-2">
                             {primary !== "png" ? (
                                 <Button
                                     type="button"
-                                    className={BUTTON}
                                     disabled={off}
                                     onClick={() => void m.make()}
                                 >
                                     {primary === "make"
                                         ? "Make this code"
-                                        : "Save changes"}
+                                        : "Save"}
                                 </Button>
                             ) : null}
                             <Button
@@ -165,7 +157,6 @@ export function QrMaker({
                                 variant={
                                     primary === "png" ? "default" : "outline"
                                 }
-                                className={BUTTON}
                                 disabled={off}
                                 onClick={() => void m.download("png")}
                             >
@@ -174,7 +165,6 @@ export function QrMaker({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className={BUTTON}
                                 disabled={off}
                                 aria-label="Download SVG"
                                 onClick={() => void m.download("svg")}
@@ -184,7 +174,6 @@ export function QrMaker({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className={BUTTON}
                                 disabled={!bound?.link || m.busy !== null}
                                 onClick={() => void m.copy()}
                             >
@@ -196,7 +185,6 @@ export function QrMaker({
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    className={BUTTON}
                                     disabled={m.busy !== null}
                                     onClick={input.onChangingDone}
                                 >

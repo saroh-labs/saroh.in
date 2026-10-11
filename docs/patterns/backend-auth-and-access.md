@@ -34,7 +34,7 @@ what the API allows.
 | Role       | What it may do                                                                                                                                                                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                                                                                                                     |
-| `ADMIN`    | Everything except `org:delete`.                                                                                                                                                                                                                                                                                         |
+| `ADMIN`    | Everything except the owner-only powers: `org:delete`, `org:address:update` and `billing:manage` (it reads Plan and billing with `billing:read`).                                                                                                                                                                       |
 | `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020) — plus `order:stage` (DEC-024, adopted): an order's kitchen view without money, and moving its stage. No leads, no pipeline, no money. |
 | `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                                                                                                                     |
 
@@ -146,6 +146,21 @@ what the API allows.
   Detail's words ("Your role can't record payments — …"). A storefront role
   that should take payments needs a business role carrying `order:edit`.
   Guarded by the same two scans.
+- **Current** (10 Oct 2026) — **A location's read says what the caller
+  may do there.** `GET stores/:id` carries `abilities` (`edit`,
+  `takeOrders`, `takePayments`, `changeOrders`), from
+  `StoresService.abilities`, which asks the very functions the writes'
+  guards ask (`canWrite`, `orderWriteOrganization` with `money` as
+  `OrdersService.create` passes it). It is never a second policy: a rule
+  changed in a guard changes the answer, and
+  `stores.service.abilities.authorization.spec.ts` and
+  `location-abilities.db.spec.ts` fail if the two disagree. The app reads
+  it (`lib/stores/abilities.ts`) to offer a location Admin, Manager or
+  Editor New order at their location (paid on collection, never the
+  money) and its name and description to edit. A Viewer gets neither. The
+  three writing roles are the same today (`WRITE_ROLES`). Catalogue writes
+  a location role may make are not offered: the product screens are the
+  business's (`requireCan("store:write")`), not a location's.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
@@ -175,8 +190,8 @@ what the API allows.
 - **Current** (F17, DEC-039) — **A person can hold extra permissions beyond
   their role.** `Membership.extraActions` (action keys, default empty).
   `resolveCapabilities(roleKey, stored, extras)` unites the role's set with
-  the extras, filtered by `extraActionsFor` (known actions only, never
-  `org:delete`, and for a Reviewer only `site:read`, `site:comment`,
+  the extras, filtered by `extraActionsFor` (known actions only, never an
+  owner-only power, and for a Reviewer only `site:read`, `site:comment`,
   `site:approve` — DEC-006), then runs `withImplied` over the union; with no
   extras it returns exactly the role's set. Every place that resolves a
   person passes their extras: `OrganizationContextService.resolve` and
@@ -265,9 +280,101 @@ what the API allows.
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so
   no role→action map can express it.
+- **Current** (DEC-131, 10 Oct 2026) — **Anyone in a business can leave it.**
+  `POST organizations/:id/leave` (`OrganizationMembersService.leave`) asks
+  no permission, only membership, which `OrganizationGuard` has proven: the
+  membership removed is the caller's own, in the context's organization,
+  never an id from the request. It takes what a removal takes (`detach`,
+  shared with `remove`: the sites they review, their share links, their
+  location roles and any location invitation still waiting) and writes
+  `membership.remove` with `metadata.left`, which Activity reads as "left
+  the team". The last Owner is refused (400, `LAST_OWNER_CANT_LEAVE`), with
+  the check repeated inside the transaction. It is a wind-down write, so a
+  closing business lets its people go. `remove` still asks `member:remove`.
+  `organization-leave.db.spec.ts`.
+- **Current** (DEC-131, amended 2026-10-11) — **Only the Owner changes
+  what the business pays Saroh.** The API reads Plan and billing to
+  `billing:read` (Owner and Admin by default, and grantable) and changes it
+  with `billing:manage`, which is owner-only: it is in `OWNER_ONLY_ACTIONS`
+  with `org:delete` and `org:address:update`, and that one list is what
+  keeps it from everyone else.
+    - An Admin doesn't hold it (the built-in map leaves the list out).
+    - A role a business makes can't be given it: `ownerOnly` in the
+      catalogue, so the role editor never offers it and `vetActions` drops
+      it from a save.
+    - A stored list that names it anyway is read without it:
+      `roleCapabilities` drops owner-only powers from every row but the
+      Owner's, as it drops an unknown string.
+    - It is never an extra (`extraActionsFor`; a 400 on the write).
+    - Every write that changes what is paid asks it before reading
+      anything: `POST …/billing/change-plan` (a coupon rides on it),
+      `PUT …/billing/addons/:id`, `POST …/billing/checkout/confirm`,
+      `POST …/billing/subscribe`, `POST …/billing/cancel` and
+      `POST …/launch-offer`. `billing/plan-owner-only.spec.ts` names every
+      write route of the billing controller, so a new one fails until it is
+      listed and its guard proven.
+      The refusal is 403 "Only the owner can change the plan." with
+      `ROLE_DENIED` and the permission in `details`. Saroh's emails about a
+      bill go to who holds `billing:manage` (`billingRecipients`), so to the
+      Owners and no longer an Admin (to confirm, DEC-131). Every Owner of a
+      business may: nothing marks one of them as the payer. The app's Settings
+      tab, the page and every plan prompt ask the same two
+      (`lib/billing/plan-access.ts`), never the role's name. Operators acting
+      from the admin console run under their own context and are not part of
+      this.
 
 ## Rules
 
+- **Current** (10 Oct 2026) — **A refusal by role is a sentence, with the
+  permission in `details`.** `authorize()` throws a 403 whose message is
+  "Your role can't do this. An owner or admin can change that in Settings ›
+  Team." and whose envelope carries `details: { code: "ROLE_DENIED", action }`
+  (`roleDenial(action)` in `organization-policy.ts`). An owner-only power
+  never points at Settings › Team, where no role can be given it: it reads
+  "Only the owner can do this.", and for `billing:manage` "Only the owner
+  can change the plan." (`roleDeniedMessage`, 2026-10-11). Never a role's
+  key or a permission's in the message: it reaches the screen. An endpoint that says
+  its own sentence (`requireBookingPower`, `customer-access.ts`) keeps it. A
+  spec pins which permission refused with
+  `rejects.toMatchObject({ response: roleDenial("site:update") })`, not by
+  reading the message. The app reads it in `lib/api/role-denied.ts`
+  (`frontend-error-feedback.md`).
+- **Current** — **Signing in lands on the app, not on a list of Saroh's
+  hosts** (UX audit, 10 Oct). With no `?redirect=`, accounts sends a sign-in,
+  a Google sign-in, a signed-in visit to a sign-in page, `/` and its 404 and
+  error pages to `getAppUrl()` (`apps/accounts.saroh.in/lib/return-to.ts`);
+  the app's front door sends someone with no business to setup, opens the one
+  they have, or asks which. A new account goes straight to setup, by code or
+  by Google. `/apps` is for Saroh staff: the page asks the API
+  (`GET /admin/me`, `isStaff`), sends everyone else on to the app, and
+  nothing links to it.
+- **Current** (DEC-129, 10 Oct 2026) — **A merchant signs up and signs in
+  with an emailed code; a password is optional.** `/signup` takes the email,
+  then the code; `/login` leads with "Email me a code" and keeps "Use a
+  password instead" (`/login?with=password` opens on it). Both are Better
+  Auth's `emailOTP` endpoints, never a session of our own making:
+  `emailOtp.sendVerificationOtp({ type: "sign-in" })`, then
+  `signIn.emailOtp`. Asking for a code answers the same, and sends the same
+  email, whether or not the address has an account, so no screen says who is
+  registered; the code makes the account when there was none. One code step
+  for every page (`apps/accounts.saroh.in/components/auth/code-step.tsx`),
+  its rules and words pure in `lib/sign-in-code.ts`, in the words of the
+  customer site's sheet. The limits are constants in
+  `@saroh/auth/constants` that the server's plugin and the screen both read
+  (code lifetime, 5 wrong tries, 3 a minute, the Resend wait), and
+  `packages/auth/src/sign-in-code.test.ts` runs the real library on
+  `authOptions()` with a database in memory: change the auth options or
+  upgrade the library and it says what broke. A first password is set on
+  the account page with a code to the account's address
+  (`lib/password.ts`), never on the session alone. The name is asked in
+  setup; an invitee's sign-up asks for it.
+- **Current** — **The old password sign-up endpoint still answers the same
+  for an address that has an account** (`requireEmailVerification`): no
+  page calls it now, but it is the library's and stays on, so the owner of
+  the address is still emailed "You already have a Saroh account"
+  (`onExistingUserSignUp` → `existingUserSignUpHook` in
+  `packages/auth/src/server.ts`, `sendExistingAccountEmail` in the API). A
+  failed send never changes the answer.
 - **Current** — **Derive the organization; never accept it.** `:organizationId`
   or `x-organization-id` is a hint the guard re-validates against real
   membership. Public routes derive the organization from the resource (a Site),

@@ -335,6 +335,13 @@ model Organization {
   // dismissed. Only people added after it are listed again.
   storefrontTeamNoticeDismissedAt DateTime?
 
+  // The moments this business has seen (wave G): a first order, a first
+  // booking, a tenth order. One key per moment, with the time someone put
+  // it away or opened what it pointed at, so it is said once for the whole
+  // business, on every device. The keys are the API's fixed list
+  // (`organizations/moments.ts`). Never a count or anyone's details.
+  momentsSeen Json @default("{}")
+
   // The business's referral code (DEC-102, #812): the `?ref=` its site's
   // "Made with Saroh" credit links with on Free. 8 characters a reader can't
   // confuse, never the business name. Null until the credit is first
@@ -454,6 +461,24 @@ model BusinessProfile {
   // ("+919845012345"), checked by the API and by a CHECK constraint. Null:
   // no number, and the site shows no Call button rather than an empty one.
   phone String?
+
+  // The business's social links (DEC-128): one canonical https address per
+  // network it has set, keyed by network ("instagram", "whatsapp", …), each
+  // on that network's own host (`@saroh/block-contract` social-links.ts).
+  // Written only through the settings save, which rebuilds every value, and
+  // re-checked on the way out. Null: none.
+  socialLinks                Json?
+  // The website shows the registered address above as where to find the
+  // business (DEC-128). Off by default: it is the legal address, often a
+  // home, and a business with a location customers visit shows that
+  // instead. Read only while no such location has an address.
+  siteShowsRegisteredAddress Boolean @default(false)
+  // The registered address's place on Google Maps (DEC-128): what "Get
+  // directions" opens on the website while that address is the one shown.
+  // One canonical address on Google's own map hosts
+  // (`@saroh/block-contract` normaliseMapLink). Null: a search for the
+  // address.
+  registeredAddressMapUrl    String?
 
   // "Members can pause from their account" (round-2 A8), beside the
   // subscriptions' time zone above: on, a member pauses their own plan for
@@ -2167,6 +2192,11 @@ model StoreSettings {
   // ONLINE store has none of them.
   kind              String    @default("ONLINE") // SHOP | ONLINE
   address           String?   @db.Text
+  // The location's place on Google Maps (DEC-128): what "Get directions"
+  // opens on the business's website. One canonical address on Google's own
+  // map hosts (`@saroh/block-contract` normaliseMapLink). Null: a search
+  // for the address.
+  mapUrl            String?
   // Seven entries, Monday first: { day, open: "09:00", close: "18:00", closed }
   openingHours      Json?
   collectionEnabled Boolean   @default(false)
@@ -4293,6 +4323,14 @@ model Notification {
   // the message that raised it. Informational, no FK, like leadId.
   contactId String?
   messageId String?
+  // Or an order, a booking, an invoice or the website (10 Oct 2026): every
+  // notice opens the thing it is about, so every writer sets the one its
+  // type requires (`notifications/notice-target.ts` in the API).
+  // Informational, no FK, like leadId.
+  orderId   String?
+  bookingId String?
+  invoiceId String?
+  siteId    String?
 
   readAt DateTime? // null = unread
 

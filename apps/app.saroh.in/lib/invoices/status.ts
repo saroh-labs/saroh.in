@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { METHOD_WORD } from "@/lib/payments/method-words";
 import { isSince } from "@/lib/views/since";
 
@@ -58,10 +59,7 @@ export function invoiceStatus(
             return {
                 label: "Overdue",
                 variant: "error",
-                detail:
-                    late <= 0
-                        ? "Overdue"
-                        : `${late} ${late === 1 ? "day" : "days"} overdue`,
+                detail: late <= 0 ? "Overdue" : `${count(late, "day")} overdue`,
             };
         }
         case "ISSUED": {
@@ -146,8 +144,8 @@ type ListInvoice = Pick<
     | "payment"
 >;
 
-/** A pill's colour role, after the design: ok, accent, bad, off. */
-export type PillVariant = "success" | "draft" | "error" | "neutral";
+/** A pill's tone: paid, owed (in play, yours to collect), late, quiet. */
+export type PillVariant = "success" | "active" | "error" | "neutral";
 
 /**
  * The word on an invoice's pill. Issued reads "Due" — the design's word for
@@ -167,7 +165,7 @@ export function invoicePill(
         case "DRAFT":
             return { label: "Draft", variant: "neutral" };
         case "ISSUED":
-            return { label: "Due", variant: "draft" };
+            return { label: "Due", variant: "active" };
         case "OVERDUE":
             return { label: "Overdue", variant: "error" };
         case "PAID":
@@ -362,14 +360,12 @@ export function whenLine(
     }
     switch (i.standing) {
         case "DRAFT":
-            return { ...none, before: "Not issued — no number yet" };
+            return { ...none, before: "Not issued, no number yet" };
         case "OVERDUE": {
             const late = i.dueAt ? Math.max(1, daysLate(i.dueAt, now)) : 0;
             return {
                 ...none,
-                before: late
-                    ? `${late} ${late === 1 ? "day" : "days"} late`
-                    : "Overdue",
+                before: late ? `${count(late, "day")} late` : "Overdue",
                 late: true,
             };
         }
@@ -379,10 +375,7 @@ export function whenLine(
             return {
                 before: "Due ",
                 date: i.dueAt,
-                after:
-                    d <= 0
-                        ? " · today"
-                        : ` · in ${d} ${d === 1 ? "day" : "days"}`,
+                after: d <= 0 ? " · today" : ` · in ${count(d, "day")}`,
                 late: false,
             };
         }

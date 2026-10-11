@@ -1,4 +1,6 @@
 import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackKind, PackServiceOption, PackValues } from "./pack-editor";
 import {
@@ -36,12 +38,12 @@ export function packChanges(
     }
     if (published.credits !== values.credits) {
         out.push(
-            `${published.credits ?? "—"} → ${values.credits ?? "—"} ${units}`,
+            `${published.credits ?? "none"} → ${values.credits ?? "none"} ${units}`,
         );
     }
     if (published.validityDays !== values.validityDays) {
         out.push(
-            `use within ${published.validityDays ?? "—"} → ${values.validityDays ?? "—"} days`,
+            `use within ${published.validityDays ?? "no limit"} → ${values.validityDays ?? "no limit"} days`,
         );
     }
     if (published.name.trim() !== values.name.trim() && values.name.trim()) {
@@ -56,7 +58,7 @@ export function packChanges(
         [...values.serviceIds].sort().join()
     ) {
         out.push(
-            `good for ${values.serviceIds.length} ${values.serviceIds.length === 1 ? unitOf(values.kind) : units}`,
+            `good for ${count(values.serviceIds.length, unitOf(values.kind), units)}`,
         );
     }
     if (published.firstPackOnly !== values.firstPackOnly) {
@@ -91,7 +93,7 @@ export function publishedToast(
             ? `Changes published. The ${sold} already sold keep what they bought.`
             : "Changes published.";
     }
-    return `${values.name.trim()} is published — you can sell it now.`;
+    return `${values.name.trim()} is published. You can sell it now.`;
 }
 
 // — The side column ————————————————————————————————————————————————————
@@ -124,14 +126,13 @@ export function eachNote(
 ): string {
     const each = perCredit(values);
     if (each === null) return "";
-    const m = (n: number) =>
-        formatMoneyMajor(Math.round(n), values.currency) ?? "";
+    const m = (n: number) => formatMoneyMajor(Math.round(n), values.currency);
     const drops = dropIns(values, services);
     let text = `${m(each)} a ${unitOf(values.kind)}`;
     if (drops.length) {
         const lo = Math.min(...drops);
         const hi = Math.max(...drops);
-        text += ` · drop-in ${lo === hi ? m(lo) : `${m(lo)}–${m(hi)}`}`;
+        text += ` · drop-in ${lo === hi ? m(lo) : `${m(lo)} to ${m(hi)}`}`;
     }
     return text;
 }
@@ -144,7 +145,7 @@ export function glance(
 ): [string, string][] {
     const each = perCredit(values);
     const drops = dropIns(values, services);
-    let saving = "—";
+    let saving = absentText();
     if (each !== null && drops.length) {
         const mid = (Math.min(...drops) + Math.max(...drops)) / 2;
         if (mid > 0) {
@@ -155,11 +156,11 @@ export function glance(
         [
             `Per ${unitOf(values.kind)}`,
             each === null
-                ? "—"
-                : (formatMoneyMajor(Math.round(each), values.currency) ?? "—"),
+                ? absentText()
+                : formatMoneyMajor(Math.round(each), values.currency),
         ],
         ["Saving vs drop-in", saving],
-        ["Sold so far", sold === null ? "—" : String(sold)],
+        ["Sold so far", sold === null ? absentText() : String(sold)],
     ];
 }
 

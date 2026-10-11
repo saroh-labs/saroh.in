@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -13,6 +14,7 @@ import {
     updateStorefront,
 } from "@/lib/stores/storefront-actions";
 
+import { runAction } from "@/lib/api/run-action";
 import type { SectionProps } from "./location-save";
 import { Note, Section } from "./storefront-section";
 
@@ -36,7 +38,7 @@ export function ClosingSection({
     const [open, setOpen] = useState(false);
     const [closing, startClosing] = useTransition();
     const orders = store.orderCount;
-    const kept = `${orders} past ${orders === 1 ? "order stays" : "orders stay"}`;
+    const kept = `${orders} past ${plural(orders, "order stays", "orders stay")}`;
     const paused = Boolean(store.pausedAt);
     const stock = heldStock(store);
     const resume = () => {
@@ -45,7 +47,10 @@ export function ClosingSection({
 
     const pause = () => {
         startClosing(async () => {
-            const res = await updateStorefront(store.id, { paused: true });
+            const res = await runAction(() =>
+                updateStorefront(store.id, { paused: true }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -70,7 +75,7 @@ export function ClosingSection({
                 {paused
                     ? `${store.name} is paused: customers can't pay for orders here until you resume it. Everything is kept.`
                     : store.unfulfilled > 0
-                      ? `${pausing} ${store.unfulfilled === 1 ? "One order here is" : `${store.unfulfilled} orders here are`} still to go out, so it can't close until ${store.unfulfilled === 1 ? "that one is" : "they are"} fulfilled or cancelled.`
+                      ? `${pausing} ${store.unfulfilled === 1 ? "One order here is" : `${store.unfulfilled} orders here are`} still to go out, so it can't close until ${plural(store.unfulfilled, "that one is", "they are")} fulfilled or cancelled.`
                       : stock
                         ? `${pausing} ${stock} So it can't close yet: move or count out its stock first.`
                         : orders > 0
@@ -81,7 +86,9 @@ export function ClosingSection({
                 {canEdit ? (
                     <Button
                         variant="outline"
-                        disabled={pending || closing}
+                        disabled={closing}
+                        busy={pending}
+                        busyLabel={paused ? "Resuming…" : "Pausing…"}
                         onClick={paused ? resume : pause}
                     >
                         {paused ? "Resume location" : "Pause location"}
@@ -108,18 +115,15 @@ export function ClosingSection({
                     orders > 0
                         ? `Its ${kept} on the business's record, and the catalogue is untouched: it belongs to the business, not to this location.`
                         : "Nothing has been sold here, so there is nothing to keep."
-                } This can't be undone.`}
-                confirmLabel="Close permanently"
-                onConfirm={() => {
-                    startClosing(async () => {
-                        const res = await closeStorefront(store.id);
-                        if (!res.ok) {
-                            showError(res.error);
-                            return;
-                        }
-                        showSuccess(`${store.name} is closed`);
-                        router.replace(LOCATIONS_HREF);
-                    });
+                } This cannot be undone.`}
+                confirmLabel="Close location"
+                busyLabel="Closing…"
+                keepLabel="Keep location"
+                onConfirm={async () => {
+                    const res = await closeStorefront(store.id);
+                    if (!res.ok) return { ok: false, error: res.error };
+                    showSuccess("Location closed.");
+                    router.replace(LOCATIONS_HREF);
                 }}
             />
         </Section>

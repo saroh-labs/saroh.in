@@ -11,7 +11,7 @@ import { requireSession } from "@/lib/session";
  *
  * The id here is a contact's. A store customer's id that reached it from an
  * older link goes to the contact it is linked to; one linked to no one is
- * left to the person page's "This person isn't here".
+ * left to the person page's "Contact not found".
  */
 export default async function CustomerRedirect({
     params,

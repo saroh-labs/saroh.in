@@ -48,7 +48,7 @@ export interface SiteAccount {
  *
  * Paid online, its lines hold nothing until the payment lands, and its
  * close a day later is written in the same transaction. Paid on handover
- * ("Pay when you collect", "Pay on delivery"), it is made as a staff
+ * ("Pay at pick-up", "Pay on delivery"), it is made as a staff
  * pay-later order is (DEC-032's "when stock is promised"): its lines
  * promise their units now — refused past what the storefront can sell —
  * it never closes on its own, and the team is told of it at once. Its
@@ -368,7 +368,7 @@ export async function createCheckoutOrder(
             }
             if (applied && isSerializationFailure(err)) {
                 throw new ConflictException({
-                    message: `${applied.code} was just used by another order. Try again, or remove it.`,
+                    message: `${applied.code} was used by another order a moment ago. Try again, or remove it.`,
                     details: { reason: "bag-changed", field: "discountCode" },
                 });
             }

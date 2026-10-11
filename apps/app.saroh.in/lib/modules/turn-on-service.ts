@@ -19,6 +19,8 @@ export type EnableResult =
           /** The module as it is now; null when the API sent no view. */
           module: ModuleView | null;
           alreadyEnabled: boolean;
+          /** The site it made or kept, when it is Website (a first run opens it). */
+          siteId?: string;
       }
     | {
           ok: false;
@@ -42,16 +44,22 @@ export async function getSetupDefaults(key: string): Promise<SetupDefaults> {
 }
 
 /**
- * Switch one module on with its minimum. `setup` is left out for a module
- * that asks for nothing, which the API reads as `{}`.
+ * Switch one module on with its minimum. A module that asks for nothing
+ * sends `{}`. With no `setup` at all (`undefined`) the API switches it on
+ * and makes nothing: setup's first run turns Bookings on that way, and the
+ * first service is made on its own page, where the merchant lands.
  */
 export async function enableModule(
     key: string,
-    setup: object,
+    setup: object | undefined,
 ): Promise<EnableResult> {
     const base = await orgBase();
     if (!base) {
-        return { ok: false, error: "No active organization.", fields: {} };
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+            fields: {},
+        };
     }
     const res = await apiFetch(`${base}/modules/${encodeURIComponent(key)}`, {
         method: "PUT",
@@ -73,6 +81,9 @@ export async function enableModule(
             alreadyEnabled: parsed.success
                 ? (parsed.data.alreadyEnabled ?? false)
                 : false,
+            ...(parsed.success && parsed.data.created?.siteId
+                ? { siteId: parsed.data.created.siteId }
+                : {}),
         };
     }
     const body = raw as {

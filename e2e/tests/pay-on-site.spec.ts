@@ -28,6 +28,9 @@ const hostOf = (sub: string) => `${renderer.protocol}//${sub}.${renderer.host}`;
 const NORTHWIND = hostOf("northwind");
 const RYE = hostOf("rye-and-co");
 
+/** The provider windows' scripts: never loaded from a test run. */
+const PROVIDER_SDKS = /checkout\.razorpay\.com|sdk\.cashfree\.com/;
+
 /** An issued Northwind invoice and its fresh pay link's token. */
 async function issuedInvoice(
     request: APIRequestContext,
@@ -166,6 +169,67 @@ test.describe("pay links on the business's own address (L6)", () => {
             page.getByRole("heading", { name: `Invoice ${number}` }),
         ).toBeVisible();
         await expect.poll(() => new URL(page.url()).host).toBe(home.host);
+    });
+
+    test("the page is the business's, and Pay opens its payment window, never a placeholder", async ({
+        page,
+    }, testInfo) => {
+        await useSession(page);
+        const request = page.request;
+        const { number, token } = await issuedInvoice(request, stamp(testInfo));
+        const res = await request.get(
+            `${urls.API_URL}/public/invoices/${token}`,
+        );
+        const { businessName, payOnline } = (await res.json()) as {
+            businessName: string;
+            payOnline?: boolean;
+        };
+
+        // No provider's script is fetched from here: the window "can't
+        // open", which is a state the page has words for.
+        await page.route(PROVIDER_SDKS, (route) => route.abort());
+        await page.goto(`${urls.RENDERER_URL}/pay/${token}`);
+
+        // Who is being paid: the tab and the page's one heading.
+        await expect(page).toHaveTitle(`Pay ${businessName}`);
+        await expect(
+            page.getByRole("heading", { level: 1, name: businessName }),
+        ).toBeVisible();
+        await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+        await expect(
+            page.getByRole("heading", { name: `Invoice ${number}` }),
+        ).toBeVisible();
+        // Nothing to check before a payment is started.
+        await expect(
+            page.getByRole("button", { name: "Check again" }),
+        ).toHaveCount(0);
+
+        const pay = page.getByRole("button", { name: /^Pay ₹/ });
+        test.skip(
+            payOnline === false || (await pay.count()) === 0,
+            "Northwind doesn't take payment online on this stack",
+        );
+        await pay.click();
+
+        // Either the window couldn't open (its script was blocked), or the
+        // business's provider couldn't start the payment on this stack.
+        // Both are said in the customer's words, with a way to go again.
+        // The page's own alert: Next's route announcer is one too.
+        const said = page.getByRole("main").getByRole("alert");
+        await expect(said).toBeVisible({ timeout: 15_000 });
+        await expect(said).toHaveText(
+            /We couldn't open the payment window\. Check your connection and try again\.|can't take payment online right now|We couldn't start the payment/,
+        );
+        await expect(
+            page.getByRole("button", { name: /^(Try again · |Pay )₹/ }),
+        ).toBeEnabled();
+        // Never the developer's placeholder, a provider's id or raw JSON.
+        await expect(page.locator("body")).not.toContainText(
+            /widget|mounts here|Provider order id|clientParams|order_[A-Za-z0-9]{6,}/,
+        );
+        await expect(page.locator("pre")).toHaveCount(0);
+        // Unpaid still: nothing on the page claims otherwise.
+        await expect(page.getByText(/This invoice is paid/)).toHaveCount(0);
     });
 
     test("an order's pay path is served on a tenant host too", async ({

@@ -6,6 +6,7 @@ import { HomeDashboard } from "@/components/home/home-dashboard";
 import { HomeHeader } from "@/components/home/home-header";
 import { ReviewerHome } from "@/components/home/reviewer-home";
 import { StaffHome } from "@/components/home/staff-home";
+import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
@@ -13,6 +14,7 @@ import { mayWriteInvoices } from "@/lib/home/first-run";
 import { getHome } from "@/lib/home/service";
 import { hasAnyInvoice } from "@/lib/invoices/service";
 import { listModules } from "@/lib/modules/service";
+import { homeMoment } from "@/lib/moments/read";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
 import type { Organization } from "@/lib/organizations/service";
@@ -22,6 +24,7 @@ import {
 } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
 import { requireSession } from "@/lib/session";
+import { checklistSubject } from "@/lib/settings/ready";
 import { loadReadyChecklist } from "@/lib/settings/ready-service";
 
 /**
@@ -97,6 +100,8 @@ export default async function Home() {
     const invoicing = home.hasAnyModule
         ? undefined
         : await loadInvoicing(business, kind);
+    // The first order or booking, in its first day (wave G), said once.
+    const moment = home.hasAnyModule ? await homeMoment(home, business) : null;
 
     return (
         // A dashboard, so the width matches the other data screens rather than
@@ -110,7 +115,10 @@ export default async function Home() {
                 name={session.user.name}
                 businessName={business?.name ?? "This business"}
                 kind={kind}
+                // The line under the greeting follows the checklist below.
+                subject={setup ? checklistSubject(setup.list) : null}
             />
+            {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
                 <HomeDashboard
                     home={home}
@@ -141,7 +149,7 @@ async function loadInvoicing(
 }
 
 /**
- * "Get ready to take money" (F8): for owners and admins only (`org:update`),
+ * "Finish setup" (F8): for owners and admins only (`org:update`),
  * whose steps they are. Best-effort — a settings read that fails leaves the
  * checklist off Home, never Home itself.
  */

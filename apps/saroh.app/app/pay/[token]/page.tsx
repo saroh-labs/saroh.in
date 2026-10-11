@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { SiteTheme } from "@saroh/site-blocks";
 
@@ -23,11 +24,24 @@ import { SITE_FACES } from "@/lib/site-fonts";
  * "Download PDF" (DEC-083) is this app's `pdf/route.ts` beside it, which
  * asks the API server to server, as the page's own read does.
  */
-export const metadata: Metadata = {
-    title: "Pay your invoice",
-    robots: { index: false, follow: false },
-    referrer: "no-referrer",
-};
+// One read for the tab's title and the page.
+const readInvoice = cache(getPayInvoice);
+
+/** "Pay Rye & Co." in the tab; the plain title when the link doesn't open. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    const result = await readInvoice((await params).token);
+    return {
+        title: result.ok
+            ? `Pay ${result.invoice.businessName}`
+            : "Pay your invoice",
+        robots: { index: false, follow: false },
+        referrer: "no-referrer",
+    };
+}
 
 const GONE: Record<
     "missing" | "busy" | "unavailable",
@@ -53,7 +67,7 @@ export default async function PayPage({
     params: Promise<{ token: string }>;
 }) {
     const { token } = await params;
-    const result = await getPayInvoice(token);
+    const result = await readInvoice(token);
 
     if (!result.ok) {
         const copy = GONE[result.reason];

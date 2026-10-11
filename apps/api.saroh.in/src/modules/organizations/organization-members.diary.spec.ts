@@ -177,7 +177,7 @@ describe("inviting someone on the diary (#868)", () => {
                 email: "priya@example.com",
                 staffId: "staff_priya",
             }),
-        ).rejects.toThrow("Priya already has a login here.");
+        ).rejects.toThrow("Priya already signs in here.");
 
         db.staffMember!.findFirst!.mockResolvedValueOnce(null);
         await expect(

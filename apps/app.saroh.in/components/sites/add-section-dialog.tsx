@@ -119,7 +119,7 @@ export function AddSectionDialog({
                 ) : (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Add a section</DialogTitle>
+                            <DialogTitle>New section</DialogTitle>
                             <DialogDescription>
                                 Each is shown with example content in your
                                 site&apos;s colours.
@@ -180,7 +180,7 @@ function PickerCard({
         <button
             type="button"
             onClick={onPick}
-            className="grid w-full gap-2 rounded-lg border p-2 text-left transition-colors hover:border-foreground/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="grid w-full gap-2 rounded-lg border p-2 text-left transition-colors duration-fast hover:border-foreground/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             {children}
             <span className="grid gap-0.5 px-1 pb-1">

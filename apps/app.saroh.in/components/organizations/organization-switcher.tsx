@@ -9,12 +9,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { setActiveOrganization } from "@/lib/organizations/actions";
 import { PAUSED_LABEL } from "@/lib/organizations/choose";
 import type {
     Organization,
     OrganizationRole,
 } from "@/lib/organizations/service";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 const ROLE_LABEL: Record<OrganizationRole, string> = {
     OWNER: "Owner",
@@ -83,7 +85,10 @@ export function OrganizationSwitcher({
         // fallback for a missing or stale cookie, and re-selecting it is the
         // only way to write the cookie back. The action is membership-guarded.
         startTransition(async () => {
-            const res = await setActiveOrganization(organizationId);
+            const res = await runAction(() =>
+                setActiveOrganization(organizationId),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -134,7 +139,7 @@ export function OrganizationSwitcher({
     const heading = (label: string, first: boolean) => (
         <p
             className={cn(
-                "px-[9px] pb-[5px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
+                "label px-[9px] pb-[5px]",
                 first ? "pt-1" : "mt-[5px] border-t border-muted pt-2.5",
             )}
         >
@@ -154,8 +159,8 @@ export function OrganizationSwitcher({
                 <button
                     type="button"
                     disabled={pending}
-                    aria-label={`Change business — currently ${active.name}`}
-                    className="flex min-w-0 items-center gap-[9px] rounded-lg px-[9px] py-1.5 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active disabled:opacity-60 coarse:min-h-11"
+                    aria-label={`Change business, currently ${active.name}`}
+                    className="flex min-w-0 items-center gap-[9px] rounded-lg px-[9px] py-1.5 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active disabled:text-disabled-foreground coarse:min-h-11"
                 >
                     <BusinessTile name={active.name} active size={30} />
                     <span className="flex min-w-0 items-baseline gap-2">
@@ -180,11 +185,11 @@ export function OrganizationSwitcher({
             >
                 <div className="px-1 pb-[7px] pt-[3px]">
                     <Input
+                        dense
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Find a business"
                         aria-label="Find a business"
-                        className="h-8 text-[12.5px]"
                     />
                 </div>
                 {owned.length > 0 ? (
@@ -201,7 +206,7 @@ export function OrganizationSwitcher({
                 ) : null}
                 {matches.length === 0 ? (
                     <p className="px-[9px] py-3.5 text-[12.5px] text-muted-foreground">
-                        No business matches that.
+                        {noMatchLine("businesses", query)}
                     </p>
                 ) : null}
                 <div className="mt-1.5 border-t border-muted pt-1.5">

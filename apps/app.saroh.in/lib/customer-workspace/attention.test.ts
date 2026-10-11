@@ -434,10 +434,10 @@ describe("booking-page notes (C12)", () => {
         );
         // Their full name, as the design has it (DEC-073).
         expect(suggestionWhen("Rahul Verma", rahul, TZ, NOW)).toBe(
-            "Rahul Verma wrote this when booking online, 18 Sep at 10:42",
+            "Rahul Verma wrote this when booking online, 18 Sep at 10:42 am",
         );
         expect(suggestionWhen(null, rahul, TZ, NOW)).toBe(
-            "They wrote this when booking online, 18 Sep at 10:42",
+            "They wrote this when booking online, 18 Sep at 10:42 am",
         );
         expect(setAsideText(rahul)).toBe(
             "Set aside. The note stays in their booking history.",
@@ -453,7 +453,7 @@ describe("booking-page notes (C12)", () => {
             "2 notes from the customer",
         );
         expect(suggestionWhen("Rahul", fromAccount, TZ, NOW)).toBe(
-            "Rahul sent this from their account, 18 Sep at 10:42",
+            "Rahul sent this from their account, 18 Sep at 10:42 am",
         );
         // Set aside, it leaves their list: it isn't kept on a booking.
         expect(setAsideText(fromAccount)).toBe(
@@ -517,13 +517,13 @@ describe("who can read a sensitive note (C12, DEC-073)", () => {
 
     it("says the roles in the tick, and only the rule when they're unknown", () => {
         expect(sensitiveTickText(["Dentist", "Owner"])).toBe(
-            "Sensitive — only people who can see sensitive notes (Dentist, Owner) can read it",
+            "Sensitive. Only people who can see sensitive notes (Dentist, Owner) can read it",
         );
         expect(sensitiveTickText(null)).toBe(
-            "Sensitive — only people who can see sensitive notes can read it",
+            "Sensitive. Only people who can see sensitive notes can read it",
         );
         expect(sensitiveTickText([])).toBe(
-            "Sensitive — only people who can see sensitive notes can read it",
+            "Sensitive. Only people who can see sensitive notes can read it",
         );
     });
 });

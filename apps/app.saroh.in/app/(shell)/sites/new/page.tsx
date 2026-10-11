@@ -1,13 +1,12 @@
 import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
+import { LimitReachedState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Globe } from "lucide-react";
 import Link from "next/link";
 
-import { AccessDenied } from "@/components/shared/access-denied";
-import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { CreateSiteForm } from "@/components/sites/create-site-form";
+import { requireCan } from "@/lib/access/require-can";
 import { mayAddWebsite } from "@/lib/business-limits";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { kindDefaults } from "@/lib/organizations/kind";
@@ -58,22 +57,25 @@ export default async function NewSitePage({
     /*
      * Said before the work, not after it (§30).
      *
-     * `site:create` is OWNER/ADMIN, and the API has always refused everyone
-     * else — but only on submit. A MEMBER or a REVIEWER who reached this page
-     * picked a template, named a site, pressed Create and only then learned
-     * they could not. Nothing is offered here now, in the rail, the palette or
-     * the list (#313); this is for whoever arrives with the address anyway.
+     * The API has always refused anyone without `site:create`, but only on
+     * submit. A MEMBER or a REVIEWER who reached this page picked a template,
+     * named a site, pressed Create and only then learned they could not.
+     * Nothing is offered here now, in the rail, the palette or the list
+     * (#313); this is for whoever arrives with the address anyway.
+     *
+     * Asked of the permissions the API resolved, never the role's name: a
+     * role the business made with `site:create` ticked makes one, and one
+     * without it is told here.
      */
-    if (!navRoleCan(organization?.role ?? null, "site:create")) {
-        return (
-            <AccessDenied
-                title="Only owners and admins can create a site"
-                description="You can open and read the websites you have been given access to. An owner or admin can create a new one."
-                backHref="/sites"
-                backLabel="Back to Website"
-            />
-        );
-    }
+    const access = await requireCan(
+        "site:create",
+        {
+            thing: "New site",
+            back: { href: "/sites", label: "Back to Website" },
+        },
+        organization,
+    );
+    if (access.denied) return access.denied;
 
     /*
      * One website per business, on every plan (ADR-006, DEC-094), and the
@@ -85,13 +87,21 @@ export default async function NewSitePage({
         const name = existing.name.trim() || "Untitled site";
         return (
             <PageContainer width="form">
-                <PageHeader title="Create a site" />
-                <EmptyState
-                    data-ph-mask=""
+                <PageHeader
+                    breadcrumb={[
+                        <Link key="site" href="/sites">
+                            Website
+                        </Link>,
+                        "New site",
+                    ]}
+                    title="New site"
+                />
+                <LimitReachedState
                     icon={<Globe />}
-                    title={`${name} is this business's website`}
+                    title="You already have a website"
                     description="A business has one website. Its pages, posts, look and address are all changed from Website."
-                    action={
+                    secondary={
+                        // The site's own name: masked in a recording.
                         <Button data-ph-mask="" asChild variant="outline">
                             <Link href={`/sites/${existing.id}/pages`}>
                                 Go to {name}
@@ -116,7 +126,13 @@ export default async function NewSitePage({
     return (
         <PageContainer width="form">
             <PageHeader
-                title="Create a site"
+                breadcrumb={[
+                    <Link key="site" href="/sites">
+                        Website
+                    </Link>,
+                    "New site",
+                ]}
+                title="New site"
                 description="Name your new site, check its web address and pick a template."
             />
             <CreateSiteForm

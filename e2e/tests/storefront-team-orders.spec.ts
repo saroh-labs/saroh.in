@@ -139,7 +139,7 @@ test("a storefront teammate sees and moves only their storefront's orders (DEC-0
 
         // Online's order isn't there for her, even by its address.
         await page.goto(`/commerce/orders/${theirs.id}`);
-        await expect(page.getByText("No order here")).toBeVisible();
+        await expect(page.getByText("Order not found")).toBeVisible();
     } finally {
         // Put the business back: hers collected, Online's cancelled.
         const nw = northwind(owner.request);

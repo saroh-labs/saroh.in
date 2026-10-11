@@ -70,13 +70,16 @@ export function northwind(request: APIRequestContext) {
     };
 }
 
-/** A Northwind contact made for this test. */
+/**
+ * A Northwind contact made for this test. The email is asked for: the API
+ * refuses a contact without one (`CreateContactDto`).
+ */
 export async function makeContact(
     request: APIRequestContext,
     body: {
         firstName: string;
         lastName: string;
-        email?: string;
+        email: string;
         phone?: string;
     },
 ): Promise<{ id: string; name: string }> {

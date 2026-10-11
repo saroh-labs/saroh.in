@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { noticeOf } from "../notifications/notice-target";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { bookingNoticeKey } from "../site-accounts/customer-notify-queue";
 import { CustomerNotifyService } from "../site-accounts/customer-notify.handler";
@@ -217,7 +218,10 @@ async function tellTeam(
     const notification = await tx.notification.create({
         data: {
             organizationId,
-            type: TEAM_NOTICE_TYPE[input.kind],
+            // It opens the booking.
+            ...noticeOf(TEAM_NOTICE_TYPE[input.kind], {
+                bookingId: input.bookingId,
+            }),
             title: words.title,
             body: words.body,
         },

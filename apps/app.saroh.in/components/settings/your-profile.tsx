@@ -1,6 +1,7 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
+import { LeaveBusiness } from "@/components/organizations/leave-business";
 import type { AlertPreferencesRead } from "@/lib/notifications/preferences";
 
 import { AlertsGrid } from "./alerts-grid";
@@ -18,6 +19,9 @@ import { UsageSharingCard } from "./usage-sharing-card";
  * "What you hear about" is the design's grid of alerts by channel: your own
  * choices in this business (F14, `alerts-grid.tsx`).
  *
+ * "Leave {business}" is last: the one way out that every member has, since
+ * this page is the one every role can open.
+ *
  * "Help improve Saroh" is a third card, not in the design, shown only where
  * session recording is switched on (DEC-125, `usage-sharing-card.tsx`).
  */
@@ -26,6 +30,7 @@ export function YourProfile({
     email,
     accountUrl,
     alerts,
+    leave = null,
     sharesUsage,
 }: {
     name: string;
@@ -33,6 +38,17 @@ export function YourProfile({
     /** Your account on accounts.saroh.in. */
     accountUrl: string;
     alerts: AlertPreferencesRead;
+    /**
+     * The business this is open in, for "Leave {business}": the way out for
+     * everyone in it, whatever their role (UX audit, 10 Oct 2026). The only
+     * owner reads why they can't, in place of the button.
+     */
+    leave?: {
+        business: string;
+        onlyOwner: boolean;
+        /** Locations of this business they work at. */
+        locations: string[];
+    } | null;
     /**
      * "Help improve Saroh" (DEC-125): whether you share how you use the
      * workspace. Undefined where session recording is not switched on (or
@@ -56,7 +72,7 @@ export function YourProfile({
     ];
 
     return (
-        <div className="grid max-w-[760px] gap-4">
+        <div className="grid gap-4">
             <section
                 aria-label="You"
                 className="overflow-hidden rounded-xl border border-border bg-card"
@@ -111,6 +127,36 @@ export function YourProfile({
             {sharesUsage === undefined ? null : (
                 <UsageSharingCard on={sharesUsage} />
             )}
+
+            {leave ? (
+                <section
+                    aria-label={`Leave ${leave.business}`}
+                    className="rounded-xl border border-border bg-card px-[18px] py-4"
+                >
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                        <div className="min-w-0 flex-[1_1_260px]">
+                            <h2 className="font-display text-[15px] font-semibold">
+                                Leave {leave.business}
+                            </h2>
+                            <p className="mt-1 text-pretty text-[12.5px] leading-normal text-muted-foreground">
+                                You stop being part of {leave.business}. Your
+                                Saroh account and your other businesses stay as
+                                they are.
+                            </p>
+                        </div>
+                        <LeaveBusiness
+                            business={leave.business}
+                            onlyOwner={leave.onlyOwner}
+                            locations={leave.locations}
+                            className={
+                                leave.onlyOwner
+                                    ? "flex-[1_1_260px] text-foreground/80"
+                                    : "shrink-0"
+                            }
+                        />
+                    </div>
+                </section>
+            ) : null}
         </div>
     );
 }

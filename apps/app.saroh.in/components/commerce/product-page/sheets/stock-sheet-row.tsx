@@ -8,6 +8,8 @@ import { useId } from "react";
 
 import type { SheetSize } from "@/lib/products/stock-sheet";
 import { canSellNote } from "@/lib/products/stock-sheet";
+import { Label } from "@saroh/ui/label";
+import { MoneyInput } from "@saroh/ui/money-input";
 
 /**
  * The sheet's column heads on the desk: size · price · on hand · warn at ·
@@ -48,7 +50,7 @@ export function SheetSizeRow({
     canWrite,
     hasVariants,
     productPrice,
-    symbol,
+    currency,
     onSize,
     onPrice,
     onShelf,
@@ -61,7 +63,8 @@ export function SheetSizeRow({
     hasVariants: boolean;
     /** The product's price, as edited: a size's blank price. */
     productPrice: string;
-    symbol: string;
+    /** The product's currency, for the price box. */
+    currency: string;
     onSize: (patch: Partial<SheetSize>) => void;
     /** The product's own price, for a product sold as itself. */
     onPrice: (price: string) => void;
@@ -90,12 +93,9 @@ export function SheetSizeRow({
                     ? `${s.title} has open orders, so it can't be removed`
                     : `Remove ${s.title || "this size"}`
             }
-            className={cn(
-                "rounded-md p-0 text-destructive-subtle-foreground",
-                className,
-            )}
+            className={cn("p-0 text-destructive-subtle-foreground", className)}
         >
-            <X aria-hidden className="size-3" strokeWidth={2.2} />
+            <X aria-hidden className="size-3" />
         </Button>
     );
 
@@ -118,44 +118,32 @@ export function SheetSizeRow({
                     <span />
                 ) : (
                     <div className={FIELD}>
-                        <label htmlFor={`${id}-price`} className={PHONE_LABEL}>
+                        <Label htmlFor={`${id}-price`} className={PHONE_LABEL}>
                             Price
-                        </label>
-                        <div className="relative">
-                            <span
-                                aria-hidden
-                                className="pointer-events-none absolute inset-y-0 left-[9px] flex items-center text-[12.5px] text-muted-foreground"
-                            >
-                                {symbol}
-                            </span>
-                            <Input
-                                id={`${id}-price`}
-                                value={s.variantId ? s.price : productPrice}
-                                onChange={(e) =>
-                                    s.variantId
-                                        ? onSize({ price: e.target.value })
-                                        : onPrice(e.target.value)
-                                }
-                                readOnly={!canWrite}
-                                inputMode="decimal"
-                                placeholder={
-                                    s.variantId ? productPrice : undefined
-                                }
-                                aria-label={`${s.title || "Size"} price${s.variantId ? ", blank for the product's" : ""}`}
-                                className={cn("pl-5", !canWrite && LOCKED)}
-                            />
-                        </div>
+                        </Label>
+                        <MoneyInput
+                            id={`${id}-price`}
+                            currency={currency}
+                            value={s.variantId ? s.price : productPrice}
+                            onValueChange={(price) =>
+                                s.variantId ? onSize({ price }) : onPrice(price)
+                            }
+                            readOnly={!canWrite}
+                            placeholder={s.variantId ? productPrice : undefined}
+                            aria-label={`${s.title || "Size"} price${s.variantId ? ", blank for the product's" : ""}`}
+                            className={cn(!canWrite && LOCKED)}
+                        />
                     </div>
                 )}
                 {counts ? (
                     <>
                         <div className={FIELD}>
-                            <label
+                            <Label
                                 htmlFor={`${id}-on-hand`}
                                 className={PHONE_LABEL}
                             >
                                 On hand
-                            </label>
+                            </Label>
                             <Input
                                 id={`${id}-on-hand`}
                                 value={
@@ -178,12 +166,12 @@ export function SheetSizeRow({
                             />
                         </div>
                         <div className={FIELD}>
-                            <label
+                            <Label
                                 htmlFor={`${id}-warn`}
                                 className={PHONE_LABEL}
                             >
                                 Warn at
-                            </label>
+                            </Label>
                             <Input
                                 id={`${id}-warn`}
                                 value={s.warn}

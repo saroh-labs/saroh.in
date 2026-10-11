@@ -2,12 +2,11 @@ import type { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { moneyWordsMinor } from "../../common/words-format";
 import { resolveContact } from "../customer-workspace/resolve-contact";
-import { formatMoney } from "../invoices/invoice-send.service";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { appendMessage } from "../site-accounts/thread-store";
 import type { FulfilmentType } from "./fulfilment";
-import { fromCents } from "./order-pricing";
 
 /*
  * "Tell the customer" on Order Detail (round-2 B9): a change of how their
@@ -128,7 +127,7 @@ const FOR_TYPE: Record<FulfilmentType, string> = {
 };
 
 const said = (cents: number, currency: string) =>
-    formatMoney(fromCents(Math.abs(cents)), currency);
+    moneyWordsMinor(Math.abs(cents), currency);
 
 /**
  * "Your order #1063 is now for local delivery. There's ₹40.00 more to pay

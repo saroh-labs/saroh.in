@@ -8,19 +8,18 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load payments"
-            description="No payment was affected — this page just failed to render."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Payments"
+            things="payments"
+            reassurance="No payment was affected."
         />
     );
 }

@@ -103,7 +103,12 @@ test("the owner changes the web address, and the old one is kept for them", asyn
 
     await expect(
         page
-            .getByText(`Your web address is now ${next}${suffix}`)
+            .getByText("Web address changed.", { exact: true })
+            .filter({ visible: true }),
+    ).toBeVisible();
+    await expect(
+        page
+            .getByText(`It is now ${next}${suffix}.`, { exact: true })
             .filter({ visible: true }),
     ).toBeVisible();
     await expect(dialog).toBeHidden();

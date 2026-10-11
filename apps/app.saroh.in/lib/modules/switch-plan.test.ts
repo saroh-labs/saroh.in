@@ -105,11 +105,11 @@ describe("what turning it off says", () => {
                 rows: ["Calendar", "Services"],
                 dependents: [],
                 lines: [
-                    "3 upcoming bookings stay booked; the booking page stops taking new ones.",
+                    "3 upcoming bookings stay booked. The booking page stops taking new ones.",
                 ],
             }),
         ).toBe(
-            "3 upcoming bookings stay booked; the booking page stops taking new ones. Calendar and Services leave the rail. Nothing is deleted.",
+            "3 upcoming bookings stay booked. The booking page stops taking new ones. Calendar and Services leave the rail. Nothing is deleted.",
         );
     });
 

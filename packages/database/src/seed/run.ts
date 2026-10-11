@@ -1,6 +1,7 @@
 import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
 import { alignOrderNumberSequence } from "../order-number";
+import { seedCalendarOnlyTeammate } from "./calendar-only-teammate";
 import {
     ANALYTICS_DAYS,
     ANALYTICS_PATHS,
@@ -322,6 +323,9 @@ export async function seed(): Promise<void> {
     // An old address of Northwind's that still forwards to its site (L3).
     await seedPreviousAddress(prisma, org.id, siteIds[0], now);
     await seedStorefrontTeammate(prisma, org.id, storeId);
+    // Tara, Calendar only, with one booking of her own on a seeded
+    // service (#868; `role-calendar-only.spec.ts`).
+    await seedCalendarOnlyTeammate(prisma, org.id, id("service", 2), now);
     const founderId = await seedFounder(prisma);
     // Two of Asha's that Saroh sends booking emails for, flags on for them
     // alone (DEC-086; `providers-saroh-email.spec.ts`).

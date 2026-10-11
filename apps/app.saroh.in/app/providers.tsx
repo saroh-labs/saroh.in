@@ -1,7 +1,11 @@
 "use client";
 
 import { brandToastOptions } from "@saroh/ui/sonner";
+import { setRefusalTest } from "@saroh/ui/toast";
+import { useEffect } from "react";
 import { Toaster } from "sonner";
+
+import { isRoleRefusal } from "@/lib/api/role-denied";
 
 /*
  * Toasts rise from the bottom, and below 760px the tab bar lives there: the
@@ -22,6 +26,9 @@ const mobileOffset = {
 };
 
 export function Providers({ children }: { children: React.ReactNode }) {
+    // A refusal by role is said calmly wherever a save says it: every
+    // `showError(res.error)` in the app asks this first (`role-denied.ts`).
+    useEffect(() => setRefusalTest(isRoleRefusal), []);
     return (
         <>
             <Toaster

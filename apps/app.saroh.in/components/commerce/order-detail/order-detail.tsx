@@ -45,11 +45,10 @@ import { HoldCard } from "./hold-card";
 import { AllergyBanner, OrderItems } from "./items";
 import { KitchenPaymentCard } from "./kitchen-payment-card";
 import { MoneyCard } from "./money-card";
-import { OrderCrumbs, OrderHeading } from "./order-header";
+import { OrderHeading } from "./order-header";
 import { useOrderPanel } from "./order-sheet";
 import { OrderSheets } from "./order-sheets";
 import type { PillTone } from "./parts";
-import { actionClass } from "./parts";
 import { PayLinkBlock, usePayLink } from "./pay-link";
 import { KitchenStepper } from "./stepper";
 import { OrderTimeline } from "./timeline";
@@ -156,7 +155,7 @@ export function OrderDetail({
     const number = `#${order.orderId}`;
     const first = firstName(order.customer?.name ?? order.walkIn?.name);
     const currency = order.money?.currency ?? "INR";
-    const format = (n: number) => formatMoneyMajor(n, currency) ?? String(n);
+    const format = (n: number) => formatMoneyMajor(n, currency);
     const kitchenSteps = stepsOf(order);
     const refundedFull = order.refundStanding === "REFUNDED";
     // A treatment is fulfilled by its visits (B14): no kitchen stages.
@@ -206,7 +205,6 @@ export function OrderDetail({
         order,
         first,
         currency,
-        format,
         refundTo,
         setPanel,
     });
@@ -260,10 +258,10 @@ export function OrderDetail({
         >
             {order.ticketName ? (
                 <Button
+                    // The business's own name for its ticket: masked.
                     data-ph-mask=""
                     type="button"
                     variant="outline"
-                    className={actionClass("ghost")}
                     onClick={print}
                 >
                     Print {order.ticketName.toLowerCase()}
@@ -291,15 +289,11 @@ export function OrderDetail({
                             : undefined
                     }
                     format={order.money ? format : undefined}
+                    currency={currency}
                 />
             ) : null}
             {next && !hold ? (
-                <Button
-                    type="button"
-                    className={actionClass("primary")}
-                    disabled={busy}
-                    onClick={advance}
-                >
+                <Button type="button" disabled={busy} onClick={advance}>
                     {STEP_LABEL[next]}
                 </Button>
             ) : null}
@@ -342,7 +336,7 @@ export function OrderDetail({
           : !money || remaining <= 0
             ? "Nothing has been paid to refund."
             : money.recordedByHand
-              ? "Paid by hand — hand it back by hand, then record it from the menu."
+              ? "Paid by hand. Hand it back by hand, then record it from the menu."
               : can.refundOnline === false
                 ? "Your payment provider isn't connected, so Saroh can't send this refund. Refund it in your provider's dashboard, then record it as refunded."
                 : hold?.kind === "refund"
@@ -375,8 +369,7 @@ export function OrderDetail({
 
     return (
         <main className="w-full">
-            <OrderCrumbs number={number} />
-            <div className="flex flex-col gap-4 px-4 pb-[26px] pt-5 sm:px-6">
+            <div className="flex flex-col gap-4 px-4 pb-[26px] pt-5 sm:px-[26px]">
                 {heading}
                 {unpaid ? (
                     <PaymentBanner
@@ -584,6 +577,7 @@ export function OrderDetail({
             </div>
             {payLink.dialog}
             <OrderSheets
+                currency={currency}
                 panel={panel}
                 opening={opening}
                 order={order}

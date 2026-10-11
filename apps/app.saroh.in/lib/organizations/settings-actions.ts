@@ -42,6 +42,18 @@ export async function saveOrganizationSettings(
     const result = await updateOrganizationSettings(input);
     if (result.ok) {
         revalidatePath("/settings/organization");
+        // Website settings shows what the site says of how to reach the
+        // business (DEC-128): the phone, the email, the social links.
+        if (
+            input.socialLinks !== undefined ||
+            input.siteShowsRegisteredAddress !== undefined ||
+            input.registeredAddressMapUrl !== undefined ||
+            input.profile?.phone !== undefined ||
+            input.profile?.contactEmail !== undefined ||
+            input.registeredAddress !== undefined
+        ) {
+            revalidatePath("/sites", "layout");
+        }
         if (input.kind !== undefined) revalidatePath("/", "layout");
         else revalidatePath("/");
     }

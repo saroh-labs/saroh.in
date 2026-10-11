@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
@@ -61,7 +62,7 @@ export function OrderExport({
         downloadCsv(rows, storeName);
         if (complete) {
             showSuccess(
-                `Exported ${rows.length} ${rows.length === 1 ? "order" : "orders"} as a spreadsheet file.`,
+                `Exported ${count(rows.length, "order")} as a spreadsheet file.`,
             );
         } else {
             showError(
@@ -76,11 +77,13 @@ export function OrderExport({
         <Button
             data-ph-unmask=""
             variant="outline"
-            disabled={total === 0 || busy}
+            disabled={total === 0}
             onClick={() => void run()}
             aria-live="polite"
+            busy={busy}
+            busyLabel={`Exporting… ${read} of ${total}`}
         >
-            {busy ? `Exporting… ${read} of ${total}` : "Export"}
+            Export
         </Button>
     );
 }

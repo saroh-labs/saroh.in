@@ -174,7 +174,7 @@ export function ShareCard({
                         <Picture image={image} className="h-[180px]" />
                     ) : null}
                     <div className="grid gap-0.5 bg-[#F0F2F5] px-3 py-2.5">
-                        <span className="truncate text-xs uppercase text-[#65676B]">
+                        <span className="label truncate text-[#65676B]">
                             {domain}
                         </span>
                         <span className="text-[15px] font-semibold leading-[1.3] text-[#050505] [overflow-wrap:anywhere]">

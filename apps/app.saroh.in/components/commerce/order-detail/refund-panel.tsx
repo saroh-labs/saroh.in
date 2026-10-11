@@ -1,7 +1,8 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
+import { plural } from "@/lib/format/plural";
+import { Input } from "@saroh/ui/input";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
 
 import { putBackOf, refundableQuantity } from "@/lib/orders/lifecycle";
@@ -14,8 +15,15 @@ import {
     REFUND_REASONS,
 } from "@/lib/orders/refund-choice";
 
-import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
-import { FOCUS } from "./parts";
+import { CheckRow } from "@/components/shared/check-row";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 
 export interface RefundChoice {
     /** Null: everything still refundable, delivery included. */
@@ -34,12 +42,7 @@ export interface RefundChoice {
      * line, so nothing comes back to the shelf. Null: the lines decide.
      */
     goodwill: string | null;
-}
-
-const FIELD =
-    "h-8 rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
-/**
+} /**
  * "What are you refunding?" — tick lines; every line refunds the order in
  * full, delivery too. Each line refunds what is left of it. Or type another
  * amount — late, a goodwill gesture — which refunds just that, needs a
@@ -81,6 +84,8 @@ interface RefundProps {
     /** "Back to Razorpay, in 3–5 days." */
     how: string;
     format: (amount: number) => string;
+    /** The order's currency, for the amount box. */
+    currency: string;
     onCancel: () => void;
     onRefund: (choice: RefundChoice) => void;
 }
@@ -92,6 +97,7 @@ function RefundDraft({
     shipping,
     how,
     format,
+    currency,
     onRefund,
 }: RefundProps) {
     const ids = useId();
@@ -101,6 +107,7 @@ function RefundDraft({
     const [other, setOther] = useState("");
     const [typed, setTyped] = useState("");
     const [stock, setStock] = useState<"back" | "off">("off");
+    useOrderSheetDraft([picked, reason, other, typed, stock]);
     const worth = (l: OrderReadLine) =>
         Number(l.price ?? 0) * refundableQuantity(l);
     const sum = open.reduce((n, l) => n + (picked[l.id] ? worth(l) : 0), 0);
@@ -123,31 +130,14 @@ function RefundDraft({
                     {open.map((l) => {
                         const on = !!picked[l.id];
                         return (
-                            <button
+                            <CheckRow
                                 key={l.id}
-                                type="button"
-                                role="checkbox"
-                                aria-checked={on}
-                                onClick={() =>
-                                    setPicked((p) => ({
-                                        ...p,
-                                        [l.id]: !p[l.id],
-                                    }))
+                                checked={on}
+                                onChange={(next) =>
+                                    setPicked((p) => ({ ...p, [l.id]: next }))
                                 }
-                                className={cn(
-                                    FOCUS,
-                                    "flex w-full items-center gap-2.5 rounded-[7px] px-1.5 py-2 text-left text-[13px] hover:bg-muted active:bg-accent-active coarse:min-h-11",
-                                )}
+                                className="w-full gap-2.5 rounded-[7px] px-1.5 py-2 hover:bg-muted active:bg-accent-active"
                             >
-                                <span
-                                    aria-hidden
-                                    className={cn(
-                                        "size-4 shrink-0 rounded",
-                                        on
-                                            ? "border-[5px] border-foreground"
-                                            : "border-[1.5px] border-border-strong",
-                                    )}
-                                />
                                 <span className="min-w-0 flex-1">
                                     {refundableQuantity(l)} ×{" "}
                                     {l.name ??
@@ -159,54 +149,48 @@ function RefundDraft({
                                 <span className="tabular-nums">
                                     {format(worth(l))}
                                 </span>
-                            </button>
+                            </CheckRow>
                         );
                     })}
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
-                    <label className="grid gap-1 text-[12px] font-medium">
-                        Why
-                        <select
+                    <Field label="Why">
+                        <OptionSelect<RefundReason | "">
+                            size="sm"
                             value={reason}
-                            onChange={(e) =>
-                                setReason(e.target.value as RefundReason | "")
-                            }
+                            onValueChange={setReason}
+                            placeholder="Choose a reason"
+                            options={REFUND_REASONS}
                             aria-invalid={needsWhy || undefined}
                             aria-describedby={
                                 needsWhy ? `${ids}-why-help` : undefined
                             }
-                            className={cn(FOCUS, FIELD)}
-                        >
-                            <option value="">Choose a reason</option>
-                            {REFUND_REASONS.map((r) => (
-                                <option key={r.value} value={r.value}>
-                                    {r.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                            className="w-full min-w-[150px]"
+                        />
+                    </Field>
                     {reason === "other" ? (
-                        <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                            Say why
-                            <input
+                        <Field
+                            label="Say why"
+                            optional
+                            className="flex-[1_1_160px]"
+                        >
+                            <Input
+                                dense
                                 type="text"
                                 value={other}
                                 maxLength={REFUND_REASON_MAX}
                                 onChange={(e) => setOther(e.target.value)}
-                                placeholder="Optional"
-                                className={cn(FOCUS, FIELD, "w-full")}
+                                className="w-full"
                             />
-                        </label>
+                        </Field>
                     ) : null}
-                    <label className="grid gap-1 text-[12px] font-medium">
-                        Or another amount
-                        <input
-                            type="text"
-                            inputMode="decimal"
+                    <Field label="Or another amount">
+                        <MoneyInput
+                            dense
+                            currency={currency}
                             value={typed}
-                            onChange={(e) => setTyped(e.target.value)}
-                            placeholder="₹"
-                            aria-label="Refund another amount, in rupees"
+                            onValueChange={setTyped}
+                            aria-label="Refund another amount"
                             aria-invalid={
                                 typedAmount.kind === "bad" || undefined
                             }
@@ -215,31 +199,51 @@ function RefundDraft({
                                     ? `${ids}-amount-help`
                                     : undefined
                             }
-                            className={cn(
-                                FOCUS,
-                                FIELD,
-                                "w-[110px] tabular-nums",
-                            )}
+                            className="w-[110px]"
                         />
-                    </label>
+                    </Field>
                     {putBackUnits > 0 ? (
-                        <label className="grid gap-1 text-[12px] font-medium">
-                            Stock
-                            <select
+                        <Field label="Stock">
+                            <OptionSelect<"back" | "off">
+                                size="sm"
                                 value={stock}
-                                onChange={(e) =>
-                                    setStock(e.target.value as "back" | "off")
-                                }
-                                className={cn(FOCUS, FIELD)}
-                            >
-                                <option value="back">Put back in stock</option>
-                                <option value="off">Write off</option>
-                            </select>
-                        </label>
+                                onValueChange={setStock}
+                                options={[
+                                    {
+                                        value: "back",
+                                        label: "Put back in stock",
+                                    },
+                                    { value: "off", label: "Write off" },
+                                ]}
+                                className="w-full min-w-[150px]"
+                            />
+                        </Field>
                     ) : null}
                 </div>
             </OrderSheetBody>
             <OrderSheetFoot
+                tone="destructive"
+                saveLabel={`Refund ${format(amount)}`}
+                savingLabel="Refunding…"
+                saveOff={off}
+                onSubmit={() =>
+                    onRefund({
+                        lines: goodwill
+                            ? null
+                            : all
+                              ? null
+                              : open
+                                    .filter((l) => picked[l.id])
+                                    .map((l) => ({
+                                        itemId: l.id,
+                                        quantity: refundableQuantity(l),
+                                    })),
+                        putBack: stock === "back" ? canPutBack : [],
+                        amount,
+                        reason: why,
+                        goodwill: goodwill ? goodwill.money : null,
+                    })
+                }
                 note={
                     <>
                         {typedAmount.kind === "bad" ? (
@@ -261,44 +265,17 @@ function RefundDraft({
                         <p className="text-[12px] text-muted-foreground">
                             {how}
                             {goodwill
-                                ? " Only this amount goes back; the items stay sold."
+                                ? " Only this amount goes back. The items stay sold."
                                 : shipping > 0
                                   ? ` Ticking every line refunds the ${format(shipping)} delivery too.`
                                   : ""}
                             {putBackUnits > 0 && stock === "back"
-                                ? ` ${putBackUnits} go${putBackUnits === 1 ? "es" : ""} back in stock when the refund is confirmed.`
+                                ? ` ${putBackUnits} ${plural(putBackUnits, "goes", "go")} back in stock when the refund is confirmed.`
                                 : ""}
                         </p>
                     </>
                 }
-            >
-                <Button
-                    data-ph-unmask=""
-                    type="button"
-                    variant="destructive"
-                    disabled={off}
-                    onClick={() =>
-                        onRefund({
-                            lines: goodwill
-                                ? null
-                                : all
-                                  ? null
-                                  : open
-                                        .filter((l) => picked[l.id])
-                                        .map((l) => ({
-                                            itemId: l.id,
-                                            quantity: refundableQuantity(l),
-                                        })),
-                            putBack: stock === "back" ? canPutBack : [],
-                            amount,
-                            reason: why,
-                            goodwill: goodwill ? goodwill.money : null,
-                        })
-                    }
-                >
-                    Refund {format(amount)}
-                </Button>
-            </OrderSheetFoot>
+            />
         </>
     );
 }

@@ -1,26 +1,27 @@
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
 
-import { SIGNUP_PANEL } from "@/components/auth/panel-copy";
+import { SIGNUP_JOIN_PANEL, SIGNUP_PANEL } from "@/components/auth/panel-copy";
 import { SignupForm } from "@/components/auth/signup-form";
+import { isJoining } from "@/lib/joining";
 import { onboardingForInvite, onboardingForPlan } from "@/lib/plan-intent";
 import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
 
 export const metadata: Metadata = {
-    title: "Sign up | Saroh",
-    description: "Create an account with Saroh.",
+    title: "Sign up · Saroh",
+    description: "Sell, take bookings, bill and run your website in one place.",
 };
 
 /**
- * A server component, for the same reason the login page is one (#222): the
+ * A server component, for the same reason the sign-in page is one (#222): the
  * trusted-origin list comes from an env var the browser never sees, so the
  * destination is vetted here.
  *
  * Sign-up used to drop `?redirect=` on the floor. Someone invited to a
- * workspace who had never used Saroh (#276) is exactly the person who arrives
- * here rather than at login, and they were losing the invitation they clicked
- * and landing in onboarding for a workspace of their own.
+ * business who had never used Saroh (#276) is exactly the person who arrives
+ * here rather than at sign-in, and they were losing the invitation they
+ * clicked and landing in setup for a business of their own.
  *
  * A visitor who picked a plan on saroh.in arrives with `?plan=&cycle=` (plan
  * U27). With nowhere else to return to, the account goes on to onboarding
@@ -44,7 +45,16 @@ export default async function SignupPage({
         onboardingForPlan(plan, cycle);
     const providers = await signInProviders();
     return (
-        <SplitShell panel={<SplitPanel {...SIGNUP_PANEL} />}>
+        <SplitShell
+            // An invitee joins a business that exists: no three-step plan.
+            panel={
+                <SplitPanel
+                    {...(isJoining(returnTo)
+                        ? SIGNUP_JOIN_PANEL
+                        : SIGNUP_PANEL)}
+                />
+            }
+        >
             <SignupForm
                 returnTo={returnTo}
                 invitedEmail={typeof email === "string" ? email : undefined}

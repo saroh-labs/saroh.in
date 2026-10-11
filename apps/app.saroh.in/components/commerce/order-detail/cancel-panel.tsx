@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
+import { Input } from "@saroh/ui/input";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
 
 import { refundableQuantity } from "@/lib/orders/lifecycle";
@@ -13,18 +13,19 @@ import {
     REFUND_REASONS,
 } from "@/lib/orders/refund-choice";
 
-import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
-import { FOCUS } from "./parts";
+import { CheckRow } from "@/components/shared/check-row";
+import { Field } from "@saroh/ui/field";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 
 export interface CancelChoice {
     reason: string | null;
     tell: boolean;
-}
-
-const FIELD =
-    "h-8 rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
-/**
+} /**
  * "Cancel #1063? It stays on record as cancelled, never deleted." — the
  * refund sheet with every line ticked (the design's option B): a cancel
  * refunds what is left on the order, so there is no "another amount" and
@@ -86,6 +87,7 @@ function CancelDraft({
     const [reason, setReason] = useState<RefundReason | "">("");
     const [other, setOther] = useState("");
     const [tell, setTell] = useState(canTell);
+    useOrderSheetDraft([reason, other, tell]);
 
     return (
         <>
@@ -114,55 +116,55 @@ function CancelDraft({
                     ))}
                 </ul>
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
-                    <label className="grid gap-1 text-[12px] font-medium">
-                        Why
-                        <select
+                    <Field label="Why">
+                        <OptionSelect<RefundReason | "">
+                            size="sm"
                             value={reason}
-                            onChange={(e) =>
-                                setReason(e.target.value as RefundReason | "")
-                            }
-                            className={cn(FOCUS, FIELD, "cursor-pointer")}
-                        >
-                            <option value="">Choose a reason</option>
-                            {REFUND_REASONS.map((r) => (
-                                <option key={r.value} value={r.value}>
-                                    {r.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                            onValueChange={setReason}
+                            placeholder="Choose a reason"
+                            options={REFUND_REASONS}
+                            className="w-full min-w-[150px]"
+                        />
+                    </Field>
                     {reason === "other" ? (
-                        <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                            Say why
-                            <input
+                        <Field
+                            label="Say why"
+                            optional
+                            className="flex-[1_1_160px]"
+                        >
+                            <Input
+                                dense
                                 type="text"
                                 value={other}
                                 maxLength={REFUND_REASON_MAX}
                                 onChange={(e) => setOther(e.target.value)}
-                                placeholder="Optional"
-                                className={cn(FOCUS, FIELD, "w-full")}
+                                className="w-full"
                             />
-                        </label>
+                        </Field>
                     ) : null}
                 </div>
                 {canTell ? (
-                    <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12.5px]">
-                        <input
-                            type="checkbox"
-                            checked={tell}
-                            onChange={(e) => setTell(e.target.checked)}
-                            className={cn(FOCUS, "size-4 cursor-pointer")}
-                        />
+                    <CheckRow
+                        checked={tell}
+                        onChange={setTell}
+                        className="mt-2 text-[12.5px]"
+                    >
                         Tell {first} in their messages
-                    </label>
+                    </CheckRow>
                 ) : (
                     <p className="mt-1 text-[12px] text-muted-foreground">
-                        Nothing is sent to {first} — let them know by email or
+                        Nothing is sent to {first}. Let them know by email or
                         phone.
                     </p>
                 )}
             </OrderSheetBody>
             <OrderSheetFoot
+                // Its button cancels the order, so the way out says what
+                // it keeps: never "Cancel" beside "Cancel order".
+                cancelLabel="Keep order"
+                tone="destructive"
+                saveLabel={confirm}
+                savingLabel="Cancelling…"
                 note={
                     <p
                         id={`${ids}-how`}
@@ -171,21 +173,13 @@ function CancelDraft({
                         {says}
                     </p>
                 }
-            >
-                <Button
-                    type="button"
-                    variant="destructive"
-                    aria-describedby={`${ids}-how`}
-                    onClick={() =>
-                        onConfirm({
-                            reason: reasonText(reason, other),
-                            tell: canTell && tell,
-                        })
-                    }
-                >
-                    {confirm}
-                </Button>
-            </OrderSheetFoot>
+                onSubmit={() =>
+                    onConfirm({
+                        reason: reasonText(reason, other),
+                        tell: canTell && tell,
+                    })
+                }
+            />
         </>
     );
 }

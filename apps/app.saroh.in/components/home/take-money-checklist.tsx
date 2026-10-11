@@ -1,46 +1,44 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import { showUndo } from "@saroh/ui/toast";
-import { Check } from "lucide-react";
-import Link from "next/link";
-import { useId, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
-import type {
-    ReadyAside,
-    ReadyChecklist,
-    ReadyStep,
-} from "@/lib/settings/ready";
+import { useCanChangePlan } from "@/components/billing/plan-way";
+import { PlanAsides, readyRows } from "@/components/settings/ready-rows";
+import { SetupChecklist } from "@/components/shared/setup-checklist";
+import type { ReadyChecklist } from "@/lib/settings/ready";
 import {
-    SETUP_HIDDEN_KEY,
-    checklistHeading,
+    checklistWords,
     readSetupHidden,
+    SETUP_HIDDEN_KEY,
     takeMoneyPlace,
     writeSetupHidden,
 } from "@/lib/settings/ready";
 
 /**
- * "Get ready to take money" on Home ("Saroh Home" design, F8): the same steps
- * Settings › Business lists, each with why it matters and a link to where it
- * is done.
+ * "Finish setup" on Home ("Saroh Home" design, F8): the same steps Settings
+ * › Business lists, drawn by the one checklist
+ * (`components/shared/setup-checklist.tsx`), each with why it matters and
+ * one button to where it is done.
  *
  * Home renders this twice — `slot="first"` above Needs you and `slot="late"`
  * at the foot of the column — and each draws only when the checklist belongs
  * there: first while fewer than half the steps are done, at the foot once
- * more are. Hidden, the foot keeps a "Show setup" link. Once every step is
- * done neither draws anything.
+ * more are. Hidden, the foot keeps a "Show setup" link. Finished, it is back
+ * at the top: the card says so on the visit the last step was done, is one
+ * quiet line on the next, and is gone after that.
  *
- * The heading follows the steps (DEC-070): "Get your site live" when
- * publishing the site is all there is — nothing invoices or takes money.
+ * The line under its name follows the steps (DEC-070): it is about the site
+ * when publishing the site is all there is, and nothing invoices or takes
+ * money.
  *
  * What the plan holds back (taking payment online on a plan without it,
  * DEC-092) follows the steps, outside the count and the bar, with the plan
  * that has it — the same as Settings › Business.
  *
- * Hide is per person, per business, in this browser (default 123). Both
- * slots read one store so hiding in one moves the other at once; a browser
- * that won't store it still hides it for this visit.
+ * Hide is per person, per business, in this browser (default 123): there is
+ * no per-person preference store on the server to keep it in. Both slots
+ * read one store so hiding in one moves the other at once; a browser that
+ * won't store it still hides it for this visit.
  */
 
 type Slot = "first" | "late";
@@ -85,7 +83,6 @@ export function TakeMoneyChecklist({
     businessId: string;
     slot: Slot;
 }) {
-    const headingId = useId();
     // The server can't see the browser's storage, so it draws the checklist
     // shown; a hidden one steps aside right after hydration.
     const hidden = useSyncExternalStore(
@@ -93,168 +90,35 @@ export function TakeMoneyChecklist({
         () => isHidden(businessId),
         () => false,
     );
+    // A step that is the way to another plan is a plan prompt.
+    const canChangePlan = useCanChangePlan();
     const place = takeMoneyPlace(list, hidden);
-    const count = `${list.done} of ${list.total} done`;
-
-    if (place === "hidden") {
-        if (slot !== "late") return null;
-        return (
-            <button
-                type="button"
-                onClick={() => setHidden(businessId, false)}
-                className="justify-self-start text-left text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
-            >
-                Show setup ({count})
-            </button>
-        );
-    }
-    if (place !== slot) return null;
-
-    const hide = () => {
-        setHidden(businessId, true);
-        showUndo("Setup hidden. Show it again from the bottom of Home.", () =>
-            setHidden(businessId, false),
-        );
-    };
-
-    // Leading, it is a business early in setup: every step shows, the done
-    // ones ticked, under a bar of ticks. At the foot, only what is left.
-    const steps =
-        slot === "first" ? list.steps : list.steps.filter((s) => !s.done);
+    // Hidden, the foot keeps the way back. Finished, the top has the last
+    // word. Otherwise each slot draws only its own.
+    const mine =
+        place === "hidden"
+            ? slot === "late"
+            : place === "done"
+              ? slot === "first"
+              : place === slot;
+    if (!mine) return null;
 
     return (
-        <section
-            aria-labelledby={headingId}
-            className="grid gap-2.5 rounded-xl border border-border bg-card px-[18px] py-4"
+        <SetupChecklist
+            name="home"
+            {...checklistWords(list)}
+            rows={readyRows(list.steps, canChangePlan)}
+            hide={{
+                hidden,
+                onHide: () => setHidden(businessId, true),
+                onShow: () => setHidden(businessId, false),
+                said: "Setup hidden. Show it again from the bottom of Home.",
+            }}
+            // One line on the next visit, then Home is left to the work.
+            fold="once"
+            foldKey={`home:${businessId}`}
         >
-            <div className="flex flex-wrap items-baseline gap-2.5">
-                <h2 id={headingId} className="text-[15px] font-semibold">
-                    {checklistHeading(list)}
-                </h2>
-                <span className="text-[12.5px] text-muted-foreground">
-                    {count}
-                </span>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={hide}
-                    className="ml-auto px-2.5 text-[12.5px] font-medium text-neutral-600 dark:text-neutral-400"
-                >
-                    Hide for now
-                </Button>
-            </div>
-            {slot === "first" ? (
-                <div
-                    role="progressbar"
-                    aria-label="Setup done"
-                    aria-valuemin={0}
-                    aria-valuemax={list.total}
-                    aria-valuenow={list.done}
-                    aria-valuetext={count}
-                    className="flex gap-1"
-                >
-                    {list.steps.map((step, i) => (
-                        <span
-                            key={step.key}
-                            className={cn(
-                                "h-1 flex-1 rounded-sm",
-                                i < list.done
-                                    ? "bg-success-subtle-foreground"
-                                    : "bg-muted",
-                            )}
-                        />
-                    ))}
-                </div>
-            ) : null}
-            <ul className="grid">
-                {steps.map((step) => (
-                    <li key={step.key}>
-                        <StepRow step={step} />
-                    </li>
-                ))}
-            </ul>
-            {list.outside.length > 0 ? (
-                <ul
-                    aria-label="Not counted: comes with another plan"
-                    className="grid border-t border-border pt-1.5"
-                >
-                    {list.outside.map((item) => (
-                        <li key={item.key}>
-                            <AsideRow item={item} />
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
-        </section>
-    );
-}
-
-function AsideRow({ item }: { item: ReadyAside }) {
-    return (
-        <Link
-            href={item.href}
-            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-            <span
-                aria-hidden
-                className="mt-px size-5 flex-none rounded-md border-[1.5px] border-dashed border-border-strong"
-            />
-            <span className="grid min-w-0 flex-1 gap-0.5">
-                <span className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
-                    {item.label}
-                    <span className="rounded-full bg-muted px-2 py-px text-[11.5px] font-medium text-muted-foreground">
-                        {item.comesWith}
-                    </span>
-                </span>
-                <span className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground">
-                    {item.why}
-                </span>
-            </span>
-            <span className="mt-px flex-none text-[12.5px] font-semibold text-brand">
-                {item.cta}
-            </span>
-        </Link>
-    );
-}
-
-function StepRow({ step }: { step: ReadyStep }) {
-    return (
-        <Link
-            href={step.href}
-            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-            <span
-                aria-hidden
-                className={cn(
-                    "mt-px flex size-5 flex-none items-center justify-center rounded-md",
-                    step.done
-                        ? "border border-success-subtle-foreground bg-success-subtle-foreground text-card"
-                        : step.broken
-                          ? "border-[1.5px] border-destructive"
-                          : "border-[1.5px] border-border-strong",
-                )}
-            >
-                {step.done ? (
-                    <Check className="size-3" strokeWidth={3} />
-                ) : null}
-            </span>
-            <span className="grid min-w-0 gap-0.5">
-                <span
-                    className={cn(
-                        "text-[14px] font-medium",
-                        step.done && "text-muted-foreground line-through",
-                    )}
-                >
-                    {step.label}
-                    {step.done ? (
-                        <span className="sr-only"> — done</span>
-                    ) : null}
-                </span>
-                <span className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground">
-                    {step.why}
-                </span>
-            </span>
-        </Link>
+            {place === "done" ? null : <PlanAsides items={list.outside} />}
+        </SetupChecklist>
     );
 }

@@ -6,7 +6,10 @@ import {
     codeSenderName,
     codeSubject,
 } from "../modules/site-accounts/sender-name";
+import type { WelcomeMail } from "./email-welcome";
+import { welcomeEmail } from "./email-welcome";
 import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
+import { dayWords } from "./words-format";
 
 const FROM =
     env.EMAIL_FROM ?? env.SENDER_EMAIL_ID ?? "Saroh <noreply@saroh.in>";
@@ -90,6 +93,71 @@ export function sendPasswordResetEmail(
     return Promise.resolve();
 }
 
+/**
+ * Where the sign-in pages are, for a link in an email: `ACCOUNTS_URL`, else
+ * the origin the request came from (already checked against the trusted
+ * list by the caller), else the local accounts app in development. Null
+ * when this instance cannot say, and the email goes without buttons.
+ */
+export function accountsBase(
+    source: { ACCOUNTS_URL?: string; NODE_ENV?: string },
+    origin?: string,
+): string | null {
+    const base =
+        source.ACCOUNTS_URL ??
+        origin ??
+        (source.NODE_ENV === "development"
+            ? "https://accounts.saroh.localhost"
+            : undefined);
+    return base ? base.replace(/\/$/, "") : null;
+}
+
+export const EXISTING_ACCOUNT_SUBJECT = "You already have a Saroh account";
+
+const BUTTON =
+    "display:inline-block;padding:10px 16px;text-decoration:none;border-radius:6px";
+
+/**
+ * What the owner of an address reads when someone signs up with it again
+ * (UX audit, 10 Oct). The sign-up screen says "Check your email" either
+ * way, so this is the only place that can say an account already exists:
+ * it reaches the mailbox's owner and nobody else.
+ */
+export function existingAccountEmail(to: string, base: string | null): string {
+    const buttons = base
+        ? `<p><a href="${esc(`${base}/login?email=${encodeURIComponent(to)}`)}" style="${BUTTON};background:#111;color:#fff">Sign in</a>
+  &nbsp;<a href="${esc(`${base}/forgot-password`)}" style="${BUTTON};border:1px solid #111;color:#111">Reset password</a></p>`
+        : "<p>Open Saroh and choose Sign in. If you have forgotten your password, choose Forgot it? on that page.</p>";
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${esc(EXISTING_ACCOUNT_SUBJECT)}</h2>
+  <p>Someone, probably you, tried to sign up for Saroh with this email address. It already has an account, so no new one was made.</p>
+  <p>Sign in to carry on. If you have forgotten your password, reset it.</p>
+  ${buttons}
+  <p style="color:#666;font-size:12px">If this wasn't you, you can ignore this email. Nobody got into your account.</p>
+</div>`;
+}
+
+/** See {@link existingAccountEmail}. Console-only without SMTP, like its neighbours. */
+export function sendExistingAccountEmail(
+    to: string,
+    origin?: string,
+): Promise<void> {
+    const base = accountsBase(env, origin);
+    if (!transporter) {
+        console.info(
+            `[Existing account] (no SMTP) ${to}: ${base ? `${base}/login` : "no accounts address"}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: EXISTING_ACCOUNT_SUBJECT,
+        html: existingAccountEmail(to, base),
+    });
+    return Promise.resolve();
+}
+
 /** A code, rendered big and monospaced so it is easy to read off and retype. */
 function codeEmail(
     heading: string,
@@ -105,6 +173,45 @@ function codeEmail(
 </div>`;
 }
 
+/**
+ * "‹Business› is set up on Saroh" to whoever created it (`email-welcome.ts`
+ * has the words and the rules). Awaited and it says how it went, though the
+ * caller only logs: a welcome that didn't leave never undoes a business.
+ * With no SMTP the log names the subject and never the address.
+ */
+export async function sendWelcomeEmail(
+    to: string,
+    mail: WelcomeMail,
+): Promise<EmailOutcome> {
+    const { subject, html } = welcomeEmail(mail);
+    if (!transporter) {
+        console.info(`[Welcome] (no SMTP) not sent: ${subject}`);
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({ from: FROM, to, subject, html });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+export const SIGN_IN_CODE_SUBJECT = "Your Saroh sign-in code";
+
+/** A code email's subject and body, for one kind of code. */
+export function verificationOtpEmail(
+    type: VerificationOtpType,
+    otp: string,
+    expiresInSeconds: number,
+): { subject: string; html: string } {
+    const copy = OTP_COPY[type];
+    const minutes = Math.max(1, Math.round(expiresInSeconds / 60));
+    return {
+        subject: copy.subject,
+        html: codeEmail(copy.heading, copy.body, otp, minutes),
+    };
+}
+
 const OTP_COPY: Record<
     VerificationOtpType,
     { subject: string; heading: string; body: string }
@@ -114,15 +221,20 @@ const OTP_COPY: Record<
         heading: "Verify your email",
         body: "Enter this code to finish setting up your Saroh account.",
     },
+    // Signing up and signing in (owner, 10 Oct 2026): one email for both,
+    // because asking for a code must not say whether the address has an
+    // account. The heading is the subject, and the body names the screen
+    // the person is looking at ("Check your email").
     "sign-in": {
-        subject: "Your Saroh sign-in code",
-        heading: "Sign in to Saroh",
-        body: "Enter this code to sign in.",
+        subject: SIGN_IN_CODE_SUBJECT,
+        heading: SIGN_IN_CODE_SUBJECT,
+        body: "Enter this code on the Saroh page that says Check your email. New to Saroh? The same code creates your account.",
     },
+    // Also what sets a first password from the account page.
     "forget-password": {
-        subject: "Your Saroh password reset code",
-        heading: "Reset your password",
-        body: "Enter this code to choose a new password.",
+        subject: "Your Saroh password code",
+        heading: "Your Saroh password code",
+        body: "Enter this code to set a new password.",
     },
     "change-email": {
         subject: "Your Saroh email change code",
@@ -151,10 +263,9 @@ export function sendVerificationOtpEmail(
     type: VerificationOtpType,
     expiresInSeconds: number,
 ): Promise<void> {
-    const copy = OTP_COPY[type];
-    const minutes = Math.max(1, Math.round(expiresInSeconds / 60));
+    const mail = verificationOtpEmail(type, otp, expiresInSeconds);
     if (!transporter) {
-        console.info(`[${copy.heading}] (no SMTP) ${to}: code ${otp}`);
+        console.info(`[${mail.subject}] (no SMTP) ${to}: code ${otp}`);
         if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
             writeSiteCodeOutbox(to, otp);
         }
@@ -163,8 +274,8 @@ export function sendVerificationOtpEmail(
     void transporter.sendMail({
         from: FROM,
         to,
-        subject: copy.subject,
-        html: codeEmail(copy.heading, copy.body, otp, minutes),
+        subject: mail.subject,
+        html: mail.html,
     });
     return Promise.resolve();
 }
@@ -198,7 +309,7 @@ export function sendChangeEmailConfirmationEmail(
         html: actionEmail(
             "Confirm your email change",
             `We received a request to change your Saroh sign-in email to ${newEmail}. ` +
-                "Confirm below if that was you. If it wasn't, ignore this email — nothing changes.",
+                "Confirm below if that was you. If it wasn't, ignore this email. Nothing changes.",
             confirmUrl,
             "Confirm change",
         ),
@@ -222,7 +333,7 @@ export function sendDeleteAccountEmail(
         html: actionEmail(
             "Confirm account deletion",
             "This permanently deletes your Saroh account and cannot be undone. " +
-                "If you didn't request this, ignore this email — nothing is deleted.",
+                "If you didn't request this, ignore this email. Nothing is deleted.",
             confirmUrl,
             "Delete my account",
         ),
@@ -340,12 +451,7 @@ export interface DataExportReadyMail {
 }
 
 function dayOf(date: Date): string {
-    return date.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        timeZone: "Asia/Kolkata",
-    });
+    return dayWords(date, "Asia/Kolkata", { year: true });
 }
 
 /**
@@ -451,7 +557,7 @@ export function sendSelfTestEmail(
     const bodyHtml = `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
   <p style="background:#fffbe6;border:1px solid #f0d000;border-radius:6px;padding:8px 12px;color:#665500;font-size:13px;margin:0 0 16px">
     ${SAROH_TEST_LABEL} This is a Saroh preview email sent only to your own
-    verified account address. It is not a production message from any Organization.
+    verified account address. It is not a real message from any business.
   </p>
   ${html}
 </div>`;
@@ -518,7 +624,7 @@ export function sendOrganizationInvitationEmail(
         subject: `You've been invited to ${organizationName} on Saroh`,
         html: actionEmail(
             `Join ${organizationName}`,
-            `You've been invited to work on ${organizationName} in Saroh. Accept below to join — the link expires in a week.`,
+            `You've been invited to work on ${organizationName} in Saroh. Accept below to join. The link expires in a week.`,
             acceptUrl,
             "Accept invitation",
         ),
@@ -912,7 +1018,7 @@ export function siteEmailChangedEmail(businessName: string): string {
     const name = esc(businessName);
     return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
   <h2>Your sign-in email changed</h2>
-  <p>The email you use to sign in on ${name}'s website was just changed to another address. This address won't sign you in there any more.</p>
+  <p>The email you use to sign in on ${name}'s website was changed to another address. This address won't sign you in there any more.</p>
   <p>If you didn't make this change, contact ${name} straight away.</p>
   <p style="color:#666;font-size:12px">${name}'s website runs on Saroh. This address sends only sign-in codes, and a notice like this one if your sign-in email changes.</p>
 </div>`;

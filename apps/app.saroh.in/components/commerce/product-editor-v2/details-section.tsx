@@ -1,7 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { cn } from "@saroh/ui/lib/utils";
+import { Input } from "@saroh/ui/input";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -27,8 +28,9 @@ import type {
 } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
+import { Chip } from "@/components/shared/chip";
 import { useEditor, useSection } from "./editor-state";
-import { boxClass, FieldHelp, FieldLabel } from "./fields";
+import { FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
 
 const EMPTY: DetailsValues = {
@@ -151,13 +153,12 @@ export function DetailsSection({
             >
                 {copy.how.label}
             </FieldLabel>
-            <input
+            <Input
                 id="pe-how"
                 {...form.register("howToUse")}
                 disabled={ro}
                 placeholder={copy.how.placeholder}
                 aria-invalid={howLong || !!errors.howToUse}
-                className={boxClass({ bad: howLong || !!errors.howToUse })}
             />
             <FieldHelp
                 className="mb-4 mt-1.5"
@@ -185,17 +186,14 @@ export function DetailsSection({
             >
                 {copy.materials.label}
             </FieldLabel>
-            <textarea
+            <Textarea
                 id="pe-materials"
                 {...form.register("materials")}
                 rows={2}
                 disabled={ro}
                 placeholder={copy.materials.placeholder}
                 aria-invalid={!!errors.materials}
-                className={cn(
-                    boxClass({ bad: !!errors.materials }),
-                    "h-auto resize-y py-2 leading-[1.5]",
-                )}
+                className="resize-y"
             />
             {errors.materials ? (
                 <FieldHelp className="mt-1.5" tone="bad">
@@ -262,10 +260,10 @@ function FulfilmentChips({
                 {FULFILMENT_CHOICES.map((c) => {
                     const on = picked.includes(c.value);
                     return (
-                        <button
+                        <Chip
                             key={c.value}
-                            type="button"
-                            aria-pressed={on}
+                            as="toggle"
+                            on={on}
                             disabled={disabled}
                             onClick={() =>
                                 onChange(
@@ -274,15 +272,9 @@ function FulfilmentChips({
                                         : inTableOrder([...picked, c.value]),
                                 )
                             }
-                            className={cn(
-                                "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
                         >
                             {c.label}
-                        </button>
+                        </Chip>
                     );
                 })}
             </div>
@@ -326,21 +318,15 @@ function Allergens({
             {list.map((a) => {
                 const on = ids.includes(a.id);
                 return (
-                    <button
+                    <Chip
                         key={a.id}
-                        type="button"
-                        aria-pressed={on}
+                        as="toggle"
+                        on={on}
                         disabled={disabled}
                         onClick={() => onChange(toggle(ids, a.id))}
-                        className={cn(
-                            "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                            on
-                                ? "border-foreground bg-foreground font-semibold text-background"
-                                : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                        )}
                     >
                         {a.name}
-                    </button>
+                    </Chip>
                 );
             })}
         </div>
@@ -357,13 +343,13 @@ function Allergens({
             </div>
             {group("Contains", contains, onContains)}
             <p className="mb-[7px] mt-3.5 text-[12.5px] font-medium">
-                May contain — same kitchen
+                May contain (same kitchen)
             </p>
             {group("May contain", may, onMay)}
             <FieldHelp className="mt-[9px]">
                 {contains.length || may.length
                     ? `Customers see: ${contains.length ? `Contains ${names(contains)}.` : ""}${may.length ? ` May contain ${names(may)}.` : ""}`
-                    : "Tick nothing and the shop says nothing — it will not claim a product is allergen-free."}
+                    : "Tick nothing and the shop says nothing. It will not claim a product is allergen-free."}
             </FieldHelp>
         </>
     );

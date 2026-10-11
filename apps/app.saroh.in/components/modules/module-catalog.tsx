@@ -29,8 +29,8 @@ export function ModuleCatalog({
     if (shown.length === 0) {
         return (
             <EmptyState
-                title="No modules to show"
-                description="Modules appear here once your organization is set up."
+                title="No modules yet"
+                description="They show here once your business is set up."
             />
         );
     }

@@ -184,7 +184,7 @@ describe("Identity's rows and sheets", () => {
         await type(input("name"), "   ");
         await press(item("Save"));
         expect(save).not.toHaveBeenCalled();
-        expect(sheet()?.textContent).toContain("Name is required");
+        expect(sheet()?.textContent).toContain("Add a name.");
     });
 
     it("a refusal keeps the sheet open with what was typed, on the field the API names", async () => {
@@ -300,7 +300,7 @@ describe("What is this? (DEC-070, K5)", () => {
             string,
             () => void,
         ];
-        expect(message).toBe("What this is saved");
+        expect(message).toBe("What this is saved.");
         // The rows read the new words at once.
         expect(card("Identity")?.textContent).toContain("Just me");
         expect(card("Identity")?.textContent).toContain("Your name or brand");

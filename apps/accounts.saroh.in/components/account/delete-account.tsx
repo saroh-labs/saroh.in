@@ -1,6 +1,7 @@
 "use client";
 
 import { env } from "@/env";
+import { authFailureCopy, settle } from "@/lib/auth-error-copy";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import {
@@ -28,10 +29,10 @@ const CONFIRM_PHRASE = "delete my account";
  * Two things guard it. First a PRE-FLIGHT against the API: deleting the only
  * OWNER of an Organization would strand that tenant (the org, its stores, sites
  * and orders survive with nobody able to reach them), so `@saroh/auth`'s
- * `beforeDelete` hook refuses it — but that hook only fires after the user
- * follows the emailed link, and being refused *after* committing is a bad way to
+ * `beforeDelete` hook refuses it. That hook only fires after the user follows
+ * the emailed link, and being refused *after* committing is a bad way to
  * learn a rule. We surface it here instead, before anything is sent. The hook
- * remains the authority; this is only the earlier, kinder telling.
+ * remains the authority. This is only the earlier, kinder telling.
  *
  * Second, deletion always completes through an emailed one-time link, so a
  * hijacked session alone cannot destroy an account.
@@ -40,7 +41,7 @@ export function DeleteAccount() {
     const apiUrl = env.NEXT_PUBLIC_BETTER_AUTH_URL;
     // Seeded rather than set from the effect: with no API URL there is nothing
     // to ask (the auth client reads the same variable, so the whole page would
-    // be non-functional), and `null` means "still checking" — which keeps the
+    // be non-functional), and `null` means "still checking", which keeps the
     // form disabled.
     const [soleOwned, setSoleOwned] = useState<SoleOwnedOrg[] | null>(
         apiUrl ? null : [],
@@ -60,9 +61,13 @@ export function DeleteAccount() {
             .then((orgs: SoleOwnedOrg[]) =>
                 setSoleOwned(Array.isArray(orgs) ? orgs : []),
             )
-            // A failed pre-flight must not imply "safe to delete" — leave the
+            // A failed pre-flight must not imply "safe to delete": leave the
             // list unknown (null keeps the form disabled) rather than guessing.
-            .catch(() => setError("Could not check your organizations."));
+            .catch(() =>
+                setError(
+                    "Couldn't check your businesses. Reload to try again.",
+                ),
+            );
     }, [apiUrl]);
 
     const blocked = soleOwned === null || soleOwned.length > 0;
@@ -71,13 +76,20 @@ export function DeleteAccount() {
         e.preventDefault();
         setError(null);
         setIsLoading(true);
-        const { error: err } = await authClient.deleteUser({
-            password,
-            callbackURL: "/login",
-        });
+        const { error: err } = await settle(() =>
+            authClient.deleteUser({
+                password,
+                callbackURL: "/login",
+            }),
+        );
         setIsLoading(false);
         if (err) {
-            setError(err.message ?? "Could not start account deletion.");
+            setError(
+                authFailureCopy(
+                    err,
+                    "Couldn't start deleting your account. Try again.",
+                ),
+            );
             return;
         }
         setSent(true);
@@ -97,7 +109,7 @@ export function DeleteAccount() {
             <CardContent>
                 {sent ? (
                     <p className="text-sm">
-                        Check your inbox — deletion completes only when you
+                        Check your inbox. Your account is deleted only when you
                         follow the confirmation link.
                     </p>
                 ) : (
@@ -111,8 +123,8 @@ export function DeleteAccount() {
                                 <span className="font-medium">
                                     You are the only owner of{" "}
                                     {soleOwned.length === 1
-                                        ? "an organization"
-                                        : `${soleOwned.length} organizations`}
+                                        ? "a business"
+                                        : `${soleOwned.length} businesses`}
                                     :
                                 </span>
                                 <span>
@@ -120,8 +132,8 @@ export function DeleteAccount() {
                                 </span>
                                 <span className="text-muted-foreground">
                                     Make someone else an owner, or delete the
-                                    organization, before deleting your account —
-                                    otherwise its data would be left with no one
+                                    business, before deleting your account.
+                                    Otherwise its data would be left with no one
                                     able to reach it.
                                 </span>
                             </div>

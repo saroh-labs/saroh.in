@@ -1,4 +1,4 @@
-import { PartialNotice } from "@saroh/ui/data-state";
+import { PartialRead } from "@/components/shared/failed-read";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
@@ -146,11 +146,10 @@ export default async function CataloguePage({
     );
     const notice =
         reviews === null ? (
-            <PartialNotice>
-                Reviews couldn&apos;t be read just now, so their count shows as
-                “—”. It is not zero. Everything else on this page arrived
-                normally.
-            </PartialNotice>
+            <PartialRead
+                things="reviews"
+                so="Their count can't be shown. It is not zero."
+            />
         ) : null;
 
     if (onReviews) {

@@ -1,10 +1,9 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { Copy } from "lucide-react";
 import Link from "next/link";
 
+import { ShareLink } from "@saroh/ui/copy-button";
 import { StepCard } from "./parts";
 
 /**
@@ -24,37 +23,25 @@ export function LinkMade({
     orderHref: string;
     onDone: () => void;
 }) {
-    async function copy() {
-        try {
-            await navigator.clipboard.writeText(url);
-            showSuccess("Pay link copied");
-        } catch {
-            showError("Couldn't copy it. Select the link and copy it.");
-        }
-    }
     return (
         <StepCard title="Payment link">
             <p className="text-pretty text-[13px] leading-[1.5]">
-                Order made. It waits unpaid until they pay — send them this link
+                Order made. It waits unpaid until they pay. Send them this link
                 {reach ? ` at ${reach}` : ""}.
             </p>
             <div className="mt-2.5 flex min-w-0 items-center gap-2">
                 <code className="min-w-0 flex-1 select-all break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">
                     {url}
                 </code>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void copy()}
-                    aria-label="Copy the pay link"
-                    className="cursor-pointer"
-                >
-                    <Copy aria-hidden className="size-4" />
-                </Button>
+                <ShareLink
+                    value={url}
+                    label="Copy pay link"
+                    text="Your link to pay for the order"
+                    className="shrink-0"
+                />
             </div>
             <p className="mt-1.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground">
-                Shown this once — copy it now. Saroh doesn&apos;t send it; the
+                Shown this once, so copy it now. Saroh doesn&apos;t send it. The
                 order shows paid once they pay.
             </p>
             <div className="mt-3 flex flex-wrap justify-end gap-2">

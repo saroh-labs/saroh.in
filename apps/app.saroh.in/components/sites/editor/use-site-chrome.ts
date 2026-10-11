@@ -1,7 +1,6 @@
 import { showError } from "@saroh/ui/toast";
 import { useEffect, useRef, useState } from "react";
 
-import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { updateSiteFooter, updateSiteSettings } from "@/lib/sites/actions";
 import { footerFromLine, footerLineField } from "@/lib/sites/footer-line";
 import type { SiteFooter, SitesResult } from "@/lib/sites/service";
@@ -139,7 +138,7 @@ export function useSiteChrome({
         save: (value) => updateSiteSettings(siteId, { name: value }),
         onSaved: () => onSaved("name"),
         unreachable:
-            "Could not reach Saroh. The name is still here, and saving will try again shortly.",
+            "Couldn't reach Saroh. The name is still here, and saving will try again shortly.",
     });
     // Read once: a footer richer than one line is Website settings' to edit.
     const [field] = useState(() => footerLineField(footerPreview));
@@ -155,13 +154,13 @@ export function useSiteChrome({
             updateSiteFooter(siteId, footerFromLine(value, format)),
         onSaved: () => onSaved("footer"),
         unreachable:
-            "Could not reach Saroh. The footer is still here, and saving will try again shortly.",
+            "Couldn't reach Saroh. The footer is still here, and saving will try again shortly.",
     });
 
     const saving = nameSave.saving || footerSave.saving;
     const dirty = nameSave.dirty || footerSave.dirty;
-    // A name or footer still going out is work a closed tab would lose.
-    useLeaveGuard(dirty);
+    // A name or footer still going out is work leaving would lose: it
+    // reaches the leave guard as `chromeDirty` (`use-editor-leave.ts`).
 
     return {
         canUpdate,

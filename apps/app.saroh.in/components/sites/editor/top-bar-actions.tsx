@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
@@ -11,13 +12,13 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import {
     ChevronDown,
-    Ellipsis,
     Eye,
     FlaskConical,
     Link2,
     ListChecks,
     MessageSquare,
     Monitor,
+    MoreHorizontal,
     Plus,
     Smartphone,
     Tablet,
@@ -27,10 +28,11 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import { DEVICES, ZOOMS } from "@/components/sites/editor-constants";
+import { OptionSelect } from "@saroh/ui/option-select";
+import { Tip } from "@saroh/ui/tooltip";
 
 /** What the bar's right-hand side can do: how the page is shown, and publish. */
 export interface TopBarActionProps {
@@ -83,10 +85,6 @@ export interface TestReleaseActions {
     /** How many are ready or scheduled, for the menu's count. */
     count: number;
 }
-
-const ACTION =
-    "h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground";
-
 /**
  * The bar's actions: theme, width, zoom and Preview, then Share and
  * Publish. Moved out of `editor-top-bar.tsx` (G4) so a phone can show the same
@@ -142,22 +140,23 @@ export function TopBarActions({
                                   ? Tablet
                                   : Monitor;
                         return (
-                            <button
-                                key={d.key}
-                                type="button"
-                                onClick={() => p.setDevice(d.key)}
-                                aria-pressed={p.device === d.key}
-                                aria-label={`Show at ${d.label.toLowerCase()} width`}
-                                title={d.label}
-                                className={cn(
-                                    "flex h-full w-8 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:w-11",
-                                    p.device === d.key
-                                        ? "bg-secondary text-foreground"
-                                        : "text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                <Icon aria-hidden className="size-4" />
-                            </button>
+                            <Tip label={d.label}>
+                                <button
+                                    key={d.key}
+                                    type="button"
+                                    onClick={() => p.setDevice(d.key)}
+                                    aria-pressed={p.device === d.key}
+                                    aria-label={`Show at ${d.label.toLowerCase()} width`}
+                                    className={cn(
+                                        "flex h-full w-8 items-center justify-center rounded transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:w-11",
+                                        p.device === d.key
+                                            ? "bg-secondary text-foreground"
+                                            : "text-muted-foreground hover:text-foreground",
+                                    )}
+                                >
+                                    <Icon aria-hidden className="size-4" />
+                                </button>
+                            </Tip>
                         );
                     })}
                 </div>
@@ -177,7 +176,7 @@ export function TopBarActions({
                         value: String(z),
                         label: z === "fit" ? "Fit" : `${z}%`,
                     }))}
-                    className="h-8 w-[4.75rem] tabular-nums text-muted-foreground coarse:h-11"
+                    className="w-[4.75rem] tabular-nums text-muted-foreground"
                 />
             </div>
 
@@ -188,9 +187,15 @@ export function TopBarActions({
                             variant="outline"
                             size="sm"
                             aria-label="More: preview, feedback and test releases"
-                            className={cn(ACTION, "w-[34px] px-0")}
+                            className={cn(
+                                "text-[0.78125rem] text-muted-foreground",
+                                "w-[34px] px-0",
+                            )}
                         >
-                            <Ellipsis aria-hidden className="size-[15px]" />
+                            <MoreHorizontal
+                                aria-hidden
+                                className="size-[15px]"
+                            />
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent
@@ -244,40 +249,39 @@ export function TopBarActions({
              * design it stays pressable when nothing has changed:
              * publishing again is how a new version is made.
              */}
-            <Button
-                size="sm"
-                className={cn(
-                    "wk-press h-[34px] rounded-[9px] px-3.5 text-[0.78125rem] font-semibold",
-                    stacked && "h-11 w-full",
-                )}
-                title={p.publishHint}
-                onClick={p.onPublish}
-                // With "Publishing needs approval" on, only an owner can
-                // press it, and it says so rather than refusing on the press.
-                disabled={
-                    p.publishDisabled || (p.needsApproval && !p.canOverride)
-                }
-            >
-                {p.publishing
-                    ? "Publishing…"
-                    : p.needsApproval
-                      ? "Needs approval"
-                      : "Publish"}
-                {/*
-                 * Things worth a look before publishing, as a dot (UX-081):
-                 * a number here read as "changes to publish" when it
-                 * counted warnings. The check lists them on the press, so
-                 * the dot stays out of the button's name.
-                 */}
-                {!p.publishing && p.flagCount > 0 ? (
-                    <span
-                        aria-hidden
-                        data-flag-dot=""
-                        title={`${p.flagCount} ${p.flagCount === 1 ? "thing" : "things"} worth a look`}
-                        className="ml-1.5 inline-block size-1.5 rounded-full bg-background/80"
-                    />
-                ) : null}
-            </Button>
+            <Tip label={p.publishHint}>
+                <Button
+                    size="sm"
+                    className={cn(
+                        "wk-press text-[0.78125rem]",
+                        stacked && "w-full",
+                    )}
+                    onClick={p.onPublish}
+                    // With "Publishing needs approval" on, only an owner can
+                    // press it, and it says so rather than refusing on the press.
+                    disabled={
+                        p.publishDisabled || (p.needsApproval && !p.canOverride)
+                    }
+                    busy={p.publishing}
+                    busyLabel="Publishing…"
+                >
+                    {p.needsApproval ? "Needs approval" : "Publish"}
+                    {/*
+                     * Things worth a look before publishing, as a dot (UX-081):
+                     * a number here read as "changes to publish" when it
+                     * counted warnings. The check lists them on the press, so
+                     * the dot stays out of the button's name.
+                     */}
+                    {!p.publishing && p.flagCount > 0 ? (
+                        <span
+                            aria-hidden
+                            data-flag-dot=""
+                            title={`${count(p.flagCount, "thing")} worth a look`}
+                            className="ml-1.5 inline-block size-1.5 rounded-full bg-background/80"
+                        />
+                    ) : null}
+                </Button>
+            </Tip>
             {/* A phone has no hover, so what Publish puts live is written out. */}
             {stacked && p.publishHint ? (
                 <p className="text-xs leading-relaxed text-muted-foreground">
@@ -309,7 +313,11 @@ function SecondaryActions({
                 variant="outline"
                 size="sm"
                 aria-pressed={p.previewing}
-                className={cn(ACTION, p.previewing && "bg-secondary", touch)}
+                className={cn(
+                    "text-[0.78125rem] text-muted-foreground",
+                    p.previewing && "bg-secondary",
+                    touch,
+                )}
                 onClick={() => p.setPreviewing(!p.previewing)}
             >
                 <Eye aria-hidden className="size-[15px]" />
@@ -321,13 +329,16 @@ function SecondaryActions({
                     data-ph-unmask=""
                     variant="outline"
                     size="sm"
-                    className={cn(ACTION, touch)}
+                    className={cn(
+                        "text-[0.78125rem] text-muted-foreground",
+                        touch,
+                    )}
                     onClick={p.onFeedback}
                 >
                     <MessageSquare aria-hidden className="size-[15px]" />
                     Feedback
                     {p.openNotes > 0 ? (
-                        <span className="tabular-nums text-highlight">
+                        <span className="tabular-nums text-foreground">
                             {p.openNotes}
                         </span>
                     ) : null}
@@ -360,7 +371,7 @@ function ShareChoice({
             type="button"
             disabled={disabled}
             onClick={onSelect}
-            className="flex w-full gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 coarse:min-h-11"
+            className="flex w-full gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-disabled-foreground coarse:min-h-11"
         >
             <span aria-hidden className="mt-0.5 text-muted-foreground">
                 {icon}
@@ -403,7 +414,7 @@ function ShareControl({
                 <ShareChoice
                     icon={<UserCheck className="size-4" />}
                     label="Ask a teammate to review"
-                    hint="Puts the site In review. Reviewers comment on blocks; publishing still works."
+                    hint="Puts the site In review. Reviewers comment on blocks, and publishing still works."
                     disabled={p.asking}
                     onSelect={pick(p.askForReview)}
                 />
@@ -434,7 +445,7 @@ function ShareControl({
                     variant="outline"
                     size="sm"
                     aria-haspopup="dialog"
-                    className={ACTION}
+                    className="text-[0.78125rem] text-muted-foreground"
                 >
                     <Link2 aria-hidden className="size-[15px]" />
                     {p.inReview ? "In review" : "Share"}
@@ -470,9 +481,13 @@ function TestReleaseSplit({
             <>
                 {actions.onMake ? (
                     <Button
-                        variant="outline"
                         size="sm"
-                        className={cn(ACTION, "h-11 w-full justify-start")}
+                        variant="outline"
+
+                        className={cn(
+                            "text-[0.78125rem] text-muted-foreground",
+                            "w-full justify-start",
+                        )}
                         onClick={actions.onMake}
                     >
                         <Plus aria-hidden className="size-[15px]" />
@@ -480,9 +495,13 @@ function TestReleaseSplit({
                     </Button>
                 ) : null}
                 <Button
-                    variant="outline"
                     size="sm"
-                    className={cn(ACTION, "h-11 w-full justify-start")}
+                    variant="outline"
+
+                    className={cn(
+                        "text-[0.78125rem] text-muted-foreground",
+                        "w-full justify-start",
+                    )}
                     onClick={actions.onOpenList}
                 >
                     <FlaskConical aria-hidden className="size-[15px]" />
@@ -493,27 +512,30 @@ function TestReleaseSplit({
     }
     return (
         <div role="group" aria-label="Test release" className="flex">
-            <Button
-                variant="outline"
-                size="sm"
-                className={cn(ACTION, "rounded-r-none")}
-                title={
+            <Tip
+                label={
                     actions.onMake
                         ? "Freeze the draft into a test release, to share and go live with later"
                         : "See this site's test releases"
                 }
-                onClick={actions.onMake ?? actions.onOpenList}
             >
-                <FlaskConical aria-hidden className="size-[15px]" />
-                Test release
-            </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-r-none text-muted-foreground"
+                    onClick={actions.onMake ?? actions.onOpenList}
+                >
+                    <FlaskConical aria-hidden className="size-[15px]" />
+                    Test release
+                </Button>
+            </Tip>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button
                         variant="outline"
                         size="sm"
                         aria-label="More test release actions"
-                        className="h-[34px] w-8 rounded-l-none rounded-r-[9px] border-l-0 px-0 text-muted-foreground"
+                        className="w-8 rounded-l-none rounded-r-[9px] border-l-0 px-0 text-muted-foreground"
                     >
                         <ChevronDown aria-hidden className="size-[13px]" />
                     </Button>

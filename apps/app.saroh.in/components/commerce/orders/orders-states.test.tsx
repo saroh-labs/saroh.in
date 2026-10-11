@@ -9,7 +9,6 @@ import {
     OrdersAttentionPartial,
     OrdersEmpty,
     OrdersFailed,
-    OrdersLoading,
     OrdersLocked,
 } from "./orders-states";
 
@@ -30,7 +29,7 @@ describe("OrdersFailed", () => {
         expect(html).toContain('role="alert"');
         expect(html).toContain("Couldn&#x27;t load orders");
         expect(html).toContain("Try again");
-        expect(html).toContain("nothing has been changed");
+        expect(html).toContain("Nothing has been changed.");
         expect(html).toContain("Reference: d1g3st");
     });
 
@@ -46,7 +45,7 @@ describe("OrdersAttentionPartial (B15)", () => {
 
     it("says what is missing, that the rows are whole, and offers a retry", () => {
         expect(html).toContain('role="status"');
-        expect(html).toContain("Needs attention couldn&#x27;t be read");
+        expect(html).toContain("Couldn&#x27;t load what needs attention.");
         expect(html).toContain("Not available");
         expect(html).toContain("arrived normally");
         expect(html).toContain("Try again");
@@ -60,7 +59,8 @@ describe("OrdersLocked", () => {
     );
 
     it("explains, says who can change it, and keeps the heading", () => {
-        expect(html).toContain("You do not have access to this");
+        expect(html).toContain("open Orders<");
+        expect(html).not.toContain("You do not have access to this");
         expect(html).toContain("Why.");
         expect(html).toContain("Who can change it.");
         expect(html).toContain(">Orders</h1>");
@@ -75,25 +75,10 @@ describe("OrdersLocked", () => {
 describe("OrderLocked", () => {
     it("is the design's card with the way back", () => {
         const html = renderToStaticMarkup(<OrderLocked text="Your role." />);
-        expect(html).toContain("You can&#x27;t open orders");
+        expect(html).toContain("You can&#x27;t open Orders");
         expect(html).toContain("Your role.");
         expect(html).toContain("Back to Home");
         expect(html).not.toContain('role="alert"');
-    });
-});
-
-describe("OrdersLoading", () => {
-    const html = renderToStaticMarkup(<OrdersLoading />);
-
-    it("is busy, and says what is on its way", () => {
-        expect(html).toContain('aria-busy="true"');
-        expect(html).toContain("Loading orders");
-    });
-
-    it("shows the tabs without counts, and no empty or failed words", () => {
-        expect(html).toContain("Refunded");
-        expect(html).not.toMatch(/>\d+</);
-        expect(html).not.toMatch(/No orders|Couldn/);
     });
 });
 
@@ -110,8 +95,28 @@ describe("OrdersEmpty", () => {
     it("says No orders yet only for a business with none", () => {
         const html = empty({}, "Hill Road");
         expect(html).toContain("No orders yet");
-        expect(html).toContain("The first order in Hill Road");
+        expect(html).toContain(
+            "Orders from your website and counter show here.",
+        );
         expect(html).not.toContain('role="alert"');
+        // Nobody who may not take an order is offered the button.
+        expect(html).not.toContain("New order");
+    });
+
+    it("offers the header's New order on the first run, to someone who may", () => {
+        const first = (params: Record<string, string>) =>
+            renderToStaticMarkup(
+                <OrdersEmpty
+                    query={readOrdersQuery(params)}
+                    storeName="Hill Road"
+                    go={noop}
+                    onNew={noop}
+                />,
+            );
+        expect(first({})).toMatch(/<button[^>]*>New order<\/button>/);
+        // A search that found nothing offers the way back, not a new order.
+        expect(first({ q: "zzz" })).not.toContain("New order");
+        expect(first({ q: "zzz" })).toContain("Clear search");
     });
 
     it("shares the online shop, else the website, on the first run only (L8)", () => {
@@ -150,13 +155,13 @@ describe("OrdersEmpty", () => {
             links("https://rye.saroh.app/shop", "https://rye.saroh.app"),
         );
         expect(open).not.toContain("Share your");
-        expect(open).toContain("View all orders");
+        expect(open).toContain("Show all orders");
     });
 
     it("says what each tab would hold, with the way back to All", () => {
         const open = empty({ tab: "open" }, null);
         expect(open).toContain("Nothing left to fulfil");
-        expect(open).toContain("View all orders");
+        expect(open).toContain("Show all orders");
         const refunded = empty({ tab: "refunded" }, null);
         expect(refunded).toContain("No refunds");
         expect(refunded).not.toContain("No orders yet");

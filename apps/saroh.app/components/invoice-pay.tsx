@@ -1,16 +1,18 @@
 "use client";
 
+import type { OpenCheckout } from "@saroh/site-blocks";
 import {
     ctaClasses,
-    destructiveAlertClasses,
     hasPayInstructions,
     PayInstructionsCard,
+    payLinkButtonLabel,
+    PayLinkPay,
     payWaysText,
     phoneText,
 } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useCallback } from "react";
 
 import { startPayment } from "@/app/pay/[token]/actions";
 import {
@@ -19,8 +21,6 @@ import {
 } from "@/components/download-pdf-button";
 import { InvoiceAutopay } from "@/components/invoice-autopay";
 import { PrintButton } from "@/components/print-button";
-import { ProviderHandoff } from "@/components/provider-handoff";
-import type { CheckoutIntent } from "@/lib/checkout-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
 import type { PayContact } from "@/lib/invoice-pay-shape";
 import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
@@ -31,10 +31,11 @@ import { hasCustomerPdf } from "@/lib/invoice-pdf";
  *
  * Only what the API's allow-list sends is on the page: the business, the
  * number, the dates, the lines, tax and total, and who it is billed to. The
- * Pay button starts an intent for the invoice's own total and hands over to
- * the provider exactly as order checkout does; the page never claims a
- * payment went through — "Check again" re-reads the invoice, which only the
- * provider's webhook moves to paid.
+ * Pay button starts an intent for the invoice's own total and opens the
+ * business's provider window on it, as the bag and the booking page do
+ * (`PayLinkPay`, over the one shared `openProviderCheckout`). The page never
+ * claims a payment went through: after the window it re-reads the invoice
+ * until the server says paid, and "Check again" does the same by hand.
  *
  * A plan's invoice, where the business's provider takes autopay, offers
  * "Pay and turn on autopay" first (D12, `invoice-autopay.tsx`).
@@ -59,24 +60,23 @@ export function InvoicePay({
     invoice,
     apiUrl,
     pdfHref,
+    openCheckout,
 }: {
     token: string;
     invoice: PayInvoice;
-    /** Where an autopay window's return is posted (P1). */
+    /** Where a provider window's return is posted (P1). */
     apiUrl?: string;
     /** This app's route for the invoice's PDF (DEC-083); absent, none. */
     pdfHref?: string;
+    /** The provider window; replaced in tests. */
+    openCheckout?: OpenCheckout;
 }) {
     const router = useRouter();
-    const [intent, setIntent] = useState<CheckoutIntent | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-    // One key per visit, so a double tap can't start two payments.
-    const [idempotencyKey] = useState(() =>
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : Math.random().toString(36).slice(2),
+    const start = useCallback(
+        (idempotencyKey: string) => startPayment(token, idempotencyKey),
+        [token],
     );
+    const refresh = useCallback(() => router.refresh(), [router]);
 
     const money = (a: string) => payMoney(a, invoice.currency);
     const issued = payDate(invoice.issuedAt);
@@ -100,26 +100,15 @@ export function InvoicePay({
             ? invoice.autopay
             : null;
 
-    function pay() {
-        setError(null);
-        startTransition(async () => {
-            const res = await startPayment(token, idempotencyKey);
-            if (res.ok) {
-                setIntent(res.intent);
-                return;
-            }
-            setError(res.message);
-            if (res.settled) router.refresh();
-        });
-    }
-
     return (
         <section className="mx-auto w-full max-w-xl px-5 py-12 sm:px-8 sm:py-16">
-            <p className="text-sm text-site-muted">{invoice.businessName}</p>
+            <h1 className="text-2xl font-bold tracking-tight text-site-fg [overflow-wrap:anywhere]">
+                {invoice.businessName}
+            </h1>
             <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-2xl font-bold tracking-tight text-site-fg">
+                <h2 className="text-base font-semibold text-site-body">
                     {payTitle(invoice)} {invoice.number}
-                </h1>
+                </h2>
                 <StatusBadge status={invoice.status} />
             </div>
             <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
@@ -201,56 +190,40 @@ export function InvoicePay({
             ) : null}
 
             {payable ? (
-                <div className="mt-6 space-y-4">
-                    {error ? (
-                        <p role="alert" className={destructiveAlertClasses}>
-                            {error}
-                        </p>
-                    ) : null}
-                    {intent ? (
-                        <ProviderHandoff
-                            intent={intent}
-                            after="Once you've paid, use “Check again” to see this invoice marked paid."
-                        />
-                    ) : autopay ? (
-                        // A plan's invoice with autopay offered (D12).
-                        <InvoiceAutopay
-                            token={token}
-                            autopay={autopay}
-                            businessName={invoice.businessName}
-                            billedTo={invoice.billedTo}
-                            total={money(invoice.total)}
-                            payable
-                            onJustPay={pay}
-                            justPayBusy={pending}
-                            apiUrl={apiUrl}
-                        />
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={pay}
-                            disabled={pending}
-                            className={cn(
-                                ctaClasses("primary"),
-                                "w-full disabled:cursor-not-allowed disabled:opacity-60",
-                            )}
-                        >
-                            {pending
-                                ? "Starting payment…"
-                                : `Pay ${money(invoice.total)}`}
-                        </button>
-                    )}
-                    {/* Only once a payment was started: before that there's
-                        nothing to check (UX-080). */}
-                    {intent ? (
-                        <button
-                            type="button"
-                            onClick={() => router.refresh()}
-                            className={cn(ctaClasses("secondary"), "w-full")}
-                        >
-                            Check again
-                        </button>
-                    ) : null}
+                <div className="mt-6">
+                    <PayLinkPay
+                        start={start}
+                        refresh={refresh}
+                        amount={money(invoice.total)}
+                        businessName={invoice.businessName}
+                        description={`${payTitle(invoice)} ${invoice.number}`}
+                        payerName={invoice.billedTo}
+                        contact={invoice.businessContact}
+                        apiUrl={apiUrl}
+                        openCheckout={openCheckout}
+                        choice={
+                            autopay
+                                ? // A plan's invoice with autopay offered (D12).
+                                  (paying) => (
+                                      <InvoiceAutopay
+                                          token={token}
+                                          autopay={autopay}
+                                          businessName={invoice.businessName}
+                                          billedTo={invoice.billedTo}
+                                          total={money(invoice.total)}
+                                          payable
+                                          onJustPay={paying.pay}
+                                          justPayBusy={paying.busy}
+                                          justPayLabel={payLinkButtonLabel(
+                                              paying,
+                                              money(invoice.total),
+                                          )}
+                                          apiUrl={apiUrl}
+                                      />
+                                  )
+                                : undefined
+                        }
+                    />
                 </div>
             ) : offer === "elsewhere" ? (
                 <div className="mt-6 space-y-4">
@@ -329,7 +302,7 @@ export function InvoicePay({
                     <div className="rounded-xl border border-site-border bg-site-surface p-5 text-center">
                         <p className="text-site-fg">
                             {invoice.status === "PAID"
-                                ? `This invoice is paid. Thank you — there's nothing more to do.`
+                                ? "This invoice is paid. Thank you, there's nothing more to do."
                                 : `This invoice is no longer payable. If you think that's a mistake, ask ${invoice.businessName}.`}
                         </p>
                         {invoice.status === "PAID" && nextCharge ? (
@@ -347,8 +320,6 @@ export function InvoicePay({
                             billedTo={invoice.billedTo}
                             total={money(invoice.total)}
                             payable={false}
-                            onJustPay={pay}
-                            justPayBusy={pending}
                             apiUrl={apiUrl}
                         />
                     ) : null}

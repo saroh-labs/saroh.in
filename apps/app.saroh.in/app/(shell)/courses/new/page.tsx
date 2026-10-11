@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { CourseServiceOption } from "@/components/courses/course-form";
 import { CourseForm } from "@/components/courses/course-form";
 import { PageContainer } from "@/components/shared/page-container";
+import { requireCan } from "@/lib/access/require-can";
 import { listCourses } from "@/lib/courses/service";
 import { listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
@@ -14,6 +15,17 @@ export const metadata = { title: "New course" };
 /** Courses → New: a run of sessions on one service. */
 export default async function NewCoursePage() {
     await requireSession();
+    // Asked before the form is drawn: `course:write` is what the API asks of
+    // the save (`requireCan`).
+    const access = await requireCan("course:write", {
+        thing: "New course",
+        back: {
+            href: "/courses",
+            label: "Back to Courses",
+            needs: "course:read",
+        },
+    });
+    if (access.denied) return access.denied;
     const [services, courses] = await Promise.all([
         listServices(),
         listCourses(),
@@ -35,6 +47,7 @@ export default async function NewCoursePage() {
                 <PageHeader
                     className="mb-0"
                     breadcrumb={[
+                        "Bookings",
                         <Link
                             key="courses"
                             href="/courses"
@@ -61,7 +74,7 @@ export default async function NewCoursePage() {
                         >
                             Make a service
                         </Link>{" "}
-                        first — its length and how many it takes at once set the
+                        first. Its length and how many it takes at once set the
                         course's sessions and seats.
                     </p>
                 ) : (

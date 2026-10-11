@@ -1,4 +1,5 @@
 import { formatInr } from "@saroh/pricing-catalog";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import type { UpgradeTo } from "./access";
 
@@ -59,8 +60,7 @@ export function planRefusalOf(
             code: "PLAN_LIMIT_REACHED",
             title,
             body: text(notice.body) ?? "",
-            cta:
-                text(notice.cta) ?? (upgradeTo ? "See plans" : "See your plan"),
+            cta: text(notice.cta) ?? planLabel(),
             upgradeTo,
             limit: typeof details.limit === "number" ? details.limit : null,
             used: typeof details.used === "number" ? details.used : null,
@@ -73,9 +73,9 @@ export function planRefusalOf(
             code: "MODULE_LOCKED",
             title,
             body: upgradeTo
-                ? `${upgradeTo.name} is ${formatInr(upgradeTo.pricePaise)} a month + GST. Nothing you've made is lost; it's here when you upgrade.`
+                ? `${upgradeTo.name} is ${formatInr(upgradeTo.pricePaise)} a month + GST. Nothing you've made is lost. It's here when you upgrade.`
                 : "Nothing you've made is lost.",
-            cta: upgradeTo ? `See ${upgradeTo.name}` : "See plans",
+            cta: planLabel(upgradeTo?.name),
             upgradeTo,
             limit: null,
             used: null,

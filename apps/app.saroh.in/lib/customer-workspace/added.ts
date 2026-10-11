@@ -1,7 +1,5 @@
-import { dayText } from "@/lib/subscriptions/view";
-
+import { formatDate } from "@/lib/format/datetime";
 import type { CustomerDetail } from "./detail";
-import { whenText } from "./when";
 
 /**
  * Someone added on the Customers list by hand (DEC-056, C14): a contact, and
@@ -26,9 +24,12 @@ export function addedLine(
     now: Date,
 ): string {
     if (contact.source !== ADDED_BY_HAND) {
-        return `Added ${dayText(contact.createdAt, timeZone, now)}`;
+        return `Added ${formatDate(contact.createdAt, timeZone, { now })}`;
     }
-    const when = whenText(contact.createdAt, timeZone, now);
+    const when = formatDate(contact.createdAt, timeZone, {
+        now,
+        relative: true,
+    });
     return when === "Today" || when === "Yesterday"
         ? `Added by hand ${when.toLowerCase()}`
         : `Added by hand on ${when}`;

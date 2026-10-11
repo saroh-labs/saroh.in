@@ -127,9 +127,23 @@ export interface DataViewProps<TRow> {
     filterStyle?: "tabs" | "segmented";
     isLoading?: boolean;
     error?: string | null;
-    /** What a row is, for counts and states: "3 products", "No products match…". */
-    noun?: { one: string; other: string };
-    /** Placeholder for the search field, e.g. "Search products". */
+    /**
+     * What a row is, in the thing's own word, for counts and states:
+     * "3 products", "No products match…". Required: a list that says
+     * "rows" is speaking the system's language, not the merchant's.
+     */
+    noun: { one: string; other: string };
+    /**
+     * Whether the list says how many it holds. A screen whose page header
+     * already carries the count ("12 bookings" beside the title) passes
+     * `false`: the total is then said once, and the list only speaks up
+     * when it is narrowed ("3 of 12 bookings").
+     */
+    showTotal?: boolean;
+    /**
+     * The search field's placeholder and name: "Search products". Without
+     * one it is "Search {noun}". Never "Search…".
+     */
     searchPlaceholder?: string;
     /**
      * Hide the Table/List switch. The viewport still decides — a table above

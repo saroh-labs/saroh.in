@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -9,6 +10,7 @@ import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
 import {
     addOption,
@@ -18,7 +20,7 @@ import {
     renameOption,
 } from "@/lib/products/settings-actions";
 
-import { PROBLEM, SettingsSheet } from "./settings-sheet";
+import { PROBLEM } from "./product-settings";
 
 type Option = CatalogueView["options"][number];
 const MAX = 40;
@@ -122,11 +124,10 @@ export function OptionSheet({
         if (!res.ok) return showError(res.error);
         setOpen(false);
         router.refresh();
-        showUndo(`${nd} added.`, () => {
-            void removeOption(res.data.id).then((undo) => {
-                if (!undo.ok) showError(undo.error);
-                router.refresh();
-            });
+        showUndo(`${nd} added.`, async () => {
+            const back = await removeOption(res.data.id);
+            router.refresh();
+            return back;
         });
     }
 
@@ -164,31 +165,36 @@ export function OptionSheet({
             renamed
                 ? `${o.name} is now ${nd}. Customers see the new name.`
                 : `${nd} saved.`,
-            () => {
-                void (async () => {
-                    for (const step of undo.reverse()) {
-                        const back = await step();
-                        if (!back.ok) {
-                            showError(
-                                `Couldn't undo every change to ${nd}. Check its values.`,
-                            );
-                            break;
-                        }
+            async () => {
+                let undone = true;
+                for (const step of undo.reverse()) {
+                    const back = await step();
+                    if (!back.ok) {
+                        undone = false;
+                        break;
                     }
-                    router.refresh();
-                })();
+                }
+                router.refresh();
+                return undone
+                    ? true
+                    : {
+                          ok: false,
+                          error: `Not every change to ${nd} went back. Check its values.`,
+                      };
             },
         );
     }
 
     return (
-        <SettingsSheet
+        <FormSheet
             trigger={trigger}
             open={open}
-            onOpenChange={(o) => {
-                if (o) reset();
-                setOpen(o);
+            onOpen={() => {
+                reset();
+                setOpen(true);
             }}
+            onClose={() => setOpen(false)}
+            fieldsClassName="gap-4"
             title={option ? `Edit ${option.name}` : "New option"}
             description={
                 option
@@ -196,8 +202,8 @@ export function OptionSheet({
                     : "A way customers choose between variants, such as Size or Shade, and the values it offers."
             }
             pending={busy}
-            submitLabel={option ? "Save" : "Add option"}
-            busyLabel={option ? "Saving…" : "Adding…"}
+            saveLabel={option ? "Save" : "Add option"}
+            savingLabel={option ? "Saving…" : "Adding…"}
             onSubmit={(e) => {
                 e.preventDefault();
                 setTried(true);
@@ -235,9 +241,11 @@ export function OptionSheet({
                     Values
                 </p>
                 {kept.length + fresh.length === 0 ? (
-                    <p className="text-[12.5px] text-muted-foreground">
-                        No values yet. Add the ones your variants pick from.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No values yet"
+                        description="Add the ones your variants pick from."
+                    />
                 ) : (
                     <ul
                         aria-labelledby={`${id}-values`}
@@ -327,7 +335,7 @@ export function OptionSheet({
                             : "Type a value and press Enter, or add them later.")}
                 </p>
             </div>
-        </SettingsSheet>
+        </FormSheet>
     );
 }
 
@@ -348,7 +356,7 @@ function RemoveValue({
             className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active disabled:cursor-not-allowed coarse:size-9"
             onClick={onClick}
         >
-            <X aria-hidden className="size-3" strokeWidth={2.2} />
+            <X aria-hidden className="size-3" />
         </button>
     );
 }

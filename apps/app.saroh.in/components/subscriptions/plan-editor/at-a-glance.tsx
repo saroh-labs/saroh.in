@@ -1,4 +1,5 @@
 import { Section } from "@/components/services/service-editor/fields";
+import { AbsentOr } from "@saroh/ui/absent-value";
 
 /** Label and figure rows under a section title, as the design's side cards. */
 function Rows({ rows }: { rows: { label: string; value: string }[] }) {
@@ -11,7 +12,11 @@ function Rows({ rows }: { rows: { label: string; value: string }[] }) {
                 >
                     <dt className="flex-1 text-muted-foreground">{r.label}</dt>
                     <dd className="text-right font-semibold tabular-nums">
-                        {r.value}
+                        <AbsentOr
+                            says={r.label === "Per month" ? "Not set" : "None"}
+                        >
+                            {r.value}
+                        </AbsentOr>
                     </dd>
                 </div>
             ))}
@@ -44,8 +49,8 @@ export function PlanAside({
             <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
                 {/* The design says members do this from "their own link";
                     that link (A8) isn't live, so this says what is true now. */}
-                Archiving a plan stops new sign-ups; everyone on it carries on.
-                You can pause, skip or move anyone on it from their
+                Archiving a plan stops new sign-ups, and everyone on it carries
+                on. You can pause, skip or move anyone on it from their
                 subscription.
             </p>
         </>

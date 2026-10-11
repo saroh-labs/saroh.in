@@ -13,6 +13,18 @@
 // The line above is types only — erased at runtime — and gives `expect` the
 // matchers' signatures; the extend below is what adds them.
 import * as matchers from "@testing-library/jest-dom/matchers";
-import { expect } from "vitest";
+import { afterEach, beforeEach, expect } from "vitest";
+
+import { viewport } from "./src/test-viewport";
 
 expect.extend(matchers);
+
+// Every test starts at a desk's width: what only a phone shows is hidden,
+// as it is for a visitor there. A phone's test asks for `viewport("phone")`.
+beforeEach(() => viewport("desk"));
+
+// Each test is its own visit: what one kept for the visit (the bag's draft,
+// a sign-in half done) must not be there for the next.
+afterEach(() => {
+    if (typeof window !== "undefined") window.sessionStorage.clear();
+});

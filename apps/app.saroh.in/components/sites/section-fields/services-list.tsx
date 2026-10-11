@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Field } from "@saroh/ui/field";
+import { TextLink } from "@saroh/ui/text-link";
 
 import { resolveVariant } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
@@ -28,7 +30,6 @@ import {
     unlessDefault,
     wordsOrAbsent,
 } from "./display-options";
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 import { ServicesLoadNotice } from "./services-load-notice";
 
@@ -100,17 +101,16 @@ export function ServicesListFields({
                         ) : null}
                     </div>
                 ) : services.length === 0 && c.serviceIds.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No services yet.{" "}
-                        <Link
-                            href="/services/new"
-                            className="underline hover:text-foreground"
-                        >
-                            Create a service
-                        </Link>{" "}
-                        first, then add it here. Until then this section shows
-                        nothing on the site.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No services yet"
+                        description="Add one, then add it here. Until then this section shows nothing on the site."
+                        action={
+                            <TextLink href="/services/new">
+                                New service
+                            </TextLink>
+                        }
+                    />
                 ) : (
                     <div className="grid gap-2">
                         {c.serviceIds.length === 0 ? (
@@ -123,9 +123,9 @@ export function ServicesListFields({
                                 {c.serviceIds.map((id, index) => {
                                     const service = byId.get(id);
                                     const note = !service
-                                        ? "Deleted — not shown on the site"
+                                        ? "Deleted, not shown on the site"
                                         : service.status === "ARCHIVED"
-                                          ? "Archived — not shown on the site"
+                                          ? "Archived, not shown on the site"
                                           : null;
                                     return (
                                         <li
@@ -264,13 +264,13 @@ export function ServicesListFields({
              * The section's own button, under the list (#207), kept apart
              * from each service's: it goes wherever the merchant points it.
              */}
-            <Field label="Button below the list">
+            <Field optional label="Button below the list">
                 <Input
                     value={c.cta?.label ?? ""}
                     onChange={(e) =>
                         patch({ cta: withCtaLabel(c.cta, e.target.value) })
                     }
-                    placeholder="Book now. Optional."
+                    placeholder="Book now."
                 />
             </Field>
             {c.cta?.label.trim() ? (
@@ -320,7 +320,7 @@ function PriceCardFields({
                     placeholder="In person, or by video"
                 />
             </Field>
-            <Field label="Under the button">
+            <Field optional label="Under the button">
                 <Textarea
                     value={c.followUpLine ?? ""}
                     onChange={(e) =>
@@ -328,7 +328,7 @@ function PriceCardFields({
                     }
                     rows={2}
                     maxLength={300}
-                    placeholder="Optional. What a follow-up costs, and how often."
+                    placeholder="What a follow-up costs, and how often."
                 />
             </Field>
             <Field label="What it includes">

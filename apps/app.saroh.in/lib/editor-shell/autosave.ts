@@ -122,7 +122,7 @@ export class Autosave<V, R extends { revision: number }> {
             .send(values, this.state.revision)
             .catch((): EditorResult<R> => ({
                 ok: false,
-                error: "Couldn't reach Saroh — your changes are still here.",
+                error: "Couldn't reach Saroh. Your changes are still here.",
             }))
             .then((res) => {
                 if (res.ok) {

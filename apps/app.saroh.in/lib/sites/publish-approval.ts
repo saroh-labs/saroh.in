@@ -50,7 +50,7 @@ export function publishApprovalOf(
 
 /** What the rule does, said beside the owner's switch. */
 export const PUBLISH_APPROVAL_RULE =
-    "Only an approved test release can go live. You can still go live without approval; it's recorded.";
+    "Only an approved test release can go live. You can still go live without approval, and it's recorded.";
 
 /** What someone who can't change it reads: only the owner can (KTD-11). */
 export function publishApprovalLine(on: boolean): string {

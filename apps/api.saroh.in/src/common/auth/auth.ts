@@ -5,6 +5,7 @@ import { signedUp } from "../../modules/analytics/product-milestones";
 import {
     sendChangeEmailConfirmationEmail,
     sendDeleteAccountEmail,
+    sendExistingAccountEmail,
     sendPasswordResetEmail,
     sendVerificationOtpEmail,
 } from "../email";
@@ -26,6 +27,10 @@ export const auth: Auth = createAuth({
             VERIFICATION_OTP_EXPIRY_SECONDS,
         ),
     sendResetPassword: ({ to, url }) => sendPasswordResetEmail(to, url),
+    // A sign-up for an address that already has an account: the screen says
+    // "Check your email" either way, and this is what arrives.
+    sendExistingAccountNotice: ({ to, origin }) =>
+        sendExistingAccountEmail(to, origin),
     sendChangeEmailConfirmation: ({ to, newEmail, url }) =>
         sendChangeEmailConfirmationEmail(to, url, newEmail),
     sendDeleteAccountVerification: ({ to, url }) =>

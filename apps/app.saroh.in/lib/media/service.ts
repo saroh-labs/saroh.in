@@ -65,7 +65,11 @@ export async function createUpload(input: {
     purpose?: "site-image" | "business-logo" | "product-video";
 }): Promise<MediaResult<UploadTicket>> {
     const base = await mediaBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/upload-url`, {
         method: "POST",
         // One bucket for everything a site shows: hero, gallery, share card.
@@ -79,7 +83,7 @@ export async function createUpload(input: {
     }
     return {
         ok: false,
-        error: messageOf(data, "Could not start the upload."),
+        error: messageOf(data, "Couldn't start the upload."),
     };
 }
 
@@ -87,7 +91,11 @@ export async function completeUpload(
     mediaId: string,
 ): Promise<MediaResult<CompletedUpload>> {
     const base = await mediaBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${mediaId}/complete`, {
         method: "POST",
     });
@@ -97,7 +105,7 @@ export async function completeUpload(
     }
     return {
         ok: false,
-        error: messageOf(data, "Could not confirm the upload."),
+        error: messageOf(data, "Couldn't confirm the upload."),
     };
 }
 

@@ -6,6 +6,7 @@ import { useId, useState, useTransition } from "react";
 
 import { submitReview } from "@/app/review/[token]/actions";
 import type { ReviewInvitation, ReviewLine } from "@/lib/reviews";
+import { siteImage } from "@saroh/site-blocks";
 
 const STARS = [1, 2, 3, 4, 5] as const;
 
@@ -54,10 +55,11 @@ export function ReviewForm({
                     </label>
                     <input
                         id="review-name"
+                        autoComplete="name"
                         value={name}
                         maxLength={60}
                         onChange={(e) => setName(e.target.value)}
-                        className="h-11 w-full max-w-xs rounded-md border border-site-border bg-site-bg px-3 text-site-fg outline-none focus-visible:ring-2 focus-visible:ring-site-accent"
+                        className="h-11 w-full max-w-xs rounded-md border border-site-border bg-site-bg px-3 text-base text-site-fg outline-none focus-visible:ring-2 focus-visible:ring-site-accent"
                     />
                 </div>
             )}
@@ -109,6 +111,9 @@ function LineCard({
                 <img
                     src={line.image}
                     alt=""
+                    width={48}
+                    height={48}
+                    {...siteImage()}
                     className="size-12 shrink-0 rounded-md border border-site-border object-cover"
                 />
             ) : null}
@@ -121,7 +126,7 @@ function LineCard({
             <div className="rounded-xl border border-site-border bg-site-surface p-5">
                 {header}
                 <p className="mt-2 text-sm text-site-muted">
-                    Posted — thank you.
+                    Posted. Thank you.
                 </p>
             </div>
         );
@@ -205,7 +210,7 @@ function LineCard({
                     maxLength={2000}
                     rows={3}
                     onChange={(e) => setBody(e.target.value)}
-                    className="w-full rounded-md border border-site-border bg-site-bg px-3 py-2 text-site-fg outline-none focus-visible:ring-2 focus-visible:ring-site-accent"
+                    className="w-full rounded-md border border-site-border bg-site-bg px-3 py-2 text-base text-site-fg outline-none focus-visible:ring-2 focus-visible:ring-site-accent"
                 />
             </label>
             {error ? (

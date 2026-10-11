@@ -35,8 +35,14 @@ export default function HeroSection({
     visit,
     today,
     now,
+    priority = false,
 }: {
     content: RenderedHero;
+    /**
+     * The page opens on this hero (it is the first section): its photo is
+     * fetched ahead of everything else. Any other hero's waits its turn.
+     */
+    priority?: boolean;
     /** The live site, for On today's read (G18). See `SectionRenderer`. */
     siteId?: string | null;
     /** Base URL of the public API, for On today's read. */
@@ -59,6 +65,7 @@ export default function HeroSection({
                 apiUrl={apiUrl}
                 visit={visit}
                 now={now}
+                priority={priority}
             />
         );
     }
@@ -75,7 +82,7 @@ export default function HeroSection({
             />
         );
     }
-    return <PlainHero content={content} />;
+    return <PlainHero content={content} priority={priority} />;
 }
 
 /** The `none` look: a page title, not a hero. */

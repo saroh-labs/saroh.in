@@ -1,5 +1,7 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
@@ -14,8 +16,8 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -23,8 +25,12 @@ import { z } from "zod";
 
 import type { MultiOption } from "@/components/shared/multi-select";
 import { MultiSelect } from "@/components/shared/multi-select";
-import { OptionSelect } from "@/components/shared/option-select";
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
+import {
+    lostChanges,
+    lostNew,
+    useLeaveGuard,
+} from "@/components/shared/use-leave-guard";
+import { runAction } from "@/lib/api/run-action";
 import { createDiscount, updateDiscount } from "@/lib/discounts/actions";
 import type { Selections } from "@/lib/discounts/reach";
 import {
@@ -40,8 +46,8 @@ import type {
     DiscountReach,
 } from "@/lib/discounts/service";
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
-
-const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AUD", "CAD", "SGD", "AED"];
+import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
+import { Segmented } from "@saroh/ui/segmented";
 
 const formSchema = z
     .object({
@@ -51,7 +57,8 @@ const formSchema = z
             .min(2, { message: "At least 2 characters" })
             .max(32)
             .regex(/^[A-Za-z0-9_-]+$/, {
-                message: "Letters, digits, dashes or underscores — no spaces",
+                message:
+                    "Letters, digits, dashes or underscores, with no spaces",
             }),
         description: z.string().max(200),
         kind: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
@@ -99,7 +106,7 @@ const REACH_NOTE: Record<DiscountReach, string> = {
     BUSINESS: "Every order at every location.",
     STOREFRONT: "Every order at the locations you choose.",
     COLLECTION:
-        "Only the lines in the categories you choose — and the categories inside them.",
+        "Only the lines in the categories you choose, and the categories inside them.",
     PRODUCT: "Only the lines for the products you choose.",
 };
 
@@ -143,6 +150,7 @@ export function DiscountForm({
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
+        ...PAGE_FORM,
         defaultValues: {
             code: discount?.code ?? "",
             description: discount?.description ?? "",
@@ -162,7 +170,13 @@ export function DiscountForm({
         },
     });
     const kind = form.watch("kind");
-    const { isSubmitting } = form.formState;
+    const { isSubmitting, isDirty } = form.formState;
+    // What it applies to is kept beside the form, so it is compared too.
+    const [reachAtFirst] = useState(() => JSON.stringify([mode, picks]));
+    const guard = useLeaveGuard({
+        dirty: isDirty || JSON.stringify([mode, picks]) !== reachAtFirst,
+        lost: discount ? lostChanges("this code") : lostNew("code"),
+    });
 
     async function onSubmit(values: FormValues) {
         setTargetsError(null);
@@ -196,7 +210,7 @@ export function DiscountForm({
             else showError(res.error);
             return;
         }
-        showSuccess(discount ? "Code saved" : `${res.data.code} is ready`);
+        showSuccess(discount ? "Code saved." : `${res.data.code} is ready.`);
         router.push("/commerce/discounts");
         router.refresh();
     }
@@ -204,14 +218,17 @@ export function DiscountForm({
     function endNow() {
         if (!discount) return;
         startEnding(async () => {
-            const res = await updateDiscount(discount.id, {
-                endsAt: new Date().toISOString(),
-            });
+            const res = await runAction(() =>
+                updateDiscount(discount.id, {
+                    endsAt: new Date().toISOString(),
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
             }
-            showSuccess(`${discount.code} has ended — its figures are kept`);
+            showSuccess(`${discount.code} has ended. Its figures are kept.`);
             router.push("/commerce/discounts");
             router.refresh();
         });
@@ -222,7 +239,8 @@ export function DiscountForm({
     return (
         <Form {...form}>
             <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onKeyDown={submitOnModEnter}
+                onSubmit={form.handleSubmit(onSubmit, toFirstError)}
                 className="grid max-w-[620px] gap-4"
             >
                 <FormCard>
@@ -248,8 +266,8 @@ export function DiscountForm({
                                 </FormControl>
                                 <FormDescription>
                                     What a customer says or types. Letters,
-                                    digits, dashes — each code once per
-                                    business.
+                                    digits and dashes. Each code is used once
+                                    per business.
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>
@@ -268,7 +286,7 @@ export function DiscountForm({
                                     />
                                 </FormControl>
                                 <FormDescription>
-                                    For you and your team; customers never see
+                                    For you and your team. Customers never see
                                     it.
                                 </FormDescription>
                                 <FormMessage />
@@ -284,28 +302,21 @@ export function DiscountForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>What it takes off</FormLabel>
-                                <ToggleGroup
-                                    type="single"
+                                <Segmented
+                                    label="What it takes off"
                                     value={field.value}
-                                    onValueChange={(v) => {
-                                        if (v) field.onChange(v);
-                                    }}
-                                    aria-label="What it takes off"
-                                    className={SEGMENTED}
-                                >
-                                    <ToggleGroupItem
-                                        value="PERCENTAGE"
-                                        className={SEGMENT}
-                                    >
-                                        A percentage
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem
-                                        value="FIXED_AMOUNT"
-                                        className={SEGMENT}
-                                    >
-                                        An amount
-                                    </ToggleGroupItem>
-                                </ToggleGroup>
+                                    onValueChange={field.onChange}
+                                    options={[
+                                        {
+                                            value: "PERCENTAGE",
+                                            label: "A percentage",
+                                        },
+                                        {
+                                            value: "FIXED_AMOUNT",
+                                            label: "An amount",
+                                        },
+                                    ]}
+                                />
                             </FormItem>
                         )}
                     />
@@ -349,39 +360,21 @@ export function DiscountForm({
                                     <FormItem>
                                         <FormLabel>Amount off</FormLabel>
                                         <FormControl>
-                                            <Input
-                                                {...field}
-                                                inputMode="decimal"
-                                                placeholder="10.00"
-                                                className="w-36 tabular-nums"
-                                            />
+                                            <div className="w-36">
+                                                <MoneyInput
+                                                    {...field}
+                                                    currency={form.watch(
+                                                        "currency",
+                                                    )}
+                                                    onValueChange={
+                                                        field.onChange
+                                                    }
+                                                />
+                                            </div>
                                         </FormControl>
                                         <FormDescription>
                                             Never more than what it applies to.
                                         </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="currency"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Currency</FormLabel>
-                                        <FormControl>
-                                            <OptionSelect
-                                                value={field.value}
-                                                onValueChange={field.onChange}
-                                                options={CURRENCIES.map(
-                                                    (c) => ({
-                                                        value: c,
-                                                        label: c,
-                                                    }),
-                                                )}
-                                                className="w-28 font-mono"
-                                            />
-                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -398,28 +391,16 @@ export function DiscountForm({
                         >
                             What it applies to
                         </span>
-                        <ToggleGroup
-                            type="single"
+                        <Segmented
+                            label="What it applies to"
+                            aria-labelledby="discount-reach"
                             value={mode}
                             onValueChange={(v) => {
-                                if (v) {
-                                    setMode(v as DiscountReach);
-                                    setTargetsError(null);
-                                }
+                                setMode(v);
+                                setTargetsError(null);
                             }}
-                            aria-labelledby="discount-reach"
-                            className={SEGMENTED}
-                        >
-                            {REACH.map((r) => (
-                                <ToggleGroupItem
-                                    key={r.value}
-                                    value={r.value}
-                                    className={SEGMENT}
-                                >
-                                    {r.label}
-                                </ToggleGroupItem>
-                            ))}
-                        </ToggleGroup>
+                            options={REACH}
+                        />
                         <p
                             id="discount-reach-note"
                             className="text-[11.5px] leading-[1.5] text-muted-foreground"
@@ -536,7 +517,7 @@ export function DiscountForm({
                                 <FormDescription>
                                     Across every order. Leave empty for no cap.
                                     {discount
-                                        ? ` Used ${discount.used} ${discount.used === 1 ? "time" : "times"} so far.`
+                                        ? ` Used ${count(discount.used, "time")} so far.`
                                         : ""}
                                 </FormDescription>
                                 <FormMessage />
@@ -548,14 +529,12 @@ export function DiscountForm({
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
                         type="submit"
-                        disabled={isSubmitting || ending}
+                        disabled={ending}
                         className="wk-press"
+                        busy={isSubmitting}
+                        busyLabel="Saving…"
                     >
-                        {isSubmitting
-                            ? "Saving…"
-                            : discount
-                              ? "Save changes"
-                              : "Create code"}
+                        {discount ? "Save" : "Create code"}
                     </Button>
                     {discount?.state === "ACTIVE" ? (
                         <Button
@@ -569,6 +548,7 @@ export function DiscountForm({
                     ) : null}
                 </div>
             </form>
+            {guard.dialog}
         </Form>
     );
 }

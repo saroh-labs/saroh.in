@@ -78,24 +78,24 @@ describe("the stop", () => {
         expect(
             testReleaseBookingLine({
                 serviceName: "Haircut",
-                whenText: "Sat 4 Oct at 11:00 with Asha",
+                whenText: "Sat 4 Oct at 11:00 am with Asha",
                 waitlist: false,
                 pay: "NOW",
                 payingNow: "₹500",
             }),
         ).toBe(
-            "the customer signs in here and books Haircut, Sat 4 Oct at 11:00 with Asha and pays ₹500",
+            "the customer signs in here and books Haircut, Sat 4 Oct at 11:00 am with Asha and pays ₹500",
         );
         expect(
             testReleaseBookingLine({
                 serviceName: "HIIT class",
-                whenText: "Sun 20 Sep at 18:30",
+                whenText: "Sun 20 Sep at 6:30 pm",
                 waitlist: true,
                 pay: "DESK",
                 payingNow: "",
             }),
         ).toBe(
-            "the customer signs in here and joins the waitlist for HIIT class, Sun 20 Sep at 18:30",
+            "the customer signs in here and joins the waitlist for HIIT class, Sun 20 Sep at 6:30 pm",
         );
     });
 

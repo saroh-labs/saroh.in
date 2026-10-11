@@ -5,6 +5,7 @@ import * as React from "react";
 import type { ControllerProps, FieldPath, FieldValues } from "react-hook-form";
 import { Controller, FormProvider, useFormContext } from "react-hook-form";
 import { cn } from "../../lib/utils";
+import { FieldError, FieldHint } from "./field";
 import { Label } from "./label";
 
 const Form = FormProvider;
@@ -70,7 +71,11 @@ const FormItem = React.forwardRef<
 
     return (
         <FormItemContext.Provider value={{ id }}>
-            <div ref={ref} className={cn("space-y-2", className)} {...props} />
+            <div
+                ref={ref}
+                className={cn("min-w-0 space-y-1.5", className)}
+                {...props}
+            />
         </FormItemContext.Provider>
     );
 });
@@ -80,12 +85,14 @@ const FormLabel = React.forwardRef<
     React.ElementRef<typeof LabelPrimitive.Root>,
     React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
 >(({ className, ...props }, ref) => {
-    const { error, formItemId } = useFormField();
+    const { formItemId } = useFormField();
 
+    // The label keeps its colour in error: the field's edge and the line
+    // under it say what is wrong, as `Field` draws it.
     return (
         <Label
             ref={ref}
-            className={cn(error && "text-destructive", className)}
+            className={className}
             htmlFor={formItemId}
             {...props}
         />
@@ -104,11 +111,7 @@ const FormControl = React.forwardRef<
         <Slot
             ref={ref}
             id={formItemId}
-            aria-describedby={
-                !error
-                    ? formDescriptionId
-                    : `${formDescriptionId} ${formMessageId}`
-            }
+            aria-describedby={error ? formMessageId : formDescriptionId}
             aria-invalid={Boolean(error)}
             {...props}
         />
@@ -120,16 +123,19 @@ const FormDescription = React.forwardRef<
     HTMLParagraphElement,
     React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => {
-    const { formDescriptionId } = useFormField();
+    const { error, formDescriptionId } = useFormField();
+
+    // The error takes the hint's place, as in `Field`.
+    if (error) return null;
 
     return (
-        <p
+        <FieldHint
             ref={ref}
             id={formDescriptionId}
             data-slot="form-description"
             // Help text is Saroh's own words: a recording may read it.
             data-ph-unmask=""
-            className={cn("text-sm text-muted-foreground", className)}
+            className={className}
             {...props}
         />
     );
@@ -147,19 +153,20 @@ const FormMessage = React.forwardRef<
         return null;
     }
 
+    // The one error line, shared with `Field`.
     return (
-        <p
+        <FieldError
             ref={ref}
             id={formMessageId}
             // What was wrong with a field, in the form's own words (the
             // schema's message): a recording may read it. Digits and emails
             // are hidden even here, and the field's value always is.
             data-ph-unmask=""
-            className={cn("text-sm font-medium text-destructive", className)}
+            className={className}
             {...props}
         >
             {body}
-        </p>
+        </FieldError>
     );
 });
 FormMessage.displayName = "FormMessage";

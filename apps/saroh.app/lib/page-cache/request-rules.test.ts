@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { decideRequest, pageCacheKey } from "./request-rules";
+import {
+    decideRequest,
+    drawnRequest,
+    isTrackingParam,
+    keyedSearch,
+    pageCacheKey,
+} from "./request-rules";
 
 const ROOT = "saroh.app";
 
@@ -154,13 +160,13 @@ describe("the key a page is kept under (#863)", () => {
         );
     });
 
-    it("keeps the page a QR scan opened apart from the page itself", async () => {
+    it("keeps the page a QR scan opened as the page itself", async () => {
         // `?src=qr-<code>` is read in the browser only, so both are the
-        // same drawing; and being keyed apart, a tagged request could never
-        // answer a visitor who asked for the plain page.
+        // same drawing. The page is drawn without the tag (`drawnRequest`),
+        // so the one kept carries nothing of the scan to the next visitor.
         const plain = await key(req("https://rye.saroh.app/book"));
         const scanned = await key(req("https://rye.saroh.app/book?src=qr-h7c"));
-        expect(scanned).not.toBe(plain);
+        expect(scanned).toBe(plain);
         expect(new URL(plain).searchParams.has("src")).toBe(false);
     });
 
@@ -181,5 +187,86 @@ describe("the key a page is kept under (#863)", () => {
                 req("https://rye.saroh.app/about", { headers: { rsc: "1" } }),
             ),
         ).toBe(rsc);
+    });
+});
+
+describe("an ad click, a shared link and a QR scan meet the kept page", () => {
+    const key = (url: string) => pageCacheKey(req(url), "rye.saroh.app", "v1");
+
+    it("keys a page the same with or without the tags of where a visit came from", async () => {
+        const plain = await key("https://rye.saroh.app/shop/sourdough");
+        for (const tagged of [
+            "https://rye.saroh.app/shop/sourdough?utm_source=instagram&utm_medium=story&utm_campaign=diwali",
+            "https://rye.saroh.app/shop/sourdough?fbclid=IwAR0abc",
+            "https://rye.saroh.app/shop/sourdough?gclid=Cj0abc",
+            "https://rye.saroh.app/shop/sourdough?igshid=MzRl",
+            "https://rye.saroh.app/shop/sourdough?src=qr-h7c",
+            "https://rye.saroh.app/shop/sourdough?UTM_Source=x&FBCLID=y",
+        ]) {
+            expect(await key(tagged)).toBe(plain);
+        }
+    });
+
+    it("still keys on everything the server draws from", async () => {
+        const booking = await key(
+            "https://rye.saroh.app/book?service=svc_1&date=2026-10-12&start=09%3A00",
+        );
+        expect(
+            await key(
+                "https://rye.saroh.app/book?service=svc_1&date=2026-10-12&start=09%3A00&src=qr-h7c&utm_source=flyer",
+            ),
+        ).toBe(booking);
+        expect(
+            await key(
+                "https://rye.saroh.app/book?service=svc_2&date=2026-10-12&start=09%3A00",
+            ),
+        ).not.toBe(booking);
+        expect(await key("https://rye.saroh.app/book")).not.toBe(booking);
+        // A name that only looks like one is kept.
+        expect(await key("https://rye.saroh.app/shop?source=x")).not.toBe(
+            await key("https://rye.saroh.app/shop"),
+        );
+    });
+
+    it("knows a tracking parameter from any other", () => {
+        for (const name of [
+            "utm_source",
+            "utm_id",
+            "fbclid",
+            "gclid",
+            "igshid",
+            "src",
+        ]) {
+            expect(isTrackingParam(name)).toBe(true);
+        }
+        for (const name of [
+            "service",
+            "page",
+            "q",
+            "source",
+            "utm",
+            "srcset",
+        ]) {
+            expect(isTrackingParam(name)).toBe(false);
+        }
+        expect(keyedSearch("?a=1&utm_source=x&b=2&src=qr-abc")).toBe(
+            "?a=1&b=2",
+        );
+        expect(keyedSearch("?fbclid=x")).toBe("");
+        expect(keyedSearch("")).toBe("");
+    });
+
+    it("draws the page for the address every visitor shares, and leaves any other request alone", () => {
+        const tagged = req(
+            "https://rye.saroh.app/book?service=svc_1&src=qr-h7c&utm_source=flyer",
+            { headers: { rsc: "1" } },
+        );
+        const drawn = drawnRequest(tagged);
+        expect(drawn.url).toBe("https://rye.saroh.app/book?service=svc_1");
+        expect(drawn.method).toBe("GET");
+        expect(drawn.headers.get("rsc")).toBe("1");
+        expect(drawn.headers.get("host")).toBe("rye.saroh.app");
+        const plain = req("https://rye.saroh.app/book?service=svc_1");
+        expect(drawnRequest(plain)).toBe(plain);
     });
 });

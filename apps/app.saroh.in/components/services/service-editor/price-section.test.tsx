@@ -60,6 +60,8 @@ function render(d: ServiceDraft, payment: BookingPaymentView | null) {
             <PriceSection
                 draft={d}
                 set={() => undefined}
+                problem={() => null}
+                leave={() => undefined}
                 currency="INR"
                 payment={payment}
             />,

@@ -1,3 +1,4 @@
+import { formatRelative } from "@/lib/format/datetime";
 import { providerName } from "@/lib/payments/providers";
 
 import type { PaymentProviderName, PaymentWebhookSetup } from "./service";
@@ -31,20 +32,6 @@ export function isTestKey(keyId: string): boolean {
     return keyId.trim().startsWith("rzp_test_");
 }
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-/** "just now", "2 min ago", "3 h ago", "yesterday", "5 days ago". */
-export function sinceWords(at: Date, now: Date): string {
-    const gap = Math.max(0, now.getTime() - at.getTime());
-    if (gap < MINUTE) return "just now";
-    if (gap < HOUR) return `${Math.floor(gap / MINUTE)} min ago`;
-    if (gap < DAY) return `${Math.floor(gap / HOUR)} h ago`;
-    const days = Math.floor(gap / DAY);
-    return days === 1 ? "yesterday" : `${days} days ago`;
-}
-
 /**
  * The providers row's line about the webhook: when a payment update last
  * arrived — only deliveries whose signature checked out are kept, so one
@@ -58,11 +45,11 @@ export function lastUpdateLine(
     if (!setup) return null;
     const name = providerName(setup.provider);
     if (!setup.lastReceivedAt) {
-        return `No payment updates received yet — check the webhook in ${name}.`;
+        return `No payment updates received yet. Check the webhook in ${name}.`;
     }
     const at = new Date(setup.lastReceivedAt);
     if (Number.isNaN(at.getTime())) return null;
-    return `Last payment update from ${name}: ${sinceWords(at, now)}.`;
+    return `Last payment update from ${name}: ${formatRelative(at, now)}.`;
 }
 
 /**

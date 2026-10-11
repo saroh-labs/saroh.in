@@ -62,8 +62,8 @@ export const PRODUCT_MEDIA_KINDS = ["photo", "video"] as const;
 export type ProductMediaKind = (typeof PRODUCT_MEDIA_KINDS)[number];
 
 /** What the merchant reads when a limit is reached. */
-export const PHOTO_LIMIT_MESSAGE = `Already ${PRODUCT_IMAGE_LIMIT} photos — take one off first.`;
-export const VIDEO_LIMIT_MESSAGE = `Already ${PRODUCT_VIDEO_LIMIT} videos — take one off first.`;
+export const PHOTO_LIMIT_MESSAGE = `Already ${PRODUCT_IMAGE_LIMIT} photos. Take one off first.`;
+export const VIDEO_LIMIT_MESSAGE = `Already ${PRODUCT_VIDEO_LIMIT} videos. Take one off first.`;
 
 /** Limits the editor shows as counters; the API is the authority. */
 export const DETAIL_LIMITS = {
@@ -484,7 +484,7 @@ export class ProductImageInput {
 export class ReplaceProductImagesDto {
     @IsArray()
     @ArrayMaxSize(PRODUCT_IMAGE_LIMIT + PRODUCT_VIDEO_LIMIT, {
-        message: `A product can have ${PRODUCT_IMAGE_LIMIT} photos and ${PRODUCT_VIDEO_LIMIT} videos at most — take one off first.`,
+        message: `A product can have ${PRODUCT_IMAGE_LIMIT} photos and ${PRODUCT_VIDEO_LIMIT} videos at most. Take one off first.`,
     })
     @ValidateNested({ each: true })
     @Type(() => ProductImageInput)

@@ -73,7 +73,9 @@ export class PlansController {
  * Double-guarded (`BetterAuthGuard` + `OrganizationGuard`); handlers receive
  * only a proven {@link OrganizationContext} via `@OrgContext()`. Reading the
  * current subscription requires `billing:read`; subscribing / changing plan /
- * cancelling requires `billing:manage` — enforced in the service.
+ * cancelling requires `billing:manage` — enforced in the service. Only the
+ * Owner holds `billing:manage` (DEC-131, amended 2026-10-11): every write
+ * here is named in `plan-owner-only.spec.ts`, and a new one must be too.
  *
  * Handlers return `Subscription`-bearing entities (with a `Json`-bearing `Plan`),
  * so each is annotated with an EXPLICIT `Promise<...>` return type (TS2883).

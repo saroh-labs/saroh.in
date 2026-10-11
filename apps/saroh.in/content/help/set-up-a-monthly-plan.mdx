@@ -8,12 +8,12 @@
 #         plan"; "Changing a price only changes what's sold next. Everyone
 #         already on a plan keeps what they agreed to.")
 #   EDIT  .../subscriptions/plan-editor/details-section.tsx ("Details",
-#         "Name", "What's included", "One line — it's what people read on
+#         "Name", "What's included", "One line. It's what people read on
 #         the booking page and their receipt."); price-section.tsx ("Price
 #         and billing", "Charged": "Every month", "Every year", "More…");
 #         lib/subscriptions/plan-editor.ts ("Invoiced each month with a pay
 #         link."; "…or by autopay for members who set it up" only where
-#         autopay is offered; "Draft · saved — nobody can join it yet")
+#         autopay is offered; "Draft · saved, nobody can join it yet")
 #   PUB   lib/editor-shell/state.ts ("Publish", "Publish changes");
 #         plan-editor.ts ("… is open for sign-ups.")
 #   SUB   .../subscriptions/subscribe-dialog.tsx, lib/subscriptions/autopay.ts,
@@ -27,7 +27,7 @@
 #         subscriptions.service.ts (each period's invoice is issued on the
 #         renewal day, not sent); lib/invoices/send.ts ("Send with pay link"
 #         only with a provider that takes money, else "Send invoice")
-#   FAIL  lib/subscriptions/view.ts ("Retry with a new pay link", "Record a
+#   FAIL  lib/subscriptions/view.ts ("Try again with a new pay link", "Record a
 #         payment", "Pause instead"; "Saroh doesn't charge a card or try
 #         again on its own …")
 #   OFF   apps/api.saroh.in/src/modules/invoices/payments-on.ts (with
@@ -82,9 +82,9 @@ steps:
       marker: The month's invoice
     # FAIL.
     - title: When a renewal isn't paid
-      body: "A renewal that isn't paid by its due day shows under Payment failed, and nothing more is collected until it's paid. Saroh doesn't charge a card or try again on its own. Press Retry with a new pay link and send the link yourself, Record a payment you took, or pause or cancel it."
+      body: "A renewal that isn't paid by its due day shows under Payment failed, and nothing more is collected until it's paid. Saroh doesn't charge a card or try again on its own. Press Try again with a new pay link and send the link yourself, Record a payment you took, or pause or cancel it."
       shot: help-monthly-plan-6
       caption: "Arjun Mehta's renewal at Rye & Co. (demo bakery), not paid yet."
-      marker: Retry with a new pay link
+      marker: Try again with a new pay link
 next: []
 ---

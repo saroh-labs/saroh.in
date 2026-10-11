@@ -1,13 +1,16 @@
 "use client";
 
+import { formatClockRange, formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showUndo, showWarning } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type {
     AvailabilityDraft,
     KeptBooking,
@@ -20,7 +23,6 @@ import {
     weeklyHours,
 } from "@/lib/services/availability-rules";
 import type { LocalDate } from "@/lib/services/diary";
-import { clock, dayLabel } from "@/lib/services/diary";
 import {
     addClosure,
     addExtraHours,
@@ -41,7 +43,13 @@ import type {
     StaffView,
     WeeklyRange,
 } from "@/lib/staff/types";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Users } from "lucide-react";
 
+import { ChipGroup } from "@/components/shared/choice-group";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
+import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "./add-person-dialog";
 import { BookingRulesCard } from "./booking-rules-card";
 import { OffRow, TimeOffCard } from "./time-off-card";
@@ -93,8 +101,8 @@ function rulesOnly(ops: readonly SaveOp[]): boolean {
 /** The save bar's line: what saving will do. */
 export function unsavedText(ops: readonly SaveOp[]): string {
     return rulesOnly(ops)
-        ? "Unsaved. New bookings follow the rules when you save; bookings already made keep theirs."
-        : "Unsaved. New free times show on the calendar and the booking page when you save; bookings already made don't move.";
+        ? "Unsaved. New bookings follow the rules when you save. Bookings already made keep theirs."
+        : "Unsaved. New free times show on the calendar and the booking page when you save. Bookings already made don't move.";
 }
 
 /** The toast once saved: never "Hours saved" for a rule (UX-022). */
@@ -111,7 +119,7 @@ const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
 /**
  * Bookings › Availability (U16, the design's `?view=avail`): when each person
  * can be booked. Weekly hours, time off, one-off extra hours and the
- * business's booking rules are a draft until "Save changes"; saving writes
+ * business's booking rules are a draft until "Save"; saving writes
  * what changed, and Undo puts it all back. Hours never move a booking — the
  * ones left outside are listed and kept. The booking rules show with nobody
  * on the diary too (UX-022): a solo owner sets how people pay and cancel.
@@ -181,23 +189,37 @@ export function AvailabilityEditor({
         ]);
         let failed: string | null = null;
         for (const op of ops) {
-            const res =
-                op.kind === "hours"
-                    ? await replaceStaffHours(op.staffId, op.hours)
-                    : op.kind === "addOff"
-                      ? op.off.staffId
-                          ? await addTimeOff(op.off.staffId, rangeOf(op.off))
-                          : await addClosure({
-                                ...rangeOf(op.off),
-                                fromDate: op.off.fromDate,
-                            })
-                      : op.kind === "removeOff"
-                        ? await removeTimeOffMany(op.staffId, op.before.ids)
-                        : op.kind === "removeClosure"
-                          ? await removeClosures(op.before.ids)
-                          : op.kind === "removeExtra"
-                            ? await removeExtraHours(op.staffId, op.before.id)
-                            : await updateBookingRules(op.rules);
+            const res = await runAction(
+                async () =>
+                    op.kind === "hours"
+                        ? await replaceStaffHours(op.staffId, op.hours)
+                        : op.kind === "addOff"
+                          ? op.off.staffId
+                              ? await addTimeOff(
+                                    op.off.staffId,
+                                    rangeOf(op.off),
+                                )
+                              : await addClosure({
+                                    ...rangeOf(op.off),
+                                    fromDate: op.off.fromDate,
+                                })
+                          : op.kind === "removeOff"
+                            ? await removeTimeOffMany(op.staffId, op.before.ids)
+                            : op.kind === "removeClosure"
+                              ? await removeClosures(op.before.ids)
+                              : op.kind === "removeExtra"
+                                ? await removeExtraHours(
+                                      op.staffId,
+                                      op.before.id,
+                                  )
+                                : await updateBookingRules(op.rules),
+                // Said below, with what did save.
+                { quiet: true },
+            );
+            if (!res) {
+                failed = UNREACHED;
+                break;
+            }
             if (!res.ok) {
                 failed = res.error;
                 break;
@@ -232,18 +254,19 @@ export function AvailabilityEditor({
             return;
         }
         setDraft(null);
-        showUndo(savedText(ops), () => {
-            void undo(done).then(() => router.refresh());
+        showUndo(savedText(ops), async () => {
+            await undo(done);
+            router.refresh();
         });
         if (outside.length) {
             showWarning(
-                `${outside.length} ${outside.length === 1 ? "booking is" : "bookings are"} now outside the hours`,
+                `${count(outside.length, "booking is", "bookings are")} now outside the hours.`,
                 "They stay booked. Move them from the calendar if you need to.",
             );
         }
         if (covered.size) {
             showWarning(
-                `${covered.size} ${covered.size === 1 ? "booking falls" : "bookings fall"} in the time off`,
+                `${count(covered.size, "booking falls", "bookings fall")} in the time off.`,
                 "They stay booked. Move or cancel them from the calendar.",
             );
         }
@@ -284,8 +307,15 @@ export function AvailabilityEditor({
         }
     }
 
+    // Hours, time off and rules wait for "Save": a way off the
+    // page asks first.
+    const guard = useLeaveGuard({
+        dirty: canEdit && dirty && !saving,
+        lost: "Your changes to hours, time off or booking rules aren't saved, and will be lost.",
+    });
+
     const saveBar = dirty ? (
-        <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight-border bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
+        <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-border-strong bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
             <span
                 role="status"
                 className="flex-[1_1_240px] text-[12.5px] text-foreground"
@@ -294,18 +324,17 @@ export function AvailabilityEditor({
             </span>
             <Button
                 variant="outline"
-                className="h-[38px] rounded-[9px] px-4 text-[14px]"
                 disabled={saving}
                 onClick={() => setDraft(null)}
             >
                 Discard
             </Button>
             <Button
-                className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                disabled={saving}
                 onClick={() => void save()}
+                busy={saving}
+                busyLabel="Saving…"
             >
-                {saving ? "Saving…" : "Save changes"}
+                Save
             </Button>
         </div>
     ) : null;
@@ -316,35 +345,34 @@ export function AvailabilityEditor({
         // booking, so they are here all the same (UX-022).
         return (
             <>
-                <h1 className="mb-3.5 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-                    Availability
-                </h1>
+                <PageHeader
+                    className="mb-5"
+                    breadcrumb={["Bookings", "Availability"]}
+                    title="Availability"
+                />
                 {canEdit ? null : (
                     <ReadOnlyNote>
                         Your role can see these rules but not change them.
                     </ReadOnlyNote>
                 )}
                 <div className="flex flex-wrap items-start gap-4">
-                    <div className="min-w-0 flex-[3_1_320px] rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-                        <p className="text-[14px] font-semibold">
-                            Nobody takes bookings yet
-                        </p>
-                        <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                            Add the people who can be booked. Each gets weekly
-                            hours, time off and a column on the calendar.
-                        </p>
-                        {canEdit ? (
-                            <Button
-                                className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
-                                onClick={() => setAdding(true)}
-                            >
-                                Add someone
-                            </Button>
-                        ) : null}
-                        <p className="mx-auto mt-2 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                            Until then, customers book each service in its own
-                            weekly hours, set on the service.
-                        </p>
+                    <div className="min-w-0 flex-[3_1_320px]">
+                        <EmptyState
+                            icon={<Users />}
+                            title="No one takes bookings yet"
+                            description={
+                                canEdit
+                                    ? "Add the people who can be booked, and until then customers book each service in its own weekly hours."
+                                    : "Until someone is added, customers book each service in its own weekly hours."
+                            }
+                            action={
+                                canEdit ? (
+                                    <Button onClick={() => setAdding(true)}>
+                                        Add someone
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
                         <AddPersonDialog
                             open={adding}
                             onOpenChange={setAdding}
@@ -361,6 +389,7 @@ export function AvailabilityEditor({
                     </div>
                 </div>
                 {saveBar}
+                {guard.dialog}
             </>
         );
     }
@@ -372,31 +401,19 @@ export function AvailabilityEditor({
 
     return (
         <>
-            <div className="mb-1 flex flex-wrap items-center gap-3">
-                <h1 className="m-0 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-                    Availability
-                </h1>
-                <span className="ml-auto text-[12.5px] text-muted-foreground">
-                    {me.name} · {weeklyHours(hours)} hours a week
-                </span>
-            </div>
-            <p className="mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
-                When each person can be booked. Customers only ever see free
-                times inside these hours, minus bookings and the gap after each.
-                Changing hours never moves a booking that&apos;s already made.
-            </p>
+            <PageHeader
+                className="mb-5"
+                breadcrumb={["Bookings", "Availability"]}
+                title="Availability"
+                description="When each person can be booked. Customers only ever see free times inside these hours, minus bookings and the gap after each. Changing hours never moves a booking that's already made."
+                meta={`${me.name} · ${weeklyHours(hours)} hours a week`}
+            />
             {openingHours ? (
                 <p className="-mt-2 mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
                     In-person bookings are only offered while you&apos;re open,
                     so hours outside your opening hours aren&apos;t bookable in
                     person. Opening hours are in{" "}
-                    <Link
-                        href={HOURS}
-                        className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
-                    >
-                        Settings › Hours
-                    </Link>
-                    .
+                    <TextLink href={HOURS}>Settings › Hours</TextLink>.
                 </p>
             ) : null}
             {canEdit ? null : (
@@ -404,49 +421,39 @@ export function AvailabilityEditor({
                     Your role can see these hours but not change them.
                 </ReadOnlyNote>
             )}
-            <div
-                role="radiogroup"
-                aria-label="Team member"
-                className="mb-3.5 flex flex-wrap gap-1.5"
-            >
-                {people.map((p) => {
-                    const on = p.id === me.id;
-                    return (
-                        <button
-                            key={p.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => setWho(p.id)}
-                            className={cn(
-                                "inline-flex h-8 items-center whitespace-nowrap rounded-full border px-3 text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
-                                on
-                                    ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                                    : "border-border bg-card font-medium hover:border-border-strong",
-                            )}
-                        >
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "mr-[7px] inline-block size-2 rounded-full",
-                                    takesClasses.includes(p.id)
-                                        ? "bg-diary-class"
-                                        : "bg-diary-one",
-                                )}
-                            />
-                            {p.name}
-                            {p.title ? ` · ${p.title}` : ""}
-                        </button>
-                    );
-                })}
+            <div className="mb-3.5 flex flex-wrap gap-1.5">
+                <ChipGroup
+                    label="Team member"
+                    value={me.id}
+                    onChange={setWho}
+                    choices={people.map((p) => ({
+                        value: p.id,
+                        label: (
+                            <>
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "mr-[7px] inline-block size-2 rounded-full",
+                                        takesClasses.includes(p.id)
+                                            ? "bg-diary-class"
+                                            : "bg-diary-one",
+                                    )}
+                                />
+                                {p.name}
+                                {p.title ? ` · ${p.title}` : ""}
+                            </>
+                        ),
+                    }))}
+                />
                 {canEdit ? (
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
                         onClick={() => setAdding(true)}
-                        className="h-8 rounded-full border border-dashed border-border-strong px-3 text-[12.5px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                        className="h-8 rounded-full border-dashed border-border-strong px-3 text-[12.5px] font-semibold"
                     >
                         + Add someone
-                    </button>
+                    </Button>
                 ) : null}
             </div>
 
@@ -511,15 +518,15 @@ export function AvailabilityEditor({
                                 return (
                                     <OffRow
                                         key={x.id}
-                                        when={`${dayLabel(x.date.slice(0, 10))} · ${clock(x.startMinute)}–${clock(x.endMinute)}`}
+                                        when={`${formatDay(x.date.slice(0, 10), { weekday: "short", year: "never" })} · ${formatClockRange(x.startMinute, x.endMinute)}`}
                                         why={
                                             n
-                                                ? `${n} ${n === 1 ? "booking" : "bookings"} that day — kept if you close these`
+                                                ? `${count(n, "booking")} that day, kept if you close these`
                                                 : null
                                         }
                                         warn={n > 0}
                                         canEdit={canEdit}
-                                        removeLabel={`Remove extra hours ${clock(x.startMinute)} to ${clock(x.endMinute)} on ${dayLabel(x.date.slice(0, 10))}`}
+                                        removeLabel={`Remove extra hours ${formatClockRange(x.startMinute, x.endMinute)} on ${formatDay(x.date.slice(0, 10), { weekday: "short", year: "never" })}`}
                                         onRemove={() =>
                                             edit((y) => {
                                                 y.extraRemoved.push(x.id);
@@ -530,10 +537,15 @@ export function AvailabilityEditor({
                             })}
                         </ul>
                         {!extraMine.length ? (
-                            <p className="text-[12.5px] text-muted-foreground">
-                                None. Click closed time on the calendar to add
-                                some.
-                            </p>
+                            <EmptyState
+                                size="inline"
+                                title="No extra hours"
+                                description={
+                                    canEdit
+                                        ? "Choose closed time on the calendar to add some."
+                                        : undefined
+                                }
+                            />
                         ) : null}
                     </section>
 

@@ -37,7 +37,7 @@ import { asNewVisitor, signInOnSheet } from "./site-codes";
  *
  * What it owns. Its product (`LOOP_PRODUCT`, untracked, so it holds no stock
  * another test counts) and a new customer per run, with a new email and a
- * visitor address of their own. It turns on "Pay when you collect" and
+ * visitor address of their own. It turns on "Pay at pick-up" and
  * Pick-up at the storefront the site sells from, which every checkout on
  * Northwind reads, so it is `@serial` and puts both back as they were.
  *
@@ -158,12 +158,15 @@ test.describe("selling, end to end (#122)", () => {
                 await expect(pickUp).toBeVisible({ timeout: 15_000 });
                 await pickUp.click();
                 await expect(pickUp).toHaveAttribute("aria-checked", "true");
-                const go = bag.getByRole("button", { name: /^Continue · / });
+                // Signed out, the button says what pressing it does.
+                const go = bag.getByRole("button", {
+                    name: /^Sign in and (pay|place order) · /,
+                });
                 await expect(go).toBeEnabled({ timeout: 15_000 });
                 // Offered beside paying online only when both are open;
                 // alone, it is the way and no choice is drawn.
                 const collect = bag.getByRole("radio", {
-                    name: "Pay when you collect",
+                    name: "Pay at pick-up",
                 });
                 if ((await collect.count()) > 0) {
                     await collect.click();
@@ -171,6 +174,8 @@ test.describe("selling, end to end (#122)", () => {
                         "aria-checked",
                         "true",
                     );
+                    // Paid at the handover: the code is the last step.
+                    await expect(go).toHaveText(/^Sign in and place order · /);
                 }
                 // Nothing here may open a provider's window.
                 await site.route("https://checkout.razorpay.com/**", (r) =>
@@ -191,9 +196,7 @@ test.describe("selling, end to end (#122)", () => {
                     if (await place.isVisible()) await place.click();
                     await expect(placed).toBeVisible({ timeout: 3_000 });
                 }).toPass({ timeout: 30_000 });
-                await expect(placed).toContainText(
-                    "You'll pay when you collect your order.",
-                );
+                await expect(placed).toContainText("You'll pay at pick-up.");
                 const number =
                     /Order (\S+) ·/.exec(await placed.innerText())?.[1] ?? "";
                 expect(number, "the sheet names the order").not.toBe("");
@@ -218,8 +221,8 @@ test.describe("selling, end to end (#122)", () => {
                     .getByRole("status")
                     .filter({ hasText: "Pay on collection" });
                 await expect(banner).toBeVisible();
-                const record = page.getByRole("alertdialog", {
-                    name: "Record this order as paid?",
+                const record = page.getByRole("dialog", {
+                    name: "Record as paid",
                 });
                 await pressUntil(
                     banner.getByRole("button", { name: "Mark paid" }),
@@ -269,8 +272,8 @@ test.describe("selling, end to end (#122)", () => {
                 await page
                     .getByRole("menuitem", { name: "Record as refunded" })
                     .click();
-                const refund = page.getByRole("alertdialog", {
-                    name: "Record a refund?",
+                const refund = page.getByRole("dialog", {
+                    name: "Record a refund",
                 });
                 await expect(
                     refund.getByRole("radio", { name: /Full amount/ }),

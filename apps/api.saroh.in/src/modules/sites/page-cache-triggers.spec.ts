@@ -103,6 +103,16 @@ const TRIGGERS: [string, RegExp, string][] = [
         "a site with no icon of its own keeps the old business logo in its tab (DEC-124)",
     ],
     [
+        "organizations/organization-settings.service.ts",
+        /private async contactChangedOnSites[\s\S]*enqueuePageRevalidation\(prisma, \{\s*cause: "contact"/,
+        "a changed phone, email, address or social link stays old in the footer (DEC-128)",
+    ],
+    [
+        "stores/storefronts.service.ts",
+        /enqueueBusinessSitesRevalidation\(\s*tx,\s*organizationId,\s*"contact"/,
+        "a location's changed address or hours stays old in the footer (DEC-128)",
+    ],
+    [
         "content/posts.service.ts",
         /enqueuePageRevalidation\(tx, \{\s*cause: "publish"/,
         "a published post is missing from the journal",

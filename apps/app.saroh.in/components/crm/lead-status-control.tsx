@@ -4,10 +4,11 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
+import { runAction } from "@/lib/api/run-action";
 import { LEAD_STATUS } from "@/lib/crm/format";
 import { updateLead } from "@/lib/leads/actions";
 import type { LeadStatus } from "@/lib/leads/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const STATUSES: LeadStatus[] = ["OPEN", "WON", "LOST"];
 
@@ -28,14 +29,16 @@ export function LeadStatusControl({
 
     async function onChange(next: LeadStatus) {
         if (next === status) return;
-        setBusy(true);
-        const res = await updateLead(leadId, { status: next });
-        setBusy(false);
+        const res = await runAction(
+            () => updateLead(leadId, { status: next }),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
-        showSuccess("Lead updated");
+        showSuccess("Lead saved.");
         router.refresh();
     }
 

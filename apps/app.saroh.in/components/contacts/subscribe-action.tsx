@@ -21,12 +21,7 @@ export function SubscribeAction({
     const [open, setOpen] = useState(false);
     return (
         <>
-            <Button
-                size="sm"
-                variant="outline"
-                className="coarse:h-11"
-                onClick={() => setOpen(true)}
-            >
+            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
                 Subscribe
             </Button>
             <SubscribeDialog

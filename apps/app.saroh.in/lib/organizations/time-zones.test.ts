@@ -1,8 +1,8 @@
+import { isTimeZone } from "@/lib/format/datetime";
 import { describe, expect, it } from "vitest";
 
 import {
     currentZoneName,
-    isKnownZone,
     timeZoneOptions,
     zoneLabel,
     zoneOption,
@@ -14,10 +14,10 @@ const january = new Date("2026-01-15T12:00:00Z");
 describe("zoneLabel", () => {
     it("reads as a city, the zone's name and its offset", () => {
         expect(zoneLabel("Asia/Kolkata", july)).toBe(
-            "Kolkata — India Standard Time (GMT+5:30)",
+            "Kolkata · India Standard Time (GMT+5:30)",
         );
         expect(zoneLabel("America/Argentina/Buenos_Aires", july)).toMatch(
-            /^Buenos Aires — .+ \(GMT-3\)$/,
+            /^Buenos Aires · .+ \(GMT-3\)$/,
         );
     });
 
@@ -36,7 +36,7 @@ describe("zoneLabel", () => {
     });
 
     it("shows a zone it does not know as stored", () => {
-        expect(isKnownZone("Mars/Olympus")).toBe(false);
+        expect(isTimeZone("Mars/Olympus")).toBe(false);
         expect(zoneLabel("Mars/Olympus")).toBe("Mars/Olympus");
     });
 });

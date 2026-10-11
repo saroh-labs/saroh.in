@@ -276,7 +276,7 @@ describe("the Product grid on the editor's canvas (G12)", () => {
     it("with the shop not open here (a 404), says why the section is left off", async () => {
         await drawWith(json({ message: "Nothing to show here" }, 404));
         expect(screen.getByRole("status").textContent).toContain(
-            "doesn't sell from a storefront yet",
+            "doesn't sell from a location yet",
         );
     });
 

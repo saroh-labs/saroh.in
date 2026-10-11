@@ -29,6 +29,10 @@ import {
 } from "@/lib/organizations/business-types";
 import { kindWords } from "@/lib/organizations/kind";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
+import {
+    NO_SOCIAL_LINKS,
+    socialRowSummary,
+} from "@/lib/organizations/social-links";
 import { zoneLabel } from "@/lib/organizations/time-zones";
 
 import type { BusinessSheets } from "./use-business-sheets";
@@ -200,6 +204,8 @@ export function BusinessDetailRows({
     }
 
     if (tab === "contact") {
+        const social = settings.socialLinks ?? {};
+        const socialLinked = Object.keys(social).length > 0;
         return (
             <BusinessRows
                 title={DETAIL_TABS.contact.title}
@@ -247,6 +253,26 @@ export function BusinessDetailRows({
                         text={saved.website ?? ""}
                         empty="None outside Saroh"
                     />
+                </Row>
+                {/* One row for every network (DEC-128): what is linked,
+                    and one sheet with a field for each. */}
+                <Row
+                    id={BUSINESS_ROW_ID.social}
+                    label="Social links"
+                    action={editOrAdd(
+                        "social",
+                        socialLinked,
+                        "social links",
+                        "Add links",
+                    )}
+                >
+                    <Saved
+                        text={socialLinked ? socialRowSummary(social) : ""}
+                        empty={NO_SOCIAL_LINKS}
+                    />
+                    {socialLinked ? (
+                        <Follows>On your website&apos;s footer</Follows>
+                    ) : null}
                 </Row>
             </BusinessRows>
         );

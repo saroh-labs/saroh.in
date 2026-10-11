@@ -21,13 +21,13 @@ import {
     PAY_SECTION,
     PayInstructionsSection,
 } from "@/components/organizations/pay-instructions-section";
+import { SocialLinksSheet } from "@/components/organizations/social-links-sheet";
 import { useBusinessSheets } from "@/components/organizations/use-business-sheets";
 import {
     cardUndo,
     logoCardUndo,
     useSettingsUndo,
 } from "@/components/organizations/use-settings-undo";
-import { SettingsTabStrip } from "@/components/shared/settings-tab-strip";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { BusinessTab } from "@/lib/organizations/business-rows";
 import {
@@ -38,6 +38,7 @@ import {
 import { savedWords } from "@/lib/organizations/business-sheet-words";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import type { StorefrontHoursRead } from "@/lib/stores/storefronts";
+import { TabStrip } from "@saroh/ui/tabs";
 
 /** Hours and How to pay us keep their own panels, rows and sheets. */
 type OwnPanelKey = "hours" | "pay";
@@ -118,14 +119,14 @@ export function OrganizationSettingsForm({
 
     return (
         <>
-            <SettingsTabStrip
+            <TabStrip
                 label="Business details"
                 idPrefix="business-tab"
-                current={tab}
-                onChange={setTab}
+                value={tab}
+                onValueChange={setTab}
                 className="-mt-1.5 mb-[18px]"
                 tabs={BUSINESS_TABS.map((key) => ({
-                    key,
+                    value: key,
                     label: titleOf(key),
                     controls: isDetailTab(key)
                         ? "business-panel"
@@ -193,6 +194,22 @@ export function OrganizationSettingsForm({
                             logoCardUndo(settings, next, setSettings),
                         );
                         setSettings(next);
+                    }}
+                />
+            ) : editing?.which === "social" ? (
+                <SocialLinksSheet
+                    key={editing.opened}
+                    links={settings.socialLinks}
+                    phone={settings.profile?.phone}
+                    kind={settings.kind}
+                    open={editing.open}
+                    returnTo={editing.returnTo}
+                    onClose={sheets.close}
+                    onSaved={(next, said) => {
+                        // No Undo: the sheet is the way back, and a link
+                        // typed again is the same link.
+                        undo.offer(said, null);
+                        applySaved(next);
                     }}
                 />
             ) : editing &&

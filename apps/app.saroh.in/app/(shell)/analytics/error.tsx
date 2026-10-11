@@ -8,19 +8,17 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't load Insights"
-            description="The figures didn't come back. This is usually temporary."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Insights"
+            things="Insights"
         />
     );
 }

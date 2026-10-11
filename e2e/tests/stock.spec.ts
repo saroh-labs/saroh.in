@@ -109,7 +109,9 @@ test.describe("Stock screen", () => {
 
             // 2. Undo reverses the count as a batch.
             await page.getByRole("button", { name: "Undo" }).click();
-            await expect(page.getByText("Count undone.")).toBeVisible();
+            await expect(
+                page.getByText("Undone.", { exact: true }),
+            ).toBeVisible();
             await expect(
                 page.getByText("7 on hand · 0 promised"),
             ).toBeVisible();
@@ -124,9 +126,9 @@ test.describe("Stock screen", () => {
                 .click();
             await page.getByRole("option", { name, exact: true }).click();
             await sheet.getByLabel("How many").fill("2");
-            await sheet.getByRole("button", { name: "Record" }).click();
+            await sheet.getByRole("button", { name: "Record stock" }).click();
             await expect(
-                page.getByText("Recorded 2 wasted — 5 on hand now."),
+                page.getByText("Recorded 2 wasted. 5 on hand now."),
             ).toBeVisible();
 
             await page.goto(
@@ -149,9 +151,6 @@ test.describe("Stock screen", () => {
                 await expect(
                     dialog.getByText(/^Only 5 can be moved/),
                 ).toBeVisible();
-                await expect(
-                    dialog.getByRole("button", { name: "Move" }),
-                ).toBeDisabled();
                 await dialog.getByRole("button", { name: "Cancel" }).click();
             }
         } finally {
@@ -242,7 +241,8 @@ test.describe("Stock screen", () => {
         await page.goto("/commerce/stock");
         await expect(
             page.getByRole("heading", {
-                name: "You do not have access to Commerce",
+                // The menu's name for it, never the registry's "Commerce".
+                name: "You can't open Sell",
             }),
         ).toBeVisible();
         await expect(

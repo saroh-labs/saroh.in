@@ -22,7 +22,15 @@ import { describe, expect, it } from "vitest";
  *
  * `PageHeader` is stricter, because a detail page's title is so often the
  * record's own name: a title or description that is not a literal string
- * must say `holdsData` (`true` masks both).
+ * must say `holdsData` (`true` masks both). `SettingsPanelHeader` draws a
+ * `PageHeader` and hands `holdsData` on, so it is held to the same.
+ *
+ * `Field` draws its label in a `Label` and its hint in a `FieldHint`, both
+ * readable, so a computed `label` or `hint` that looks like a record's must
+ * say `holdsData` (masks the whole field) or `holdsData={false}` (fixed
+ * words). Never `data-ph-unmask` on a `Field`: it would read the control
+ * inside it too. Its `error` is the form's own sentence and is not read
+ * here, as `FormMessage`'s is not.
  *
  * A net, not a proof: it reads names, it does not follow values. Digits and
  * emails are hidden in a recording even inside readable words, whatever
@@ -38,6 +46,10 @@ const READABLE = new Set([
     "FormDescription",
     "TabsTrigger",
     "TableHead",
+    "FieldHint",
+    // The customer page's own empty line: an `EmptyState` around its
+    // children (`components/customers/detail/parts.tsx`).
+    "Empty",
 ]);
 
 /** The state cards: their `title`, `description` and `note` are read. */
@@ -46,8 +58,26 @@ const STATES = new Set([
     "FailedState",
     "CapabilityOffState",
     "PermissionDeniedState",
+    "ModuleOffState",
+    "PlanLockedState",
+    "LimitReachedState",
+    "PausedState",
+    "SignedOutState",
+    "ProviderDisconnectedState",
+    // The same cards behind a screen's own name for them.
+    "PlanLockedCard",
+    "LimitReachedCard",
+    "TabState",
+    "Empty",
 ]);
 const STATE_PROPS = ["title", "description", "note"];
+
+/** `Field`: its label and its hint are read. */
+const FIELDS = new Set(["Field"]);
+const FIELD_PROPS = ["label", "hint"];
+
+/** Draws a `PageHeader` from its own `title` and `description`. */
+const HEADERS = new Set(["PageHeader", "SettingsPanelHeader"]);
 
 /** Names that say a value is a record's, or something a person typed. */
 const DATA =
@@ -159,7 +189,7 @@ function findings(): { unmarked: Finding[]; headers: Finding[] } {
         const text = readFileSync(file, "utf8");
         // Cheap skip: most files use none of them.
         if (
-            !/<(?:Button|Label|Form|Tabs|TableHead|PageHeader|\w+State)\b/.test(
+            !/<(?:Button|Label|Form|Tabs|TableHead|Field|Empty|\w+Header|\w+State|\w+Card)\b/.test(
                 text,
             )
         )
@@ -206,7 +236,21 @@ function findings(): { unmarked: Finding[]; headers: Finding[] } {
                             });
                     }
                 }
-                if (tag === "PageHeader" && !attribute(opening, "holdsData")) {
+                if (
+                    FIELDS.has(tag) &&
+                    !decided(opening) &&
+                    !attribute(opening, "holdsData")
+                ) {
+                    for (const prop of FIELD_PROPS) {
+                        const e = computedProp(opening, prop);
+                        if (e && DATA.test(e.getText(sf)))
+                            unmarked.push({
+                                where: at(node),
+                                what: `<${tag} ${prop}={${words(e)}}>`,
+                            });
+                    }
+                }
+                if (HEADERS.has(tag) && !attribute(opening, "holdsData")) {
                     for (const prop of ["title", "description"]) {
                         const e = computedProp(opening, prop);
                         if (e)

@@ -1,13 +1,16 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import {
     isSettled,
     joinAnd,
@@ -25,7 +28,7 @@ import type {
     EditorRecord,
 } from "@/lib/editor-shell/types";
 
-import { LeaveDialog, useEditorLeaveGuard } from "./leave-guard";
+import { runAction } from "@/lib/api/run-action";
 import { PhoneActionBar, PublishBanner } from "./publish-banner";
 import { useAutosave } from "./use-autosave";
 
@@ -52,8 +55,8 @@ export interface EditorShellProps<V extends Record<string, unknown>> {
     canEdit: boolean;
     /** The read-only note's first sentence, when `canEdit` is false. */
     readOnlyText?: string;
-    /** The crumbs bar over the header (`PaymentsCrumbs` for a plan). */
-    crumbs?: ReactNode;
+    /** Where the record sits: "Payments › Plans › Monthly", links and all. */
+    breadcrumb?: ReactNode[];
     /** The header's title: the name typed so far, or "New plan". */
     titleOf: (values: V, record: EditorRecord<V> | null) => string;
     /**
@@ -111,7 +114,7 @@ export function EditorShell<V extends Record<string, unknown>>(
         emptyValues,
         canEdit,
         readOnlyText,
-        crumbs,
+        breadcrumb,
         titleOf,
         problemsOf,
         blockerOf,
@@ -180,15 +183,19 @@ export function EditorShell<V extends Record<string, unknown>>(
     if (refused) errors[refused.field] = refused.message;
 
     const settled = isSettled(save);
-    const guard = useEditorLeaveGuard({
-        unsettled: canEdit && !settled,
+    // It saves by itself, so Cmd/Ctrl+S saves what is waiting now.
+    useSaveShortcut(() => void editor.flush(), canEdit);
+    // It saves by itself, so a way out saves what is waiting first and
+    // asks only when that save fails (or the record is in a conflict).
+    const guard = useLeaveGuard({
+        dirty: canEdit && !settled,
+        lost: leaveCopy({
+            save,
+            fields: unsavedFields(editor.lastSaved(), values, fieldLabels),
+            created: record !== null,
+            noun: copy.noun,
+        }),
         flush: editor.flush,
-    });
-    const leave = leaveCopy({
-        save,
-        fields: unsavedFields(editor.lastSaved(), values, fieldLabels),
-        created: record !== null,
-        noun: copy.noun,
     });
 
     const set = (patch: Partial<V>) => {
@@ -221,15 +228,15 @@ export function EditorShell<V extends Record<string, unknown>>(
         }
     }
 
-    async function discard() {
-        setConfirm(null);
+    /** From its confirm, which waits and says a refusal itself. */
+    async function discard(): Promise<ConfirmResult> {
         setBusy(true);
         try {
             const res = await editor.discard();
             if (!res) return;
             if (!res.ok) {
-                if (!res.conflict) showError(res.error);
-                return;
+                // A conflict is the page's own state, with Reload.
+                return res.conflict ? true : { ok: false, error: res.error };
             }
             setRefused(null);
             showSuccess("Changes discarded.");
@@ -239,10 +246,10 @@ export function EditorShell<V extends Record<string, unknown>>(
         }
     }
 
-    async function remove() {
-        setConfirm(null);
+    async function remove(): Promise<ConfirmResult> {
         setBusy(true);
-        const res = await editor.remove();
+        // Stays busy while it leaves; anything else gives the control back.
+        const res = await runAction(() => editor.remove());
         if (res?.ok) {
             showSuccess("Draft deleted.");
             router.push(afterDeleteHref);
@@ -250,7 +257,7 @@ export function EditorShell<V extends Record<string, unknown>>(
             return;
         }
         setBusy(false);
-        if (res && !res.conflict) showError(res.error);
+        if (res && !res.conflict) return { ok: false, error: res.error };
     }
 
     async function reload() {
@@ -284,8 +291,8 @@ export function EditorShell<V extends Record<string, unknown>>(
 
     return (
         <main className="w-full pb-8">
-            {crumbs}
             <PublishBanner
+                breadcrumb={breadcrumb}
                 title={title}
                 pill={pill}
                 line={line}
@@ -312,7 +319,7 @@ export function EditorShell<V extends Record<string, unknown>>(
                 disabled={!canEdit || busy}
                 // Leaving a field saves what it holds now, not in 800 ms.
                 onBlur={() => void editor.flush()}
-                className="m-0 flex min-w-0 flex-wrap items-start gap-4 border-0 px-6 pb-7 pt-4 max-[759px]:px-4"
+                className="m-0 flex min-w-0 flex-wrap items-start gap-4 border-0 px-4 pb-7 pt-4 sm:px-[26px]"
             >
                 <legend className="sr-only">{title}</legend>
                 <div className="grid min-w-0 flex-[1_1_420px] gap-3.5">
@@ -342,9 +349,9 @@ export function EditorShell<V extends Record<string, unknown>>(
                         : "Your unpublished changes go."
                 } What's live stays as it is. This cannot be undone.`}
                 confirmLabel="Discard changes"
-                cancelLabel="Keep changes"
+                keepLabel="Keep changes"
                 icon={RotateCcw}
-                onConfirm={() => void discard()}
+                onConfirm={discard}
             />
             <ConfirmDialog
                 open={confirm === "delete"}
@@ -352,16 +359,10 @@ export function EditorShell<V extends Record<string, unknown>>(
                 title={`Delete ${title}?`}
                 description={`The draft goes, with everything typed into it. It was never published, so nobody loses anything. This cannot be undone.`}
                 confirmLabel="Delete draft"
-                cancelLabel="Keep draft"
-                onConfirm={() => void remove()}
+                keepLabel="Keep draft"
+                onConfirm={remove}
             />
-            <LeaveDialog
-                open={guard.leaveTo !== null}
-                title={leave.title}
-                body={leave.body}
-                onStay={guard.stay}
-                onLeave={guard.leave}
-            />
+            {guard.dialog}
         </main>
     );
 }

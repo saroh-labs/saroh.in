@@ -57,11 +57,11 @@ function api(page: Page, org: string) {
     };
 }
 
-/** Settings › Business's checklist card, whichever heading it has. */
+/** Settings › Business's checklist card: one name, whatever it is about. */
 const settingsCard = (page: Page) =>
     page
         .getByRole("region", {
-            name: /Get ready to take money|Get your site live|Finish setting up/,
+            name: "Finish setup",
         })
         .filter({ visible: true });
 
@@ -102,14 +102,14 @@ test("the address, type and logo wait for a first invoice", async ({
     const card = settingsCard(page);
     await expect(card).toBeVisible();
     // Home's title and steps (UX-019).
-    await expect(card).toHaveAccessibleName("Get ready to take money");
+    await expect(card).toHaveAccessibleName("Finish setup");
+    await expect(card).toContainText("What is left before you take money.");
     // Her kind's words: "your address", not "your registered address".
     await expect(card).toContainText("Add your address");
     await expect(card).not.toContainText("registered address");
-    // The type and the logo are suggested apart, never counted (UX-019).
-    const extras = page
-        .getByRole("region", { name: "Make it yours" })
-        .filter({ visible: true });
+    // The type and the logo are suggested apart, never counted (UX-019):
+    // ruled off inside the same card, not a second card.
+    const extras = card.getByRole("group", { name: "Make it yours" });
     await expect(extras).toContainText("Choose your business type");
     await expect(extras).toContainText("Add your logo");
     const add = card.getByRole("link", { name: "Add address" });

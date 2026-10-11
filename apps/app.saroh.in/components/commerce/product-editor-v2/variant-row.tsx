@@ -1,16 +1,23 @@
 "use client";
 
+import { IconButton } from "@saroh/ui/icon-button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Trash2 } from "lucide-react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { isMoney } from "@/lib/products/editor-sections";
 import { soldAtSummary } from "@/lib/products/listing-changes";
 import type { ProductImage } from "@/lib/products/service";
 import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
+import { OptionSelect } from "@saroh/ui/option-select";
 
-import { boxClass, FieldHelp, MoneyBox } from "./fields";
+import { Chip } from "@/components/shared/chip";
+import { ChoiceGroup } from "@/components/shared/choice-group";
+import { MoneyInput } from "@saroh/ui/money-input";
+import { TextLink } from "@saroh/ui/text-link";
+import { Tip } from "@saroh/ui/tooltip";
+import { FieldHelp } from "./fields";
 
 export const VARIANT_GRID =
     "grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_30px] gap-1.5";
@@ -29,7 +36,7 @@ export function VariantRowView({
     takenIds,
     skuDupe,
     error,
-    symbol,
+    currency,
     productPrice,
     photos,
     stores,
@@ -48,7 +55,8 @@ export function VariantRowView({
     takenIds: string[];
     skuDupe: boolean;
     error: string;
-    symbol: string;
+    /** The business's currency, for the price box. */
+    currency: string;
     productPrice: string;
     photos: ProductImage[];
     /** The business's storefronts when there is more than one; else []. */
@@ -72,6 +80,7 @@ export function VariantRowView({
         <li>
             <div className={cn(VARIANT_GRID, "items-center")}>
                 <OptionSelect
+                    size="sm"
                     value={r.valueId}
                     onValueChange={(id) =>
                         onChange({ valueId: id, legacyTitle: "" })
@@ -85,68 +94,50 @@ export function VariantRowView({
                     disabled={locked}
                     aria-label={`Variant ${i + 1} ${opt}`}
                     className={cn(
-                        "h-8 rounded-[8px] text-[13px]",
                         !r.valueId && !legacy && "border-destructive",
                     )}
                 />
-                <input
+                <Input
+                    dense
+                    aria-invalid={!r.sku.trim() || skuDupe}
                     value={r.sku}
                     onChange={(e) => onChange({ sku: e.target.value })}
                     disabled={locked}
                     aria-label={`Variant ${i + 1} SKU`}
-                    className={boxClass({
-                        small: true,
-                        mono: true,
-                        bad: !r.sku.trim() || skuDupe,
-                    })}
+                    className="font-mono"
                 />
-                <MoneyBox symbol={symbol} small>
-                    <input
-                        value={r.price}
-                        onChange={(e) => onChange({ price: e.target.value })}
-                        inputMode="decimal"
-                        disabled={locked}
-                        placeholder={productPrice}
-                        aria-label={`Variant ${i + 1} price, blank uses the product's`}
-                        className={cn(
-                            boxClass({
-                                small: true,
-                                bad: r.price.trim() !== "" && !isMoney(r.price),
-                            }),
-                            "pl-[22px]",
-                        )}
-                    />
-                </MoneyBox>
-                <button
-                    type="button"
+                <MoneyInput
+                    dense
+                    currency={currency}
+                    aria-invalid={r.price.trim() !== "" && !isMoney(r.price)}
+                    value={r.price}
+                    onValueChange={(price) => onChange({ price })}
                     disabled={locked}
-                    onClick={onRemove}
-                    aria-label={`Remove ${title || "this variant"}`}
-                    title={`Remove ${title || "this variant"}`}
-                    className="flex h-8 w-[30px] items-center justify-center rounded-[7px] text-muted-foreground hover:bg-destructive-subtle disabled:cursor-not-allowed coarse:size-11"
-                >
-                    <Trash2
-                        aria-hidden
-                        className="size-[15px]"
-                        strokeWidth={1.9}
+                    placeholder={productPrice}
+                    aria-label={`Variant ${i + 1} price, blank uses the product's`}
+                />
+                <Tip label={`Remove ${title || "this variant"}`}>
+                    <IconButton
+                        label={`Remove ${title || "this variant"}`}
+                        icon={<Trash2 aria-hidden className="size-[15px]" />}
+                        disabled={locked}
+                        onClick={onRemove}
+                        className="text-muted-foreground"
                     />
-                </button>
+                </Tip>
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
+                <TextLink
                     aria-expanded={open}
                     onClick={() => onOpen(!open)}
-                    className="text-[12px] font-semibold text-brand hover:text-foreground coarse:min-h-11"
+                    className="text-[12px] coarse:min-h-11"
                 >
                     {open ? "Less" : "More"}
-                </button>
+                </TextLink>
                 <span
                     className={cn(
                         "min-w-0 text-pretty text-[11.5px]",
-                        nowhere
-                            ? "text-brand-subtle-foreground"
-                            : "text-muted-foreground",
+                        nowhere ? "text-foreground" : "text-muted-foreground",
                     )}
                 >
                     {summary}
@@ -213,28 +204,16 @@ function PhotoChoice({
             <p className="mb-[7px] text-[12px] font-semibold">
                 Photo shown when someone picks it
             </p>
-            <div
-                role="radiogroup"
-                aria-label={`Photo for ${title || "this variant"}`}
+            <ChoiceGroup
+                label={`Photo for ${title || "this variant"}`}
                 className="flex flex-wrap gap-1.5"
-            >
-                {choices.map((p) => {
-                    const on = imageId === p.id;
-                    return (
-                        <button
-                            key={p.id || "cover"}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            disabled={locked}
-                            onClick={() => onPick(p.id)}
-                            className={cn(
-                                "inline-flex h-[30px] items-center gap-1.5 rounded-[8px] bg-card pl-1 pr-2.5 disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-[1.5px] border-foreground"
-                                    : "border border-border",
-                            )}
-                        >
+                value={imageId}
+                onChange={onPick}
+                disabled={locked}
+                choices={choices.map((p) => ({
+                    value: p.id,
+                    label: (
+                        <>
                             {p.url ? (
                                 // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos
                                 <img
@@ -248,12 +227,20 @@ function PhotoChoice({
                             <span className="max-w-[110px] truncate text-[11.5px]">
                                 {p.label}
                             </span>
-                        </button>
-                    );
-                })}
-            </div>
+                        </>
+                    ),
+                }))}
+                itemClassName={(on) =>
+                    cn(
+                        "inline-flex h-[30px] items-center gap-1.5 rounded-[8px] bg-card pl-1 pr-2.5 coarse:h-11",
+                        on
+                            ? "border-[1.5px] border-foreground"
+                            : "border border-border",
+                    )
+                }
+            />
             <FieldHelp className="mt-1.5">
-                Chosen from this product&apos;s photos — nothing new to upload.
+                Chosen from this product&apos;s photos. Nothing new to upload.
             </FieldHelp>
         </>
     );
@@ -292,10 +279,10 @@ function SellItAt({
                 {stores.map((s) => {
                     const on = chosen.includes(s.id);
                     return (
-                        <button
+                        <Chip
                             key={s.id}
-                            type="button"
-                            aria-pressed={on}
+                            as="toggle"
+                            on={on}
                             disabled={locked}
                             onClick={() =>
                                 onChange(
@@ -304,24 +291,18 @@ function SellItAt({
                                         : [...chosen, s.id],
                                 )
                             }
-                            className={cn(
-                                "h-[30px] rounded-full border px-3 text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
                         >
                             {s.name}
-                        </button>
+                        </Chip>
                     );
                 })}
             </div>
             {chosen.length === 0 ? (
                 <p
                     role="status"
-                    className="mt-[7px] text-[11.5px] text-brand-subtle-foreground"
+                    className="mt-[7px] text-[11.5px] text-foreground"
                 >
-                    Not sold anywhere — customers will not see this {opt}.
+                    Not sold anywhere. Customers will not see this {opt}.
                 </p>
             ) : null}
         </>

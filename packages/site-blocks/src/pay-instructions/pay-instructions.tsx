@@ -96,7 +96,7 @@ export function PayInstructionsCard({
                         <p className="text-site-muted mt-0.5 text-sm">
                             Scan the code with any UPI app
                             {amount && currency === "INR" && Number(amount) > 0
-                                ? "; the amount fills in."
+                                ? ", and the amount fills in."
                                 : ", or pay this UPI ID."}
                         </p>
                         <CopyRow label="UPI ID" value={upiId} />

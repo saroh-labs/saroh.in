@@ -5,6 +5,8 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { BusinessSetupForm } from "@/components/organizations/business-setup-form";
+import { SetupPanel } from "@/components/organizations/setup-panel";
+import { SetupStepProvider } from "@/components/organizations/setup-step-context";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import {
     ACTIVE_ORG_NAME_COOKIE,
@@ -15,6 +17,7 @@ import {
     getOrganization,
     listOrganizations,
 } from "@/lib/organizations/service";
+import { stepFromQuery } from "@/lib/organizations/setup-steps";
 import { readInviteIntent } from "@/lib/saroh-billing/invite-intent";
 import { inviteNote, inviteToTake } from "@/lib/saroh-billing/launch-offer";
 import {
@@ -23,23 +26,27 @@ import {
 } from "@/lib/saroh-billing/plan-checkout";
 import { readPlanIntent } from "@/lib/saroh-billing/plan-intent";
 import { requireSession } from "@/lib/session";
+import { Notice } from "@saroh/ui/notice";
 
 export const metadata: Metadata = { title: "Set up Saroh" };
 
 /**
- * Setup: the one step between a verified account and the workspace, in the
- * same split the account pages wear (see Saroh Auth Flow, the live design).
+ * Setup: the steps between a new account and the product, in the same split
+ * the account pages wear (see Saroh Auth Flow, the live design).
  *
- * It doubles as "Set up another" from the switcher, so Back appears only
- * when there is a workspace to go back to. A first one has nowhere behind it
- * — the account was just verified — and the way out is signing out, which
- * the form offers under its button.
+ * A stepper (DEC-130, amended 11 Oct 2026): one question to a screen, with
+ * Back and Continue. What is being set up (DEC-070), its name and web
+ * address, and what to do first, whose button creates the business and
+ * opens that first thing itself. Which step is on show is in the address
+ * (`?step=`), read here for the first paint and kept by the browser after
+ * that (`setup-step-context.tsx`). The form draws the step's own heading,
+ * and the panel beside it marks the same step in the plan the sign-up page
+ * started.
  *
- * What the business does is not asked here any more: that is chosen from
- * Home, where each capability can be seen for what it is. What is being set
- * up — a business, just me, or a site for my work (DEC-070) — is asked, as
- * the form's first question, and the form speaks in its words. The page
- * around it stays neutral: it is drawn before the answer is given.
+ * It doubles as "Set up another" from the switcher, so the first step has a
+ * Back only when there is a workspace to go back to. A first one has
+ * nowhere behind it (the account was just made) and the way out is signing
+ * out, which the form offers under its buttons on every step.
  *
  * A plan picked on saroh.in arrives from sign-up as `?plan=&cycle=` (plan
  * U27). It is checked against the live catalogue and said in one line under
@@ -97,58 +104,59 @@ export default async function OnboardingPage({
             : null;
 
     return (
-        <SplitShell
-            panel={
-                <SplitPanel
-                    eyebrow={hasOrgs ? "Set up another" : "Last step"}
-                    heading="Then you are in."
-                    body="Name it and Saroh opens. You decide what it does from inside, where you can see what each thing actually is."
-                    points={[
-                        // True: name, type and country change in Business
-                        // settings, and the web address in its Web address
-                        // card, where a change breaks saved links (UX-085).
-                        "You can change any of it later in Settings",
-                        "You are the Owner of what you create",
-                        "Everything else is one tap away on Home",
-                    ]}
-                />
-            }
-        >
-            <h1 className="font-display text-[25px] font-semibold leading-[1.15] tracking-[-0.03em]">
-                {hasOrgs ? "Set up another" : "Set up Saroh"}
-            </h1>
-            <p className="mb-[22px] mt-[7px] text-pretty text-[13px] leading-[1.55] text-muted-foreground">
-                {hasOrgs
-                    ? "It sits beside the ones you have, and you switch between them from the top of the workspace."
-                    : "Last step. You can change all of this later, and you pick what Saroh does for you once you are inside."}
-            </p>
-            {left ? (
-                <p
-                    role="status"
-                    className="-mt-2.5 mb-[22px] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[13px] leading-[1.55] text-foreground"
-                >
-                    {left}
-                </p>
-            ) : null}
-            {note ? (
-                <p
-                    data-testid="plan-intent"
-                    className="-mt-2.5 mb-[22px] text-pretty text-[13px] leading-[1.55] text-foreground"
-                >
-                    {note}
-                </p>
-            ) : null}
-            <BusinessSetupForm
-                email={session?.user.email ?? ""}
-                backTo={hasOrgs ? "/" : undefined}
-                checkout={checkoutIntent(intent)}
-                invite={inviteToTake(invite)}
-                defaultName={
-                    invite.kind === "ready"
-                        ? (invite.businessName ?? undefined)
-                        : undefined
+        <SetupStepProvider initial={stepFromQuery(query.step)}>
+            <SplitShell
+                panel={
+                    hasOrgs ? (
+                        <SplitPanel
+                            eyebrow="Set up another"
+                            heading="One more, beside the ones you have."
+                            body="Say what it is, name it and pick what to do first. The last step opens that thing, ready to fill in."
+                            points={[
+                                // True: name and country change in Business
+                                // settings, and the web address in its Web
+                                // address card, where a change breaks saved
+                                // links (UX-085).
+                                "You can change any of it later in Settings",
+                                "You are the Owner of what you create",
+                                "Everything else is one tap away on Home",
+                            ]}
+                        />
+                    ) : (
+                        // The plan the sign-up page started, with the
+                        // account ticked and the step on show marked.
+                        <SetupPanel />
+                    )
                 }
-            />
-        </SplitShell>
+            >
+                <BusinessSetupForm
+                    email={session?.user.email ?? ""}
+                    // An account made with an emailed code has no name yet.
+                    needsName={!!session && !session.user.name?.trim()}
+                    another={hasOrgs}
+                    backTo={hasOrgs ? "/" : undefined}
+                    checkout={checkoutIntent(intent)}
+                    invite={inviteToTake(invite)}
+                    defaultName={
+                        invite.kind === "ready"
+                            ? (invite.businessName ?? undefined)
+                            : undefined
+                    }
+                    arrival={
+                        left ? <Notice role="status">{left}</Notice> : null
+                    }
+                    note={
+                        note ? (
+                            <p
+                                data-testid="plan-intent"
+                                className="text-pretty text-[13px] leading-[1.55] text-foreground"
+                            >
+                                {note}
+                            </p>
+                        ) : null
+                    }
+                />
+            </SplitShell>
+        </SetupStepProvider>
     );
 }

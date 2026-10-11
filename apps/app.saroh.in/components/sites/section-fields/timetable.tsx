@@ -2,6 +2,7 @@
 
 import { TIMETABLE_MAX_SERVICES } from "@saroh/block-contract";
 import { Checkbox } from "@saroh/ui/checkbox";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
@@ -9,7 +10,6 @@ import { Textarea } from "@saroh/ui/textarea";
 
 import type { TimetableContent } from "@/lib/sites/service";
 
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { ServicesLoadNotice } from "./services-load-notice";
@@ -57,14 +57,14 @@ export function TimetableFields({
                     placeholder="This week"
                 />
             </Field>
-            <Field label="A line under it">
+            <Field optional label="A line under it">
                 <Textarea
                     value={c.intro ?? ""}
                     onChange={(e) =>
                         patch({ intro: e.target.value || undefined })
                     }
                     rows={2}
-                    placeholder="Optional. Book a class from the timetable."
+                    placeholder="Book a class from the timetable."
                 />
             </Field>
 
@@ -102,8 +102,8 @@ export function TimetableFields({
                                     </div>
                                 ))}
                             <p className="text-xs text-muted-foreground">
-                                Only classes — services with more than one place
-                                — show on the timetable. A one-to-one service
+                                Only classes (services with more than one place)
+                                show on the timetable. A one-to-one service
                                 ticked here is left out.
                             </p>
                         </>

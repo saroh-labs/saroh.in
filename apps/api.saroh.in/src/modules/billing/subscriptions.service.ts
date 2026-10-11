@@ -37,7 +37,7 @@ export type SubscriptionWithPlan = Subscription & { plan: Plan };
  * CREDENTIAL BOUNDARY: this service touches ONLY the billing models
  * (`Subscription`, `Plan`) + Saroh's platform provider — NEVER a per-org
  * merchant payment record (`MerchantPaymentProvider` / `PaymentIntent` / …).
- * Reads require `billing:read`, writes `billing:manage`.
+ * Reads require `billing:read`, writes `billing:manage` (the Owner's alone).
  */
 @Injectable()
 export class SubscriptionsService {

@@ -1,9 +1,8 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
+import { SettingsColumns } from "@/components/shared/settings-columns";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SettingsSheet } from "@/lib/sites/settings-edit";
 import {
@@ -16,8 +15,15 @@ import type {
     ShareStep,
     ShareStepKey,
 } from "@/lib/sites/settings-page";
-import { groupOfStep, SETTINGS_TAB_PARAM } from "@/lib/sites/settings-page";
+import {
+    groupOfStep,
+    readinessCount,
+    SETTINGS_TAB_PARAM,
+} from "@/lib/sites/settings-page";
+import { OptionSelect } from "@saroh/ui/option-select";
 
+import { SectionList } from "@/components/shared/section-list";
+import { Label } from "@saroh/ui/label";
 import { ShareChecklist } from "./share-checklist";
 
 /**
@@ -135,105 +141,82 @@ export function SettingsSections({
         else setFocusOn(step.anchor);
     }
 
-    const index = ids.indexOf(open);
-    const onKeyDown = (e: React.KeyboardEvent) => {
-        const n = ids.length;
-        const next =
-            e.key === "ArrowDown"
-                ? (index + 1) % n
-                : e.key === "ArrowUp"
-                  ? (index - 1 + n) % n
-                  : e.key === "Home"
-                    ? 0
-                    : e.key === "End"
-                      ? n - 1
-                      : null;
-        if (next === null) return;
-        e.preventDefault();
-        setOpen(ids[next]);
-        document.getElementById(`settings-tab-${ids[next]}`)?.focus();
-    };
+    // The rows' measure and where the checklist sits are the one layout
+    // Sell › Location and Settings › Business use. Once everything is
+    // set the checklist is a line, which stays above the rows.
+    const count = readinessCount(steps);
+    const allSet = count.done === count.of;
+    const checklist = (
+        <ShareChecklist
+            steps={steps}
+            live={live}
+            canEdit={canEdit}
+            onJump={jump}
+        />
+    );
 
     return (
-        <div className="lg:grid lg:grid-cols-[200px_minmax(0,720px)] lg:items-start lg:gap-10 min-[1440px]:grid-cols-[220px_minmax(0,1040px)]">
-            <div
-                role="tablist"
-                aria-label="Settings sections"
-                aria-orientation="vertical"
-                onKeyDown={onKeyDown}
-                className="sticky top-20 hidden flex-col gap-0.5 lg:flex"
+        <div className="lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-10 min-[1440px]:grid-cols-[220px_minmax(0,1fr)]">
+            <SectionList
+                label="Settings sections"
+                idPrefix="settings-tab"
+                phone="hidden"
+                value={open}
+                onValueChange={setOpen}
+                className="sticky top-20"
+                items={groups.map((g) => ({
+                    value: g.id,
+                    label: g.label,
+                    controls: `settings-panel-${g.id}`,
+                }))}
+            />
+
+            <SettingsColumns
+                beside
+                className="gap-6"
+                aside={allSet ? undefined : checklist}
+                before={allSet ? checklist : undefined}
             >
-                {groups.map((g) => {
-                    const on = g.id === open;
-                    return (
-                        <button
-                            key={g.id}
-                            id={`settings-tab-${g.id}`}
-                            type="button"
-                            role="tab"
-                            aria-selected={on}
-                            aria-controls={`settings-panel-${g.id}`}
-                            tabIndex={on ? 0 : -1}
-                            onClick={() => setOpen(g.id)}
-                            className={cn(
-                                "rounded-md px-3 py-2 text-left text-sm transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                on
-                                    ? "bg-muted font-semibold text-foreground"
-                                    : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground active:bg-accent-active",
-                            )}
+                <div className="flex min-w-0 flex-col gap-6">
+                    {/* Below 1024px: the same choice, as a select. */}
+                    <div className="flex items-center gap-3 lg:hidden">
+                        <Label
+                            htmlFor={selectId}
+                            className="shrink-0 text-sm font-medium leading-normal text-muted-foreground"
                         >
-                            {g.label}
-                        </button>
-                    );
-                })}
-            </div>
+                            Section
+                        </Label>
+                        <OptionSelect
+                            id={selectId}
+                            value={open}
+                            onValueChange={setOpen}
+                            options={groups.map((g) => ({
+                                value: g.id,
+                                label: g.label,
+                            }))}
+                            className="w-full max-w-xs"
+                        />
+                    </div>
 
-            <div className="min-w-0 space-y-6">
-                <ShareChecklist
-                    steps={steps}
-                    live={live}
-                    canEdit={canEdit}
-                    onJump={jump}
-                />
+                    <div>
+                        {groups.map((g) => (
+                            <div
+                                key={g.id}
+                                id={`settings-panel-${g.id}`}
+                                role="tabpanel"
+                                aria-labelledby={`settings-tab-${g.id}`}
+                                hidden={g.id !== open}
+                                tabIndex={0}
+                                className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
+                            >
+                                {panels[g.id]}
+                            </div>
+                        ))}
+                    </div>
 
-                {/* Below 1024px: the same choice, as a select. */}
-                <div className="flex items-center gap-3 lg:hidden">
-                    <label
-                        htmlFor={selectId}
-                        className="shrink-0 text-sm font-medium text-muted-foreground"
-                    >
-                        Section
-                    </label>
-                    <OptionSelect
-                        id={selectId}
-                        value={open}
-                        onValueChange={setOpen}
-                        options={groups.map((g) => ({
-                            value: g.id,
-                            label: g.label,
-                        }))}
-                        className="w-full max-w-xs"
-                    />
+                    {footer}
                 </div>
-
-                <div>
-                    {groups.map((g) => (
-                        <div
-                            key={g.id}
-                            id={`settings-panel-${g.id}`}
-                            role="tabpanel"
-                            aria-labelledby={`settings-tab-${g.id}`}
-                            hidden={g.id !== open}
-                            tabIndex={0}
-                            className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
-                        >
-                            {panels[g.id]}
-                        </div>
-                    ))}
-                </div>
-
-                {footer}
-            </div>
+            </SettingsColumns>
         </div>
     );
 }

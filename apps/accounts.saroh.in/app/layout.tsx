@@ -38,8 +38,8 @@ const fontMono = localFont({
 });
 
 export const metadata: Metadata = {
-    title: "Saroh Auth",
-    description: "login to your saroh account.",
+    title: "Sign in · Saroh",
+    description: "Sell, take bookings, bill and run your website in one place.",
 };
 
 export default function RootLayout({

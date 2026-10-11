@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { cardAttention } from "./attention";
 import type { OrderRow } from "./business-service";
 import type { OrderRead } from "./read";
@@ -125,7 +126,7 @@ export function ticketsSummary(counts: {
         );
     }
     return {
-        title: printed === 1 ? "1 ticket" : `${printed} tickets`,
+        title: count(printed, "ticket"),
         notes,
     };
 }

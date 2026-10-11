@@ -6,7 +6,6 @@ import {
     detailsCopy,
     markupCount,
     maySection,
-    noAccessLine,
     readCount,
     readOnlyBanner,
     roleName,
@@ -30,21 +29,13 @@ describe("roleName", () => {
 describe("readOnlyBanner", () => {
     it("tells a reader who can change their role", () => {
         expect(readOnlyBanner("Member", false)).toBe(
-            "You're viewing as Member. You can read this product but not change it — an owner or admin can change your role in Team.",
+            "You're viewing as Member. You can read this product but not change it. An owner or admin can change this in Settings › Team.",
         );
     });
 
     it("tells a stock-only role the one section it can change", () => {
         expect(readOnlyBanner("Packer", true)).toMatch(
             /^You're viewing as Packer\. .* Only the Stock section below can be changed\.$/,
-        );
-    });
-});
-
-describe("noAccessLine", () => {
-    it("says who they are, where, and who can change it", () => {
-        expect(noAccessLine("Reviewer", "Northwind Supply")).toBe(
-            "You're signed in as Reviewer in Northwind Supply. That role doesn't include seeing products. An owner or admin can give you access in Team.",
         );
     });
 });

@@ -59,6 +59,7 @@ import * as shop from "../app/[domain]/shop/actions";
 const READS = new Set([
     "quoteBag",
     "checkoutStanding",
+    "savedDeliveryAddress",
     "creditFor",
     "waitlistFor",
     "loadSignInOptions",

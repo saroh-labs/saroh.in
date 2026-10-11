@@ -37,7 +37,7 @@ export interface TrackStep {
 export type TrackState = "open" | "done" | "refunded" | "cancelled";
 
 /** How long a refund takes to reach the customer (plan A, A7). */
-export const REFUND_LINE = "Money back in 5–7 days";
+export const REFUND_LINE = "Money back in 5 to 7 days";
 
 export interface TrackInput {
     number: string;
@@ -99,8 +99,8 @@ function stepLine(
         case "READY":
             if (type !== "PICKUP") return "Packed, waiting to leave";
             return order.collectFrom
-                ? `Collect from ${order.collectFrom} — show #${order.number}`
-                : `At the counter — show #${order.number}`;
+                ? `Pick-up from ${order.collectFrom}. Show #${order.number}`
+                : `At the counter. Show #${order.number}`;
         case "COLLECTED":
             return "Picked up";
         case "OUT_FOR_DELIVERY":

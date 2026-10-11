@@ -119,7 +119,7 @@ test.describe("orders list", () => {
         const open = await list(page, LISTS, "&tab=open");
 
         await page.goto("/commerce/orders");
-        await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
+        await expect(tab(page, "All")).toHaveAttribute("aria-current", "page");
         for (const [name, n] of [
             ["All", all.counts.all],
             ["Open", all.counts.open],
@@ -130,7 +130,7 @@ test.describe("orders list", () => {
 
         await tab(page, "Open").click();
         await expect(page).toHaveURL(/tab=open/);
-        await expect(tab(page, "Open")).toHaveAttribute("aria-current", "true");
+        await expect(tab(page, "Open")).toHaveAttribute("aria-current", "page");
         const shown = orders(page).getByRole("listitem");
         if (open.rows.length === 0) {
             await expect(
@@ -175,8 +175,8 @@ test.describe("orders list", () => {
         await expect(
             page.getByRole("heading", { name: "No refunds", exact: true }),
         ).toBeVisible();
-        await page.getByRole("button", { name: "View all orders" }).click();
-        await expect(tab(page, "All")).toHaveAttribute("aria-current", "true");
+        await page.getByRole("button", { name: "Show all orders" }).click();
+        await expect(tab(page, "All")).toHaveAttribute("aria-current", "page");
     });
 
     test("a late Pick-up order reads Late, in words", async ({ page }) => {
@@ -215,14 +215,14 @@ test.describe("orders list", () => {
 
         await page.goto("/commerce/orders");
         await expect(
-            page.getByText(`Showing 1–50 of ${first.counts.all}`),
+            page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
         await page.getByRole("link", { name: "Next" }).click();
         await expect(page).toHaveURL(/cursor=/);
-        await expect(page.getByText(/Showing 51–/)).toBeVisible();
+        await expect(page.getByText(/Showing 51 to /)).toBeVisible();
         await page.getByRole("link", { name: "Previous" }).click();
         await expect(
-            page.getByText(`Showing 1–50 of ${first.counts.all}`),
+            page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
         await expect(page).not.toHaveURL(/cursor=/);
     });
@@ -435,7 +435,7 @@ test.describe("a treatment's next visit on the row (B14)", () => {
                 .filter({ hasText: `#${t.orderId}` });
             await expect(row).toContainText(
                 t.nextVisit
-                    ? /Next (today|yesterday|\d{1,2} \w{3})/
+                    ? /Next (today|tomorrow|yesterday|\d{1,2} \w{3})/
                     : "Next visit not booked",
             );
             await expect(row).not.toContainText(/\bLate\b/);
@@ -654,7 +654,7 @@ test.describe("orders quick view and row menu (B5)", () => {
             panel.getByRole("link", { name: /Open full page/ }),
         ).toBeVisible();
         // As the design draws it (DEC-073): Close is a plain X, and a
-        // customer with a record is a Saffron link to it.
+        // customer with a record is an underlined link to it.
         const close = panel.getByRole("button", { name: "Close quick view" });
         await expect(close).toBeVisible();
         await expect(close).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -664,7 +664,7 @@ test.describe("orders quick view and row menu (B5)", () => {
             .first();
         if (await customer.count()) {
             await expect(customer).toHaveAttribute("href", /\/customers\//);
-            await expect(customer).toHaveClass(/text-brand/);
+            await expect(customer).toHaveClass(/underline/);
         }
 
         await page.keyboard.press("Escape");

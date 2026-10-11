@@ -1,3 +1,4 @@
+import { formatClock } from "@/lib/format/datetime";
 /**
  * The Week hour grid's geometry (plan 005 E27, R17), after the "Saroh
  * Business Calendar" design: 06:00 to 22:00 at 44px an hour. Where a block
@@ -134,24 +135,18 @@ export function workBands(
     return bands;
 }
 
-/** "07:00" … "21:00", each at its line; 06:00 is the grid's top, unlabelled. */
+/** "7 am" … "9 pm", each at its line; 6 am is the grid's top, unlabelled. */
 export function hourLabels(): { text: string; top: number }[] {
     return Array.from(
         { length: GRID_END_HOUR - GRID_START_HOUR - 1 },
         (_, i) => {
             const h = GRID_START_HOUR + 1 + i;
             return {
-                text: `${String(h).padStart(2, "0")}:00`,
+                text: formatClock(h * 60, { short: true }),
                 top: (h - GRID_START_HOUR) * HOUR_PX - 6,
             };
         },
     );
-}
-
-/** "HH:MM" of a minute of the day; past midnight wraps ("24:30" → "00:30"). */
-export function hhmm(minutes: number): string {
-    const m = ((Math.round(minutes) % 1440) + 1440) % 1440;
-    return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
 /** "09:15" → 555. */

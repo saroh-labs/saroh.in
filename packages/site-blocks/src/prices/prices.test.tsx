@@ -210,7 +210,10 @@ async function signInAsAsha() {
     fireEvent.change(await screen.findByLabelText("Code"), {
         target: { value: "123456" },
     });
-    await press(screen.getByRole("button", { name: "Sign in" }));
+    // The sixth digit sends the code; let the check settle.
+    await act(async () => {
+        await Promise.resolve();
+    });
 }
 
 describe("Join on the Plans block", () => {
@@ -299,7 +302,7 @@ describe("Join on the Plans block", () => {
         await press(screen.getByRole("button", { name: "Send code" }));
 
         expect(await screen.findByRole("alert")).toHaveTextContent(
-            "We couldn't send your code — try again in a few minutes",
+            "We couldn't send your code. Try again in a few minutes",
         );
         expect(
             screen.getByRole("link", {

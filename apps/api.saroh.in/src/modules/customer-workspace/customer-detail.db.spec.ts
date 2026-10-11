@@ -238,7 +238,7 @@ describe("Customer detail (DB)", () => {
         await expect(
             allergens.remove(ctx.organizationId, nuts.id),
         ).rejects.toThrow(
-            "Nuts is on 1 customer's Needs attention — take it off first.",
+            "Nuts is on 1 customer's Needs attention. Take it off first.",
         );
         const [entry] = (await attention.list(ctx, contactId)).entries;
         expect(entry).toMatchObject({ kind: "ALLERGY", label: "Nuts" });

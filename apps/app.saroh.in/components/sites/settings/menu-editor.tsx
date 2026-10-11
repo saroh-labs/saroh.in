@@ -5,6 +5,8 @@ import { Input } from "@saroh/ui/input";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 
 import type { SiteNavigationItem, SitePage } from "@/lib/sites/service";
+import { EmptyState } from "@saroh/ui/data-state";
+import { IconButton } from "@saroh/ui/icon-button";
 
 /**
  * The menu, open for editing (#206): its entries in order, each renamable,
@@ -62,56 +64,45 @@ export function MenuEditor({
                                     value={item.label ?? ""}
                                     placeholder={page?.title ?? "Page"}
                                     aria-label={`Menu label for ${title}`}
-                                    className="h-9 min-w-0 flex-1"
+                                    className="min-w-0 flex-1"
                                     onChange={(e) => rename(i, e.target.value)}
                                 />
                                 <span className="hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:inline">
                                     {page?.path}
                                 </span>
-                                <Button
-                                    type="button"
+                                <IconButton
+                                    label={`Move ${title} up`}
+                                    icon={<ArrowUp />}
                                     variant="ghost"
-                                    size="icon"
                                     className="shrink-0"
-                                    aria-label={`Move ${title} up`}
                                     disabled={i === 0}
                                     onClick={() => move(i, -1)}
-                                >
-                                    <ArrowUp aria-hidden className="size-4" />
-                                </Button>
-                                <Button
-                                    type="button"
+                                />
+                                <IconButton
+                                    label={`Move ${title} down`}
+                                    icon={<ArrowDown />}
                                     variant="ghost"
-                                    size="icon"
                                     className="shrink-0"
-                                    aria-label={`Move ${title} down`}
                                     disabled={i === menu.length - 1}
                                     onClick={() => move(i, 1)}
-                                >
-                                    <ArrowDown aria-hidden className="size-4" />
-                                </Button>
-                                <Button
-                                    type="button"
+                                />
+                                <IconButton
+                                    label={`Remove ${title} from the menu`}
+                                    icon={<X />}
                                     variant="ghost"
-                                    size="icon"
                                     className="shrink-0"
-                                    aria-label={`Remove ${title} from the menu`}
                                     onClick={() =>
                                         setMenu((m) =>
                                             m.filter((_, j) => j !== i),
                                         )
                                     }
-                                >
-                                    <X aria-hidden className="size-4" />
-                                </Button>
+                                />
                             </li>
                         );
                     })}
                 </ol>
             ) : (
-                <p className="text-sm text-muted-foreground">
-                    No pages in the menu yet.
-                </p>
+                <EmptyState size="inline" title="No pages in the menu yet." />
             )}
             {offered.length ? (
                 <div className="flex flex-wrap gap-1.5">

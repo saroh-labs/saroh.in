@@ -50,6 +50,30 @@ never a number in a handler; and a thing a deletion removes is first asked
 "a secret, or a record with a period?". `docs/patterns/backend-jobs.md` →
 Retention.
 
+## Accounts — signing in opened a list of Saroh's own hosts, and four more dead ends
+
+**Symptom**: a UX audit (10 Oct 2026) signed in as a shop owner and landed
+on "Your apps": Application, "Admin: Platform control plane", "UI: The
+design system". Signing up with an address that already had an account
+said "Check your email" and no code ever came. A failed sign-in showed
+"Invalid email or password" or the browser's "Failed to fetch". An
+invitation opened while the API was restarting said "This invitation is no
+longer valid".
+**Cause**: four separate ones. `DEFAULT_DESTINATION = "/apps"` was every
+caller's fallback. Better Auth answers a duplicate sign-up with a fake
+success on purpose and sends nothing. The forms passed
+`ctx.error.message` to the screen. And `getInvitation` returned `null` for
+a network failure and for a 404 alike, so the page could only say one thing.
+**Fix**: the default is the app (`lib/return-to.ts`) and `/apps` is staff
+only. `onExistingUserSignUp` emails the address's owner, and the verify page
+offers Sign in. One `authErrorCopy` map. Reads and accepts keep their
+status, so "couldn't check" is its own state with a retry.
+**Check**: `apps/accounts.saroh.in` has a vitest suite now (it had no
+runner): `lib/return-to.test.ts`, `lib/auth-error-copy.test.ts`,
+`lib/invitations.test.ts` and `lib/copy.test.ts`, which reads the app's
+source for "Log in", banned words, em dashes and semicolons. The rules are
+in `backend-auth-and-access.md` and `frontend-error-feedback.md`.
+
 ## Seed — the dev environment's businesses claimed providers they couldn't use
 
 **Symptom**: on the dev environment (9 Oct 2026), Northwind's Settings ›
@@ -3911,6 +3935,119 @@ the files itself, which is about a second slower and always returns.
 that goes silent at 0% CPU is a hang, not a slow test: kill it and find why.
 **Category**: tooling · `apps/api.saroh.in/jest.config.js`
 
+## Enter in an invoice field issued the invoice
+
+**Symptom**: pressing Enter in any field of a new or draft invoice numbered
+it and locked its lines (UX audit, 10 Oct). Nothing on screen said Enter
+would do the irreversible thing.
+**Cause**: the form had two `type="submit"` buttons and chose between them
+with an `intent` state that started as `"issue"`. Enter is the form's own
+submit: it runs the first submit button in the form, which was "Issue it".
+**Fix**: the form's one submit is Save as draft; Issue is a `type="button"`
+that calls the submit itself. The course form had the opposite fault (its
+primary was a `type="button"`, so Enter ran "Save as draft") and is fixed
+the same way round.
+**Check**: `components/invoices/invoice-form.enter.test.tsx` and
+`components/courses/course-form.enter.test.tsx` pin which button is the
+form's submit and what submitting the form does.
+**Category**: forms · `docs/patterns/frontend-forms.md` (Enter runs the
+form's first submit button, so that button is the reversible one)
+
+## Typed work was lost to a stray tap, a link or a Cancel
+
+**Symptom**: fourteen create and edit flows guarded leaving in six different
+ways or not at all; every settings sheet dropped its draft on a press
+outside; a stock count's Cancel dropped every number typed (UX audit, 10
+Oct).
+**Cause**: each flow and each sheet wrote its own leave dialog,
+`beforeunload` and `SheetContent`, so the rule was whatever the last author
+remembered. Two frames were copies "until the two are lifted into one".
+**Fix**: one guard (`components/shared/use-leave-guard.tsx`), one sheet
+frame (`components/shared/settings-sheet-frame.tsx`) that reads whether its
+draft changed from its own fields (`use-draft-changed.ts`), and Undo on the
+count's Cancel (`components/commerce/stock/use-count-mode.ts`).
+**Check**: `components/shared/leave-guard-flows.test.ts` lists the flows and
+fails one that words its own question; `settings-sheet-frame.test.tsx`
+lists the sheets and fails one that draws its own `SheetContent`;
+`cancel-way-out.test.ts` fails a `ConfirmDialog` that pairs a Cancel verb
+with the default "Cancel".
+**Category**: forms · `docs/patterns/frontend-forms.md`
+
+## People met buttons they couldn't use, and refusals in a developer's words
+
+**Symptom**: a UX audit that walked every role (10 Oct 2026) found a Member
+with live Move, Cancel and outcome buttons on every booking, a Reviewer in the
+post editor with Save and Publish, create and edit pages that opened for
+anyone who typed the address and refused on Save, and refusals reaching the
+screen as `Role "MEMBER" may not perform "store:create"`.
+**Cause**: three habits. A page drew its write controls without asking the
+permission the API asks of the write, because the API refuses anyway.
+`authorize()` threw a sentence written for a developer, and the exception
+filter keeps a 4xx's message. And each screen worded its own denial, 28 ways.
+**Fix**: `requireCan(action, { thing })` (`lib/access/require-can.tsx`) is the
+first line of every `new`, `edit` and `import` page, and a page a role may
+read but not change is drawn to read. `authorize()` throws a readable 403 with
+`details: { code: "ROLE_DENIED", action }`, which the app says in
+`lib/api/role-denied.ts`'s words. Every denial reads `whoCanChange()`.
+**Check**: `lib/access/guarded-pages.test.tsx` fails a new create, edit or
+import page with no guard; `lib/access/who-can-change.test.ts` scans for the
+old wordings; `components/shared/quick-actions.test.ts` fails a command menu
+row that names no permission; `organization-policy.spec.ts` pins the refusal's
+shape.
+**Category**: access · `docs/patterns/frontend-error-feedback.md`,
+`docs/patterns/backend-auth-and-access.md`
+
+## Every screen drew its own tabs, pills, notices and links
+
+**Symptom**: a UX audit (10 Oct 2026) counted fourteen tab strips in two
+colours and three type sizes, about twenty pill components and ninety pills
+drawn by hand (six of them in capitals), eighty-five boxed alerts in
+thirty-four styles, a hundred Saffron links, seventeen clipboard calls with
+nine failure sentences, and seven words for "customers can get it".
+**Cause**: each screen was built from its design file alone. The library had
+a tooltip, an alert and a progress bar that nothing used, so the next screen
+copied the last screen's markup and changed it.
+**Fix**: one of each, in `@saroh/ui` (`TabStrip`, `Segmented`, `ListSearch`,
+`Notice`, `TextLink`, `IconButton`, `Tip`, `CopyButton`, `ShareLink`,
+`ProgressBar`, `CountBadge`, the `.label` utility) and in
+`components/shared` (`StatusBadge`, `SectionList`, `Chip`), with the status
+words in `lib/status/vocabulary.ts`. Every call site was moved and the old
+pieces deleted.
+**Check**: `apps/app.saroh.in/lib/consistency/shared-pieces.test.ts` fails a
+hand-rolled `role="tablist"`, a boxed alert outside `Notice`,
+`navigator.clipboard` outside the copy pieces, `uppercase` outside `.label`,
+any Saffron class outside the menu's marker, and a transition with a literal
+duration. Its allowlists name what is left, each with its reason.
+**Category**: design system · `docs/patterns/frontend-design-system.md`
+
+## A tooltip made a jsdom test take seconds
+
+**Symptom**: wrapping a button in the library's tooltip timed out twenty
+component tests in `apps/app.saroh.in` at 5s each.
+**Cause**: the one `packages/ui/vitest.setup.ts` already describes. jsdom's
+selector engine answers `:modal` and `:popover-open` by recursing to a stack
+overflow, and floating-ui asks both of every positioned tooltip. The app had
+no setup file, so it had no fix.
+**Fix**: `apps/app.saroh.in/vitest.setup.ts` mirrors the library's patch (a
+no-op under `node`), wired through `setupFiles`.
+**Check**: the suite itself: the order sheets' tests press tooltipped buttons.
+**Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`
+
+## Every page said "Home" for a moment on its way in
+
+**Symptom**: moving between sections of the app, the loader's breadcrumb read
+"Home" before the page's own name appeared.
+**Cause**: the router shows the outermost loading file first on a move between
+top-level sections, before the section's own. `app/(shell)/loading.tsx` was
+written as Home's loader, with "Home" fixed in it, though it stands in for
+every address under the shell.
+**Fix**: the shell's loader is `ShellLoading`, which reads the address against
+the menu (`shellLoadingWords`) and names the section and page being opened,
+with a bar for a title it can't know.
+**Check**: `shell-loading.test.ts` (never "Home" for another address), and
+`page-chrome.test.ts` still holds every loader to the one loading shell.
+**Category**: frontend · `docs/patterns/frontend-app-structure.md`
+
 ## A sign-in that answered 500 never reached error tracking
 
 **Symptom**: rehearsing PostHog on dev, 10 Oct 2026:
@@ -3940,3 +4077,144 @@ way to `reportError`. When one is added, ask where its 5xx goes. Read the
 installed version's source for the hook: `onError` here is handed the
 error and no request, which no type says loudly.
 **Category**: observability · `packages/auth/src/server-errors.ts`
+
+## The consistency pass broke seven things only a browser could see
+
+**Symptom**: the first browser run after the UX consistency pass (11 Oct
+2026), with every unit test, type check and lint green:
+
+- Customer Detail's ⋯ More actions opened nothing, so nobody could merge,
+  delete or remove a customer's details from there.
+- With the keyboard on a control that has a hint, Escape closed the hint and
+  left the sheet open. The site editor's block sheet on a phone took two
+  presses, and so did its Publish menu.
+- A product with a photo had no title: the heading was zero wide.
+- On a phone, a record's page (a customer, an order, an invoice) was wider
+  than the screen, and Chrome zoomed the page out to fit it.
+- A product's Orders tab on a phone was the error page.
+- A location's Pick-up sheet closed on Save with "3 minutes" typed, saying
+  nothing and keeping nothing.
+- The eyebrow on the sign-in panel was dark on dark (contrast 2.1).
+
+**Cause**: one shared piece each, changed for every screen at once.
+
+- `Tip` was put between a trigger and its control
+  (`<DropdownMenuTrigger asChild><Tip><Button/></Tip>`). `asChild` hands the
+  trigger's ref, handlers and state to its child, which was now the Tip, and
+  the Tip kept them. Four places did this.
+- A showing tooltip is Radix's topmost layer, and Radix gives Escape to the
+  topmost layer alone. Turning every `title=` into a `Tip` put a layer over
+  every focused icon button.
+- `PageHeader` wrapped `lead` in a block box. The product's cover is an
+  inline link around a photo with `size-full`: in a block box its `size-14`
+  did nothing, and the photo drew at its own 1600px.
+- `PageHeader` moved the actions inside a wrapping row and kept their
+  `shrink-0`. As a child of that row they were held to the width of all
+  their buttons in a line, so they couldn't wrap.
+- `arrivalProps` was exported from `use-arrivals.ts`, a "use client" file,
+  and `order-row.tsx` (drawn by a server component too) called it.
+- The sheet frame closes an edit whose draft is unchanged without running
+  its submit. The Pick-up sheet said "unchanged" from what the draft would
+  send, and a time it couldn't read sends nothing.
+- `.label` gained a colour (muted Ink) when the label styles became one, and
+  the panel's eyebrow, which had inherited the panel's, took it.
+
+**Fix**: `Tip` passes on what it is handed and takes itself off the page
+before Radix reads an Escape (`packages/ui/src/components/ui/tooltip.tsx`);
+`PageHeader`'s lead is a flex box and its actions hold their width only from
+`sm` up; `arrivalProps` lives in `components/shared/arrival-props.ts`, which
+is not a client file; `wayChanged` (`lib/stores/delivery-summary.ts`) counts
+a draft with something to fix as changed; the eyebrow is `text-inherit`.
+**Check**: `tooltip.test.tsx` and `tooltip-escape.test.tsx` (a real Radix
+dialog), `page-header.test.tsx`, `split-shell.test.tsx`,
+`use-arrivals.test.tsx` (neither file may say "use client") and
+`delivery-summary.test.ts`. The browser specs that found them:
+`customer-detail`, `customer-merge`, `person-page`, `site-editor-narrow`,
+`site-versions`, `product-editor`, `phone-reflow`, `product-page-stock`,
+`storefront-settings` and `a11y`.
+**Rule**: a change to a shared piece is checked in a browser, on desk and
+phone, before it is merged: none of these was visible to jsdom, which has
+no layout, no server components and no layer stack unless a test builds
+one. A wrapper that can sit under `asChild` passes on what it is given. An
+overlay's `dirty` is "differs from what is saved", not "would send
+something".
+**Category**: frontend · `docs/patterns/frontend-verification.md`
+
+## A customer picked "13:00" on the page and was emailed "1:00 pm"
+
+**Symptom**: on a merchant's site the booking page offered "09:00 … 13:00 …
+16:30" and the account area wrote "Mon 5 Oct, 14:00", while the email the
+same customer got said "1:00 pm" and the merchant app "1:00 pm" (seen in a
+browser, 11 Oct 2026).
+**Cause**: the 12-hour decision (10 Oct) gave the merchant app and the API
+one formatter each, with a check on each. The site (`packages/site-blocks`)
+had neither: `timeIn`, `bookingWhen` and a message's time each asked `Intl`
+for `hour12: false`, and the timetable and On today drew the API's "HH:MM"
+as it came.
+**Fix**: `packages/site-blocks/src/lib/clock.ts` (`timeWords`, `clockWords`,
+`timeRangeWords`), the twin of the API's `timeWords`, drawn everywhere a
+customer reads a time. `timeIn` and `clockValue` stay the 24-hour value for
+an address and a comparison.
+**Check**: `lib/clock.test.ts` runs the API spec's cases, and fails any
+other file in the package that formats an hour.
+**Rule**: a format decided for "everywhere" has three homes: the merchant
+app, the API's sentences and the merchant's site. Change all three, and give
+each its own check.
+**Category**: frontend · `docs/patterns/frontend-design-system.md` → Numbers
+and dates
+
+## The code scanner found what the gate could not
+
+**Symptom**: every check on the batch's pull request passed but CodeQL, which
+raised five findings in new code: a customer's phone number written to
+`sessionStorage` with a kept booking, tags taken out of a post's body by
+replacing patterns (twice), and two test helpers that unescaped an ampersand
+first or matched `<script` in one case only. One came back after the first
+fix: a second pattern replace, done in a loop.
+**Cause**: nothing local runs the scanner, and each of these reads as
+reasonable code. Replacing a tag pattern can leave the same pattern behind
+(`<scr<script>ipt>`), however many times it is done.
+**Fix**: the kept booking holds no phone number (a signed-in customer's comes
+from their account); `postParagraphs` reads the body a character at a time
+and copies no bracket (`lib/content/plain-text.ts`, with tests for nested
+tags); the helpers unescape `&amp;` last and match without regard to case.
+**Check**: `plain-text.test.ts`; the booking flow's reload test asserts the
+phone is not in storage. The scanner itself stays CI's: read its findings on
+the pull request before calling a batch green.
+**Category**: security · `docs/patterns/frontend-data-and-state.md`
+
+## A large batch's pull request ran no integration and no browser tests on CI
+
+**Symptom**: on a pull request of 2,200 files every listed check was green,
+and three were "skipped": the integration shards, the browser shards and the
+permission states. The summary jobs passed in two seconds.
+**Cause**: CI's "What changed" job asked `printf '%s\n' "$files" | grep -qE …`
+under `set -o pipefail`. `grep -q` leaves at its first match. With a list
+longer than the pipe holds, `printf` is still writing, dies of a broken pipe,
+and pipefail turns the match into a failure: "the API didn't change", "no
+browser test is needed". A short list fits in the pipe, so small pull
+requests were right and only the largest ones were wrong.
+**Fix**: `has()` reads the list from a here-string and sends grep's output to
+`/dev/null`, so nothing is left writing. The same shape in `scripts/prepush.sh`
+(seven places) is changed the same way.
+**Check**: proven by hand on a list of 60,000 lines (old: no match; new:
+match). A skipped job on a pull request that touches `apps/` or `packages/`
+is a finding: read the "skipping" rows, not only the red ones.
+**Category**: ci · `docs/patterns/devops-tooling-and-deploy.md`
+
+## A row of four buttons ran past a phone's edge, on CI's fonts only
+
+**Symptom**: once CI ran its browser shards on the batch, four own-domain
+specs failed on the phone project: the page had zoomed out to 414px at a
+412px screen. The same specs passed on a Mac.
+**Cause**: a site setting's row (`Row` in `components/sites/settings-rows.tsx`)
+held its actions in a `shrink-0` box. Web address has four (Copy, QR code,
+View, Change), wider than the card on a phone, so the box ran out of the card.
+On a Mac it stopped 9px short of the screen's edge. On CI's Linux fonts it
+went 2px past, and the browser zoomed out to fit.
+**Fix**: the actions' box may shrink on a phone (`min-w-0 max-w-full
+sm:shrink-0`), so the buttons wrap inside the card.
+**Check**: the specs' own `expectNothingHiddenSideways`. A row that reaches
+the screen's edge on a Mac is past it somewhere else: nothing inside a card
+may be wider than the card.
+**Category**: frontend · `docs/patterns/frontend-verification.md`

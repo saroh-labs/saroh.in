@@ -1,7 +1,7 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,14 +29,15 @@ import type { ProductRating } from "@/lib/product-reviews/service";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { rowFacts, stockWords } from "@/lib/products/catalogue";
 
+import { IconButton } from "@saroh/ui/icon-button";
 import { ProductThumb } from "./product-thumb";
 import { STATUS_LABEL, STATUS_VARIANT, TONE_TEXT } from "./tones";
 
 /** The row's price: the variants' range when they differ. */
 export function priceText(row: CatalogueRow): string {
-    const money = (v: string) => formatMoneyMajor(v, row.currency) ?? "—";
+    const money = (v: string) => formatMoneyMajor(v, row.currency);
     return row.priceRange
-        ? `${money(row.priceRange.low)} – ${money(row.priceRange.high)}`
+        ? `${money(row.priceRange.low)} to ${money(row.priceRange.high)}`
         : money(row.price);
 }
 
@@ -84,7 +85,7 @@ export function catalogueColumns({
                                 rating ? (
                                     <span
                                         key="rating"
-                                        aria-label={`Rated ${rating.average} from ${rating.count} ${rating.count === 1 ? "review" : "reviews"}`}
+                                        aria-label={`Rated ${rating.average} from ${count(rating.count, "review")}`}
                                     >
                                         ★ {ratingLabel(rating)}
                                     </span>
@@ -117,23 +118,20 @@ export function catalogueColumns({
                 r.paused ? (
                     <Badge
                         variant="warning"
-                        className="px-[9px] py-[3px] text-[11px] font-medium"
+                        size="sm"
                         title="Hidden from your site and read-only: past your plan's products limit"
                     >
                         Paused
                     </Badge>
                 ) : (
-                    <Badge
-                        variant={STATUS_VARIANT[r.status]}
-                        className="px-[9px] py-[3px] text-[11px] font-medium"
-                    >
+                    <Badge variant={STATUS_VARIANT[r.status]} size="sm">
                         {STATUS_LABEL[r.status]}
                     </Badge>
                 ),
         },
         {
             id: "inventory",
-            header: "Inventory",
+            header: "Stock",
             priority: "secondary",
             width: "128px",
             cell: (r) => {
@@ -193,14 +191,12 @@ export function RowMenu({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button
+                <IconButton
+                    label={`More actions for ${row.name}`}
+                    icon={<MoreHorizontal />}
                     variant="ghost"
-                    size="icon"
-                    className="size-7 text-muted-foreground hover:text-foreground coarse:size-11"
-                    aria-label={`More actions for ${row.name}`}
-                >
-                    <MoreHorizontal className="size-4" />
-                </Button>
+                    className="text-muted-foreground"
+                />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onSelect={onPreview}>

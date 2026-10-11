@@ -39,7 +39,7 @@ describe("OrderConfirmation (P4)", () => {
             <OrderConfirmation
                 lookup={{
                     ok: true,
-                    order: { ...ORDER, toPay: "Pay when you collect" },
+                    order: { ...ORDER, toPay: "Pay at pick-up" },
                 }}
                 businessName="Rye & Co."
             />,
@@ -47,16 +47,16 @@ describe("OrderConfirmation (P4)", () => {
         expect(
             screen.getByRole("heading", {
                 level: 1,
-                name: "Thank you — your order is placed",
+                name: "Thank you, your order is placed",
             }),
         ).toBeTruthy();
         expect(
             screen.getByText(
-                "You'll pay when you collect your order. Rye & Co. will be in touch when it's ready.",
+                "You'll pay at pick-up. Rye & Co. will be in touch when it's ready.",
             ),
         ).toBeTruthy();
         expect(
-            screen.getByText("To pay when you collect").nextElementSibling
+            screen.getByText("To pay at pick-up").nextElementSibling
                 ?.textContent,
         ).toBe("₹680");
         expect(screen.queryByText("Paid")).toBeNull();
@@ -74,7 +74,7 @@ describe("OrderConfirmation (P4)", () => {
                             pickup: {
                                 name: "Hill Road",
                                 address: "12 Hill Road, Bandra",
-                                hours: "Mon–Sat 10:00–19:00, Sun closed",
+                                hours: "Mon to Sat 10:00 am to 7:00 pm, Sun closed",
                             },
                         },
                     },
@@ -83,7 +83,7 @@ describe("OrderConfirmation (P4)", () => {
             />,
         );
         expect(
-            screen.getByText("Open Mon–Sat 10:00–19:00, Sun closed"),
+            screen.getByText("Open Mon to Sat 10:00 am to 7:00 pm, Sun closed"),
         ).toBeTruthy();
     });
 
@@ -97,7 +97,7 @@ describe("OrderConfirmation (P4)", () => {
         expect(
             screen.getByRole("heading", {
                 level: 1,
-                name: "Thank you — your order is placed",
+                name: "Thank you, your order is placed",
             }),
         ).toBeTruthy();
         expect(screen.getByText("Order ORD-019")).toBeTruthy();
@@ -108,7 +108,7 @@ describe("OrderConfirmation (P4)", () => {
             "₹680",
         );
         expect(
-            screen.getByRole("heading", { name: "Pick up from" }),
+            screen.getByRole("heading", { name: "Pick-up from" }),
         ).toBeTruthy();
         expect(screen.getByText("12 Hill Road, Bandra")).toBeTruthy();
         // No receipt email is sent when a site order is placed.
@@ -218,8 +218,108 @@ describe("OrderConfirmation (P4)", () => {
         expect(document.body.textContent).not.toMatch(/responsible/);
     });
 
+    it("offers to sign in where the page was opened signed out, ahead of the way back", () => {
+        render(
+            <OrderConfirmation
+                lookup={{ ok: false, reason: "signed-out" }}
+                businessName="Rye & Co."
+                signIn={<button type="button">Sign in</button>}
+            />,
+        );
+        expect(
+            screen.getByText(
+                "Your order is shown to the person who placed it. Sign in with the email you ordered with and it opens here.",
+            ),
+        ).toBeTruthy();
+        const signIn = screen.getByRole("button", { name: "Sign in" });
+        const back = screen.getByRole("link", { name: "Back to the shop" });
+        // Sign in leads; the shop is the other way out.
+        expect(
+            signIn.compareDocumentPosition(back) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        expect(back.className).not.toContain("bg-site-accent");
+    });
+
+    it.each(["missing", "unavailable"] as const)(
+        "offers no sign-in when the order is %s: signing in wouldn't mend it",
+        (reason) => {
+            render(
+                <OrderConfirmation
+                    lookup={{ ok: false, reason }}
+                    businessName="Rye & Co."
+                    signIn={<button type="button">Sign in</button>}
+                />,
+            );
+            expect(screen.queryByRole("button", { name: "Sign in" })).toBe(
+                null,
+            );
+            expect(
+                screen.getByRole("link", { name: "Back to the shop" })
+                    .className,
+            ).toContain("bg-site-accent");
+        },
+    );
+
     it("keeps the customer on the business's own site", () => {
         expect(orderConfirmationHref("ord_1")).toBe("/shop/order/ord_1");
         expect(orderConfirmationHref("a/b")).toBe("/shop/order/a%2Fb");
+    });
+});
+
+describe("the order page says whether a message is coming", () => {
+    it("says the address it emailed when the business's email sends the notice", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        reach: "EMAIL_AND_ACCOUNT",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(
+            screen.getByText("We've emailed asha@example.com."),
+        ).toBeVisible();
+    });
+
+    it("says it is saved in their account otherwise, and claims no email", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        reach: "NONE",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(screen.getByText("It's saved in your account.")).toBeVisible();
+        expect(document.body.textContent).not.toMatch(/emailed/);
+    });
+
+    it("says neither about an order that was refunded", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        refunded: true,
+                        reach: "EMAIL",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(document.body.textContent).not.toMatch(/emailed|saved in/);
     });
 });

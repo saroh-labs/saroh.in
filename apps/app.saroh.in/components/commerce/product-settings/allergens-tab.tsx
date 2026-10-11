@@ -1,5 +1,7 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -10,9 +12,11 @@ import { useTransition } from "react";
 import type { AllergenView } from "@/lib/products/settings";
 import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
+import { NameDialog } from "@/components/shared/name-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { NameDialog } from "./name-dialog";
-import { bigBtn, rowBtn, smallBtn, TabIntro } from "./product-settings";
+import { runAction } from "@/lib/api/run-action";
+import { Tip } from "@saroh/ui/tooltip";
+import { TabIntro } from "./product-settings";
 
 const MAX = 30;
 const COMMON = [
@@ -44,7 +48,11 @@ export function AllergensTab({
 
     function run(work: () => Promise<void>) {
         start(async () => {
-            await work();
+            const reached = await runAction(async () => {
+                await work();
+                return true;
+            });
+            if (!reached) return;
             router.refresh();
         });
     }
@@ -70,12 +78,12 @@ export function AllergensTab({
     const addOne = canWrite ? (
         <NameDialog
             trigger={
-                <button type="button" className={bigBtn}>
+                <Button type="button" className="shrink-0">
                     <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
                     Add allergen
-                </button>
+                </Button>
             }
-            title="Add allergen"
+            title="New allergen"
             note="Customers see it as you name it here."
             label="Allergen name"
             placeholder="Celery"
@@ -112,26 +120,34 @@ export function AllergensTab({
 
             {allergens.length === 0 ? (
                 <EmptyState
+                    size="panel"
                     title="No allergens yet"
-                    description="A shop that sells food usually starts with the common eight; anyone else can leave this empty."
+                    description="A shop that sells food usually starts with the common eight. Anyone else can leave this empty."
                     action={
                         canWrite ? (
                             <div className="flex flex-wrap items-center justify-center gap-2">
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     type="button"
                                     disabled={pending}
-                                    className={cn(smallBtn, "h-9 px-3.5")}
                                     onClick={() =>
                                         start(async () => {
-                                            await add(
-                                                COMMON,
-                                                "The common food allergens are on the list.",
+                                            const reached = await runAction(
+                                                async () => {
+                                                    await add(
+                                                        COMMON,
+                                                        "The common food allergens are on the list.",
+                                                    );
+                                                    return true;
+                                                },
                                             );
+                                            if (!reached) return;
                                         })
                                     }
                                 >
                                     Add the common food allergens
-                                </button>
+                                </Button>
                                 {addOne}
                             </div>
                         ) : null
@@ -142,7 +158,7 @@ export function AllergensTab({
                     {allergens.map((a) => {
                         const used = a.contains + a.mayContain;
                         const title = used
-                            ? `${a.name} is on ${used} ${used === 1 ? "product" : "products"} — take it off them first`
+                            ? `${a.name} is on ${count(used, "product")}. Take it off them first`
                             : `Remove ${a.name}`;
                         return (
                             <li
@@ -167,40 +183,49 @@ export function AllergensTab({
                                         : "Not on any product yet"}
                                 </span>
                                 {canWrite ? (
-                                    <button
-                                        type="button"
-                                        disabled={used > 0 || pending}
-                                        title={title}
-                                        aria-label={title}
-                                        className={cn(
-                                            rowBtn,
-                                            used === 0 && "text-destructive",
-                                        )}
-                                        onClick={() =>
-                                            run(async () => {
-                                                const res =
-                                                    await removeAllergen(a.id);
-                                                if (!res.ok)
-                                                    return showError(res.error);
-                                                showUndo(
-                                                    `${a.name} removed from the list.`,
-                                                    () =>
-                                                        run(async () => {
-                                                            const undo =
-                                                                await addAllergens(
-                                                                    [a.name],
-                                                                );
-                                                            if (!undo.ok)
-                                                                showError(
-                                                                    undo.error,
-                                                                );
-                                                        }),
-                                                );
-                                            })
-                                        }
-                                    >
-                                        Remove
-                                    </button>
+                                    <Tip label={title}>
+                                        <Button
+                                            variant="outline"
+                                            size="xs"
+                                            type="button"
+                                            disabled={used > 0 || pending}
+                                            aria-label={title}
+                                            className={cn(
+                                                used === 0 &&
+                                                    "text-destructive hover:text-destructive",
+                                            )}
+                                            onClick={() =>
+                                                run(async () => {
+                                                    const res =
+                                                        await removeAllergen(
+                                                            a.id,
+                                                        );
+                                                    if (!res.ok)
+                                                        return showError(
+                                                            res.error,
+                                                        );
+                                                    showUndo(
+                                                        `${a.name} removed from the list.`,
+                                                        () =>
+                                                            run(async () => {
+                                                                const undo =
+                                                                    await addAllergens(
+                                                                        [
+                                                                            a.name,
+                                                                        ],
+                                                                    );
+                                                                if (!undo.ok)
+                                                                    showError(
+                                                                        undo.error,
+                                                                    );
+                                                            }),
+                                                    );
+                                                })
+                                            }
+                                        >
+                                            Remove
+                                        </Button>
+                                    </Tip>
                                 ) : null}
                             </li>
                         );
@@ -209,7 +234,7 @@ export function AllergensTab({
             )}
 
             <p className="mt-2 text-[11.5px] text-muted-foreground">
-                One a product lists cannot be removed — take it off those
+                One a product lists cannot be removed. Take it off those
                 products first.
             </p>
         </section>

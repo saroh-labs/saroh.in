@@ -199,7 +199,7 @@ export function alertGrid(read: AlertPreferencesRead): AlertGrid {
                         channel,
                         on: false,
                         disabled: true,
-                        label: `${name}, off — ${UNAVAILABLE_WORDS[state.reason]}`,
+                        label: `${name}, off. ${UNAVAILABLE_WORDS[state.reason]}`,
                     };
                 }
                 const on = row.channels[channel];
@@ -262,7 +262,7 @@ export function alertSaved(change: AlertChange): string {
 }
 
 /** Said when the switch has changed under the Undo (as Settings says it, F12). */
-export const ALERT_CHANGED_SINCE = "Changed since — reload";
+export const ALERT_CHANGED_SINCE = "Changed since. Reload";
 
 /**
  * The Undo for a save (F12): the same switch put back, refused if it no

@@ -210,7 +210,9 @@ describe("StorefrontsScreen as a location's own page", () => {
         ]) {
             const html = screen({}, section);
             expect(h1(html)).toBe("Hill Road");
-            expect(html).toContain('data-testid="location-readiness"');
+            expect(html).toContain(
+                'data-setup-checklist="location" data-state="open"',
+            );
         }
     });
 
@@ -241,7 +243,9 @@ describe("StorefrontsScreen as a location's own page", () => {
             "Customers come here Yes, they visit It has an address and opening hours, and can offer pick-up. Change",
         );
         expect(t).toContain("Address 12 Hill Road, Bandra Edit");
-        expect(t).toContain("Opening hours Mon–Sat · 9:00 AM – 6:00 PM Edit");
+        expect(t).toContain(
+            "Opening hours Mon to Sat · 9:00 am to 6:00 pm Edit",
+        );
         expect(t).toContain(
             "Description and logo No description yet · no logo yet Edit",
         );
@@ -414,17 +418,17 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(panel(html)).not.toContain("<a ");
     });
 
-    it("no location yet: says so, and offers Add a location", () => {
+    it("no location yet: says so, and offers New location", () => {
         const html = screen({ storefronts: [], selected: null });
-        expect(text(html)).toContain("No location yet");
-        expect(text(html)).toContain("Add a location");
+        expect(text(html)).toContain("No locations yet");
+        expect(text(html)).toContain("New location");
         expect(h1(html)).toBe("Location");
     });
 
     it("a location that couldn't be read keeps its name and offers Try again", () => {
         const html = screen({ selected: null, chosenId: hill.id });
         expect(h1(html)).toBe("Hill Road");
-        expect(text(html)).toContain("This location could not be loaded");
+        expect(text(html)).toContain("Couldn't load this location");
         expect(text(html)).toContain("Try again");
         expect(html).not.toContain('role="tablist"');
     });
@@ -467,7 +471,7 @@ describe("the People tab", () => {
         expect(tabsOf(html).open).toBe("People");
         const t = text(panel(html));
         expect(t).toContain(
-            "Who can work on Hill Road's catalogue, orders and customers. Everyone here is also on your team, under Team.",
+            "Who can see Hill Road's products and orders, and move its orders along. An Admin, Manager or Editor can also take orders here and change its name and description. Everyone here is also on your team, under Team.",
         );
         expect(t).toContain("Asha Rao asha.rao@example.com Owner");
         expect(t).toContain("Dev Shah dev.shah@example.com");
@@ -482,7 +486,7 @@ describe("the People tab", () => {
         expect(h1(html)).toBe("Hill Road");
         expect(html).toContain('role="tablist"');
         const t = text(panel(html));
-        expect(t).toContain("The people here could not be loaded");
+        expect(t).toContain("Couldn't load the people here");
         expect(t).toContain("Try again");
         expect(panel(html)).toContain('role="alert"');
         // The other tabs are untouched by it.
@@ -502,7 +506,7 @@ describe("the readiness card", () => {
             site: site(null),
         });
         const t = text(html);
-        expect(t).toContain("Ready for online orders 1 of 3");
+        expect(t).toContain("Get ready for online orders 1 of 3 done");
         // Goal gradient: the done step comes first.
         expect(t.indexOf("Shipping on")).toBeLessThan(
             t.indexOf("Take payments online"),
@@ -526,22 +530,28 @@ describe("the readiness card", () => {
             },
             site: site("st_online"),
         });
-        expect(html).toContain('data-testid="location-ready"');
-        expect(html).not.toContain('data-testid="location-readiness"');
-        expect(text(html)).toContain("Ready for online orders");
+        expect(html).toContain(
+            'data-setup-checklist="location" data-state="folded"',
+        );
+        expect(html).not.toContain(
+            'data-setup-checklist="location" data-state="open"',
+        );
+        expect(text(html)).toContain("Ready for online orders.");
         expect(html).toContain('href="https://rye.saroh.app/shop"');
     });
 
     it("a counter the shop sells from counts both, and links the live shop", () => {
         const html = screen({ site: site("st_hill") });
-        expect(text(html)).toContain("Ready for the counter and online orders");
+        expect(text(html)).toContain(
+            "Get ready for the counter and online orders",
+        );
         expect(html).toContain('href="https://rye.saroh.app/shop"');
     });
 
     it("a counter that sells in person counts its address and hours, and says so", () => {
         const t = text(screen({ site: site("st_online") }));
         expect(t).toContain(
-            "Ready for the counter 1 of 2 · Sells in person only",
+            "Get ready for the counter 1 of 2 done · Sells in person only",
         );
         expect(t).toContain("Address on receipts");
         expect(t).toContain("Save its opening hours");
@@ -552,7 +562,7 @@ describe("the readiness card", () => {
     it("a location past the plan's limit (#800) is not ready, and says why", () => {
         const t = text(screen({ notTakingOrders: [hill.id] }));
         expect(t).toContain("Not taking orders on your plan");
-        expect(t).toContain("See Plan and billing");
+        expect(t).toContain("See plans");
     });
 
     it("a paused location counts its pause as a step left", () => {

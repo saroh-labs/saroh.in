@@ -14,7 +14,7 @@ pattern files refer back here.
 - **Current** (DEC-070) — **Three kinds of people**: **a business** (shop,
   studio, practice), **Just me** (freelancer, consultant, creator) and **a
   site for my work** (portfolio, blog, projects). Setup asks "What are you
-  setting up?" first, with nothing chosen, and stores the answer as
+  setting up?" as its first step, with "A business" chosen (DEC-130), and stores the answer as
   `Organization.kind` (`BUSINESS`, `SOLO`, `WORK`; every business set up
   before it is `BUSINESS`). Whoever holds `org:update` (Owner and Admin)
   changes it at the top of Settings › Business › Identity, with Undo.
@@ -29,16 +29,17 @@ pattern files refer back here.
   `apps/app.saroh.in/lib/organizations/kind.ts` (`kindWords`,
   `kindDefaults`); an unknown or missing kind reads as `BUSINESS`.
 
-    |                                       | A business                        | Just me                                             | A site for my work                |
-    | ------------------------------------- | --------------------------------- | --------------------------------------------------- | --------------------------------- |
-    | The owner                             | your business                     | you                                                 | you                               |
-    | Their people                          | customers                         | clients                                             | readers                           |
-    | Setup's name field                    | What is it called?                | Your name or brand                                  | Your name or brand                |
-    | Settings tab                          | Business                          | Your details                                        | Your details                      |
-    | Home's first run, in order            | Sell, Bookings, Website, Contacts | Bookings, Invoice a client, Contacts, Website, Sell | Website, Contacts, Bookings, Sell |
-    | The module picker suggests            | Sell                              | nothing                                             | Website                           |
-    | Setup asks "registered as a company?" | yes                               | yes                                                 | no                                |
-    | Bookings' Turn on prefill             | Mon–Sat 10–7, no service          | Mon–Fri 10–6, "Consultation", 60 min                | Mon–Sat 10–7, no service          |
+    |                            | A business                        | Just me                                             | A site for my work                |
+    | -------------------------- | --------------------------------- | --------------------------------------------------- | --------------------------------- |
+    | The owner                  | your business                     | you                                                 | you                               |
+    | Their people               | customers                         | clients                                             | readers                           |
+    | Setup's name step          | Name your business                | Name it                                             | Name your site                    |
+    | Setup's name field         | What is it called?                | Your name or brand                                  | Your name or brand                |
+    | Setup's last button        | Create the business               | Set it up                                           | Set it up                         |
+    | Settings tab               | Business                          | Your details                                        | Your details                      |
+    | Home's first run, in order | Sell, Bookings, Website, Contacts | Bookings, Invoice a client, Contacts, Website, Sell | Website, Contacts, Bookings, Sell |
+    | The module picker suggests | Sell                              | nothing                                             | Website                           |
+    | Bookings' Turn on prefill  | Mon–Sat 10–7, no service          | Mon–Fri 10–6, "Consultation", 60 min                | Mon–Sat 10–7, no service          |
 
     The words reach the surfaces that name the owner or their people in
     general terms: setup, the module picker, Home's first run and the
@@ -48,6 +49,65 @@ pattern files refer back here.
     client" turns nothing on: it opens a new invoice, for someone with
     `invoice:write`, until the business has one.
 
+- **Current** (DEC-130, amended 11 Oct 2026) — **The first run is four
+  short steps, and it ends in the product.** Sign-up takes an email and a
+  code (DEC-129). Setup is a stepper
+  (`components/organizations/business-setup-form.tsx`), one question to a
+  screen with Back and Continue: "What are you setting up?", then the name
+  step (your name if the account has none, the name, the web address, the
+  country, India chosen), then "What will you do first?". The last step's
+  button is the create: it turns that goal on with its defaults, with no
+  second sheet (`lib/modules/first-goal.ts`), and lands on the thing
+  itself: a new product, a new service, the site with Publish, New contact
+  open. Setup never asks whether it is a registered company: the Finish
+  setup step "Choose your business type" does. It says "Step 2 of 4",
+  never "Last step".
+- **Current** (DEC-130, 11 Oct 2026) — **How the stepper is built.** Change
+  a step in `lib/organizations/setup-steps.ts`, nowhere else.
+    - **One list.** The plan's names are `SETUP_PLAN` in
+      `@saroh/ui/lib/setup-plan`, which the sign-up panel on
+      accounts.saroh.in draws too. `setup-steps.ts` builds setup's steps
+      from it (each with the fields its gate checks), and the form, the
+      panel beside it, the count above the heading and the progress bar
+      all read that. A test in each app pins the same four strings.
+    - **One form.** Every step's answers live in one react-hook-form, and
+      only the step on show is drawn. Back and Continue lose nothing, and
+      Back never asks.
+    - **Continue is the step's gate.** It checks its own fields
+      (`form.trigger`), says each problem under its field, puts the
+      keyboard on the first, and on the name step waits for the web
+      address's answer, so a taken address is never passed on. The step's
+      button is the form's one submit, so Enter in a field presses it.
+    - **The step is in the address** (`?step=name`, `?step=first`, the
+      first step bare) and in the browser's history
+      (`setup-step-context.tsx`), so the browser's Back is the step before.
+      A step asked for before the ones ahead of it are answered opens the
+      first that is not (`openStep`).
+    - **What was typed is kept for the tab** (`sessionStorage`, answers
+      only, read and written inside try/catch), so a reload stays on the
+      step. It is cleared when the business is made and on signing out.
+    - **Each step is the same frame:** the count, a large heading (which
+      takes the keyboard when the step changes), one sentence, that step's
+      fields, then at the foot a thin `ProgressBar`, a quiet Back on the
+      left and the step's button on the right, stacked on a phone with the
+      button on top. "Signed in as … · Sign out" is under it on every
+      step.
+- **Current** (DEC-130) — **One list of goals, in one set of words**:
+  `lib/modules/goals.ts` ("Sell things", "Take bookings", "Put up a
+  website", "Keep track of people", and a kind's own for the last). Setup,
+  Home's first run and the module picker read it, and `goalHref` is each
+  goal's one destination. Never word the choice again on a new screen.
+- **Current** (DEC-130) — **The web address is asked once**, at setup. The
+  Turn on sheet says it as a line when Website is turned on later, and
+  turns it back into a field only when the API refuses it.
+- **Current** (DEC-130) — **A new business gets one email from Saroh**:
+  "{Business} is set up on Saroh", the next step for the goal chosen, and
+  "Open {Business}" (`apps/api.saroh.in/src/common/email-welcome.ts`).
+  Onboarding sends it, once, to the person who set the business up. Never
+  to someone invited: they are told where they are on arrival instead
+  ("You've joined {Business} as {Role}. …", `lib/organizations/joined.ts`),
+  and every accepted invitation, a location's too, comes through the
+  workspace's door (`/open/:id`), which opens the business they joined.
 - **Current** (DEC-070, K4) — The registered address, business type and
   logo steps appear only once something invoices or takes money: Sell,
   Bookings, Courses, Class packs or Payments on, or an invoice exists
@@ -97,6 +157,48 @@ pattern files refer back here.
 - **Current** — A source that fails to load degrades into a named notice; it
   never becomes a zero or a false "nothing to do"
   (`.agents/skills/saroh-product-states/SKILL.md`).
+
+## Moments
+
+- **Current** (10 Oct 2026) — **A moment is one calm line where the product
+  marks that something good happened for the business**, in the right place,
+  once, with the real fact in it and at most one thing worth doing next. The
+  shared piece is `Moment` (`apps/app.saroh.in/components/shared/moment.tsx`):
+  a `Notice` in the success tone with a title, one fact line, one optional
+  action and Dismiss, announced politely (`role="status"`), entering on the
+  motion tokens and still under reduced motion.
+
+    | Moment                   | Where                                   | Says                                                       |
+    | ------------------------ | --------------------------------------- | ---------------------------------------------------------- |
+    | First order              | Orders, and Home in its first 24 hours  | "Your first order" · who, how much · Open order            |
+    | 10th and 100th order     | Orders (Home when its figures allow)    | "Your 10th order" · who, how much · Open order             |
+    | First booking            | All bookings, and Home in its first day | "Your first booking" · who, what, when · Open booking      |
+    | The site's first publish | The publish check's finished state      | "‹Site› is live." · the address as a link · Share, QR code |
+    | Setup finished           | `SetupChecklist`'s own done title       | Its own words; not a `Moment`                              |
+
+- **Current** — **A moment is derived, never stored.** It is the first order
+  because the business has exactly one (`lib/moments/derive.ts`, from the
+  reads the screen already makes), only within a week of it, and only for
+  someone who can open the thing (`order:read`, `booking:read`). What is
+  stored is that the business has seen it: `Organization.momentsSeen`, a
+  fixed list of keys (`organizations/moments.ts` in the API,
+  `lib/moments/keys.ts` in the app; `GET` and `POST …/moments/:key/seen`,
+  `org:read`). Dismissing it or following its action marks it seen for the
+  whole business, on every device. If the seen list can't be read, nothing
+  is shown. Home reads a list for a moment only when its own figures make a
+  first possible (`homeMayHaveFirstOrder`), so a shop past its first day
+  pays nothing. A new moment is a key in both lists, a rule in `derive.ts`
+  with its test, and a row here.
+- **Current** — **What a moment must never be:** an exclamation mark, an
+  emoji, confetti, "Congratulations", a streak, a badge, a count of days in
+  a row, a modal, anything that blocks the work or asks to be looked at
+  twice. Never a number that was not read, never a claim that Saroh holds
+  money, and never a second message for something already said (setup's
+  welcome email and the checklist's done title are those moments).
+- **Not built** — a first online payment (no read counts a business's
+  online payments), a first online order as its own moment and a first
+  returning customer (the Orders list row says neither), and a day-close
+  summary (there is no day close).
 
 ## Capabilities (modules)
 
@@ -311,6 +413,21 @@ organizations/:org/customers`: everyone who has paid (an order through a
   `robots.txt`), only after consent unless cookieless, and customer-data forms
   carry `NO_CAPTURE_ATTRS`/`NO_CAPTURE_CLASS` (`site-blocks/consent-events.ts`).
   A new form that takes a customer's details carries them too.
+- **Current** (DEC-128) — **How to reach the business is read live, and is
+  the business's, not the site's.** The footer's phone, contact email,
+  address and social links come from `GET /public/sites/:siteId/contact`
+  (`organizations/business-contact.ts`, an allow-list), so a save shows with
+  no publish and none of them is a "Next publish" row. Anything new that
+  says how to reach the business reads that one read. A social link is only
+  ever a fixed network's own address (`@saroh/block-contract`
+  `social-links.ts`): never add a free link field beside it. The address
+  shown is where customers come (locations that say customers visit); the
+  registered address only by the owner's choice, and a location with no
+  counter never. Google Maps is not a social link: it is an address's own
+  optional map link (`StoreSettings.mapUrl`, the registered address's
+  `registeredAddressMapUrl`), which "Get directions" opens, else a search
+  for the address. The icons are drawn in the page's own text colour
+  (`SocialLinkRow`), with nothing fetched from a network.
 - **Current** — `draft → publish → immutable snapshot` (ADR-002). Drafts are
   private; the public renderer reads only `Publication` snapshots; rollback
   repoints `Site.currentPublicationId`. Rich fields are sanitised at publish, so
@@ -476,6 +593,62 @@ values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
   every breadcrumb (`locationsWord` in `lib/stores/pick.ts`).
 - Classes vs credits: **not decided** — leave both as they are.
 
+**Current** (10 Oct 2026) — **what a merchant reads in the workspace**
+(`apps/app.saroh.in`: JSX text, labels, placeholders, aria-labels, toasts,
+empty states, and every sentence a `lib/` function returns):
+
+- **No em dash and no semicolon in a sentence.** Two sentences, a comma, a colon or
+  "and", whichever reads naturally ("Voided. Nothing is owed.", "A place
+  you sell from: a shop counter, a studio, a market stall."). A name and
+  its note are joined by a colon or " · ", never a dash.
+- **A range says "to"**: "31 Aug to 27 Sep", "14 to 20 Sep 2026", "₹499 to
+  ₹899", "Showing 1 to 50 of 120", "Mon to Sat". The one exception is the
+  typed format of a day's hours, "07:00–19:00", which the field reads back.
+- **An absent value in a cell is a dash, drawn by the one shared piece**
+  (owner, 11 Oct 2026; the words of 10 Oct read heavier, most of all in a
+  big stat tile and a mono SKU cell). A table cell, a stat tile, a row's
+  meta line, a code cell, a quick look and a summary draw
+  `<AbsentValue says="…" />` (`@saroh/ui/absent-value`): a muted "—" the
+  eye sees, hidden from a screen reader, and the word it hears instead.
+  The word is still chosen with care: "Not set" (nobody has filled it in),
+  "None" (there are none), "Not known" (it couldn't be read or worked
+  out), "Not yet" (a month still to come), "Not recorded", "None sold".
+  `<AbsentOr says="…">{text}</AbsentOr>` draws a `lib/` function's words,
+  or the dash when they are nothing. A place that can only hold a plain
+  string (a `title`, a joined meta line, a sort value) takes
+  `absentText()` from `@saroh/ui/lib/absent`, the only file the dash is
+  written in. `CountBadge` draws the same mark for a count that couldn't
+  be read.
+    - **A Settings read row keeps its words.** Label on the left, value
+      on the right, the row's Edit button beside it: "Not set" there is the
+      invitation to set it (`Absent` in `components/sites/settings-rows.tsx`,
+      `empty` on a Business row, Your profile, the pay-instructions and
+      verification rows, an Activity change).
+    - **A sentence is not a cell.** A line that reads as words keeps them
+      ("GSTIN not set" on the print preview, "use within no limit → 30
+      days" in a pack's changes, "changed billing from every unknown
+      period").
+- **business**, never organization or workspace; **location**, never store
+  or storefront; **module**, never capability; **Stock**, never inventory;
+  **Sign in** and the noun **sign-in**, never log in or login; a **time**,
+  never a slot; **Try again**, never Retry; **Save**, never "Save changes".
+- No exclamation mark, "successfully", "please", "simply", "easy", "oops"
+  or "invalid": an error says what happened and what to do next ("Add a
+  name.", "That didn't go through. Try again.").
+- `pnpm check:copy` (`scripts/check-app-copy.mjs`, in `pnpm prepush` and
+  CI) reads the app with TypeScript's parser and fails each of these. Its
+  allow-list takes a file, a rule and a reason. The absent mark is its one
+  dash: it reads `packages/ui/src/lib/absent.ts` too, which is on the
+  allow-list, so a "—" (or `&mdash;`, or `\u2014`) typed anywhere else in
+  the app still fails.
+- **Current** (owner, 11 Oct 2026): the menu's last group, which holds
+  Settings (and, in the phone's More sheet, the rows with no seat on the
+  bar), is headed **Manage** everywhere it is drawn or spoken. The rail
+  itself is the landmark "Main menu". Nothing a person reads says
+  "Workspace"; Settings search still finds the web address by it, a
+  synonym that is matched and never shown (the check's one "workspace"
+  entry). The docs still call the app itself "the workspace".
+
 ## Saying what is true
 
 - **Current** — UI, marketing, docs and comments match what ships, and a
@@ -492,7 +665,8 @@ values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
   (Free otherwise, and an unknown plan says so). The second switch is
   production accounts' prelaunch key gate (`PRELAUNCH_GATE` in
   `apps/accounts.saroh.in/wrangler.jsonc`), which keeps sign-in and
-  sign-up to key holders and sends everyone else to www.saroh.in. Flipping
+  sign-up to key holders and sends everyone else to the waitlist page on
+  www.saroh.in (`DEV_REDIRECT_PATH`). Flipping
   both is launch, on the owner's judgement (`PRODUCT.md`); until then no CTA
   points at sign-up or Sign in. Social publishing is not a
   current priority and must not be exposed as production-ready (§22). AI

@@ -2,15 +2,16 @@
 
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import {
     deselectProjectModuleAction,
     selectProjectModuleAction,
 } from "@/lib/modules/actions";
 import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Per-Project module selection (ADR-003 / #116). OWNER/ADMIN choose which of
@@ -55,14 +56,17 @@ function ProjectModuleRow({
 
     const toggle = (next: boolean) => {
         startTransition(async () => {
-            const result = next
-                ? await selectProjectModuleAction(projectId, module.key)
-                : await deselectProjectModuleAction(projectId, module.key);
+            const result = await runAction(() =>
+                next
+                    ? selectProjectModuleAction(projectId, module.key)
+                    : deselectProjectModuleAction(projectId, module.key),
+            );
+            if (!result) return;
             if (result.ok) {
                 showSuccess(
                     next
-                        ? `${module.label} added to this project`
-                        : `${module.label} removed from this project`,
+                        ? `${module.label} added to this project.`
+                        : `${module.label} removed from this project.`,
                 );
             } else {
                 showError(refusalSentence(result));
@@ -79,13 +83,10 @@ function ProjectModuleRow({
                 <p className="text-sm font-medium">{module.label}</p>
                 {!orgEnabled ? (
                     <p className="text-sm text-muted-foreground">
-                        Not enabled for the organization.{" "}
-                        <Link
-                            href="/settings/modules"
-                            className="font-medium underline underline-offset-2"
-                        >
-                            Enable it first
-                        </Link>
+                        Not turned on for the business.{" "}
+                        <TextLink href="/settings/modules">
+                            Turn it on first
+                        </TextLink>
                     </p>
                 ) : !module.canManage ? (
                     <p className="text-sm text-muted-foreground">

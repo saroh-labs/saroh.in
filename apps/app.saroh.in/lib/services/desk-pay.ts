@@ -10,6 +10,7 @@
 import type { CashChange } from "@/lib/orders/new-order";
 import { cashChange, centsOf } from "@/lib/orders/new-order";
 import { METHOD_WORD, methodLabel } from "@/lib/payments/method-words";
+import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
 /** How the desk takes it, as the API records it. */
 export type DeskMethod = "CASH" | "UPI" | "CARD";
@@ -86,7 +87,7 @@ export function deskChoices(input: {
                       off: !input.take.byLink
                           ? "A pay link bills the whole booking, so take the rest here"
                           : !input.canLink
-                            ? "Connect a payment provider to send a link"
+                            ? providerDisconnected.title("payment")
                             : null,
                   },
               ]),
@@ -101,9 +102,9 @@ export function deskNote(choice: DeskChoice, amount: string): string {
         case "UPI":
             return `Show the counter QR. Record it once ${amount} shows on your UPI app.`;
         case "CARD":
-            return `Key ${amount} into the machine; record it once it approves.`;
+            return `Key ${amount} into the machine, and record it once it approves.`;
         case "LINK":
-            return "You get a link to send them. The booking shows unpaid until they pay; Saroh doesn't send it for you yet.";
+            return "You get a link to send them. The booking shows unpaid until they pay. Saroh doesn't send it for you yet.";
     }
 }
 
@@ -172,6 +173,6 @@ export function deskTakenText(
               ? `${amount} taken by UPI`
               : `${amount} taken by card`;
     return paid.changeCents
-        ? `${how} — give ${format(paid.changeCents)} change.`
+        ? `${how}. Give ${format(paid.changeCents)} change.`
         : `${how}. The invoice is marked paid.`;
 }

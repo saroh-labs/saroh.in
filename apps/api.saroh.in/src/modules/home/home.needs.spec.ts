@@ -44,7 +44,7 @@ const dueOrder = ev({
     id: "o2",
     title: "1043",
     headline: "Send order #1043 to Dev Shah",
-    detail: "Placed today at 08:10",
+    detail: "Placed today at 8:10 am",
     tag: "Due today",
     tone: "due",
 });
@@ -337,7 +337,7 @@ describe("openOrderWords", () => {
             headline: "Send order #1042 to a customer",
             tag: "Due tomorrow",
             tone: "due",
-            detail: "Placed today at 08:30",
+            detail: "Placed today at 8:30 am",
         });
         const pickup = order({ fulfilment: "PICKUP", createdAt: ago(HOUR) });
         expect(openOrderWords(pickup, "Dev", NOW, ZONE)).toMatchObject({
@@ -416,7 +416,7 @@ describe("openOrderWords", () => {
 describe("placedWords", () => {
     it("says today with the time, yesterday, then the date", () => {
         expect(placedWords(ago(HOUR).toISOString(), NOW, ZONE)).toBe(
-            "Placed today at 08:30",
+            "Placed today at 8:30 am",
         );
         expect(placedWords(ago(DAY).toISOString(), NOW, ZONE)).toBe(
             "Placed yesterday",

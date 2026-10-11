@@ -1,17 +1,13 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import {
-    ACTION_SHEET_BODY,
-    ACTION_SHEET_FORM,
-    ActionSheetFooter,
-} from "@/components/shared/action-sheet";
+import { FormSheetBody, FormSheetFoot } from "@/components/shared/form-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { logActivity } from "@/lib/leads/actions";
 
 /**
@@ -25,38 +21,38 @@ import { logActivity } from "@/lib/leads/actions";
 export function ActivityComposer({
     leadId,
     onDone,
-    onDirtyChange,
 }: {
     leadId: string;
     /** The note was saved: close the sheet. */
     onDone: () => void;
-    /** Something is typed, so a stray press outside must not close it. */
-    onDirtyChange?: (dirty: boolean) => void;
 }) {
     const router = useRouter();
     const [body, setBody] = useState("");
     const [busy, setBusy] = useState(false);
+    const [tried, setTried] = useState(false);
     const id = useId();
+    const empty = tried && !body.trim();
 
-    async function onSubmit(e: React.FormEvent) {
-        e.preventDefault();
+    async function onSubmit() {
+        setTried(true);
         const text = body.trim();
         if (!text) return;
-        setBusy(true);
-        const res = await logActivity(leadId, text);
-        setBusy(false);
+        const res = await runAction(() => logActivity(leadId, text), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
         }
-        showSuccess("Note added");
+        showSuccess("Note added.");
         onDone();
         router.refresh();
     }
 
     return (
-        <form onSubmit={onSubmit} className={ACTION_SHEET_FORM}>
-            <div className={ACTION_SHEET_BODY}>
+        <>
+            <FormSheetBody className="gap-4">
                 <div className="grid gap-2">
                     <Label htmlFor={id}>Note</Label>
                     <Textarea
@@ -64,23 +60,28 @@ export function ActivityComposer({
                         placeholder="Log a note or call summary…"
                         value={body}
                         disabled={busy}
-                        onChange={(e) => {
-                            setBody(e.target.value);
-                            onDirtyChange?.(e.target.value.trim() !== "");
-                        }}
+                        aria-invalid={empty || undefined}
+                        aria-describedby={empty ? `${id}-problem` : undefined}
+                        onChange={(e) => setBody(e.target.value)}
                         rows={6}
                     />
+                    {empty ? (
+                        <p
+                            id={`${id}-problem`}
+                            role="alert"
+                            className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                        >
+                            Write the note first.
+                        </p>
+                    ) : null}
                 </div>
-            </div>
-            <ActionSheetFooter busy={busy}>
-                <Button
-                    type="submit"
-                    className="wk-press"
-                    disabled={busy || !body.trim()}
-                >
-                    {busy ? "Saving…" : "Add note"}
-                </Button>
-            </ActionSheetFooter>
-        </form>
+            </FormSheetBody>
+            <FormSheetFoot
+                saveLabel="Add note"
+                savingLabel="Adding…"
+                pending={busy}
+                onSubmit={onSubmit}
+            />
+        </>
     );
 }

@@ -1,12 +1,20 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Search } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
 
 import { SettingsSearch } from "@/components/settings/settings-search";
+import {
+    isApplePlatform,
+    searchShortcut,
+    searchShortcutSpoken,
+} from "@/lib/nav/shortcut";
 import type { SettingsActor } from "@/lib/settings/search";
 import { isSettingsScreen } from "@/lib/settings/search";
 
+import { Tip } from "@saroh/ui/tooltip";
 import { openCommandMenu } from "./command-menu";
 
 const BUTTON =
@@ -28,20 +36,30 @@ const BUTTON =
  * opens the command menu everywhere, settings included, so nothing the
  * keyboard knew is lost.
  */
+/** The keyboard never changes in a session: nothing to subscribe to. */
+const subscribe = () => () => undefined;
+const onApple = () => isApplePlatform(navigator);
+// The server can't know: it says Ctrl, and a Mac corrects it on arrival.
+const onServer = () => false;
+
 export function CommandTrigger({ actor }: { actor: SettingsActor }) {
+    // ⌘K on a Mac, Ctrl K on Windows and Linux: the hint names the key
+    // this keyboard has.
+    const apple = useSyncExternalStore(subscribe, onApple, onServer);
     if (isSettingsScreen(usePathname())) {
         return <SettingsSearch actor={actor} className={BUTTON} />;
     }
     return (
-        <button
-            type="button"
-            onClick={openCommandMenu}
-            aria-label="Search Saroh (Command K)"
-            title="Search  ⌘K"
-            data-ph-unmask=""
-            className={BUTTON}
-        >
-            <Search className="size-4" />
-        </button>
+        <Tip label={`Search  ${searchShortcut(apple)}`}>
+            <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                onClick={openCommandMenu}
+                aria-label={`Search Saroh (${searchShortcutSpoken(apple)})`}
+            >
+                <Search className="size-4" />
+            </Button>
+        </Tip>
     );
 }

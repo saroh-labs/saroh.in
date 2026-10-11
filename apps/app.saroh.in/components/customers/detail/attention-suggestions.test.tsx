@@ -68,14 +68,14 @@ describe("AttentionSuggestions (C12, DEC-073)", () => {
 
     it("names the roles that can read a sensitive note", () => {
         expect(render()).toContain(
-            "Sensitive — only people who can see sensitive notes (Dentist, Owner) can read it",
+            "Sensitive. Only people who can see sensitive notes (Dentist, Owner) can read it",
         );
     });
 
     it("keeps the rule without names when the roles couldn't be read", () => {
         const html = render({ sensitiveRoles: null });
         expect(html).toContain(
-            "Sensitive — only people who can see sensitive notes can read it",
+            "Sensitive. Only people who can see sensitive notes can read it",
         );
         expect(html).not.toContain("(Dentist");
     });

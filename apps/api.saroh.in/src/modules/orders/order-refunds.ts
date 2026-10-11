@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 
+import { moneyWordsMinor } from "../../common/words-format";
+
 /**
  * Refund by line (ADR-008, U6) — the money arithmetic, pure.
  *
@@ -264,24 +266,6 @@ export function refundStanding(
 }
 
 /**
- * "₹1,250" or "₹49.50" — an amount as a merchant reads it in a refusal.
- * Paise only when there are some.
- */
-export function moneyWords(cents: number, currency: string): string {
-    const fraction = cents % 100 === 0 ? 0 : 2;
-    try {
-        return new Intl.NumberFormat("en-IN", {
-            style: "currency",
-            currency,
-            minimumFractionDigits: fraction,
-            maximumFractionDigits: fraction,
-        }).format(cents / 100);
-    } catch {
-        return `${currency} ${(cents / 100).toFixed(fraction)}`;
-    }
-}
-
-/**
  * Another amount (B8, "Or another amount"): a goodwill refund names its
  * amount and why, and nothing else — no line, so no stock comes back. Pure
  * checks on what was asked; the cap against what is left is
@@ -337,7 +321,7 @@ export function capGoodwill(
         message:
             left === 0
                 ? "Nothing is left to refund on this order."
-                : `At most ${moneyWords(left, currency)} can be refunded.`,
+                : `At most ${moneyWordsMinor(left, currency)} can be refunded.`,
         field: "amount",
     });
 }

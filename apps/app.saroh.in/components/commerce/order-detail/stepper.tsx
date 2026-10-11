@@ -52,7 +52,7 @@ export function KitchenStepper({
                                     "size-2.5 shrink-0 rounded-full",
                                     done && "bg-foreground",
                                     now &&
-                                        "bg-highlight ring-[3px] ring-brand-subtle",
+                                        "bg-foreground ring-[3px] ring-foreground",
                                     !done &&
                                         !now &&
                                         "border-[1.5px] border-border-strong",
@@ -83,7 +83,7 @@ export function KitchenStepper({
                                     type="button"
                                     onClick={onAdvance}
                                     disabled={busy}
-                                    aria-label={`${STEP_LABEL[s]} — next step`}
+                                    aria-label={`${STEP_LABEL[s]}, next step`}
                                     className={cn(
                                         FOCUS,
                                         "-mx-1 inline-flex items-center gap-[7px] rounded-md px-1 transition-colors duration-fast hover:bg-accent active:bg-accent-active coarse:min-h-11",

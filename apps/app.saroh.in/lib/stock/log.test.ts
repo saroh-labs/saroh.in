@@ -107,7 +107,7 @@ describe("an entry", () => {
                     mismatch: true,
                 }),
             ),
-        ).toBe("Counted 8 against 10 shown; the log said 9");
+        ).toBe("Counted 8 against 10 shown, and the log said 9");
     });
 
     it("says where a move went, with its note, and when it was undone", () => {

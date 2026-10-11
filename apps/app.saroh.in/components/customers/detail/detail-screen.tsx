@@ -36,6 +36,7 @@ import {
     tagFor,
 } from "@/lib/customer-workspace/view";
 
+import { runAction } from "@/lib/api/run-action";
 import {
     AttentionCard,
     AttentionEditor,
@@ -45,7 +46,7 @@ import {
 import { AttentionSuggestions } from "./attention-suggestions";
 import { InvoicesTab, SubscriptionsTab } from "./billing-tabs";
 import { BookingsTab } from "./bookings-tab";
-import { Crumbs, Header, Tabs } from "./header";
+import { Header, Tabs } from "./header";
 import { MessagesTab } from "./messages-tab";
 import { useMoreActions } from "./more-actions";
 import { Notes } from "./notes";
@@ -197,20 +198,20 @@ export function CustomerDetailScreen({
     };
 
     async function stop() {
-        setStopping(true);
-        const res = await stopOffersAction(d.contact.id);
-        setStopping(false);
+        const res = await runAction(() => stopOffersAction(d.contact.id), {
+            setBusy: setStopping,
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         router.refresh();
         const said = `Recorded: no more offers to ${name}.`;
         // Undo puts back the yes they gave; with no yes on record there is
         // nothing to put back, and inventing one would be a false consent.
         if (d.consent?.status !== "GRANTED") return showSuccess(said);
-        showUndo(said, () => {
-            void restoreOffersAction(d.contact.id).then((back) => {
-                if (!back.ok) showError(back.error);
-                router.refresh();
-            });
+        showUndo(said, async () => {
+            const back = await restoreOffersAction(d.contact.id);
+            router.refresh();
+            return back;
         });
     }
 
@@ -339,11 +340,8 @@ export function CustomerDetailScreen({
     return (
         <>
             <div className="px-[26px] pt-5">
-                <Crumbs
-                    here={name}
-                    sells={crumbsSell ?? crumbsUnderSell(sells, d)}
-                />
                 <Header
+                    sells={crumbsSell ?? crumbsUnderSell(sells, d)}
                     name={name}
                     initials={initials(name)}
                     tag={tagFor(d)}

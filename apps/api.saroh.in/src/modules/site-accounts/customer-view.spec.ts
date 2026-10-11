@@ -242,7 +242,7 @@ describe("the account's allow-list", () => {
                 {
                     label: "Ready",
                     state: "now",
-                    line: "Now · At the counter — show #1019",
+                    line: "Now · At the counter. Show #1019",
                     at: null,
                 },
                 {
@@ -272,7 +272,7 @@ describe("the account's allow-list", () => {
                 hours: null,
             });
             expect(view.steps[2].line).toBe(
-                "Now · Collect from 12 Hill Road — show #1019",
+                "Now · Pick-up from 12 Hill Road. Show #1019",
             );
             expect(leaks(view)).toEqual([]);
             // A "No counter" place has no door: no address is given.
@@ -284,7 +284,7 @@ describe("the account's allow-list", () => {
             } as never);
             expect(online.collectFrom).toBeNull();
             expect(online.steps[2].line).toBe(
-                "Now · At the counter — show #1019",
+                "Now · At the counter. Show #1019",
             );
         });
 
@@ -351,7 +351,7 @@ describe("the account's allow-list", () => {
             expect(view).toMatchObject({
                 state: "refunded",
                 status: "Refunded",
-                refund: "Money back in 5–7 days",
+                refund: "Money back in 5 to 7 days",
             });
             expect(view.steps.map((s) => [s.label, s.state])).toEqual([
                 ["New", "done"],
@@ -361,7 +361,7 @@ describe("the account's allow-list", () => {
                 ["Delivered", "done"],
                 ["Refunded", "done"],
             ]);
-            expect(view.steps.at(-1)?.line).toBe("Money back in 5–7 days");
+            expect(view.steps.at(-1)?.line).toBe("Money back in 5 to 7 days");
 
             // Refunded before it left: it never claims it was delivered.
             const early = orderDetailView({

@@ -25,14 +25,15 @@ export type {
     TestReleaseStanding,
     TestReleaseStatus,
 } from "./test-release-types";
-export { clockTime, dayKey, nextSlot, whenIn, zoneName } from "./zone-time";
+export { nextSlot, whenIn, zoneName } from "./zone-time";
+import { formatDate } from "@/lib/format/datetime";
 import type {
     GoLiveResult,
     TestRelease,
     TestReleaseLink,
     TestReleaseStanding,
 } from "./test-release-types";
-import { shortDay, whenIn, zoneName } from "./zone-time";
+import { whenIn, zoneName } from "./zone-time";
 
 /** How long a shared link works, as the API accepts it. */
 export type TestReleaseLinkDays = 1 | 7 | 30;
@@ -59,7 +60,8 @@ export const FROZEN_IN_RELEASE = [
 // A release's status
 // ---------------------------------------------------------------------------
 
-export type ReleaseTone = "success" | "draft" | "neutral" | "error" | "info";
+export type ReleaseTone =
+    "success" | "draft" | "active" | "neutral" | "error" | "info";
 
 export interface ReleaseStatusCopy {
     label: string;
@@ -120,7 +122,7 @@ export function releaseStatusCopy(
                         "The scheduled go-live didn't happen. Go live now, or schedule it again.",
                 };
             }
-            return { label: "Ready", tone: "draft", line: made };
+            return { label: "Ready", tone: "active", line: made };
     }
 }
 
@@ -187,7 +189,7 @@ export function standingCopy(standing: TestReleaseStanding): {
         case "CHANGES_REQUESTED":
             return { text: `${who} asked for changes`, approved: false };
         case "REQUESTED":
-            return { text: `In review — asked by ${who}`, approved: false };
+            return { text: `In review, asked by ${who}`, approved: false };
         // Going live closed the review (DEC-101): it no longer reads
         // "In review" about a version that is already out.
         case "BYPASSED":
@@ -323,9 +325,9 @@ export function linkLine(
         : "Not opened yet";
     switch (link.state) {
         case "active":
-            return `Works until ${shortDay(link.expiresAt, zone)} · ${opened}`;
+            return `Works until ${formatDate(link.expiresAt, zone, { now })} · ${opened}`;
         case "expired":
-            return `Stopped working on ${shortDay(link.expiresAt, zone)} · ${opened}`;
+            return `Stopped working on ${formatDate(link.expiresAt, zone, { now })} · ${opened}`;
         case "revoked":
             return `Turned off · ${opened}`;
         case "ended":

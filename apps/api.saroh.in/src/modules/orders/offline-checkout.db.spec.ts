@@ -412,7 +412,7 @@ describe("a paid plan (DB)", () => {
         );
         expect(quote.payments).toEqual([
             { type: "ONLINE", label: "Pay online" },
-            { type: "ON_HANDOVER", label: "Pay when you collect" },
+            { type: "ON_HANDOVER", label: "Pay at pick-up" },
         ]);
 
         const offline = await start(s, { payment: "ON_HANDOVER" });

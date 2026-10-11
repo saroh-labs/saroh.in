@@ -91,7 +91,7 @@ test.describe("Collections", () => {
 
         try {
             // New collection, picked by hand: two products, in order.
-            await page.goto("/commerce/products?view=collections");
+            await page.goto("/commerce/products?tab=collections");
             await page
                 .getByRole("button", { name: "New collection" })
                 .or(page.getByRole("link", { name: "New collection" }))
@@ -108,7 +108,7 @@ test.describe("Collections", () => {
             await sheet
                 .getByRole("button", { name: "Create collection" })
                 .click();
-            await expect(page.getByText(`${picked} created.`)).toBeVisible();
+            await expect(page.getByText("Collection created.")).toBeVisible();
             await expect(
                 page
                     .getByRole("listitem")
@@ -155,9 +155,9 @@ test.describe("Collections", () => {
             const edit = page.getByRole("dialog", { name: "Edit collections" });
             const locked = edit.getByRole("checkbox", { name: automatic });
             await expect(locked).toHaveAttribute("aria-checked", "true");
-            await expect(locked).toHaveAttribute("aria-disabled", "true");
+            await expect(locked).toBeDisabled();
             await expect(
-                edit.getByText(/change the product's category to change this/),
+                edit.getByText(/Change the product's category to change this/),
             ).toBeVisible();
 
             // Untick the hand-picked one here; the page follows.

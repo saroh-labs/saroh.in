@@ -22,6 +22,6 @@ describe("logoFileProblem", () => {
     it("says how big a file over 1 MB is", () => {
         expect(
             logoFileProblem({ type: "image/png", size: 1.4 * LOGO_MAX_BYTES }),
-        ).toBe("That image is 1.4 MB — keep it under 1 MB.");
+        ).toBe("That image is 1.4 MB. Keep it under 1 MB.");
     });
 });

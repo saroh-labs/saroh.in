@@ -1005,7 +1005,11 @@ export async function createSite(
     input: CreateSiteInput,
 ): Promise<SitesResult<{ siteId: string; slug: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(base, {
         method: "POST",
         body: JSON.stringify(input),
@@ -1020,7 +1024,7 @@ export async function createSite(
             data: { siteId: data.siteId, slug: data.slug ?? "" },
         };
     }
-    const failure = toFailure(data, "Could not create the site");
+    const failure = toFailure(data, "Couldn't create the site.");
     const suggestion = addressSuggestionOf(data);
     return {
         ok: false,
@@ -1074,7 +1078,11 @@ export async function saveDraftSections(
     }>
 > {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(
         `${base}/${siteId}/pages/${pageId}/draft/sections`,
         {
@@ -1123,7 +1131,7 @@ export async function saveDraftSections(
             },
         };
     }
-    return { ok: false, ...readError(data, "Could not save the sections") };
+    return { ok: false, ...readError(data, "Couldn't save the sections.") };
 }
 
 /** Publish an immutable snapshot of the site's current drafts. */
@@ -1136,7 +1144,11 @@ export async function publishSite(
     override = false,
 ): Promise<SitesResult<{ publicationId?: string; bypassed: boolean }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/publish`, {
         method: "POST",
         ...(override ? { body: JSON.stringify({ override: true }) } : {}),
@@ -1156,7 +1168,7 @@ export async function publishSite(
             },
         };
     }
-    return { ok: false, ...readError(data, "Could not publish the site") };
+    return { ok: false, ...readError(data, "Couldn't publish the site.") };
 }
 
 /**
@@ -1171,7 +1183,11 @@ export async function updateSiteSettings(
     input: SiteSettingsInput,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/settings`, {
         method: "PATCH",
         body: JSON.stringify(input),
@@ -1184,7 +1200,7 @@ export async function updateSiteSettings(
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return {
         ok: false,
-        ...readError(data, "Could not save these settings."),
+        ...readError(data, "Couldn't save these settings."),
     };
 }
 
@@ -1199,7 +1215,11 @@ export async function saveSiteIcon(
     mediaId: string | null,
 ): Promise<SitesResult<{ icon: SiteIconSaved }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(
         `${base}/${siteId}/icon`,
         mediaId === null
@@ -1214,7 +1234,7 @@ export async function saveSiteIcon(
     if (res.ok && data?.icon) return { ok: true, data: { icon: data.icon } };
     return {
         ok: false,
-        ...readError(data, "Could not save the site icon."),
+        ...readError(data, "Couldn't save the site icon."),
     };
 }
 
@@ -1325,7 +1345,11 @@ export async function restorePublication(
     override = false,
 ): Promise<SitesResult<{ publicationId: string; bypassed: boolean }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(
         `${base}/${siteId}/publications/${publicationId}/restore`,
         {
@@ -1349,7 +1373,7 @@ export async function restorePublication(
             },
         };
     }
-    return { ok: false, ...readError(data, "Could not restore that version.") };
+    return { ok: false, ...readError(data, "Couldn't restore that version.") };
 }
 
 /** Replace a site's look. The panel always sends a whole style (#189). */
@@ -1512,14 +1536,18 @@ export async function createComment(
     },
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/comments`, {
         method: "POST",
         body: JSON.stringify(input),
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, ...readError(data, "Could not leave that note.") };
+    return { ok: false, ...readError(data, "Couldn't leave that note.") };
 }
 
 /**
@@ -1550,7 +1578,11 @@ export async function createApproval(
     reason?: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/approvals`, {
         method: "POST",
         body: JSON.stringify({
@@ -1561,7 +1593,7 @@ export async function createApproval(
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, ...readError(data, "Could not record that.") };
+    return { ok: false, ...readError(data, "Couldn't record that.") };
 }
 
 /** One section of a page, as a reviewer reads it (#275). */
@@ -1608,14 +1640,18 @@ export async function requestReview(
     testReleaseId?: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/review/request`, {
         method: "POST",
         ...(testReleaseId ? { body: JSON.stringify({ testReleaseId }) } : {}),
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, ...readError(data, "Could not ask for a review.") };
+    return { ok: false, ...readError(data, "Couldn't ask for a review.") };
 }
 
 /**
@@ -1626,7 +1662,11 @@ export async function withdrawReview(
     siteId: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/review/withdraw`, {
         method: "POST",
     });
@@ -1634,7 +1674,7 @@ export async function withdrawReview(
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return {
         ok: false,
-        ...readError(data, "Could not withdraw the review request."),
+        ...readError(data, "Couldn't withdraw the review request."),
     };
 }
 
@@ -1645,7 +1685,11 @@ export async function setCommentResolved(
     resolved: boolean,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/comments/${commentId}`, {
         method: "PATCH",
         body: JSON.stringify({ resolved }),
@@ -1654,7 +1698,7 @@ export async function setCommentResolved(
         id?: string;
     } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, ...readError(data, "Could not update the note.") };
+    return { ok: false, ...readError(data, "Couldn't update the note.") };
 }
 
 // ---------------------------------------------------------------------------
@@ -1760,7 +1804,11 @@ export async function createPage(
     input: CreatePageInput,
 ): Promise<SitesResult<SitePage>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/pages`, {
         method: "POST",
         body: JSON.stringify(input),
@@ -1768,7 +1816,7 @@ export async function createPage(
     const data = (await res.json().catch(() => null)) as
         (Partial<SitePage> & { message?: string; error?: string }) | null;
     if (res.ok && data?.id) return { ok: true, data: data as SitePage };
-    return { ok: false, ...readError(data, "Could not add the page.") };
+    return { ok: false, ...readError(data, "Couldn't add the page.") };
 }
 
 /**
@@ -1781,7 +1829,11 @@ export async function updatePage(
     input: UpdatePageInput,
 ): Promise<SitesResult<SitePage>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/pages/${pageId}`, {
         method: "PATCH",
         body: JSON.stringify(input),
@@ -1789,7 +1841,7 @@ export async function updatePage(
     const data = (await res.json().catch(() => null)) as
         (Partial<SitePage> & { message?: string; error?: string }) | null;
     if (res.ok && data?.id) return { ok: true, data: data as SitePage };
-    return { ok: false, ...readError(data, "Could not update the page.") };
+    return { ok: false, ...readError(data, "Couldn't update the page.") };
 }
 
 /** Delete a page and everything on it. The home page cannot be deleted. */
@@ -1798,7 +1850,11 @@ export async function deletePage(
     pageId: string,
 ): Promise<SitesResult<{ deleted: true }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/pages/${pageId}`, {
         method: "DELETE",
     });
@@ -1807,7 +1863,7 @@ export async function deletePage(
         message?: string;
         error?: string;
     } | null;
-    return { ok: false, ...readError(data, "Could not delete the page.") };
+    return { ok: false, ...readError(data, "Couldn't delete the page.") };
 }
 
 export async function updateSiteNavigation(
@@ -1815,7 +1871,11 @@ export async function updateSiteNavigation(
     navigation: SiteNavigation | null,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/navigation`, {
         method: "PUT",
         // Always an object on the wire — Express's json parser rejects a bare
@@ -1828,7 +1888,7 @@ export async function updateSiteNavigation(
         error?: string;
     } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, ...readError(data, "Could not save the menu.") };
+    return { ok: false, ...readError(data, "Couldn't save the menu.") };
 }
 
 export async function updateSiteFooter(
@@ -1836,7 +1896,11 @@ export async function updateSiteFooter(
     footer: SiteFooter | null,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/footer`, {
         method: "PUT",
         /*
@@ -1859,7 +1923,7 @@ export async function updateSiteFooter(
         error?: string;
     } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, ...readError(data, "Could not save the footer.") };
+    return { ok: false, ...readError(data, "Couldn't save the footer.") };
 }
 
 export async function updateSiteStyle(
@@ -1867,7 +1931,11 @@ export async function updateSiteStyle(
     style: SiteStyle,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/style`, {
         method: "PUT",
         body: JSON.stringify(style),
@@ -1878,7 +1946,7 @@ export async function updateSiteStyle(
         error?: string;
     } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
-    return { ok: false, ...readError(data, "Could not save the style.") };
+    return { ok: false, ...readError(data, "Couldn't save the style.") };
 }
 
 // ---------------------------------------------------------------------------
@@ -1920,7 +1988,11 @@ export async function createPreviewLink(
     expiresInDays: PreviewLinkDays,
 ): Promise<SitesResult<SitePreviewLinkView & { token: string }>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/preview-links`, {
         method: "POST",
         body: JSON.stringify({ expiresInDays }),
@@ -1932,7 +2004,7 @@ export async function createPreviewLink(
     }
     return {
         ok: false,
-        ...readError(data, "Could not create a preview link."),
+        ...readError(data, "Couldn't create a preview link."),
     };
 }
 
@@ -1941,7 +2013,11 @@ export async function revokePreviewLink(
     linkId: string,
 ): Promise<SitesResult<SitePreviewLinkView>> {
     const base = await sitesBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}/${siteId}/preview-links/${linkId}`, {
         method: "DELETE",
     });
@@ -1950,6 +2026,6 @@ export async function revokePreviewLink(
     if (res.ok && data?.id) return { ok: true, data };
     return {
         ok: false,
-        ...readError(data, "Could not turn this link off."),
+        ...readError(data, "Couldn't turn this link off."),
     };
 }

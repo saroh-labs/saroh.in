@@ -76,7 +76,11 @@ async function send<T>(
     fallback: string,
 ): Promise<ApiResult<T>> {
     const base = await orgBase();
-    if (!base) return { ok: false, error: "No active organization." };
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
     const res = await apiFetch(`${base}${path}`, {
         method,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -95,7 +99,7 @@ export interface CreateStaffInput {
 }
 
 export function createStaff(input: CreateStaffInput) {
-    return send<StaffView>("/staff", "POST", input, "Could not add them");
+    return send<StaffView>("/staff", "POST", input, "Couldn't add them.");
 }
 
 export function updateStaff(
@@ -110,7 +114,7 @@ export function updateStaff(
         `/staff/${staffId}`,
         "PATCH",
         input,
-        "Could not save them",
+        "Couldn't save them.",
     );
 }
 
@@ -119,7 +123,7 @@ export function setStaffServices(staffId: string, serviceIds: string[]) {
         `/staff/${staffId}/services`,
         "PUT",
         { serviceIds },
-        "Could not save who takes it",
+        "Couldn't save who takes it.",
     );
 }
 
@@ -129,7 +133,7 @@ export function replaceStaffHours(staffId: string, hours: WeeklyRange[]) {
         `/staff/${staffId}/hours`,
         "PUT",
         { hours },
-        "Could not save the hours",
+        "Couldn't save the hours.",
     );
 }
 
@@ -141,7 +145,7 @@ export function addExtraHours(
         `/staff/${staffId}/extra-hours`,
         "POST",
         input,
-        "Could not open those hours",
+        "Couldn't open those hours.",
     );
 }
 
@@ -150,7 +154,7 @@ export function removeExtraHours(staffId: string, extraHoursId: string) {
         `/staff/${staffId}/extra-hours/${extraHoursId}`,
         "DELETE",
         undefined,
-        "Could not close those hours",
+        "Couldn't close those hours.",
     );
 }
 
@@ -173,7 +177,7 @@ export function addTimeOff(staffId: string, input: TimeOffInput) {
         `/staff/${staffId}/time-off`,
         "POST",
         input,
-        "Could not add the time off",
+        "Couldn't add the time off.",
     );
 }
 
@@ -182,7 +186,7 @@ export function removeTimeOff(staffId: string, timeOffId: string) {
         `/staff/${staffId}/time-off/${timeOffId}`,
         "DELETE",
         undefined,
-        "Could not remove the time off",
+        "Couldn't remove the time off.",
     );
 }
 
@@ -192,7 +196,7 @@ export function removeTimeOffMany(staffId: string, ids: string[]) {
         `/staff/${staffId}/time-off/remove`,
         "POST",
         { ids },
-        "Could not remove the time off",
+        "Couldn't remove the time off.",
     );
 }
 
@@ -202,7 +206,7 @@ export function addClosure(input: OffRangeInput & { reason?: string }) {
         "/closures",
         "POST",
         input,
-        "Could not close the business then",
+        "Couldn't close the business then.",
     );
 }
 
@@ -212,7 +216,7 @@ export function removeClosures(ids: string[]) {
         "/closures/remove",
         "POST",
         { ids },
-        "Could not open the business again",
+        "Couldn't open the business again.",
     );
 }
 
@@ -225,7 +229,7 @@ export function previewOff(input: OffRangeInput & { staffId?: string }) {
         "/time-off/preview",
         "POST",
         input,
-        "Could not check the bookings then",
+        "Couldn't check the bookings then.",
     );
 }
 
@@ -234,6 +238,6 @@ export function updateBookingRules(input: Partial<BookingRules>) {
         "/booking-rules",
         "PUT",
         input,
-        "Could not save the booking rules",
+        "Couldn't save the booking rules.",
     );
 }

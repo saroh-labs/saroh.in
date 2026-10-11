@@ -5,6 +5,7 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { pressOutside } from "@/components/shared/press-outside.test-kit";
 import type { OrderRead, OrderReadLine } from "@/lib/orders/read";
 
 import { OrderDetail } from "./order-detail";
@@ -294,9 +295,15 @@ async function press(el: HTMLElement) {
 }
 
 function field(label: string) {
-    const el = Array.from(dialog()?.querySelectorAll("label") ?? [])
-        .find((l) => l.textContent.trim().startsWith(label))
-        ?.querySelector("input");
+    // The label sits above its box and points at it (`Field`).
+    const named = Array.from(dialog()?.querySelectorAll("label") ?? []).find(
+        (l) => l.textContent.trim().startsWith(label),
+    );
+    const el = named?.htmlFor
+        ? dialog()?.querySelector<HTMLInputElement>(
+              `input[id="${named.htmlFor}"]`,
+          )
+        : named?.querySelector("input");
     if (!el) throw new Error(`No "${label}" field`);
     return el;
 }
@@ -348,7 +355,13 @@ describe("Order Detail is read first", () => {
             expect(dialogName()).toBe(name);
             // The page keeps no copy of the fields.
             expect(host.querySelector("input, select, textarea")).toBe(null);
-            await press(button("Cancel", dialog()));
+            // The cancel sheet's way out is "Keep order".
+            await press(
+                button(
+                    opener === "Cancel order…" ? "Keep order" : "Cancel",
+                    dialog(),
+                ),
+            );
             expect(dialog()).toBe(null);
         }
     });
@@ -431,10 +444,68 @@ describe("Cancel, Escape and the close button", () => {
     it("drop a cancel that was never confirmed", async () => {
         render();
         await press(button("Cancel order…"));
-        await press(button("Cancel", dialog()));
+        await press(button("Keep order", dialog()));
         expect(dialog()).toBe(null);
         expect(actions.cancelOrder).not.toHaveBeenCalled();
         expect(host.textContent).not.toMatch(/Cancelling/);
+    });
+
+    it('the cancel sheet\'s way out is "Keep order", never "Cancel" beside the button that cancels', async () => {
+        render();
+        await press(button("Cancel order…"));
+        const words = Array.from(dialog()?.querySelectorAll("button") ?? [])
+            .map((b) => b.textContent.trim())
+            .filter(Boolean);
+        expect(words).toContain("Keep order");
+        expect(words).toContain("Refund ₹360");
+        expect(words).not.toContain("Cancel");
+    });
+
+    it('every other sheet keeps "Cancel" as its way out', async () => {
+        render();
+        await press(button("Edit items or address"));
+        expect(button("Cancel", dialog())).toBeTruthy();
+    });
+});
+
+describe("a press outside the sheet", () => {
+    it("closes it while nothing has been changed", async () => {
+        render();
+        await press(button("Edit items or address"));
+        expect(dialog()).not.toBe(null);
+        await pressOutside();
+        expect(dialog()).toBe(null);
+    });
+
+    it("does nothing once something has been changed, and Cancel still drops it", async () => {
+        render();
+        await press(button("Edit items or address"));
+        await press(button("One more Seeded loaf", dialog()));
+        await pressOutside();
+        expect(dialog()).not.toBe(null);
+        expect(quantity(0)).toBe("3");
+
+        await escape();
+        expect(dialog()).toBe(null);
+        expect(actions.editBeforePreparing).not.toHaveBeenCalled();
+    });
+
+    it("closes again once the change is put back", async () => {
+        render();
+        await press(button("Edit items or address"));
+        await press(button("One more Seeded loaf", dialog()));
+        await press(button("One fewer Seeded loaf", dialog()));
+        await pressOutside();
+        expect(dialog()).toBe(null);
+    });
+
+    it("holds Hand to courier once a tracking number is typed", async () => {
+        render(readyToShip());
+        await press(button("Hand to courier"));
+        type(field("Tracking number"), "AWB123");
+        await pressOutside();
+        expect(dialog()).not.toBe(null);
+        expect(field("Tracking number").value).toBe("AWB123");
     });
 });
 
@@ -447,7 +518,7 @@ describe("a refusal", () => {
         render();
         await press(button("Edit items or address"));
         await press(button("One more Seeded loaf", dialog()));
-        await press(button("Save — ₹120 more due", dialog()));
+        await press(button("Save (₹120 more due)", dialog()));
 
         expect(actions.editBeforePreparing).toHaveBeenCalledWith("o1", {
             lines: [{ itemId: "l1", quantity: 3 }],
@@ -486,7 +557,7 @@ describe("a refusal", () => {
         render(readyToShip());
         await press(button("Hand to courier"));
         type(field("Tracking number"), "BD 9920 1140");
-        await press(button("Handed over", dialog()));
+        await press(button("Mark handed over", dialog()));
 
         expect(toast.showError).toHaveBeenCalledWith("It isn't paid yet.");
         expect(dialogName()).toBe("Hand to courier");
@@ -510,7 +581,7 @@ describe("a save", () => {
         await press(button("Save", dialog()));
 
         expect(dialog()).toBe(null);
-        expect(toast.showSuccess).toHaveBeenCalledWith("Saved.");
+        expect(toast.showSuccess).toHaveBeenCalledWith("Order saved.");
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(document.activeElement).toBe(edit);
     });
@@ -525,7 +596,7 @@ describe("a save", () => {
         render();
         await press(button("Edit items or address"));
         await press(button("One more Seeded loaf", dialog()));
-        await press(button("Save — ₹120 more due", dialog()));
+        await press(button("Save (₹120 more due)", dialog()));
 
         expect(button("Cancel", dialog()).disabled).toBe(true);
         await escape();
@@ -550,7 +621,7 @@ describe("a save", () => {
         render(readyToShip());
         await press(button("Hand to courier"));
         type(field("Tracking number"), "BD 9920 1140");
-        await press(button("Handed over", dialog()));
+        await press(button("Mark handed over", dialog()));
 
         expect(actions.moveStage).toHaveBeenCalledWith("o1", {
             to: "HANDED_TO_COURIER",
@@ -578,11 +649,15 @@ describe("a save", () => {
         });
         render();
         await press(button("Change how it's fulfilled…"));
-        const sheet = dialog();
-        const delivery = Array.from(
-            sheet?.querySelectorAll<HTMLElement>("[role=radio]") ?? [],
-        ).find((r) => r.textContent === "Local delivery");
-        if (!delivery) throw new Error("No Local delivery");
+        // The ways arrive a tick after the sheet: wait for them, or a busy
+        // machine reads the sheet before they are drawn.
+        const delivery = await vi.waitFor(() => {
+            const found = Array.from(
+                dialog()?.querySelectorAll<HTMLElement>("[role=radio]") ?? [],
+            ).find((r) => r.textContent === "Local delivery");
+            if (!found) throw new Error("No Local delivery");
+            return found;
+        });
         await press(delivery);
         for (const [name, value] of [
             ["Street and number", "14 Lake View Road"],
@@ -590,7 +665,7 @@ describe("a save", () => {
             ["State", "Maharashtra"],
             ["PIN code", "411001"],
         ]) {
-            const input = sheet?.querySelector<HTMLInputElement>(
+            const input = dialog()?.querySelector<HTMLInputElement>(
                 `input[aria-label="${name}"]`,
             );
             if (!input) throw new Error(`No ${name}`);

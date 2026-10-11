@@ -1,11 +1,11 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Globe, Plus } from "lucide-react";
+import { Globe } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { navRoleCan } from "@/components/shared/nav-items";
+import { navCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -39,7 +39,12 @@ export default async function SitesPage() {
     if (first) redirect(`/sites/${first.id}/pages`);
 
     const role = organization?.role ?? null;
-    const mayCreate = navRoleCan(role, "site:create");
+    // By what the role was given, never by its name: a role the business
+    // made with `site:create` ticked may make one.
+    const mayCreate = navCan(
+        { role, actions: organization?.actions },
+        "site:create",
+    );
 
     /*
      * Three roles reach this screen with nothing on it, and it said the same
@@ -56,14 +61,18 @@ export default async function SitesPage() {
             : {
                   title: "No website yet",
                   description: mayCreate
-                      ? "Pages, posts and an address — make one and it is yours to edit before anyone can see it."
-                      : "An owner or admin creates the first one.",
+                      ? "Make one and it is yours to edit before anyone can see it."
+                      : "Its pages and posts show here once there is one.",
               };
 
     return (
         <PageContainer width="full">
             <div className="flex flex-col gap-6">
-                <PageHeader title="Website" className="mb-0" />
+                <PageHeader
+                    breadcrumb={["Website"]}
+                    title="Website"
+                    className="mb-0"
+                />
                 <EmptyState
                     data-ph-unmask=""
                     icon={<Globe />}
@@ -72,10 +81,7 @@ export default async function SitesPage() {
                     action={
                         mayCreate ? (
                             <Button asChild>
-                                <Link href="/sites/new">
-                                    <Plus className="mr-1.5 size-4" />
-                                    New site
-                                </Link>
+                                <Link href="/sites/new">New site</Link>
                             </Button>
                         ) : undefined
                     }

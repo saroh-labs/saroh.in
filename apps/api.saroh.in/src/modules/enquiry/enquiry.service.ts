@@ -137,7 +137,7 @@ export class EnquiryService {
             const allowed = this.rateLimiter.take(`${formId}:${ipHash}`);
             if (!allowed) {
                 throw new HttpException(
-                    "Too many submissions — please slow down and try again shortly",
+                    "Too many submissions. Wait a moment, then try again.",
                     429,
                 );
             }

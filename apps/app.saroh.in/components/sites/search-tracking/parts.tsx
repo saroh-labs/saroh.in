@@ -3,15 +3,17 @@
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { FailedState } from "@saroh/ui/data-state";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { Copy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import type { SearchTrackingSave } from "@/lib/sites/search-tracking";
 import { SUPPORT_EMAIL, SWITCHED_OFF_LINE } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
+import { CopyButton } from "@saroh/ui/copy-button";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The pieces the "Search and tracking" section (DEC-108, U7) shares
@@ -82,18 +84,13 @@ export function SearchTrackingFailed() {
     const [pending, startTransition] = useTransition();
     return (
         <FailedState
-            title="Tracking couldn't be loaded"
-            description="Your codes and trackers are unchanged. Try again in a moment."
-            action={
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => startTransition(() => router.refresh())}
-                >
-                    {pending ? "Trying…" : "Retry"}
-                </Button>
-            }
+            size="panel"
+            title={couldntLoad("tracking")}
+            description={nothingChanged(
+                "Your codes and trackers are as they were.",
+            )}
+            onRetry={() => startTransition(() => router.refresh())}
+            retrying={pending}
         />
     );
 }
@@ -101,10 +98,7 @@ export function SearchTrackingFailed() {
 /** Saroh staff switched this site's trackers off (#897). */
 export function SwitchedOffNotice() {
     return (
-        <div
-            role="status"
-            className="rounded-lg border bg-muted px-4 py-3 text-sm"
-        >
+        <Notice role="status">
             <p className="font-medium">{SWITCHED_OFF_LINE}</p>
             <p className="text-muted-foreground">
                 None of your trackers run, and none can be turned on. To ask
@@ -117,7 +111,7 @@ export function SwitchedOffNotice() {
                 </a>
                 .
             </p>
-        </div>
+        </Notice>
     );
 }
 
@@ -129,35 +123,31 @@ export function LockNotice({ lock }: { lock: TrackersLock }) {
             className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
         >
             <span className="min-w-0">{lock.line}</span>
-            <Button asChild variant="outline" size="sm" className="shrink-0">
-                <Link href={lock.href}>{lock.cta}</Link>
-            </Button>
+            <PlanWay>
+                <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                >
+                    <Link href={lock.href}>{lock.cta}</Link>
+                </Button>
+            </PlanWay>
         </div>
     );
 }
 
-/** Copy a value, with a toast once it's on the clipboard. */
+/** Copy a value: the button says "Copied" itself. */
 export function CopyValue({ value, label }: { value: string; label: string }) {
-    async function copy() {
-        try {
-            await navigator.clipboard.writeText(value);
-            showSuccess(`${label} copied`);
-        } catch {
-            showError(`Couldn't copy. Select it and copy it yourself.`);
-        }
-    }
     return (
-        <Button
-            type="button"
+        <CopyButton
+            value={value}
+            label="Copy"
+            thing={label.toLowerCase()}
             variant="ghost"
-            size="sm"
-            onClick={() => void copy()}
             aria-label={`Copy ${label.toLowerCase()}`}
             className="shrink-0"
-        >
-            <Copy aria-hidden className="size-4" />
-            Copy
-        </Button>
+        />
     );
 }
 

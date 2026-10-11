@@ -69,10 +69,11 @@ test.describe("invoices", () => {
         await expect(
             page.getByText(/issued and its pay link copied/).first(),
         ).toBeVisible();
-        const number = (
-            await page.getByRole("heading", { level: 1 }).innerText()
-        ).trim();
-        expect(number).toMatch(/\d{4}$/);
+        // The loading shell has a heading too ("Loading the invoice"): read
+        // the number once the invoice's own heading is there.
+        const heading = page.getByRole("heading", { level: 1 });
+        await expect(heading).toHaveText(/\d{4}$/);
+        const number = (await heading.innerText()).trim();
         await expect(
             page.getByText("Due", { exact: true }).first(),
         ).toBeVisible();
@@ -136,7 +137,7 @@ test.describe("invoices", () => {
         // 4. The money arrives, and is recorded.
         await page.getByRole("button", { name: "Mark paid" }).click();
         const dialog = page.getByRole("dialog", { name: "Record a payment" });
-        await dialog.getByRole("button", { name: "Mark it paid" }).click();
+        await dialog.getByRole("button", { name: "Record payment" }).click();
         await expect(
             page.getByText(`${number} marked paid`).first(),
         ).toBeVisible();
@@ -369,16 +370,20 @@ test.describe("sending an invoice with its pay link (D17)", () => {
         await expect(send).toHaveCSS("cursor", "pointer");
         await send.click();
 
-        // It says who is told, where, and what happens to the old link.
-        const confirm = page.getByRole("alertdialog");
-        await expect(confirm).toContainText(`by email at ${email}`);
-        await expect(confirm).toContainText(
+        // A send asks nothing: it waits ten seconds with Undo, saying who
+        // is told, where, and what happens to the old link.
+        const held = page
+            .locator("[data-sonner-toast]")
+            .filter({ hasText: "Sending in 10 seconds" });
+        await expect(held).toContainText(`by email at ${email}`);
+        await expect(held).toContainText(
             "A link you shared before stops working.",
         );
-        await confirm.getByRole("button", { name: "Send it" }).click();
+        await expect(held.getByRole("button", { name: "Undo" })).toBeVisible();
+        // The hold ends by itself, and then it is sent.
         await expect(
             page.getByText(`Sent to ${email} with a pay link.`).first(),
-        ).toBeVisible();
+        ).toBeVisible({ timeout: 25_000 });
 
         // Saroh recorded the send to that address.
         const recorded = await call.get<InvoiceRead>(`/invoices/${id}`);
@@ -467,7 +472,7 @@ test.describe("sending an invoice with its pay link (D17)", () => {
         await expect(confirm).toContainText(
             "It takes the next number and its lines lock.",
         );
-        await confirm.getByRole("button", { name: "Send it" }).click();
+        await confirm.getByRole("button", { name: "Issue and send" }).click();
         await expect(
             page.getByText(`Sent to ${email} with a pay link.`).first(),
         ).toBeVisible();

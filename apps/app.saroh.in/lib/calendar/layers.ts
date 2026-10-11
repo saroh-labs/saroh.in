@@ -1,3 +1,6 @@
+import { formatMonth, formatTime } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
+import { absentText } from "@saroh/ui/lib/absent";
 import { fromMajor, toMajor } from "./money";
 import { dayProblems, problemChip } from "./problems";
 import type {
@@ -150,7 +153,7 @@ export function dayChips(
         if (n === 0) continue;
         chips.push({
             key: layer.key,
-            text: `${n} ${n === 1 ? layer.one : layer.many}`,
+            text: count(n, layer.one, layer.many),
             tone: layer.tone,
         });
     }
@@ -210,16 +213,6 @@ export interface ItemLine {
     href: string;
 }
 
-/** "06:00", "18:30" in the business's zone — the design's day panel clock. */
-export function clock(at: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).format(new Date(at));
-}
-
 /** A bare order number reads as one: "1017" → "#1017". */
 function orderRef(ref: string): string {
     return /^\d+$/.test(ref) ? `#${ref}` : ref;
@@ -238,7 +231,7 @@ export function describeItem(
     item: CalendarItem,
     { timeZone, ahead }: { timeZone: string; ahead: boolean },
 ): ItemLine {
-    const at = item.at ? clock(item.at, timeZone) : null;
+    const at = item.at ? formatTime(item.at, timeZone) : null;
     const href = linkHref(item.link);
     const line = (
         title: string,
@@ -347,32 +340,7 @@ export function shiftMonth(month: string, by: number): string {
 
 /** "September 2026". */
 export function monthTitle(month: string): string {
-    const [y, m] = month.split("-").map(Number);
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone: "UTC",
-        month: "long",
-        year: "numeric",
-    }).format(new Date(Date.UTC(y, m - 1, 1)));
-}
-
-/** "Fri 18 Sep", with the year when it is not this one. */
-export function dayTitle(date: string, today: string): string {
-    const [y, m, d] = date.split("-").map(Number);
-    return (
-        new Intl.DateTimeFormat("en-GB", {
-            timeZone: "UTC",
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-            ...(date.slice(0, 4) === today.slice(0, 4)
-                ? {}
-                : { year: "numeric" }),
-        })
-            .format(new Date(Date.UTC(y, m - 1, d)))
-            .replace(",", "")
-            // The design writes "Sep"; newer ICU writes "Sept" for en-GB.
-            .replace("Sept", "Sep")
-    );
+    return formatMonth(`${month}-01`, "UTC");
 }
 
 /** Blank cells before the 1st, weeks starting on Monday. */
@@ -405,7 +373,7 @@ export function monthSummary({
     if (off[lead.key]) {
         const on = layers
             .filter((l) => !off[l.key])
-            .map((l) => `${l.label} ${month.totals[l.key] ?? "—"}`);
+            .map((l) => `${l.label} ${month.totals[l.key] ?? absentText()}`);
         return on.length ? on.join(" · ") : "Every layer is off";
     }
     const soFar = month.days

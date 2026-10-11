@@ -19,6 +19,9 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { SocialNetwork } from "@saroh/block-contract";
+import { MAP_LINK_MAX, SOCIAL_INPUT_MAX } from "@saroh/block-contract";
+
 import {
     MAX_COUNTER_DIGITS,
     MIN_COUNTER_DIGITS,
@@ -120,6 +123,16 @@ export class OnboardingProfileDto extends BusinessProfileDto {
     registered?: boolean;
 }
 
+/** The goals setup offers: four modules, and invoicing, which needs none. */
+export const FIRST_GOALS = [
+    "COMMERCE",
+    "APPOINTMENTS",
+    "WEBSITE",
+    "CRM",
+    "INVOICE",
+] as const;
+export type FirstGoal = (typeof FIRST_GOALS)[number];
+
 /**
  * Payload for `POST /organizations` (S1-004). Carries only the business
  * identity — never the owner. Ownership is derived from the authenticated
@@ -129,7 +142,7 @@ export class OnboardOrganizationDto {
     /** Human display name for the organization; also seeds the slug. */
     @Transform(trim)
     @IsString()
-    @MinLength(1, { message: "An organization name is required" })
+    @MinLength(1, { message: "Enter the business's name." })
     @MaxLength(120)
     name!: string;
 
@@ -162,6 +175,16 @@ export class OnboardOrganizationDto {
         message: "kind must be BUSINESS, SOLO or WORK",
     })
     kind?: OrganizationKind;
+
+    /**
+     * What they chose to do first on the setup screen (UX audit, 10 Oct):
+     * one of {@link FIRST_GOALS}. It turns nothing on (the app does that,
+     * module by module) and decides no access. The welcome email leads with
+     * its next step. Absent: they will decide later.
+     */
+    @IsOptional()
+    @IsIn(FIRST_GOALS, { message: "goal is not one Saroh offers" })
+    goal?: FirstGoal;
 }
 
 const DIGITS_MESSAGE = `The counter is ${MIN_COUNTER_DIGITS} to ${MAX_COUNTER_DIGITS} digits.`;
@@ -331,11 +354,41 @@ export class PayInstructionsDto {
  * no-op. Also absent: anything about ownership or membership — those move only
  * through the membership endpoints.
  */
+/** A link's field: text, held to the longest a network's link runs. */
+const SocialLink = () => (target: object, key: string) => {
+    IsOptional()(target, key);
+    IsString()(target, key);
+    MaxLength(SOCIAL_INPUT_MAX, { message: "That link is too long." })(
+        target,
+        key,
+    );
+};
+
+/**
+ * The business's social links (DEC-128): for each network a handle
+ * ("@rye") or a pasted link, "" to clear it; a network left out stays as it
+ * is. Only the fixed list below is taken (the pipe refuses any other key),
+ * and each value is rebuilt into one canonical address on the network's own
+ * host by the settings save (`business-social.ts`), which names the field
+ * it refuses. No other address is accepted.
+ */
+export class SocialLinksDto implements Partial<Record<SocialNetwork, string>> {
+    @SocialLink() instagram?: string;
+    @SocialLink() facebook?: string;
+    /** A phone number with its country code; kept as a wa.me link. */
+    @SocialLink() whatsapp?: string;
+    @SocialLink() youtube?: string;
+    @SocialLink() x?: string;
+    @SocialLink() linkedin?: string;
+    @SocialLink() pinterest?: string;
+    @SocialLink() telegram?: string;
+}
+
 export class UpdateOrganizationDto {
     @IsOptional()
     @Transform(trim)
     @IsString()
-    @MinLength(1, { message: "An organization name is required" })
+    @MinLength(1, { message: "Enter the business's name." })
     @MaxLength(120)
     name?: string;
 
@@ -372,6 +425,32 @@ export class UpdateOrganizationDto {
         message: "kind must be BUSINESS, SOLO or WORK",
     })
     kind?: OrganizationKind;
+
+    /** The business's social links (DEC-128), a field per network. */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => SocialLinksDto)
+    socialLinks?: SocialLinksDto;
+
+    /**
+     * Its website shows the registered address as where to find it
+     * (DEC-128), while no location customers visit has one. Absent, it is
+     * left as it is.
+     */
+    @IsOptional()
+    @IsBoolean()
+    siteShowsRegisteredAddress?: boolean;
+
+    /**
+     * The registered address's place on Google Maps (DEC-128): what "Get
+     * directions" opens while the website shows that address. "" clears
+     * it. Only Google's own map links are kept; the settings save checks
+     * it and names the field (`map-link.ts`).
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(MAP_LINK_MAX, { message: "That link is too long." })
+    registeredAddressMapUrl?: string;
 }
 
 /**

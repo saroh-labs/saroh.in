@@ -8,10 +8,12 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
-import { ChevronDown, Plus, Store } from "lucide-react";
+import { ChevronDown, Store } from "lucide-react";
 import Link from "next/link";
 
+import { PlanWay } from "@/components/billing/plan-way";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { meterBeside } from "@/lib/billing/meter";
 import { newProductHref, productSettingsHref } from "@/lib/products/links";
@@ -33,7 +35,10 @@ export function CatalogueHeader({
     canWrite,
     meter = null,
     bannerShown = false,
+    count,
 }: {
+    /** "12 products across 2 locations", beside the title; none at zero. */
+    count?: string;
     stores: { id: string; name: string }[];
     /** The storefront filter, if one is picked. */
     storeId: string | null;
@@ -77,45 +82,32 @@ export function CatalogueHeader({
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                {meter && beside.label ? (
-                    <span
-                        className={
-                            meter.full
-                                ? "text-[12.5px] font-semibold text-destructive-subtle-foreground"
-                                : "text-[12.5px] text-muted-foreground"
-                        }
-                    >
-                        {beside.label}
-                    </span>
-                ) : null}
                 {meter?.full ? (
                     <>
                         <Button disabled title={meter.reason ?? undefined}>
-                            <Plus className="mr-1.5 size-4" />
                             New product
                         </Button>
                         <span className="sr-only">{meter.reason}</span>
                         {beside.upgrade ? (
-                            <Button asChild variant="outline">
-                                <Link href={meter.href}>
-                                    {meter.upgradeTo
-                                        ? `Upgrade to ${meter.upgradeTo}`
-                                        : "See plans"}
-                                </Link>
-                            </Button>
+                            <PlanWay fallback={null}>
+                                <Button asChild variant="outline">
+                                    <Link href={meter.href}>
+                                        {planLabel(meter.upgradeTo)}
+                                    </Link>
+                                </Button>
+                            </PlanWay>
                         ) : null}
                     </>
                 ) : many && !here ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button>
-                                <Plus className="mr-1.5 size-4" />
                                 New product
                                 <ChevronDown className="ml-1 size-4" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            <DropdownMenuLabel className="label">
                                 Add it to
                             </DropdownMenuLabel>
                             {stores.map((s) => (
@@ -131,7 +123,6 @@ export function CatalogueHeader({
                 ) : (
                     <Button asChild>
                         <Link href={newProductHref((here ?? first).id)}>
-                            <Plus className="mr-1.5 size-4" />
                             New product
                         </Link>
                     </Button>
@@ -142,7 +133,22 @@ export function CatalogueHeader({
         <PageHeader
             breadcrumb={["Sell", "Products"]}
             title="Products"
+            count={count}
             className="mb-0"
+            // The plan's meter is a figure, not a button: before them.
+            meta={
+                actions && meter && beside.label ? (
+                    <span
+                        className={
+                            meter.full
+                                ? "text-[12.5px] font-semibold text-destructive-subtle-foreground"
+                                : "text-[12.5px] text-muted-foreground"
+                        }
+                    >
+                        {beside.label}
+                    </span>
+                ) : undefined
+            }
             actions={actions}
         />
     );

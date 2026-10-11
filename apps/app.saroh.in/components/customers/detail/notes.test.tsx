@@ -20,6 +20,7 @@ vi.mock("@/lib/customer-workspace/actions", () => ({
 const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
+    showSuccess: vi.fn(),
     showUndo: vi.fn(),
 }));
 
@@ -138,7 +139,7 @@ describe("the Notes tab", () => {
     it("offers text only: no allergen picker", async () => {
         render([note()]);
         await press(buttons("Add note")[0]);
-        expect(dialogName()).toBe("Add note");
+        expect(dialogName()).toBe("New note");
         expect(dialog()?.querySelectorAll("textarea")).toHaveLength(1);
         expect(dialog()?.querySelector('[role="group"]')).toBe(null);
         expect(dialog()?.querySelector("[aria-pressed]")).toBe(null);
@@ -157,7 +158,7 @@ describe("the Notes tab", () => {
         render([]);
         expect(buttons("Add note")).toHaveLength(1);
         await press(buttons("Add note")[0]);
-        expect(dialogName()).toBe("Add note");
+        expect(dialogName()).toBe("New note");
     });
 
     it("shows a note's words and who wrote it, with no allergy chips", () => {
@@ -198,7 +199,7 @@ describe("the Add note sheet", () => {
             body: "Likes the corner table",
         });
         expect(showError).toHaveBeenCalledWith("Your role can't add notes.");
-        expect(dialogName()).toBe("Add note");
+        expect(dialogName()).toBe("New note");
         expect(dialog()?.querySelector("textarea")?.value).toBe(
             "Likes the corner table",
         );
@@ -237,15 +238,19 @@ describe("the Add note sheet", () => {
         render([note()]);
         await press(buttons("Add note")[0]);
         const add = () => buttons("Add note", dialog())[0];
-        expect(add().disabled).toBe(true);
+        // The button is never off: pressed on nothing, it says so.
+        expect(add().disabled).toBe(false);
         expect(dialog()?.textContent).toContain("0 / 500");
+        await submit();
+        expect(dialog()?.textContent).toContain("Write the note first.");
+        expect(addNoteAction).not.toHaveBeenCalled();
 
         type("a".repeat(500));
-        expect(add().disabled).toBe(false);
         expect(dialog()?.textContent).toContain("500 / 500");
 
         type("a".repeat(501));
-        expect(add().disabled).toBe(true);
         expect(dialog()?.textContent).toContain("Over 500 characters");
+        await submit();
+        expect(addNoteAction).not.toHaveBeenCalled();
     });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { EditorLoading } from "@/components/sites/editor-loading";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -7,6 +8,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 
+import { FormSheet } from "@/components/shared/form-sheet";
 import type {
     SiteFooter,
     SiteNavigationItem,
@@ -14,8 +16,9 @@ import type {
 } from "@/lib/sites/service";
 import { settingsEditId } from "@/lib/sites/settings-edit";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { MenuEditor } from "./menu-editor";
-import { NOTE, SettingsSheetFrame } from "./settings-sheet";
+import { NOTE } from "./settings-sheet";
 
 /* On demand and browser-only, for the same reasons as in the editor. */
 const RichTextEditor = dynamic(
@@ -25,9 +28,7 @@ const RichTextEditor = dynamic(
         ),
     {
         ssr: false,
-        loading: () => (
-            <div className="min-h-40 animate-pulse rounded-md border bg-muted" />
-        ),
+        loading: () => <EditorLoading className="min-h-40" />,
     },
 );
 
@@ -60,10 +61,10 @@ export function MenuSheet({
 }) {
     const [menu, setMenu] = useState(saved);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             {...frame}
             wide
-            editId={settingsEditId("menu")}
+            returnFocusTo={settingsEditId("menu")}
             title="Menu"
             description="The links at the top of every page, in this order."
             onSubmit={(e) => {
@@ -77,7 +78,7 @@ export function MenuSheet({
                 A page left with no label goes by its own title. Save with no
                 pages to remove the menu.
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -96,10 +97,10 @@ export function FooterSheet({
         saved?.format ?? "html",
     );
     return (
-        <SettingsSheetFrame
+        <FormSheet
             {...frame}
             wide
-            editId={settingsEditId("footer")}
+            returnFocusTo={settingsEditId("footer")}
             title="Footer"
             description="The line at the foot of every page."
             onSubmit={(e) => {
@@ -133,30 +134,29 @@ export function FooterSheet({
             )}
             {/* The two formats a richText section offers: one content
                 model, one sanitizer. */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>Written as</span>
-                {(["html", "markdown"] as const).map((f) => (
-                    <button
-                        key={f}
-                        type="button"
-                        onClick={() => setFormat(f)}
-                        aria-pressed={format === f}
-                        className={cn(
-                            "rounded px-2 py-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                            format === f
-                                ? "bg-secondary text-secondary-foreground"
-                                : "hover:text-foreground active:bg-accent-active",
-                        )}
-                    >
-                        {f === "html" ? "HTML" : "Plain text"}
-                    </button>
-                ))}
+            <div className="grid gap-1.5">
+                <span
+                    id="footer-written-as"
+                    className="text-[0.78125rem] font-medium"
+                >
+                    Written as
+                </span>
+                <Segmented
+                    label="Written as"
+                    aria-labelledby="footer-written-as"
+                    value={format}
+                    onValueChange={setFormat}
+                    options={[
+                        { value: "html", label: "HTML" },
+                        { value: "markdown", label: "Plain text" },
+                    ]}
+                />
             </div>
             <p className={NOTE}>
                 Clear the box to remove the footer. Links and basic formatting
                 are kept.
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }
 
@@ -175,9 +175,9 @@ export function PostsPathSheet({
 }) {
     const [path, setPath] = useState(saved);
     return (
-        <SettingsSheetFrame
+        <FormSheet
             {...frame}
-            editId={settingsEditId("posts-path")}
+            returnFocusTo={settingsEditId("posts-path")}
             title="Posts path"
             description="Where your posts live on your site."
             onSubmit={(e) => {
@@ -200,6 +200,6 @@ export function PostsPathSheet({
             <p id="settings-posts-path-note" className={NOTE}>
                 Posts will live at {host ?? ""}/{path || "blog"}/…
             </p>
-        </SettingsSheetFrame>
+        </FormSheet>
     );
 }

@@ -74,9 +74,9 @@ export class ProviderHealthService {
                 notConfigured: "Connect a payment provider to accept payments.",
                 active: "Payments are ready.",
                 degraded:
-                    "A connected provider is disabled — re-enable it to take payments.",
+                    "A connected provider is disabled. Re-enable it to take payments.",
                 refused:
-                    "Your payment provider refused its keys — connect it again to take payments.",
+                    "Your payment provider refused its keys. Connect it again to take payments.",
                 actionHref: PROVIDERS_HREF,
             }),
             connectedHealth({
@@ -86,9 +86,9 @@ export class ProviderHealthService {
                 notConfigured: "Connect a provider to send messages.",
                 active: "Messaging is ready.",
                 degraded:
-                    "A connected provider is disabled — re-enable it to send messages.",
+                    "A connected provider is disabled. Re-enable it to send messages.",
                 refused:
-                    "Your messaging provider refused its keys — connect it again to send messages.",
+                    "Your messaging provider refused its keys. Connect it again to send messages.",
                 actionHref: PROVIDERS_HREF,
             }),
             domainHealth(domains.map((d) => d.status)),
@@ -154,13 +154,13 @@ function domainHealth(statuses: string[]): ProviderHealth {
             ...base,
             status: "NOT_CONFIGURED",
             message:
-                "No custom domain connected — you're using a Saroh subdomain.",
+                "No custom domain connected. You're using a saroh.app web address.",
         };
     if (statuses.some((s) => s === "FAILED"))
         return {
             ...base,
             status: "FAILED",
-            message: "A domain failed verification — check its DNS records.",
+            message: "A domain failed verification. Check its DNS records.",
         };
     if (statuses.some((s) => s === "PENDING"))
         return {

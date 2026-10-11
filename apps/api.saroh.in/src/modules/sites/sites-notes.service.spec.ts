@@ -101,7 +101,7 @@ describe("createComment pins to a section that exists (#277)", () => {
     it("is open to a REVIEWER and closed to a MEMBER", async () => {
         await expect(
             service.createComment(ctx("MEMBER"), "site_1", note),
-        ).rejects.toThrow(/may not perform/);
+        ).rejects.toThrow(/Your role can't do this/);
 
         db.page.findFirst.mockReset();
         db.page.findFirst

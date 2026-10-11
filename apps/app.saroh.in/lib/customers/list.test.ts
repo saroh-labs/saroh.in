@@ -269,10 +269,10 @@ describe("counts and pages", () => {
 
     it("says which rows a page shows", () => {
         expect(pageText(page({ total: 120, page: 1 }))).toBe(
-            "Showing 1–50 of 120",
+            "Showing 1 to 50 of 120",
         );
         expect(pageText(page({ total: 120, page: 3 }))).toBe(
-            "Showing 101–120 of 120",
+            "Showing 101 to 120 of 120",
         );
         expect(pageCount(page({ total: 120 }))).toBe(3);
         expect(pageCount(page({ total: 0 }))).toBe(1);

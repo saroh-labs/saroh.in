@@ -374,7 +374,7 @@ async function reserveOnce(
         // Serialization failure — Postgres aborted the loser of a race.
         // On its own, the only thing two bookings contend for is the slot.
         if (code === "P2034") {
-            throw new RaceLost(also?.onRace ?? "This slot is fully booked");
+            throw new RaceLost(also?.onRace ?? "That time is fully booked.");
         }
         throw err;
     }
@@ -480,7 +480,7 @@ export async function reserveInTx(
             },
         );
         if (confirmed + held >= service.capacity) {
-            throw new ConflictException("This slot is fully booked");
+            throw new ConflictException("That time is fully booked.");
         }
     }
     if (person) {

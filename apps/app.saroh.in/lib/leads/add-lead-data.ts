@@ -1,21 +1,24 @@
 import type { LeadContactOption } from "@/components/leads/add-lead-dialog";
 import { listContacts } from "@/lib/contacts/service";
 import { contactName } from "@/lib/crm/format";
+import { readBusinessCurrency } from "@/lib/organizations/business-currency";
 import type { Pipeline } from "@/lib/pipelines/service";
 import { listPipelines } from "@/lib/pipelines/service";
 
 /**
- * What "Add a lead" needs: who it could be for, and where it can start. A
- * failed read is an empty list — the dialog then offers "Someone new" only,
- * which still works.
+ * What "Add a lead" needs: who it could be for, where it can start, and
+ * the business's currency, which its Worth is typed in. A failed read is an
+ * empty list — the dialog then offers "Someone new" only, which still works.
  */
 export async function loadAddLead(pipelines?: Pipeline[]): Promise<{
     contacts: LeadContactOption[];
     stages: { id: string; name: string }[];
+    currency: string;
 }> {
-    const [contacts, all] = await Promise.all([
+    const [contacts, all, currency] = await Promise.all([
         listContacts().catch(() => []),
         pipelines ?? listPipelines().catch(() => []),
+        readBusinessCurrency(),
     ]);
     const pipeline = all.find((p) => p.isDefault) ?? all.at(0);
     return {
@@ -28,5 +31,6 @@ export async function loadAddLead(pipelines?: Pipeline[]): Promise<{
             .slice()
             .sort((a, b) => a.order - b.order)
             .map((s) => ({ id: s.id, name: s.name })),
+        currency,
     };
 }
