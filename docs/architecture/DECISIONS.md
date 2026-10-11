@@ -1762,3 +1762,28 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Open.**
     - A live site that still shows v3's prompt keeps showing it until its owner publishes: the snapshot is immutable. The fix that reaches those visitors today is in the hero block (do not draw a line that `isOwnerNote`), which belongs to the blocks' own change.
     - Owners are not told their draft has a new look waiting, beyond the changes shown in the workspace. An inbox notice is the obvious addition.
+
+## DEC-144 Updates in Messages are on for every business, and each business can turn them off
+
+**Status: Accepted — 2026-10-12** · owner ("all businesses, and they can select")
+
+- Context: a customer's account on a business's site has a Messages tab. Saroh's own posts into it (an order's steps, a booking moved or cancelled, an invoice sent) were behind the instance switch and a per-business rollout flag that is off until an operator sets it. A business with no email provider has no other way to tell a customer their order is ready.
+- **On for everyone when customer accounts go live.** The operator turns the `ACCOUNT_THREAD` rollout flag on for every business from the console. The flag's default and how rollout flags resolve are unchanged.
+- **Each business can turn its updates off, and on again**, on Settings › Providers ("Updates in Messages", `comms:manage`). The choice is `BusinessProfile.accountUpdates`, on by default.
+- **Saroh posts only when three things hold:** the account area is on for the instance (`SITE_ACCOUNT_AREA`), the rollout flag is on for the business, and the business has not turned its updates off. The rule is one function, `accountThreadOn`, and every caller goes through it.
+- **Off stops only Saroh's own posts, from the next one on.** What is already in Messages stays, customers can still write, the team's replies still reach them, and so does a note a team member chooses to send when changing or cancelling an order.
+- **With updates off, each update goes as it did before Messages was live:** by email through the business's own provider where one is connected, otherwise not at all, and the workspace says so.
+- **The row is shown only while the choice can have an effect**, and it tells a business with no email provider what turning it off costs.
+- Amends ADR-011's "always goes into their account".
+- **Open.** The email prompt on Providers and Home still says "Your customers see their updates only in their account", which is untrue for a business that turned updates off.
+
+## DEC-145 Test mode is a test business behind a Live / Test switch
+
+**Status: Accepted — 2026-10-12, not built** · owner (asked for a test environment like a payment provider's, and agreed the test business) · tracked in #939
+
+- Context: an owner trying Saroh has nowhere safe to take a payment, issue an invoice or send a confirmation. Trying it for real issues a numbered tax invoice and can message a real customer. The same need comes with the public API and MCP: a developer or an agent needs a place to try calls.
+- **A test business, not a mark on every record.** Each business gets a twin, and a Live / Test switch in the header moves between them. The business is already the tenant root (ADR-001), so the twin is isolated by the same wall that separates two businesses. A live/test column on every order, booking and invoice would make every read in the API filter by it, and one missed filter would show test data to a real customer.
+- **What a test business does differently:** payments use only the provider's test keys; emails and WhatsApp go only to the owner and the team; invoices are marked TEST and use their own number series, so the live series keeps no gaps; the site is labelled and not indexed; it does not count against the live business's limits; it can copy the live business's setup without its customers, and it can be reset.
+- **A test key belongs to the test business and a live key to the live one.** A key never crosses.
+- **When:** after early access opens, planned together with API keys. Nothing is built by this entry.
+- **Open.** One test business per live business or several; which roles see the switch; what "copy my live setup" does when the live business changes later; whether a provider's test-mode webhooks need their own endpoint or secret.
