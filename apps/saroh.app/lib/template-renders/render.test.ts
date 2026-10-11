@@ -11,7 +11,12 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { briefImage, wrapBrief } from "./brief-image";
-import { FIXTURE_DAY, FIXTURE_NOW, FIXTURE_TIME_ZONE } from "./fixtures";
+import {
+    FIXTURE_DAY,
+    FIXTURE_NOW,
+    FIXTURE_TIME_ZONE,
+    STARTER_SAMPLES,
+} from "./fixtures";
 import {
     drawBriefs,
     galleryTemplates,
@@ -137,10 +142,10 @@ describe("templateRender", () => {
 
     it("is null for what it cannot draw", () => {
         expect(templateRender("no-such-template", undefined, "/")).toBeNull();
-        // The starter is not a gallery template.
-        expect(templateRender("starter", undefined, "/")).toBeNull();
         expect(templateRender("bakery", "no-such-colourway", "/")).toBeNull();
         expect(templateRender("bakery", undefined, "/no-such-page")).toBeNull();
+        // Personal is neither in the gallery nor a starter sample.
+        expect(templateRender("personal", undefined, "/")).toBeNull();
     });
 
     it("fills the dietician's practitioner from the template's gallery sample", () => {
@@ -453,5 +458,139 @@ describe("pageFileName", () => {
         expect(pageFileName("/")).toBe("home");
         expect(pageFileName("/timetable")).toBe("timetable");
         expect(pageFileName("/a/b/")).toBe("a-b");
+    });
+});
+
+describe("the starter's renders (DEC-141)", () => {
+    const COLOURWAYS = ["stone", "harbour", "clay"];
+    const types = (id: string, path = "/") =>
+        templateRender(id, undefined, path)?.sections.map((s) => s.type);
+
+    it("are three businesses, none of them in the gallery's index", () => {
+        expect(Object.keys(STARTER_SAMPLES)).toEqual([
+            "starter",
+            "starter-shop",
+            "starter-salon",
+        ]);
+        // The capture script shoots the gallery, which the starter is not in.
+        const listed = index.map((t) => t.id);
+        for (const id of Object.keys(STARTER_SAMPLES)) {
+            expect(listed).not.toContain(id);
+        }
+    });
+
+    it.each(
+        Object.keys(STARTER_SAMPLES).flatMap((id) =>
+            COLOURWAYS.map((style) => [id, style] as const),
+        ),
+    )("%s/%s draws every bound block from fixtures", (id, style) => {
+        const home = templateRender(id, style, "/");
+        expect(home).not.toBeNull();
+        if (!home) return;
+        expect(home.templateId).toBe("starter");
+        expect(home.styleId).toBe(style);
+        expect(home.styleVariables["--site-font-heading"]).toBe(
+            "source-serif-inter",
+        );
+        home.sections.forEach((s, i) => {
+            expect(
+                dataFor(home, s.type, i),
+                `${id}: ${s.type} has no fixture`,
+            ).toBeTruthy();
+        });
+        expect(JSON.stringify(home.sections)).not.toMatch(/https?:\/\//);
+    });
+
+    it("draws a business with nothing switched on as a headline and a form", () => {
+        expect(types("starter")).toEqual(["hero", "enquiry"]);
+        const render = templateRender("starter", undefined, "/");
+        expect(render?.action).toBeNull();
+        expect(render?.navigation).toEqual([
+            { label: "Home", href: "/" },
+            { label: "Contact", href: "/contact", kind: "CONTACT" },
+        ]);
+        // No line: nothing is known of what it does.
+        expect(render?.sections[0]?.content).not.toHaveProperty("subheading");
+        expect(render?.footer).toEqual({
+            format: "markdown",
+            value: "",
+            layout: "left",
+        });
+        expect(templateRender("starter", undefined, "/about")).toBeNull();
+    });
+
+    it("draws a shop with its products, and no photograph it does not have", () => {
+        expect(types("starter-shop")).toEqual([
+            "hero",
+            "productGrid",
+            "features",
+            "richText",
+        ]);
+        const render = templateRender("starter-shop", "harbour", "/");
+        expect(render?.action).toEqual({ label: "Order", href: "/shop" });
+        expect(render?.shopServes).toBe(true);
+        const grid = render?.productGrids[1];
+        expect(grid?.products.length).toBeGreaterThan(3);
+        // A site on its first day: no picture is invented for a product.
+        expect(grid?.products.every((p) => p.image === null)).toBe(true);
+        expect(render?.navigation.map((n) => n.label)).toEqual([
+            "Home",
+            "Shop",
+            "About",
+            "Contact",
+        ]);
+    });
+
+    it("draws a salon with its services, its free times and its place", () => {
+        expect(types("starter-salon")).toEqual([
+            "hero",
+            "servicesList",
+            "features",
+            "visitUs",
+            "richText",
+        ]);
+        const render = templateRender("starter-salon", "clay", "/");
+        expect(render?.action).toEqual({ label: "Book", href: "/book" });
+        expect(render?.sections[0]?.content).toMatchObject({
+            heading: "Meher Hair Studio",
+            subheading: "Haircut, Colour and Bridal styling in Bengaluru",
+            onToday: true,
+        });
+        // The brief stays a note to the owner: no picture is drawn from it.
+        expect(render?.sections[0]?.content).not.toHaveProperty("image");
+        expect(render?.footer?.value).toBe(
+            "Haircut, Colour and Bridal styling in Bengaluru",
+        );
+        expect(render?.navigation.map((n) => n.href)).toEqual([
+            "/",
+            "/book",
+            "/about",
+            "/contact",
+        ]);
+        // About is drawn too.
+        expect(types("starter-salon", "/about")).toEqual([
+            "hero",
+            "richText",
+            "richText",
+        ]);
+    });
+
+    it("shows a visitor nothing that is the template's note to the owner", () => {
+        for (const id of Object.keys(STARTER_SAMPLES)) {
+            for (const path of ["/", "/about"]) {
+                const render = templateRender(id, undefined, path);
+                for (const section of render?.sections ?? []) {
+                    const content = section.content as Record<string, unknown>;
+                    for (const [key, value] of Object.entries(content)) {
+                        if (key === "imageBrief" || typeof value !== "string") {
+                            continue;
+                        }
+                        for (const piece of value.split(/<[^>]*>/)) {
+                            expect(templatePlaceholderIn(piece)).toBeNull();
+                        }
+                    }
+                }
+            }
+        }
     });
 });
