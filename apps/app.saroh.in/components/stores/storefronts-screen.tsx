@@ -125,6 +125,7 @@ export function StorefrontsScreen({
         storefronts.at(0);
     const header = (
         <PageHeader
+            holdsData
             breadcrumb={["Sell", word]}
             title={chosen?.name ?? word}
             description={selected ? locationSubtitle(selected) : undefined}

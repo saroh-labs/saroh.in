@@ -67,7 +67,7 @@ export function ListFirstRun({
             description="People who've paid, signed in on your website or been added here show up as customers."
             action={
                 <div className="flex flex-wrap justify-center gap-2">
-                    <Button asChild variant="outline">
+                    <Button data-ph-unmask="" asChild variant="outline">
                         <Link href="/contacts">
                             {contacts && contacts > 0
                                 ? `Open Contacts (${formatNumber(contacts)})`

@@ -3,6 +3,7 @@ import {
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
 import { YourProfile } from "@/components/settings/your-profile";
+import { env } from "@/env";
 import { accountSettingsUrl } from "@/lib/accounts";
 import { getAlertPreferences } from "@/lib/notifications/service";
 import { isOnlyOwner } from "@/lib/organizations/leave-business";
@@ -10,6 +11,8 @@ import { listMembers } from "@/lib/organizations/members";
 import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { usageSharingOrNull } from "@/lib/usage-sharing/service";
+import { replaySwitchedOn, sharesUsageNow } from "@/lib/usage-sharing/sharing";
 
 /**
  * Settings → Your profile: your login and the alerts you get. For everyone
@@ -24,14 +27,24 @@ import { requireSession } from "@/lib/session";
  * only by someone who may (`member:read`), to know whether they are the
  * only owner and which locations they come off. Unread, the button is
  * offered and the API decides.
+ *
+ * "Help improve Saroh" (DEC-125) is here too, only where session recording
+ * is switched on for this environment: a switch that did nothing would not
+ * be true. It is left out when the choice couldn't be read, rather than
+ * shown as a choice nobody made.
  */
 export const metadata = { title: "Your profile" };
 
 export default async function ProfilePage() {
     const { user } = await requireSession();
-    const [alerts, org] = await Promise.all([
+    const recordingOn = replaySwitchedOn({
+        key: env.NEXT_PUBLIC_POSTHOG_KEY,
+        replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
+    });
+    const [alerts, org, usageSharing] = await Promise.all([
         getAlertPreferences(),
         resolveActiveOrganization(),
+        recordingOn ? usageSharingOrNull() : null,
     ]);
     // An owner always reads the roster. Anyone else only with the
     // permission: a refused read would turn this page into a denial.
@@ -57,6 +70,9 @@ export default async function ProfilePage() {
                               ),
                           }
                         : null
+                }
+                sharesUsage={
+                    usageSharing ? sharesUsageNow(usageSharing) : undefined
                 }
             />
         </SettingsPanel>

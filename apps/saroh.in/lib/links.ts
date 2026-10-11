@@ -1,12 +1,14 @@
 import { env } from "@/env";
 
-const ACCOUNTS = env.NEXT_PUBLIC_ACCOUNTS_URL ?? "https://accounts.saroh.in";
+/** accounts.saroh.in, or this environment's own. */
+export const ACCOUNTS_URL =
+    env.NEXT_PUBLIC_ACCOUNTS_URL ?? "https://accounts.saroh.in";
 
 /** Sign in, for someone who already has a business on Saroh. */
-export const SIGN_IN_URL = `${ACCOUNTS}/login`;
+export const SIGN_IN_URL = `${ACCOUNTS_URL}/login`;
 
 /** Sign-up, used only in open mode (`cta`). */
-export const SIGN_UP_URL = `${ACCOUNTS}/signup`;
+export const SIGN_UP_URL = `${ACCOUNTS_URL}/signup`;
 
 export type LaunchMode = "waitlist" | "open";
 export type PlanId = "free" | "grow" | "pro";

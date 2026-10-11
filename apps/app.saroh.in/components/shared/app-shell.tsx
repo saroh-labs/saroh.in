@@ -13,13 +13,17 @@ import { CommandMenu } from "@/components/shared/command-menu";
 import { JoinedNotice } from "@/components/shared/joined-notice";
 import { LiveRefresh } from "@/components/shared/live-refresh";
 import type { NavCounts } from "@/components/shared/nav-items";
-import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
+import { navCan, NOTIFICATIONS_NAV } from "@/components/shared/nav-items";
 import {
     lockedNavHrefs,
     planLockedModuleKeys,
 } from "@/components/shared/nav-locks";
 import { PageContainer } from "@/components/shared/page-container";
 import { TabBar } from "@/components/shared/tab-bar";
+import {
+    recordingSwitchedOn,
+    UsageRecording,
+} from "@/components/shared/usage-recording";
 import { accountsUrl } from "@/lib/accounts";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
@@ -36,6 +40,7 @@ import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
+import { usageSharingOrNull } from "@/lib/usage-sharing/service";
 import { Button } from "@saroh/ui/button";
 import { PausedState } from "@saroh/ui/data-state";
 
@@ -100,6 +105,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         );
     }
 
+    // Whether session recording is switched on for this environment
+    // (DEC-125): a PostHog key and the replay switch. Off, nothing is read.
+    const recordingOn = recordingSwitchedOn();
+
     // Concurrently, because none of the three depends on another. They used to
     // run one after the next, which cost the sum of three round trips on every
     // page in the app rather than the slowest one.
@@ -123,6 +132,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         billing,
         paused,
         closing,
+        usageSharing,
     ] = await Promise.all([
         unreadNotificationCount(),
         listModules().catch(() => null),
@@ -168,6 +178,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         activeOrg?.lifecycleStatus === "PENDING_DELETION"
             ? closingOrNull()
             : null,
+        // "Help improve Saroh" (DEC-125): the person's own choice and
+        // whether they have seen the notice, read before the recorder
+        // could start, and only where session recording is switched on at
+        // all. Null when unread: not recorded.
+        recordingOn ? usageSharingOrNull() : null,
     ]);
     // Available modules, plus those shut only by the plan: locked, not off,
     // so they stay in the rail with a lock and a way up (U14).
@@ -320,6 +335,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                          * keeps it, on the server's first paint too.
                          */}
                         <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/*
+                             * PostHog in the signed-in shell (DEC-125):
+                             * internal ids beside the workspace's error
+                             * reports, the one-time notice that it is
+                             * recorded, and the recorder, which waits for
+                             * that notice. Nothing without a key.
+                             */}
+                            <UsageRecording
+                                userId={session.user.id}
+                                organizationId={activeOrg?.id}
+                                usage={usageSharing}
+                            />
                             {/* Scheduled for deletion (#921). */}
                             <ClosingBanner view={closing} />
                             {/* A plan that ends within 30 days (#805). */}

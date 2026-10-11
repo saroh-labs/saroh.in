@@ -126,6 +126,7 @@ export function BusinessWeek({
     return (
         <>
             <PageHeader
+                holdsData={false}
                 breadcrumb={["Home", "Overview"]}
                 title={title}
                 className="mb-0"

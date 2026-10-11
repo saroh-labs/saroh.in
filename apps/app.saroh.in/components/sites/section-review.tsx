@@ -262,6 +262,7 @@ function SectionSlot({
                         </span>
                     ) : null}
                     <Button
+                        data-ph-mask=""
                         type="button"
                         size="sm"
                         variant="secondary"

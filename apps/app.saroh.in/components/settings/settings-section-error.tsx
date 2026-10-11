@@ -52,6 +52,7 @@ export function SettingsSectionError({
     return (
         <SettingsPanel header={<SettingsPanelHeader title={copy.heading} />}>
             <FailedState
+                data-ph-unmask=""
                 className="max-w-[760px]"
                 title={couldntLoad(copy.things)}
                 description={nothingChanged(copy.reassurance)}

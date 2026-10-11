@@ -20,6 +20,7 @@
     "portless": "saroh.app",
     "dependencies": {
         "@saroh/block-contract": "workspace:*",
+        "@saroh/error-tracking": "workspace:*",
         "@saroh/site-blocks": "workspace:*",
         "@saroh/templates": "workspace:*",
         "@saroh/ui": "workspace:*",

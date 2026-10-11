@@ -65,6 +65,7 @@ export function MultiSelect({
             <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
                     <Button
+                        data-ph-unmask=""
                         id={id}
                         type="button"
                         variant="outline"

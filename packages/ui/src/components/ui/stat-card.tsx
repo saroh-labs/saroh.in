@@ -35,7 +35,11 @@ export function StatCard({
             {/* An eyebrow (11px Geist 600, uppercase) over a figure in Space
                 Grotesk — large figures are one of the display face's jobs. */}
             <p className="label">{label}</p>
-            <p className="mt-[7px] font-display text-[25px] font-semibold tabular-nums leading-none tracking-[-0.03em]">
+            {/* A business's figure: always masked in a session recording. */}
+            <p
+                data-ph-mask=""
+                className="mt-[7px] font-display text-[25px] font-semibold tabular-nums leading-none tracking-[-0.03em]"
+            >
                 {value}
             </p>
             {hint ? (

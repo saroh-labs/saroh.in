@@ -33,6 +33,7 @@ export default async function DiscountPage({
 
     const header = (
         <PageHeader
+            holdsData
             breadcrumb={["Sell", "Discount codes", discount.code]}
             title={<span className="font-mono">{discount.code}</span>}
         />

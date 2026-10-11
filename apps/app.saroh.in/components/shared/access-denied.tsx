@@ -48,6 +48,9 @@ export function AccessDenied({
 }) {
     const card = (
         <PermissionDeniedState
+            // The caller's own sentences, which may name a record: masked
+            // in a session recording.
+            data-ph-mask=""
             title={title}
             description={description}
             note={note}

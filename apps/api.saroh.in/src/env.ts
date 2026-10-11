@@ -313,12 +313,21 @@ const envSchema = z.object({
         .max(3650)
         .optional(),
 
-    // Error tracking (#103). Off when unset: every 5xx is still logged, and
-    // nothing leaves the process. No tracker SDK is installed yet, so a value
-    // here only logs a warning at startup — see
-    // src/common/observability/report-error.ts and
+    // PostHog (DEC-125): unhandled errors and the workspace's product
+    // milestones. Off when POSTHOG_KEY is unset: every 5xx is still logged
+    // and nothing leaves the process. The key is the project's PUBLIC key
+    // (`phc_…`, the one browsers get), so it is a setting, not a secret.
+    // One PostHog project holds development and production, and the dev
+    // API runs with NODE_ENV=production too, so POSTHOG_ENVIRONMENT says
+    // which this is: with a key and no environment nothing is sent. See
+    // src/common/observability/posthog.ts and
     // docs/architecture/ERROR_TRACKING_AND_UPTIME.md.
-    ERROR_TRACKING_DSN: z.string().url().optional(),
+    POSTHOG_KEY: z
+        .string()
+        .regex(/^phc_[A-Za-z0-9]+$/)
+        .optional(),
+    POSTHOG_HOST: z.string().url().optional(),
+    POSTHOG_ENVIRONMENT: z.enum(["development", "production"]).optional(),
 
     npm_package_version: z.string().optional(),
 });

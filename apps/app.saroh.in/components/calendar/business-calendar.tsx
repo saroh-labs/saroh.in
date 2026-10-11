@@ -173,6 +173,7 @@ export function BusinessCalendar({
     return (
         <>
             <PageHeader
+                holdsData={false}
                 breadcrumb={["Home", "Overview"]}
                 title={monthTitle(data.month)}
                 className="mb-0"

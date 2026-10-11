@@ -21,7 +21,12 @@ const MARK: Record<
 /** The white panel: the score line, the domain, and each tag as found. */
 export function ScorePanel({ result }: { result: Checked }) {
     return (
-        <div className="grid gap-3.5 rounded-2xl border border-border bg-card p-5">
+        <div
+            // The visitor's own link, read back: masked in a session
+            // recording (DEC-125). Saroh's sample is ours, and readable.
+            data-ph-mask={result.sample ? undefined : ""}
+            className="grid gap-3.5 rounded-2xl border border-border bg-card p-5"
+        >
             <span className="grid gap-0.5">
                 <span className="font-semibold" data-testid="score-line">
                     {result.score}
@@ -70,7 +75,10 @@ export function CardsGrid({
     const { facts } = result;
     const image = cardImage(facts, result.sample === true);
     return (
-        <div className="grid min-w-0 gap-4">
+        <div
+            className="grid min-w-0 gap-4"
+            data-ph-mask={result.sample ? undefined : ""}
+        >
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-4">
                 {result.apps.map(({ app, ok }) => (
                     <section

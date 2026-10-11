@@ -74,6 +74,7 @@ export default async function SitesPage() {
                     className="mb-0"
                 />
                 <EmptyState
+                    data-ph-unmask=""
                     icon={<Globe />}
                     title={nothingHere.title}
                     description={nothingHere.description}

@@ -29,7 +29,13 @@ export function ReadOnlyNote({
     id?: string;
 }) {
     return (
-        <Notice id={id} icon={false} className={cn("mb-3.5", className)}>
+        <Notice
+            id={id}
+            icon={false}
+            // Saroh's own words: a session recording may read them.
+            data-ph-unmask=""
+            className={cn("mb-3.5", className)}
+        >
             {children} {whoCanChangeLine(ownerOnly)}
         </Notice>
     );

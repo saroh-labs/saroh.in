@@ -257,7 +257,13 @@ export function OrderDetail({
             }
         >
             {order.ticketName ? (
-                <Button type="button" variant="outline" onClick={print}>
+                <Button
+                    // The business's own name for its ticket: masked.
+                    data-ph-mask=""
+                    type="button"
+                    variant="outline"
+                    onClick={print}
+                >
                     Print {order.ticketName.toLowerCase()}
                 </Button>
             ) : null}

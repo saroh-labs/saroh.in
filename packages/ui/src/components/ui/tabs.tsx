@@ -223,6 +223,8 @@ const TabsTrigger = React.forwardRef<
     return (
         <TabsPrimitive.Trigger
             ref={ref}
+            // A tab's name is Saroh's own words: a recording may read it.
+            data-ph-unmask=""
             className={cn(
                 variant === "underline"
                     ? cn(

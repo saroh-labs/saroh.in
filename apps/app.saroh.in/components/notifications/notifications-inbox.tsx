@@ -111,6 +111,7 @@ export function NotificationsInbox({
     if (notifications.length === 0) {
         return (
             <EmptyState
+                data-ph-mask=""
                 icon={<Bell />}
                 title="No notifications yet"
                 description={`Updates from what ${businessName} has turned on show here.`}

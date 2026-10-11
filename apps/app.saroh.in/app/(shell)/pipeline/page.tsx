@@ -263,6 +263,7 @@ function Header({
     return (
         <PageHeader
             breadcrumb={["Pipeline"]}
+            holdsData="description"
             title="Pipeline"
             description={pipelineName}
             meta={<LeadsViewSwitch current="board" />}

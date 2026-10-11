@@ -53,6 +53,9 @@ export function QrArt({
         <svg
             viewBox={art.viewBox}
             role="img"
+            // Its shape is the link it holds: left out of a session
+            // recording (frontend-design-system.md → Session recordings).
+            data-ph-block=""
             aria-label={ariaLabel}
             focusable="false"
             shapeRendering="geometricPrecision"

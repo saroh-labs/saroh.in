@@ -85,6 +85,7 @@ export default async function PastVersionPage({
                         year: "always",
                     }),
                 ]}
+                holdsData
                 title={`Version from ${formatDateTime(publication.publishedAt, zone, { year: "always" })}`}
                 description={
                     publication.publishedBy
@@ -143,6 +144,7 @@ export default async function PastVersionPage({
                 >
                     {pages.map((p) => (
                         <Button
+                            data-ph-mask=""
                             key={p.path}
                             asChild
                             size="sm"

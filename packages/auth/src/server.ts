@@ -17,6 +17,8 @@ import {
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
 import { getTrustedOrigins, isTrustedOrigin } from "./origins";
+import type { OnAuthServerError } from "./server-errors";
+import { serverErrorHook } from "./server-errors";
 
 // Re-export so existing consumers (api) keep importing it from @saroh/auth.
 export { getTrustedOrigins, isTrustedOrigin } from "./origins";
@@ -31,6 +33,7 @@ export {
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
+export type { AuthServerFault, OnAuthServerError } from "./server-errors";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
@@ -135,6 +138,20 @@ export interface CreateAuthOptions {
     }) => Promise<void> | void;
     /** Confirm account deletion via a one-time link, never a bare API call. */
     sendDeleteAccountVerification?: EmailSender;
+    /**
+     * Told once, after a user's row is first written (sign-up by password
+     * or through a provider). Handed the id only, never the email or name.
+     * Whatever it throws is swallowed: it can't fail a sign-up.
+     */
+    onUserCreated?: (user: { id: string }) => void;
+    /**
+     * Told when Better Auth answered a request 5xx: the thrown value and the
+     * status, for the host's error reporter. Never told about an expected
+     * outcome (a wrong password, an unverified email, a rate limit, a failed
+     * validation). Whatever it throws is swallowed: it can't fail a sign-in.
+     * See `server-errors.ts`.
+     */
+    onServerError?: OnAuthServerError;
 }
 
 /**
@@ -316,6 +333,30 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         database: prismaAdapter(prisma, {
             provider: "postgresql",
         }),
+        // Only when the host asked to be told: no hook otherwise.
+        ...(opts.onUserCreated
+            ? {
+                  databaseHooks: {
+                      user: {
+                          create: {
+                              after: (user: { id: string }) => {
+                                  try {
+                                      opts.onUserCreated?.({ id: user.id });
+                                  } catch {
+                                      // Never a sign-up's problem.
+                                  }
+                                  return Promise.resolve();
+                              },
+                          },
+                      },
+                  },
+              }
+            : {}),
+        // Only when the host asked to be told: Better Auth's own logging of
+        // these errors otherwise.
+        ...(opts.onServerError
+            ? { onAPIError: serverErrorHook(opts.onServerError) }
+            : {}),
         account: {
             accountLinking: {
                 enabled: true,

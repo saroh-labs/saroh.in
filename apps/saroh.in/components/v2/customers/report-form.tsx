@@ -11,6 +11,7 @@ import {
     reportProblem,
 } from "@/lib/business-report";
 import { cn } from "@/lib/cn";
+import { readAddress } from "@/lib/page-address";
 
 const copy = CUSTOMERS.form;
 
@@ -45,7 +46,7 @@ export function ReportForm() {
     // (the server draws the field empty), so the page stays static.
     const given = useSyncExternalStore(
         noChange,
-        () => prefilledSite(window.location.search),
+        () => prefilledSite(readAddress()),
         () => "",
     );
     const [typed, setSite] = useState<string | null>(null);

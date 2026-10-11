@@ -58,6 +58,9 @@ export function InvitationProblemView({
                 />
             ) : problem === "wrong-person" ? (
                 <PermissionDeniedState
+                    // It names the two email addresses: masked in a
+                    // session recording, the button beside it too.
+                    data-ph-mask=""
                     className="w-full"
                     title={INVITATION_WRONG_PERSON_TITLE}
                     description={wrongPersonDescription(
@@ -85,6 +88,9 @@ export function InvitationProblemView({
                 />
             ) : (
                 <FailedState
+                    // The API's own sentence, which may name a person or
+                    // a place: masked in a session recording.
+                    data-ph-mask=""
                     className="w-full"
                     title={INVITATION_REFUSED_TITLE}
                     description={refusal ?? null}

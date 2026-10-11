@@ -93,6 +93,7 @@ export function TimetableFields({
                                             }
                                         />
                                         <Label
+                                            data-ph-mask=""
                                             htmlFor={`${id}-svc-${s.id}`}
                                             className="text-sm font-normal"
                                         >

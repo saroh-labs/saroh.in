@@ -5,6 +5,7 @@ import { LeaveBusiness } from "@/components/organizations/leave-business";
 import type { AlertPreferencesRead } from "@/lib/notifications/preferences";
 
 import { AlertsGrid } from "./alerts-grid";
+import { UsageSharingCard } from "./usage-sharing-card";
 
 /**
  * Settings → Your profile ("Saroh Settings" design): you, and what you hear
@@ -20,6 +21,9 @@ import { AlertsGrid } from "./alerts-grid";
  *
  * "Leave {business}" is last: the one way out that every member has, since
  * this page is the one every role can open.
+ *
+ * "Help improve Saroh" is a third card, not in the design, shown only where
+ * session recording is switched on (DEC-125, `usage-sharing-card.tsx`).
  */
 export function YourProfile({
     name,
@@ -27,6 +31,7 @@ export function YourProfile({
     accountUrl,
     alerts,
     leave = null,
+    sharesUsage,
 }: {
     name: string;
     email: string;
@@ -44,6 +49,12 @@ export function YourProfile({
         /** Locations of this business they work at. */
         locations: string[];
     } | null;
+    /**
+     * "Help improve Saroh" (DEC-125): whether you share how you use the
+     * workspace. Undefined where session recording is not switched on (or
+     * the choice couldn't be read), and the card is then left out.
+     */
+    sharesUsage?: boolean;
 }) {
     const rows: {
         label: string;
@@ -112,6 +123,10 @@ export function YourProfile({
             </section>
 
             <AlertsGrid read={alerts} />
+
+            {sharesUsage === undefined ? null : (
+                <UsageSharingCard on={sharesUsage} />
+            )}
 
             {leave ? (
                 <section

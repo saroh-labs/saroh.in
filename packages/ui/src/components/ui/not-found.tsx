@@ -83,6 +83,8 @@ export function NotFound({
         <section
             aria-labelledby={headingId}
             data-not-found={variant}
+            // Fixed words: a recording may read them.
+            data-ph-unmask=""
             className={cn(
                 "mx-auto flex w-full min-w-0 flex-col items-center text-center",
                 card

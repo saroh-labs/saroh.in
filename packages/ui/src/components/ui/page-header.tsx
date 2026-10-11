@@ -30,6 +30,22 @@ export interface PageHeaderProps extends Omit<
      */
     meta?: React.ReactNode;
     /**
+     * Say so when the title or the description shows a record's own data: a
+     * customer's name, an order's number, a site's name. A session
+     * recording then masks it (DEC-125): `true` masks both, `"title"` or
+     * `"description"` only that one. Left out, both are read as Saroh's own
+     * fixed words ("Customers", "New product").
+     *
+     * A title or description that is not a literal string must say which
+     * (`false` for fixed words): `lib/usage-sharing/replay-marks.test.ts`
+     * in the workspace fails on one that doesn't.
+     *
+     * The count, the badge, the lead, the meta and the breadcrumb are never
+     * marked here, so they stay masked: each is the caller's own node and
+     * as often a record's as a fixed word.
+     */
+    holdsData?: boolean | "title" | "description";
+    /**
      * Trailing actions. The primary is LAST, a default `Button` with no icon
      * ("New booking"); secondary actions come before it.
      */
@@ -58,9 +74,16 @@ export function PageHeader({
     meta,
     actions,
     breadcrumb,
+    holdsData = false,
     className,
     ...props
 }: PageHeaderProps) {
+    // One or the other, never neither: fixed words can be read in a session
+    // recording, a record's data never (`data-ph-mask` always wins).
+    const mark = (part: "title" | "description") =>
+        holdsData === true || holdsData === part
+            ? { "data-ph-mask": "" }
+            : { "data-ph-unmask": "" };
     const crumbs = breadcrumb?.length ? (
         <nav
             aria-label="Breadcrumb"
@@ -148,7 +171,10 @@ export function PageHeader({
                                 badge ? "items-center" : "items-baseline",
                             )}
                         >
-                            <h1 className="min-w-0 text-balance font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] [overflow-wrap:anywhere]">
+                            <h1
+                                {...mark("title")}
+                                className="min-w-0 text-balance font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] [overflow-wrap:anywhere]"
+                            >
                                 {title}
                             </h1>
                             {badge ? (
@@ -169,7 +195,10 @@ export function PageHeader({
                             ) : null}
                         </div>
                         {description ? (
-                            <div className="mt-1.5 max-w-[68ch] text-[13.5px] leading-relaxed text-muted-foreground">
+                            <div
+                                {...mark("description")}
+                                className="mt-1.5 max-w-[68ch] text-[13.5px] leading-relaxed text-muted-foreground"
+                            >
                                 {description}
                             </div>
                         ) : null}

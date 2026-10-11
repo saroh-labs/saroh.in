@@ -138,6 +138,7 @@ export function TakePayment({
     return (
         <>
             <Button
+                data-ph-unmask=""
                 type="button"
                 variant={variant}
                 className={cn("cursor-pointer", triggerClassName)}

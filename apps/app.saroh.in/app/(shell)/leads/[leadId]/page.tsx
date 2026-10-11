@@ -135,6 +135,7 @@ export default async function LeadDetailPage({
                     </Link>,
                     lead.title,
                 ]}
+                holdsData
                 title={lead.title}
                 description={
                     lead.contact ? (

@@ -121,6 +121,7 @@ export function SectionError({
         <PageContainer>
             {heading ? <PageHeader title={heading} className="mb-6" /> : null}
             <FailedState
+                data-ph-unmask=""
                 title={couldntLoad(things)}
                 description={nothingChanged(reassurance)}
                 onRetry={retry}

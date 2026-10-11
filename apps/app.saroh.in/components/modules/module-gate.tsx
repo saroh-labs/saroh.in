@@ -46,7 +46,13 @@ function Unavailable({
         // arrived where they meant to — the workspace design draws every state
         // INSIDE the page, under its own heading.
         <PageContainer>
-            <PageHeader breadcrumb={[name]} title={name} className="mb-6" />
+            <PageHeader
+                breadcrumb={[name]}
+                // The menu's own word for the module: read in a recording.
+                holdsData={false}
+                title={name}
+                className="mb-6"
+            />
             {/* Someone who can't turn it on reads who can: a button to a
                 switch they can't press would be a dead end. */}
             <ModuleOffState
@@ -124,6 +130,7 @@ export async function ModuleGate({
                 <PageContainer>
                     <PageHeader
                         breadcrumb={[access.module.label]}
+                        holdsData={false}
                         title={access.module.label}
                         className="mb-6"
                     />

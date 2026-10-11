@@ -36,7 +36,13 @@ export function PlanEndingBanner({
     if (!ending) return null;
     const days = daysLeft(ending.endsAt, now);
     return (
-        <Notice tone="info" layout="banner">
+        <Notice
+            tone="info"
+            layout="banner"
+            // Saroh's words and Saroh's plan names; the day count and the
+            // date's digits are hidden in a recording all the same.
+            data-ph-unmask=""
+        >
             <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
                 <p className="min-w-0 flex-[1_1_320px] text-pretty text-[13px] leading-normal text-foreground">
                     <span className="font-semibold">

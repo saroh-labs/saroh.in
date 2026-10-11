@@ -94,6 +94,7 @@ export default async function TestReleasePage({
                     </Link>,
                     releaseTitle(release),
                 ]}
+                holdsData
                 title={releaseTitle(release)}
                 description={`${site.name} · ${status.line}`}
                 actions={

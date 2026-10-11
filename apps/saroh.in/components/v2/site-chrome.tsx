@@ -2,9 +2,9 @@ import { resourceItems } from "@/components/v2/nav-items";
 import { SiteFooter } from "@/components/v2/site-footer";
 import { SiteNav } from "@/components/v2/site-nav";
 import { shownLegal, shownResources, shownTools } from "@/content/resources";
-import { env } from "@/env";
-import { gaMeasurementId } from "@/lib/ga";
+import { asksConsent } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
+import { siteTagConfig } from "@/lib/site-tag-config";
 
 /**
  * Marketing Site V2's chrome (plan U18/U19): Paper, a 1280px page with the
@@ -20,10 +20,9 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
     const ctx = resourcesContext();
     const resources = resourceItems(shownResources(ctx));
     const tools = resourceItems(shownTools(ctx));
-    const analytics = !!gaMeasurementId({
-        id: env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
-        vercelEnv: env.VERCEL_ENV,
-    });
+    // "Cookie choices" shows wherever the notice can ask: Google Analytics,
+    // an advertising tag (DEC-127) or the recorder (DEC-125).
+    const analytics = asksConsent(siteTagConfig());
     return (
         <div className="min-h-screen bg-background text-foreground [line-height:normal]">
             <div className="mx-auto max-w-mk-page overflow-x-clip bg-background">

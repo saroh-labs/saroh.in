@@ -76,6 +76,7 @@ export default async function ImportProductsPage({
     return (
         <PageContainer width="default">
             <PageHeader
+                holdsData="description"
                 breadcrumb={sellCrumbs(
                     { label: "Products", href: "/commerce/products" },
                     "Import",

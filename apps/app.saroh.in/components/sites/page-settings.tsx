@@ -176,6 +176,7 @@ export function PageSettings({
                             <p>{refusal.message}</p>
                             {refusal.suggestion ? (
                                 <Button
+                                    data-ph-mask=""
                                     type="button"
                                     variant="outline"
                                     size="xs"

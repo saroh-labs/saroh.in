@@ -1,6 +1,7 @@
 import type { Auth } from "@saroh/auth";
 import { createAuth, VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth";
 
+import { signedUp } from "../../modules/analytics/product-milestones";
 import {
     sendChangeEmailConfirmationEmail,
     sendDeleteAccountEmail,
@@ -8,6 +9,7 @@ import {
     sendPasswordResetEmail,
     sendVerificationOtpEmail,
 } from "../email";
+import { reportAuthServerError } from "./report-auth-error";
 
 /**
  * The Better Auth instance — api.saroh.in is now the auth SERVER (it hosts
@@ -33,4 +35,10 @@ export const auth: Auth = createAuth({
         sendChangeEmailConfirmationEmail(to, url, newEmail),
     sendDeleteAccountVerification: ({ to, url }) =>
         sendDeleteAccountEmail(to, url),
+    // The `signed_up` product milestone (DEC-125): the user's id, nothing
+    // else. A no-op unless PostHog is on.
+    onUserCreated: ({ id }) => signedUp(id),
+    // A 5xx inside Better Auth, which answers /api/auth/* itself and so
+    // never reaches AllExceptionsFilter. Never a 4xx.
+    onServerError: reportAuthServerError,
 });

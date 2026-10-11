@@ -59,6 +59,7 @@ export default async function SiteVersionsPage({
                     </Link>,
                     "Version history",
                 ]}
+                holdsData="description"
                 title="Version history"
                 description={site.name}
                 actions={

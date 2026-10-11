@@ -284,7 +284,12 @@ function CheckActions({
                 <>
                     {checked(true)}
                     {c.order ? (
-                        <Button size="sm" asChild variant="outline">
+                        <Button
+                            data-ph-unmask=""
+                            size="sm"
+                            asChild
+                            variant="outline"
+                        >
                             <Link
                                 href={`/commerce/orders/${encodeURIComponent(c.order.id)}`}
                             >

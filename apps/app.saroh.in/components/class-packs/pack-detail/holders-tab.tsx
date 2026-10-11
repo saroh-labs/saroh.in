@@ -113,6 +113,7 @@ export function HoldersTab({
             <>
                 {head}
                 <EmptyState
+                    data-ph-unmask=""
                     icon={<Users />}
                     size="panel"
                     title="No one has this pack yet"

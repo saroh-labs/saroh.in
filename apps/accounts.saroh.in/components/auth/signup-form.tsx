@@ -13,7 +13,7 @@ import {
 } from "@/components/auth/field";
 import { codeNext, doneLine, PROMISE } from "@/components/auth/panel-copy";
 import { SocialButtons } from "@/components/auth/social-buttons";
-import { getAppUrl, getOnboardingUrl } from "@/lib/app-urls";
+import { afterSignUp, getAppUrl, getOnboardingUrl } from "@/lib/app-urls";
 import { codeClient } from "@/lib/code-client";
 import { isJoining, withCarry } from "@/lib/joining";
 import type { CodeClient } from "@/lib/sign-in-code";
@@ -93,7 +93,11 @@ export function SignupForm({
                     // door sends it to setup. So does it sort out someone
                     // who already had an account and signed up again: they
                     // land in their business, not in setup for another.
-                    window.location.href = returnTo ?? getAppUrl();
+                    // `afterSignUp` routes it through saroh.in's /welcome
+                    // when that hand-off is on (DEC-127): the code typed
+                    // here is the address confirmed, which is the sign-up
+                    // that page counts. This page loads no advertising tag.
+                    window.location.href = afterSignUp(returnTo ?? getAppUrl());
                 }}
                 client={client}
             />

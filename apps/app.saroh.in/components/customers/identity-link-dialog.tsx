@@ -67,7 +67,7 @@ export function IdentityLinkDialog({
             size="lg"
             trigger={
                 controlled === undefined ? (
-                    <Button variant="outline" size="sm">
+                    <Button data-ph-unmask="" variant="outline" size="sm">
                         Link commerce record
                         {suggestions.length > 0
                             ? ` (${suggestions.length})`

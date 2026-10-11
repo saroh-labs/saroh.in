@@ -121,6 +121,7 @@ export function PacksScreen({
     return (
         <>
             <PageHeader
+                holdsData="description"
                 breadcrumb={[
                     <Link
                         key="bookings"

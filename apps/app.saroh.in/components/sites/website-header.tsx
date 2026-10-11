@@ -172,6 +172,7 @@ export function WebsiteHeader({
         <div className="flex flex-col gap-5">
             <PageHeader
                 breadcrumb={["Website"]}
+                holdsData="description"
                 title="Website"
                 className="mb-0"
                 description={
@@ -390,6 +391,7 @@ function SitePicker({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button
+                    data-ph-mask=""
                     variant="outline"
                     className="max-w-[260px] gap-[7px] font-medium text-neutral-600 dark:text-foreground"
                     aria-label={`Website: ${site.name}. Change it.`}

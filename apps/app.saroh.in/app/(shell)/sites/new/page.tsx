@@ -101,7 +101,8 @@ export default async function NewSitePage({
                     title="You already have a website"
                     description="A business has one website. Its pages, posts, look and address are all changed from Website."
                     secondary={
-                        <Button asChild variant="outline">
+                        // The site's own name: masked in a recording.
+                        <Button data-ph-mask="" asChild variant="outline">
                             <Link href={`/sites/${existing.id}/pages`}>
                                 Go to {name}
                             </Link>

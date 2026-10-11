@@ -9,6 +9,7 @@ import {
 import type { BillingCheckout, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { ActivationEvents } from "../analytics/activation-events";
 import {
     AuditAction,
     AuditOutcome,
@@ -62,6 +63,8 @@ interface Completed {
     from: string | null;
     to: string;
     at: string;
+    /** The paid plan's key, when the business moved onto it now (DEC-125). */
+    upgradedTo?: string;
 }
 
 interface Outcome {
@@ -120,6 +123,8 @@ export class BillingWebhookService {
          * that builds the service by hand without it writes none.
          */
         @Optional() private readonly invoices?: SarohInvoicesService,
+        /** The activation ledger, for the first paid plan (DEC-125). */
+        @Optional() private readonly activation?: ActivationEvents,
     ) {}
 
     async handle(
@@ -268,6 +273,14 @@ export class BillingWebhookService {
             outcome: AuditOutcome.Success,
             metadata: { from: c.from, to: c.to, at: c.at },
         });
+        // The business's first move onto a paid plan (DEC-125): the plan's
+        // key, never a price. After the commit, and it swallows its errors.
+        if (c.upgradedTo) {
+            await this.activation?.firstPlanUpgraded(
+                c.organizationId,
+                c.upgradedTo,
+            );
+        }
     }
 
     // ── A checkout's provider subscription ──────────────────────────────
@@ -602,6 +615,9 @@ export class BillingWebhookService {
                 from: sub?.plan.name ?? null,
                 to: plan.name,
                 at: now.toISOString(),
+                // A paid plan the business is on from now (NEW or
+                // UPGRADE), as against a trial or a change that waits.
+                ...(trial ? {} : { upgradedTo: plan.key }),
             },
         };
     }

@@ -155,7 +155,11 @@ function StateCard({
                         {icon}
                     </span>
                 ) : null}
-                <p className="min-w-0 text-pretty">
+                {/* A state's words are Saroh's own: a session recording may
+                    read them (`data-ph-unmask`). One that repeats what
+                    someone typed or names a record is marked `data-ph-mask`
+                    where it is used: on the root, it wins over this. */}
+                <p data-ph-unmask="" className="min-w-0 text-pretty">
                     <span
                         className={
                             tone === "danger"
@@ -207,17 +211,28 @@ function StateCard({
             {/* The display face for the line that names the state, and body
                 copy a step darker than meta text: this is the sentence
                 someone has to read to know what happened. */}
+            {/* A state's words are Saroh's own: a session recording may
+                read them (`data-ph-unmask`). One that repeats what someone
+                typed or names a record is marked `data-ph-mask` where it
+                is used. */}
             {panel ? (
-                <h3 className="font-display text-[15px] font-semibold tracking-[-0.015em]">
+                <h3
+                    data-ph-unmask=""
+                    className="font-display text-[15px] font-semibold tracking-[-0.015em]"
+                >
                     {title}
                 </h3>
             ) : (
-                <h2 className="font-display text-[19px] font-semibold tracking-[-0.025em]">
+                <h2
+                    data-ph-unmask=""
+                    className="font-display text-[19px] font-semibold tracking-[-0.025em]"
+                >
                     {title}
                 </h2>
             )}
             {description ? (
                 <p
+                    data-ph-unmask=""
                     className={cn(
                         "mx-auto max-w-[50ch] text-pretty leading-[1.55] text-neutral-600 dark:text-muted-foreground",
                         panel ? "text-[13px]" : "text-[13.5px]",
@@ -230,7 +245,10 @@ function StateCard({
                 // Who can change it, set apart from why it happened: the
                 // design gives this its own sunken block rather than a third
                 // paragraph nobody finishes.
-                <p className="mx-auto max-w-[50ch] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground">
+                <p
+                    data-ph-unmask=""
+                    className="mx-auto max-w-[50ch] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[12.5px] leading-[1.5] text-neutral-600 dark:text-muted-foreground"
+                >
                     {note}
                 </p>
             ) : null}

@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CodeStep } from "@/components/auth/code-step";
 import { AuthHeading } from "@/components/auth/field";
 import { codeNext, doneLine } from "@/components/auth/panel-copy";
-import { getAppUrl } from "@/lib/app-urls";
+import { afterSignUp, getAppUrl } from "@/lib/app-urls";
 import { withCarry } from "@/lib/joining";
 
 /**
@@ -59,7 +59,10 @@ export function VerifyEmailForm({
             resendAfterSeconds={CODE_RESEND_SECONDS}
             onChangeEmail={() => router.push(withCarry("/login", returnTo))}
             onDone={() => {
-                window.location.href = returnTo ?? getAppUrl();
+                // A newly confirmed account. `afterSignUp` routes it through
+                // saroh.in's /welcome when that hand-off is on (DEC-127);
+                // this page itself loads no advertising tag.
+                window.location.href = afterSignUp(returnTo ?? getAppUrl());
             }}
         />
     );
