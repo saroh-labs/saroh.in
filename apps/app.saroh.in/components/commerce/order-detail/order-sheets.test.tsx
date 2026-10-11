@@ -649,11 +649,15 @@ describe("a save", () => {
         });
         render();
         await press(button("Change how it's fulfilled…"));
-        const sheet = dialog();
-        const delivery = Array.from(
-            sheet?.querySelectorAll<HTMLElement>("[role=radio]") ?? [],
-        ).find((r) => r.textContent === "Local delivery");
-        if (!delivery) throw new Error("No Local delivery");
+        // The ways arrive a tick after the sheet: wait for them, or a busy
+        // machine reads the sheet before they are drawn.
+        const delivery = await vi.waitFor(() => {
+            const found = Array.from(
+                dialog()?.querySelectorAll<HTMLElement>("[role=radio]") ?? [],
+            ).find((r) => r.textContent === "Local delivery");
+            if (!found) throw new Error("No Local delivery");
+            return found;
+        });
         await press(delivery);
         for (const [name, value] of [
             ["Street and number", "14 Lake View Road"],
@@ -661,7 +665,7 @@ describe("a save", () => {
             ["State", "Maharashtra"],
             ["PIN code", "411001"],
         ]) {
-            const input = sheet?.querySelector<HTMLInputElement>(
+            const input = dialog()?.querySelector<HTMLInputElement>(
                 `input[aria-label="${name}"]`,
             );
             if (!input) throw new Error(`No ${name}`);

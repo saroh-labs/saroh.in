@@ -114,11 +114,20 @@ function listen() {
             for (const drop of hints) drop();
             const target = event.target;
             window.setTimeout(() => {
-                const to =
-                    target instanceof Node && target.isConnected
-                        ? target
-                        : document;
-                to.dispatchEvent(
+                // Only to the control the key was pressed in, and only if
+                // it is still on the page. A sheet or dialog holds the
+                // keyboard inside itself, so a press on the page's body
+                // had nothing of that kind to close, and handed on there
+                // it closed whatever had opened in the meantime.
+                if (
+                    !(target instanceof Element) ||
+                    !target.isConnected ||
+                    target === document.body ||
+                    target === document.documentElement
+                ) {
+                    return;
+                }
+                target.dispatchEvent(
                     new KeyboardEvent("keydown", {
                         key: "Escape",
                         code: "Escape",
