@@ -565,7 +565,9 @@ the Privacy Policy states both.
   DEC-124), how the business is reached (its phone, contact email, social
   links, the registered address, its choice or its map link, and a
   location's name, address, map link, hours or kind: the footer reads them live, DEC-128; cause
-  `contact`, `enqueueBusinessSitesRevalidation`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
+  `contact`, `enqueueBusinessSitesRevalidation`), the business's own domain
+  pausing or coming back with its plan (every page then names another
+  address as its own, DEC-139; cause `domain`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
   stock row or how a product counts takes `lockStockLevels`, `lockProduct`
   or `lockProducts` (`products/stock-levels.ts`, the lock order), and those
   queue on the same transaction, once per row or product per transaction.
@@ -677,4 +679,12 @@ overrideId, reason }`. Re-read, then decide
   that charge), PAST_DUE, a period that ends the plan
   (`cancelAtPeriodEnd`), a move due by then, a SCHEDULED checkout starting
   by then, a year paid once, and a monthly term's end (DEC-100's notices).
-  Email only: no inbox notice for a routine charge.
+  Email only: no inbox notice for a routine charge. Before it, the domain
+  step (DEC-139, `domain-plan-notice.ts` `sweepDomains`): for every
+  business with a connected domain it tells an end the plan's own notices
+  didn't, starts the 3-day clock when the plan stops including a domain,
+  says once when the domain is paused, and clears its claims once the plan
+  includes one again. Its claims are `DOMAIN_ENDING`
+  (`domain-ending:<end>:<stage>`), `DOMAIN_PLAN_ENDED`
+  (`domain-plan-ended`) and `DOMAIN_PAUSED` (`domain-paused:<clock>`); its
+  email is `billing.email` kind `DOMAIN`, re-read before it is sent.

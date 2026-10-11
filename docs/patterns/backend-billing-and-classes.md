@@ -166,6 +166,15 @@ moving back up restores everything at once.
   already made (`now`) says "your plan's limits" (`pausesParagraphs`).
 - **The admin limit override** says what then happens
   (`admin/limit-override-warning.ts`, #802).
+- **The business's own domain** pauses the same way, on its own rule
+  (DEC-139; `billing/domain-plan.ts`, `domain-plan.service.ts`,
+  `domain-plan-notice.ts`): derived from `customDomain` and a 3-day clock
+  (`CustomerNotice` `DOMAIN_PLAN_ENDED`), never a mark on the `Domain` row,
+  which is not written at all. Anything that picks a site's address asks
+  `domainPlan.paused(org)` (cached 30 s): the host lookup, `primaryHostOf`,
+  `siteOriginOf`, `siteMovedTo`, the test-release lookup and Web address.
+  A new place that prefers the verified domain must ask it too.
+  `PRICING_ROLLOUT.md` → A business's own domain.
 
 ## Business details before money — **Current** (DEC-068, M3)
 
