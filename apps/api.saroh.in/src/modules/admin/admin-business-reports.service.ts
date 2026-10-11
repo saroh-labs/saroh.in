@@ -22,6 +22,10 @@ export interface BusinessReportRow {
     hasEmail: boolean;
     /** The email itself, only for staff with `organization:pii:read`. */
     reporterEmail: string | null;
+    /** Whether the reporter left a mobile number; reports before DEC-138 have none. */
+    hasPhone: boolean;
+    /** The number itself, only for staff with `organization:pii:read`. */
+    reporterPhone: string | null;
 }
 
 export interface BusinessReportPage {
@@ -35,9 +39,9 @@ export interface BusinessReportPage {
  * CROSS-TENANT READ: every report, about every business, outside any
  * organization context — behind `organization:read`. It returns what decides
  * whether to act: the address, the business it resolved to and the
- * customer's words. The reporter's email is personal data and comes back
- * only to staff holding `organization:pii:read`; others see that one was
- * left. Closing a report needs `reports:resolve` (Support and Platform
+ * customer's words. The reporter's email and mobile number are personal
+ * data and come back only to staff holding `organization:pii:read`; others
+ * see that each was left. Closing a report needs `reports:resolve` (Support and Platform
  * Owners) and is audited.
  */
 @Injectable()
@@ -53,7 +57,7 @@ export class AdminBusinessReportsService {
             status === "all"
                 ? {}
                 : ({ status: status === "done" ? "DONE" : "OPEN" } as const);
-        const seesEmail = staff.permissions.includes(
+        const seesContact = staff.permissions.includes(
             AdminPermission.OrganizationPiiRead,
         );
         const [rows, open] = await outsideOrgContext(() =>
@@ -68,6 +72,7 @@ export class AdminBusinessReportsService {
                         createdAt: true,
                         doneAt: true,
                         reporterEmail: true,
+                        reporterPhone: true,
                         organization: { select: { id: true, name: true } },
                     },
                     ...(query.cursor
@@ -83,12 +88,16 @@ export class AdminBusinessReportsService {
         const hasMore = rows.length > PAGE_SIZE;
         const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
         return {
-            items: page.map(({ reporterEmail, organization, ...row }) => ({
-                ...row,
-                business: organization,
-                hasEmail: reporterEmail !== null,
-                reporterEmail: seesEmail ? reporterEmail : null,
-            })),
+            items: page.map(
+                ({ reporterEmail, reporterPhone, organization, ...row }) => ({
+                    ...row,
+                    business: organization,
+                    hasEmail: reporterEmail !== null,
+                    reporterEmail: seesContact ? reporterEmail : null,
+                    hasPhone: reporterPhone !== null,
+                    reporterPhone: seesContact ? reporterPhone : null,
+                }),
+            ),
             open,
             nextCursor: hasMore ? page[page.length - 1]?.id : undefined,
         };

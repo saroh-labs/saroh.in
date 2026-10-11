@@ -33,7 +33,7 @@ model User {
   // workspace, as masked session recordings (DEC-125). Null: never chosen,
   // which reads as yes only where recording is switched on at all. False:
   // they said no, on every device. Theirs, not a business's.
-  sharesUsage Boolean?
+  sharesUsage       Boolean?
   // When they dismissed the workspace's one-time notice that says how it is
   // recorded (DEC-125, 10 Oct). Null: not yet, so it is shown, and nothing is
   // recorded before it has been.
@@ -7433,10 +7433,11 @@ model SarohInvoiceSequence {
 }
 
 // A report a customer sent at saroh.in/customers about a business that uses
-// Saroh: the site's address as they gave it, what happened, and an email if
-// they left one. `organizationId` is set when the address is a Saroh site,
+// Saroh: the site's address as they gave it, what happened, and the email and
+// mobile number they gave (both asked for since DEC-138; older reports may
+// have neither). `organizationId` is set when the address is a Saroh site,
 // else null. Staff read it in the admin console (organization:read; the
-// reporter's email only with organization:pii:read) and mark it done
+// reporter's email and number only with organization:pii:read) and mark it done
 // (reports:resolve). Kept when the business is deleted.
 model BusinessReport {
   id             String               @id @default(cuid())
@@ -7446,6 +7447,8 @@ model BusinessReport {
   siteHost       String
   message        String
   reporterEmail  String?
+  // Asked for with the email since DEC-138; null on a report sent before it.
+  reporterPhone  String?
   // A digest of the reporter's address, as the waitlist keeps one; never the address.
   ipHash         String?
   status         BusinessReportStatus @default(OPEN)

@@ -1,3 +1,4 @@
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { Badge } from "@saroh/ui/badge";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { PageContainer } from "@saroh/ui/page-container";
@@ -8,7 +9,11 @@ import { AdminShell } from "@/components/admin-shell";
 import { MarkDone } from "@/components/business-reports/mark-done";
 import { FilterBar, FilterSelect } from "@/components/filter-bar";
 import { Pager } from "@/components/operations/pager";
-import { listBusinessReports, reportStatus } from "@/lib/business-reports";
+import {
+    listBusinessReports,
+    reporterDetail,
+    reportStatus,
+} from "@/lib/business-reports";
 import { can, requireStaff } from "@/lib/console";
 import { formatDateTime, formatRelative, plural } from "@/lib/format";
 import { param } from "@/lib/params";
@@ -18,9 +23,10 @@ export const metadata = { title: "Reports" };
 /**
  * What customers reported about businesses at saroh.in/customers (Terms rev
  * 46): newest first, open unless asked otherwise, each with the business the
- * address is a Saroh site of. The reporter's email shows only to staff who
- * may read personal data. Marking a report done needs `reports:resolve`,
- * which Support holds.
+ * address is a Saroh site of. The reporter's email and mobile number show
+ * only to staff who may read personal data; a report from before both were
+ * asked for (DEC-138) has a dash for the number. Marking a report done needs
+ * `reports:resolve`, which Support holds.
  */
 export default async function ReportsPage({
     searchParams,
@@ -37,7 +43,7 @@ export default async function ReportsPage({
         () => undefined,
     );
     const canClose = can(staff, "reports:resolve");
-    const seesEmail = can(staff, "organization:pii:read");
+    const seesContact = can(staff, "organization:pii:read");
 
     return (
         <AdminShell staff={staff}>
@@ -129,11 +135,22 @@ export default async function ReportsPage({
                                     </p>
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                                         <span className="break-all">
-                                            {!row.hasEmail
-                                                ? "No email left"
-                                                : seesEmail && row.reporterEmail
-                                                  ? row.reporterEmail
-                                                  : "Left an email (needs personal data access)"}
+                                            {reporterDetail(
+                                                row.hasEmail,
+                                                row.reporterEmail,
+                                                seesContact,
+                                                "an email",
+                                            ) ?? "No email left"}
+                                        </span>
+                                        <span className="break-all">
+                                            {reporterDetail(
+                                                row.hasPhone,
+                                                row.reporterPhone,
+                                                seesContact,
+                                                "a mobile number",
+                                            ) ?? (
+                                                <AbsentValue says="No mobile number left" />
+                                            )}
                                         </span>
                                         {row.doneAt && (
                                             <span>
