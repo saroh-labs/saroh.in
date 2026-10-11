@@ -1,10 +1,10 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 
 import { CUSTOMERS } from "@/content/customers";
-import type { ReportResult } from "@/lib/business-report";
+import type { ReportField, ReportResult } from "@/lib/business-report";
 import {
     prefilledSite,
     REPORT_LIMITS,
@@ -15,7 +15,7 @@ import { readAddress } from "@/lib/page-address";
 
 const copy = CUSTOMERS.form;
 
-type Field = "site" | "message" | "email";
+type Field = ReportField;
 
 type State =
     | { at: "idle" | "sending" | "done" }
@@ -25,7 +25,10 @@ const FIELD_MESSAGE: Record<Field, string> = {
     site: copy.badSite,
     message: copy.shortMessage,
     email: copy.badEmail,
+    phone: copy.badPhone,
 };
+
+const isField = (failure: string): failure is Field => failure in FIELD_MESSAGE;
 
 /** The address in the URL doesn't change while the page is open. */
 const noChange = () => () => undefined;
@@ -35,11 +38,17 @@ const INPUT =
 
 /**
  * Report a business (/customers, Terms rev 46): the site's address, what
- * happened, and an email only if they want a reply. Posts to
- * `/api/business-reports`. A Free merchant site's "Report" link
- * fills the address in from `?site=`, read in the browser so the page stays
- * static. The answer is the same whether or not the address is a Saroh
- * site.
+ * happened, and the reporter's own email and mobile number, all four asked
+ * for (DEC-138). Posts to `/api/business-reports`. A Free merchant site's
+ * "Report" link fills the address in from `?site=`, read in the browser so
+ * the page stays static. The answer is the same whether or not the address
+ * is a Saroh site.
+ *
+ * Send checks the fields in the form's order: the first at fault has the
+ * red border, the one line says what it needs, and the keyboard goes to it.
+ * A send that fails keeps everything typed. What is typed is masked in a
+ * session recording by the recorder's own rule for every input (DEC-125),
+ * and the thanks says none of it back.
  */
 export function ReportForm() {
     // The link's address until they type their own: read in the browser
@@ -53,7 +62,17 @@ export function ReportForm() {
     const site = typed ?? given;
     const [message, setMessage] = useState("");
     const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
     const [state, setState] = useState<State>({ at: "idle" });
+    const fields = useRef<
+        Partial<Record<Field, HTMLInputElement | HTMLTextAreaElement | null>>
+    >({});
+
+    /** Says what a field needs and puts the keyboard on it. */
+    const fault = (field: Field) => {
+        setState({ at: "error", message: FIELD_MESSAGE[field], field });
+        fields.current[field]?.focus();
+    };
 
     const clear = () => {
         if (state.at === "error") setState({ at: "idle" });
@@ -61,13 +80,9 @@ export function ReportForm() {
 
     const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const problem = reportProblem({ site, message, email });
+        const problem = reportProblem({ site, message, email, phone });
         if (problem) {
-            setState({
-                at: "error",
-                message: FIELD_MESSAGE[problem],
-                field: problem,
-            });
+            fault(problem);
             return;
         }
         setState({ at: "sending" });
@@ -78,7 +93,8 @@ export function ReportForm() {
                 body: JSON.stringify({
                     site: site.trim(),
                     message: message.trim(),
-                    ...(email.trim() ? { email: email.trim() } : {}),
+                    email: email.trim(),
+                    phone: phone.trim(),
                 }),
             });
             const body = (await res.json()) as ReportResult;
@@ -87,24 +103,16 @@ export function ReportForm() {
                 return;
             }
             const failure = body.failure;
-            setState(
-                failure === "site" ||
-                    failure === "message" ||
-                    failure === "email"
-                    ? {
-                          at: "error",
-                          message: FIELD_MESSAGE[failure],
-                          field: failure,
-                      }
-                    : {
-                          at: "error",
-                          message:
-                              failure === "rate-limited"
-                                  ? copy.rateLimited
-                                  : copy.failed,
-                          field: null,
-                      },
-            );
+            if (isField(failure)) {
+                fault(failure);
+                return;
+            }
+            setState({
+                at: "error",
+                message:
+                    failure === "rate-limited" ? copy.rateLimited : copy.failed,
+                field: null,
+            });
         } catch {
             setState({ at: "error", message: copy.failed, field: null });
         }
@@ -149,10 +157,14 @@ export function ReportForm() {
                     {copy.siteLabel}
                 </label>
                 <input
+                    ref={(el) => {
+                        fields.current.site = el;
+                    }}
                     id="report-site"
                     name="site"
                     type="text"
                     inputMode="url"
+                    aria-required
                     autoComplete="off"
                     autoCapitalize="none"
                     spellCheck={false}
@@ -182,9 +194,13 @@ export function ReportForm() {
                     {copy.messageLabel}
                 </label>
                 <textarea
+                    ref={(el) => {
+                        fields.current.message = el;
+                    }}
                     id="report-message"
                     name="message"
                     rows={5}
+                    aria-required
                     maxLength={REPORT_LIMITS.message}
                     value={message}
                     onChange={(e) => {
@@ -219,11 +235,15 @@ export function ReportForm() {
                     {copy.emailLabel}
                 </label>
                 <input
+                    ref={(el) => {
+                        fields.current.email = el;
+                    }}
                     id="report-email"
                     name="email"
                     type="email"
                     autoComplete="email"
                     inputMode="email"
+                    aria-required
                     maxLength={REPORT_LIMITS.email}
                     value={email}
                     onChange={(e) => {
@@ -245,6 +265,46 @@ export function ReportForm() {
                     className="m-0 text-mk-note leading-[1.5] text-muted-foreground"
                 >
                     {copy.emailHint}
+                </p>
+            </div>
+            <div className="grid gap-1.5">
+                <label
+                    htmlFor="report-phone"
+                    className="text-[14px] font-medium"
+                >
+                    {copy.phoneLabel}
+                </label>
+                <input
+                    ref={(el) => {
+                        fields.current.phone = el;
+                    }}
+                    id="report-phone"
+                    name="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    aria-required
+                    maxLength={REPORT_LIMITS.phone}
+                    value={phone}
+                    onChange={(e) => {
+                        setPhone(e.target.value);
+                        clear();
+                    }}
+                    aria-invalid={wrong("phone") || undefined}
+                    aria-describedby={describedBy("phone", "report-phone-hint")}
+                    className={cn(
+                        INPUT,
+                        "h-[46px]",
+                        wrong("phone")
+                            ? "border-destructive"
+                            : "border-border-strong",
+                    )}
+                />
+                <p
+                    id="report-phone-hint"
+                    className="m-0 text-mk-note leading-[1.5] text-muted-foreground"
+                >
+                    {copy.phoneHint}
                 </p>
             </div>
             {state.at === "error" ? (
