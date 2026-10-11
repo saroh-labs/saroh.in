@@ -87,7 +87,20 @@ export function Tip({
 const showing = new Set<() => void>();
 let listening = false;
 
-/** One listener for every hint, on the window, ahead of Radix's own. */
+/** How long the layers under a hint take to learn it has gone. */
+const HAND_ON_MS = 30;
+
+/**
+ * One listener for every hint, on the window, ahead of Radix's own.
+ *
+ * Radix gives Escape to the topmost layer, and each layer works out whether
+ * it is topmost when it draws. Taking the hint away is not enough inside
+ * the same key press: the sheet under it has not drawn again yet, still
+ * believes the hint is above it, and lets the press go (seen in the built
+ * app, where that redraw is not in step with the press). So the press that
+ * meets a hint stops here, the hint goes, and the same key is handed on a
+ * moment later, when the sheet knows it is on top.
+ */
 function listen() {
     if (listening || typeof window === "undefined") return;
     listening = true;
@@ -97,7 +110,24 @@ function listen() {
             if (event.key !== "Escape" || showing.size === 0) return;
             const hints = Array.from(showing);
             showing.clear();
+            event.stopImmediatePropagation();
             for (const drop of hints) drop();
+            const target = event.target;
+            window.setTimeout(() => {
+                const to =
+                    target instanceof Node && target.isConnected
+                        ? target
+                        : document;
+                to.dispatchEvent(
+                    new KeyboardEvent("keydown", {
+                        key: "Escape",
+                        code: "Escape",
+                        bubbles: true,
+                        cancelable: true,
+                        composed: true,
+                    }),
+                );
+            }, HAND_ON_MS);
         },
         true,
     );

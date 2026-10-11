@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -31,7 +37,7 @@ describe("Escape with a hint showing", () => {
     }
     const state = { open: true };
 
-    it("closes what the control sits in, at the first press", () => {
+    it("closes what the control sits in, at the first press", async () => {
         state.open = true;
         open();
         const button = screen.getByRole("button", { name: "Up" });
@@ -40,8 +46,10 @@ describe("Escape with a hint showing", () => {
         expect(screen.getByRole("tooltip")).toHaveTextContent("Move up");
 
         fireEvent.keyDown(button, { key: "Escape" });
-        expect(state.open).toBe(false);
+        // The hint goes at once. The press is handed on to the dialog a
+        // moment later, once it knows nothing is above it.
         expect(screen.queryByRole("tooltip")).toBeNull();
+        await waitFor(() => expect(state.open).toBe(false));
     });
 
     it("closes just the hint where there is nothing else to close", () => {
