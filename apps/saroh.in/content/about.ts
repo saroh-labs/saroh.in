@@ -66,10 +66,10 @@ export const ABOUT = {
     /** What the page is, in one line (`/llms.txt`). */
     line: "Who Saroh is for, what the name means and who makes it.",
     seo: {
-        title: "About · Saroh",
+        title: "About us and what the name means · Saroh",
         socialTitle: "About Saroh",
         description:
-            "Saroh puts bookings, orders, subscriptions, payments and your website in one place, for small businesses in India. What the name means, what we hold ourselves to and who makes it.",
+            "About Saroh, business software for small businesses in India: who it is for, what the name means and the company that makes it.",
     },
 
     eyebrow: "About Saroh",

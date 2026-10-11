@@ -1,6 +1,12 @@
 /**
- * The eight feature pages, from the Features template's `F` and `LINE` data
- * blocks, the Nav's `FEATURES` lines and Home's `modules` bodies.
+ * The nine feature pages: eight from the Features template's `F` and `LINE`
+ * data blocks, the Nav's `FEATURES` lines and Home's `modules` bodies, and
+ * Website, written in the same shape on 12 Oct 2026 (it has no design of
+ * its own yet).
+ *
+ * Each page's `phrase`, `seoTitle` and `seoDescription` are what it says to
+ * a search engine (`SearchWords`, `types.ts`), and its `sub` opens with the
+ * phrase so the first screen says in plain words what the page is.
  *
  * Changes from the design's words, each for a repo rule:
  * - "storefront" reads "location" (saroh-product.md);
@@ -17,12 +23,16 @@ import { FEATURE_SLUGS } from "./types";
 export const features: Record<FeatureSlug, Feature> = {
     dashboard: {
         slug: "dashboard",
+        phrase: "business dashboard",
+        seoTitle: "Business dashboard for small business owners",
+        seoDescription:
+            "A business dashboard that lists what's late, who's coming in, what's owed and what failed each morning, most urgent first.",
         name: "Dashboard",
         navLine: "What needs you today, for each person",
         cardLine: "What needs you today.",
         homeBody: "What needs each person today, based on their role.",
         headline: "Open up and see what needs you.",
-        sub: "Every morning, the dashboard lists what's late, who's coming in, what's owed and what failed, most urgent first. Each person sees the part that's theirs, and most things can be done right from the list.",
+        sub: "A business dashboard that starts with what needs you. Every morning it lists what's late, who's coming in, what's owed and what failed, most urgent first. Each person sees the part that's theirs, and most things can be done right from the list.",
         hero: {
             shot: "s-home",
         },
@@ -87,13 +97,17 @@ export const features: Record<FeatureSlug, Feature> = {
     },
     products: {
         slug: "products",
+        phrase: "stock management",
+        seoTitle: "Stock management software for small shops",
+        seoDescription:
+            "Stock management and a product catalogue for small shops: sizes, prices and photos, stock for each location, and low stock shown first.",
         name: "Products",
         navLine: "Prices, sizes, photos and stock, shared everywhere",
         cardLine: "Names, prices and stock for everything you sell.",
         homeBody:
             "Variants, prices, photos and stock, shared by your site and your orders.",
         headline: "Add a product once. It's right everywhere.",
-        sub: "Your site and your orders read the same product. Change a price and the next order and its invoice use it; orders already placed keep the price agreed. Stock goes down as orders go out, and the Products list shows what's running low before a size runs out.",
+        sub: "A product catalogue and stock management for a small shop. Your site and your orders read the same product. Change a price and the next order and its invoice use it; orders already placed keep the price agreed. Stock goes down as orders go out, and the Products list shows what's running low before a size runs out.",
         hero: {
             shot: "p-products",
         },
@@ -170,12 +184,16 @@ export const features: Record<FeatureSlug, Feature> = {
     },
     orders: {
         slug: "orders",
+        phrase: "order management",
+        seoTitle: "Order management software for small business",
+        seoDescription:
+            "Order management for small businesses: every order in one list, with pick-up, delivery, shipping and visits, and late ones flagged.",
         name: "Orders",
         navLine: "Every order in one list, late ones flagged",
         cardLine: "Every order, in one list.",
         homeBody: "One list from every location, with late orders flagged.",
         headline: "Every order in one list, and none slip.",
-        sub: "Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged.",
+        sub: "Order management for a small business. Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged.",
         hero: {
             shot: "s-orders",
         },
@@ -230,13 +248,17 @@ export const features: Record<FeatureSlug, Feature> = {
     },
     customers: {
         slug: "customers",
+        phrase: "customer management",
+        seoTitle: "Customer management software for small business",
+        seoDescription:
+            "Customer management for small businesses: each customer's bookings, bills, notes and linked orders on one page, with what they've spent.",
         name: "Customers",
         navLine: "Bookings, bills, notes and linked orders on one page",
         cardLine: "Everything about each customer.",
         homeBody:
             "Bookings, bills, notes and linked orders on one page. Sensitive notes only for the right roles.",
         headline: "Know the person in front of you.",
-        sub: "Every customer's bookings, plans, bills and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything the team should know before they arrive.",
+        sub: "Customer management for a small team. Every customer's bookings, plans, bills and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything the team should know before they arrive.",
         hero: {
             shot: "r-customers",
         },
@@ -293,13 +315,17 @@ export const features: Record<FeatureSlug, Feature> = {
     },
     bookings: {
         slug: "bookings",
+        phrase: "online booking",
+        seoTitle: "Online booking and appointment scheduling software",
+        seoDescription:
+            "Online booking and appointment scheduling for classes and one-to-one sessions: customers pick a real free time and pay a deposit.",
         name: "Bookings",
         navLine: "Classes, sessions and appointments",
         cardLine: "Classes, sessions and appointments.",
         homeBody:
             "Classes, sessions and appointments with staff, places and hours.",
         headline: "A calendar customers can book into themselves.",
-        sub: "Classes, one-to-one sessions and appointments, with staff, places and hours. Customers book on your site, pay a deposit or use a credit, and you see it straight away.",
+        sub: "Online booking and appointment scheduling for classes, one-to-one sessions and appointments, with staff, places and hours. Customers book on your site, pay a deposit or use a credit, and you see it straight away.",
         hero: {
             shot: "g-bookings",
         },
@@ -359,18 +385,22 @@ export const features: Record<FeatureSlug, Feature> = {
         worksLead:
             "Bookings put people on the calendar, money in Billing and notes on the customer.",
         worksWith: ["customers", "billing", "subscriptions", "dashboard"],
-        usedBy: ["gyms", "clinics"],
+        usedBy: ["salons", "gyms", "clinics"],
         closer: "Open your calendar to bookings.",
     },
     subscriptions: {
         slug: "subscriptions",
+        phrase: "membership and subscription billing",
+        seoTitle: "Membership and subscription billing software",
+        seoDescription:
+            "Membership and subscription billing: each renewal makes its invoice on the day, paid by pay link or by UPI Autopay on your own Razorpay.",
         name: "Subscriptions",
         navLine: "Plans that renew themselves",
         cardLine: "Plans that renew themselves.",
         homeBody:
             "Plans that renew on their day, with failed payments shown and a pay link ready.",
         headline: "Regulars on a plan, renewed on time.",
-        sub: "Memberships, weekly bread, monthly boxes. Each renewal makes its invoice on the day, and plans can renew on their own by UPI Autopay where you've set it up on your Razorpay account. A failed payment is shown to you with a new pay link.",
+        sub: "Membership and subscription billing for your regulars: memberships, weekly bread, monthly boxes. Each renewal makes its invoice on the day, and plans can renew on their own by UPI Autopay where you've set it up on your Razorpay account. A failed payment is shown to you with a new pay link.",
         hero: {
             shot: "r-subdetail",
         },
@@ -421,13 +451,17 @@ export const features: Record<FeatureSlug, Feature> = {
     },
     billing: {
         slug: "billing",
+        phrase: "GST billing",
+        seoTitle: "GST billing and invoice software for small business",
+        seoDescription:
+            "GST billing and invoice software for small businesses in India: numbered tax invoices, bills of supply, pay links and reminders.",
         name: "Billing",
         navLine: "Invoices made for you",
         cardLine: "Invoices made for you.",
         homeBody:
             "Tax invoices and bills of supply, made from orders, bookings and renewals.",
         headline: "Invoices you don't have to write.",
-        sub: "Every paid order gets its own numbered invoice with the right tax, and with Payments on, so do bookings paid online and every renewal. See what's owed, send a reminder with a pay link, and write one by hand when you need to.",
+        sub: "GST billing and invoice software that writes the invoice for you. Every paid order gets its own numbered invoice with the right tax, and with Payments on, so do bookings paid online and every renewal. See what's owed, send a reminder with a pay link, and write one by hand when you need to.",
         hero: {
             shot: "s-billing",
         },
@@ -485,6 +519,91 @@ export const features: Record<FeatureSlug, Feature> = {
         closer: "Get your Sundays back.",
     },
     /*
+     * Website (12 Oct 2026): one of the four things Saroh promises, and the
+     * one feature that had no page. Written in the Features template's shape;
+     * there is no design for it yet. It says only what a business can do
+     * today with nothing switched on for it (claims ledger §16, W rows):
+     * nothing about choosing a template (DEC-135), the online shop
+     * (`SITE_SHOP`) or the customer's account area (`SITE_ACCOUNT_AREA`).
+     * Both shots are of a demo business's own site and booking page.
+     */
+    website: {
+        slug: "website",
+        phrase: "website builder",
+        seoTitle: "Website builder for small business with bookings",
+        seoDescription:
+            "A website builder for small businesses in India: your services, prices and hours stay up to date, with online booking and your own domain.",
+        name: "Website",
+        navLine: "A site that keeps up with your business",
+        cardLine: "A site that keeps up with your business.",
+        homeBody:
+            "Your services, prices and hours on your own site, with a booking page built in.",
+        headline: "A website that keeps up with your business.",
+        sub: "A website builder for a small business, joined to the rest of Saroh. Your services, prices and opening hours are read from where you already keep them, customers book from the page, and it lives at a web address of your own.",
+        hero: {
+            shot: "g-site",
+        },
+        howTitle: "From your first page to your own domain.",
+        steps: [
+            {
+                title: "It reads what you already entered",
+                body: "A services list shows each service with how long it takes and its price. Opening hours, today's free times, your phone and your address are read the same way, so a change in Saroh shows on your site without editing the page.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "d-site",
+            },
+            {
+                title: "Customers book from it",
+                body: "With Bookings on, your site has a booking page that offers only real free times. A customer signs in with a code sent to their email, and you see the booking straight away.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-book",
+            },
+        ],
+        points: [
+            {
+                title: "Your own domain",
+                body: "Every site starts at a free saroh.app address. Connect a domain you own with two records at your registrar, and the screen says when it's live. A domain is connected through www.",
+                openNote: "Your own domain comes with a paid plan.",
+            },
+            {
+                title: "Draft, then publish",
+                body: "Changes stay in a draft until you publish. Send a preview link first when someone should see it before it goes live.",
+            },
+            {
+                title: "Every version kept",
+                body: "Each publish is kept in Version history, and you can put an earlier one back.",
+            },
+            {
+                title: "How a shared link looks",
+                body: "Set the title, description and share image under Search and sharing. You're told when the picture is too small for Facebook and LinkedIn, or too heavy for WhatsApp.",
+            },
+            {
+                title: "Ready for search",
+                body: "Each site has its own sitemap, and you can add your Google Search Console or Bing Webmaster Tools code in Settings.",
+            },
+            {
+                title: "Your look",
+                body: "Choose a colourway, a pair of typefaces and the spacing, and every page follows.",
+            },
+            {
+                title: "Customers sign in with a code",
+                body: "No passwords. A customer's account is with your business on your site, not with Saroh.",
+            },
+            {
+                title: "Enquiries reach your team",
+                body: "A form on your site adds the person to your contacts as a lead and tells the owners and admins.",
+            },
+            {
+                title: "A blog when you want one",
+                body: "Write posts and list them on a page of your site.",
+            },
+        ],
+        worksLead:
+            "Your site reads from Bookings and your business's own details, so it says what's true today.",
+        worksWith: ["bookings", "subscriptions", "insights"],
+        usedBy: ["shops", "salons", "gyms", "clinics"],
+        closer: "Put your business on a site of its own.",
+    },
+    /*
      * Insights says only what today's Insights shows (DEC-075, D2): site
      * views, visitors, enquiries and orders, views by day and the most-viewed
      * pages, for the last 7, 30 or 90 days. The designed takings, best week,
@@ -494,12 +613,16 @@ export const features: Record<FeatureSlug, Feature> = {
      */
     insights: {
         slug: "insights",
+        phrase: "website analytics",
+        seoTitle: "Website analytics for your business site",
+        seoDescription:
+            "Website analytics for a small business site: views, visitors, enquiries and orders for the last 7, 30 or 90 days, and your top pages.",
         name: "Insights",
         navLine: "Site views, visitors, enquiries and orders",
         cardLine: "How your site is doing.",
         homeBody: "Site views, visitors, enquiries and orders, day by day.",
         headline: "See how your site is doing.",
-        sub: "Site views, visitors, enquiries and orders for the last week, month or three months, with views by day and the pages people open most.",
+        sub: "Website analytics for your business's site: site views, visitors, enquiries and orders for the last week, month or three months, with views by day and the pages people open most.",
         hero: { shot: "s-insights" },
         howTitle: "From this week to the last three months.",
         steps: [
@@ -542,7 +665,7 @@ export const features: Record<FeatureSlug, Feature> = {
         ],
         worksLead:
             "Insights counts what happens on your site: views, visitors, enquiries and orders.",
-        worksWith: ["dashboard", "orders"],
+        worksWith: ["website", "dashboard", "orders"],
         usedBy: ["shops", "gyms", "clinics"],
         closer: "See how your site is doing.",
     },

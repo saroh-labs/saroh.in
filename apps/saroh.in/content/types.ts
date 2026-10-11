@@ -12,7 +12,7 @@ import type { ShotKey } from "./shots";
 
 export type { PlanId, ShotKey };
 
-/** The eight feature pages, in the menu's order. */
+/** The nine feature pages, in the menu's order. */
 export const FEATURE_SLUGS = [
     "dashboard",
     "products",
@@ -21,12 +21,13 @@ export const FEATURE_SLUGS = [
     "bookings",
     "subscriptions",
     "billing",
+    "website",
     "insights",
 ] as const;
 export type FeatureSlug = (typeof FEATURE_SLUGS)[number];
 
-/** The three solution pages, in the menu's order. */
-export const SOLUTION_SLUGS = ["shops", "gyms", "clinics"] as const;
+/** The four solution pages, in the menu's order. */
+export const SOLUTION_SLUGS = ["shops", "salons", "gyms", "clinics"] as const;
 export type SolutionSlug = (typeof SOLUTION_SLUGS)[number];
 
 /**
@@ -41,6 +42,31 @@ export interface ShotRef {
     alt?: string;
 }
 
+/**
+ * What a page says to a search engine (12 Oct 2026), apart from what it
+ * says to a visitor. The headline may keep its voice; these say the plain
+ * thing someone types into a search box.
+ *
+ * - `phrase`: the category phrase the page owns, in plain words ("GST
+ *   billing", "salon booking software"). The title leads with it, the
+ *   description opens with it, and the page's first screen says it (its
+ *   eyebrow, headline or lead). A feature page owns "X software"; a
+ *   solution page owns "software for ‹trade›", so the two never ask for the
+ *   same search.
+ * - `seoTitle`: the `<title>` without the brand, which `pageTitle`
+ *   (`lib/seo.ts`) puts last: 52 characters or fewer, so the whole title
+ *   fits in 60.
+ * - `seoDescription`: one sentence, 150 characters or fewer.
+ *
+ * Both follow the claims ledger like any other line, and name no price and
+ * no plan (`content/seo.test.ts`).
+ */
+export interface SearchWords {
+    phrase: string;
+    seoTitle: string;
+    seoDescription: string;
+}
+
 export interface FeatureStep extends ShotRef {
     title: string;
     body: string;
@@ -51,9 +77,14 @@ export interface FeatureStep extends ShotRef {
 export interface Point {
     title: string;
     body: string;
+    /**
+     * A sentence added once the launch switch is open: what a plan has to
+     * do with it. Never drawn in waitlist mode (DEC-136, DEC-137).
+     */
+    openNote?: string;
 }
 
-export interface Feature {
+export interface Feature extends SearchWords {
     slug: FeatureSlug;
     /** "Dashboard", "Products"… — menu, breadcrumb, cards, "See {name} →". */
     name: string;
@@ -78,7 +109,13 @@ export interface Feature {
     closer: string;
 }
 
-export interface SolutionSegment extends ShotRef {
+export interface SolutionSegment {
+    /**
+     * The screen that shows it, when one has been captured. Without one the
+     * segment is drawn as words alone, never beside another trade's screen.
+     */
+    shot?: ShotKey;
+    alt?: string;
     /** The feature this problem belongs to ("See {feature} →"). */
     feature: FeatureSlug;
     /**
@@ -92,7 +129,7 @@ export interface SolutionSegment extends ShotRef {
     body: string;
 }
 
-export interface Solution {
+export interface Solution extends SearchWords {
     slug: SolutionSlug;
     /** "Shops", "Gyms & studios", "Clinics" — menu, breadcrumb. */
     name: string;
@@ -110,8 +147,13 @@ export interface Solution {
     };
     headline: string;
     sub: string;
-    hero: ShotRef;
-    heroNote: string;
+    /**
+     * The page's screenshot and the line under it naming the demo business.
+     * Both absent until a screen of this trade has been captured: the page
+     * then opens on its words (Salons, 12 Oct 2026).
+     */
+    hero?: ShotRef;
+    heroNote?: string;
     changeTitle: string;
     segments: SolutionSegment[];
     pricing: {
@@ -137,6 +179,7 @@ export const FAQ_IDS = [
     "shops-counter-online",
     "gyms-pack-and-membership",
     "clinics-medical-notes",
+    "salons-choose-stylist",
 ] as const;
 export type FaqId = (typeof FAQ_IDS)[number];
 

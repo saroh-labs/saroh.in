@@ -1,4 +1,4 @@
-const { REDIRECTS, temporary } = require("./redirects");
+const { REDIRECTS, temporary, launched } = require("./redirects");
 const { builtRoutes } = require("./routes.config");
 
 // A production deployment without API_URL drops every waitlist join, and
@@ -61,6 +61,11 @@ const nextConfig = {
      */
     env: {
         SAROH_BUILT_ROUTES: JSON.stringify(builtRoutes()),
+        // When this build was made. Every page is drawn then, so what runs
+        // per request and must agree with the pages (proxy.ts sending
+        // help.saroh.in on) asks "was Help shown when this was built?",
+        // not "is it shown now?" (`builtContext`, lib/resources-context.ts).
+        SAROH_BUILT_AT: new Date().toISOString(),
     },
 
     // No `X-Powered-By: Next.js`: it only tells scanners what to try.
@@ -85,13 +90,17 @@ const nextConfig = {
     },
 
     /**
-     * Old addresses to their V2 pages, one hop each, and, before launch,
-     * Pricing to the waitlist (`redirects.js`).
+     * Old addresses to their V2 pages, one hop each; before launch, Pricing
+     * to the waitlist; after it, the waitlist to sign-up (`redirects.js`).
      */
     async redirects() {
         return [
             ...REDIRECTS,
             ...temporary(process.env.NEXT_PUBLIC_LAUNCH_MODE),
+            ...launched(
+                process.env.NEXT_PUBLIC_LAUNCH_MODE,
+                process.env.NEXT_PUBLIC_ACCOUNTS_URL,
+            ),
         ];
     },
 

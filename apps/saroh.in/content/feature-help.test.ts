@@ -55,6 +55,10 @@ describe("FEATURE_HELP", () => {
             bookings: ["set-your-teams-hours", "take-a-deposit-when-they-book"],
             subscriptions: ["set-up-a-monthly-plan"],
             billing: ["add-your-gstin"],
+            website: [
+                "connect-your-own-domain",
+                "make-your-link-look-right-when-shared",
+            ],
             insights: [],
         });
     });

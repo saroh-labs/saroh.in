@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Arrow } from "@/components/v2/arrow";
 import { CtaLink } from "@/components/v2/cta-link";
 import { IntegrationSteps } from "@/components/v2/integrations/integration-steps";
+import { JsonLd } from "@/components/v2/json-ld";
 import {
     INTEGRATION_SLUGS,
     integrationHref,
@@ -13,6 +14,7 @@ import {
 } from "@/content/integrations";
 import { integrationMeta, loadIntegration } from "@/lib/integration-docs";
 import { pageMetadata } from "@/lib/seo";
+import { breadcrumbLd } from "@/lib/structured-data";
 
 /**
  * One integration's page (Resources plan U3, design "Saroh Resources -
@@ -67,6 +69,14 @@ export default async function IntegrationPage({ params }: Props) {
     return (
         <>
             <article className="mx-auto grid max-w-[760px] gap-6 px-6 pt-[72px]">
+                {/* The trail drawn below, ending on this page. */}
+                <JsonLd
+                    data={breadcrumbLd([
+                        { name: "Integrations", path: INTEGRATIONS_PATH },
+                        { name: fm.category },
+                        { name: fm.name, path: self },
+                    ])}
+                />
                 <nav aria-label="Breadcrumb">
                     <ol className="m-0 flex list-none items-center gap-2 p-0 text-[14px] text-muted-foreground">
                         <li>

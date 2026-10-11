@@ -26,10 +26,10 @@ export const qrCodeMaker = {
     path: "/tools/qr-code-maker",
     title: "QR code maker",
     sub: "Your link, your logo, your colour. Free.",
-    metaTitle: "QR code maker: your link, your logo, your colour · Saroh",
+    metaTitle: "QR code maker with your logo and colour · Saroh",
     socialTitle: "A QR code with your logo, in your colour.",
     metaDescription:
-        "Free QR code maker. Type your link, add your logo and pick a colour, then download the code as a PNG or SVG. It's made in your browser.",
+        "Free QR code maker: type your link, add your logo and pick a colour, then download the code as a PNG or SVG, made in your browser.",
     /** What the page is, for search engines' structured data. */
     definition:
         "A free QR code maker: type a link, add your logo, pick a colour and a label, and download the code as a PNG or an SVG. The code is made in your browser.",

@@ -216,6 +216,18 @@ export function checkedLine(
     return `Checked at ${time}.`;
 }
 
+/** The longest address the tool reads from a shared link. */
+const SHARED_MAX = 2048;
+
+/**
+ * The address a shared report names: `url` in the page's query
+ * (`?url=shop.in`), cut to a sane length, or undefined when there is none.
+ */
+export function sharedAddress(search: string): string | undefined {
+    const url = new URLSearchParams(search).get("url")?.trim();
+    return url ? url.slice(0, SHARED_MAX) : undefined;
+}
+
 /** The address to share this report by: this page with `?url=`. */
 export function reportLink(origin: string, address: string): string {
     const { scheme } = splitScheme(address);

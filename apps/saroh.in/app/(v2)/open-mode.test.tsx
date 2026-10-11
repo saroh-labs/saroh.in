@@ -104,6 +104,31 @@ describe("open mode (U27)", () => {
         expectOpen(render(await SolutionPage(slug("gyms"))).container);
     });
 
+    it("the Website page: to sign-up, with what a plan has to do with a domain, and still no template", async () => {
+        const { default: FeaturePage } = await import("./features/[slug]/page");
+        const { container } = render(await FeaturePage(slug("website")));
+        expectOpen(container);
+        // Held back before launch (`Point.openNote`, DEC-136).
+        expect(container.textContent).toContain(
+            "Your own domain comes with a paid plan.",
+        );
+        expect(container.textContent).not.toMatch(/template/i);
+        expect(container.textContent).not.toMatch(/₹/);
+    });
+
+    it("the Salons page: to sign-up, with its plans, and still no template", async () => {
+        const { default: SolutionPage } =
+            await import("./solutions/[slug]/page");
+        const { container } = render(await SolutionPage(slug("salons")));
+        expectOpen(container);
+        expect(
+            screen.getByRole("heading", { name: "Pricing for salons" }),
+        ).toBeTruthy();
+        expect(container.querySelectorAll("[data-plan]").length).toBe(2);
+        expect(container.querySelectorAll("[data-shot]")).toHaveLength(0);
+        expect(container.textContent).not.toMatch(/template/i);
+    });
+
     it("the nav: Start free to sign-up", async () => {
         const { SiteNav } = await import("@/components/v2/site-nav");
         const { container } = render(<SiteNav />);

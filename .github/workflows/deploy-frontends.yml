@@ -7,8 +7,8 @@ name: Build and deploy apps on Cloudflare
 #
 #   push to development   -> the dev Workers (saroh-*-dev, *.saroh.io)
 #   push to main          -> the production Workers (saroh-*, *.saroh.in, saroh.app)
-#   every night 00:00 IST -> the marketing site, both environments, so a page
-#                            dated today appears (the site is static)
+#   no schedule           -> nothing deploys at night; a marketing-site page
+#                            dated today appears with that site's next deploy
 #   manual / the API      -> one app (or all) in one environment, always
 #                            deployed; the API starts the marketing site's build
 #                            when pricing is published, and Platform Owners

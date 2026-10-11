@@ -11,7 +11,7 @@ import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
-    title: "Changelog · Saroh",
+    title: CHANGELOG.metaTitle,
     socialTitle: "Saroh changelog",
     description: CHANGELOG.metaDescription,
     path: "/changelog",
@@ -21,8 +21,8 @@ export const metadata: Metadata = pageMetadata({
  * The changelog (plan U4, design "Changelog" 1a): the title, the one email
  * field, the entries newest first, then Coming next. Before the first
  * entry's day (17 Oct) the entry's place says when it comes (R15); from that
- * day the entry is there, with no deploy (KTD-2, the root layout's
- * five-minute revalidate).
+ * day the entry is there once the site is next deployed: the page is built
+ * at deploy time, and nothing rebuilds it on a schedule (`app/layout.tsx`).
  */
 export default function ChangelogPage() {
     const view = changelogView(resourcesContext());

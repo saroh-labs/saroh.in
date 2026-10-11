@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 
 import { AboutPage } from "@/components/v2/about/about-page";
+import { JsonLd } from "@/components/v2/json-ld";
 import { ABOUT } from "@/content/about";
 import { LAUNCH_MODE } from "@/lib/links";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
+import { organizationLd } from "@/lib/structured-data";
 
 /*
  * The page's Hindi, in Noto Sans Devanagari (the design's face): सारोह at
@@ -37,6 +39,8 @@ export const metadata: Metadata = pageMetadata({
 export default function AboutRoute() {
     return (
         <div className={devanagari.variable}>
+            {/* Who makes Saroh, for search engines: the facts the page draws. */}
+            <JsonLd data={organizationLd()} />
             <AboutPage mode={LAUNCH_MODE} ctx={resourcesContext()} />
         </div>
     );

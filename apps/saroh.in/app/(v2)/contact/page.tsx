@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
 import { ContactPage } from "@/components/v2/contact/contact-page";
+import { JsonLd } from "@/components/v2/json-ld";
 import { CONTACT_PAGE } from "@/content/contact-page";
 import { LAUNCH_MODE } from "@/lib/links";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
+import { organizationLd } from "@/lib/structured-data";
 
 export const metadata: Metadata = pageMetadata({
     title: CONTACT_PAGE.seo.title,
@@ -18,5 +20,11 @@ export const metadata: Metadata = pageMetadata({
  * hands the message to the API (`components/v2/contact/`).
  */
 export default function ContactRoute() {
-    return <ContactPage mode={LAUNCH_MODE} ctx={resourcesContext()} />;
+    return (
+        <>
+            {/* Who to write to, for search engines: the facts the page draws. */}
+            <JsonLd data={organizationLd()} />
+            <ContactPage mode={LAUNCH_MODE} ctx={resourcesContext()} />
+        </>
+    );
 }

@@ -41,10 +41,10 @@ describe("contentErrors", () => {
     it("fails a Used by chip that names a missing page", () => {
         const broken = {
             ...features,
-            billing: { ...features.billing, usedBy: ["salons" as never] },
+            billing: { ...features.billing, usedBy: ["hotels" as never] },
         };
         expect(contentErrors({ ...real, features: broken })).toEqual([
-            "feature billing: used by missing salons",
+            "feature billing: used by missing hotels",
         ]);
     });
 
@@ -74,7 +74,7 @@ describe("contentErrors", () => {
 });
 
 describe("feature pages", () => {
-    it("has exactly the eight slugs, keyed by their own slug", () => {
+    it("has exactly the nine slugs, keyed by their own slug", () => {
         expect(Object.keys(features).sort()).toEqual([...FEATURE_SLUGS].sort());
         for (const [key, f] of Object.entries(features)) {
             expect(f.slug).toBe(key);
@@ -139,9 +139,12 @@ describe("solution pages", () => {
             expect(s.slug).toBe(slug);
             expect(s.headline.trim()).not.toBe("");
             expect(s.sub.trim()).not.toBe("");
-            expect(s.heroNote.trim()).not.toBe("");
+            // A hero comes with its note naming the demo business, or not
+            // at all (a trade with no screen captured yet).
+            expect(s.heroNote !== undefined).toBe(s.hero !== undefined);
             expect(s.segments.length).toBeGreaterThan(0);
             for (const ref of [s.hero, ...s.segments]) {
+                if (!ref?.shot) continue;
                 expect(shotKeys, `${slug}: ${ref.shot}`).toContain(ref.shot);
             }
             for (const seg of s.segments) {
@@ -216,11 +219,29 @@ describe("captions", () => {
     const refs: ShotRef[] = [
         home.hero,
         ...Object.values(features).flatMap((f) => [f.hero, ...f.steps]),
-        ...Object.values(solutions).flatMap((s) => [s.hero, ...s.segments]),
+        ...Object.values(solutions).flatMap((s) => [
+            ...(s.hero ? [s.hero] : []),
+            ...s.segments.flatMap((seg) =>
+                seg.shot ? [{ shot: seg.shot, alt: seg.alt }] : [],
+            ),
+        ]),
     ];
 
     it("no page carries its own alt for a shot", () => {
         for (const ref of refs) expect(ref.alt, ref.shot).toBeUndefined();
+        for (const s of Object.values(solutions)) {
+            for (const seg of s.segments) {
+                expect(seg.alt, `${s.slug}: ${seg.title}`).toBeUndefined();
+            }
+        }
+    });
+
+    it("a page with no screen of its own trade shows no other trade's (Salons)", () => {
+        const salons = solutions.salons;
+        expect(salons.hero).toBeUndefined();
+        expect(salons.segments.every((seg) => seg.shot === undefined)).toBe(
+            true,
+        );
     });
 
     it("a caption that names a demo business says it is a demo (D14)", () => {
@@ -242,6 +263,7 @@ describe("captions", () => {
             }
         }
         for (const s of Object.values(solutions)) {
+            if (s.heroNote === undefined) continue;
             expect(s.heroNote, s.slug).toMatch(/, a demo /);
         }
     });

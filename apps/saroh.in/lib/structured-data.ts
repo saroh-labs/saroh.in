@@ -1,6 +1,9 @@
 import type { Catalog } from "@saroh/pricing-catalog";
 import { offeredPlans } from "@saroh/pricing-catalog";
 
+import type { CompanyFacts } from "@/content/company";
+import { COMPANY } from "@/content/company";
+import { SAROH_CONTACT_EMAIL } from "@/content/contact";
 import { SAROH_SOCIAL } from "@/content/social";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
@@ -10,18 +13,80 @@ import { SITE_NAME, SITE_URL } from "@/lib/seo";
  *
  * Offers come from the published pricing catalogue only (KTD-10): no price
  * lives in this repo, so with no catalogue the app is described without
- * offers rather than with made-up ones.
+ * offers rather than with made-up ones. Nothing here is ever a rating, a
+ * review or a number of customers: there are none to cite.
  */
 export type JsonLdObject = Record<string, unknown>;
 
-export function organizationLd(): JsonLdObject {
-    return {
+/**
+ * Who makes Saroh: the brand, the LLP behind it, where to write, and its
+ * registered office, on Home, About and Contact. Only facts that are set
+ * (`content/company.ts`, DEC-137): a phone number or an address that isn't
+ * there is left out, key and all, never given empty.
+ */
+export function organizationLd(company: CompanyFacts = COMPANY): JsonLdObject {
+    const org: JsonLdObject = {
         "@context": "https://schema.org",
         "@type": "Organization",
+        "@id": `${SITE_URL}/#organization`,
         name: SITE_NAME,
+        legalName: company.legalName,
         url: SITE_URL,
         logo: `${SITE_URL}/icon1.png`,
+        email: SAROH_CONTACT_EMAIL,
+        contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "customer support",
+            email: SAROH_CONTACT_EMAIL,
+            ...(company.phone && { telephone: company.phone.dial }),
+            url: `${SITE_URL}/contact`,
+        },
         sameAs: SAROH_SOCIAL.map((link) => link.href),
+    };
+    if (company.phone) org.telephone = company.phone.dial;
+    if (company.postal) {
+        org.address = {
+            "@type": "PostalAddress",
+            streetAddress: company.postal.street,
+            addressLocality: company.postal.locality,
+            addressRegion: company.postal.region,
+            postalCode: company.postal.postalCode,
+            addressCountry: company.postal.country,
+        };
+    }
+    return org;
+}
+
+/** The site itself, on Home: its name, its one address and who publishes it. */
+export function webSiteLd(): JsonLdObject {
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "@id": `${SITE_URL}/#website`,
+        name: SITE_NAME,
+        url: SITE_URL,
+        inLanguage: "en-IN",
+        publisher: { "@id": `${SITE_URL}/#organization` },
+    };
+}
+
+/**
+ * The trail a page draws above its title, for search engines: each crumb in
+ * order, with its address on this site. A crumb with no page of its own (a
+ * label) takes no `item`.
+ */
+export function breadcrumbLd(
+    crumbs: readonly { name: string; path?: string }[],
+): JsonLdObject {
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: crumbs.map((crumb, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            name: crumb.name,
+            ...(crumb.path && { item: `${SITE_URL}${crumb.path}` }),
+        })),
     };
 }
 
@@ -118,6 +183,41 @@ export function articleLd(input: {
         url: `${SITE_URL}${input.path}`,
         mainEntityOfPage: `${SITE_URL}${input.path}`,
         datePublished: `${input.publishOn}T00:00:00+05:30`,
+        author: saroh,
+        publisher: saroh,
+    };
+}
+
+/**
+ * A Help article as a `TechArticle`, beside its `HowTo`: its title, the day
+ * it went up and the day its words or screens last changed (`updated`, the
+ * date the page shows), with Saroh as author and publisher. An article
+ * written before the day it went up was last changed, to a reader, on that
+ * day: the later of the two.
+ */
+export function techArticleLd(input: {
+    headline: string;
+    description: string;
+    path: string;
+    publishOn: string;
+    updated: string;
+}): JsonLdObject {
+    const saroh = {
+        "@type": "Organization",
+        name: SITE_NAME,
+        url: SITE_URL,
+        logo: { "@type": "ImageObject", url: `${SITE_URL}/icon1.png` },
+    };
+    return {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        headline: input.headline,
+        description: input.description,
+        url: `${SITE_URL}${input.path}`,
+        mainEntityOfPage: `${SITE_URL}${input.path}`,
+        inLanguage: "en-IN",
+        datePublished: `${input.publishOn}T00:00:00+05:30`,
+        dateModified: `${input.updated > input.publishOn ? input.updated : input.publishOn}T00:00:00+05:30`,
         author: saroh,
         publisher: saroh,
     };
