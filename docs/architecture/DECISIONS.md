@@ -1582,3 +1582,4 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Unchanged: a site already made from a template, its pages and its colourways. The API still lists templates and accepts one; the switch hides the choice and is not an access rule.
 - To bring them back: add `"NEXT_PUBLIC_TEMPLATES": "on"` to `env.production.vars` in `apps/saroh.in/wrangler.jsonc` and `apps/app.saroh.in/wrangler.jsonc`, and release. Each app is switched on its own.
 - The changelog's launch entry no longer says a site can "Start from a template": its "Your website" line is about the domain and how a page looks when shared. The words go back when the gallery does (owner, 11 Oct).
+- Open: the switch is read at build, so flipping it takes a deploy of that app.
