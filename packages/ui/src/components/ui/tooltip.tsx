@@ -180,6 +180,22 @@ function Hint({
         });
     }, []);
     React.useEffect(() => () => void showing.delete(drop), [drop]);
+    // A hint that has closed is still on the page while it fades, and
+    // still the topmost layer: it took Escape then too (and in the built
+    // app, on a phone, it was found there long after it closed). So it is
+    // listed for as long as its content is on the page, not only while it
+    // is open.
+    const onContent = React.useCallback(
+        (node: HTMLDivElement | null) => {
+            if (node) {
+                listen();
+                showing.add(drop);
+            } else {
+                showing.delete(drop);
+            }
+        },
+        [drop],
+    );
     return (
         <TooltipProvider delayDuration={350} skipDelayDuration={150}>
             <Tooltip
@@ -190,7 +206,11 @@ function Hint({
                         listen();
                         showing.add(drop);
                     } else {
-                        showing.delete(drop);
+                        // Gone at once, with no fade out: a hint left on
+                        // the page while it fades is still a layer above
+                        // the sheet, and one that never finished fading
+                        // stayed there.
+                        setDropped(true);
                     }
                     setOpen(next);
                 }}
@@ -207,7 +227,7 @@ function Hint({
                     {children}
                 </TooltipTrigger>
                 {dropped ? null : (
-                    <TooltipContent side={side} align={align}>
+                    <TooltipContent ref={onContent} side={side} align={align}>
                         {label}
                     </TooltipContent>
                 )}
