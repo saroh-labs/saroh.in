@@ -8,7 +8,7 @@ import { GOAL_LATER } from "@/lib/modules/goals";
 import type { SetupGoal } from "@/lib/organizations/setup-plan";
 
 /**
- * "What will you do first?" on the setup screen (UX audit, 10 Oct): the
+ * "What will you do first?", setup's last step (UX audit, 10 Oct): the
  * starting goals as radio cards, one chosen, in the same words Home and the
  * module picker use (`lib/modules/goals.ts`). Each card says what "Create"
  * opens. The last answer is for someone who would rather look around first.
@@ -84,7 +84,7 @@ export function SetupGoalChoice({
             })}
             itemClassName={(on) =>
                 cn(
-                    "flex min-h-11 items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left focus-visible:ring-offset-0",
+                    "flex min-h-[56px] items-center gap-3 rounded-lg border px-4 py-3 text-left focus-visible:ring-offset-0",
                     on
                         ? "border-foreground bg-muted"
                         : "border-input hover:bg-muted active:bg-accent-active",

@@ -1,18 +1,48 @@
 // @vitest-environment jsdom
 /**
- * Setup is one screen that ends in the product (UX audit, 10 Oct): "A
- * business" is chosen and every field is there from the start, the goal is
- * picked on the same screen, nothing asks whether it is a registered
- * company, and Create turns the goal on and lands on the thing itself.
+ * Setup is a stepper (DEC-130, amended 11 Oct 2026): one question to a
+ * screen, Back and Continue, and only the step on show in the page. One
+ * form holds every answer, the step is in the address, what was typed
+ * survives a reload, and the last step's button creates the business.
  *
- * `react-dom/client` + `act` directly, as the other component tests do.
+ * What the create then does (the goal, a plan, an invite) is
+ * `business-setup-create.test.tsx`.
  */
 import { act } from "react";
-import type { Root } from "react-dom/client";
-import { createRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SetupStepId } from "@/lib/organizations/setup-steps";
+import { SETUP_DRAFT_KEY } from "@/lib/organizations/setup-steps";
+
 import { BusinessSetupForm } from "./business-setup-form";
+import { SetupStepProvider } from "./setup-step-context";
+
+import {
+    address,
+    browser,
+    button,
+    checked,
+    choose,
+    eyebrow,
+    group,
+    heading,
+    host,
+    labelled,
+    mount,
+    plan,
+    press,
+    pressBack,
+    primary,
+    radio,
+    settle,
+    stepOnShow,
+    text,
+    toFirst,
+    toName,
+    typeInto,
+    unmount,
+} from "./business-setup-form.test-kit";
 
 const createOrganization = vi.fn();
 const checkAddress = vi.fn();
@@ -31,61 +61,40 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn() }),
 }));
 const updateUser = vi.fn();
+const signOut = vi.fn();
 vi.mock("@saroh/auth/client", () => ({
     authClient: {
-        signOut: vi.fn(),
+        signOut: (...args: unknown[]) => signOut(...args) as unknown,
         updateUser: (...args: unknown[]) => updateUser(...args) as unknown,
     },
 }));
 vi.mock("@/lib/accounts", () => ({ accountsLoginUrl: "/login" }));
-// The browser's zone, sent with the business (UX-008).
-const browserZone = vi.fn<() => string | null>(() => "America/Chicago");
 vi.mock("@/lib/organizations/time-zones", () => ({
-    browserZone: () => browserZone(),
+    browserZone: () => "America/Chicago",
 }));
-const startCheckout = vi.fn();
-const takeOffer = vi.fn();
 vi.mock("@/lib/saroh-billing/checkout-actions", () => ({
-    startCheckoutAfterOnboarding: (...args: unknown[]) =>
-        startCheckout(...args) as unknown,
-    takeLaunchOfferAfterOnboarding: (...args: unknown[]) =>
-        takeOffer(...args) as unknown,
+    startCheckoutAfterOnboarding: vi.fn(),
+    takeLaunchOfferAfterOnboarding: vi.fn(),
 }));
 const showError = vi.fn();
-const showInfo = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
-    showInfo: (...args: unknown[]) => showInfo(...args) as unknown,
+    showInfo: vi.fn(),
 }));
-
-let root: Root;
-let host: HTMLDivElement;
-
-function mount(props: Partial<Parameters<typeof BusinessSetupForm>[0]> = {}) {
-    act(() => root.unmount());
-    root = createRoot(host);
-    act(() =>
-        root.render(<BusinessSetupForm email="asha@example.com" {...props} />),
-    );
-}
 
 beforeEach(() => {
     (
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
-    host = document.createElement("div");
-    document.body.appendChild(host);
-    root = createRoot(host);
+    window.sessionStorage.clear();
     for (const fn of [
         createOrganization,
         checkAddress,
         startWithGoalAction,
         push,
         updateUser,
-        startCheckout,
-        takeOffer,
+        signOut,
         showError,
-        showInfo,
     ]) {
         fn.mockReset();
     }
@@ -93,83 +102,28 @@ beforeEach(() => {
         ok: true,
         data: { id: "org_1", slug: "asha-rao" },
     });
-    checkAddress.mockImplementation((address: string) =>
-        Promise.resolve({ address, available: true }),
+    checkAddress.mockImplementation((asked: string) =>
+        Promise.resolve({ address: asked, available: true }),
     );
     startWithGoalAction.mockResolvedValue({
         href: "/commerce/products/new",
         turnedOn: ["COMMERCE"],
     });
     updateUser.mockResolvedValue({ error: null });
-    act(() => root.render(<BusinessSetupForm email="asha@example.com" />));
+    signOut.mockResolvedValue(undefined);
+    mount();
 });
 
 afterEach(() => {
-    act(() => root.unmount());
-    host.remove();
-    document.body.innerHTML = "";
+    unmount();
+    vi.restoreAllMocks();
 });
 
-async function settle() {
-    for (let i = 0; i < 5; i++) {
-        await act(async () => {
-            await new Promise((r) => setTimeout(r, 0));
-        });
-    }
-}
-
-function labelled(text: string): HTMLInputElement {
-    const label = Array.from(host.querySelectorAll("label")).find(
-        (l) => l.textContent.trim() === text,
-    );
-    const id = label?.getAttribute("for");
-    const el = id ? document.getElementById(id) : null;
-    if (!el) throw new Error(`No field labelled ${text}`);
-    return el as HTMLInputElement;
-}
-
-function radio(name: string): HTMLButtonElement {
-    const hit = Array.from(
-        host.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
-    ).find((b) => b.textContent.includes(name));
-    if (!hit) throw new Error(`No choice ${name}`);
-    return hit;
-}
-
-const group = (labelledBy: string) =>
-    Array.from(
-        host.querySelectorAll<HTMLButtonElement>(
-            `[aria-labelledby="${labelledBy}"] [role="radio"]`,
-        ),
-    );
-
-const checked = (labelledBy: string) =>
-    group(labelledBy)
-        .filter((b) => b.getAttribute("aria-checked") === "true")
-        .map((b) => b.textContent);
-
-function typeInto(el: HTMLInputElement, value: string) {
-    act(() => {
-        Object.getOwnPropertyDescriptor(
-            HTMLInputElement.prototype,
-            "value",
-        )?.set?.call(el, value);
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-}
-
-async function submit() {
-    await act(async () => {
-        host.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
-        await Promise.resolve();
-    });
-    await settle();
-}
-
-const text = () => host.textContent;
-
-describe("one screen, open from the start", () => {
-    it("starts on A business, with nothing kept back", () => {
+describe("the first step: What are you setting up?", () => {
+    it("asks only that, with A business chosen and Continue", () => {
+        expect(stepOnShow()).toBe("kind");
+        expect(eyebrow()).toBe("Step 2 of 4");
+        expect(heading().textContent).toBe("What are you setting up?");
         expect(group("kind-label").map((c) => c.textContent)).toEqual([
             "A businessShop, studio, practice",
             "Just meFreelancer, consultant, creator",
@@ -178,68 +132,20 @@ describe("one screen, open from the start", () => {
         expect(checked("kind-label")).toEqual([
             "A businessShop, studio, practice",
         ]);
-        // Every field is on screen before anything is pressed.
-        const form = host.querySelector("form");
-        expect(form?.className).not.toContain("hidden");
-        expect(labelled("What is it called?").placeholder).toBe(
-            "Rye & Co. Bakery",
-        );
-        expect(labelled("Web address")).toBeTruthy();
-        expect(text()).toContain("Where does it trade?");
-        expect(text()).toContain("What will you do first?");
-        expect(text()).toContain("Create the business");
+        expect(primary().textContent).toBe("Continue");
+        // The first step has nothing behind it.
+        expect(button("Back")).toBeUndefined();
+        // Nothing of the other steps is in the page.
+        expect(host.querySelector("form input")).toBeNull();
+        expect(text()).not.toContain("Web address");
+        expect(text()).not.toContain("What will you do first?");
+        expect(text()).not.toContain("Create the business");
     });
 
-    it("calls the web address a web address, never an address on Saroh", () => {
-        expect(text()).not.toContain("Its address on Saroh");
-        expect(
-            Array.from(host.querySelectorAll("label")).map((l) =>
-                l.textContent.trim(),
-            ),
-        ).toContain("Web address");
-    });
-
-    it("never asks whether it is a registered company", async () => {
-        for (const kind of ["A business", "Just me", "A site for my work"]) {
-            act(() => radio(kind).click());
-            expect(text()).not.toContain("registered");
-        }
-        act(() => radio("A business").click());
-        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
-        const sent = createOrganization.mock.calls[0]?.[0] as {
-            profile: Record<string, unknown>;
-        };
-        expect(sent.profile).toEqual({
-            country: "IN",
-            timezone: "America/Chicago",
-        });
-    });
-
-    it("says neither Last step nor Then you are in", () => {
-        expect(text()).not.toMatch(/last step/i);
-        expect(text()).not.toContain("Then you are in");
-    });
-
-    it("defaults the country to India", () => {
-        expect(checked("country-label")).toEqual(["INIndia"]);
-    });
-
-    it("fills the web address from the name until it is edited", async () => {
-        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await settle();
-        expect(labelled("Web address").value).toBe("rye-co-bakery");
-        typeInto(labelled("Web address"), "rye");
-        typeInto(labelled("What is it called?"), "Rye Bakery");
-        await settle();
-        expect(labelled("Web address").value).toBe("rye");
-    });
-
-    it("refuses an empty name, and makes nothing", async () => {
-        await submit();
-        expect(text()).toContain("It needs a name");
-        expect(createOrganization).not.toHaveBeenCalled();
-        expect(startWithGoalAction).not.toHaveBeenCalled();
+    it("stacks the three choices full width, one to a row", () => {
+        const cards = host.querySelector('[aria-labelledby="kind-label"]');
+        expect(cards?.className).toContain("grid");
+        expect(cards?.className).not.toMatch(/grid-cols/);
     });
 
     it("moves the choice with the arrow keys, as a radio group does", () => {
@@ -257,54 +163,236 @@ describe("one screen, open from the start", () => {
         expect(radio("Just me").tabIndex).toBe(0);
         expect(business.tabIndex).toBe(-1);
     });
+
+    it("says neither Last step nor Then you are in", () => {
+        expect(text()).not.toMatch(/last step/i);
+        expect(text()).not.toContain("Then you are in");
+    });
+
+    it("another business counts setup's own three steps, and Back is the way to the workspace", () => {
+        mount({ another: true, backTo: "/" });
+        expect(eyebrow()).toBe("Set up another · Step 1 of 3");
+        expect(text()).toContain("It sits beside the ones you have");
+        expect(button("Back")?.getAttribute("href")).toBe("/");
+    });
 });
 
-describe("What are you setting up? changes words and defaults only (DEC-070)", () => {
-    it("names a business as today, and sends BUSINESS", async () => {
+describe("the name step", () => {
+    it("is what Continue opens, in a business's words, with its address", async () => {
+        await toName();
+        expect(stepOnShow()).toBe("name");
+        expect(address()).toBe("/onboarding?step=name");
+        expect(eyebrow()).toBe("Step 3 of 4");
+        expect(heading().textContent).toBe("Name your business");
+        expect(labelled("What is it called?").placeholder).toBe(
+            "Rye & Co. Bakery",
+        );
+        expect(labelled("Web address")).toBeTruthy();
+        expect(text()).toContain("Where does it trade?");
+        expect(checked("country-label")).toEqual(["INIndia"]);
+        expect(primary().textContent).toBe("Continue");
+        expect(button("Back")).toBeTruthy();
+        // The step before and the step after are out of the page.
+        expect(group("kind-label")).toEqual([]);
+        expect(group("goal-label")).toEqual([]);
+        expect(text()).not.toContain("registered");
+        expect(text()).not.toContain("Its address on Saroh");
+    });
+
+    it.each([
+        ["Just me", "Name it", "Your name or brand", "Asha Rao"],
+        [
+            "A site for my work",
+            "Name your site",
+            "Your name or brand",
+            "Asha Rao Studio",
+        ],
+    ])("speaks in %s's words", async (kind, title, label, placeholder) => {
+        choose(kind);
+        await toName();
+        expect(heading().textContent).toBe(title);
+        expect(labelled(label).placeholder).toBe(placeholder);
+        expect(text()).toContain("Where are you based?");
+    });
+
+    it("fills the web address from the name until it is edited", async () => {
+        await toName();
         typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
-        expect(createOrganization).toHaveBeenCalledWith({
-            name: "Rye & Co. Bakery",
-            kind: "BUSINESS",
-            address: "rye-co-bakery",
-            goal: "COMMERCE",
-            profile: { country: "IN", timezone: "America/Chicago" },
+        await settle();
+        expect(labelled("Web address").value).toBe("rye-co-bakery");
+        typeInto(labelled("Web address"), "rye");
+        typeInto(labelled("What is it called?"), "Rye Bakery");
+        await settle();
+        expect(labelled("Web address").value).toBe("rye");
+    });
+
+    it("Continue is its gate: an empty name is said under its field, with the keyboard on it", async () => {
+        await toName();
+        await press();
+        expect(stepOnShow()).toBe("name");
+        expect(address()).toBe("/onboarding?step=name");
+        expect(text()).toContain("It needs a name");
+        expect(text()).toContain("A web address needs at least 3 characters");
+        const name = labelled("What is it called?");
+        expect(name.getAttribute("aria-invalid")).toBe("true");
+        await settle(12);
+        expect(document.activeElement).toBe(name);
+        expect(createOrganization).not.toHaveBeenCalled();
+
+        // Each problem clears as it is fixed, though the field was never
+        // left (Enter, not a press on the button).
+        typeInto(name, "Rye");
+        await settle();
+        expect(text()).not.toContain("It needs a name");
+        expect(text()).not.toContain("at least 3 characters");
+    });
+
+    it("says a problem on leaving the field, before Continue", async () => {
+        await toName();
+        const name = labelled("What is it called?");
+        await act(async () => {
+            name.focus();
+            name.blur();
+            name.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+            await Promise.resolve();
+        });
+        await settle();
+        expect(text()).toContain("It needs a name");
+    });
+
+    it("checks only its own step: the last step's answer is never asked for here", async () => {
+        await toName();
+        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+        await press();
+        expect(stepOnShow()).toBe("first");
+    });
+
+    it("the main button is the form's one submit, so Enter in a field continues", async () => {
+        await toName();
+        const form = host.querySelector("form");
+        expect(form?.querySelectorAll('[type="submit"]')).toHaveLength(1);
+        expect(button("Back")?.getAttribute("type")).toBe("button");
+        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+        await act(async () => {
+            form?.requestSubmit();
+            await Promise.resolve();
+        });
+        await settle();
+        expect(stepOnShow()).toBe("first");
+    });
+
+    describe("Your name, for an account that has none", () => {
+        it("is not asked of an account that has one", async () => {
+            await toName();
+            expect(() => labelled("Your name")).toThrow();
+        });
+
+        it("is asked first on this step, and Continue needs it", async () => {
+            mount({ needsName: true });
+            await toName();
+            typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+            await press();
+            expect(stepOnShow()).toBe("name");
+            expect(text()).toContain("Enter your name");
+            await settle(12);
+            expect(document.activeElement).toBe(labelled("Your name"));
+            typeInto(labelled("Your name"), "Asha Rao");
+            await press();
+            expect(stepOnShow()).toBe("first");
         });
     });
+});
 
-    it("asks Just me for a name or brand, and sends SOLO", async () => {
-        act(() => radio("Just me").click());
-        const name = labelled("Your name or brand");
-        expect(name.placeholder).toBe("Asha Rao");
-        expect(text()).toContain("Where are you based?");
-        expect(text()).toContain("Set it up");
-        typeInto(name, "Asha Rao");
-        await submit();
-        expect(createOrganization).toHaveBeenCalledWith(
-            expect.objectContaining({ name: "Asha Rao", kind: "SOLO" }),
+describe("the web address check holds Continue", () => {
+    let answer: (value: unknown) => void;
+
+    beforeEach(async () => {
+        checkAddress.mockImplementation(
+            () =>
+                new Promise((resolve) => {
+                    answer = resolve;
+                }),
         );
+        await toName();
+        typeInto(labelled("What is it called?"), "Rye");
     });
 
-    it("keeps what was typed when the answer changes", () => {
-        typeInto(labelled("What is it called?"), "Asha Rao Studio");
-        act(() => radio("A site for my work").click());
-        expect(labelled("Your name or brand").value).toBe("Asha Rao Studio");
+    it("waits for the answer, saying so, and goes on when it is free", async () => {
+        await press();
+        // Asked at once, without waiting for the typing pause.
+        expect(checkAddress).toHaveBeenCalledWith("rye");
+        expect(stepOnShow()).toBe("name");
+        expect(primary().getAttribute("aria-busy")).toBe("true");
+        expect(primary().textContent).toContain("Checking…");
+
+        await act(async () => {
+            answer({ address: "rye", available: true });
+            await Promise.resolve();
+        });
+        await settle();
+        expect(stepOnShow()).toBe("first");
+        // One question, though typing and Continue both wanted it.
+        expect(checkAddress).toHaveBeenCalledTimes(1);
     });
 
-    it("sends no zone when the browser can't say one (UX-008)", async () => {
-        browserZone.mockReturnValueOnce(null);
-        typeInto(labelled("What is it called?"), "Asha Rao Studio");
-        await submit();
-        expect(createOrganization).toHaveBeenLastCalledWith(
-            expect.objectContaining({ profile: { country: "IN" } }),
-        );
+    it("never passes a taken address on: it stays, says why and puts the keyboard there", async () => {
+        await press();
+        await act(async () => {
+            answer({
+                address: "rye",
+                available: false,
+                reason: "rye is taken. Try another.",
+            });
+            await Promise.resolve();
+        });
+        await settle(12);
+        expect(stepOnShow()).toBe("name");
+        expect(address()).toBe("/onboarding?step=name");
+        expect(text()).toContain("rye is taken. Try another.");
+        const field = labelled("Web address");
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+        expect(field.getAttribute("aria-describedby")).toBe("address-status");
+        expect(document.activeElement).toBe(field);
+        expect(primary().getAttribute("aria-busy")).not.toBe("true");
+    });
+
+    it("goes on when the check couldn't be asked: the create checks again", async () => {
+        await press();
+        await act(async () => {
+            answer(null);
+            await Promise.resolve();
+        });
+        await settle();
+        expect(stepOnShow()).toBe("first");
+    });
+
+    it("asks again for an address changed while it waited", async () => {
+        await press();
+        typeInto(labelled("Web address"), "rye-bakery");
+        await act(async () => {
+            answer({ address: "rye", available: true });
+            await Promise.resolve();
+        });
+        await settle();
+        expect(stepOnShow()).toBe("name");
+        expect(checkAddress).toHaveBeenLastCalledWith("rye-bakery");
+        await act(async () => {
+            answer({ address: "rye-bakery", available: true });
+            await Promise.resolve();
+        });
+        await settle();
+        expect(stepOnShow()).toBe("first");
     });
 });
 
-describe("What will you do first?", () => {
+describe("the last step: What will you do first?", () => {
     const goals = () => group("goal-label").map((b) => b.dataset.goal);
 
-    it("offers a business the four goals in Home's words, Sell chosen, and a way to decide later", () => {
+    it("offers a business the four goals in Home's words, Sell chosen, and a way to decide later", async () => {
+        await toFirst();
+        expect(address()).toBe("/onboarding?step=first");
+        expect(eyebrow()).toBe("Step 4 of 4");
+        expect(heading().textContent).toBe("What will you do first?");
         expect(goals()).toEqual([
             "COMMERCE",
             "APPOINTMENTS",
@@ -315,21 +403,29 @@ describe("What will you do first?", () => {
         expect(text()).toContain("Sell things");
         expect(text()).toContain("Take bookings");
         expect(text()).toContain("Put up a website");
-        expect(text()).toContain("Keep track of people");
+        expect(text()).toContain("Put up a website");
+        expect(text()).toContain("Decide later");
         expect(text()).not.toContain("Sell products");
-        expect(text()).not.toContain("Show up online");
         expect(checked("goal-label")).toEqual([
             "Sell thingsTake money for products, in person or online. Opens your first product.",
         ]);
+        expect(primary().textContent).toBe("Create the business");
+        expect(host.querySelector("form input")).toBeNull();
     });
 
-    it("follows the kind until a goal is picked by hand", () => {
-        act(() => radio("A site for my work").click());
+    it("follows the kind until a goal is picked by hand", async () => {
+        choose("A site for my work");
+        await toFirst("Asha Rao Studio");
         expect(goals()[0]).toBe("WEBSITE");
         expect(checked("goal-label")[0]).toContain("Put up a website");
         expect(text()).toContain("Hear from readers");
+        expect(primary().textContent).toBe("Set it up");
 
-        act(() => radio("Just me").click());
+        await pressBack();
+        await pressBack();
+        choose("Just me");
+        await press();
+        await press();
         expect(goals()).toEqual([
             "APPOINTMENTS",
             "INVOICE",
@@ -341,195 +437,405 @@ describe("What will you do first?", () => {
         expect(checked("goal-label")[0]).toContain("Take bookings");
 
         // Picked by hand: a change of kind leaves it alone.
-        act(() => radio("Put up a website").click());
-        act(() => radio("A business").click());
+        choose("Put up a website");
+        await pressBack();
+        await pressBack();
+        choose("A business");
+        await press();
+        await press();
+        expect(checked("goal-label")[0]).toContain("Put up a website");
+    });
+});
+
+describe("Back", () => {
+    it("goes to the step before with every answer kept, and asks nothing", async () => {
+        choose("Just me");
+        await toFirst("Asha Rao");
+        choose("Put up a website");
+
+        await pressBack();
+        expect(stepOnShow()).toBe("name");
+        expect(host.querySelector('[role="dialog"]')).toBeNull();
+        expect(host.querySelector('[role="alertdialog"]')).toBeNull();
+        expect(labelled("Your name or brand").value).toBe("Asha Rao");
+        expect(labelled("Web address").value).toBe("asha-rao");
+
+        await pressBack();
+        expect(stepOnShow()).toBe("kind");
+        expect(address()).toBe("/onboarding");
+        expect(checked("kind-label")[0]).toContain("Just me");
+
+        await press();
+        await press();
         expect(checked("goal-label")[0]).toContain("Put up a website");
     });
 
-    it.each([
-        ["Sell things", "COMMERCE", "/commerce/products/new"],
-        ["Take bookings", "APPOINTMENTS", "/services/new"],
-        ["Put up a website", "WEBSITE", "/sites/site_1"],
-        ["Keep track of people", "CRM", "/contacts?new=1"],
-    ])(
-        "%s: Create turns it on and lands on the thing itself",
-        async (label, goal, href) => {
-            startWithGoalAction.mockResolvedValue({ href, turnedOn: [goal] });
-            typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-            act(() => radio(label).click());
-            await submit();
-            expect(createOrganization).toHaveBeenCalledWith(
-                expect.objectContaining({ goal }),
-            );
-            // After the business exists, with no second sheet in between.
-            expect(startWithGoalAction).toHaveBeenCalledWith(goal, "BUSINESS");
-            expect(
-                startWithGoalAction.mock.invocationCallOrder[0],
-            ).toBeGreaterThan(
-                createOrganization.mock.invocationCallOrder[0] ?? Infinity,
-            );
-            expect(push).toHaveBeenCalledWith(href);
-            expect(host.querySelector('[role="dialog"]')).toBeNull();
-        },
-    );
+    it("is the browser's own Back too: each step is a history entry", async () => {
+        await toFirst();
+        await browser("back");
+        expect(stepOnShow()).toBe("name");
+        expect(labelled("What is it called?").value).toBe("Rye & Co. Bakery");
+        await browser("back");
+        expect(stepOnShow()).toBe("kind");
+        await browser("forward");
+        expect(stepOnShow()).toBe("name");
+    });
 
-    it("Decide later sends no goal and lands on Home", async () => {
-        startWithGoalAction.mockResolvedValue({ href: "/", turnedOn: [] });
+    it("a Forward into a step whose earlier step is no longer answered opens that step, saying why", async () => {
+        await toFirst();
+        await browser("back");
+        typeInto(labelled("What is it called?"), "");
+        typeInto(labelled("Web address"), "");
+        await browser("forward");
+        expect(stepOnShow()).toBe("name");
+        expect(address()).toBe("/onboarding?step=name");
+        expect(text()).toContain("It needs a name");
+    });
+});
+
+describe("the step is in the address", () => {
+    it("keeps a plan picked on saroh.in in it through every step", async () => {
+        mount({}, "/onboarding?plan=grow&cycle=month");
+        await toFirst();
+        expect(address()).toBe("/onboarding?plan=grow&cycle=month&step=first");
+        await pressBack();
+        await pressBack();
+        expect(address()).toBe("/onboarding?plan=grow&cycle=month");
+    });
+
+    it("an address for the last step with nothing typed opens the first step that isn't answered, calling nothing wrong", async () => {
+        mount({}, "/onboarding?step=first");
+        await settle();
+        expect(stepOnShow()).toBe("name");
+        expect(address()).toBe("/onboarding?step=name");
+        expect(text()).not.toContain("It needs a name");
+        expect(text()).not.toContain("Create the business");
+        // Arriving, the keyboard is left where the browser put it.
+        expect(document.activeElement).toBe(document.body);
+    });
+
+    it("reads an unknown step as the first", async () => {
+        mount({}, "/onboarding?step=9");
+        await settle();
+        expect(stepOnShow()).toBe("kind");
+    });
+
+    it("a reload stays on the step, with what was typed", async () => {
+        choose("Just me");
+        await toFirst("Asha Rao");
+        choose("Decide later");
+
+        // The same tab, the same address, a new page.
+        mount({}, "/onboarding?step=first");
+        await settle();
+        expect(stepOnShow()).toBe("first");
+        expect(checked("goal-label")[0]).toContain("Decide later");
+        expect(primary().textContent).toBe("Set it up");
+        await pressBack();
+        expect(labelled("Your name or brand").value).toBe("Asha Rao");
+        expect(labelled("Web address").value).toBe("asha-rao");
+        await pressBack();
+        expect(checked("kind-label")[0]).toContain("Just me");
+    });
+
+    it("keeps an address typed by hand from following the name after a reload", async () => {
+        await toName();
         typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        act(() => radio("Decide later").click());
-        await submit();
-        expect(createOrganization.mock.calls[0]?.[0]).not.toHaveProperty(
+        typeInto(labelled("Web address"), "rye");
+        await settle();
+        mount({}, "/onboarding?step=name");
+        await settle();
+        expect(labelled("Web address").value).toBe("rye");
+        typeInto(labelled("What is it called?"), "Rye Bakery");
+        await settle();
+        expect(labelled("Web address").value).toBe("rye");
+    });
+});
+
+describe("the draft", () => {
+    const draft = () => window.sessionStorage.getItem(SETUP_DRAFT_KEY) ?? "";
+
+    it("holds the answers and nothing secret", async () => {
+        mount({ invite: "t".repeat(43), needsName: true });
+        await toName();
+        typeInto(labelled("Your name"), "Asha Rao");
+        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+        await settle();
+        const kept = JSON.parse(draft()) as { values: Record<string, string> };
+        expect(Object.keys(kept.values).sort()).toEqual([
+            "address",
+            "country",
             "goal",
-        );
-        expect(push).toHaveBeenCalledWith("/");
+            "kind",
+            "name",
+            "yourName",
+        ]);
+        expect(draft()).not.toContain("t".repeat(43));
     });
 
-    it("says why when the goal couldn't be turned on, and still goes in", async () => {
-        startWithGoalAction.mockResolvedValue({
-            href: "/",
-            said: "Bookings isn't on offer for this business yet. Pick what to do first from Home.",
-            turnedOn: [],
-        });
+    it("is not another account's: a draft left by someone else is ignored", async () => {
+        await toName();
         typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
-        expect(showInfo).toHaveBeenCalledWith(
-            "Bookings isn't on offer for this business yet. Pick what to do first from Home.",
-        );
-        expect(push).toHaveBeenCalledWith("/");
+        await settle();
+        mount({ email: "kiran@example.com" }, "/onboarding?step=name");
+        await settle();
+        expect(labelled("What is it called?").value).toBe("");
     });
 
-    it("turns nothing on when the business wasn't made", async () => {
+    it("is cleared once the business is made", async () => {
+        await toFirst();
+        expect(draft()).toContain("Rye & Co. Bakery");
+        await press();
+        expect(createOrganization).toHaveBeenCalled();
+        expect(draft()).toBe("");
+    });
+
+    it("goes when the person signs out", async () => {
+        // Never answered here: the page would leave for sign-in.
+        signOut.mockReturnValue(new Promise(() => undefined));
+        await toName();
+        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+        await settle();
+        await act(async () => {
+            button("Sign out")?.click();
+            await Promise.resolve();
+        });
+        expect(draft()).toBe("");
+        expect(signOut).toHaveBeenCalled();
+    });
+
+    it("setup works where the browser refuses storage", async () => {
+        vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+            throw new Error("QuotaExceededError");
+        });
+        vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+            throw new Error("SecurityError");
+        });
+        mount();
+        await toFirst();
+        await press();
+        expect(createOrganization).toHaveBeenCalledWith(
+            expect.objectContaining({ name: "Rye & Co. Bakery" }),
+        );
+    });
+});
+
+describe("a create that fails keeps every answer", () => {
+    it("a problem with a field is said under that field, on its own step", async () => {
         createOrganization.mockResolvedValue({
             ok: false,
             error: "rye is taken",
             field: "address",
         });
-        typeInto(labelled("What is it called?"), "Rye");
-        await submit();
+        choose("Just me");
+        await toFirst("Rye");
+        choose("Put up a website");
+        await press();
+        await settle(12);
+
         expect(startWithGoalAction).not.toHaveBeenCalled();
         expect(push).not.toHaveBeenCalled();
+        expect(stepOnShow()).toBe("name");
         expect(text()).toContain("rye is taken");
+        const field = labelled("Web address");
+        expect(document.activeElement).toBe(field);
+        expect(labelled("Your name or brand").value).toBe("Rye");
+        expect(field.value).toBe("rye");
+        await pressBack();
+        expect(checked("kind-label")[0]).toContain("Just me");
+        await press();
+        typeInto(labelled("Web address"), "rye-bakery");
+        await press();
+        expect(checked("goal-label")[0]).toContain("Put up a website");
     });
-});
 
-describe("Your name, for an account that has none", () => {
-    it("is not asked of an account that has one", () => {
-        expect(() => labelled("Your name")).toThrow();
-    });
-
-    it("is asked first, saved to the account, and then the business is made", async () => {
-        mount({ needsName: true });
-        typeInto(labelled("Your name"), "Asha Rao");
-        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
-        expect(updateUser).toHaveBeenCalledWith({ name: "Asha Rao" });
-        expect(updateUser.mock.invocationCallOrder[0]).toBeLessThan(
-            createOrganization.mock.invocationCallOrder[0] ?? 0,
+    it("any other failure is said where it is today, and the last step stays as it was", async () => {
+        createOrganization.mockResolvedValue({
+            ok: false,
+            error: "That didn't go through. Try again.",
+        });
+        await toFirst();
+        choose("Take bookings");
+        await press();
+        expect(showError).toHaveBeenCalledWith(
+            "That didn't go through. Try again.",
         );
+        expect(stepOnShow()).toBe("first");
+        expect(checked("goal-label")[0]).toContain("Take bookings");
+        expect(primary().getAttribute("aria-busy")).not.toBe("true");
+        await pressBack();
+        expect(labelled("What is it called?").value).toBe("Rye & Co. Bakery");
     });
 
-    it("is required, and nothing is made without it", async () => {
-        mount({ needsName: true });
-        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
-        expect(text()).toContain("Enter your name");
-        expect(updateUser).not.toHaveBeenCalled();
-        expect(createOrganization).not.toHaveBeenCalled();
-    });
-
-    it("stops when the name can't be saved", async () => {
+    it("a name that can't be saved to the account is said under Your name", async () => {
         updateUser.mockResolvedValue({ error: { code: "NOPE" } });
         mount({ needsName: true });
+        await toName();
         typeInto(labelled("Your name"), "Asha Rao");
         typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
+        await press();
+        await press();
+        await settle(12);
+        expect(stepOnShow()).toBe("name");
         expect(text()).toContain("Couldn't save your name. Try again.");
         expect(createOrganization).not.toHaveBeenCalled();
     });
 });
 
-describe("a paid plan picked on saroh.in (U27)", () => {
-    const GROW = { plan: "grow", cycle: "month" as const, name: "Grow" };
-
-    beforeEach(() => mount({ checkout: GROW }));
-
-    it("goes on to its checkout once the business exists, sending only the plan and cycle", async () => {
-        startCheckout.mockResolvedValue({ kind: "done" });
+describe("where the person is", () => {
+    it("the heading takes the keyboard when the step changes, and not on arrival", async () => {
+        expect(document.activeElement).toBe(document.body);
+        await toName();
+        expect(heading().tabIndex).toBe(-1);
+        expect(document.activeElement).toBe(heading());
         typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
-        expect(createOrganization).toHaveBeenCalled();
-        expect(startCheckout).toHaveBeenCalledWith({
-            plan: "grow",
-            cycle: "month",
-        });
-        expect(showError).not.toHaveBeenCalled();
+        await press();
+        expect(document.activeElement).toBe(heading());
+        expect(heading().textContent).toBe("What will you do first?");
+        await pressBack();
+        expect(document.activeElement).toBe(heading());
     });
 
-    it("says so when the checkout can't start, and the business stays", async () => {
-        startCheckout.mockResolvedValue({
-            kind: "failed",
-            error: "The payment page couldn't be opened, so it's on Free for now.",
+    it("the heading names the choices it asks about", async () => {
+        const kinds = host.querySelector('[role="radiogroup"]');
+        expect(kinds?.getAttribute("aria-labelledby")).toBe(heading().id);
+        await toFirst();
+        const goals = host.querySelector('[role="radiogroup"]');
+        expect(goals?.getAttribute("aria-labelledby")).toBe(heading().id);
+        expect(goals?.getAttribute("aria-describedby")).toBe("step-lead");
+    });
+
+    it("the progress bar sits at the foot of every step, right above Back and the main button", async () => {
+        const bar = () => {
+            const el = host.querySelector('[role="progressbar"]');
+            const foot = el?.nextElementSibling;
+            return {
+                label: el?.getAttribute("aria-label"),
+                now: el?.getAttribute("aria-valuenow"),
+                max: el?.getAttribute("aria-valuemax"),
+                aboveFoot: foot?.contains(primary()) ?? false,
+                afterStep:
+                    el?.previousElementSibling?.hasAttribute(
+                        "data-setup-step",
+                    ) ?? false,
+            };
+        };
+        expect(bar()).toEqual({
+            label: "Step 2 of 4",
+            now: "2",
+            max: "4",
+            aboveFoot: true,
+            afterStep: true,
         });
+        await toName();
+        expect(bar()).toMatchObject({ label: "Step 3 of 4", now: "3" });
         typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
-        expect(showError).toHaveBeenCalledWith(
-            "Rye & Co. Bakery is set up, but Grow isn't started yet.",
-            "The payment page couldn't be opened, so it's on Free for now.",
+        await press();
+        expect(bar()).toMatchObject({
+            label: "Step 4 of 4",
+            now: "4",
+            aboveFoot: true,
+            afterStep: true,
+        });
+    });
+
+    it("Back is before the main button, which is on top on a phone", async () => {
+        await toName();
+        const foot = primary().parentElement;
+        expect(foot?.className).toContain("flex-col-reverse");
+        expect(foot?.className).toContain("sm:flex-row");
+        expect(foot?.firstElementChild).toBe(button("Back"));
+        expect(foot?.lastElementChild).toBe(primary());
+    });
+
+    it("the panel marks the same step as the form, from the one list", async () => {
+        expect(plan()).toEqual([
+            { text: "Done: Make your account", current: false },
+            { text: "Now: Say what you are setting up", current: true },
+            { text: "Next: Give it a name and a web address", current: false },
+            { text: "Next: Pick what to do first", current: false },
+        ]);
+        await toName();
+        expect(plan().map((p) => p.current)).toEqual([
+            false,
+            false,
+            true,
+            false,
+        ]);
+        expect(plan()[1]?.text).toBe("Done: Say what you are setting up");
+        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+        await press();
+        expect(plan()[3]).toEqual({
+            text: "Now: Pick what to do first",
+            current: true,
+        });
+        await browser("back");
+        expect(plan()[2]?.current).toBe(true);
+        expect(host.querySelector("aside")?.textContent).not.toMatch(
+            /one screen|Steps 2 and 3/,
         );
     });
 
-    it("never starts a checkout when the business wasn't made", async () => {
-        createOrganization.mockResolvedValue({
-            ok: false,
-            error: "That didn't go through. Try again..",
-        });
+    it("Signed in as and Sign out are on every step", async () => {
+        const way = () =>
+            text().includes("Signed in as asha@example.com") &&
+            Boolean(button("Sign out"));
+        expect(way()).toBe(true);
+        await toName();
+        expect(way()).toBe(true);
         typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
-        await submit();
-        expect(startCheckout).not.toHaveBeenCalled();
+        await press();
+        expect(way()).toBe(true);
+    });
+
+    it("a new step may fade in, and never where motion is turned down", async () => {
+        const block = () => host.querySelector("[data-setup-step]");
+        // Arriving, nothing moves.
+        expect(block()?.className).not.toContain("animate-in");
+        await toName();
+        expect(block()?.className).toContain("animate-in");
+        expect(block()?.className).toContain("fade-in-0");
+        expect(block()?.className).toContain("motion-reduce:animate-none");
+    });
+
+    it("what the person typed is not readable in a recording, and Saroh's words are", async () => {
+        await toName();
+        const email = Array.from(host.querySelectorAll("span")).find(
+            (s) => s.textContent === "asha@example.com",
+        );
+        expect(email?.hasAttribute("data-ph-mask")).toBe(true);
+        expect(heading().closest("[data-ph-unmask]")).not.toBeNull();
+        for (const input of Array.from(host.querySelectorAll("form input"))) {
+            expect(input.closest("[data-ph-unmask]")).toBeNull();
+        }
+        expect(
+            document
+                .getElementById("address-status")
+                ?.closest("[data-ph-unmask]"),
+        ).toBeNull();
     });
 });
 
-describe("an opening-day invite (U31)", () => {
-    const TOKEN = "t".repeat(43);
-
-    beforeEach(() =>
-        mount({
-            checkout: { plan: "pro", cycle: "month", name: "Pro" },
-            invite: TOKEN,
-            defaultName: "Asha Salon",
-        }),
-    );
-
-    it("starts with the name it was listed under, and takes the offer instead of a checkout", async () => {
-        takeOffer.mockResolvedValue({ ok: true, until: "2031-01-01" });
-        expect(labelled("What is it called?").value).toBe("Asha Salon");
-        await submit();
-        expect(createOrganization).toHaveBeenCalledWith(
-            expect.objectContaining({ name: "Asha Salon" }),
+describe("the page as the server sends it, before the tab's draft can be read", () => {
+    const sent = (step: SetupStepId) =>
+        renderToString(
+            <SetupStepProvider initial={step}>
+                <BusinessSetupForm email="asha@example.com" />
+            </SetupStepProvider>,
         );
-        expect(takeOffer).toHaveBeenCalledWith(TOKEN);
-        expect(startCheckout).not.toHaveBeenCalled();
-        expect(showError).not.toHaveBeenCalled();
+
+    it("draws the first step as it is", () => {
+        const html = sent("kind");
+        expect(html).toContain("What are you setting up?");
+        expect(html).toContain('data-setup-step="kind" class=""');
     });
 
-    it("says so when the offer can't be applied, and the business stays", async () => {
-        takeOffer.mockResolvedValue({
-            ok: false,
-            error: "This invite has already been used. Ask for a new invite.",
-        });
-        await submit();
-        expect(showError).toHaveBeenCalledWith(
-            "Asha Salon is set up, but the launch offer isn't applied yet.",
-            "This invite has already been used. Ask for a new invite.",
+    it("holds a later step back until the draft is read, so Create never shows over an empty name", () => {
+        expect(sent("first")).toMatch(
+            /data-setup-step="first" class="invisible"/,
         );
-    });
-
-    it("never takes the offer when the business wasn't made", async () => {
-        createOrganization.mockResolvedValue({
-            ok: false,
-            error: "That didn't go through. Try again..",
-        });
-        await submit();
-        expect(takeOffer).not.toHaveBeenCalled();
+        expect(sent("name")).toMatch(
+            /data-setup-step="name" class="invisible"/,
+        );
     });
 });

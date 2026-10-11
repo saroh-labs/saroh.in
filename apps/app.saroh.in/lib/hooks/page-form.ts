@@ -22,7 +22,14 @@ export const PAGE_FORM = {
 /** Put the keyboard on the first field in error in the form submitted. */
 export function toFirstError(_errors?: unknown, event?: BaseSyntheticEvent) {
     const from: unknown = event?.target;
-    const form = from instanceof Element ? from.closest("form") : null;
+    toFirstErrorIn(from instanceof Element ? from.closest("form") : null);
+}
+
+/**
+ * The same for a form checked outside `handleSubmit`: a step's Continue,
+ * which checks only its own fields (`form.trigger`).
+ */
+export function toFirstErrorIn(form: Element | null) {
     // The errors are drawn a moment after this is called (the form library
     // sets them, then React draws them), so look until one is on the page:
     // a few frames at most.

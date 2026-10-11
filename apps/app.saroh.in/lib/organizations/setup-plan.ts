@@ -4,25 +4,12 @@ import { GOAL_LATER, goalFor } from "@/lib/modules/goals";
 import type { OrganizationKind } from "./kind";
 import { firstRunOrder } from "./kind";
 
-/**
- * The plan from nothing to working, as the sign-up panel gives it
- * (`apps/accounts.saroh.in/components/auth/panel-copy.ts`, `PLAN_STEPS`):
- * keep the two in step. The account is step 1. Setup is ONE screen that does
- * steps 2 and 3, and it says so rather than calling itself the "last step".
+/*
+ * The goals setup's last step offers. The steps themselves, and where the
+ * person is in them, are `setup-steps.ts`.
  */
-export const SETUP_STEPS = [
-    "Make your account",
-    "Name your business",
-    "Pick what to do first",
-] as const;
 
-/** The step setup opens on: the account is made. */
-export const SETUP_CURRENT_STEP = 2;
-
-/** Above setup's heading, on every screen size. */
-export const SETUP_STEP_LINE = "Steps 2 and 3 of 3";
-
-/** One answer to "What will you do first?" on the setup screen. */
+/** One answer to "What will you do first?" at setup. */
 export interface SetupGoal extends Goal {
     /** What "Create" opens, said under the choice. */
     lands: string;
