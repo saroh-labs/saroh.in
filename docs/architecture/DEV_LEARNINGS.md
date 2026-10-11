@@ -4372,5 +4372,11 @@ read the same way, where before only a `ConflictException` was.
 **Rule**: after a transaction loses a race, a read on another connection
 may not see the winner yet. Read again before deciding what the loser is
 told.
+**How it was confirmed**: the spec would not fail on demand (30 of 30 passes
+without the fix), so the cause was measured in Postgres itself: two
+Serializable transactions racing to insert the same slot, 600 times, with
+the loser reading on another connection the moment it was refused. In 11 of
+599 lost races the winner's row could not be read yet; in all 11 it could
+50 ms later.
 **Check**: the spec itself, run twelve times in RLS mode after the fix.
 **Category**: backend · `docs/patterns/backend-data-and-money.md`
