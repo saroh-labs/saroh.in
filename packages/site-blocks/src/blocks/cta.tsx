@@ -61,7 +61,7 @@ export function ctaClasses(
      * does not move.
      */
     const base =
-        "inline-flex cursor-pointer items-center justify-center rounded-[var(--site-radius)] text-sm font-semibold transition-[color,background-color,border-color,opacity,transform] duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:cursor-default disabled:opacity-55 aria-disabled:pointer-events-none aria-disabled:cursor-default aria-disabled:opacity-55 coarse:min-h-11";
+        "inline-flex cursor-pointer items-center justify-center rounded-[var(--site-radius)] text-sm font-semibold transition-[color,background-color,border-color,opacity,transform] duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:cursor-default disabled:opacity-55 aria-disabled:pointer-events-none aria-disabled:cursor-default aria-disabled:opacity-55 coarse:min-h-11";
     const ring =
         surface === "band"
             ? "focus-visible:ring-site-cta-fg focus-visible:ring-offset-site-cta-bg"

@@ -329,9 +329,11 @@ function SplitHero({
         <section
             // It paints its own ground (`site-craft.ts`).
             data-site-ground="hero"
-            className="bg-site-hero-bg text-site-hero-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
+            // The colour runs edge to edge, as the plain hero's does
+            // (`hero-plain.tsx`); the words keep to the page's column.
+            className="bg-site-hero-bg text-site-hero-fg w-full py-[var(--site-section-padding)]"
         >
-            <div className="grid items-start gap-[22px] [grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))]">
+            <div className="mx-auto grid w-full max-w-screen-xl items-start gap-[22px] px-5 [grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))] sm:px-[var(--site-page-margin)]">
                 <div className="pt-2">
                     <HeroHeading
                         level={level}

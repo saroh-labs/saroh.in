@@ -189,7 +189,7 @@ export function useShownInPageItems<T extends SiteNavItem>(items: T[]): T[] {
  * only. Literal strings, so Tailwind finds them.
  */
 const MOVES =
-    "transition-[color,background-color,border-color,opacity,transform] duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)]";
+    "transition-[color,background-color,border-color,opacity,transform] duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)]";
 
 /**
  * The menu as a row of pills, from 820px up. The page you are on is the

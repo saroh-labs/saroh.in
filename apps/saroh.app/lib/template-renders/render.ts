@@ -263,6 +263,12 @@ export function templateRender(
             nthOfType(page.sections, i),
             { ...(s.content as Record<string, unknown>) },
         );
+        // A real site's message form gets its Form when the site is made
+        // (`site-create.ts`). A sample has none, and the block draws nothing
+        // without one, so the sample names a form that is never sent.
+        if (s.type === "enquiry" && !content.formId) {
+            content.formId = "sample-form";
+        }
         return {
             type: s.type,
             content: sample.briefsAsPhotos

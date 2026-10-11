@@ -163,7 +163,7 @@ export function SiteHeader({
                     // rather than push the row's actions off the edge. The
                     // menu beside it gives way four times as fast and then
                     // scrolls, so a long name is cut only as a last resort.
-                    className="text-site-fg focus-visible:ring-site-accent [body:has([data-site-first-hero])_&]:text-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-site-bg focus-visible:ring-offset-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-offset-site-fg flex min-w-0 flex-[0_1_auto] cursor-pointer items-center gap-2.5 rounded-[var(--site-radius)] transition-opacity duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-70"
+                    className="text-site-fg focus-visible:ring-site-accent [body:has([data-site-first-hero])_&]:text-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-site-bg focus-visible:ring-offset-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-offset-site-fg flex min-w-0 flex-[0_1_auto] cursor-pointer items-center gap-2.5 rounded-[var(--site-radius)] transition-opacity duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-70"
                 >
                     {mark ? (
                         // The name beside it says whose it is, so the mark

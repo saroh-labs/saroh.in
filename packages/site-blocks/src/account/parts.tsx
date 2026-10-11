@@ -22,7 +22,7 @@ import { cn } from "../lib/utils";
  * as the rest of the business's site does.
  */
 const MOTION =
-    "transition-[background-color,border-color,opacity,transform] duration-150 ease-[var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] motion-reduce:transition-none motion-reduce:active:translate-y-0";
+    "transition-[background-color,border-color,opacity,transform] duration-150 [transition-timing-function:var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] motion-reduce:transition-none motion-reduce:active:translate-y-0";
 
 /** A card's or page's heading size, on the site's own scale. */
 const TITLE =
