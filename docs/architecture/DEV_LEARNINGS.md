@@ -4418,3 +4418,43 @@ next.config for pages, the middleware for what it answers, `_headers` for
 files. Curl the redirect, not only the page. And "private because it
 redirects" is not a mechanism.
 **Category**: security · frontend · `docs/patterns/frontend-app-structure.md` → Titles, and staying out of search
+
+## The marketing site's files went out uncacheable, and its comments promised a nightly rebuild that doesn't exist
+
+**Date**: 12 Oct 2026 · saroh.in
+**Symptom**: an SEO audit of production found every fingerprinted script,
+stylesheet and font served `Cache-Control: public, max-age=0,
+must-revalidate`; each page's hero screenshot taking about a second to its
+first byte through `/_next/image`, with no cache header; `/tools/link-preview`
+rendered on every request while every other content page was a file; and
+five comments (and the deploy workflow's header) saying a page dated today
+appears "through the nightly rebuild at 00:00 IST" or "the root layout's
+five-minute revalidate". Nothing rebuilds at night and nothing revalidates.
+**Cause**: on Workers, files in `public/` and under `/_next/static` are
+served without the Worker, so they get Cloudflare's default header and none
+of next.config's; nobody had looked at a response header on production.
+`next/image` on OpenNext re-encodes per request. The page awaited
+`searchParams` for one optional `?url=`. And the comments described a plan
+(KTD-2) the owner had ended on 9 Oct ("no scheduled deploys"): the docs
+were corrected then, the code's comments weren't. `proxy.ts` asked the
+clock whether Help was shown, so at midnight on 17 Oct it would have sent
+help.saroh.in to a `/help` the running build didn't have.
+**Fix**: `apps/saroh.in/public/_headers` (a year, immutable, for
+`/_next/static/*`; a day for `/shots/*`; the four security headers for
+every file). Screenshots as files with a `srcset`
+(`scripts/shot-sizes.mjs`, `lib/shot-sources.ts`, `shot-image.tsx`). The
+tool reads `?url=` in the browser through `readAddress`. The comments say
+what is true, and `builtContext()` asks the build's own moment
+(`SAROH_BUILT_AT`) for anything that answers per request about a dated
+page. Launch day is a checklist:
+`docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`.
+**Check**: `public-headers.test.ts`, `lib/shot-sources.test.ts` (a missing
+sized copy fails, naming the command), `app/(v2)/seo-pages.test.tsx` (the
+link preview page takes no props and awaits nothing),
+`lib/help-host.test.ts`.
+**Rule**: a static site's caching is set where its files are served, so
+curl a file on production, not only a page. A page that reads one optional
+query parameter reads it in the browser. And when a plan is dropped, grep
+the code's comments for it the same day: a comment that promises a job is
+read as the job existing.
+**Category**: performance · frontend · devops · `docs/patterns/frontend-app-structure.md` → saroh.in and search

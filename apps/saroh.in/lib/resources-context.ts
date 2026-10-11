@@ -49,6 +49,29 @@ export function parseBuiltRoutes(raw: string | undefined): string[] | null {
  * client components get the shown pages as props.
  */
 export function resourcesContext(now: Date = new Date()): PublishContext {
+    return contextAt(now);
+}
+
+/** The moment `next.config.js` stamped the build with, or null without one. */
+export function parseBuiltAt(raw: string | undefined): Date | null {
+    if (!raw) return null;
+    const at = new Date(raw);
+    return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/**
+ * The context the build's pages were drawn with: the build's own moment
+ * (`SAROH_BUILT_AT`), not now. The site is static, so a page dated for today
+ * is not there until the site is deployed again. Anything that answers per
+ * request and points at such a page (`proxy.ts`, sending help.saroh.in on
+ * to Help) must ask this, or at midnight it would send people to a page the
+ * running build doesn't have. Without a stamp (a unit test), it is now.
+ */
+export function builtContext(): PublishContext {
+    return contextAt(parseBuiltAt(env.SAROH_BUILT_AT) ?? new Date());
+}
+
+function contextAt(now: Date): PublishContext {
     return {
         now,
         preview: previewOn(env.RESOURCES_PREVIEW, env.VERCEL_ENV),
