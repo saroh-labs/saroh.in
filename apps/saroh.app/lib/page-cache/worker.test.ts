@@ -7,6 +7,7 @@ import { fakeCache, fakeNamespace } from "./testing";
 import type { PageCacheEnv, WaitUntil } from "./worker";
 import {
     CACHE_STATUS_HEADER,
+    neverStoreTemporaryRedirect,
     pageCacheConfig,
     REVALIDATE_PATH,
     withPageCache,
@@ -401,6 +402,73 @@ describe("the merchant sites' page cache (#863)", () => {
                 CACHE_STATUS_HEADER,
             ),
         ).toBe("miss");
+    });
+});
+
+describe("a temporary redirect (DEC-069, DEC-139)", () => {
+    /** What Next answers for `redirect()` from a page drawn per request. */
+    const hop = (status: number, cacheControl?: string) =>
+        new Response(null, {
+            status,
+            headers: {
+                location: "https://yourshop.saroh.app/shop?x=1",
+                ...(cacheControl ? { "cache-control": cacheControl } : {}),
+            },
+        });
+
+    it("leaves a paused domain's host as a 307 nobody may store, and keeps nothing", async () => {
+        const h = harness();
+        h.render = () => hop(307);
+        for (let visit = 0; visit < 2; visit += 1) {
+            const res = await h.fetch("https://shop.example.com/shop?x=1");
+            expect(res.status).toBe(307);
+            expect(res.headers.get("location")).toBe(
+                "https://yourshop.saroh.app/shop?x=1",
+            );
+            expect(res.headers.get("cache-control")).toBe("no-store");
+            expect(res.headers.get(CACHE_STATUS_HEADER)).toBe("bypass");
+        }
+        // Asked again every time: the domain is back the moment its plan is.
+        expect(h.renders).toBe(2);
+        expect(h.cache.entries.size).toBe(0);
+    });
+
+    it("says so with the cache switched off too", async () => {
+        const h = harness({ SITE_PAGE_CACHE: "off" });
+        h.render = () => hop(307, "public, max-age=3600");
+        const res = await h.fetch("https://shop.example.com/");
+        expect(res.status).toBe(307);
+        expect(res.headers.get("cache-control")).toBe("no-store");
+    });
+
+    it("marks 302, 303 and 307, and leaves everything else as it came", () => {
+        for (const status of [302, 303, 307]) {
+            const out = neverStoreTemporaryRedirect(
+                hop(status, "public, max-age=60"),
+            );
+            expect(out.status).toBe(status);
+            expect(out.headers.get("cache-control")).toBe("no-store");
+            expect(out.headers.get("location")).toBe(
+                "https://yourshop.saroh.app/shop?x=1",
+            );
+        }
+        // A permanent redirect says what it says; so does a page.
+        for (const status of [301, 308]) {
+            const res = hop(status, "public, max-age=60");
+            expect(neverStoreTemporaryRedirect(res)).toBe(res);
+        }
+        const drawn = page();
+        expect(neverStoreTemporaryRedirect(drawn)).toBe(drawn);
+        const already = hop(303, "no-store");
+        expect(neverStoreTemporaryRedirect(already)).toBe(already);
+    });
+
+    it("still serves the Saroh address from the cache while the domain is paused", async () => {
+        const h = harness();
+        await h.fetch("https://yourshop.saroh.app/shop");
+        const again = await h.fetch("https://yourshop.saroh.app/shop");
+        expect(again.status).toBe(200);
+        expect(again.headers.get(CACHE_STATUS_HEADER)).toBe("hit");
     });
 });
 

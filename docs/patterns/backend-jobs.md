@@ -351,6 +351,17 @@ the Privacy Policy states both.
   or the test-only domain fakes on: the chain is never started, a stray
   run logs `domains_recheck_off` and ends, and domains move only on
   "Check now".
+- **A `www` domain's bare domain is looked at in the same check**
+  (DEC-140, `domains/bare-domain-sync.ts`): whether `example.com` forwards
+  to `www.example.com`, over https too, or points straight here. It is
+  written on the row (`bareStatus`) as a notice. It is never a host
+  failure, never counts toward the back-off, and never tells the team:
+  the `www` site is not affected by it. A look waits on a stranger's
+  host (three seconds at most for each of `http://` and `https://`), so
+  the background's looks share 60 seconds in any five minutes
+  (`BareLookBudget`): past that they are skipped, the row keeps its last
+  standing, and the run stays inside its job lease. "Check now" always
+  looks.
 - **A live domain that goes down tells the team, once per incident**
   (#917, `notifications/domain-alerts.ts`). The check's write that moves a
   domain out of live (ACTIVE), or back into it, queues `team.alert`
@@ -565,7 +576,9 @@ the Privacy Policy states both.
   DEC-124), how the business is reached (its phone, contact email, social
   links, the registered address, its choice or its map link, and a
   location's name, address, map link, hours or kind: the footer reads them live, DEC-128; cause
-  `contact`, `enqueueBusinessSitesRevalidation`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
+  `contact`, `enqueueBusinessSitesRevalidation`), the business's own domain
+  pausing or coming back with its plan (every page then names another
+  address as its own, DEC-139; cause `domain`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
   stock row or how a product counts takes `lockStockLevels`, `lockProduct`
   or `lockProducts` (`products/stock-levels.ts`, the lock order), and those
   queue on the same transaction, once per row or product per transaction.
@@ -677,4 +690,12 @@ overrideId, reason }`. Re-read, then decide
   that charge), PAST_DUE, a period that ends the plan
   (`cancelAtPeriodEnd`), a move due by then, a SCHEDULED checkout starting
   by then, a year paid once, and a monthly term's end (DEC-100's notices).
-  Email only: no inbox notice for a routine charge.
+  Email only: no inbox notice for a routine charge. Before it, the domain
+  step (DEC-139, `domain-plan-notice.ts` `sweepDomains`): for every
+  business with a connected domain it tells an end the plan's own notices
+  didn't, starts the 3-day clock when the plan stops including a domain,
+  says once when the domain is paused, and clears its claims once the plan
+  includes one again. Its claims are `DOMAIN_ENDING`
+  (`domain-ending:<end>:<stage>`), `DOMAIN_PLAN_ENDED`
+  (`domain-plan-ended`) and `DOMAIN_PAUSED` (`domain-paused:<clock>`); its
+  email is `billing.email` kind `DOMAIN`, re-read before it is sent.

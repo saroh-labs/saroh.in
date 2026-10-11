@@ -73,16 +73,6 @@ const ALLOWED = [
         why: "a stored role label, matched so it can be shown as Location team",
     },
     {
-        file: "lib/organizations/opening-hours.ts",
-        rule: "en dash",
-        why: 'the typed format of a day\'s hours, "07:00–19:00", which the field reads back',
-    },
-    {
-        file: "components/organizations/business-hours-sheet.tsx",
-        rule: "en dash",
-        why: "shows that typed format as the field's example",
-    },
-    {
         file: "components/sites/section-fields/contact.tsx",
         rule: "en dash",
         why: "an example of hours a merchant types on their own page, in their words",

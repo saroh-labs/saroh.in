@@ -1,11 +1,11 @@
 import {
     BadRequestException,
     ConflictException,
-    ForbiddenException,
     Inject,
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
     ServiceUnavailableException,
 } from "@nestjs/common";
 import type { Domain } from "@saroh/database";
@@ -13,13 +13,28 @@ import { prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { DOMAIN_ENTITLEMENT, domainPlanView } from "../billing/domain-plan";
+import type { DomainPlanService } from "../billing/domain-plan.service";
+import { domainPlan } from "../billing/domain-plan.service";
 import { EntitlementService } from "../billing/entitlement.service";
+import { domainNotInPlan } from "../billing/plan-limit-errors";
 import { queueDomainAlert } from "../notifications/domain-alerts";
 import {
     errorResult,
     logDeletionProviderCall,
 } from "../organizations/deletion-provider-log";
 import { authorize } from "../organizations/organization-policy";
+import { rendererHost } from "../sites/site-origin";
+import {
+    bareCandidates,
+    BareLookBudget,
+    bareRead,
+    hostnameToConnect,
+    ownHostnamesAmong,
+    syncBareDomain,
+} from "./bare-domain-sync";
+import type { BareDomainCheck } from "./bare-forwarding";
+import { BARE_DOMAIN_CHECK } from "./bare-forwarding";
 import type { DomainHosting } from "./domain-hosting";
 import { DOMAIN_HOSTING, HostingCallError } from "./domain-hosting";
 import type { OnLiveChange } from "./domain-hosting-sync";
@@ -55,6 +70,11 @@ export interface DnsTxtInstructions {
  * hostname impossible (surfaced here as a 409 Conflict), and a hostname is only
  * LINKED to a Site after it reaches VERIFIED — so at most one org ever controls
  * a hostname and only via proven DNS control.
+ *
+ * A plan that stops including a domain pauses it and never comes here
+ * (DEC-139, `billing/domain-plan.ts`): nothing in this service changes a
+ * row, its verification or its hostname at the host because of a plan.
+ * {@link list} only reports where each domain stands.
  */
 @Injectable()
 export class DomainsService {
@@ -64,7 +84,22 @@ export class DomainsService {
         // #859: null when hosting isn't set up on this instance (off).
         @Inject(DOMAIN_HOSTING)
         private readonly hosting: DomainHosting | null = null,
+        // DEC-140: null where the bare-domain check is off (tests, fakes).
+        @Inject(BARE_DOMAIN_CHECK)
+        private readonly bareCheck: BareDomainCheck | null = null,
+        // Not a provider: every reader shares the one instance (and its
+        // 30-second answers), so Nest injects nothing and this stands.
+        @Optional()
+        private readonly plans: DomainPlanService = domainPlan,
     ) {}
+
+    /** The time the background re-check may spend on bare domains. */
+    private readonly bareBudget = new BareLookBudget();
+
+    /** A check nobody pressed (the re-check job) looks within the budget. */
+    private bareBudgetFor(actorUserId: string | null) {
+        return actorUserId === null ? this.bareBudget : undefined;
+    }
 
     /**
      * Claim a hostname for the org. Authorizes `domain:manage`, rejects an
@@ -77,21 +112,30 @@ export class DomainsService {
         authorize(ctx, "domain:manage");
 
         // Custom domains are a paid-plan entitlement (S7-005). The FREE default
-        // has `customDomain: false`, so an un-subscribed org is refused here.
+        // has `customDomain: false`, so an un-subscribed org is refused here,
+        // the way every plan refusal is (DEC-139): the app shows the notice
+        // and the way to the plans.
         if (
-            !(await this.entitlements.can(ctx.organizationId, "customDomain"))
+            !(await this.entitlements.can(
+                ctx.organizationId,
+                DOMAIN_ENTITLEMENT,
+            ))
         ) {
-            throw new ForbiddenException(
-                "Custom domains come with a paid plan. Upgrade to add one.",
+            throw domainNotInPlan(
+                await this.entitlements.planOf(ctx.organizationId),
             );
         }
 
-        const hostname = input.hostname.trim().toLowerCase();
+        const typed = input.hostname.trim().toLowerCase();
         // DEC-071: `test.<H>` and `test--*` are test-release hosts. The DTO
         // refuses them at the edge; this keeps any other caller honest.
-        if (isTestReservedHostname(hostname)) {
+        if (isTestReservedHostname(typed)) {
             throw new BadRequestException(TEST_RESERVED_HOSTNAME_MSG);
         }
+        // DEC-140: a bare domain (`example.com`) is connected as its `www`,
+        // unless its DNS already reaches the hosting. The answer carries the
+        // hostname that was claimed, so the screen says which it was.
+        const hostname = await hostnameToConnect(typed, this.bareCheck);
 
         // Globally-unique guard: a hostname claimed by ANY org (this one or
         // another) blocks a new claim. Pre-check for a clear 409; the unique
@@ -134,7 +178,7 @@ export class DomainsService {
         }
 
         return {
-            domain: this.withHosting(domain),
+            domain: await this.withBare(this.withHosting(domain)),
             dnsRecord: this.instructionsFor(domain),
         };
     }
@@ -156,13 +200,10 @@ export class DomainsService {
 
         const domain = await this.requireOwned(ctx, domainId);
         const result = await this.check(domain, ctx.userId);
+        const read = await this.withBare(this.withHosting(result.domain));
         return result.verified
-            ? { domain: this.withHosting(result.domain), verified: true }
-            : {
-                  domain: this.withHosting(result.domain),
-                  verified: false,
-                  reason: result.reason,
-              };
+            ? { domain: read, verified: true }
+            : { domain: read, verified: false, reason: result.reason };
     }
 
     /**
@@ -192,7 +233,15 @@ export class DomainsService {
                 domain,
                 tellTeam(actorUserId),
             );
-            return { domain: synced, verified: true };
+            // DEC-140: and where the bare domain of a `www` one stands.
+            return {
+                domain: await syncBareDomain(
+                    this.bareCheck,
+                    synced,
+                    this.bareBudgetFor(actorUserId),
+                ),
+                verified: true,
+            };
         }
 
         const checkedAt = new Date();
@@ -243,7 +292,14 @@ export class DomainsService {
             verified,
             tellTeam(actorUserId),
         );
-        return { domain: hosted, verified: true };
+        return {
+            domain: await syncBareDomain(
+                this.bareCheck,
+                hosted,
+                this.bareBudgetFor(actorUserId),
+            ),
+            verified: true,
+        };
     }
 
     /**
@@ -251,6 +307,11 @@ export class DomainsService {
      * it needs (#200) — the screen shows that record as something to copy,
      * and deriving it here keeps the record name's rule in one place.
      * Tenant-scoped by ctx.
+     *
+     * Each carries `plan` (DEC-139): whether the business's plan includes
+     * its own domain, the day the domain stops showing the site when it
+     * doesn't, and where visitors are sent once it is paused. Always
+     * `included` while plan enforcement is off.
      */
     async list(ctx: OrganizationContext) {
         authorize(ctx, "domain:manage");
@@ -258,10 +319,24 @@ export class DomainsService {
             where: { organizationId: ctx.organizationId },
             orderBy: { createdAt: "desc" },
         });
-        return domains.map((domain) => ({
-            ...this.withHosting(domain),
-            dnsRecord: this.instructionsFor(domain),
-        }));
+        // A plan that can't be read says nothing about the domains.
+        const standing = await this.plans.standingOrNull(ctx.organizationId);
+        const root = rendererHost();
+        const own = new Set(domains.map((d) => d.hostname));
+        return domains.map((domain) => {
+            const address = standing?.domains.find(
+                (d) => d.hostname === domain.hostname,
+            )?.subdomain;
+            return {
+                ...this.withHosting(domain),
+                ...bareRead(domain, own),
+                dnsRecord: this.instructionsFor(domain),
+                plan: domainPlanView(
+                    standing?.plan ?? { state: "included" },
+                    address ? `${address}.${root}` : null,
+                ),
+            };
+        });
     }
 
     /**
@@ -406,6 +481,24 @@ export class DomainsService {
             ...domain,
             hosting: hostingView(domain, this.hosting !== null),
         };
+    }
+
+    /**
+     * A domain's read with its bare-domain part (DEC-140): the hostname's
+     * kind and, for a `www` connection, where the bare domain stands and
+     * whether this business added it too.
+     */
+    private async withBare<
+        T extends Pick<
+            Domain,
+            "organizationId" | "hostname" | "bareStatus" | "bareCheckedAt"
+        >,
+    >(domain: T) {
+        const own = await ownHostnamesAmong(
+            domain.organizationId,
+            bareCandidates(domain.hostname),
+        );
+        return { ...domain, ...bareRead(domain, own) };
     }
 
     /** The DNS TXT record the org must publish for a domain. */

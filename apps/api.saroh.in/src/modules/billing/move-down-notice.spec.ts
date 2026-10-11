@@ -306,7 +306,11 @@ describe("the MOVE_DOWN email's payload", () => {
     };
 
     it("reads a whole one, and refuses one missing what pauses", () => {
-        expect(parseBillingEmailPayload(good)).toEqual(good);
+        expect(parseBillingEmailPayload(good)).toEqual({
+            ...good,
+            // No domain line unless the sweep added one (DEC-139).
+            domain: null,
+        });
         expect(parseBillingEmailPayload({ ...good, lines: "a" })).toBeNull();
         expect(parseBillingEmailPayload({ ...good, mode: "later" })).toBeNull();
     });

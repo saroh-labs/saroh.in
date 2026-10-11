@@ -9,6 +9,10 @@ jest.mock("@saroh/database", () => ({
     runInOrgContext: (_org: string, fn: () => unknown) => fn(),
 }));
 jest.mock("./site-origin", () => ({ rendererHost: () => "saroh.app" }));
+// No plan pauses the domain here; `domain-paused.spec.ts` covers one that does.
+jest.mock("../billing/domain-plan.service", () => ({
+    domainPlan: { paused: () => Promise.resolve(false) },
+}));
 
 import { primaryHostOf } from "./primary-host";
 

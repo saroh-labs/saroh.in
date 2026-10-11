@@ -274,6 +274,11 @@ with why it stops there:
   note and next steps to `editor-parts.tsx` (leaving asks through the one
   guard, `components/shared/use-leave-guard.tsx`). A little over;
   what is left shares one component's state.
+- `sites/custom-domain.tsx` (417 after DEC-140's bare domains) — the
+  domains' read, add, check and remove share its list and busy state. The
+  bare domain's step, standing and words went to `bare-domain-step.tsx`
+  and `lib/domains/bare-view.ts`, leaving only the call and "Add ‹domain›"
+  from a row. A domain's card is the next seam.
 
 Split rather than listed: `organizations/organization-settings-form.tsx`
 (1,321 before; 219 now) when Settings › Business became rows with a sheet

@@ -6,9 +6,12 @@ import { Button } from "@saroh/ui/button";
 import { showError, showInfo, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
+import { PausedNote } from "@/components/billing/paused-banner";
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { FailedRead } from "@/components/shared/failed-read";
 import { AddDomainDialog } from "@/components/sites/add-domain-dialog";
+import { BareDomainPart } from "@/components/sites/bare-domain-step";
 import { DomainRecords } from "@/components/sites/domain-records";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import { useSheetControl } from "@/components/sites/settings/settings-sheet";
@@ -20,6 +23,8 @@ import {
     removeDomain,
     verifyDomain,
 } from "@/lib/domains/actions";
+import { bareView } from "@/lib/domains/bare-view";
+import { domainPlanNote, withDomainPlan } from "@/lib/domains/domain-plan";
 import {
     checkLine,
     checkToast,
@@ -27,6 +32,7 @@ import {
     domainView,
 } from "@/lib/domains/domain-view";
 import type { SiteDomain } from "@/lib/domains/service";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { SETTINGS_ROW_ID, settingsEditId } from "@/lib/sites/settings-edit";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -55,6 +61,12 @@ import { TextLink } from "@saroh/ui/text-link";
  * Read first (owner, 10 Oct): the domains are cards, and one "Add domain"
  * button under them opens the dialog that takes the hostname and then shows
  * its records (`add-domain-dialog.tsx`). No field sits open on the page.
+ *
+ * A plan that stops including a domain pauses it and removes nothing
+ * (DEC-139): the card says the day it stops showing the site, then that it
+ * is paused and where its visitors are sent, with the way to the plans
+ * (`lib/domains/domain-plan.ts`). All of it is the api's `plan`, and none of
+ * it is drawn while plans aren't shown (DEC-136).
  */
 
 /** Where a verified domain points when the api doesn't say. Per deployment. */
@@ -125,14 +137,51 @@ export function CustomDomain({
 
     async function claim(hostname: string) {
         const res = await claimDomain(siteId, hostname);
-        // The api's own words, said in the dialog under what was typed.
-        if (!res.ok) return { ok: false as const, error: res.error };
+        if (!res.ok) {
+            // A plan without its own domain: the plan's notice, with the
+            // way to the plans, takes over from the dialog (DEC-139).
+            if (res.plan) {
+                showPlanRefusal(res.plan);
+                adding.close();
+                return { ok: true as const };
+            }
+            // The api's own words, said in the dialog under what was typed.
+            return { ok: false as const, error: res.error };
+        }
         setDomains((prev) => [res.data, ...(prev ?? [])]);
         setAdded({ id: res.data.id, opened: adding.opened });
         showSuccess(
             `${res.data.hostname} added. Now add the record below at your registrar.`,
         );
         return { ok: true as const };
+    }
+
+    /**
+     * A bare domain that already points at Saroh, added as a domain of its
+     * own from its `www` domain's row (DEC-140). Its card then shows its
+     * record, in place.
+     */
+    async function addBare(from: SiteDomain, hostname: string) {
+        const res = await runAction(() => claimDomain(siteId, hostname), {
+            setBusy: (on) => setBusy(on ? `bare:${from.id}` : null),
+        });
+        if (!res) return;
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        // The `www` row now knows its bare domain was added too.
+        setDomains((prev) => [
+            res.data,
+            ...(prev ?? []).map((d) =>
+                d.id === from.id && d.bare
+                    ? { ...d, bare: { ...d.bare, added: true } }
+                    : d,
+            ),
+        ]);
+        showSuccess(
+            `${res.data.hostname} added. Now add its record at your registrar.`,
+        );
     }
 
     async function check(domain: SiteDomain) {
@@ -166,6 +215,8 @@ export function CustomDomain({
         showSuccess(`${domain.hostname} removed.`);
     }
 
+    const shown = plansShown();
+
     if (domains === null) {
         return (
             <Block>
@@ -181,13 +232,18 @@ export function CustomDomain({
         added?.opened === adding.opened
             ? domains.find((d) => d.id === added.id)
             : undefined;
-    const addedNow = addedDomain
-        ? {
-              domain: addedDomain,
-              view: domainView(addedDomain, CNAME_TARGET),
-              line: checkLine(addedDomain, zone),
-          }
+    const addedView = addedDomain
+        ? domainView(addedDomain, CNAME_TARGET)
         : null;
+    const addedNow =
+        addedDomain && addedView
+            ? {
+                  domain: addedDomain,
+                  view: addedView,
+                  line: checkLine(addedDomain, zone),
+                  bare: bareView(addedDomain, addedView, zone),
+              }
+            : null;
 
     return (
         <>
@@ -204,8 +260,21 @@ export function CustomDomain({
             ) : null}
 
             {domains.map((domain) => {
-                const view = domainView(domain, CNAME_TARGET);
+                // What the plan means for this domain, only while plans are
+                // shown (DEC-136); else the card is as it always was.
+                const plan = shown ? domain.plan : undefined;
+                const view = withDomainPlan(
+                    domainView(domain, CNAME_TARGET),
+                    domain.hostname,
+                    plan,
+                );
+                const planNote = domainPlanNote(view.scene, plan, zone);
                 const line = checkLine(domain, zone);
+                // DEC-140: the bare domain of a `www` one, beside its state.
+                const bare = bareView(domain, view, zone);
+                const checkLabel =
+                    view.checkLabel ??
+                    (bare?.offerCheck ? "Check again" : null);
                 const lineAt =
                     view.scene === "waiting"
                         ? domain.lastCheckedAt
@@ -233,7 +302,7 @@ export function CustomDomain({
                                 </Badge>
                             </div>
                             <div className="flex items-center gap-2">
-                                {view.checkLabel ? (
+                                {checkLabel ? (
                                     <Button
                                         type="button"
                                         size="sm"
@@ -242,7 +311,7 @@ export function CustomDomain({
                                         busy={busy === domain.id}
                                         busyLabel="Checking…"
                                     >
-                                        {view.checkLabel}
+                                        {checkLabel}
                                     </Button>
                                 ) : null}
                                 {confirmRemove === domain.id ? null : (
@@ -274,6 +343,12 @@ export function CustomDomain({
                             </p>
                         ) : null}
 
+                        {planNote ? (
+                            <div data-domain-plan={plan?.state}>
+                                <PausedNote>{planNote}</PausedNote>
+                            </div>
+                        ) : null}
+
                         {view.problem ? (
                             <p className="rounded-md bg-warning-subtle px-3 py-2 text-sm text-warning-subtle-foreground">
                                 {view.problem}
@@ -281,6 +356,14 @@ export function CustomDomain({
                         ) : null}
 
                         <DomainRecords domain={domain} view={view} />
+
+                        <BareDomainPart
+                            domain={domain}
+                            view={view}
+                            bare={bare}
+                            adding={busy === `bare:${domain.id}`}
+                            onAdd={(hostname) => void addBare(domain, hostname)}
+                        />
 
                         {line ? (
                             <p

@@ -54,6 +54,8 @@ export function UsageNotice() {
         <Notice
             layout="banner"
             role="status"
+            // One line of words and a button: level with each other.
+            align="center"
             data-ph-unmask=""
             data-testid="usage-notice"
             action={

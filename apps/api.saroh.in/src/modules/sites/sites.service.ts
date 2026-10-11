@@ -27,6 +27,7 @@ import {
 } from "../orders/checkout-readiness";
 import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import { allows, authorize } from "../organizations/organization-policy";
+import { domainPausedHere } from "./domain-paused";
 import type {
     CreateApprovalDto,
     CreateCommentDto,
@@ -2149,6 +2150,10 @@ export class SitesService {
      * VERIFIED, and only a VERIFIED row routes — a PENDING claim on someone
      * else's hostname resolves nothing. Same read guarantees as
      * {@link getPublicationBySubdomain}.
+     *
+     * A domain its plan has paused (DEC-139) shows nothing either: the 404
+     * says so and names the site's Saroh address (`domain-paused.ts`), and
+     * the renderer sends the visitor there.
      */
     async getPublicationByHostname(hostname: string): Promise<PublicSiteView> {
         // A test host is never served the live site (DEC-071, KTD-7).
@@ -2159,13 +2164,18 @@ export class SitesService {
         }
         const domain = await prisma.domain.findUnique({
             where: { hostname: hostname.trim().toLowerCase() },
-            select: { status: true, siteId: true },
+            select: { status: true, siteId: true, organizationId: true },
         });
         if (domain?.status !== "VERIFIED" || !domain.siteId) {
             throw new NotFoundException(
                 `No published site found for hostname "${hostname}"`,
             );
         }
+        const paused = await domainPausedHere({
+            organizationId: domain.organizationId,
+            siteId: domain.siteId,
+        });
+        if (paused) throw paused;
         return this.resolveCurrentPublication(
             { id: domain.siteId, deletedAt: null },
             `hostname "${hostname}"`,

@@ -1,6 +1,7 @@
 import { GoneException, NotFoundException } from "@nestjs/common";
 import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
+import { domainPlan } from "../billing/domain-plan.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { publicSiteOnline } from "../organizations/organization-lifecycle.policy";
@@ -82,7 +83,9 @@ const GONE_MESSAGE: Record<TestReleaseGoneReason, string> = {
  * Does the site behind the link answer to this host? The platform address
  * for `test--<address>`, or a VERIFIED custom domain bound to the site for
  * `test.<domain>`. Read across businesses: the host is the visitor's, not a
- * business's.
+ * business's. A domain its plan has paused (DEC-139) names nothing, on its
+ * test host as on the domain itself; the release still opens on
+ * `test--<address>`.
  */
 async function hostNamesSite(
     shaped: SiteHostClass,
@@ -99,11 +102,14 @@ async function hostNamesSite(
             select: { status: true, siteId: true, organizationId: true },
         }),
     );
-    return (
-        domain?.status === "VERIFIED" &&
-        domain.siteId === site.id &&
-        domain.organizationId === site.organizationId
-    );
+    if (
+        domain?.status !== "VERIFIED" ||
+        domain.siteId !== site.id ||
+        domain.organizationId !== site.organizationId
+    ) {
+        return false;
+    }
+    return !(await domainPlan.paused(site.organizationId));
 }
 
 function goneReason(

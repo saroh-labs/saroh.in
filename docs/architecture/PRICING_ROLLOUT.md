@@ -64,7 +64,10 @@ release time.
 6. **Turn on `PLAN_ENFORCEMENT`** (the kill switch, OQ-4) on that instance:
    module availability then locks a module the plan leaves out (after the
    rollout gate, DEC-057), and U13's limits are enforced. Off again undoes
-   it at once, without a deploy.
+   it at once, without a deploy. A business with its own domain on a plan
+   without one is told within the hour, and the domain is paused 3 days
+   later (below). The merchant-site renderer must be on a release that
+   knows a paused domain before this is turned on.
 7. **U13 enforcement**, behind the same switch; then the merchant app (U14)
    and Saroh's own billing (U15–U17).
 8. **Saroh billing (U15)** needs, on the instance: Saroh's own Razorpay keys
@@ -161,6 +164,45 @@ and the admin's usage lines and impact (`ImpactService`).
   can't be read (logged `plan_meter_unresolved`).
 - **Notices:** `plan.limit.notice` at 80%, at the limit and past a soft
   cap, once each per limit and month (`backend-jobs.md`).
+
+## A business's own domain (DEC-139)
+
+A domain belongs to a plan that includes one. When the plan stops including
+it the domain is paused, never removed. Code: `billing/domain-plan.ts` (the
+rule), `domain-plan.service.ts` (the reads), `domain-plan-notice.ts` (the
+sweep's step), `sites/domain-paused.ts` (what the host answers).
+
+- **Only behind `PLAN_ENFORCEMENT`.** Off, every domain reads `included`
+  and nothing anywhere changes: no notice, no redirect, no word in the app.
+- **What it reads:** `customDomain` in the business's entitlements (on with
+  any plan that has a price, `PAID_PLAN_SWITCHES`; off on one without, and
+  for a business the catalogue doesn't reach).
+- **The states.** `ending`: the plan still includes a domain and is known
+  to end within 30 days without one (a plan override's end, a pending
+  move, a term nobody paid for again). `grace`: the plan has no domain; the
+  domain shows the site for 3 days. `paused`: it sends visitors to the
+  site's Saroh address. Back on a plan with a domain: `included`, at the
+  next read.
+- **The clock** is a `CustomerNotice` (`DOMAIN_PLAN_ENDED`,
+  `domain-plan-ended`), written by the hourly sweep (`billing.moves.apply`)
+  and dated at the end the business was told about, else at that sweep.
+  Until it is written the domain is in its 3 days, so a sweep that isn't
+  running pauses nothing.
+- **Notices.** Ahead: a line in the plan-ending, term-ending or move-down
+  notice and email, 30, 7 and 1 days before; the domain's own `DOMAIN`
+  billing email where none of those is sent. At once: told within the
+  hour. Paused: told once. To the business's owners, with an inbox notice
+  that opens Plan and billing.
+- **Paused, the host** (`GET public/sites/by-hostname/:hostname`) answers
+  404 with `details.reason: "domain-paused"` and `details.to`, and the
+  renderer answers the visitor 307, `Cache-Control: no-store`, to the same
+  path there. The `Domain` row, its verification and its hostname at the
+  host are never written.
+- **Fail safe:** a plan that can't be read pauses nothing
+  (`domain_plan_unresolved`).
+- **Before turning enforcement on:** deploy the API and the merchant-site
+  renderer with this; an older renderer treats the 404 as a host with no
+  site.
 
 ## Saroh billing (U15)
 

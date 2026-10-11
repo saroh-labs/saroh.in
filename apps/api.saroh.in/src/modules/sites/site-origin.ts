@@ -2,12 +2,15 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
+import { domainPlan } from "../billing/domain-plan.service";
 
 /**
  * Where a business's own site lives, as `https://host` with no trailing
  * slash (round-2 D12): its verified custom domain when it has one, else its
  * platform subdomain on the renderer's apex (`northwind.saroh.app`). Null
- * when the business has no published site.
+ * when the business has no published site. While its plan has paused the
+ * domain (DEC-139) the Saroh address is the one given: the domain would
+ * only send the customer on to it.
  *
  * The site is the one named (the customer's, for an account), else the
  * business's first published one — the one the pay page
@@ -36,10 +39,13 @@ export async function siteOriginOf(
         orderBy: { verifiedAt: "asc" },
         select: { hostname: true },
     });
-    if (domain) return `https://${domain.hostname}`;
-    return site.subdomain
+    const platform = site.subdomain
         ? `https://${site.subdomain}.${rendererHost()}`
         : null;
+    if (!domain) return platform;
+    return platform && (await domainPlan.paused(organizationId))
+        ? platform
+        : `https://${domain.hostname}`;
 }
 
 /**

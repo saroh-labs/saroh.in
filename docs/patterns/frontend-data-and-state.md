@@ -92,6 +92,12 @@ add or change there may be served to the next visitor without rendering.
   minutes) unless the API revalidates its tags: a new API write that
   changes what a published page shows queues `site.pages.revalidate`
   (`backend-jobs.md` → Site page cache).
+- **A temporary redirect is never kept, by anyone.** Only a 200 goes in
+  the cache, and the Worker marks every 302, 303 and 307 `no-store`
+  (`neverStoreTemporaryRedirect`), cache on or off: an old address that
+  forwards (DEC-069) and a domain its plan has paused (DEC-139) both stop
+  being true. Use `redirect()` for a hop like these, never
+  `permanentRedirect()`.
 - **Where a visit came from is not part of the page.** The key drops
   `utm_*`, `fbclid`, `gclid`, `igshid` and `src` (a QR scan's tag), and a
   page that may be kept is drawn for the address without them

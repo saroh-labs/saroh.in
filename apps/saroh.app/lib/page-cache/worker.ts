@@ -36,6 +36,10 @@ import { siteOfTag, tagsBySite } from "./tags";
  * - **Off.** `SITE_PAGE_CACHE` is not `on`, or a binding is missing:
  *   every request renders as before. Anything failing on the way (the
  *   cache, the tag store) also renders as before, and never keeps the page.
+ * - **A temporary redirect is never kept by anyone.** A 302, 303 or 307
+ *   leaves with `Cache-Control: no-store`, cache on or off: an old address
+ *   that forwards (DEC-069) and a domain its plan has paused (DEC-139)
+ *   both stop being true, and no browser or edge may remember the hop.
  */
 
 /** What the Worker gives the entry, as far as the cache needs it. */
@@ -135,6 +139,20 @@ function recordStore(): AsyncLocalStorage<PageCacheRecord> {
     const store = new AsyncLocalStorage<PageCacheRecord>();
     g[RECORD_STORE_KEY] = store;
     return store;
+}
+
+const TEMPORARY_REDIRECTS: ReadonlySet<number> = new Set([302, 303, 307]);
+
+/**
+ * A temporary redirect, marked never to be stored; any other response as
+ * it came. A permanent redirect (301, 308) is left to say what it says.
+ */
+export function neverStoreTemporaryRedirect(response: Response): Response {
+    if (!TEMPORARY_REDIRECTS.has(response.status)) return response;
+    if (response.headers.get("cache-control") === "no-store") return response;
+    const out = new Response(response.body, response);
+    out.headers.set("cache-control", "no-store");
+    return out;
 }
 
 function withStatus(response: Response, status: string): Response {
@@ -316,9 +334,11 @@ async function keep(
  * tests pass fakes.
  */
 export function withPageCache<E extends PageCacheEnv, C extends WaitUntil>(
-    inner: FetchHandler<E, C>,
+    render: FetchHandler<E, C>,
     deps: PageCacheDeps,
 ): FetchHandler<E, C> {
+    const inner: FetchHandler<E, C> = async (request, env, ctx) =>
+        neverStoreTemporaryRedirect(await render(request, env, ctx));
     return async (request, env, ctx) => {
         if (new URL(request.url).pathname === REVALIDATE_PATH) {
             try {

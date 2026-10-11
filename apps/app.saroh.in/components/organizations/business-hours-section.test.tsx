@@ -13,7 +13,6 @@ import {
     draw,
     edit,
     host,
-    input,
     item,
     mount,
     ONE_LOCATION,
@@ -23,7 +22,6 @@ import {
     settings,
     sheet,
     sheetName,
-    type,
     unmount,
 } from "./business-settings.test-kit";
 
@@ -102,7 +100,18 @@ describe("Hours' row and sheet", () => {
         expect(panel()?.querySelector("input")).toBeNull();
     });
 
-    it("Edit opens the week; a day that isn't one is refused in place; Save writes the location and closes", async () => {
+    /** A choice in the sheet's "Open days" control, by its words. */
+    const days = (label: string) =>
+        Array.from(
+            sheet()?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
+        ).find((el) => el.textContent.trim() === label) ?? null;
+    const sentWeek = () =>
+        (
+            updateStorefront.mock.calls[0]?.[1] as
+                { openingHours: OpeningHoursDay[] } | undefined
+        )?.openingHours;
+
+    it("Edit opens the week as days and hours to pick, nothing to type; Save writes the location and closes", async () => {
         updateStorefront.mockImplementation(
             (_id: string, sent: { openingHours: OpeningHoursDay[] }) =>
                 Promise.resolve({
@@ -114,26 +123,22 @@ describe("Hours' row and sheet", () => {
         draw(settings(), { hours: ONE_LOCATION, canEditHours: true });
         await press(edit("Edit opening hours"));
         expect(sheetName()).toBe("Opening hours");
-        expect(input("mon")?.value).toBe("09:00–18:00");
-        expect(input("sun")?.value).toBe("Closed");
+        // The location's own fields: the saved week reads as Mon to Sat.
+        expect(days("Mon to Sat")?.getAttribute("aria-checked")).toBe("true");
+        expect(sheet()?.querySelector('input[type="text"]')).toBeNull();
+        expect(sheet()?.textContent).not.toContain("or Closed");
 
-        await type(input("sun"), "ten to four");
-        await press(item("Save"));
-        expect(updateStorefront).not.toHaveBeenCalled();
-        expect(sheet()?.textContent).toContain("Use 07:00–19:00, or Closed.");
-
-        await type(input("sun"), "10:00-16:00");
+        await press(days("Every day"));
         await press(item("Save"));
         expect(updateStorefront).toHaveBeenCalledTimes(1);
         expect(updateStorefront.mock.calls[0]?.[0]).toBe("st_hill");
+        expect(sentWeek()?.every((d) => !d.closed)).toBe(true);
         expect(sheet()).toBeNull();
-        expect(summary()).toBe(
-            "Mon to Sat 9:00 am to 6:00 pm · Sun 10:00 am to 4:00 pm",
-        );
+        expect(summary()).not.toContain("Sun closed");
         expect(showUndo.mock.calls[0]?.[0]).toBe("Hours saved.");
     });
 
-    it("a location that refuses is named, and the sheet stays open with what was typed", async () => {
+    it("a location that refuses is named, and the sheet stays open with what was chosen", async () => {
         updateStorefront.mockResolvedValue({
             ok: false,
             error: "A day has to close after it opens.",
@@ -141,14 +146,14 @@ describe("Hours' row and sheet", () => {
         onTab("hours");
         draw(settings(), { hours: ONE_LOCATION, canEditHours: true });
         await press(edit("Edit opening hours"));
-        await type(input("sun"), "10:00-16:00");
+        await press(days("Every day"));
         await press(item("Save"));
         expect(showError).toHaveBeenCalledWith(
             "Hours weren't saved for Hill Road.",
             "A day has to close after it opens.",
         );
         expect(sheetName()).toBe("Opening hours");
-        expect(input("sun")?.value).toBe("10:00-16:00");
+        expect(days("Every day")?.getAttribute("aria-checked")).toBe("true");
         expect(summary()).toBe("Mon to Sat 9:00 am to 6:00 pm · Sun closed");
     });
 
@@ -156,7 +161,7 @@ describe("Hours' row and sheet", () => {
         onTab("hours");
         draw(settings(), { hours: ONE_LOCATION, canEditHours: true });
         await press(edit("Edit opening hours"));
-        await type(input("mon"), "08:00-20:00");
+        await press(days("Every day"));
         await press(item("Cancel"));
         expect(updateStorefront).not.toHaveBeenCalled();
         expect(sheet()).toBeNull();
