@@ -1,3 +1,4 @@
+import { rememberedPageSize } from "@/lib/paging/remembered";
 import { redirect } from "next/navigation";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
@@ -77,7 +78,7 @@ export default async function OrdersPage({
         );
     }
 
-    const query = readOrdersQuery(params);
+    const query = readOrdersQuery(params, await rememberedPageSize("orders"));
     const storesRead = listBusinessStores();
     // What a row's menu and quick view may offer (B5), as Order Detail
     // asks it. A pay link needs a provider that opens the checkout window

@@ -172,7 +172,11 @@ function isSort(v: string | undefined): v is CustomerSort {
  * mistyped link opens the list rather than an error. `?storefront=` (what
  * Products and the old per-storefront links say) reads as `?store=`.
  */
-export function readListQuery(params: Params): ListQuery {
+export function readListQuery(
+    params: Params,
+    /** The size this browser last chose, for an address that names none. */
+    remembered: number = DEFAULT_PAGE_SIZE,
+): ListQuery {
     const chip = one(params, "chip");
     const sort = one(params, "sort");
     const page = Number(one(params, "page"));
@@ -182,7 +186,7 @@ export function readListQuery(params: Params): ListQuery {
         sort: isSort(sort) ? sort : null,
         store: one(params, "store") ?? one(params, "storefront") ?? null,
         page: Number.isInteger(page) && page >= 1 ? page : 1,
-        size: readPageSize(one(params, "size")),
+        size: readPageSize(one(params, "size"), remembered),
     };
 }
 

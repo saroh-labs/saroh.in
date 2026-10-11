@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -140,7 +141,10 @@ export function CustomersList({
                 total={page.total}
                 size={page.pageSize}
                 to={(n) => ({ onClick: () => go({ page: n }) })}
-                onSize={(size) => go({ size })}
+                onSize={(size) => {
+                    rememberPageSize("customers", size);
+                    go({ size });
+                }}
             />
             <ListNote />
         </div>

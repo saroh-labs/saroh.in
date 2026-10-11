@@ -72,8 +72,14 @@ function one(params: Params, key: string): string | undefined {
     return value?.trim() ? value.trim() : undefined;
 }
 
-/** What the address asks for. An unknown tab is All. */
-export function readOrdersQuery(params: Params): OrdersQuery {
+/**
+ * What the address asks for. An unknown tab is All; an address with no
+ * size opens at `remembered`, the size this browser last chose.
+ */
+export function readOrdersQuery(
+    params: Params,
+    remembered: number = ORDERS_PAGE_SIZE,
+): OrdersQuery {
     const tab = one(params, "tab");
     const view = one(params, "view");
     const page = Number(one(params, "page"));
@@ -88,7 +94,7 @@ export function readOrdersQuery(params: Params): OrdersQuery {
         since: sinceParam(params)?.toISOString() ?? null,
         ...readOrdersFilters(params),
         page: Number.isInteger(page) && page >= 1 ? page : 1,
-        size: readPageSize(one(params, "size")),
+        size: readPageSize(one(params, "size"), remembered),
     };
 }
 

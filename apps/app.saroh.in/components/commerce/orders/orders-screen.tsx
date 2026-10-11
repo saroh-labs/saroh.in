@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { countLabel } from "@saroh/ui/page-header";
+import { rememberPageSize } from "@saroh/ui/page-sizes";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
@@ -490,7 +491,10 @@ export function OrdersScreen({
                 total={total}
                 size={query.size}
                 to={(n) => ({ href: pageHref(query, n) })}
-                onSize={(size) => go({ size })}
+                onSize={(size) => {
+                    rememberPageSize("orders", size);
+                    go({ size });
+                }}
             />
         </div>
     );

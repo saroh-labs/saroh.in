@@ -333,7 +333,8 @@ describe("ListPaging", () => {
                 onSize={vi.fn()}
             />,
         );
-        const foot = container.querySelector("[data-list-paging]")!;
+        const foot = container.querySelector("[data-list-paging]");
+        if (!foot) throw new Error("no footer");
         expect(classes(foot)).toContain("justify-between");
         expect(
             screen.getByRole("combobox", { name: "Rows per page" }),
@@ -363,7 +364,7 @@ describe("ListPaging", () => {
                 page={1}
                 total={120}
                 size={50}
-                to={(n) => ({ onClick: () => go(n) })}
+                to={(n) => ({ onClick: () => void go(n) })}
                 onSize={vi.fn()}
             />,
         );

@@ -8,7 +8,8 @@ import { Checkbox } from "../checkbox";
 import { EmptyState } from "../data-state";
 import { ListSearch } from "../list-search";
 import { listTable } from "../list-table";
-import { ListFilter, ListToolbar } from "../list-toolbar";
+import { ListFilter, ListPaging, ListToolbar, pagesOf } from "../list-toolbar";
+import { usePageSize } from "../page-sizes";
 import { ScrollX } from "../scroll-x";
 import { Segmented } from "../segmented";
 import { Skeleton } from "../skeleton";
@@ -121,6 +122,7 @@ export function DataView<TRow>({
 
     const chooseFilter = (next: string) => {
         setFilterId(next);
+        setPage(1);
         /*
          * The URL is updated but NOT navigated: `history.replaceState` keeps the
          * address shareable and the back button honest without a server round
@@ -177,8 +179,23 @@ export function DataView<TRow>({
         return out;
     }, [rows, columns, search, searchableColumnIds, sort, activeFilter]);
 
+    /*
+     * The rows on screen: one page of what matched. The size is the one
+     * this list was last shown at (`usePageSize`, kept between visits). A
+     * page past the end (a search just narrowed the list) is the last one,
+     * and anything that lists something else starts again at page 1.
+     */
+    const [size, setSize] = usePageSize(viewId);
+    const [pageAsked, setPage] = useState(1);
+    const page = Math.min(pageAsked, pagesOf(visible.length, size));
+    const paged = useMemo(
+        () => visible.slice((page - 1) * size, page * size),
+        [visible, page, size],
+    );
+
     const toggleSort = (col: DataColumn<TRow>) => {
         if (!col.sortValue) return;
+        setPage(1);
         setSort((prev) =>
             prev?.id === col.id
                 ? prev.desc
@@ -191,7 +208,8 @@ export function DataView<TRow>({
     // A selection only ever holds rows that still exist: a row deleted or
     // filtered away by a refresh must not stay counted in the bulk bar.
     const selectedRows = rows.filter((r) => selected.has(rowKey(r)));
-    const visibleKeys = visible.map(rowKey);
+    // Select-all takes the rows on screen, never a page nobody is looking at.
+    const visibleKeys = paged.map(rowKey);
     const selectedInView = visibleKeys.filter((k) => selected.has(k)).length;
     const allInView =
         visibleKeys.length > 0 && selectedInView === visibleKeys.length;
@@ -351,7 +369,7 @@ export function DataView<TRow>({
                                 the translucent Ink wash (brand file §22), and
                                 transitions stay on colour only — a table that
                                 moves on hover is unreadable while scanning. */}
-                        {visible.map((row, rowIndex) => {
+                        {paged.map((row, rowIndex) => {
                             const key = rowKey(row);
                             const isSelected = selected.has(key);
                             return (
@@ -479,7 +497,7 @@ export function DataView<TRow>({
             // ends up ragged. Enforced here rather than asked of every
             // caller, because it is a property of the grid, not the card.
             <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {visible.map((row) => (
+                {paged.map((row) => (
                     <div key={rowKey(row)} className="[&>*]:h-full">
                         {renderCard(row)}
                     </div>
@@ -491,7 +509,7 @@ export function DataView<TRow>({
             // behind a disclosure nobody taps.
             // Every row is a record's data: masked in a recording.
             <ul data-ph-mask="" data-list-table="" className={listTable.card}>
-                {visible.map((row, rowIndex) => {
+                {paged.map((row, rowIndex) => {
                     // `.at()` rather than a destructure: a caller could
                     // declare only `detail` columns, leaving this empty,
                     // and index access would type as always-present.
@@ -663,7 +681,10 @@ export function DataView<TRow>({
                     (searchable.length > 0 ? (
                         <ListSearch
                             key={clearNonce}
-                            onSearch={setSearch}
+                            onSearch={(term) => {
+                                setSearch(term);
+                                setPage(1);
+                            }}
                             placeholder={
                                 searchPlaceholder ?? `Search ${noun.other}`
                             }
@@ -822,6 +843,17 @@ export function DataView<TRow>({
                     >
                         {phoneSlot ? renderMode(phoneSlot) : null}
                     </div>
+                    <ListPaging
+                        label={`Pages of ${noun.other}`}
+                        page={page}
+                        total={visible.length}
+                        size={size}
+                        to={(n) => ({ onClick: () => setPage(n) })}
+                        onSize={(next) => {
+                            setSize(next);
+                            setPage(1);
+                        }}
+                    />
                 </div>
             )}
 
