@@ -6,6 +6,7 @@ import {
     expectDenied,
     expectLeaveOfferedThenStay,
     expectMenu,
+    expectPlanReadOnly,
     expectSettingsTabs,
     NORTHWIND_NAME,
     ONLY_OWNER_CAN_CHANGE,
@@ -16,10 +17,12 @@ import { people } from "../fixtures/sessions";
 /**
  * An Admin, in the browser: Arun on Northwind (the showcase seed).
  *
- * An Admin holds everything but the two powers that are the owner's alone
- * (`OWNER_ONLY_ACTIONS` in the API's `organization-policy.ts`), so the menu
- * is the whole of `NAV_GROUPS` for Northwind's modules, and Settings is
- * every tab but Your data (`SETTINGS_PAGES`, `ownerOnly`). What an Admin is
+ * An Admin holds everything but the powers that are the owner's alone
+ * (`OWNER_ONLY_ACTIONS` in the API's `organization-policy.ts`: closing the
+ * business, its web address, and what it pays Saroh), so the menu is the
+ * whole of `NAV_GROUPS` for Northwind's modules, and Settings is every tab
+ * but Your data (`SETTINGS_PAGES`, `ownerOnly`). Plan and billing opens to
+ * read, and changes nothing (DEC-131, amended 2026-10-11). What an Admin is
  * kept from is the business's only owner: not removed, not moved to another
  * role (the API's last-owner rule, `organization-members.service.ts`).
  *
@@ -173,21 +176,13 @@ test.describe("an Admin", () => {
         ).toHaveCount(0);
     });
 
-    test("opens Settings › Plan and billing, which an Admin may change", async ({
+    test("opens Settings › Plan and billing to read, and is offered no way to change it", async ({
         page,
     }) => {
-        await page.goto("/settings/billing");
-        await expect(
-            page.getByRole("heading", { name: "Plan and billing" }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole("region", { name: "Your plan" }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole("heading", { name: /^You can't open/ }),
-        ).toHaveCount(0);
-        // Nothing says it is someone else's to change.
-        await expect(page.getByText(/^Your role can read/)).toHaveCount(0);
+        // The plan, the plans and the invoices, the note that only the
+        // owner can change it, and no control that would: a plan's button,
+        // a coupon, the payment method, a payment to carry on, an add-on.
+        await expectPlanReadOnly(page);
         await expect(
             page
                 .getByRole("navigation", { name: "Settings" })

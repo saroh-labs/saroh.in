@@ -310,6 +310,63 @@ export async function expectNoWayToPlans(page: Page): Promise<void> {
     );
 }
 
+/** What someone who reads Plan and billing but can't change it reads there. */
+export const PLAN_READ_ONLY = `Your role can read the plan but not change it. ${ONLY_OWNER_CAN_CHANGE}`;
+
+/**
+ * Plan and billing is this role's to read and the owner's to change
+ * (DEC-131, amended 2026-10-11): the page opens with the plan, the plans
+ * and Saroh's invoices, says only the owner can change it, and offers no
+ * control that would. No plan's button, no coupon, no payment method to
+ * change, no payment to carry on, and every add-on control off.
+ */
+export async function expectPlanReadOnly(page: Page): Promise<void> {
+    await page.goto("/settings/billing");
+    await expect(
+        page.getByRole("heading", { name: "Plan and billing" }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole("heading", { name: /^You can't open/ }),
+    ).toHaveCount(0);
+    await expect(page.getByText(PLAN_READ_ONLY)).toBeVisible();
+
+    const plan = page.getByRole("region", { name: "Your plan" });
+    await expect(plan).toBeVisible();
+    // How it's paid has no "Change", and no payment waits to be carried on.
+    await expect(
+        plan.getByRole("button", { name: "Change", exact: true }),
+    ).toHaveCount(0);
+    await expect(plan.getByRole("link")).toHaveCount(0);
+    await expect(plan.getByText(/^Checking your payment/)).toHaveCount(0);
+
+    // The plans are there to read. The only control is Monthly or Yearly,
+    // which changes what is shown and nothing else.
+    const picker = page.getByRole("region", { name: "Change plan" });
+    await expect(
+        picker.getByText("These are Saroh's plans and what each is for."),
+    ).toBeVisible();
+    await expect(
+        picker.getByRole("button", {
+            name: /^(Upgrade|Switch|Start |Keep |Bill (yearly|monthly))/,
+        }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Coupon" })).toHaveCount(0);
+    await expect(page.getByLabel("Coupon code")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // Add-ons, where the plan has any, are read: every control is off.
+    for (const control of await page
+        .getByRole("region", { name: "Add-ons" })
+        .getByRole("button")
+        .all()) {
+        await expect(control).toBeDisabled();
+    }
+
+    await expect(
+        page.getByRole("region", { name: "Invoices from Saroh" }),
+    ).toBeVisible();
+}
+
 /**
  * "Leave {business}" is on Your profile for this person. The confirm says
  * what goes and offers "Stay" and "Leave business"; Stay is pressed, since
