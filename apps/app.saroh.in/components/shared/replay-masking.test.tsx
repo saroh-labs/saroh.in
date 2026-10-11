@@ -293,7 +293,7 @@ describe("a recording of a workspace screen", () => {
         // On the element itself, wherever its long class list ends.
         const marked = (selector: string, mark: string) =>
             document.querySelector(selector)?.hasAttribute(mark) ?? false;
-        expect(marked("aside[aria-label='Workspace']", "data-ph-unmask")).toBe(
+        expect(marked("aside[aria-label='Main menu']", "data-ph-unmask")).toBe(
             true,
         );
         expect(marked("th", "data-ph-unmask")).toBe(true);

@@ -97,7 +97,7 @@ const hrefsOf = (links: Locator) =>
  * under it once you are in it (the rail opens the section you are in). On a
  * phone it is the bottom bar and the "More" sheet, which between them hold
  * every row once: a section's pages under its name, and the rows with no
- * seat on the bar under Workspace.
+ * seat on the bar under Manage.
  */
 export async function expectMenu(
     page: Page,
@@ -206,16 +206,16 @@ async function expectPhoneMenu(page: Page, rows: readonly MenuRow[]) {
             ).toBeVisible();
         }
     }
-    const workspace = sheet.getByRole("group", {
-        name: "Workspace",
+    const manage = sheet.getByRole("group", {
+        name: "Manage",
         exact: true,
     });
     if (unseated.length > 0) {
         await expect
-            .poll(() => hrefsOf(workspace.getByRole("link")))
+            .poll(() => hrefsOf(manage.getByRole("link")))
             .toEqual(unseated);
     } else {
-        await expect(workspace).toHaveCount(0);
+        await expect(manage).toHaveCount(0);
     }
     await sheet.getByRole("button", { name: "Close" }).click();
     await expect(sheet).toBeHidden();

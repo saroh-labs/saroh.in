@@ -358,7 +358,7 @@ export interface NavGroup {
      *
      * It was pinned once before, then only ruled, because the gap above it
      * read as a rendering fault on a rail with twelve destinations. It is
-     * pinned again by choice (2026-09-25): Workspace sits at the bottom, where
+     * pinned again by choice (2026-09-25): Manage sits at the bottom, where
      * account-level things live, apart from running the business. The space
      * above it is a flexible spacer, never less than the old 10px, so a rail
      * too long for the window scrolls with the rule still in place.
@@ -633,7 +633,7 @@ export const NAV_GROUPS: NavGroup[] = [
         // appears here when it has a route.
     },
     {
-        label: "Workspace",
+        label: "Manage",
         pinToBottom: true,
         items: [
             /*

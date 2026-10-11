@@ -63,24 +63,9 @@ const ALLOWED = [
         why: "the invoice paper's titles, which the API draws identically on the PDF. Reword both sides together",
     },
     {
-        file: "components/shared/nav-items.tsx",
-        rule: "workspace",
-        why: 'the menu\'s last group is headed "Workspace" until the owner renames it',
-    },
-    {
-        file: "lib/nav/mobile-nav.ts",
-        rule: "workspace",
-        why: "the same heading, on the phone's More sheet",
-    },
-    {
-        file: "components/shared/app-sidebar.tsx",
-        rule: "workspace",
-        why: "the menu's landmark name, kept in step with its heading",
-    },
-    {
         file: "lib/settings/search.ts",
         rule: "workspace",
-        why: '"Workspace address" is a word Settings search still finds the web address by, and is never shown',
+        why: '"Workspace address" is a word Settings search still finds the web address by. A synonym is matched, never shown',
     },
     {
         file: "lib/organizations/storefront-team.ts",

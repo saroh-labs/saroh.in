@@ -381,7 +381,7 @@ describe("what each role is offered", () => {
             moduleKeys: AVAILABLE_TO.REVIEWER,
             sites: SITES,
         });
-        // "Workspace" held five destinations, all of them refused. A heading
+        // The last group ("Manage" now) held five destinations, all of them refused. A heading
         // over an empty list names something the reader does not have.
         expect(groups.map((g) => g.label)).toEqual([undefined, "Presence"]);
         for (const group of groups)

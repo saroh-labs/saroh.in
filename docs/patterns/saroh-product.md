@@ -641,9 +641,13 @@ empty states, and every sentence a `lib/` function returns):
   dash: it reads `packages/ui/src/lib/absent.ts` too, which is on the
   allow-list, so a "—" (or `&mdash;`, or `\u2014`) typed anywhere else in
   the app still fails.
-- **Open** (owner): the menu's last group is still headed "Workspace", on
-  the allow-list until it is renamed. The docs still call the app itself
-  "the workspace".
+- **Current** (owner, 11 Oct 2026): the menu's last group, which holds
+  Settings (and, in the phone's More sheet, the rows with no seat on the
+  bar), is headed **Manage** everywhere it is drawn or spoken. The rail
+  itself is the landmark "Main menu". Nothing a person reads says
+  "Workspace"; Settings search still finds the web address by it, a
+  synonym that is matched and never shown (the check's one "workspace"
+  entry). The docs still call the app itself "the workspace".
 
 ## Saying what is true
 
