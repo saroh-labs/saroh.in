@@ -1715,7 +1715,8 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Not decided here, the owner's to decide:**
     - turning the account area on in production (`SITE_ACCOUNT_AREA`, the API first, then the site);
     - making a business's own domain the one place its customers sign in. Today each address holds its own cookie, as ADR-011 says.
-## DEC-141 saroh.in says to a search engine what a page is, in the words people search with
+
+## DEC-143 saroh.in says to a search engine what a page is, in the words people search with
 
 **Status: Accepted — 2026-10-12** · owner (asked for the 12 Oct SEO audit's findings to be fixed before early access; the choices under Open are the build's own and wait for the owner)
 
@@ -1729,6 +1730,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Screenshots are files, not optimizer requests.** Each capture has smaller copies made once and committed (`scripts/shot-sizes.mjs`, `lib/shot-sources.ts`), served in a `srcset`; `public/_headers` lets a browser keep them, and Next's fingerprinted files for a year.
 - **What is dated appears with a deploy, and launch day is written down.** `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. In open mode `/waitlist` moves to sign-up for good (301), and help.saroh.in answers 308 once the running build has Help (it asks the build's own moment, `SAROH_BUILT_AT`, not the clock).
 - Open, for the owner: the phrases themselves (they are a first reading of what an owner in India types, with no search data behind them yet); screenshots for both new pages; whether production has the hosting variables the own-domain claim needs (W4); and the three ledger rows found stale and left alone (BK2, CAP2, LP6).
+
 ## DEC-141 The starter has everything a business has switched on, the system pages are part of it, and every existing starter site gets the new look
 
 **Status: Accepted — 2026-10-12** · owner (three decisions, after an audit of the starter site and the customer's side of it) · builds on [DEC-090](#dec-090-a-template-carries-its-own-exact-palette-and-type-scale), DEC-057, DEC-069 (L13), DEC-070, DEC-135

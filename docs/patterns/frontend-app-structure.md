@@ -174,7 +174,7 @@ accounts and the operator console. `pnpm run check:titles` and
 
 ## saroh.in and search
 
-- **Current** (DEC-141) — **A main page of saroh.in has search words of its
+- **Current** (DEC-143) — **A main page of saroh.in has search words of its
   own**, beside what a visitor reads: a plain category `phrase`, a
   `seoTitle` that leads with it and a one-sentence `seoDescription` that
   opens with it (`SearchWords`, `content/types.ts`). The title is
