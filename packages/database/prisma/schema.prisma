@@ -7460,3 +7460,24 @@ enum BusinessReportStatus {
   OPEN
   DONE
 }
+
+// A message someone sent from saroh.in/contact (DEC-137): what it is about,
+// who wrote it and what they wrote. No organization: the writer need not
+// have an account, and nothing links a message to a business. Staff read
+// them in the admin console (organization:pii:read). Deleted 12 months
+// after it arrived (`contact-messages/contact-retention.ts`).
+model ContactMessage {
+  id        String   @id @default(cuid())
+  // One of the form's topics (`CONTACT_TOPICS` in the API), never free text.
+  topic     String
+  name      String
+  email     String
+  // One of the waitlist's kinds of business (`WAITLIST_KINDS`), if they chose one.
+  kind      String?
+  message   String
+  // A digest of the writer's address, as the waitlist keeps one; never the address.
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}

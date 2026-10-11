@@ -24,6 +24,8 @@ import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminBusinessReportsController } from "./admin-business-reports.controller";
 import { AdminBusinessReportsService } from "./admin-business-reports.service";
+import { AdminContactMessagesController } from "./admin-contact-messages.controller";
+import { AdminContactMessagesService } from "./admin-contact-messages.service";
 import { AdminDeploymentsController } from "./admin-deployments.controller";
 import { AdminDeploymentsService } from "./admin-deployments.service";
 import { AdminFlagsService } from "./admin-flags.service";
@@ -99,6 +101,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminPricingController,
         AdminDeploymentsController,
         AdminBusinessReportsController,
+        AdminContactMessagesController,
         AdminUsageController,
     ],
     providers: [
@@ -120,6 +123,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminWaitlistService,
         AdminDeploymentsService,
         AdminBusinessReportsService,
+        AdminContactMessagesService,
         AdminUsageService,
         // Pricing catalogue writes (U4): they audit through AdminAuditService.
         CatalogueWritesService,
