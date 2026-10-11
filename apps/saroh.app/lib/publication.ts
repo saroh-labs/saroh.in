@@ -1,6 +1,7 @@
 import type { JournalFeed, ModulePageStates } from "@saroh/site-blocks";
 
 import { env } from "@/env";
+import { pausedOriginOf, pausedTestOrigin } from "@/lib/domain-paused";
 import { journalFeed } from "@/lib/journal-feed";
 import { modulePageStatesOf } from "@/lib/module-pages";
 import type { SiteHostKind } from "@/lib/site-host-mode";
@@ -676,10 +677,11 @@ export async function getSiteForHost(
 
     const root = env.NEXT_PUBLIC_ROOT_DOMAIN?.toLowerCase();
     if (root && hostname !== root && !hostname.endsWith(`.${root}`)) {
-        const view = await fetchSiteView(
-            `by-hostname/${encodeURIComponent(hostname)}`,
-        );
-        if (view) return view;
+        const found = await fetchHostnameView(hostname);
+        if (found && "site" in found) return found.site;
+        // A domain its plan has paused shows nothing here (DEC-139), and
+        // never the site of whoever holds its first label as an address.
+        if (found) return null;
     }
     const subdomain = subdomainFromHost(host);
     if (!subdomain) return null;
@@ -698,7 +700,46 @@ async function fetchSiteView(suffix: string): Promise<ResolvedSite | null> {
         return null;
     }
     if (!res.ok) return null;
-    const body = (await res.json().catch(() => null)) as PublicSiteView | null;
+    return siteViewOf(await res.json().catch(() => null));
+}
+
+/**
+ * What a custom hostname's read answered: its site, where a paused domain
+ * sends visitors, or nothing.
+ *
+ *   GET /public/sites/by-hostname/:hostname
+ *     200 → the site's current publication
+ *     404 → nothing here; with `details.reason: "domain-paused"` and
+ *           `details.to`, the site's Saroh address (DEC-139)
+ */
+async function fetchHostnameView(
+    hostname: string,
+): Promise<{ site: ResolvedSite } | { pausedTo: string } | null> {
+    let res: Response;
+    try {
+        res = await fetch(
+            `${API_URL}/public/sites/by-hostname/${encodeURIComponent(hostname)}`,
+            { cache: "no-store", headers: { accept: "application/json" } },
+        );
+    } catch {
+        return null;
+    }
+    if (res.status === 404) {
+        const to = pausedOriginOf(
+            await res.json().catch(() => null),
+            hostname,
+            rootDomain(),
+        );
+        return to ? { pausedTo: to } : null;
+    }
+    if (!res.ok) return null;
+    const site = siteViewOf(await res.json().catch(() => null));
+    return site ? { site } : null;
+}
+
+/** A public site read's body as a resolved site, or null when it isn't one. */
+function siteViewOf(raw: unknown): ResolvedSite | null {
+    const body = raw as PublicSiteView | null;
     if (!body?.snapshot) return null;
     return {
         snapshot: body.snapshot,
@@ -732,6 +773,39 @@ export function siteOriginFor(
     requestHost: string,
 ): string {
     return `https://${site?.primaryHost ?? requestHost}`;
+}
+
+// ---------------------------------------------------------------------------
+// A domain its plan has paused (DEC-139)
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a paused domain sends its visitors, as an origin
+ * (`https://yourshop.saroh.app`), or null when `host` isn't one.
+ *
+ * A business's own domain stops showing its site 3 days after its plan
+ * stopped including one, and the API then names the site's Saroh address
+ * (`lib/domain-paused.ts`). The domain stays connected, so the same read
+ * serves the site again the moment the plan includes a domain.
+ *
+ * Asked only when a host shows nothing, as `getMovedTo` is, so a live site
+ * never pays for it. Only a custom hostname can be paused: a Saroh address
+ * is never asked about. The domain's test host (`test.<domain>`) follows
+ * it, to the Saroh address's own test host.
+ */
+export async function getDomainPausedTo(
+    host: string | null | undefined,
+): Promise<string | null> {
+    const hostname = host?.split(":")[0]?.toLowerCase().trim();
+    if (!hostname) return null;
+    const root = rootDomain();
+    const shaped = classifySiteHost(hostname, root);
+    if (shaped.lookup?.by !== "hostname") return null;
+    const found = await fetchHostnameView(shaped.lookup.hostname);
+    if (!found || !("pausedTo" in found)) return null;
+    return shaped.mode === "test"
+        ? pausedTestOrigin(found.pausedTo, root)
+        : found.pausedTo;
 }
 
 // ---------------------------------------------------------------------------

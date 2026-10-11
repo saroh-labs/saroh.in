@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { TestReleaseGate } from "@/components/test-release-gate";
 import { servedHost } from "@/lib/origin";
+import { getDomainPausedTo } from "@/lib/publication";
 import { liveHostOf } from "@/lib/site-host-mode";
 import { TEST_GATE_HEADER } from "@/lib/test-host";
 import { rootDomain } from "@/lib/test-release";
@@ -28,6 +29,10 @@ export default async function TestReleaseGatePage() {
     // The live site beside this test host, so a visitor without the link
     // has somewhere to go (UX-081).
     const host = servedHost(requestHeaders);
+    // The test host of a domain its plan has paused shows nothing, as the
+    // domain itself (DEC-139): on to the Saroh address's own test host.
+    const pausedTo = host ? await getDomainPausedTo(host) : null;
+    if (pausedTo) redirect(pausedTo);
     const live = host ? liveHostOf(host, rootDomain()) : null;
     return (
         <TestReleaseGate
