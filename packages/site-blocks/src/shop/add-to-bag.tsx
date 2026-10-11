@@ -6,7 +6,7 @@ import { focusRing } from "../booking-flow/styles";
 import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
 import { useProductSelection } from "../product/product-page";
-import { addToBag, openBag, useBag } from "./bag-store";
+import { addToBag, onBagShown, openBag, useBag } from "./bag-store";
 
 /** How long "added to your bag" stays before it goes by itself. */
 export const ADDED_SHOWN_MS = 4_000;
@@ -83,6 +83,7 @@ export function AddToBag({
         const timer = setTimeout(() => setShowAdded(false), ADDED_SHOWN_MS);
         return () => clearTimeout(timer);
     }, [said]);
+    useEffect(() => onBagShown(() => setShowAdded(false)), []);
     const bag = useBag(site);
     if (!selection) return null;
     const inBag =

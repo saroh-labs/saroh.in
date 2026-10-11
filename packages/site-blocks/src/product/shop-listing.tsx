@@ -6,7 +6,7 @@ import { focusRing } from "../booking-flow/styles";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { ADDED_SHOWN_MS, allInBagWords, roomInBag } from "../shop/add-to-bag";
-import { addToBag, openBag, useBag } from "../shop/bag-store";
+import { addToBag, onBagShown, openBag, useBag } from "../shop/bag-store";
 import { chooseLabel, optionSummary } from "./option-summary";
 import { formatAmount, percentOff } from "./product-page";
 
@@ -131,6 +131,7 @@ export default function ShopListing({
         const timer = setTimeout(() => setNotice(null), ADDED_SHOWN_MS);
         return () => clearTimeout(timer);
     }, [said]);
+    useEffect(() => onBagShown(() => setNotice(null)), []);
     const bag = useBag(bagSite ?? "");
 
     /** How many of the card's option the bag holds now. */

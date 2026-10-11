@@ -25,7 +25,7 @@ import { SHOP_OFFLINE } from "./api";
 import { readBagDraft, writeBagDraft } from "./bag-draft-store";
 import type { BagDraft, BagPriced } from "./bag-sheet";
 import { BagSheet, EMPTY_DRAFT } from "./bag-sheet";
-import { bagCount, clearBag, onOpenBag, useBag } from "./bag-store";
+import { bagCount, bagShown, clearBag, onOpenBag, useBag } from "./bag-store";
 import type { OnlineStarted } from "./checkout-sheet";
 import {
     CheckoutPay,
@@ -136,6 +136,11 @@ export function ShopBag({
     } | null>(null);
 
     useEffect(() => onOpenBag(() => setStep({ kind: "bag" })), []);
+    // Whoever said "added to your bag" takes it down once the bag is open.
+    const open = step.kind !== "closed";
+    useEffect(() => {
+        if (open) bagShown();
+    }, [open]);
 
     const close = useCallback(() => {
         setStep({ kind: "closed" });
