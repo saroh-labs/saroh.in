@@ -83,6 +83,26 @@ export function Tip({
     );
 }
 
+/** The hints on the page right now, each by the way to take it off. */
+const showing = new Set<() => void>();
+let listening = false;
+
+/** One listener for every hint, on the window, ahead of Radix's own. */
+function listen() {
+    if (listening || typeof window === "undefined") return;
+    listening = true;
+    window.addEventListener(
+        "keydown",
+        (event) => {
+            if (event.key !== "Escape" || showing.size === 0) return;
+            const hints = [...showing];
+            showing.clear();
+            for (const drop of hints) drop();
+        },
+        true,
+    );
+}
+
 function Hint({
     label,
     children,
@@ -100,24 +120,29 @@ function Hint({
     // is taken off the page before Radix looks (the window hears a key
     // before the document does), outright rather than through its fade,
     // which would keep it the topmost layer until it finished.
-    React.useEffect(() => {
-        if (!open) return;
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key !== "Escape") return;
-            flushSync(() => {
-                setDropped(true);
-                setOpen(false);
-            });
-        };
-        window.addEventListener("keydown", onKey, true);
-        return () => window.removeEventListener("keydown", onKey, true);
-    }, [open]);
+    //
+    // It is listed the moment it opens (`showing`), not in an effect: an
+    // effect runs after the paint, and an Escape pressed straight after
+    // the Tab that showed the hint arrived before it.
+    const drop = React.useCallback(() => {
+        flushSync(() => {
+            setDropped(true);
+            setOpen(false);
+        });
+    }, []);
+    React.useEffect(() => () => void showing.delete(drop), [drop]);
     return (
         <TooltipProvider delayDuration={350} skipDelayDuration={150}>
             <Tooltip
                 open={open}
                 onOpenChange={(next) => {
-                    if (next) setDropped(false);
+                    if (next) {
+                        setDropped(false);
+                        listen();
+                        showing.add(drop);
+                    } else {
+                        showing.delete(drop);
+                    }
                     setOpen(next);
                 }}
             >
