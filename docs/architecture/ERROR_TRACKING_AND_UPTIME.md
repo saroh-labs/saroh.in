@@ -200,7 +200,7 @@ It records only when **every** one of these holds (`replayDecision` in
    recorder in that tab before the save is even sent.
 4. **They have been told.** The first time they open the workspace where 2
    and 3 hold, a notice sits above the page (`UsageNotice`): "We record how
-   the workspace is used to make Saroh easier. Your customers' details and
+   Saroh is used to make it easier. Your customers' details and
    anything you type are hidden. Turn it off in Settings › Your profile."
    The recorder starts only once that notice is on screen. "Got it" is kept
    on their user row (`User.usageNoticeSeenAt`, `POST

@@ -11,15 +11,17 @@
 /** What a person is asked, word for word, in Settings › Your profile. */
 export const USAGE_SHARING_LABEL = "Help improve Saroh";
 export const USAGE_SHARING_HELP =
-    "Share how I use the workspace (your customers' details and anything you type are hidden).";
+    "Share how I use Saroh (your customers' details and anything you type are hidden).";
 
 /**
- * The one-time notice (owner, 10 Oct), word for word. Shown above the
+ * The one-time notice (owner, 10 Oct). The app is "Saroh" in what a
+ * merchant reads, never "the workspace" (saroh-product.md, One word each),
+ * so the owner's sentence says "how Saroh is used". Shown above the
  * workspace the first time a person opens it where recording is on, and
  * until they dismiss it; nothing is recorded before it has been shown.
  */
 export const USAGE_NOTICE = {
-    body: "We record how the workspace is used to make Saroh easier. Your customers' details and anything you type are hidden.",
+    body: "We record how Saroh is used to make it easier. Your customers' details and anything you type are hidden.",
     turnOff: "Turn it off in",
     settings: "Settings › Your profile",
     href: "/settings/profile",

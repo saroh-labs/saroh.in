@@ -17,6 +17,7 @@ import {
 import { Avatar, AvatarFallback } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -143,6 +144,26 @@ function Fixture() {
                     title="No bookings yet"
                     description="A booking shows here once someone books."
                 />
+                {/* A search that found nothing repeats what was typed. */}
+                <EmptyState
+                    kind="no-results"
+                    things="orders"
+                    query="Farida"
+                    clearHref="/commerce/orders"
+                    description="Check the spelling, or search by order number."
+                />
+                {/* A field's label and hint are Saroh's; one that names a
+                    record says so and is masked whole. */}
+                <Field label="Tracking link" hint="It stays on the order.">
+                    <Input defaultValue="https://example.com/t/88" />
+                </Field>
+                <Field
+                    holdsData
+                    label="Reply to Devika"
+                    hint="Devika reads it in her email."
+                >
+                    <Input />
+                </Field>
                 {/* Unmarked text: masked, whatever it says. */}
                 <p>Last seen at 14 Hill Road, Bandra</p>
             </main>
@@ -184,7 +205,7 @@ describe("a recording of a workspace screen", () => {
 
     it("reads the notice that says it is being recorded", () => {
         expect(recorded().join(" ")).toContain(
-            "We record how the workspace is used to make Saroh easier.",
+            "We record how Saroh is used to make it easier.",
         );
     });
 
@@ -207,6 +228,24 @@ describe("a recording of a workspace screen", () => {
             "Prefers evening visits",
         ])
             expect(all, secret).not.toContain(secret);
+    });
+
+    it("masks a no-results title that repeats the search, and reads the line under it", () => {
+        const page = recorded();
+        expect(page.join("\n")).not.toContain("Farida");
+        expect(page).toContain("** ****** ***** ********"); // No orders match “Farida”
+        expect(page).toContain(
+            "Check the spelling, or search by order number.",
+        );
+        expect(page).toContain("Clear search");
+    });
+
+    it("reads a field's label and hint, and masks a field that names someone", () => {
+        const page = recorded();
+        expect(page).toContain("Tracking link");
+        expect(page).toContain("It stays on the order.");
+        expect(page.join("\n")).not.toContain("Devika");
+        expect(page).toContain("***** ** ******"); // Reply to Devika
     });
 
     it("masks a table cell's name and amount, and a button inside the row", () => {
@@ -251,16 +290,17 @@ describe("a recording of a workspace screen", () => {
     });
 
     it("the shared components carry the marks themselves", () => {
-        const marked = (selector: string) =>
-            document.querySelector(selector)?.outerHTML.slice(0, 200) ?? "";
-        expect(marked("aside[aria-label='Workspace']")).toContain(
-            "data-ph-unmask",
+        // On the element itself, wherever its long class list ends.
+        const marked = (selector: string, mark: string) =>
+            document.querySelector(selector)?.hasAttribute(mark) ?? false;
+        expect(marked("aside[aria-label='Workspace']", "data-ph-unmask")).toBe(
+            true,
         );
-        expect(marked("th")).toContain("data-ph-unmask");
-        expect(marked("td")).toContain("data-ph-mask");
-        expect(marked("label")).toContain("data-ph-unmask");
-        expect(marked("[data-testid='usage-notice']")).toContain(
-            "data-ph-unmask",
+        expect(marked("th", "data-ph-unmask")).toBe(true);
+        expect(marked("td", "data-ph-mask")).toBe(true);
+        expect(marked("label", "data-ph-unmask")).toBe(true);
+        expect(marked("[data-testid='usage-notice']", "data-ph-unmask")).toBe(
+            true,
         );
     });
 });

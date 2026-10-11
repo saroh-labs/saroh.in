@@ -80,7 +80,7 @@ describe("the one-time notice (DEC-125, 10 Oct)", () => {
         expect(
             `${USAGE_NOTICE.body} ${USAGE_NOTICE.turnOff} ${USAGE_NOTICE.settings}.`,
         ).toBe(
-            "We record how the workspace is used to make Saroh easier. Your customers' details and anything you type are hidden. Turn it off in Settings › Your profile.",
+            "We record how Saroh is used to make it easier. Your customers' details and anything you type are hidden. Turn it off in Settings › Your profile.",
         );
         expect(USAGE_NOTICE.href).toBe("/settings/profile");
     });
