@@ -99,6 +99,7 @@ export default async function SitePagesPage({
             ) : null}
             <ListCard
                 main="Page"
+                paged={{ list: "site-pages", things: "pages" }}
                 middle="Updated"
                 end="On the site"
                 // Plain words (UX-081): where a page is removed, not why it isn't here.

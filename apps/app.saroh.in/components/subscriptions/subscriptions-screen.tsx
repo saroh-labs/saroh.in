@@ -7,6 +7,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListSearch } from "@saroh/ui/list-search";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import { Repeat } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -149,6 +150,11 @@ export function SubscriptionsScreen({
                 s.contact.name.toLowerCase().includes(needle) ||
                 s.plan.name.toLowerCase().includes(needle)),
     );
+    // A page of them at a time, at the size this list was last shown at.
+    const { rows: paged, paging } = useLocalPages("subscriptions", rows, {
+        label: "Pages of subscriptions",
+        resetOn: `${tab}|${needle}`,
+    });
     const running = subscriptions.filter((s) => listTab(s) === "active");
     const total = monthlyTotal(subscriptions);
     const monthly = total
@@ -379,7 +385,7 @@ export function SubscriptionsScreen({
                                     </span>
                                 </ListTableHead>
                                 <ul aria-label="Subscriptions">
-                                    {rows.map((s) => (
+                                    {paged.map((s) => (
                                         <li
                                             key={s.id}
                                             className={listTable.rule}
@@ -396,6 +402,7 @@ export function SubscriptionsScreen({
                                 </ul>
                             </ListTable>
                         )}
+                        {rows.length > 0 ? paging : null}
                         {truncated ? (
                             <p className="mt-3 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                                 Showing the newest {LIST_LIMIT} subscriptions

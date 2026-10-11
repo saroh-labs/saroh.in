@@ -1,6 +1,10 @@
+"use client";
+
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, ListTableHead } from "@saroh/ui/list-table";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import type { ReactNode } from "react";
+import { Children } from "react";
 
 /*
  * An optional column between the title and the right-hand edge (the Pages
@@ -23,9 +27,16 @@ export function ListCard({
     middle,
     end,
     note,
+    paged,
     children,
     className,
 }: {
+    /**
+     * Page the rows with the shared footer: the list's own id (its rows
+     * per page are kept under it) and what its rows are ("posts"). Left
+     * out for a card that is one of several on a screen, grouped by day.
+     */
+    paged?: { list: string; things: string };
     /** The left column's heading: "Provider", "Notification". */
     main: string;
     /** A column's heading between the two: "Updated". Desk only. */
@@ -37,6 +48,10 @@ export function ListCard({
     children: ReactNode;
     className?: string;
 }) {
+    const all = Children.toArray(children);
+    const { rows, paging } = useLocalPages(paged?.list ?? "list-card", all, {
+        label: `Pages of ${paged?.things ?? "rows"}`,
+    });
     return (
         <div className={className}>
             <ListTable>
@@ -52,8 +67,9 @@ export function ListCard({
                         {end}
                     </span>
                 </ListTableHead>
-                <ul>{children}</ul>
+                <ul>{paged ? rows : all}</ul>
             </ListTable>
+            {paged ? paging : null}
             {note ? (
                 <p className="mt-2.5 max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
                     {note}

@@ -42,6 +42,7 @@ export default async function SiteFormsPage({
     return (
         <ListCard
             main="Form"
+            paged={{ list: "site-forms", things: "forms" }}
             end="Latest entry"
             note="Each entry also becomes a contact and a lead. Here is what they typed, kept as they sent it."
         >

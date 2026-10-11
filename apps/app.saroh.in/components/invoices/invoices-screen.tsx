@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import { ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -163,6 +164,11 @@ export function InvoicesScreen({
             ? mine.find((p) => p.id === i.related?.id)
             : undefined;
         return tab !== "all" && parent !== undefined && inTab(parent, tab);
+    });
+    // A page of them at a time, at the size this list was last shown at.
+    const { rows: paged, paging } = useLocalPages("invoices", shown, {
+        label: "Pages of invoices",
+        resetOn: `${tab}|${chip}`,
     });
     const tabLabel = INVOICE_TABS.find((t) => t.id === tab)?.label ?? "";
     // Every issued paper a bill of supply (D15): the line says so, rather
@@ -340,7 +346,7 @@ export function InvoicesScreen({
                             <span className="text-right">Total</span>
                         </ListTableHead>
                         <ul aria-label="Invoices">
-                            {shown.map((i) => (
+                            {paged.map((i) => (
                                 <li key={i.id} className={listTable.rule}>
                                     <InvoiceRow
                                         invoice={i}
@@ -353,6 +359,7 @@ export function InvoicesScreen({
                         </ul>
                     </ListTable>
                 )}
+                {shown.length > 0 ? paging : null}
 
                 {truncated ? (
                     <p className="mt-3 max-w-[68ch] text-[12px] text-muted-foreground">

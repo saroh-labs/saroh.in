@@ -29,6 +29,7 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { useLocalPages } from "@saroh/ui/page-sizes";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { Check, Info, Mail, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -541,6 +542,10 @@ function PeopleTab({
         ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_150px]"
         : "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]";
     const rowButton = "text-[12.5px]";
+    // A page of people at a time, at the size this list was last shown at.
+    const { rows: paged, paging } = useLocalPages("team", members, {
+        label: "Pages of people",
+    });
 
     return (
         <div className="space-y-3.5">
@@ -566,7 +571,7 @@ function PeopleTab({
                     <span />
                 </ListTableHead>
                 <ul>
-                    {members.map((m) => {
+                    {paged.map((m) => {
                         const role = m.roleKey ?? m.role;
                         const extras = extraLabels(
                             m.extraActions ?? [],
@@ -697,6 +702,7 @@ function PeopleTab({
                     })}
                 </ul>
             </ListTable>
+            {paging}
 
             <div className="flex items-start gap-[9px] rounded-[10px] bg-foreground/[0.03] px-[15px] py-3">
                 <Info
