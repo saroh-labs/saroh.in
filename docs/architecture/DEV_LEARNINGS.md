@@ -4350,3 +4350,33 @@ the pointer away (`page.mouse.move(1, 1)`) and wait for
 it on a phone. A test that fails "sometimes" has a cause; read the call log
 before calling it flaky.
 **Category**: tests · `docs/patterns/frontend-verification.md`
+
+## The loser of a booking race was told the class was full, not that they were booked
+
+**Symptom**: on the release pull request, one integration shard (RLS mode)
+failed `account-bookings.controller.db.spec.ts`, "two tabs racing for one
+class": the two answers were 201 and 409 as they should be, but the 409
+carried no `reason: "already-booked"` (11 Oct 2026). The same test had
+passed on every run before it.
+**Cause**: when two bookings race, Postgres stops one of them, and can tell
+it so while the other is still committing. The service then read at once for
+"does this customer hold the slot already?", on another connection, and
+sometimes read before the winner's booking could be seen. Finding nothing,
+it sent the plain "fully booked" refusal. A real customer with two tabs
+would have been told a class with room in it was full.
+**Fix**: the loser of a race reads again, briefly (20, 80, then 200 ms),
+before the refusal is decided (`RACE_REREAD_MS`,
+`bookings/public-bookings.service.ts`; `lostRace` in `reservation.ts`). A
+refusal that reaches the service as Prisma's own error (P2002, P2034) is
+read the same way, where before only a `ConflictException` was.
+**Rule**: after a transaction loses a race, a read on another connection
+may not see the winner yet. Read again before deciding what the loser is
+told.
+**How it was confirmed**: the spec would not fail on demand (30 of 30 passes
+without the fix), so the cause was measured in Postgres itself: two
+Serializable transactions racing to insert the same slot, 600 times, with
+the loser reading on another connection the moment it was refused. In 11 of
+599 lost races the winner's row could not be read yet; in all 11 it could
+50 ms later.
+**Check**: the spec itself, run twelve times in RLS mode after the fix.
+**Category**: backend · `docs/patterns/backend-data-and-money.md`

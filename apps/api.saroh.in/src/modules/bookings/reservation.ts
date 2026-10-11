@@ -258,6 +258,16 @@ export async function bookingByKey(
 class RaceLost extends ConflictException {}
 
 /**
+ * Whether `err` is the loser of a race for a slot: Postgres stopped this
+ * transaction because another one took it. The winner may still be
+ * committing when the loser hears of it, so a read made at once can miss
+ * the booking that beat it.
+ */
+export function lostRace(err: unknown): boolean {
+    return err instanceof RaceLost;
+}
+
+/**
  * The reservation itself, shared by the booking page and a booking made
  * by hand: re-count inside a Serializable transaction, upsert the contact,
  * write the CONFIRMED booking, its first history event and the notify job.
