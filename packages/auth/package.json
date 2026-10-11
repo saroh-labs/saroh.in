@@ -74,6 +74,7 @@
     "./auth-status": "./src/auth-status.tsx",
     "./middleware": "./src/middleware.ts",
     "./dev-access": "./src/dev-access.ts",
+    "./private-app": "./src/private-app.ts",
     "./next": "./src/next.ts"
   }
 }

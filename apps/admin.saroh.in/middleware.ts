@@ -1,5 +1,6 @@
 import { withDevAccess } from "@saroh/auth/dev-access";
 import { createAuthMiddleware } from "@saroh/auth/middleware";
+import { withPrivateApp } from "@saroh/auth/private-app";
 
 import { accountsLoginUrl } from "@/lib/admin-access";
 
@@ -7,8 +8,10 @@ import { accountsLoginUrl } from "@/lib/admin-access";
 // check (isAdmin) runs server-side in the pages — middleware only enforces
 // authentication (Edge-safe cookie presence), not authorization.
 // The dev environment admits only browsers holding its key (withDevAccess).
-export default withDevAccess(
-    createAuthMiddleware({ loginUrl: accountsLoginUrl }),
+// Outermost, withPrivateApp: every answer given here, the redirect to sign-in
+// among them, says "noindex, nofollow" and carries the security headers.
+export default withPrivateApp(
+    withDevAccess(createAuthMiddleware({ loginUrl: accountsLoginUrl })),
 );
 
 export const config = {

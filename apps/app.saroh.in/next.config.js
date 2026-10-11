@@ -38,7 +38,13 @@ if (missing.length > 0) {
 // another site's frame (so a sign-in or a button can't be dressed up and
 // clicked through from elsewhere), and no guessing a file's type. The app's
 // own previews are same-origin, so 'self' may still frame it.
+// And never in a search engine: this is a signed-in app. These reach what
+// Next answers; what the middleware answers itself (the redirect to sign-in)
+// gets the same list from `withPrivateApp` (@saroh/auth/private-app), and
+// the files Cloudflare serves without the Worker from `public/_headers`.
+// `pnpm run check:security-headers` keeps the three the same.
 const SECURITY_HEADERS = [
+    { key: "X-Robots-Tag", value: "noindex, nofollow" },
     {
         key: "Strict-Transport-Security",
         value: "max-age=31536000; includeSubDomains",
