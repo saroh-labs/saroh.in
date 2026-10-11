@@ -21,6 +21,20 @@ export interface CompanyFacts {
      * Joined with ", " it is the address the legal pages give.
      */
     registeredOffice?: readonly string[];
+    /**
+     * The same registered office in the parts a machine reads (the
+     * Organization structured data, `lib/structured-data.ts`): everything
+     * before the town, then the town, the state, the PIN code and the
+     * country's two-letter code. Nothing new: `company.test.ts` fails when a
+     * part isn't in `registeredOffice`. Unset, no address is given.
+     */
+    postal?: {
+        street: string;
+        locality: string;
+        region: string;
+        postalCode: string;
+        country: string;
+    };
     /** The LLP's identification number. */
     llpin?: string;
     /** The GST registration number. */
@@ -50,6 +64,13 @@ export const COMPANY: CompanyFacts = {
         "Unit 309, 3rd Floor, Tower-A, SAS Tower, Support Area, Medicity, Sector-38",
         "Gurgaon, Haryana 122001, India",
     ],
+    postal: {
+        street: "Unit 309, 3rd Floor, Tower-A, SAS Tower, Support Area, Medicity, Sector-38",
+        locality: "Gurgaon",
+        region: "Haryana",
+        postalCode: "122001",
+        country: "IN",
+    },
 };
 
 /** The registered office on one line, or null when it isn't set. */

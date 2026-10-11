@@ -111,7 +111,7 @@ describe("SiteNav", () => {
         launch.mode = "waitlist";
     });
 
-    it("Features opens a menu of eight, focused on the first", () => {
+    it("Features opens a menu of nine, focused on the first", () => {
         render(<SiteNav />);
         const chevron = () =>
             button("Features").querySelector("[data-chevron]")?.classList;
@@ -120,14 +120,14 @@ describe("SiteNav", () => {
         expect(chevron()?.contains("rotate-180")).toBe(true);
         expect(button("Features").getAttribute("aria-expanded")).toBe("true");
         const items = screen.getAllByRole("menuitem");
-        expect(items).toHaveLength(8);
+        expect(items).toHaveLength(9);
         expect(document.activeElement).toBe(items[0]);
     });
 
     it("Esc in the Solutions menu closes it and focuses the Solutions button", () => {
         render(<SiteNav />);
         fireEvent.click(button("Solutions"));
-        expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+        expect(screen.getAllByRole("menuitem")).toHaveLength(4);
         fireEvent.keyDown(document, { key: "Escape" });
         expect(screen.queryByRole("menu")).toBeNull();
         expect(document.activeElement).toBe(button("Solutions"));
@@ -150,8 +150,10 @@ describe("SiteNav", () => {
     it("arrow keys move within the menu and wrap", () => {
         render(<SiteNav />);
         fireEvent.click(button("Solutions"));
-        const [shops, gyms, clinics] = screen.getAllByRole("menuitem");
+        const [shops, salons, gyms, clinics] = screen.getAllByRole("menuitem");
         fireEvent.keyDown(shops, { key: "ArrowDown" });
+        expect(document.activeElement).toBe(salons);
+        fireEvent.keyDown(salons, { key: "ArrowDown" });
         expect(document.activeElement).toBe(gyms);
         fireEvent.keyDown(gyms, { key: "ArrowRight" });
         expect(document.activeElement).toBe(clinics);

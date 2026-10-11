@@ -5,7 +5,7 @@ import "./site.css";
 
 import { home } from "@/content/home";
 import { shownLegal } from "@/content/resources";
-import { SITE_NAME, SITE_URL } from "@/lib/seo";
+import { pageTitle, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 import { resourcesContext } from "@/lib/resources-context";
 import { siteTagConfig } from "@/lib/site-tag-config";
@@ -59,32 +59,40 @@ const fontWordmark = localFont({
 // (`lib/seo.ts`). These are the fallbacks for a page that sets none, such as
 // the 404: Home's words, and no canonical, so a missing page never claims
 // another's address.
+const FALLBACK_TITLE = pageTitle(home.seoTitle);
+
 export const metadata: Metadata = {
     // The site is served at www (saroh.in redirects there), so every
     // canonical and share link names www: one host for search engines.
     metadataBase: new URL(SITE_URL),
-    title: home.metaTitle,
-    description: home.sub,
+    title: FALLBACK_TITLE,
+    description: home.seoDescription,
     openGraph: {
         type: "website",
         siteName: SITE_NAME,
         locale: "en_IN",
-        title: home.metaTitle,
-        description: home.sub,
+        title: FALLBACK_TITLE,
+        description: home.seoDescription,
     },
     twitter: {
         card: "summary_large_image",
-        title: home.metaTitle,
-        description: home.sub,
+        title: FALLBACK_TITLE,
+        description: home.seoDescription,
     },
 };
 
 /**
  * The site is static: every page is built at deploy time and served as a
  * file, with no regeneration at request time (Cloudflare Workers can neither
- * read `content/` nor compile MDX while serving). A page dated today appears
- * through the nightly rebuild at 00:00 IST (plan KTD-2), and published pricing
- * or a launch offer through the build a publish starts (KTD-10).
+ * read `content/` nor compile MDX while serving). So a page dated for a day
+ * (Help, the QR code maker, the launch entry: `publishOn`) appears with the
+ * first deploy made on or after that day, and not before: nothing rebuilds
+ * the site on a schedule (owner, 9 Oct 2026), and the owner starts each
+ * deploy. Published pricing or a launch offer arrives with the build a
+ * publish starts (KTD-10). The day early access opens is in
+ * `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`.
+ *
+ * `lang="en-IN"`: Indian English, as the share tags already say (`en_IN`).
  */
 
 /**
@@ -105,7 +113,7 @@ export default function RootLayout({
         (p) => p.id === "privacy",
     );
     return (
-        <html lang="en" style={{ colorScheme: "light" }}>
+        <html lang="en-IN" style={{ colorScheme: "light" }}>
             <body
                 className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} ${fontWordmark.variable} font-sans antialiased`}
             >

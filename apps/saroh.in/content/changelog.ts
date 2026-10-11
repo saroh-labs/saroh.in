@@ -262,8 +262,9 @@ export const CHANGELOG = {
         "None of these is available yet. Times are rough and can move. When one ships, it gets its own entry above.",
     notYet: NOT_AVAILABLE_YET,
     readMore: "Read the full note",
+    metaTitle: "Changelog and product updates · Saroh",
     metaDescription:
-        "What's new in Saroh, the one place a small business in India sells, takes bookings, invoices and runs its website. Every release, and what's coming next.",
+        "Changelog for Saroh, business software for small businesses in India: every release in plain words, and what's coming next.",
 } as const;
 
 /** The entries live now, newest first. */

@@ -17,8 +17,23 @@ export const OG_CONTENT_TYPE = "image/png";
 /** The root card's alt (`app/opengraph-image.tsx`), which Home names itself. */
 export const HOME_OG_ALT = `Saroh: ${home.headlineLabel}`;
 
+/**
+ * A page's `<title>`: what the page is, then the brand, with " · " between.
+ * One pattern for every page (12 Oct 2026; some had a dash, some a colon and
+ * the brand twice). The words lead because a search result cuts a long
+ * title from the right, and because nobody searching for a kind of software
+ * types "Saroh".
+ */
+export function pageTitle(phrase: string): string {
+    return `${phrase} · ${SITE_NAME}`;
+}
+
+/** The longest a main page's `<title>` and description may be (`content/seo.test.ts`). */
+export const TITLE_MAX = 60;
+export const DESCRIPTION_MAX = 150;
+
 export interface PageSeo {
-    /** The `<title>`, whole: pages write their own " · Saroh". */
+    /** The `<title>`, whole, as `pageTitle` writes it. */
     title: string;
     /** The search-result line, also the share card's. */
     description: string;

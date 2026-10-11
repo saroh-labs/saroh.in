@@ -9,6 +9,7 @@ import {
     FeatureWorksWith,
 } from "@/components/v2/feature/feature-related";
 import { FeatureSteps } from "@/components/v2/feature/feature-steps";
+import { JsonLd } from "@/components/v2/json-ld";
 import { featureHelpLinks } from "@/content/feature-help";
 import { featureHref, features, isFeatureSlug } from "@/content/features";
 import { summarise } from "@/content/help";
@@ -18,14 +19,15 @@ import { LAUNCH_MODE } from "@/lib/links";
 import { freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
 import { resourcesContext } from "@/lib/resources-context";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, pageTitle } from "@/lib/seo";
+import { breadcrumbLd } from "@/lib/structured-data";
 
 /**
- * The eight feature pages (plan U22): ONE template, the Features design,
- * and eight data sets in `content/features.ts`. Built at build time; any
+ * The feature pages (plan U22): ONE template, the Features design, and a
+ * data set each in `content/features.ts`. Built at build time; any
  * other slug is a 404. The "How to …" links to Help (plan U7) follow the
- * publish date: the root layout's five-minute revalidate brings them in on
- * the day Help opens, with no deploy (KTD-2).
+ * publish date: they are drawn by the first deploy made on or after the day
+ * Help opens (`app/layout.tsx`; nothing rebuilds the site on a schedule).
  * The hero's free-plan line reads the pricing catalogue once the launch
  * switch is open (KTD-10); before that it is the line with no plan details
  * (`freePlanLine(null)`, Gate W).
@@ -44,11 +46,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
     if (!isFeatureSlug(slug)) return {};
     const feature = features[slug];
-    const title = `${feature.name} — ${feature.headline}`;
+    // The search title says what the page is in plain words; the share
+    // card keeps the page's own headline.
     return pageMetadata({
-        title: `${title} · Saroh`,
-        socialTitle: title,
-        description: feature.sub,
+        title: pageTitle(feature.seoTitle),
+        socialTitle: `${feature.name}: ${feature.headline}`,
+        description: feature.seoDescription,
         path: featureHref(slug),
     });
 }
@@ -65,9 +68,16 @@ export default async function FeaturePage({ params }: Props) {
     );
     return (
         <>
+            {/* The trail the hero draws: Features / {name}. */}
+            <JsonLd
+                data={breadcrumbLd([
+                    { name: "Features", path: "/#features" },
+                    { name: feature.name, path: featureHref(slug) },
+                ])}
+            />
             <FeatureHero feature={feature} freeLine={freePlanLine(catalog)} />
             <FeatureSteps feature={feature} help={help} />
-            <FeaturePoints feature={feature} />
+            <FeaturePoints feature={feature} mode={LAUNCH_MODE} />
             <FeatureWorksWith feature={feature} />
             <FeatureUsedBy feature={feature} />
             <CtaBand

@@ -1,6 +1,11 @@
 /**
- * The three solution pages, from the Solutions template's `S` and `SUB` data
- * blocks, the Nav's `SOLUTIONS` lines and Home's `kinds` cards.
+ * The four solution pages: three from the Solutions template's `S` and `SUB`
+ * data blocks, the Nav's `SOLUTIONS` lines and Home's `kinds` cards, and
+ * Salons, written in the same shape on 12 Oct 2026.
+ *
+ * Each page's `phrase`, `seoTitle` and `seoDescription` are what it says to
+ * a search engine (`SearchWords`, `types.ts`): "software for ‹trade›", which
+ * the feature pages leave to these. Its `sub` opens with the phrase.
  *
  * Changes from the design's words: "storefront" reads "location"
  * (saroh-product.md), captions name no amounts, claims the product can't
@@ -21,6 +26,10 @@ import { SOLUTION_SLUGS } from "./types";
 export const solutions: Record<SolutionSlug, Solution> = {
     shops: {
         slug: "shops",
+        phrase: "billing and stock software for shops",
+        seoTitle: "Billing and stock software for shops and bakeries",
+        seoDescription:
+            "Billing and stock software for shops and bakeries: counter orders, stock for each location and GST invoices in one place.",
         name: "Shops",
         navLine: "Sell at the counter and online",
         longName: "Shops and bakeries",
@@ -32,7 +41,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
             link: "See Saroh for shops",
         },
         headline: "Sell at the counter and online, from one place.",
-        sub: "For bakeries, cafés, boutiques and anyone with shelves to fill. Your site, your orders, your stock and your bills stay in step, so nothing gets lost between the chat, the notebook and the till.",
+        sub: "Billing and stock software for shops, bakeries, cafés, boutiques and anyone with shelves to fill. Your site, your orders, your stock and your bills stay in step, so nothing gets lost between the chat, the notebook and the till.",
         hero: {
             shot: "p-site",
         },
@@ -99,8 +108,110 @@ export const solutions: Record<SolutionSlug, Solution> = {
         faq: "shops-counter-online",
         closer: "Open tomorrow knowing what to bake.",
     },
+    /*
+     * Salons (12 Oct 2026): a core booking trade with no page until now.
+     * Written in the Solutions template's shape, with no screenshot: no
+     * salon has been captured, and a clinic's or a gym's screen beside a
+     * salon's words would show the wrong trade. The page opens on its words,
+     * and each segment is words alone, until salon shots exist
+     * (`e2e/marketing-shots/shots.config.ts`).
+     *
+     * It says only what a business can do today (claims ledger §16, SA
+     * rows). Left out because nothing backs them: reminders before a
+     * booking (none exists on any channel), memberships that pay for
+     * one-to-one services (a membership pays for classes only; a pack of
+     * sessions is what a salon sells), and a client moving or cancelling
+     * their own booking or buying a pack online (`SITE_ACCOUNT_AREA`).
+     */
+    salons: {
+        slug: "salons",
+        phrase: "salon booking software",
+        seoTitle: "Salon booking software for salons and parlours",
+        seoDescription:
+            "Salon booking software for salons, parlours, barbers and spas: online booking by stylist, deposits, packs of sessions and GST invoices.",
+        name: "Salons",
+        navLine: "Appointments, stylists and deposits",
+        longName: "Salons and parlours",
+        card: {
+            name: "Salons and parlours",
+            body: "Appointments by stylist, deposits at booking, and a site with your services and prices.",
+            day: "Start: see today's appointments, who's with whom and who pays at the desk.",
+            uses: "Bookings · Packs · Billing · Website",
+            link: "See Saroh for salons",
+        },
+        headline: "Appointments, stylists and deposits, in one place.",
+        sub: "Salon booking software for salons, parlours, barbers and spas. Clients book a real free time with the stylist they want, pay a deposit if you ask for one, and your site shows your services and prices.",
+        changeTitle:
+            "The problems every salon knows, and what Saroh does about each.",
+        segments: [
+            {
+                feature: "dashboard",
+                pain: "“I find out who's coming when they walk in.”",
+                title: "Today's appointments, first thing",
+                body: "Who's booked, at what time and with which stylist, and who pays at the desk. An allergy, or anything else the team should know, is beside their name.",
+            },
+            {
+                feature: "bookings",
+                label: "Bookings · Your booking page",
+                pain: "“My evening goes on WhatsApp, finding people a time.”",
+                title: "Clients book themselves, with the stylist they want",
+                body: "Your booking page shows only the times your team is free. A client picks the service, chooses a stylist or Anyone, and can add the booking to their calendar. With your own email provider connected, they get an email when it's booked, moved or cancelled.",
+            },
+            {
+                feature: "bookings",
+                label: "Bookings · Your team",
+                pain: "“Two stylists, different days off, one paper diary.”",
+                title: "Each person's hours and time off",
+                body: "Set when each person works, add time off, and mark the days the whole salon is closed. Say who takes each service, how long it runs and the gap after it, and only those times are offered.",
+            },
+            {
+                feature: "bookings",
+                label: "Bookings · Deposits",
+                pain: "“People book a Saturday afternoon and don't turn up.”",
+                title: "Take a deposit when they book",
+                body: "Ask for nothing, a quarter, half or the full price at booking, paid into your own Razorpay or Cashfree account. Mark who came and who didn't, and no-shows are counted on the client's page.",
+            },
+            {
+                feature: "bookings",
+                label: "Bookings · Packs of sessions",
+                pain: "“Regulars ask for a package, and I keep count on paper.”",
+                title: "Sell a pack of sessions",
+                body: "Five blow-dries or ten sessions at one price, sold at the desk. A credit comes off when the client books, on your booking page or with your team, and goes back if they cancel in time. You set how long a pack lasts.",
+            },
+            {
+                feature: "customers",
+                pain: "“She told me about the allergy last time, and I forgot.”",
+                title: "Know every client before they sit down",
+                body: "Their visits, what they've spent, their no-shows and your team's notes on one page. Allergies show on their bookings and on today's list.",
+            },
+            {
+                feature: "billing",
+                pain: "“A client asks for a GST bill, and I write it by hand.”",
+                title: "An invoice for every payment",
+                body: "A deposit paid online and a payment you take at the desk each get a numbered invoice. Give each service its GST rate and SAC code once, and with your GSTIN in Settings they are tax invoices.",
+            },
+            {
+                feature: "website",
+                pain: "“My price list is a photo on Instagram, and it's always out of date.”",
+                title: "A site with your services and prices",
+                body: "Your site lists each service with how long it takes and its price, read from the same list clients book from, so a new price shows without touching the page. Your opening hours and how to reach you are read the same way.",
+            },
+        ],
+        pricing: {
+            title: "Pricing for salons",
+            featured: "grow",
+            fit: "For a salon, that means deposits at booking, packs of sessions and GST invoices.",
+            second: "free",
+        },
+        faq: "salons-choose-stylist",
+        closer: "Know tomorrow's bookings before you open.",
+    },
     gyms: {
         slug: "gyms",
+        phrase: "gym and yoga studio management software",
+        seoTitle: "Gym and yoga studio management software",
+        seoDescription:
+            "Gym and yoga studio management software: class bookings with places, class packs, memberships that renew and an invoice for each payment.",
         name: "Gyms & studios",
         navLine: "Classes, memberships and class packs",
         longName: "Gyms and studios",
@@ -112,7 +223,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
             link: "See Saroh for gyms",
         },
         headline: "Classes, members and payments, without the paper diary.",
-        sub: "For gyms, yoga and dance studios, and personal trainers. Members book on your site, packs and memberships count themselves down, and memberships can renew on their own by UPI Autopay.",
+        sub: "Gym and yoga studio management software, for dance studios and personal trainers too. Members book on your site, packs and memberships count themselves down, and memberships can renew on their own by UPI Autopay.",
         hero: {
             shot: "g-site",
         },
@@ -184,6 +295,10 @@ export const solutions: Record<SolutionSlug, Solution> = {
     },
     clinics: {
         slug: "clinics",
+        phrase: "clinic appointment and patient booking software",
+        seoTitle: "Clinic appointment and patient booking software",
+        seoDescription:
+            "Clinic appointment and patient booking software: online booking, treatments over several visits and medical notes for the right people only.",
         name: "Clinics",
         navLine: "Appointments, treatments and patient notes",
         longName: "Clinics",
@@ -195,7 +310,7 @@ export const solutions: Record<SolutionSlug, Solution> = {
             link: "See Saroh for clinics",
         },
         headline: "Appointments, treatments and patient notes, kept straight.",
-        sub: "For dental, physio, skin and dietician practices. Patients book online and tell you what you need to know, treatments run over several visits, and medical notes are seen only by those who should.",
+        sub: "Clinic appointment and patient booking software for dental, physio, skin and dietician practices. Patients book online and tell you what you need to know, treatments run over several visits, and medical notes are seen only by those who should.",
         hero: {
             shot: "d-site",
         },

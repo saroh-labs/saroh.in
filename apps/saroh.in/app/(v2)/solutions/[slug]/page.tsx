@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Container } from "@/components/v2/container";
 import { CtaBand } from "@/components/v2/cta-band";
 import { Faq } from "@/components/v2/faq";
+import { JsonLd } from "@/components/v2/json-ld";
 import { SectionHeading } from "@/components/v2/section-heading";
 import { SolutionHero } from "@/components/v2/solution/solution-hero";
 import { SolutionPricing } from "@/components/v2/solution/solution-pricing";
@@ -24,13 +25,16 @@ import {
     solutionPlanTeasers,
 } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, pageTitle } from "@/lib/seo";
+import { breadcrumbLd } from "@/lib/structured-data";
 
 /**
- * `/solutions/shops`, `/solutions/gyms`, `/solutions/clinics` (plan U23): ONE
- * template, the Solutions design, fed by `content/solutions.ts`. Any other
+ * `/solutions/shops`, `/solutions/salons`, `/solutions/gyms`,
+ * `/solutions/clinics` (plan U23): ONE template, the Solutions design, fed
+ * by `content/solutions.ts`. Any other
  * slug is a 404. Prices and the free-plan line come from the published
- * pricing catalogue, refreshed every five minutes and on publish (KTD-10).
+ * pricing catalogue, read when the site is built (a publish starts a build,
+ * KTD-10), and only once the launch switch is open (DEC-136).
  */
 export const dynamicParams = false;
 
@@ -46,10 +50,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
     if (!isSolutionSlug(slug)) return {};
     const s = solutions[slug];
-    const title = `Saroh for ${s.longName.toLowerCase()}`;
+    // The search title leads with the trade's software; the share card
+    // keeps "Saroh for ‹trade›".
     return pageMetadata({
-        title,
-        description: s.sub,
+        title: pageTitle(s.seoTitle),
+        socialTitle: `Saroh for ${s.longName.toLowerCase()}`,
+        description: s.seoDescription,
         path: solutionHref(slug),
     });
 }
@@ -65,6 +71,13 @@ export default async function SolutionPage({ params }: Props) {
 
     return (
         <>
+            {/* The trail the hero draws: Solutions / {name}. */}
+            <JsonLd
+                data={breadcrumbLd([
+                    { name: "Solutions", path: "/#solutions" },
+                    { name: s.name, path: solutionHref(slug) },
+                ])}
+            />
             <SolutionHero solution={s} freeLine={freePlanLine(catalog)} />
 
             <Container as="section" aria-labelledby="changes-title">
@@ -74,10 +87,19 @@ export default async function SolutionPage({ params }: Props) {
                     title={s.changeTitle}
                     className="pt-[120px]"
                 />
-                <div className="grid gap-24 pt-16">
+                {/* With screens, one problem to a row beside its screen.
+                    With none captured for the trade yet, two columns of
+                    words: a row each would be mostly empty. */}
+                <div
+                    className={
+                        segments.some((seg) => seg.shot)
+                            ? "grid gap-24 pt-16"
+                            : "grid gap-x-14 gap-y-16 pt-16 md:grid-cols-2"
+                    }
+                >
                     {segments.map((seg, i) => (
                         <SolutionSegment
-                            key={seg.shot}
+                            key={seg.title}
                             segment={seg}
                             reverse={i % 2 === 1}
                         />

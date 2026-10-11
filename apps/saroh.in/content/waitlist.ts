@@ -95,6 +95,18 @@ export const WAITLIST: WaitlistContent = {
     offer: null,
 };
 
+/**
+ * What the page says to a search engine, and its own h1 (12 Oct 2026). The
+ * acronym line under it is Home's h1; two pages with one h1 read as one
+ * page, so here it is a display line and the h1 says what this page is.
+ */
+export const WAITLIST_PAGE = {
+    h1: "Early access to Saroh, for small businesses in India",
+    seoTitle: "Join the waitlist for early access · Saroh",
+    seoDescription:
+        "Join the waitlist for Saroh, small business software for India, and get one email with your invite when early access opens.",
+} as const;
+
 /** The card's lead and the line under it while no offer is announced. */
 export const NO_OFFER = {
     headline: "early access",
