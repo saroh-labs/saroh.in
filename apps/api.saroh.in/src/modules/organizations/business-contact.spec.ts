@@ -1,5 +1,5 @@
 /**
- * How to reach a business, as its website shows it (DEC-125): only what is
+ * How to reach a business, as its website shows it (DEC-128): only what is
  * set, the address where customers come and never an online-only location's
  * or (unless chosen) the registered one, and only the caller's business.
  * DB-free.

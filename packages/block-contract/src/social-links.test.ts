@@ -90,7 +90,7 @@ const KEPT: Record<SocialNetwork, [string, string][]> = {
     ],
 };
 
-describe("normaliseSocialLink (DEC-125)", () => {
+describe("normaliseSocialLink (DEC-128)", () => {
     it.each(SOCIAL_NETWORKS)(
         "%s: a handle and a link become one address on its own host",
         (network) => {
@@ -278,7 +278,7 @@ describe("socialLinkItems and socialLinksSummary", () => {
     });
 });
 
-describe("normaliseMapLink (DEC-125)", () => {
+describe("normaliseMapLink (DEC-128)", () => {
     const map = (raw: string) => {
         const check = normaliseMapLink(raw);
         return check.ok ? check.url : null;

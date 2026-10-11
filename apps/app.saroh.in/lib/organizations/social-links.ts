@@ -9,7 +9,7 @@ import {
 import { phoneLabel } from "./business-phone";
 
 /**
- * The business's social links in the workspace (DEC-125): what the "Social
+ * The business's social links in the workspace (DEC-128): what the "Social
  * links" row says, what its sheet starts from, what it says under a field
  * as the merchant types, and the patch a Save sends. The rules themselves
  * are `@saroh/block-contract`'s, which the API judges by, so a field never

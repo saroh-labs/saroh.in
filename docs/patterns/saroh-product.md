@@ -14,7 +14,7 @@ pattern files refer back here.
 - **Current** (DEC-070) — **Three kinds of people**: **a business** (shop,
   studio, practice), **Just me** (freelancer, consultant, creator) and **a
   site for my work** (portfolio, blog, projects). Setup asks "What are you
-  setting up?" as a small choice with "A business" chosen (DEC-127), and stores the answer as
+  setting up?" as a small choice with "A business" chosen (DEC-130), and stores the answer as
   `Organization.kind` (`BUSINESS`, `SOLO`, `WORK`; every business set up
   before it is `BUSINESS`). Whoever holds `org:update` (Owner and Admin)
   changes it at the top of Settings › Business › Identity, with Undo.
@@ -47,9 +47,9 @@ pattern files refer back here.
     client" turns nothing on: it opens a new invoice, for someone with
     `invoice:write`, until the business has one.
 
-- **Current** (DEC-127, 10 Oct 2026) — **The first run is three steps on
+- **Current** (DEC-130, 10 Oct 2026) — **The first run is three steps on
   two screens, and it ends in the product.** Sign-up takes an email and a
-  code (DEC-126). Setup is one screen
+  code (DEC-129). Setup is one screen
   (`components/organizations/business-setup-form.tsx`): your name if the
   account has none, the name, the web address, the country (India), and
   "What will you do first?". Create turns that goal on with its defaults,
@@ -58,15 +58,15 @@ pattern files refer back here.
   contact open. Setup never asks whether it is a registered company: the
   Finish setup step "Choose your business type" does. It says "Steps 2 and
   3 of 3", never "Last step".
-- **Current** (DEC-127) — **One list of goals, in one set of words**:
+- **Current** (DEC-130) — **One list of goals, in one set of words**:
   `lib/modules/goals.ts` ("Sell things", "Take bookings", "Put up a
   website", "Keep track of people", and a kind's own for the last). Setup,
   Home's first run and the module picker read it, and `goalHref` is each
   goal's one destination. Never word the choice again on a new screen.
-- **Current** (DEC-127) — **The web address is asked once**, at setup. The
+- **Current** (DEC-130) — **The web address is asked once**, at setup. The
   Turn on sheet says it as a line when Website is turned on later, and
   turns it back into a field only when the API refuses it.
-- **Current** (DEC-127) — **A new business gets one email from Saroh**:
+- **Current** (DEC-130) — **A new business gets one email from Saroh**:
   "{Business} is set up on Saroh", the next step for the goal chosen, and
   "Open {Business}" (`apps/api.saroh.in/src/common/email-welcome.ts`).
   Onboarding sends it, once, to the person who set the business up. Never
@@ -379,7 +379,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   `robots.txt`), only after consent unless cookieless, and customer-data forms
   carry `NO_CAPTURE_ATTRS`/`NO_CAPTURE_CLASS` (`site-blocks/consent-events.ts`).
   A new form that takes a customer's details carries them too.
-- **Current** (DEC-125) — **How to reach the business is read live, and is
+- **Current** (DEC-128) — **How to reach the business is read live, and is
   the business's, not the site's.** The footer's phone, contact email,
   address and social links come from `GET /public/sites/:siteId/contact`
   (`organizations/business-contact.ts`, an allow-list), so a save shows with

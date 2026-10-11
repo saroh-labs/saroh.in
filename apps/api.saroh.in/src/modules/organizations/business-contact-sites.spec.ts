@@ -1,6 +1,6 @@
 /**
  * The business's phone, contact email, social links and the address its
- * site shows are read live by the public contact read (DEC-125). So a save
+ * site shows are read live by the public contact read (DEC-128). So a save
  * of any of them tells the merchant sites' page cache (#863), or a kept
  * page carries the old footer until its five minutes are up. DB-free.
  */

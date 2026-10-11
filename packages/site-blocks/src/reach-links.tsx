@@ -10,7 +10,7 @@ import { cn } from "./lib/utils";
  *
  * Wherever a page used to say "get in touch with ‹Business›" and stop (no
  * time free, a hold that ran out, a pay page with a question), these are
- * the links. They come from the public contact read (DEC-125), the one the
+ * the links. They come from the public contact read (DEC-128), the one the
  * footer shows, so a number is never offered here that the business took
  * off its site. Nothing set draws nothing: the sentence stands alone, as
  * it did.

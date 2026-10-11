@@ -231,7 +231,7 @@ export default async function SiteLayout({
         siteId ? getCheckoutOptions(siteId) : null,
         // The footer's contact group: the business's public phone and
         // contact email, where customers come and its social links
-        // (UX-038, DEC-101, DEC-125), read live.
+        // (UX-038, DEC-101, DEC-128), read live.
         siteId ? getSiteContact(siteId) : null,
         // On Free, the Saroh credit (DEC-102).
         siteId ? getFooterFacts(siteId) : null,

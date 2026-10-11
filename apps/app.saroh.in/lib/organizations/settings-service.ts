@@ -136,18 +136,18 @@ export interface OrganizationSettings {
      */
     payInstructions?: PayInstructionsSettings;
     /**
-     * The business's social links (DEC-125): one address per network that
+     * The business's social links (DEC-128): one address per network that
      * is set, on that network's own host. Absent from an older API: none.
      */
     socialLinks?: SocialLinks;
     /**
      * Its website shows the registered address as where to find it
-     * (DEC-125), while no location customers visit has one. Absent from an
+     * (DEC-128), while no location customers visit has one. Absent from an
      * older API: no.
      */
     siteShowsRegisteredAddress?: boolean;
     /**
-     * The registered address's place on Google Maps (DEC-125), which Get
+     * The registered address's place on Google Maps (DEC-128), which Get
      * directions opens while the website shows that address. Absent from
      * an older API: none.
      */
@@ -155,7 +155,7 @@ export interface OrganizationSettings {
 }
 
 /**
- * What the business's website shows of how to reach it (DEC-125): the same
+ * What the business's website shows of how to reach it (DEC-128): the same
  * read the site's footer draws, so a row here never says something the
  * site doesn't.
  */
@@ -218,11 +218,11 @@ export interface OrganizationSettingsInput {
     /** How to pay us (R32): only the fields changed; "" clears one. */
     payInstructions?: Partial<PayValues>;
     /**
-     * Social links (DEC-125): only the networks changed, each a handle or a
+     * Social links (DEC-128): only the networks changed, each a handle or a
      * link as typed; "" clears one.
      */
     socialLinks?: Partial<Record<SocialNetwork, string>>;
-    /** Show the registered address on the website (DEC-125). */
+    /** Show the registered address on the website (DEC-128). */
     siteShowsRegisteredAddress?: boolean;
     /** Its Google Maps link, as typed; "" clears it. */
     registeredAddressMapUrl?: string;
@@ -268,7 +268,7 @@ export async function readOrganizationSettings(): Promise<
 }
 
 /**
- * What the business's website shows of how to reach it (DEC-125), for the
+ * What the business's website shows of how to reach it (DEC-128), for the
  * "Contact and social" rows of Website settings. A read that fails is
  * `null`, which the rows say as "couldn't be loaded", never as "none set".
  */

@@ -68,7 +68,7 @@ export function SiteSettings({
     canEditLocations?: boolean;
     site: SiteDetail;
     /**
-     * What the website shows of how to reach the business (DEC-125); null
+     * What the website shows of how to reach the business (DEC-128); null
      * when it couldn't be read.
      */
     contact?: SiteContactView | null;

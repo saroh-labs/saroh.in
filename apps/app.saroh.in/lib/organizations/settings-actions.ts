@@ -43,7 +43,7 @@ export async function saveOrganizationSettings(
     if (result.ok) {
         revalidatePath("/settings/organization");
         // Website settings shows what the site says of how to reach the
-        // business (DEC-125): the phone, the email, the social links.
+        // business (DEC-128): the phone, the email, the social links.
         if (
             input.socialLinks !== undefined ||
             input.siteShowsRegisteredAddress !== undefined ||

@@ -25,7 +25,7 @@ const input = (contact: Partial<PublicContact>) => ({
     contact: { ...NONE, ...contact },
 });
 
-describe("businessJsonLd (DEC-125)", () => {
+describe("businessJsonLd (DEC-128)", () => {
     it("says nothing when nothing is set", () => {
         expect(businessJsonLd(input({}))).toBeNull();
         expect(businessJsonLdScript(input({}))).toBeNull();

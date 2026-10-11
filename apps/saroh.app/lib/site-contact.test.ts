@@ -30,7 +30,7 @@ afterEach(() => {
     globalThis.fetch = realFetch;
 });
 
-describe("getSiteContact (DEC-125)", () => {
+describe("getSiteContact (DEC-128)", () => {
     it("reads the site's public contact, keeping only what may be drawn", async () => {
         answer(
             Response.json({

@@ -9,7 +9,7 @@ import { socialLinksRead } from "./business-social";
 import { mapLinkRead } from "./map-link";
 
 /**
- * How to reach a business, as its website shows it (DEC-125): the one read
+ * How to reach a business, as its website shows it (DEC-128): the one read
  * behind the site's footer, its structured data and the workspace's
  * "Contact and social" rows, so none of them can disagree.
  *

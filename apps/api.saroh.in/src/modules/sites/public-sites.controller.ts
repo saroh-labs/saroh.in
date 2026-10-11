@@ -226,7 +226,7 @@ export class PublicSitesController {
     }
 
     /**
-     * How to reach the site's business (DEC-125): its public phone, contact
+     * How to reach the site's business (DEC-128): its public phone, contact
      * email, where customers come and its social links. What the footer
      * and the home page's structured data show, and what a pay or booking
      * page can offer as "get in touch". Read live, never cached, so a

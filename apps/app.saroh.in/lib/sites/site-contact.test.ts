@@ -23,7 +23,7 @@ const contact = (places: SiteContact["places"]): SiteContact => ({
     social: [],
 });
 
-describe("the Address row (DEC-125)", () => {
+describe("the Address row (DEC-128)", () => {
     it("is one place's address on a line, unnamed", () => {
         expect(
             addressRowLines([place("Indiranagar", "12th Main\n Bengaluru ")]),

@@ -1,7 +1,7 @@
 import { mapLinkOrNull, normaliseMapLink } from "@saroh/block-contract";
 
 /**
- * An address's place on Google Maps (DEC-125): what "Get directions" opens
+ * An address's place on Google Maps (DEC-128): what "Get directions" opens
  * on the business's website. Kept beside the address it is the map of, a
  * location's (`StoreSettings.mapUrl`) or the registered one
  * (`BusinessProfile.registeredAddressMapUrl`). It is not a social link.

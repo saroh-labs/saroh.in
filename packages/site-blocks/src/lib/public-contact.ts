@@ -9,7 +9,7 @@ import type { OpeningHoursDay } from "./opening-hours";
 import { isOpeningWeek } from "./opening-hours";
 
 /**
- * The public contact read's shape (DEC-125) and its check: how to reach a
+ * The public contact read's shape (DEC-128) and its check: how to reach a
  * business, as its website shows it.
  *
  *   GET ${apiUrl}/public/sites/:siteId/contact

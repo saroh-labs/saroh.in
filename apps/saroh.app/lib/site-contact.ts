@@ -11,7 +11,7 @@ import { relayFor, SITE_RELAY_HEADER } from "./site-relay";
 const API_URL = serverApiUrl();
 
 /**
- * How to reach the site's business (DEC-125): its public phone, contact
+ * How to reach the site's business (DEC-128): its public phone, contact
  * email, where customers come and its social links, for the footer on
  * every page and the home page's structured data.
  *

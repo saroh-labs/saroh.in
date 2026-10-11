@@ -45,7 +45,7 @@ export const CONTACT_SHEETS = [
 ] as const satisfies readonly SettingsSheet[];
 
 /**
- * Contact and social (DEC-125): what the website shows of how to reach the
+ * Contact and social (DEC-128): what the website shows of how to reach the
  * business — its phone, its email, where customers come and its social
  * links — each a row saying what the site shows, read from the same read
  * the site's footer draws.

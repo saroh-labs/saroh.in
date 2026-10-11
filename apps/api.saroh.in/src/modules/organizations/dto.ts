@@ -365,7 +365,7 @@ const SocialLink = () => (target: object, key: string) => {
 };
 
 /**
- * The business's social links (DEC-125): for each network a handle
+ * The business's social links (DEC-128): for each network a handle
  * ("@rye") or a pasted link, "" to clear it; a network left out stays as it
  * is. Only the fixed list below is taken (the pipe refuses any other key),
  * and each value is rebuilt into one canonical address on the network's own
@@ -426,7 +426,7 @@ export class UpdateOrganizationDto {
     })
     kind?: OrganizationKind;
 
-    /** The business's social links (DEC-125), a field per network. */
+    /** The business's social links (DEC-128), a field per network. */
     @IsOptional()
     @ValidateNested()
     @Type(() => SocialLinksDto)
@@ -434,7 +434,7 @@ export class UpdateOrganizationDto {
 
     /**
      * Its website shows the registered address as where to find it
-     * (DEC-125), while no location customers visit has one. Absent, it is
+     * (DEC-128), while no location customers visit has one. Absent, it is
      * left as it is.
      */
     @IsOptional()
@@ -442,7 +442,7 @@ export class UpdateOrganizationDto {
     siteShowsRegisteredAddress?: boolean;
 
     /**
-     * The registered address's place on Google Maps (DEC-125): what "Get
+     * The registered address's place on Google Maps (DEC-128): what "Get
      * directions" opens while the website shows that address. "" clears
      * it. Only Google's own map links are kept; the settings save checks
      * it and names the field (`map-link.ts`).

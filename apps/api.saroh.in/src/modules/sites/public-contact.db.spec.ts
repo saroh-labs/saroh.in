@@ -1,6 +1,6 @@
 /**
  * A business's contact details and social links against a real Postgres
- * (DEC-125): set in Settings, they are what the site's public contact read
+ * (DEC-128): set in Settings, they are what the site's public contact read
  * gives on the very next read, with no publish, and clearing takes them off.
  * The address is where customers come: a location with no counter never
  * shows its own, and the registered address only when the owner chose it.
@@ -32,14 +32,14 @@ const uniq = (label: string) => `${label}${process.pid}x${++seq}`;
 /** A business with a site. */
 async function business(name: string) {
     const org = await prisma.organization.create({
-        data: { name, slug: uniq("dec125-org-") },
+        data: { name, slug: uniq("dec128-org-") },
     });
     const site = await prisma.site.create({
         data: {
             organizationId: org.id,
             name,
-            slug: uniq("dec125-site-"),
-            subdomain: uniq("dec125"),
+            slug: uniq("dec128-site-"),
+            subdomain: uniq("dec128"),
         },
     });
     const ctx: OrganizationContext = {
@@ -59,7 +59,7 @@ function location(
     return prisma.store.create({
         data: {
             name,
-            slug: uniq("dec125-store-"),
+            slug: uniq("dec128-store-"),
             organizationId,
             settings: { create: { kind, address } },
         },

@@ -2,7 +2,7 @@ import type { SocialNetwork } from "@saroh/block-contract";
 import { SOCIAL_LABELS } from "@saroh/block-contract";
 
 /**
- * The marks of a business's social links (DEC-125), for a merchant's page.
+ * The marks of a business's social links (DEC-128), for a merchant's page.
  *
  * Inline line drawings in `currentColor`, so each takes the colour of the
  * text it sits in: the site's own footer or page colours (`--site-*`),

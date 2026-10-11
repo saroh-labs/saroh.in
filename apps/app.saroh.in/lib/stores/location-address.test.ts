@@ -13,7 +13,7 @@ const SAVED = {
     mapUrl: "https://maps.app.goo.gl/AbC123xyZ",
 };
 
-describe("a location's address and Google Maps link (DEC-125)", () => {
+describe("a location's address and Google Maps link (DEC-128)", () => {
     it("starts from what is saved, the link without its https", () => {
         expect(addressDraftOf(SAVED)).toEqual({
             address: "12 Hill Road\nBandra",

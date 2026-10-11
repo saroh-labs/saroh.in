@@ -18,7 +18,7 @@ import { env } from "../../env";
  *    trackers or codes saved, Saroh switching a site's trackers off or on,
  *    the business logo set or removed (it is the icon of a site with none
  *    of its own, DEC-124), and the business's phone, contact email, social
- *    links or the address its site shows saved (read live, DEC-125).
+ *    links or the address its site shows saved (read live, DEC-128).
  *  - **products** (`productIds`, `stockLevelIds`): every stock flow and
  *    every change to how a product counts takes the product or shelf locks
  *    (`products/stock-levels.ts`, the lock order), so that is where a stock
@@ -84,7 +84,7 @@ export async function enqueuePageRevalidation(
 
 /**
  * Queue every page of a business's published sites: what a change to how
- * the business is reached needs (DEC-125), since its footer is on all of
+ * the business is reached needs (DEC-128), since its footer is on all of
  * them. With the cache off nothing is read; with no live site nothing is
  * queued.
  */

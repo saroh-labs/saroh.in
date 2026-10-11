@@ -48,7 +48,7 @@ export default async function SiteSettingsPage({
     const [site, webAddress, contact, settings] = await Promise.all([
         getSite(siteId),
         readWebAddressLinks(),
-        // What the website shows of how to reach the business (DEC-125),
+        // What the website shows of how to reach the business (DEC-128),
         // and the business's own settings for someone who may change them
         // (owner or admin): the Contact and social rows then edit in
         // place. Anyone else reads the rows.

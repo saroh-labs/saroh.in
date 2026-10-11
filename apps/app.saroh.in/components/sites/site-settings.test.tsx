@@ -22,7 +22,7 @@ vi.mock("@/lib/sites/actions", () => ({
 vi.mock("@/lib/stores/storefront-actions", () => ({
     updateStorefront: vi.fn(),
 }));
-// The business's own sheets open from Contact and social (DEC-125).
+// The business's own sheets open from Contact and social (DEC-128).
 vi.mock("@/lib/organizations/settings-actions", () => ({
     saveOrganizationSettings: vi.fn(),
 }));

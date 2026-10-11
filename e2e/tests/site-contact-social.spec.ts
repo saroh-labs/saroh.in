@@ -8,7 +8,7 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
  * A business's contact details and social links, from Website settings to
- * the foot of its site (DEC-125).
+ * the foot of its site (DEC-128).
  *
  * The owner adds an Instagram link and a phone in Website › Settings ›
  * Contact and social, each in its own sheet, without leaving that screen.
@@ -52,7 +52,7 @@ async function footerOf(site: Page) {
 }
 
 test.describe(
-    "contact details and social links on a site (DEC-125)",
+    "contact details and social links on a site (DEC-128)",
     { tag: "@serial" },
     () => {
         test("set in Website settings, shown in the footer at once, and gone when cleared", async ({

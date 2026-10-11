@@ -69,7 +69,7 @@ export interface StorefrontSettings extends StorefrontSummary {
     stock?: { onHand: number; promised: number };
     address: string | null;
     /**
-     * Its place on Google Maps (DEC-125), which Get directions opens on
+     * Its place on Google Maps (DEC-128), which Get directions opens on
      * the website; null when none is set. Absent from an older API.
      */
     mapUrl?: string | null;
@@ -276,7 +276,7 @@ export async function listVisitPlaces(): Promise<VisitPlacesRead> {
     }
 }
 
-/** A location customers visit, with where it is (DEC-125). */
+/** A location customers visit, with where it is (DEC-128). */
 export interface VisitedLocation {
     id: string;
     name: string;

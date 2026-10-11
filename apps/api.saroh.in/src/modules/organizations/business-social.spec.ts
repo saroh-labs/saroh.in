@@ -1,5 +1,5 @@
 /**
- * A business's social links as the settings save writes them (DEC-125):
+ * A business's social links as the settings save writes them (DEC-128):
  * each network set, replaced and cleared on its own, a handle and a link
  * kept as one canonical address on the network's own host, and anything
  * else refused on its field. DB-free.

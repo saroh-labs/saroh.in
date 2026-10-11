@@ -280,7 +280,7 @@ what the API allows.
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so
   no role→action map can express it.
-- **Current** (DEC-128, 10 Oct 2026) — **Anyone in a business can leave it.**
+- **Current** (DEC-131, 10 Oct 2026) — **Anyone in a business can leave it.**
   `POST organizations/:id/leave` (`OrganizationMembersService.leave`) asks
   no permission, only membership, which `OrganizationGuard` has proven: the
   membership removed is the caller's own, in the context's organization,
@@ -292,7 +292,7 @@ what the API allows.
   the check repeated inside the transaction. It is a wind-down write, so a
   closing business lets its people go. `remove` still asks `member:remove`.
   `organization-leave.db.spec.ts`.
-- **Current** (DEC-128) — **Plan and billing follows its two permissions.**
+- **Current** (DEC-131) — **Plan and billing follows its two permissions.**
   The API reads it to `billing:read` and changes it with `billing:manage`
   (Owner and Admin by default; `organization-policy.spec.ts` pins both).
   The app's Settings tab, the page and every plan prompt ask the same two
@@ -320,7 +320,7 @@ what the API allows.
   by Google. `/apps` is for Saroh staff: the page asks the API
   (`GET /admin/me`, `isStaff`), sends everyone else on to the app, and
   nothing links to it.
-- **Current** (DEC-126, 10 Oct 2026) — **A merchant signs up and signs in
+- **Current** (DEC-129, 10 Oct 2026) — **A merchant signs up and signs in
   with an emailed code; a password is optional.** `/signup` takes the email,
   then the code; `/login` leads with "Email me a code" and keeps "Use a
   password instead" (`/login?with=password` opens on it). Both are Better

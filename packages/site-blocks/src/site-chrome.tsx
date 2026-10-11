@@ -100,7 +100,7 @@ export function madeWithSarohHref(referralCode: string): string {
  * `email` is the business's contact email, shown when the business has added
  * one (DEC-101); Settings › Business says the site shows it. Its `places`
  * and `social` are where customers come and the business's social links
- * (DEC-125), from the public contact read; the group is `FooterContact`,
+ * (DEC-128), from the public contact read; the group is `FooterContact`,
  * drawn by both layouts, and nothing is drawn for what isn't set.
  *
  * The link is plain text in the site's own footer colours and type, never

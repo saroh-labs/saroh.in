@@ -17,7 +17,7 @@ const SAVED = {
     pinterest: "https://www.pinterest.com/ryebakery/",
 };
 
-describe("the Social links row (DEC-125)", () => {
+describe("the Social links row (DEC-128)", () => {
     it("names what is linked, in the networks' order", () => {
         expect(socialRowSummary(SAVED)).toBe("Instagram, WhatsApp, Pinterest");
     });

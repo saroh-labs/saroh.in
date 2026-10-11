@@ -462,18 +462,18 @@ model BusinessProfile {
   // no number, and the site shows no Call button rather than an empty one.
   phone String?
 
-  // The business's social links (DEC-125): one canonical https address per
+  // The business's social links (DEC-128): one canonical https address per
   // network it has set, keyed by network ("instagram", "whatsapp", …), each
   // on that network's own host (`@saroh/block-contract` social-links.ts).
   // Written only through the settings save, which rebuilds every value, and
   // re-checked on the way out. Null: none.
   socialLinks                Json?
   // The website shows the registered address above as where to find the
-  // business (DEC-125). Off by default: it is the legal address, often a
+  // business (DEC-128). Off by default: it is the legal address, often a
   // home, and a business with a location customers visit shows that
   // instead. Read only while no such location has an address.
   siteShowsRegisteredAddress Boolean @default(false)
-  // The registered address's place on Google Maps (DEC-125): what "Get
+  // The registered address's place on Google Maps (DEC-128): what "Get
   // directions" opens on the website while that address is the one shown.
   // One canonical address on Google's own map hosts
   // (`@saroh/block-contract` normaliseMapLink). Null: a search for the
@@ -2192,7 +2192,7 @@ model StoreSettings {
   // ONLINE store has none of them.
   kind              String    @default("ONLINE") // SHOP | ONLINE
   address           String?   @db.Text
-  // The location's place on Google Maps (DEC-125): what "Get directions"
+  // The location's place on Google Maps (DEC-128): what "Get directions"
   // opens on the business's website. One canonical address on Google's own
   // map hosts (`@saroh/block-contract` normaliseMapLink). Null: a search
   // for the address.

@@ -1,6 +1,6 @@
 /**
  * An address's Google Maps link as a save writes it and a read serves it
- * (DEC-125): Google's own map pages only, as one address each. DB-free.
+ * (DEC-128): Google's own map pages only, as one address each. DB-free.
  */
 import { mapLinkRead, mapLinkWrite } from "./map-link";
 

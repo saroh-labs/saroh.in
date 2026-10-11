@@ -4,7 +4,7 @@ import { hasContact } from "@saroh/site-blocks";
 import { jsonLdScript } from "./product-json-ld";
 
 /**
- * The home page's structured data about the business (DEC-125): who it is
+ * The home page's structured data about the business (DEC-128): who it is
  * and how to reach it, in the words search engines read. Built only from
  * the public contact read, so it says exactly what the footer shows and
  * nothing more: no account's email, no registered address the owner didn't

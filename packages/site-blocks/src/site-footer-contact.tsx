@@ -9,7 +9,7 @@ import { SocialLinkRow } from "./social-icons";
 
 /**
  * How to reach the business, at the foot of every page (UX-038, DEC-101,
- * DEC-125): its public phone, its contact email, where customers come and
+ * DEC-128): its public phone, its contact email, where customers come and
  * its social links. Every value is the business's own, set in Settings and
  * read live, so a change shows without a publish.
  */
@@ -21,7 +21,7 @@ export interface SiteContact {
      */
     address: string | null;
     email?: string | null;
-    /** Where customers come (DEC-125): one place, or each by name. */
+    /** Where customers come (DEC-128): one place, or each by name. */
     places?: readonly SiteContactPlace[];
     /** The business's social links, each a network's own address. */
     social?: readonly { network: SocialNetwork; url: string }[];

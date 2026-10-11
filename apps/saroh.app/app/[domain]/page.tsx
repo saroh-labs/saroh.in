@@ -51,7 +51,7 @@ export default async function SiteHomePage({
     }
 
     // Who the business is and how to reach it, for search engines
-    // (DEC-125): the same live read the footer draws, shared within the
+    // (DEC-128): the same live read the footer draws, shared within the
     // request, and only what is set. Nothing set: no script.
     const jsonLd = resolved.siteId
         ? businessJsonLdScript({

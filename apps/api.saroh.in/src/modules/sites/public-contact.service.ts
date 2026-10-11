@@ -15,7 +15,7 @@ const READS_PER_WINDOW = 120;
 const READ_WINDOW_MS = 60_000;
 
 /**
- * Serves how to reach a site's business (DEC-125): its public phone,
+ * Serves how to reach a site's business (DEC-128): its public phone,
  * contact email, where customers come and its social links, for the site's
  * footer, its structured data and any page that says "get in touch".
  *

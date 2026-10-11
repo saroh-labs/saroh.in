@@ -15,7 +15,7 @@ import { addressDirectionsHref, shownContact } from "./site-footer-contact";
 import { SocialIcon } from "./social-icons";
 
 /**
- * The footer's contact group and social links (DEC-125): a phone as a
+ * The footer's contact group and social links (DEC-128): a phone as a
  * `tel:` link, an email as `mailto:`, where customers come with directions,
  * and the social links as named icons that open the network and nothing
  * else. Nothing is drawn for what isn't set.
@@ -54,7 +54,7 @@ const footer = (contact: SiteContact | null, layout?: "left") =>
         />,
     );
 
-describe("the footer's contact group (DEC-125)", () => {
+describe("the footer's contact group (DEC-128)", () => {
     it("draws the phone, the email, the place and the social links", () => {
         footer(ALL);
 

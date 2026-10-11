@@ -92,7 +92,7 @@ export interface StorefrontSettings extends StorefrontSummary {
     /** Only a SHOP has these; an ONLINE store keeps them but shows none. */
     address: string | null;
     /**
-     * Its place on Google Maps (DEC-125), which "Get directions" opens on
+     * Its place on Google Maps (DEC-128), which "Get directions" opens on
      * the business's website; null: a search for the address.
      */
     mapUrl: string | null;
@@ -381,7 +381,7 @@ export class StorefrontsService {
             }
         }
 
-        // The location's Google Maps link (DEC-125): Google's own map
+        // The location's Google Maps link (DEC-128): Google's own map
         // pages only, refused on its field otherwise.
         const map = mapLinkWrite(dto.mapUrl);
         if ("problem" in map) {
@@ -533,7 +533,7 @@ export class StorefrontsService {
             }
             // A location's name, address, hours and whether customers
             // visit are what its business's website shows as where to come
-            // (DEC-125), read live: tell the pages the sites keep.
+            // (DEC-128), read live: tell the pages the sites keep.
             if (
                 dto.name !== undefined ||
                 dto.kind !== undefined ||

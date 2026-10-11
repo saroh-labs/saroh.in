@@ -7,7 +7,7 @@ import {
 } from "@saroh/block-contract";
 
 /**
- * A business's social links (DEC-125): its accounts on a fixed list of
+ * A business's social links (DEC-128): its accounts on a fixed list of
  * networks, the same on its website and anywhere else they are shown later.
  *
  * Kept on the business profile as one canonical https address per network,

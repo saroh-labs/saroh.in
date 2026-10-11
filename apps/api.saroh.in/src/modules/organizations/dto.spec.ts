@@ -257,7 +257,7 @@ describe('setup\'s "Is it registered?" (prelaunch)', () => {
     });
 });
 
-describe("social links and the registered address choice (DEC-125)", () => {
+describe("social links and the registered address choice (DEC-128)", () => {
     const pipe = new ValidationPipe(validationPipeOptions);
     const through = (body: unknown) =>
         pipe

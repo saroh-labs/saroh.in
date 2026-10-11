@@ -53,7 +53,7 @@ export function SiteSettingsRead({
     contact = null,
 }: {
     site: SiteDetail;
-    /** What the website shows of how to reach the business (DEC-125). */
+    /** What the website shows of how to reach the business (DEC-128). */
     contact?: SiteContactView | null;
     /** Where the site is reached (`siteAddressOf`); null without an address. */
     address: SiteAddress | null;

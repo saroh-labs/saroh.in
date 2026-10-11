@@ -4,7 +4,7 @@ import type {
 } from "@/lib/organizations/settings-service";
 
 /**
- * The words of Website › Settings › Contact and social (DEC-125): what
+ * The words of Website › Settings › Contact and social (DEC-128): what
  * each row says the website shows of how to reach the business, and what
  * the address sheet says about where that address comes from. Pure.
  */

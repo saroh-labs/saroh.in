@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Website › Settings › Contact and social (DEC-125): rows that say what the
+ * Website › Settings › Contact and social (DEC-128): rows that say what the
  * website shows of how to reach the business, each edited in place in the
  * business's own sheet, with nobody sent to Settings › Business. Read-only
  * for someone who can't change the business, and a read that failed says

@@ -119,17 +119,17 @@ export interface OrganizationSettings {
      */
     payInstructions: PayInstructionsView;
     /**
-     * The business's social links (DEC-125): one canonical address per
+     * The business's social links (DEC-128): one canonical address per
      * network that is set, on that network's own host. Empty: none.
      */
     socialLinks: SocialLinks;
     /**
      * Its website shows the registered address as where to find it
-     * (DEC-125), while no location customers visit has an address.
+     * (DEC-128), while no location customers visit has an address.
      */
     siteShowsRegisteredAddress: boolean;
     /**
-     * The registered address's place on Google Maps (DEC-125), which "Get
+     * The registered address's place on Google Maps (DEC-128), which "Get
      * directions" opens while the website shows that address; null when
      * none is set.
      */
@@ -148,7 +148,7 @@ export interface SiteContactView {
 
 /**
  * The columns whose change alters what a published page shows of the
- * business's contact details (DEC-125), read live by the site.
+ * business's contact details (DEC-128), read live by the site.
  */
 const SITE_CONTACT_COLUMNS: ReadonlySet<string> = new Set([
     "phone",
@@ -433,7 +433,7 @@ export class OrganizationSettingsService {
                   }),
               )
             : {};
-        // Social links (DEC-125): each sent one rebuilt into its canonical
+        // Social links (DEC-128): each sent one rebuilt into its canonical
         // address or refused on its field, over the ones already kept.
         const socialData = dto.socialLinks
             ? socialLinksWrite(
@@ -558,7 +558,7 @@ export class OrganizationSettingsService {
             },
         });
 
-        // The site reads these live (DEC-125): tell the pages it keeps.
+        // The site reads these live (DEC-128): tell the pages it keeps.
         if (changed.some((column) => SITE_CONTACT_COLUMNS.has(column))) {
             await this.contactChangedOnSites(ctx.organizationId);
         }
@@ -666,7 +666,7 @@ export class OrganizationSettingsService {
 
     /**
      * The phone, the contact email, the social links and the address the
-     * site shows are read live by the public contact read (DEC-125), as the
+     * site shows are read live by the public contact read (DEC-128), as the
      * phone always was, so a save needs no publish. The pages the merchant
      * sites keep (#863) carry the old ones in their footer until told.
      * Queued after the write, for the business's published sites.
@@ -688,7 +688,7 @@ export class OrganizationSettingsService {
     }
 
     /**
-     * What the business's website shows of how to reach it (DEC-125): the
+     * What the business's website shows of how to reach it (DEC-128): the
      * public contact read itself, for whoever may read the site in the
      * workspace (`site:read`). Nothing here is private: every value is
      * already on the site.

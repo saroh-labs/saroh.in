@@ -36,7 +36,7 @@ const HOW =
     "Type your name on each one, or paste the link to your page. Leave one empty to show none.";
 
 /**
- * The business's social links, edited in one sheet (DEC-125): a field per
+ * The business's social links, edited in one sheet (DEC-128): a field per
  * network, each with its mark, what it accepts as its placeholder, and
  * under it where the link will open as it is typed ("Opens
  * instagram.com/rye") or what is wrong with it. WhatsApp takes a phone

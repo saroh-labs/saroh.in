@@ -19,7 +19,7 @@ const PROBLEM =
 export const MAP_LINK_FIELD_ID = "storefront-map-link";
 
 /**
- * A location's address and its Google Maps link (DEC-125): the fields of
+ * A location's address and its Google Maps link (DEC-128): the fields of
  * the location's Address sheet, and of the same edit made in place from
  * Website settings. The address with its limit and note; the link with
  * what it accepts as its placeholder and, under it, where Get directions

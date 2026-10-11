@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Settings › Business › Contact › Social links (DEC-125): one row saying
+ * Settings › Business › Contact › Social links (DEC-128): one row saying
  * what is linked, and one sheet with a field per network that says where
  * each link will open as it is typed, refuses anything that isn't that
  * network's own address, and stays open on a refusal. Made-up details only.

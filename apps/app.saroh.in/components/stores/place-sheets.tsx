@@ -222,7 +222,7 @@ export function PlaceKindSheet({
 }
 
 /**
- * Where customers come: the address and its Google Maps link (DEC-125),
+ * Where customers come: the address and its Google Maps link (DEC-128),
  * in the fields Website settings edits in place too
  * (`location-address-fields.tsx`). A link that isn't Google's own is said
  * under its field and holds Save; a refusal from the API is said in the

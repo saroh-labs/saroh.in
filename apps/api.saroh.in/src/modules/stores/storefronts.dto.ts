@@ -162,7 +162,7 @@ export class UpdateStorefrontDto {
     address?: string | null;
 
     /**
-     * The location's place on Google Maps (DEC-125): what "Get directions"
+     * The location's place on Google Maps (DEC-128): what "Get directions"
      * opens on the business's website. `null` or "" clears it. Only
      * Google's own map links are kept; the save checks it and names the
      * field.

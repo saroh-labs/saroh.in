@@ -1,7 +1,7 @@
 import { MAP_LINK_PLACEHOLDER, normaliseMapLink } from "@saroh/block-contract";
 
 /**
- * A location's address and its Google Maps link (DEC-125), as its sheet
+ * A location's address and its Google Maps link (DEC-128), as its sheet
  * edits them: on the location's own screen and, in place, in Website
  * settings. One set of words, checks and patch for both, so the two stay
  * one implementation. Pure; no server code, so a client sheet can use it.

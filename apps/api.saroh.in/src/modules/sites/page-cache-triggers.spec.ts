@@ -105,12 +105,12 @@ const TRIGGERS: [string, RegExp, string][] = [
     [
         "organizations/organization-settings.service.ts",
         /private async contactChangedOnSites[\s\S]*enqueuePageRevalidation\(prisma, \{\s*cause: "contact"/,
-        "a changed phone, email, address or social link stays old in the footer (DEC-125)",
+        "a changed phone, email, address or social link stays old in the footer (DEC-128)",
     ],
     [
         "stores/storefronts.service.ts",
         /enqueueBusinessSitesRevalidation\(\s*tx,\s*organizationId,\s*"contact"/,
-        "a location's changed address or hours stays old in the footer (DEC-125)",
+        "a location's changed address or hours stays old in the footer (DEC-128)",
     ],
     [
         "content/posts.service.ts",

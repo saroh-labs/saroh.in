@@ -46,7 +46,7 @@ const NOTE = "text-pretty text-[12.5px] leading-normal text-muted-foreground";
 const locationEditId = (id: string) => `site-address-location-${id}-edit`;
 
 /**
- * The address the website shows (DEC-125), in its row's sheet, finished
+ * The address the website shows (DEC-128), in its row's sheet, finished
  * here (owner, 10 Oct): nobody is sent to Sell to change an address.
  *
  * The site shows where customers come, so the sheet lists each location

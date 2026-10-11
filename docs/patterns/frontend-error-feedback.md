@@ -350,7 +350,7 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   `LimitReachedCard`. `LimitNoticeBlock` and the plan refusal dialog do it
   themselves. A link that is only sometimes to the plans passes
   `when={isPlanHref(href)}`. Plan and billing opens to `billing:read`
-  (`mayOpenPlan`), the same rule as its Settings tab and the API (DEC-128).
+  (`mayOpenPlan`), the same rule as its Settings tab and the API (DEC-131).
   A setup checklist's plan row is row data: `planRow`
   (`components/settings/ready-rows.tsx`) leaves the button out and puts
   who can after the row's line, and `PlanAsides` wraps its button in

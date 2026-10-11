@@ -99,7 +99,7 @@ export class OrganizationsController {
     }
 
     /**
-     * What the business's website shows of how to reach it (DEC-125): its
+     * What the business's website shows of how to reach it (DEC-128): its
      * public phone, contact email, where customers come and its social
      * links, for the "Contact and social" rows of Website settings. Every
      * value is already public on the site; `site:read`.

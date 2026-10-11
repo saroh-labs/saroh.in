@@ -133,7 +133,7 @@ export type {
     PublicSocialLink,
 } from "./lib/public-contact";
 // A business's social links as icons, and the footer's contact group
-// (DEC-125).
+// (DEC-128).
 export { isPublicVisit } from "./lib/public-visit";
 export type { PublicVisit } from "./lib/public-visit";
 export { addressDirectionsHref, shownContact } from "./site-footer-contact";

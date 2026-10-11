@@ -254,7 +254,7 @@ export function BusinessDetailRows({
                         empty="None outside Saroh"
                     />
                 </Row>
-                {/* One row for every network (DEC-125): what is linked,
+                {/* One row for every network (DEC-128): what is linked,
                     and one sheet with a field for each. */}
                 <Row
                     id={BUSINESS_ROW_ID.social}

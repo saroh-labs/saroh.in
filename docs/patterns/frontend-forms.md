@@ -207,7 +207,7 @@ is done inside its sheet or dialog (the share image and the site icon are
 uploaded there, Add domain shows its DNS records there); an Edit never
 sends the merchant to another page to finish. Where the value belongs to
 another screen, that screen's own sheet opens here: Contact and social
-(DEC-125) opens the business's phone, email and social links sheets
+(DEC-128) opens the business's phone, email and social links sheets
 (`BusinessFieldSheet`, `SocialLinksSheet`) in place, so there is one
 implementation of each, and its Address sheet edits each visited
 location's address inside the open sheet with the location's own fields

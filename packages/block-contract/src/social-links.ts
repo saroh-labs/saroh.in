@@ -1,5 +1,5 @@
 /**
- * A business's social links (DEC-125): its accounts on a fixed list of
+ * A business's social links (DEC-128): its accounts on a fixed list of
  * networks, shown on its website's footer and named to search engines.
  *
  * The one place that says what a merchant may enter, shared by the API
@@ -329,7 +329,7 @@ const NOT_A_MAP_LINK =
     "That isn't a Google Maps link. In Google Maps, press Share and paste the link here.";
 
 /**
- * A place's Google Maps link (DEC-125): what "Get directions" opens for an
+ * A place's Google Maps link (DEC-128): what "Get directions" opens for an
  * address. Not a social link: it belongs to the address it is the map of,
  * a location's or the registered one. The same promise as a social link's:
  * only Google's own map pages are kept, each rebuilt into one canonical
