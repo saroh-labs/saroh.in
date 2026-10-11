@@ -4328,3 +4328,21 @@ it. The late-rule notice uses the `action` slot.
 caller needs its own row, it passes `align="center"`.
 **Check**: `packages/ui/src/components/ui/notice.test.tsx`.
 **Category**: design system · `packages/ui/src/components/ui/notice.tsx`
+
+## A toast took the press meant for a row's menu, on a phone
+
+**Symptom**: `products-list.spec.ts` ("quick look, Stop selling with Undo, and
+Duplicate") failed on the phone project in CI on `development`, both tries:
+the press on the row's "More actions" timed out because a toast "intercepts
+pointer events" (11 Oct 2026). It had passed on the pull request and locally,
+and had been written off as flaky before.
+**Cause**: the test searches down to one row, so on a phone that row sits at
+the foot of the screen, where toasts are drawn. Stop selling and Undo each
+raise one; whether they were still up when the menu was pressed depended on
+how fast the run was.
+**Fix**: the spec waits for the toasts to go before it presses the menu.
+**Rule**: in a browser spec, after an action that raises a toast, wait for
+the toast to go (`[data-sonner-toast]` count 0) before pressing anything
+that can sit under it on a phone. A test that fails "sometimes" has a cause;
+read the call log before calling it flaky.
+**Category**: tests · `docs/patterns/frontend-verification.md`
