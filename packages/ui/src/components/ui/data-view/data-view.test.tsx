@@ -322,7 +322,7 @@ describe("DataView — the one toolbar and the one table", () => {
         expect(headRow?.className.split(" ")).toEqual(
             expect.arrayContaining(["bg-muted", "border-b", "h-10"]),
         );
-        const heads = [...container.querySelectorAll("thead th")];
+        const heads = Array.from(container.querySelectorAll("thead th"));
         for (const th of heads) {
             expect(th.className.split(" ")).toEqual(
                 expect.arrayContaining(["label", "px-[14px]"]),

@@ -41,6 +41,10 @@ export interface ListToolbarProps extends Omit<
     chips?: React.ReactNode;
 }
 
+/** A slot that was given something to draw. */
+const drawn = (node: React.ReactNode) =>
+    node !== null && node !== undefined && node !== false && node !== "";
+
 export function ListToolbar({
     tabs,
     search,
@@ -51,8 +55,8 @@ export function ListToolbar({
     className,
     ...props
 }: ListToolbarProps) {
-    const row = search || filters || end || count;
-    if (!tabs && !row && !chips) return null;
+    const row = [search, filters, end, count].some(drawn);
+    if (!drawn(tabs) && !row && !drawn(chips)) return null;
     return (
         <div
             data-list-toolbar=""

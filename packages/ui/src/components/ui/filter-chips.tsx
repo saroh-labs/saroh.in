@@ -55,9 +55,11 @@ export function ChipCount({ count }: { count: number }) {
     );
 }
 
-/** The row: one line on a phone, wrapping from `sm`. */
-const ROW =
-    "flex min-w-0 items-center gap-1.5 p-1 max-sm:w-max max-sm:flex-nowrap sm:flex-wrap";
+/** A line of chips: one line on a phone, wrapping from `sm`. */
+const LINE =
+    "flex min-w-0 items-center gap-1.5 max-sm:flex-nowrap sm:flex-wrap";
+/** The row inside the scroller, with room for a chip's focus ring. */
+const ROW = `${LINE} p-1 max-sm:w-max`;
 
 export interface FilterChipsProps<V extends string = string> {
     /** The group's accessible name: "Show", "Order status". */
@@ -100,57 +102,67 @@ export function FilterChips<V extends string = string>({
             ) : null}
         </>
     );
+    const group = (className: string) =>
+        links ? (
+            <div role="group" aria-label={label} className={className}>
+                {chips.map((chip) => (
+                    <Link
+                        key={chip.value}
+                        href={chip.href ?? "#"}
+                        scroll={false}
+                        aria-current={chip.value === value ? "true" : undefined}
+                        {...mark(chip)}
+                        className={chipClass(chip.value === value)}
+                    >
+                        {body(chip)}
+                    </Link>
+                ))}
+            </div>
+        ) : (
+            <RadioGroupPrimitive.Root
+                aria-label={label}
+                orientation="horizontal"
+                value={value}
+                onValueChange={(v) => onValueChange?.(v as V)}
+                className={className}
+            >
+                {chips.map((chip) => (
+                    <RadioGroupPrimitive.Item
+                        key={chip.value}
+                        value={chip.value}
+                        {...mark(chip)}
+                        className={chipClass(chip.value === value)}
+                    >
+                        {body(chip)}
+                    </RadioGroupPrimitive.Item>
+                ))}
+            </RadioGroupPrimitive.Root>
+        );
     return (
         <ScrollX
             bare
             label={label}
             data-filter-chips=""
-            // The row's own 4px of room, taken back here, so a chip's focus
-            // ring is not clipped by the scroller.
-            className={cn("-m-1", className)}
+            // The row keeps 4px of room all round, so a chip's focus ring
+            // is not clipped by the scroller. That room is taken back
+            // above, below and on the left, where a box may reach past
+            // its parent without making anything wider. Never on the
+            // right: 4px past a parent that clips is 4px hidden sideways.
+            className={cn("-my-1 -ml-1", className)}
             current={links ? '[aria-current="true"]' : '[aria-checked="true"]'}
             revealKey={value}
         >
-            <div className={ROW}>
-                {links ? (
-                    <div role="group" aria-label={label} className="contents">
-                        {chips.map((chip) => (
-                            <Link
-                                key={chip.value}
-                                href={chip.href ?? "#"}
-                                scroll={false}
-                                aria-current={
-                                    chip.value === value ? "true" : undefined
-                                }
-                                {...mark(chip)}
-                                className={chipClass(chip.value === value)}
-                            >
-                                {body(chip)}
-                            </Link>
-                        ))}
-                    </div>
-                ) : (
-                    <RadioGroupPrimitive.Root
-                        aria-label={label}
-                        orientation="horizontal"
-                        value={value}
-                        onValueChange={(v) => onValueChange?.(v as V)}
-                        className="contents"
-                    >
-                        {chips.map((chip) => (
-                            <RadioGroupPrimitive.Item
-                                key={chip.value}
-                                value={chip.value}
-                                {...mark(chip)}
-                                className={chipClass(chip.value === value)}
-                            >
-                                {body(chip)}
-                            </RadioGroupPrimitive.Item>
-                        ))}
-                    </RadioGroupPrimitive.Root>
-                )}
-                {children}
-            </div>
+            {children ? (
+                // The choice is a real box of its own (never
+                // `display: contents`, which some browsers drop from the
+                // accessibility tree), and the on/off filters follow it.
+                <div className={ROW}>
+                    {group(LINE)}
+                    {children}
+                </div>
+            ) : (
+                group(ROW)
+            )}
         </ScrollX>
     );
 }

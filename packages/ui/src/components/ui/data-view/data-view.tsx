@@ -544,7 +544,7 @@ export function DataView<TRow>({
                             }
                             className={cn(
                                 "wk-item relative flex items-center gap-2 border-b border-border pr-[14px] transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035]",
-                                (href || onRowClick) &&
+                                (href ?? onRowClick) &&
                                     "active:bg-foreground/[0.07]",
                             )}
                         >
@@ -655,9 +655,8 @@ export function DataView<TRow>({
              */}
             <ListToolbar
                 search={
-                    toolbarSearch ? (
-                        toolbarSearch
-                    ) : searchable.length > 0 ? (
+                    toolbarSearch ??
+                    (searchable.length > 0 ? (
                         <ListSearch
                             key={clearNonce}
                             onSearch={setSearch}
@@ -665,7 +664,7 @@ export function DataView<TRow>({
                                 searchPlaceholder ?? `Search ${noun.other}`
                             }
                         />
-                    ) : null
+                    ) : null)
                 }
                 filters={toolbarExtra}
                 end={
