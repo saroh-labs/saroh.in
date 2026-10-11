@@ -5,6 +5,7 @@ import {
     listTemplates,
 } from "@saroh/templates";
 
+import { EARLY_ACCESS_DAY } from "@/content/early-access";
 import type { WaitlistKindId } from "@/content/waitlist";
 
 /**
@@ -441,8 +442,8 @@ export function listWords(words: readonly string[]): string {
     return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 }
 
-/** The day early access opens, in India (the waitlist's invites go out). */
-export const EARLY_ACCESS_DAY = "2026-10-17";
+/** The day early access opens, in India (`content/early-access.ts`). */
+export { EARLY_ACCESS_DAY };
 /** As the copy writes it. */
 const EARLY_ACCESS_SHORT = "17 Oct";
 const LAST_WAITLIST_DAY = "16th";
