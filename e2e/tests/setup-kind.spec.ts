@@ -99,11 +99,14 @@ test.describe("setup is three short steps (DEC-070, DEC-130)", () => {
         ).toHaveCount(0);
         // Asha has businesses already, so this is "Set up another" and
         // counts setup's own three steps (a new account's counts four:
-        // `signup-from-marketing.spec.ts`). Nothing calls it the last step.
+        // `signup-from-marketing.spec.ts`). No eyebrow calls it "Last step"
+        // (the panel's sentence about what the last step opens is fine).
         await expect(
             page.getByText("Set up another · Step 1 of 3", { exact: true }),
         ).toBeVisible();
-        await expect(page.getByText(/last step/i)).toHaveCount(0);
+        await expect(page.getByText("Last step", { exact: true })).toHaveCount(
+            0,
+        );
         await expect(page.getByRole("progressbar")).toHaveAttribute(
             "aria-valuetext",
             "Step 1 of 3",
