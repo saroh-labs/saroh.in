@@ -155,8 +155,8 @@ export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 export { formatAmount } from "./lib/money";
 // A business's public phone as a visitor reads it (DEC-053).
 export { phoneText } from "./lib/phone";
-export { shopFactsLine } from "./lib/shop-facts";
-export type { ShopFactsInput } from "./lib/shop-facts";
+export { shopFactsLine, shopLeadLine } from "./lib/shop-facts";
+export type { ShopFactsInput, ShopLeadInput } from "./lib/shop-facts";
 export { siteImage } from "./lib/site-image";
 export type { ImagePlace, SiteImageProps } from "./lib/site-image";
 export { emailed, reachOrNull, toldText } from "./lib/told";

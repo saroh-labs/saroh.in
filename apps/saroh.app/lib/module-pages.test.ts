@@ -8,7 +8,9 @@ import {
     moduleOff,
     modulePageStatesOf,
     moduleRoute,
+    NOT_FOR_SEARCH,
     pricesPageHref,
+    routeHasNothing,
 } from "./module-pages";
 
 /**
@@ -133,5 +135,28 @@ describe("module pages on the live site (G15)", () => {
         expect(moduleOff(PRICES, { PRICES: "on" })).toBe(false);
         expect(moduleOff(PRICES, null)).toBe(false);
         expect(moduleOff(ABOUT, { PRICES: "off" })).toBe(false);
+    });
+});
+
+describe("a module route with nothing to show (kept out of search)", () => {
+    it("is one whose page is taken off, whatever the built-in read says", () => {
+        expect(routeHasNothing({ draw: "unavailable" }, false)).toBe(true);
+        expect(routeHasNothing({ draw: "unavailable" }, true)).toBe(true);
+    });
+
+    it("is the built-in listing only while it has nothing", () => {
+        expect(routeHasNothing({ draw: "builtin" }, true)).toBe(true);
+        expect(routeHasNothing({ draw: "builtin" }, false)).toBe(false);
+    });
+
+    it("is never a published module page: that is the merchant's own", () => {
+        expect(routeHasNothing({ draw: "page" }, true)).toBe(false);
+        expect(routeHasNothing({ draw: "page" }, false)).toBe(false);
+    });
+
+    it("keeps links followed, so the way home still counts", () => {
+        expect(NOT_FOR_SEARCH).toEqual({
+            robots: { index: false, follow: true },
+        });
     });
 });

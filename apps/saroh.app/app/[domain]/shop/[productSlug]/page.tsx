@@ -7,11 +7,13 @@ import {
     AskAboutOrdering,
     NotTakingOrders,
     ProductPage,
+    reachOf,
     shopFactsLine,
     ShopUnavailable,
 } from "@saroh/site-blocks";
 
 import { getCatalogueProduct } from "@/lib/catalogue";
+import { moduleLabel, NOT_FOR_SEARCH } from "@/lib/module-pages";
 import { dontCachePage, showsProduct } from "@/lib/page-cache/site-rules";
 import { productJsonLdScript } from "@/lib/product-json-ld";
 import {
@@ -23,6 +25,7 @@ import {
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
 import { getSignInOptions } from "@/lib/sign-in";
+import { getSiteContact } from "@/lib/site-contact";
 import { canonical, productDescription } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
@@ -63,7 +66,11 @@ export async function generateMetadata({
         });
     }
     const lookup = await getCatalogueProduct(resolved.siteId, productSlug);
-    if (!lookup.ok) return null;
+    if (!lookup.ok) {
+        // "We couldn't open the shop" answers 200: kept out of search,
+        // with nothing else said about the page. A missing product 404s.
+        return lookup.reason === "unavailable" ? NOT_FOR_SEARCH : null;
+    }
     const product = lookup.data;
     const name = resolved.snapshot.site.name;
     // An empty search title means "not written", never an empty <title>.
@@ -118,7 +125,14 @@ export default async function ShopProductPage({
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
         dontCachePage("shop unavailable");
-        return <ShopUnavailable business={resolved.snapshot.site.name} />;
+        return (
+            <ShopUnavailable
+                business={resolved.snapshot.site.name}
+                retryHref={`/shop/${encodeURIComponent(productSlug)}`}
+                // The layout's own read, shared through `cache`.
+                reach={reachOf(await getSiteContact(resolved.siteId))}
+            />
+        );
     }
     const product = lookup.data;
     // Its price and stock are on this page (#863).
@@ -147,7 +161,7 @@ export default async function ShopProductPage({
     // the product sits under the menu rather than across the whole screen.
     // The page's main landmark (UX-082): the header and footer sit outside.
     return (
-        <main className="mx-auto w-full max-w-screen-xl">
+        <main className="mx-auto w-full max-w-site-content">
             {/* Product structured data (#473), from what this page shows. */}
             <script
                 type="application/ld+json"
@@ -163,6 +177,13 @@ export default async function ShopProductPage({
                 product={product}
                 preview={false}
                 action={action}
+                // The way back to the shop, by the Shop page's own name
+                // (its menu name): a product page linked to nothing but
+                // the header before.
+                back={{
+                    href: "/shop",
+                    label: moduleLabel(resolved.snapshot.pages, "SHOP", "Shop"),
+                }}
                 // What it costs to receive, before the bag: only what this
                 // location's checkout offers now.
                 facts={

@@ -37,3 +37,55 @@ export function shopFactsLine(
     }
     return parts.join(" · ");
 }
+
+/** What a way to receive an order is called mid-sentence. */
+const WAY_WORDS: Partial<Record<string, string>> = {
+    PICKUP: "pick-up",
+    LOCAL_DELIVERY: "local delivery",
+    SHIPPING: "shipping",
+};
+
+/** What the shop's lead line reads: the checkout's options, as served. */
+export interface ShopLeadInput {
+    canOrder: boolean;
+    currency: string;
+    ways: readonly { type?: string; label: string; fee: string | null }[];
+    freeDeliveryOver?: string | null;
+}
+
+/**
+ * The one line under the shop's heading: how an order reaches the customer,
+ * from what the location's checkout offers now. "Order online for pick-up
+ * or local delivery. Free delivery from ₹999."
+ *
+ * Only what the read says: the ways, in the order the location offers them,
+ * and "Free delivery from" by the same rule as the product page's line.
+ * Null, and so no line at all, for a shop that isn't taking online orders,
+ * a read that failed, or a location with no way set. It names no place and
+ * no area: the read carries neither.
+ */
+export function shopLeadLine(
+    input: ShopLeadInput | null | undefined,
+    locale = "en-IN",
+): string | null {
+    if (!input?.canOrder || input.ways.length === 0) return null;
+    const words: string[] = [];
+    for (const way of input.ways) {
+        const word =
+            (way.type ? WAY_WORDS[way.type] : undefined) ??
+            way.label.trim().toLowerCase();
+        if (word && !words.includes(word)) words.push(word);
+    }
+    if (words.length === 0) return null;
+    const last = words.at(-1) ?? "";
+    const list =
+        words.length === 1
+            ? last
+            : `${words.slice(0, -1).join(", ")} or ${last}`;
+    const over = input.freeDeliveryOver;
+    const free =
+        over && Number(over) > 0 && input.ways.some((way) => way.fee)
+            ? ` Free delivery from ${formatAmount(over, input.currency, locale)}.`
+            : "";
+    return `Order online for ${list}.${free}`;
+}

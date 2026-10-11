@@ -162,9 +162,19 @@ describe("ProductPage", () => {
                 }}
             />,
         );
-        expect(screen.getByText("No photo yet")).toBeInTheDocument();
+        // No empty frame, and no owner's note where a customer reads.
+        expect(screen.queryByText("No photo yet")).toBeNull();
         expect(screen.getByText(/No reviews yet/)).toBeInTheDocument();
         expect(screen.getByText("₹2,499")).toBeInTheDocument();
+    });
+
+    it("keeps the words No photo yet for the workspace's staff notes only", () => {
+        const bare = { ...dress, images: [] };
+        const { rerender } = render(<ProductPage product={bare} markers />);
+        expect(screen.getByText("No photo yet")).toBeInTheDocument();
+        expect(screen.getByLabelText("Note 1")).toBeInTheDocument();
+        rerender(<ProductPage product={bare} preview={false} markers />);
+        expect(screen.queryByText("No photo yet")).toBeNull();
     });
 
     it("shows a video with its length, and its poster with Open video when it can't play", () => {
@@ -294,5 +304,107 @@ describe("the facts under the price", () => {
     it("says nothing about delivery when the page was given nothing", () => {
         render(<ProductPage product={dress} preview={false} />);
         expect(screen.queryByText(/Pick-up|delivery/i)).toBeNull();
+    });
+});
+
+describe("a product with no photo, on the live page", () => {
+    const bare: ProductPageData = { ...dress, images: [] };
+
+    it("draws no frame: the name leads, and the words take the second column", () => {
+        const { container } = render(
+            <ProductPage product={bare} preview={false} />,
+        );
+        expect(container.querySelector("img")).toBeNull();
+        expect(container.querySelector(".aspect-\\[4\\/5\\]")).toBeNull();
+        expect(container).not.toHaveTextContent("No photo yet");
+        const layout = container.querySelector("[data-product-layout]");
+        expect(layout).toHaveAttribute("data-product-layout", "words");
+        expect(layout?.className).toContain("md:grid-cols-");
+        // Everything a shopper needs is still there.
+        expect(
+            screen.getByRole("heading", { level: 1, name: "Linen Wrap Dress" }),
+        ).toBeInTheDocument();
+        expect(screen.getByText("About this product")).toBeInTheDocument();
+        expect(screen.getByText("Details")).toBeInTheDocument();
+        expect(screen.getByText("Only 2 left")).toBeInTheDocument();
+    });
+
+    it("is one column when there is nothing more to say about it", () => {
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...bare,
+                    description: null,
+                    keyPoints: [],
+                    materials: null,
+                    maker: null,
+                    returns: null,
+                }}
+                preview={false}
+            />,
+        );
+        const layout = container.querySelector("[data-product-layout]");
+        expect(layout?.className).not.toContain("md:grid-cols-");
+        expect(screen.queryByText("About this product")).toBeNull();
+        expect(screen.queryByText("Details")).toBeNull();
+    });
+
+    it("keeps the photos' layout for a product that has them", () => {
+        const { container } = render(
+            <ProductPage product={dress} preview={false} />,
+        );
+        expect(
+            container.querySelector("[data-product-layout]"),
+        ).toHaveAttribute("data-product-layout", "photos");
+        const cover = screen.getByAltText("Sage wrap dress, front");
+        // Room kept for it before it arrives.
+        expect(cover).toHaveAttribute("width");
+        expect(cover).toHaveAttribute("height");
+    });
+});
+
+describe("the way back to the shop", () => {
+    it("links the live product page to the shop, by the shop's own name", () => {
+        render(
+            <ProductPage
+                product={dress}
+                preview={false}
+                back={{ href: "/shop", label: "Our counter" }}
+            />,
+        );
+        const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+        const link = screen.getByRole("link", { name: "Our counter" });
+        expect(nav).toContainElement(link);
+        expect(link).toHaveAttribute("href", "/shop");
+        // Reachable by a thumb.
+        expect(link.className).toContain("coarse:min-h-11");
+    });
+
+    it("draws none in the workspace's preview, or when the page was given none", () => {
+        const { rerender } = render(
+            <ProductPage
+                product={dress}
+                back={{ href: "/shop", label: "Shop" }}
+            />,
+        );
+        expect(screen.queryByRole("navigation")).toBeNull();
+        rerender(<ProductPage product={dress} preview={false} />);
+        expect(screen.queryByRole("navigation")).toBeNull();
+    });
+});
+
+describe("choosing an option", () => {
+    it("keeps a sold-out option readable when it is the one picked", () => {
+        render(<ProductPage product={dress} preview={false} />);
+        const small = screen.getByRole("button", { name: "S (sold out)" });
+        // Not picked: quiet, struck through and dashed.
+        expect(small.className).toContain("line-through");
+        expect(small.className).toContain("border-dashed");
+        fireEvent.click(small);
+        // Picked: the picked colours, never quiet words on the ink.
+        expect(small).toHaveAttribute("aria-pressed", "true");
+        expect(small.className).toContain("text-site-bg");
+        expect(small.className).not.toContain("text-site-muted");
+        expect(small.className).toContain("line-through");
     });
 });

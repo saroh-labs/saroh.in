@@ -9,9 +9,10 @@ interface Lookup {
 }
 
 const site = vi.hoisted(() => {
-    const state: { resolved: unknown; lookup: Lookup } = {
+    const state: { resolved: unknown; lookup: Lookup; draw: string } = {
         resolved: null,
         lookup: { ok: true },
+        draw: "builtin",
     };
     return state;
 });
@@ -21,12 +22,15 @@ vi.mock("@/lib/publication", () => ({
     findPageByPath: vi.fn(() => null),
     postsPrefix: vi.fn(() => "blog"),
 }));
-vi.mock("@/lib/module-pages", () => ({
+vi.mock("@/lib/module-pages", async (original) => ({
+    // The rule that keeps an empty page out of search is the real one.
+    ...(await original<typeof import("@/lib/module-pages")>()),
     findModulePage: vi.fn(() => null),
     isFreePage: vi.fn(() => false),
     moduleLabel: vi.fn(() => "Shop"),
-    moduleRoute: vi.fn(() => ({ draw: "builtin" })),
+    moduleRoute: vi.fn(() => ({ draw: site.draw })),
 }));
+vi.mock("@/lib/site-contact", () => ({ getSiteContact: vi.fn() }));
 vi.mock("@/lib/catalogue", () => ({
     getCatalogue: vi.fn(() => Promise.resolve(site.lookup)),
 }));
@@ -54,7 +58,8 @@ describe("the shop's tab title", () => {
             modules: [],
             snapshot: { site: { name: "Northwind Supply" }, pages: [] },
         };
-        site.lookup = { ok: true, data: { products: [] } };
+        site.lookup = { ok: true, data: { products: [{ name: "Crates" }] } };
+        site.draw = "builtin";
     });
 
     it("names the shop when it has something to sell", async () => {
@@ -92,5 +97,51 @@ describe("the shop's tab title", () => {
         site.lookup = { ok: false, reason: "unavailable" };
         const metadata = await generateMetadata({ params });
         expect(metadata?.title).toBe("Shop · Northwind Supply");
+    });
+});
+
+describe("a shop with nothing to show is kept out of search", () => {
+    beforeEach(() => {
+        site.resolved = {
+            siteId: "site_1",
+            modules: [],
+            snapshot: { site: { name: "Northwind Supply" }, pages: [] },
+        };
+        site.lookup = { ok: true, data: { products: [{ name: "Crates" }] } };
+        site.draw = "builtin";
+    });
+
+    const NOT_FOR_SEARCH = { index: false, follow: true };
+
+    it("leaves a shop with something to sell to be indexed", async () => {
+        const metadata = await generateMetadata({ params });
+        expect(metadata?.robots).toBeUndefined();
+    });
+
+    it("says noindex while the shop's read fails, and changes nothing else", async () => {
+        site.lookup = { ok: false, reason: "unavailable" };
+        const metadata = await generateMetadata({ params });
+        expect(metadata?.robots).toEqual(NOT_FOR_SEARCH);
+        expect(metadata?.title).toBe("Shop · Northwind Supply");
+        expect(metadata?.openGraph).toMatchObject({ url: "/shop" });
+    });
+
+    it("says noindex for a shop with nothing on sale", async () => {
+        site.lookup = { ok: true, data: { products: [] } };
+        const metadata = await generateMetadata({ params });
+        expect(metadata?.robots).toEqual(NOT_FOR_SEARCH);
+    });
+
+    it("says noindex while the Shop page is taken off the site", async () => {
+        site.draw = "unavailable";
+        const metadata = await generateMetadata({ params });
+        expect(metadata?.robots).toEqual(NOT_FOR_SEARCH);
+    });
+
+    it("leaves a published Shop page to be indexed whatever the catalogue says", async () => {
+        site.draw = "page";
+        site.lookup = { ok: false, reason: "unavailable" };
+        const metadata = await generateMetadata({ params });
+        expect(metadata?.robots).toBeUndefined();
     });
 });
