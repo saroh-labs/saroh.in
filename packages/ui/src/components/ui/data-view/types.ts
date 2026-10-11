@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import type { PageStep } from "../list-toolbar";
+
 /**
  * One primitive, three densities.
  *
@@ -200,6 +202,28 @@ export interface DataViewProps<TRow> {
         note?: string;
         action?: ReactNode;
     };
+    /**
+     * For a list the server reads a page at a time: `rows` is then one
+     * page, already cut, and these are the whole list's numbers. The view
+     * draws every row it is given and its usual footer in its usual place,
+     * from these instead of its own count. Without it the view pages the
+     * rows it holds itself, at `viewId`'s remembered size.
+     */
+    paging?: DataPaging;
+}
+
+/** The footer's numbers, from a screen whose server cuts the pages. */
+export interface DataPaging {
+    /** The page on screen, from 1. */
+    page: number;
+    /** How many rows the whole list holds, under its filters. */
+    total: number;
+    /** Rows a page: one of `PAGE_SIZES`. */
+    size: number;
+    /** How to reach a page: an address, or what to do. */
+    to: (page: number) => PageStep;
+    /** A size was chosen. The screen starts again at page 1. */
+    onSize: (size: number) => void;
 }
 
 /**

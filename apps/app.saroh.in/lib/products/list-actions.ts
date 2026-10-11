@@ -10,11 +10,11 @@ import { duplicateProduct, listCataloguePage } from "./service";
 
 /**
  * Server Actions for the Products list and its quick look (#519, #520):
- * the next page, "+N · Add", and Duplicate. The API decides who may; these
+ * the page read again, "+N · Add", and Duplicate. The API decides who may; these
  * only carry the session to it.
  */
 
-/** The next page of the list, or the rows already loaded read again. */
+/** A page of the list, read again after something on it changed. */
 export async function loadCataloguePage(
     filter: CatalogueFilter,
 ): Promise<ApiResult<CataloguePage>> {
@@ -26,7 +26,7 @@ export async function loadCataloguePage(
         unstable_rethrow(error);
         return {
             ok: false,
-            error: "More products couldn't be loaded. Try again.",
+            error: "Products couldn't be loaded. Try again.",
         };
     }
 }

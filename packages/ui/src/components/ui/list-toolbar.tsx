@@ -411,7 +411,7 @@ export function MoreFilters({
     );
 }
 
-interface PageStep {
+export interface PageStep {
     /** Where the page is, for a list the server reads by address. */
     href?: string;
     /** Or what to do, for a list that reads the page itself. */

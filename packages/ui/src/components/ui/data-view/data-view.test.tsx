@@ -383,3 +383,94 @@ describe("DataView — the one toolbar and the one table", () => {
         );
     });
 });
+
+/**
+ * How a list ends. A view pages the rows it holds itself; one whose server
+ * cuts the pages (`paging`) draws every row it is given and the same footer
+ * from the screen's numbers — once, never a footer of its own beside it.
+ */
+describe("DataView — pages", () => {
+    beforeEach(() => window.localStorage.clear());
+    afterEach(() => vi.unstubAllGlobals());
+
+    const many: Row[] = Array.from({ length: 60 }, (_, i) => ({
+        id: `r${i + 1}`,
+        name: `Customer ${i + 1}`,
+        note: "",
+    }));
+    const paged = (more: Partial<Parameters<typeof DataView<Row>>[0]> = {}) => (
+        <DataView
+            viewId="pages"
+            rows={many}
+            columns={columns}
+            rowKey={(r) => r.id}
+            noun={{ one: "customer", other: "customers" }}
+            {...more}
+        />
+    );
+
+    it("pages the rows it holds itself, fifty to a page", () => {
+        setWidth(true);
+        const { container } = render(paged());
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(50);
+        expect(container.querySelector("[data-list-range]")).toHaveTextContent(
+            "1 to 50 of 60",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Next" }));
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(10);
+    });
+
+    it("draws every row of a page the server cut, and one footer from the screen's numbers", () => {
+        setWidth(true);
+        const { container } = render(
+            paged({
+                paging: {
+                    page: 2,
+                    total: 532,
+                    size: 100,
+                    to: (n) => ({ href: `/customers?page=${n}` }),
+                    onSize: vi.fn(),
+                },
+            }),
+        );
+        // All sixty given, not the view's own fifty.
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(60);
+        expect(container.querySelectorAll("[data-list-paging]")).toHaveLength(
+            1,
+        );
+        expect(container.querySelector("[data-list-range]")).toHaveTextContent(
+            "101 to 200 of 532",
+        );
+        expect(
+            screen.getByRole("combobox", { name: "Rows per page" }),
+        ).toHaveTextContent("100");
+        const nav = screen.getByRole("navigation", {
+            name: "Pages of customers",
+        });
+        expect(nav.querySelector('a[href="/customers?page=3"]')).not.toBeNull();
+        expect(nav.querySelector('a[href="/customers?page=1"]')).not.toBeNull();
+    });
+
+    it("asks the screen for a page, and never moves by itself", () => {
+        setWidth(true);
+        const go = vi.fn();
+        const { container } = render(
+            paged({
+                paging: {
+                    page: 1,
+                    total: 120,
+                    size: 50,
+                    to: (n) => ({ onClick: () => void go(n) }),
+                    onSize: vi.fn(),
+                },
+            }),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Next" }));
+        expect(go.mock.calls).toEqual([[2]]);
+        // The rows are the screen's to change.
+        expect(container.querySelectorAll("tbody tr")).toHaveLength(60);
+        expect(container.querySelector("[data-list-range]")).toHaveTextContent(
+            "1 to 50 of 120",
+        );
+    });
+});

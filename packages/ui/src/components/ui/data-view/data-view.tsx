@@ -75,6 +75,7 @@ export function DataView<TRow>({
     selectable = false,
     bulkActions,
     emptyState,
+    paging,
 }: DataViewProps<TRow>) {
     const { mode, wide, deskMode, phoneMode, choose } = useViewMode(
         viewId,
@@ -184,13 +185,20 @@ export function DataView<TRow>({
      * this list was last shown at (`usePageSize`, kept between visits). A
      * page past the end (a search just narrowed the list) is the last one,
      * and anything that lists something else starts again at page 1.
+     *
+     * With `paging` the server has cut the page already: every row given
+     * is on screen, and the footer is drawn from the screen's numbers.
      */
     const [size, setSize] = usePageSize(viewId);
     const [pageAsked, setPage] = useState(1);
     const page = Math.min(pageAsked, pagesOf(visible.length, size));
+    const serverPaged = paging !== undefined;
     const paged = useMemo(
-        () => visible.slice((page - 1) * size, page * size),
-        [visible, page, size],
+        () =>
+            serverPaged
+                ? visible
+                : visible.slice((page - 1) * size, page * size),
+        [visible, page, size, serverPaged],
     );
 
     const toggleSort = (col: DataColumn<TRow>) => {
@@ -843,17 +851,28 @@ export function DataView<TRow>({
                     >
                         {phoneSlot ? renderMode(phoneSlot) : null}
                     </div>
-                    <ListPaging
-                        label={`Pages of ${noun.other}`}
-                        page={page}
-                        total={visible.length}
-                        size={size}
-                        to={(n) => ({ onClick: () => setPage(n) })}
-                        onSize={(next) => {
-                            setSize(next);
-                            setPage(1);
-                        }}
-                    />
+                    {paging ? (
+                        <ListPaging
+                            label={`Pages of ${noun.other}`}
+                            page={paging.page}
+                            total={paging.total}
+                            size={paging.size}
+                            to={paging.to}
+                            onSize={paging.onSize}
+                        />
+                    ) : (
+                        <ListPaging
+                            label={`Pages of ${noun.other}`}
+                            page={page}
+                            total={visible.length}
+                            size={size}
+                            to={(n) => ({ onClick: () => setPage(n) })}
+                            onSize={(next) => {
+                                setSize(next);
+                                setPage(1);
+                            }}
+                        />
+                    )}
                 </div>
             )}
 
