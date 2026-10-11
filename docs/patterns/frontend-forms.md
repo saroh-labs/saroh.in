@@ -318,7 +318,9 @@ preview under its fields, from the draft.
   to the first `aria-invalid` field in the form, a select or a chip set
   included. On it: New customer, the business setup form, the invoice
   form, New location, the discount code form, New site and the course
-  form. A draft that is not react-hook-form keeps a set of fields that
+  form. A form in steps checks one step at a time: its Continue calls
+  `form.trigger` with that step's fields and then `toFirstErrorIn(form)`
+  (setup, `saroh-product.md` → How the stepper is built). A draft that is not react-hook-form keeps a set of fields that
   have been left and shows a field's problem from then on (the Service
   Editor: `serviceFieldProblems`, `problemFor`), and calls
   `focusFirstError(form)` when Save is pressed. The product editor's Basics

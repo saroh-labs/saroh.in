@@ -14,7 +14,7 @@ pattern files refer back here.
 - **Current** (DEC-070) — **Three kinds of people**: **a business** (shop,
   studio, practice), **Just me** (freelancer, consultant, creator) and **a
   site for my work** (portfolio, blog, projects). Setup asks "What are you
-  setting up?" as a small choice with "A business" chosen (DEC-130), and stores the answer as
+  setting up?" as its first step, with "A business" chosen (DEC-130), and stores the answer as
   `Organization.kind` (`BUSINESS`, `SOLO`, `WORK`; every business set up
   before it is `BUSINESS`). Whoever holds `org:update` (Owner and Admin)
   changes it at the top of Settings › Business › Identity, with Undo.
@@ -33,7 +33,9 @@ pattern files refer back here.
     | -------------------------- | --------------------------------- | --------------------------------------------------- | --------------------------------- |
     | The owner                  | your business                     | you                                                 | you                               |
     | Their people               | customers                         | clients                                             | readers                           |
+    | Setup's name step          | Name your business                | Name it                                             | Name your site                    |
     | Setup's name field         | What is it called?                | Your name or brand                                  | Your name or brand                |
+    | Setup's last button        | Create the business               | Set it up                                           | Set it up                         |
     | Settings tab               | Business                          | Your details                                        | Your details                      |
     | Home's first run, in order | Sell, Bookings, Website, Contacts | Bookings, Invoice a client, Contacts, Website, Sell | Website, Contacts, Bookings, Sell |
     | The module picker suggests | Sell                              | nothing                                             | Website                           |
@@ -47,17 +49,49 @@ pattern files refer back here.
     client" turns nothing on: it opens a new invoice, for someone with
     `invoice:write`, until the business has one.
 
-- **Current** (DEC-130, 10 Oct 2026) — **The first run is three steps on
-  two screens, and it ends in the product.** Sign-up takes an email and a
-  code (DEC-129). Setup is one screen
-  (`components/organizations/business-setup-form.tsx`): your name if the
-  account has none, the name, the web address, the country (India), and
-  "What will you do first?". Create turns that goal on with its defaults,
-  with no second sheet (`lib/modules/first-goal.ts`), and lands on the
-  thing itself: a new product, a new service, the site with Publish, New
-  contact open. Setup never asks whether it is a registered company: the
-  Finish setup step "Choose your business type" does. It says "Steps 2 and
-  3 of 3", never "Last step".
+- **Current** (DEC-130, amended 11 Oct 2026) — **The first run is four
+  short steps, and it ends in the product.** Sign-up takes an email and a
+  code (DEC-129). Setup is a stepper
+  (`components/organizations/business-setup-form.tsx`), one question to a
+  screen with Back and Continue: "What are you setting up?", then the name
+  step (your name if the account has none, the name, the web address, the
+  country, India chosen), then "What will you do first?". The last step's
+  button is the create: it turns that goal on with its defaults, with no
+  second sheet (`lib/modules/first-goal.ts`), and lands on the thing
+  itself: a new product, a new service, the site with Publish, New contact
+  open. Setup never asks whether it is a registered company: the Finish
+  setup step "Choose your business type" does. It says "Step 2 of 4",
+  never "Last step".
+- **Current** (DEC-130, 11 Oct 2026) — **How the stepper is built.** Change
+  a step in `lib/organizations/setup-steps.ts`, nowhere else.
+    - **One list.** The plan's names are `SETUP_PLAN` in
+      `@saroh/ui/lib/setup-plan`, which the sign-up panel on
+      accounts.saroh.in draws too. `setup-steps.ts` builds setup's steps
+      from it (each with the fields its gate checks), and the form, the
+      panel beside it, the count above the heading and the progress bar
+      all read that. A test in each app pins the same four strings.
+    - **One form.** Every step's answers live in one react-hook-form, and
+      only the step on show is drawn. Back and Continue lose nothing, and
+      Back never asks.
+    - **Continue is the step's gate.** It checks its own fields
+      (`form.trigger`), says each problem under its field, puts the
+      keyboard on the first, and on the name step waits for the web
+      address's answer, so a taken address is never passed on. The step's
+      button is the form's one submit, so Enter in a field presses it.
+    - **The step is in the address** (`?step=name`, `?step=first`, the
+      first step bare) and in the browser's history
+      (`setup-step-context.tsx`), so the browser's Back is the step before.
+      A step asked for before the ones ahead of it are answered opens the
+      first that is not (`openStep`).
+    - **What was typed is kept for the tab** (`sessionStorage`, answers
+      only, read and written inside try/catch), so a reload stays on the
+      step. It is cleared when the business is made and on signing out.
+    - **Each step is the same frame:** the count, a large heading (which
+      takes the keyboard when the step changes), one sentence, that step's
+      fields, then at the foot a thin `ProgressBar`, a quiet Back on the
+      left and the step's button on the right, stacked on a phone with the
+      button on top. "Signed in as … · Sign out" is under it on every
+      step.
 - **Current** (DEC-130) — **One list of goals, in one set of words**:
   `lib/modules/goals.ts` ("Sell things", "Take bookings", "Put up a
   website", "Keep track of people", and a kind's own for the last). Setup,

@@ -393,7 +393,11 @@ text, a column's name, the navigation, an empty state, a banner.
 - **Setup is readable in full.** The goal picker after setup
   (`app/onboarding/modules`) and Home's first-run states are marked at
   their root: there is nothing of a customer's there yet. Inputs are still
-  masked.
+  masked. Setup's own steps (`app/onboarding`) mark only their fixed
+  words: the count, the heading and its sentence, the kind and goal cards
+  and the country chips. The signed-in email, the web address's answer
+  and a name or address problem (the API's sentence can repeat what was
+  typed) stay masked.
 - **Inputs are always masked** by the recorder itself (`maskAllInputs`),
   whatever is marked.
 
