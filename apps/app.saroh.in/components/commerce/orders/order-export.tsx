@@ -9,7 +9,7 @@ import type { OrderRow } from "@/lib/orders/business-service";
 import { ordersToCsv } from "@/lib/orders/export";
 import { loadOrdersExportPage } from "@/lib/orders/list-actions";
 import type { OrdersQuery } from "@/lib/orders/list-query";
-import { orderListParams } from "@/lib/orders/list-query";
+import { ORDERS_PAGE_SIZE, orderListParams } from "@/lib/orders/list-query";
 
 /**
  * The most pages Export walks (50 rows each): 20,000 orders, past anything
@@ -39,7 +39,12 @@ export function OrderExport({
 
     async function run() {
         setRead(0);
-        const params = orderListParams({ ...query, cursor: null, back: [] });
+        // From the top, at the list's own page size, whatever is on screen.
+        const params = orderListParams({
+            ...query,
+            page: 1,
+            size: ORDERS_PAGE_SIZE,
+        });
         const rows: OrderRow[] = [];
         let cursor: string | undefined;
         let complete = false;

@@ -139,17 +139,17 @@ export default async function OrdersPage({
         pick,
         placesRead,
     ]);
-    // A page past the end, or a cursor from a list that has since changed
-    // (an order the API can't find answers as an empty page): start again at
-    // the first page rather than show an empty one.
-    if (query.cursor && page.rows.length === 0) {
-        redirect(ordersHref(query, { cursor: null, back: [] }));
+    // A page past the end (the list has since got shorter, or the address
+    // was typed): start again at the first page rather than show an empty
+    // one.
+    if (query.page > 1 && page.rows.length === 0) {
+        redirect(ordersHref(query, { page: 1 }));
     }
     // The business's first, 10th or 100th order (wave G), said once: only
     // on the whole list's first page, where the count is every order.
     const unnarrowed = ordersEmptyCopy(query, null).kind === "first-run";
     const moment = await ordersListMoment(page, {
-        plain: unnarrowed && !query.storefront && !query.cursor,
+        plain: unnarrowed && !query.storefront && query.page === 1,
         viewer: organization,
     });
     // No orders yet: share the online shop while it is live, else the

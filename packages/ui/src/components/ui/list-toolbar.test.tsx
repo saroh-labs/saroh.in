@@ -9,6 +9,9 @@ import {
     ListPaging,
     ListToolbar,
     MoreFilters,
+    pageNumbers,
+    pagesOf,
+    readPageSize,
 } from "./list-toolbar";
 
 /**
@@ -317,40 +320,103 @@ describe("MoreFilters", () => {
 });
 
 describe("ListPaging", () => {
-    it("ends a list with Previous and Next together, on the right", () => {
-        render(
+    const to = (n: number) => ({ href: `/orders?page=${n}` });
+
+    it("ends a list with the size on the left and the pages on the right", () => {
+        const { container } = render(
             <ListPaging
                 label="Pages of orders"
-                previous={{ href: "/orders" }}
-                next={{ href: "/orders?cursor=b" }}
+                page={2}
+                total={532}
+                size={50}
+                to={to}
+                onSize={vi.fn()}
             />,
         );
+        const foot = container.querySelector("[data-list-paging]")!;
+        expect(classes(foot)).toContain("justify-between");
+        expect(
+            screen.getByRole("combobox", { name: "Rows per page" }),
+        ).toHaveTextContent("50");
+        expect(foot.querySelector("[data-list-range]")).toHaveTextContent(
+            "51 to 100 of 532",
+        );
         const nav = screen.getByRole("navigation", { name: "Pages of orders" });
-        expect(classes(nav)).toContain("justify-end");
         const links = within(nav).getAllByRole("link");
-        expect(links.map((l) => l.textContent)).toEqual(["Previous", "Next"]);
-        expect(links[1]).toHaveAttribute("href", "/orders?cursor=b");
+        expect(links[0]).toHaveTextContent("Previous");
+        expect(links[0]).toHaveAttribute("href", "/orders?page=1");
+        expect(links.at(-1)).toHaveTextContent("Next");
+        expect(links.at(-1)).toHaveAttribute("href", "/orders?page=3");
+        // The page on screen is marked, and is not a link to itself.
+        const here = within(nav).getByRole("button", { name: "Page 2" });
+        expect(here).toHaveAttribute("aria-current", "page");
+        expect(
+            within(nav).getByRole("link", { name: "Page 11" }),
+        ).toHaveAttribute("href", "/orders?page=11");
     });
 
     it("turns a way off when there is nowhere to go, and keeps both words", () => {
-        const onNext = vi.fn();
+        const go = vi.fn();
         render(
             <ListPaging
                 label="Pages of customers"
-                previous={null}
-                next={{ onClick: onNext }}
+                page={1}
+                total={120}
+                size={50}
+                to={(n) => ({ onClick: () => go(n) })}
+                onSize={vi.fn()}
             />,
         );
         expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
         fireEvent.click(screen.getByRole("button", { name: "Next" }));
-        expect(onNext).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole("button", { name: "Page 3" }));
+        expect(go.mock.calls).toEqual([[2], [3]]);
     });
 
-    it("draws nothing for a list of one page", () => {
+    it("keeps the size switch on a list of one long page, without pages", () => {
+        render(
+            <ListPaging
+                label="Pages"
+                page={1}
+                total={60}
+                size={100}
+                to={to}
+                onSize={vi.fn()}
+            />,
+        );
+        expect(
+            screen.getByRole("combobox", { name: "Rows per page" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("navigation")).toBeNull();
+    });
+
+    it("draws nothing for a list shorter than the smallest page", () => {
         const { container } = render(
-            <ListPaging label="Pages" previous={null} next={null} />,
+            <ListPaging
+                label="Pages"
+                page={1}
+                total={10}
+                size={50}
+                to={to}
+                onSize={vi.fn()}
+            />,
         );
         expect(container).toBeEmptyDOMElement();
+    });
+
+    it("shows seven places at most, whichever page is on screen", () => {
+        expect(pageNumbers(1, 5)).toEqual([1, 2, 3, 4, 5]);
+        expect(pageNumbers(1, 20)).toEqual([1, 2, 3, 4, 5, "gap", 20]);
+        expect(pageNumbers(10, 20)).toEqual([1, "gap", 9, 10, 11, "gap", 20]);
+        expect(pageNumbers(19, 20)).toEqual([1, "gap", 16, 17, 18, 19, 20]);
+    });
+
+    it("reads a size off an address, and anything else as 50", () => {
+        expect(readPageSize("25")).toBe(25);
+        expect(readPageSize("37")).toBe(50);
+        expect(readPageSize(undefined)).toBe(50);
+        expect(pagesOf(532, 50)).toBe(11);
+        expect(pagesOf(0, 50)).toBe(1);
     });
 });
 

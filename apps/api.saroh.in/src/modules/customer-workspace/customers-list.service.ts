@@ -228,6 +228,7 @@ export class CustomersListService {
             await this.requireStore(organizationId, query.store);
         }
         const page = query.page ?? 1;
+        const size = query.size ?? CUSTOMERS_PAGE_SIZE;
 
         const cte = peopleCte({
             organizationId,
@@ -253,8 +254,8 @@ export class CustomersListService {
                     FROM m
                     WHERE ${matches} AND ${chipSql(chip, invoicesToo)}
                     ORDER BY ${orderBySql(sort)}
-                    LIMIT ${CUSTOMERS_PAGE_SIZE}
-                    OFFSET ${(page - 1) * CUSTOMERS_PAGE_SIZE}`,
+                    LIMIT ${size}
+                    OFFSET ${(page - 1) * size}`,
                 this.db.$queryRaw<Record<string, number>[]>`${cte}
                     SELECT COUNT(*)::int AS everyone, ${Prisma.join(countColumns)}
                     FROM m`,
@@ -317,7 +318,7 @@ export class CustomersListService {
             }),
             total: countsOut[chip] ?? 0,
             page,
-            pageSize: CUSTOMERS_PAGE_SIZE,
+            pageSize: size,
             everyone: counts.everyone,
             counts: countsOut,
             unlinkedPaying,
@@ -346,6 +347,7 @@ export class CustomersListService {
         }
         const orders = allows(ctx, "order:read");
         const page = query.page ?? 1;
+        const size = query.size ?? CUSTOMERS_PAGE_SIZE;
         const cte = unlinkedCte(organizationId, query.store);
 
         const [rows, total] = await Promise.all([
@@ -365,8 +367,8 @@ export class CustomersListService {
                     u."storeId", u.paid_orders, u.last_at
                 FROM u
                 ORDER BY u.last_at DESC NULLS LAST, u.id ASC
-                LIMIT ${CUSTOMERS_PAGE_SIZE}
-                OFFSET ${(page - 1) * CUSTOMERS_PAGE_SIZE}`,
+                LIMIT ${size}
+                OFFSET ${(page - 1) * size}`,
             this.unlinkedCount(organizationId, query.store),
         ]);
 
@@ -404,7 +406,7 @@ export class CustomersListService {
             }),
             total,
             page,
-            pageSize: CUSTOMERS_PAGE_SIZE,
+            pageSize: size,
         };
     }
 

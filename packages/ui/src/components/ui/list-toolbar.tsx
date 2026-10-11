@@ -3,6 +3,13 @@
 import { SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import {
+    DEFAULT_PAGE_SIZE,
+    PAGE_SIZES,
+    pageNumbers,
+    pagesOf,
+    readPageSize,
+} from "../../lib/paging";
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
 import { chipClass } from "./chip";
@@ -411,38 +418,161 @@ interface PageStep {
     onClick?: () => void;
 }
 
+const SIZE_OPTIONS: Option<string>[] = PAGE_SIZES.map((n) => ({
+    value: String(n),
+    label: String(n),
+}));
+
 /**
- * How every paged list ends: Previous and Next together at the foot, on
- * the right, each off when there is nowhere to go. The same two words on
- * every list. (How many are showing is the toolbar's `count`.)
+ * How every paged list ends, the table's footer: on the left, how many
+ * rows a page holds (10, 25, 50 or 100) and which of them are showing
+ * ("101 to 125 of 532"); on the right, Previous, the page numbers and
+ * Next. The same on every list.
+ *
+ * It is drawn once the list is longer than the smallest page, so the
+ * size can be changed back from a long page; a shorter list has no
+ * footer. On a phone the numbers give way to "Page 2 of 11".
  */
 export function ListPaging({
     label,
-    previous,
-    next,
+    page,
+    total,
+    size,
+    to,
+    onSize,
     className,
 }: {
     /** The nav's accessible name: "Pages of orders". */
     label: string;
-    /** Null when this is the first page. */
-    previous: PageStep | null;
-    /** Null when this is the last. */
-    next: PageStep | null;
+    /** The page on screen, from 1. */
+    page: number;
+    /** How many rows the whole list holds, under its filters. */
+    total: number;
+    /** Rows a page: one of `PAGE_SIZES`. */
+    size: number;
+    /** How to reach a page: an address, or what to do. */
+    to: (page: number) => PageStep;
+    /** A size was chosen. The caller starts again at page 1. */
+    onSize: (size: number) => void;
     className?: string;
 }) {
-    if (!previous && !next) return null;
+    if (total <= PAGE_SIZES[0]) return null;
+    const pages = pagesOf(total, size);
     return (
-        <nav
+        <div
             data-list-paging=""
-            aria-label={label}
             className={cn(
-                "flex min-w-0 flex-wrap items-center justify-end gap-2 pt-3.5",
+                "flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 pt-3.5",
                 className,
             )}
         >
-            <PageButton step={previous} words="Previous" />
-            <PageButton step={next} words="Next" />
-        </nav>
+            <div className="flex min-w-0 items-center gap-2 text-[13px] text-muted-foreground">
+                <span aria-hidden>Rows per page</span>
+                <OptionSelect
+                    aria-label="Rows per page"
+                    value={String(size)}
+                    onValueChange={(v) => onSize(Number(v))}
+                    options={SIZE_OPTIONS}
+                    className={cn(listFilterClass, "w-auto tabular-nums")}
+                />
+                <span data-list-range="" className="tabular-nums">
+                    {figures.format((page - 1) * size + 1)} to{" "}
+                    {figures.format(Math.min(total, page * size))} of{" "}
+                    {figures.format(total)}
+                </span>
+            </div>
+            {pages > 1 ? (
+                <nav
+                    aria-label={label}
+                    className="flex min-w-0 flex-wrap items-center justify-end gap-1.5"
+                >
+                    <PageButton
+                        step={page > 1 ? to(page - 1) : null}
+                        words="Previous"
+                    />
+                    <span className="px-1.5 text-[13px] tabular-nums text-muted-foreground sm:hidden">
+                        Page {figures.format(page)} of {figures.format(pages)}
+                    </span>
+                    <ol className="hidden items-center gap-1.5 sm:flex">
+                        {pageNumbers(page, pages).map((n, i) => (
+                            <li key={n === "gap" ? `gap-${i}` : n}>
+                                {n === "gap" ? (
+                                    <span
+                                        aria-hidden
+                                        className="inline-flex w-6 justify-center text-muted-foreground"
+                                    >
+                                        …
+                                    </span>
+                                ) : (
+                                    <PageNumber
+                                        n={n}
+                                        current={n === page}
+                                        step={to(n)}
+                                    />
+                                )}
+                            </li>
+                        ))}
+                    </ol>
+                    <PageButton
+                        step={page < pages ? to(page + 1) : null}
+                        words="Next"
+                    />
+                </nav>
+            ) : null}
+        </div>
+    );
+}
+
+function PageNumber({
+    n,
+    current,
+    step,
+}: {
+    n: number;
+    current: boolean;
+    step: PageStep;
+}) {
+    const words = figures.format(n);
+    const look = cn(
+        "min-w-[38px] px-2 tabular-nums",
+        current && "border-foreground bg-accent",
+    );
+    if (current) {
+        return (
+            <Button
+                type="button"
+                variant="outline"
+                aria-current="page"
+                aria-label={`Page ${words}`}
+                className={look}
+            >
+                {words}
+            </Button>
+        );
+    }
+    if (step.href !== undefined) {
+        return (
+            <Button variant="outline" className={look} asChild>
+                <Link
+                    href={step.href}
+                    scroll={false}
+                    aria-label={`Page ${words}`}
+                >
+                    {words}
+                </Link>
+            </Button>
+        );
+    }
+    return (
+        <Button
+            type="button"
+            variant="outline"
+            aria-label={`Page ${words}`}
+            className={look}
+            onClick={step.onClick}
+        >
+            {words}
+        </Button>
     );
 }
 
@@ -469,3 +599,7 @@ function PageButton({ step, words }: { step: PageStep | null; words: string }) {
         </Button>
     );
 }
+
+// The sums live in `lib/paging` so a server page can read an address with
+// them; they are handed on here for the screens that draw the footer.
+export { DEFAULT_PAGE_SIZE, PAGE_SIZES, pageNumbers, pagesOf, readPageSize };

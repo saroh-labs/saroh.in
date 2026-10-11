@@ -21,12 +21,7 @@ import type {
 } from "@/lib/orders/business-service";
 import { filtersActive, NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
-import {
-    nextPageHref,
-    ordersHref,
-    pageRange,
-    previousPageHref,
-} from "@/lib/orders/list-query";
+import { ordersHref, pageHref, pageRange } from "@/lib/orders/list-query";
 import { newOrderStores } from "@/lib/orders/new-order-stores";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import type { ShareLink } from "@/lib/sites/share-links";
@@ -62,7 +57,7 @@ import { useOrderSelection } from "./use-order-selection";
  * filters (B4, `order-filters.tsx`) live in the address, the server asks for
  * one page of them, and the tab counts come back with it — so the counts,
  * the rows and the rail's badge are the same fact however many orders there
- * are. Previous and Next follow the API's cursor, and so does Export.
+ * are. The footer pages by number; Export walks the API's cursor.
  *
  * The storefront control is a FILTER, not a scope: orders belong to the
  * business. At the desk a row opens its quick view and has a row menu (B5,
@@ -196,14 +191,8 @@ export function OrdersScreen({
         [query, router],
     );
 
-    const previous = previousPageHref(query);
-    const next = page.nextCursor ? nextPageHref(query, page.nextCursor) : null;
-    const range = pageRange(
-        query,
-        rows.length,
-        page.counts[query.tab],
-        !!page.nextCursor,
-    );
+    const total = page.counts[query.tab];
+    const range = pageRange(query, rows.length, total);
     const firstStore = stores.length === 1 ? stores[0] : undefined;
     // Anything narrowed, a search with words in it included: the toolbar
     // then offers the way back to every order.
@@ -497,8 +486,11 @@ export function OrdersScreen({
 
             <ListPaging
                 label="Pages of orders"
-                previous={previous ? { href: previous } : null}
-                next={next ? { href: next } : null}
+                page={query.page}
+                total={total}
+                size={query.size}
+                to={(n) => ({ href: pageHref(query, n) })}
+                onSize={(size) => go({ size })}
             />
         </div>
     );

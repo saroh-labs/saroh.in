@@ -178,7 +178,11 @@ export interface OrderListParams {
     q?: string;
     /** ISO instant: only orders placed from it on (Home's "Last 24 hours"). */
     since?: string;
+    /** The row to read on from: Export's way through the list. */
     cursor?: string;
+    /** Or the page by number, from 1, and how many rows it holds. */
+    page?: number;
+    size?: number;
     /**
      * This page is read for Export (B16): the API asks `order:export` of
      * it, as a file of every order leaving Saroh is its own power.

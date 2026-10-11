@@ -14,8 +14,11 @@ import {
  * Everything arrives as text, so `page` converts explicitly.
  */
 
-/** Rows per page: the design pages by Previous and Next, 50 at a time. */
+/** Rows per page when the caller names no size. */
 export const CUSTOMERS_PAGE_SIZE = 50;
+
+/** The sizes the list offers. */
+export const CUSTOMERS_PAGE_SIZES = [10, 25, 50, 100] as const;
 
 /** The filter chips, in the order the design shows them. */
 export const CUSTOMER_CHIPS = [
@@ -83,6 +86,12 @@ export class ListCustomersQueryDto {
     @Min(1)
     @Max(PAGE_MAX)
     page?: number;
+
+    /** Rows per page: 10, 25, 50 or 100. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsIn(CUSTOMERS_PAGE_SIZES, { message: "size is 10, 25, 50 or 100" })
+    size?: number;
 }
 
 /** Paying store customers no contact holds yet (`customers/unlinked`). */
@@ -99,4 +108,10 @@ export class ListUnlinkedQueryDto {
     @Min(1)
     @Max(PAGE_MAX)
     page?: number;
+
+    /** Rows per page: 10, 25, 50 or 100. */
+    @IsOptional()
+    @Type(() => Number)
+    @IsIn(CUSTOMERS_PAGE_SIZES, { message: "size is 10, 25, 50 or 100" })
+    size?: number;
 }

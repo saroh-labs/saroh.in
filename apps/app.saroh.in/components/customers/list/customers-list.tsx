@@ -13,7 +13,6 @@ import {
     emptyTitle,
     isNarrowed,
     listHref,
-    pageCount,
     pageText,
 } from "@/lib/customers/list";
 
@@ -110,7 +109,6 @@ export function CustomersList({
         );
     }
 
-    const pages = pageCount(page);
     return (
         <div>
             {heading}
@@ -136,21 +134,14 @@ export function CustomersList({
                     }
                 />
             </div>
-            {page.total > page.pageSize ? (
-                <ListPaging
-                    label="Pages of customers"
-                    previous={
-                        page.page > 1
-                            ? { onClick: () => go({ page: page.page - 1 }) }
-                            : null
-                    }
-                    next={
-                        page.page < pages
-                            ? { onClick: () => go({ page: page.page + 1 }) }
-                            : null
-                    }
-                />
-            ) : null}
+            <ListPaging
+                label="Pages of customers"
+                page={page.page}
+                total={page.total}
+                size={page.pageSize}
+                to={(n) => ({ onClick: () => go({ page: n }) })}
+                onSize={(size) => go({ size })}
+            />
             <ListNote />
         </div>
     );

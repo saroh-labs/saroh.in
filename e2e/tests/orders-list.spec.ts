@@ -11,7 +11,7 @@ import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
  * The Orders list's rows and tabs (plan B, B3), after "Saroh Orders Screen":
  * All · Open · Refunded with the API's counts, a step pill with its progress
  * said in words, the age or "Late", the unpaid line, and paging by the API's
- * cursor — against the seeded stack.
+ * page number and size — against the seeded stack.
  *
  * Counts, pages and "the first row" are read on Rye & Co., as its owner:
  * a film set, which no test writes to, so what the API said a moment ago is
@@ -240,7 +240,9 @@ test.describe("orders list", () => {
         }
     });
 
-    test("pages by the cursor, and back", async ({ page }) => {
+    test("pages by number, and changes how many rows a page holds", async ({
+        page,
+    }) => {
         await signIn(page);
         await page.goto(`/open/${LISTS}`);
         const first = await list(page, LISTS);
@@ -250,14 +252,23 @@ test.describe("orders list", () => {
         await expect(
             page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
-        await page.getByRole("link", { name: "Next" }).click();
-        await expect(page).toHaveURL(/cursor=/);
+        const pages = page.getByRole("navigation", { name: "Pages of orders" });
+        await pages.getByRole("link", { name: "Next" }).click();
+        await expect(page).toHaveURL(/page=2/);
         await expect(page.getByText(/Showing 51 to /)).toBeVisible();
-        await page.getByRole("link", { name: "Previous" }).click();
+        await pages.getByRole("link", { name: "Previous" }).click();
         await expect(
             page.getByText(`Showing 1 to 50 of ${first.counts.all}`),
         ).toBeVisible();
-        await expect(page).not.toHaveURL(/cursor=/);
+        await expect(page).not.toHaveURL(/page=/);
+
+        // Ten rows a page: the address says so, and the list is ten long.
+        await page.getByRole("combobox", { name: "Rows per page" }).click();
+        await page.getByRole("option", { name: "10", exact: true }).click();
+        await expect(page).toHaveURL(/size=10/);
+        await expect(
+            page.getByText(`Showing 1 to 10 of ${first.counts.all}`),
+        ).toBeVisible();
     });
 
     test("rows name their storefront only when there are several", async ({

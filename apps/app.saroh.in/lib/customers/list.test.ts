@@ -35,6 +35,7 @@ const BASE: ListQuery = {
     sort: null,
     store: null,
     page: 1,
+    size: 50,
 };
 
 function row(over: Partial<CustomerRow> = {}): CustomerRow {
@@ -77,6 +78,7 @@ describe("readListQuery", () => {
                 sort: "spent",
                 store: "st_1",
                 page: "3",
+                size: "25",
             }),
         ).toEqual({
             q: "asha",
@@ -84,6 +86,7 @@ describe("readListQuery", () => {
             sort: "spent",
             store: "st_1",
             page: 3,
+            size: 25,
         });
     });
 
@@ -151,6 +154,7 @@ describe("listHref", () => {
             sort: "last",
             store: "st_9",
             page: 2,
+            size: 25,
         };
         const href = listHref(q);
         const params = Object.fromEntries(
@@ -165,6 +169,11 @@ describe("apiSearch", () => {
         expect(apiSearch(BASE)).toBe("");
         expect(apiSearch({ ...BASE, q: "a&b", chip: "offers", page: 2 })).toBe(
             "q=a%26b&chip=offers&page=2",
+        );
+        expect(apiSearch({ ...BASE, size: 100 })).toBe("size=100");
+        // Another size cuts other pages: back to the first.
+        expect(listHref({ ...BASE, page: 3 }, { size: 10 })).toBe(
+            "/commerce/customers?size=10",
         );
     });
 });
