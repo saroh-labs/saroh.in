@@ -131,6 +131,23 @@ describe("llmsText", () => {
         ).toBe(false);
     });
 
+    it("lists no template, whatever the date or preview, while Templates is switched off (DEC-135)", () => {
+        const routes = [...ALL_ROUTES, "/templates", "/templates/[slug]"];
+        for (const preview of [false, true]) {
+            const text = llmsText(
+                BASE,
+                at(AFTER, { routes, preview, off: ["templates"] }),
+                articles,
+            );
+            expect(text).not.toContain("Templates");
+            expect(linked(text).some((p) => p.startsWith("/templates"))).toBe(
+                false,
+            );
+            // The other Resources pages are untouched.
+            expect(linked(text)).toContain("/help");
+        }
+    });
+
     it("gives every link a one-line description", () => {
         const text = llmsText(BASE, at(AFTER), articles);
         const links = text.split("\n").filter((l) => l.startsWith("- ["));

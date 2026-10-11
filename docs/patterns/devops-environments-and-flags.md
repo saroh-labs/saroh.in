@@ -20,6 +20,16 @@
   `JOB_VISIBILITY_MS`, `JOB_WORKER_BATCH`, `JOB_WORKER_POLL_MS` and
   `PAYMENTS_ENC_KEY` are validated by the API and missing from its examples.
 
+- **Current** — **A build-time switch that hides something is off when
+  unset.** `NEXT_PUBLIC_TEMPLATES` (DEC-135) shows templates only when it is
+  `on`, so production hides them by leaving it out and a misspelled value
+  never shows them. Unset counts as on only where
+  `env.NODE_ENV === "development"` (`next dev`). Such a switch is set in the
+  development `vars` of the app's `wrangler.jsonc`, CI's browser-test env and
+  `scripts/prepush.sh`, declared in `turbo.json`, and listed in
+  `ENVIRONMENT.md`. It hides a feature and protects nothing: what must stay
+  private needs the API's flag (below).
+
 ## A missing production variable fails loudly — **Current**
 
 A fallback to a production address hides a missing variable: the deployment

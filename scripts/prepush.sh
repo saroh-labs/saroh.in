@@ -325,6 +325,9 @@ e2e_stack() {
     # Resources pages before their publish date, as CI: without it the Help
     # and Privacy specs skip themselves and test nothing.
     export RESOURCES_PREVIEW=1
+    # Templates on, as CI (DEC-135): the gallery on saroh.in and the template
+    # picker in the app, which the templates specs open. Unset is off.
+    export NEXT_PUBLIC_TEMPLATES=on
     local web_filter=""
     case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,

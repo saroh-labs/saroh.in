@@ -107,6 +107,9 @@
         // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
         // plan sections appear once it is "open"; read at build.
         "NEXT_PUBLIC_LAUNCH_MODE",
+        // Templates' switch (DEC-135): saroh.in's gallery and the merchant
+        // app's template picker show only when it is "on"; read at build.
+        "NEXT_PUBLIC_TEMPLATES",
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.
         "SAROH_BUILT_ROUTES",

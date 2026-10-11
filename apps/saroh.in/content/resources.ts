@@ -5,8 +5,10 @@
  * things to read, so they sit in their own menu (owner, 10 Oct 2026).
  *
  * A page is shown — linked anywhere, or listed in the sitemap — only when
- * both hold:
+ * all of these hold:
  *
+ * - it is **not switched off** (`PublishContext.off`): Templates stays
+ *   hidden until its switch is on, whatever the date (DEC-135);
  * - it is **published**: its `publishOn` day has begun in India
  *   (`isPublished`, KTD-2), or the deployment is a preview with
  *   `RESOURCES_PREVIEW` on (`lib/resources-context.ts`);
@@ -167,6 +169,22 @@ export interface PublishContext {
      * (a unit test that does not care): then every route counts as built.
      */
     routes: readonly string[] | null;
+    /**
+     * The ids of Resources pages switched off (DEC-135): never shown,
+     * whatever the date or the preview flag, and nothing under them either.
+     * None when unset.
+     */
+    off?: readonly string[];
+}
+
+/** Whether `href` is a switched-off Resources page, or a page under one. */
+function switchedOff(href: string, ctx: PublishContext): boolean {
+    if (!ctx.off || ctx.off.length === 0) return false;
+    return RESOURCE_PAGES.some(
+        (p) =>
+            ctx.off?.includes(p.id) &&
+            (href === p.href || href.startsWith(`${p.href}/`)),
+    );
 }
 
 /** Whether `path` is answered by one of the build's routes, dynamic segments included. */
@@ -193,12 +211,16 @@ export function isLive(
     return ctx.preview || isPublished(page.publishOn, ctx.now);
 }
 
-/** Whether a page may be linked: live, and its route is in this build. */
+/** Whether a page may be linked: not switched off, live, and its route is in this build. */
 export function isShown(
     page: { publishOn: IsoDay; href: string },
     ctx: PublishContext,
 ): boolean {
-    return isLive(page, ctx) && routeExists(page.href, ctx.routes);
+    return (
+        !switchedOff(page.href, ctx) &&
+        isLive(page, ctx) &&
+        routeExists(page.href, ctx.routes)
+    );
 }
 
 /** The Resources pages the nav and footer list now, the free tools apart. */

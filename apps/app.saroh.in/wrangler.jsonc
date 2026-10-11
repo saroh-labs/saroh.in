@@ -68,6 +68,9 @@
         "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET": "sites.saroh.io",
         "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.dev",
+        // Choosing a template for a new website (DEC-135): "on" here.
+        // Production leaves it out, which is off: no template picker.
+        "NEXT_PUBLIC_TEMPLATES": "on",
     },
     "env": {
         "production": {
@@ -97,6 +100,8 @@
                 "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET": "saroh.app",
                 "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.app",
+                // The template picker is off while this is left out
+                // (DEC-135). To bring it back: "NEXT_PUBLIC_TEMPLATES": "on".
             },
             "services": [
                 {

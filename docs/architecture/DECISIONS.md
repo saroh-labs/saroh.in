@@ -1570,3 +1570,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A list the server reads a page at a time (Orders, Customers, Products, Stock) carries `page` and `size` in its address, so a page is a link; an address with no size opens at the remembered one. Its API reads a page by number and size. A list read whole pages in the browser: `DataView` does it for every screen it draws, `useLocalPages` for a table built by hand.
 - Left as they were: a card that is one of several on a screen (Notifications, grouped by day), and the histories inside a detail page, which still grow by "Show more".
 - Open: the size is kept per browser, not per person, so another device starts at 50. Orders pages by offset now, so an order placed while someone pages moves the rows one down; Export still walks the cursor, which cannot skip or repeat a row.
+
+## DEC-135 Templates stay off until they are switched on: no gallery on saroh.in, no template choice for a new website
+
+**Status: Accepted — 2026-10-11** · owner (the next production release shows no templates)
+
+- Context: the Templates gallery on saroh.in was dated to appear by itself on 17 Oct (`publishOn` in `content/resources.ts`), and the merchant app offered a template to choose on `/sites/new` and in the Website step of the Turn on sheet. The owner decided the next production release shows neither, and that no date may bring them back.
+- One switch per app, with the same name: `NEXT_PUBLIC_TEMPLATES`, `on` or `off`, read at build. Anything but `on` is off, unset included, so production is off by leaving it out. Unset counts as on only under `next dev`, so local work needs no setting. It is `on` in the development Workers' `vars` (saroh.io), in CI's browser-test stack and in `pnpm prepush --e2e`, so everything there is as before.
+- saroh.in, off: `/templates`, every `/templates/<slug>` and their share cards are a 404, and nothing lists or links them: the nav, the footer, the sitemap, `llms.txt` and the changelog's "See templates". A `?template=` on the waitlist is ignored. Neither the date nor `RESOURCES_PREVIEW` overrides the switch. On, the date rule is as it was: shown from 17 Oct, or earlier on a preview.
+- The merchant app, off: `/sites/new` and the Turn on sheet show no template and send none, so the API starts the site from the one for what is being set up (the starter for a business, Personal for "Just me", Portfolio for "A site for my work"). `?template=` on `/sites/new` is ignored.
+- Unchanged: a site already made from a template, its pages and its colourways. The API still lists templates and accepts one; the switch hides the choice and is not an access rule.
+- To bring them back: add `"NEXT_PUBLIC_TEMPLATES": "on"` to `env.production.vars` in `apps/saroh.in/wrangler.jsonc` and `apps/app.saroh.in/wrangler.jsonc`, and release. Each app is switched on its own.
+- Open: the changelog's launch entry still says a site can "Start from a template", which stays true (every site starts from one) but names what cannot be chosen yet. The switch is read at build, so flipping it takes a deploy of that app.
