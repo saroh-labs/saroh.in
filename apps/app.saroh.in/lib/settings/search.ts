@@ -3,6 +3,7 @@ import {
     SETTINGS_PAGES,
     settingsPagesFor,
 } from "@/components/shared/nav-items";
+import { mayChangePlan } from "@/lib/billing/plan-access";
 import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
@@ -213,12 +214,14 @@ export interface SettingsActor {
 /**
  * Does this actor hold `action`? The API's resolved permissions when there
  * are some, else what an owner or admin holds — the pages' own fallback.
+ * Changing the plan is the owner's alone (`mayChangePlan`), so an Admin
+ * with no permissions to read is not offered "Change plan".
  */
 function holds(actor: SettingsActor, action: string): boolean {
     if (actor.actions) return actor.actions.includes(action);
-    return (
-        actor.role === null || actor.role === "OWNER" || actor.role === "ADMIN"
-    );
+    if (actor.role === null) return true;
+    if (action === "billing:manage") return mayChangePlan(actor);
+    return actor.role === "OWNER" || actor.role === "ADMIN";
 }
 
 export interface SettingsHit {

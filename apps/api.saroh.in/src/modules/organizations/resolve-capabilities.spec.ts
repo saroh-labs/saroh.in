@@ -115,6 +115,9 @@ describe("allows / authorize", () => {
         });
         expect(allows(actor, "org:delete")).toBe(false);
         expect(() => authorize(actor, "org:delete")).toThrow(
+            /Only the owner can do this/,
+        );
+        expect(() => authorize(actor, "order:write")).toThrow(
             /Your role can't do this/,
         );
     });

@@ -142,7 +142,10 @@ export class OrganizationRolesService {
             .map((r) => ({
                 key: r.key,
                 label: r.label,
-                actions: r.actions as OrgAction[],
+                // What it may be given, never a stray stored string: a
+                // list that names an owner-only power (it can't be saved
+                // that way) shows, and resolves, without it.
+                actions: this.vetActions(r.actions),
                 ringTone: r.ringTone,
                 system: false,
                 members: held.get(r.key) ?? 0,

@@ -194,9 +194,20 @@ describe("searchSettings", () => {
                 href: "/settings/billing",
             },
         ]);
-        // An Admin opens Plan and billing, as the API reads it to them.
+        // An Admin opens Plan and billing, as the API reads it to them,
+        // and is never offered "Change plan": that is the owner's alone
+        // (DEC-131, amended 2026-10-11).
         expect(
             searchSettings("plan", { role: "ADMIN" }).map((h) => h.label),
+        ).toEqual(["Plan and billing", "Invoices from Saroh"]);
+        expect(
+            searchSettings("plan", {
+                role: "ADMIN",
+                actions: ["billing:read", "org:update"],
+            }).map((h) => h.label),
+        ).toEqual(["Plan and billing", "Invoices from Saroh"]);
+        expect(
+            searchSettings("plan", { role: "OWNER" }).map((h) => h.label),
         ).toEqual(["Plan and billing", "Change plan", "Invoices from Saroh"]);
         expect(searchSettings("plan", member)).toEqual([]);
         // Read but not change: the page, never "Change plan".

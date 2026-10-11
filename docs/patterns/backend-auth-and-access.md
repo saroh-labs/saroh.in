@@ -34,7 +34,7 @@ what the API allows.
 | Role       | What it may do                                                                                                                                                                                                                                                                                                          |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                                                                                                                     |
-| `ADMIN`    | Everything except `org:delete`.                                                                                                                                                                                                                                                                                         |
+| `ADMIN`    | Everything except the owner-only powers: `org:delete`, `org:address:update` and `billing:manage` (it reads Plan and billing with `billing:read`).                                                                                                                                                                       |
 | `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020) — plus `order:stage` (DEC-024, adopted): an order's kitchen view without money, and moving its stage. No leads, no pipeline, no money. |
 | `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                                                                                                                     |
 
@@ -190,8 +190,8 @@ what the API allows.
 - **Current** (F17, DEC-039) — **A person can hold extra permissions beyond
   their role.** `Membership.extraActions` (action keys, default empty).
   `resolveCapabilities(roleKey, stored, extras)` unites the role's set with
-  the extras, filtered by `extraActionsFor` (known actions only, never
-  `org:delete`, and for a Reviewer only `site:read`, `site:comment`,
+  the extras, filtered by `extraActionsFor` (known actions only, never an
+  owner-only power, and for a Reviewer only `site:read`, `site:comment`,
   `site:approve` — DEC-006), then runs `withImplied` over the union; with no
   extras it returns exactly the role's set. Every place that resolves a
   person passes their extras: `OrganizationContextService.resolve` and
@@ -292,11 +292,36 @@ what the API allows.
   the check repeated inside the transaction. It is a wind-down write, so a
   closing business lets its people go. `remove` still asks `member:remove`.
   `organization-leave.db.spec.ts`.
-- **Current** (DEC-131) — **Plan and billing follows its two permissions.**
-  The API reads it to `billing:read` and changes it with `billing:manage`
-  (Owner and Admin by default; `organization-policy.spec.ts` pins both).
-  The app's Settings tab, the page and every plan prompt ask the same two
-  (`lib/billing/plan-access.ts`), never the role's name.
+- **Current** (DEC-131, amended 2026-10-11) — **Only the Owner changes
+  what the business pays Saroh.** The API reads Plan and billing to
+  `billing:read` (Owner and Admin by default, and grantable) and changes it
+  with `billing:manage`, which is owner-only: it is in `OWNER_ONLY_ACTIONS`
+  with `org:delete` and `org:address:update`, and that one list is what
+  keeps it from everyone else.
+    - An Admin doesn't hold it (the built-in map leaves the list out).
+    - A role a business makes can't be given it: `ownerOnly` in the
+      catalogue, so the role editor never offers it and `vetActions` drops
+      it from a save.
+    - A stored list that names it anyway is read without it:
+      `roleCapabilities` drops owner-only powers from every row but the
+      Owner's, as it drops an unknown string.
+    - It is never an extra (`extraActionsFor`; a 400 on the write).
+    - Every write that changes what is paid asks it before reading
+      anything: `POST …/billing/change-plan` (a coupon rides on it),
+      `PUT …/billing/addons/:id`, `POST …/billing/checkout/confirm`,
+      `POST …/billing/subscribe`, `POST …/billing/cancel` and
+      `POST …/launch-offer`. `billing/plan-owner-only.spec.ts` names every
+      write route of the billing controller, so a new one fails until it is
+      listed and its guard proven.
+      The refusal is 403 "Only the owner can change the plan." with
+      `ROLE_DENIED` and the permission in `details`. Saroh's emails about a
+      bill go to who holds `billing:manage` (`billingRecipients`), so to the
+      Owners and no longer an Admin (to confirm, DEC-131). Every Owner of a
+      business may: nothing marks one of them as the payer. The app's Settings
+      tab, the page and every plan prompt ask the same two
+      (`lib/billing/plan-access.ts`), never the role's name. Operators acting
+      from the admin console run under their own context and are not part of
+      this.
 
 ## Rules
 
@@ -304,8 +329,11 @@ what the API allows.
   permission in `details`.** `authorize()` throws a 403 whose message is
   "Your role can't do this. An owner or admin can change that in Settings ›
   Team." and whose envelope carries `details: { code: "ROLE_DENIED", action }`
-  (`roleDenial(action)` in `organization-policy.ts`). Never a role's key or a
-  permission's in the message: it reaches the screen. An endpoint that says
+  (`roleDenial(action)` in `organization-policy.ts`). An owner-only power
+  never points at Settings › Team, where no role can be given it: it reads
+  "Only the owner can do this.", and for `billing:manage` "Only the owner
+  can change the plan." (`roleDeniedMessage`, 2026-10-11). Never a role's
+  key or a permission's in the message: it reaches the screen. An endpoint that says
   its own sentence (`requireBookingPower`, `customer-access.ts`) keeps it. A
   spec pins which permission refused with
   `rejects.toMatchObject({ response: roleDenial("site:update") })`, not by

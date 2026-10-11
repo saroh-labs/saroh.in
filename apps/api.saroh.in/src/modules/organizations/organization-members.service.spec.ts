@@ -1449,6 +1449,18 @@ describe("extra permissions per person (F17)", () => {
         expect(db.membership.updateMany).not.toHaveBeenCalled();
     });
 
+    it("refuses changing the Saroh plan as an extra (400), even from an Owner", async () => {
+        person("ADMIN");
+        await expect(
+            service.setExtraActions(ctx("OWNER"), "user_2", {
+                actions: ["billing:manage"],
+            }),
+        ).rejects.toThrow(
+            "Change the Saroh plan stays with the owner. It can't be given as an extra permission.",
+        );
+        expect(db.membership.updateMany).not.toHaveBeenCalled();
+    });
+
     it("refuses anyone without member:role:update (403), in words", async () => {
         person("MEMBER");
         await expect(

@@ -45,11 +45,12 @@ import { requireSession } from "@/lib/session";
  * a coupon, and Saroh's invoices to it.
  *
  * Opened by whoever the API reads it to (`billing:read`: Owner and Admin
- * by default), and changed by whoever it lets (`billing:manage`). The tab
- * (`SETTINGS_PAGES`), this page and every plan prompt ask the same two
- * (`lib/billing/plan-access.ts`), so none sends a person to a page that
- * turns them away. Someone who may read but not change sees the plan, the
- * plans and the invoices with no button to press, and who can.
+ * by default), and changed by the Owner alone (`billing:manage`, DEC-131
+ * amended 2026-10-11). The tab (`SETTINGS_PAGES`), this page and every plan
+ * prompt ask the same two (`lib/billing/plan-access.ts`), so none sends a
+ * person to a page that turns them away. Someone who may read but not
+ * change (an Admin) sees the plan, the plans and the invoices with no
+ * button to press, and that only the owner can.
  *
  * Reads degrade per source: the plan and access are the page (a failure is
  * the section's boundary); the price list, invoices, add-ons and checkouts
@@ -175,7 +176,7 @@ export default async function PlanBillingPage() {
                     <PartialRead things={partial} so={NOTHING_CHANGED} />
                 ) : null}
                 {canChange ? null : (
-                    <ReadOnlyNote className="mb-0">
+                    <ReadOnlyNote className="mb-0" ownerOnly>
                         Your role can read the plan but not change it.
                     </ReadOnlyNote>
                 )}

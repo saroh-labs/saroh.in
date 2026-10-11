@@ -22,6 +22,13 @@ const WHO = WHO_CAN_CHANGE;
 /** What only the owner's role holds, whoever else is asked. */
 const OWNER_ONLY = "Only the owner can do this.";
 
+/**
+ * What the business pays Saroh: the plan, an add-on, a coupon, the payment
+ * method (`billing:manage`, DEC-131 amended 2026-10-11). The API's own
+ * sentence for it.
+ */
+export const ONLY_OWNER_CHANGES_PLAN = "Only the owner can change the plan.";
+
 /** Said when the API named no permission, or one with no line below. */
 export const ROLE_DENIED_FALLBACK =
     "Your role can't do this. An owner or admin can change that in Settings › Team.";
@@ -78,11 +85,15 @@ const CANT: Readonly<Record<string, string>> = {
     "module:manage": "Your role can't turn modules on or off.",
 };
 
-/** What no role but the owner's is given (`OWNER_ONLY_ACTIONS` in the API). */
-const OWNERS: ReadonlySet<string> = new Set([
-    "org:delete",
-    "org:address:update",
-]);
+/**
+ * What no role but the owner's is given (`OWNER_ONLY_ACTIONS` in the API),
+ * and the sentence for each.
+ */
+const OWNERS: Readonly<Record<string, string>> = {
+    "org:delete": OWNER_ONLY,
+    "org:address:update": OWNER_ONLY,
+    "billing:manage": ONLY_OWNER_CHANGES_PLAN,
+};
 
 /** The refusal in an error's `details`, or null when it isn't one. */
 export function roleDeniedOf(
@@ -99,7 +110,8 @@ export function roleDeniedOf(
  * who can change it, else the plain line. Never the permission's key.
  */
 export function roleDeniedSentence(action: string | null | undefined): string {
-    if (action && OWNERS.has(action)) return OWNER_ONLY;
+    const owners = action ? OWNERS[action] : undefined;
+    if (owners) return owners;
     const cant = action ? CANT[action] : undefined;
     return cant ? `${cant} ${WHO}` : ROLE_DENIED_FALLBACK;
 }
