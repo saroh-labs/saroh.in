@@ -10,6 +10,13 @@ import { enqueueBillingEmail } from "./billing-email.job";
 import { planEndingNotice } from "./billing-emails";
 import { isOneTime } from "./billing-term";
 import { CatalogueAccessService } from "./catalogue-access.service";
+import {
+    claimDomainToldInTx,
+    domainEndingFor,
+    sweepDomains,
+} from "./domain-plan-notice";
+import type { DomainPlanService } from "./domain-plan.service";
+import { domainPlan } from "./domain-plan.service";
 import { noticeMoveDowns, pausesForMoveInTx } from "./move-down-notice";
 import { overLimit, OverLimitService } from "./over-limit.service";
 import {
@@ -51,7 +58,11 @@ import { remindEndingTerms } from "./term-ending-notice";
  *    move pauses; a move the business chose for its period's end, or one
  *    that already happened, is told here (`move-down-notice.ts`). Each
  *    notice that lists what pauses starts the 7-day clock (`over-limit.ts`).
- * 6. **Renewals** (#804). An autopay charge due within 3 days is told once,
+ * 6. **The business's own domain** (DEC-139). Steps 3 to 5 add a line when
+ *    the move stops the domain; this tells what they didn't, starts the
+ *    3-day clock when a plan stops including a domain, and says when the
+ *    domain is paused (`domain-plan.ts`, `domain-plan-notice.ts`).
+ * 7. **Renewals** (#804). An autopay charge due within 3 days is told once,
  *    by email (`renewal-reminder.ts`, `renewal-reminder-notice.ts`).
  */
 export const BILLING_MOVES_APPLY_TYPE = "billing.moves.apply";
@@ -78,6 +89,10 @@ export class MovesApplyHandler {
         private readonly access: CatalogueAccessService = new CatalogueAccessService(),
         @Optional()
         private readonly paused: OverLimitService = overLimit,
+        // Not a provider: every reader shares the one instance, so Nest
+        // injects nothing here and this stands (a spec passes its own).
+        @Optional()
+        private readonly domains: DomainPlanService = domainPlan,
     ) {}
 
     readonly handle = async (_job: Job): Promise<void> => {
@@ -140,13 +155,20 @@ export class MovesApplyHandler {
         }
         out.lapsed = await this.lapseCheckouts(now);
         out.reminded = await this.remindEndingPlans(now);
-        out.reminded += await remindEndingTerms(now, this.logger, this.paused);
+        out.reminded += await remindEndingTerms(
+            now,
+            this.logger,
+            this.paused,
+            this.domains,
+        );
         out.reminded += await noticeMoveDowns(
             now,
             this.logger,
             this.paused,
             this.access,
+            this.domains,
         );
+        out.reminded += await sweepDomains(now, this.logger, this.domains);
         out.reminded += await remindRenewals(now, this.logger);
         return out;
     }
@@ -281,6 +303,14 @@ export class MovesApplyHandler {
             organizationId,
             ending.endsAt,
         );
+        // Its own domain, when this end is what stops it (DEC-139).
+        const domain = await domainEndingFor(
+            organizationId,
+            ending.endsAt,
+            zone,
+            now,
+            this.domains,
+        );
         return prisma.$transaction(async (tx) => {
             const claim = await tx.customerNotice.createMany({
                 data: [
@@ -301,11 +331,20 @@ export class MovesApplyHandler {
                 zone,
                 now,
             );
+            if (domain) {
+                await claimDomainToldInTx(
+                    tx,
+                    organizationId,
+                    ending.endsAt,
+                    stage,
+                );
+            }
             const words = planEndingNotice({
                 planName: ending.planName,
                 nextPlanName: ending.nextPlanName,
                 endsOn,
                 pauses,
+                domain,
             });
             const notice = await tx.notification.create({
                 data: {
@@ -331,6 +370,7 @@ export class MovesApplyHandler {
                 nextPlanName: ending.nextPlanName,
                 endsOn,
                 pauses,
+                domain,
             });
             return true;
         });

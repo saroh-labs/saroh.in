@@ -1,4 +1,5 @@
 import type { PausesWords } from "./billing-emails";
+import type { DomainWords } from "./domain-plan";
 import type { PlanEndingStage } from "./plan-ending";
 import { PLAN_ENDING_NOTICE_DAYS } from "./plan-ending";
 
@@ -42,6 +43,8 @@ export type BillingEmailPayload =
           endsOn: string;
           /** What pauses then (#801), as the sweep told it; none: nothing. */
           pauses?: PausesWords | null;
+          /** The business's own domain, when this end stops it (DEC-139). */
+          domain?: DomainWords | null;
       }
     | {
           kind: "TERM_ENDING";
@@ -52,6 +55,8 @@ export type BillingEmailPayload =
           stage: PlanEndingStage;
           /** What pauses on Free (#801), as the sweep told it. */
           pauses?: PausesWords | null;
+          /** The business's own domain, when this end stops it (DEC-139). */
+          domain?: DomainWords | null;
       }
     | {
           kind: "MOVE_DOWN";
@@ -66,6 +71,24 @@ export type BillingEmailPayload =
           movesOn: string | null;
           pausesOn: string;
           lines: string[];
+          /** The business's own domain, when this move stops it (DEC-139). */
+          domain?: DomainWords | null;
+      }
+    | {
+          /**
+           * The domain's own notice (DEC-139), where no notice of the plan's
+           * end carried the line: `ending` ahead of a known end, `ended`
+           * once a plan stopped including a domain at once, `paused` when
+           * the 3 days are up.
+           */
+          kind: "DOMAIN";
+          organizationId: string;
+          /** The notice's once-only key: one email per notice. */
+          eventKey: string;
+          mode: "ending" | "ended" | "paused";
+          hostnames: string[];
+          stopsOn: string;
+          address: string | null;
       };
 
 function isPausesWords(v: unknown): v is PausesWords {
@@ -81,6 +104,23 @@ function isPausesWords(v: unknown): v is PausesWords {
 /** A payload's `pauses`, checked: anything malformed reads as none. */
 function pausesOf(p: Record<string, unknown>): PausesWords | null {
     return isPausesWords(p.pauses) ? p.pauses : null;
+}
+
+function isDomainWords(v: unknown): v is DomainWords {
+    if (!v || typeof v !== "object") return false;
+    const w = v as Record<string, unknown>;
+    return (
+        Array.isArray(w.hostnames) &&
+        w.hostnames.length > 0 &&
+        w.hostnames.every((h) => typeof h === "string") &&
+        typeof w.stopsOn === "string" &&
+        nullableString(w.address)
+    );
+}
+
+/** A payload's `domain`, checked: anything malformed reads as none. */
+function domainOf(p: Record<string, unknown>): DomainWords | null {
+    return isDomainWords(p.domain) ? p.domain : null;
 }
 
 function nullableString(v: unknown): v is string | null {
@@ -127,7 +167,11 @@ export function parseBillingEmailPayload(
         typeof p.nextPlanName === "string" &&
         typeof p.endsOn === "string"
     ) {
-        return { ...(p as object), pauses: pausesOf(p) } as never;
+        return {
+            ...(p as object),
+            pauses: pausesOf(p),
+            domain: domainOf(p),
+        } as never;
     }
     if (
         p.kind === "TERM_ENDING" &&
@@ -135,7 +179,11 @@ export function parseBillingEmailPayload(
         typeof p.endsAt === "string" &&
         PLAN_ENDING_NOTICE_DAYS.includes(p.stage as PlanEndingStage)
     ) {
-        return { ...(p as object), pauses: pausesOf(p) } as never;
+        return {
+            ...(p as object),
+            pauses: pausesOf(p),
+            domain: domainOf(p),
+        } as never;
     }
     if (
         p.kind === "MOVE_DOWN" &&
@@ -146,6 +194,14 @@ export function parseBillingEmailPayload(
         nullableString(p.nextPlanName) &&
         nullableString(p.movesOn) &&
         isPausesWords({ pausesOn: p.pausesOn, lines: p.lines })
+    ) {
+        return { ...(p as object), domain: domainOf(p) } as never;
+    }
+    if (
+        p.kind === "DOMAIN" &&
+        typeof p.eventKey === "string" &&
+        (p.mode === "ending" || p.mode === "ended" || p.mode === "paused") &&
+        isDomainWords(p)
     ) {
         return p as unknown as BillingEmailPayload;
     }

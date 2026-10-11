@@ -7,7 +7,8 @@
  * - `PLAN_LIMIT_REACHED` (403): one more would pass the plan's cap. Only
  *   adding is refused here; what is already past a lower cap pauses on its
  *   own rule (#800, `over-limit.ts`, `paused-errors.ts`).
- * - `MODULE_LOCKED` (403): the business's plan leaves the row off.
+ * - `MODULE_LOCKED` (403): the business's plan leaves the row off. Also
+ *   what connecting a domain answers on a plan without one (DEC-139).
  * - `BOOKINGS_PAUSED` (409): the booking page at the monthly cap. Said to a
  *   customer, so it names no plan, limit or price; the merchant hears why
  *   from their limit notice. Refused before any payment is taken.
@@ -117,6 +118,28 @@ export function moduleLocked(row: ModuleAccess): ForbiddenException {
             ? `${row.name} isn't in your ${row.plan} plan. It comes with ${up.name}.`
             : `${row.name} isn't in your ${row.plan} plan.`,
         details,
+    });
+}
+
+/**
+ * 403: connecting a domain on a plan that doesn't include one (DEC-139).
+ * No catalogue row sells a domain (`PAID_PLAN_SWITCHES`), so there is no
+ * row to name and no plan to point at: the app says it and offers the
+ * plans. `plan` is null for a business the catalogue doesn't reach.
+ */
+export function domainNotInPlan(
+    plan: { id: string; name: string } | null,
+): ForbiddenException {
+    return new ForbiddenException({
+        message: plan
+            ? `Your own domain isn't in your ${plan.name} plan.`
+            : "Your own domain isn't in your plan.",
+        details: {
+            code: MODULE_LOCKED,
+            moduleId: "customDomain",
+            plan,
+            upgradeTo: null,
+        },
     });
 }
 

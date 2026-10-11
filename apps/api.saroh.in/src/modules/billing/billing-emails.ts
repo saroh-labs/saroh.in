@@ -2,12 +2,20 @@
  * The words of Saroh's own billing mail to a business (pricing catalogue
  * U17): the invoice for a charge, a payment that failed, a first month
  * (DEC-093) or a free trial about to end, a plan about to renew (#804), a plan that ends on a date
- * (#805), a 12-month term about to end (DEC-100), and what a move to a
- * lower plan pauses (#801). Pure; every value is
+ * (#805), a 12-month term about to end (DEC-100), what a move to a
+ * lower plan pauses (#801), and what happens to the business's own domain
+ * when its plan stops including one (DEC-139). Pure; every value is
  * escaped, since a business's name is text its owner typed. Merchant
  * voice: say what happened and what happens next.
  */
 
+import type { DomainWords } from "./domain-plan";
+import {
+    domainEndedLine,
+    domainEndingLine,
+    domainNotice,
+    domainPausedLine,
+} from "./domain-plan";
 import { KEEP_EVERYTHING } from "./over-limit";
 
 export interface RenderedEmail {
@@ -83,6 +91,28 @@ export function pausesSentence(
     plan: PausesPlan = "new",
 ): string {
     const p = pausesParagraphs(pauses, plan);
+    return p.length ? ` ${p.join(" ")}` : "";
+}
+
+/**
+ * The paragraph a notice of a plan's end adds for the business's own domain
+ * (DEC-139); none when the end doesn't stop one. `ended`: the plan has
+ * already stopped including a domain (a move made now).
+ */
+export function domainParagraphs(
+    domain?: DomainWords | null,
+    ended = false,
+): string[] {
+    if (!domain || domain.hostnames.length === 0) return [];
+    return [ended ? domainEndedLine(domain) : domainEndingLine(domain)];
+}
+
+/** The same, run on for an inbox notice's body. */
+export function domainSentence(
+    domain?: DomainWords | null,
+    ended = false,
+): string {
+    const p = domainParagraphs(domain, ended);
     return p.length ? ` ${p.join(" ")}` : "";
 }
 
@@ -207,12 +237,15 @@ export function planEndingEmail(input: {
     endsOn: string;
     /** What pauses then (#801), when anything does. */
     pauses?: PausesWords | null;
+    /** Its own domain, when this end stops it (DEC-139). */
+    domain?: DomainWords | null;
 }): RenderedEmail {
     return {
         subject: `${input.businessName}'s ${input.planName} plan ends on ${input.endsOn}`,
         html: wrap(`Your ${input.planName} plan ends on ${input.endsOn}`, [
             `${input.businessName} is on the ${input.planName} plan until ${input.endsOn}. After that it moves to the ${input.nextPlanName} plan.`,
             ...pausesParagraphs(input.pauses),
+            ...domainParagraphs(input.domain),
             `Everything you made is kept. To stay on ${input.planName}, choose a plan in Settings › Plan before then.`,
         ]),
     };
@@ -224,10 +257,11 @@ export function planEndingNotice(input: {
     nextPlanName: string;
     endsOn: string;
     pauses?: PausesWords | null;
+    domain?: DomainWords | null;
 }): { title: string; body: string } {
     return {
         title: `Your ${input.planName} plan ends on ${input.endsOn}`,
-        body: `After that, your business moves to the ${input.nextPlanName} plan.${pausesSentence(input.pauses)} Everything you made is kept. To stay on ${input.planName}, choose a plan in Settings › Plan.`,
+        body: `After that, your business moves to the ${input.nextPlanName} plan.${pausesSentence(input.pauses)}${domainSentence(input.domain)} Everything you made is kept. To stay on ${input.planName}, choose a plan in Settings › Plan.`,
     };
 }
 
@@ -252,6 +286,8 @@ export function termEndingEmail(input: {
     chosenFree?: boolean;
     /** What pauses on Free (#801), when anything does. */
     pauses?: PausesWords | null;
+    /** Its own domain, when Free stops it (DEC-139). */
+    domain?: DomainWords | null;
 }): RenderedEmail {
     if (input.chosenFree) return freeChosenEmail(input);
     const done =
@@ -272,6 +308,7 @@ export function termEndingEmail(input: {
                 `To keep ${input.planName}, pay for the next term in Plan and billing. Paying starts your next term when this one ends.${price}`,
                 `If you don't pay, ${input.businessName} moves to the Free plan on ${input.endsOn}. Everything you made is kept.`,
                 ...pausesParagraphs(input.pauses),
+                ...domainParagraphs(input.domain),
             ],
             { label: "Pay for the next term", href: input.payUrl },
         ),
@@ -288,6 +325,7 @@ export function freeChosenEmail(input: {
     endsOn: string;
     payUrl: string;
     pauses?: PausesWords | null;
+    domain?: DomainWords | null;
 }): RenderedEmail {
     return {
         subject: `${input.businessName} moves to the Free plan on ${input.endsOn}`,
@@ -296,6 +334,7 @@ export function freeChosenEmail(input: {
             [
                 `${input.businessName}'s ${input.planName} plan ends on ${input.endsOn}, and the business moves to the Free plan, as you chose. Everything you made is kept.`,
                 ...pausesParagraphs(input.pauses),
+                ...domainParagraphs(input.domain),
                 `Changed your mind? Choose ${input.planName} again in Plan and billing before then.`,
             ],
             { label: "Open Plan and billing", href: input.payUrl },
@@ -308,13 +347,14 @@ export function freeChosenNotice(input: {
     planName: string;
     endsOn: string;
     pauses?: PausesWords | null;
+    domain?: DomainWords | null;
 }): {
     title: string;
     body: string;
 } {
     return {
         title: `Your plan moves to Free on ${input.endsOn}, as you chose`,
-        body: `Your ${input.planName} plan ends then.${pausesSentence(input.pauses)} Everything you made is kept. To keep ${input.planName}, choose it again in Plan and billing.`,
+        body: `Your ${input.planName} plan ends then.${pausesSentence(input.pauses)}${domainSentence(input.domain)} Everything you made is kept. To keep ${input.planName}, choose it again in Plan and billing.`,
     };
 }
 
@@ -323,13 +363,14 @@ export function termEndingNotice(input: {
     planName: string;
     endsOn: string;
     pauses?: PausesWords | null;
+    domain?: DomainWords | null;
 }): {
     title: string;
     body: string;
 } {
     return {
         title: `Your ${input.planName} term ends on ${input.endsOn}`,
-        body: `To keep ${input.planName}, pay for the next term in Plan and billing. If you don't, your business moves to Free on ${input.endsOn}.${pausesSentence(input.pauses)} Everything you made is kept.`,
+        body: `To keep ${input.planName}, pay for the next term in Plan and billing. If you don't, your business moves to Free on ${input.endsOn}.${pausesSentence(input.pauses)}${domainSentence(input.domain)} Everything you made is kept.`,
     };
 }
 
@@ -351,6 +392,8 @@ export interface MoveDownWords {
     movesOn: string | null;
     pausesOn: string;
     lines: string[];
+    /** Its own domain, when this move stops it (DEC-139). */
+    domain?: DomainWords | null;
     url: string;
 }
 
@@ -377,6 +420,7 @@ export function moveDownEmail(w: MoveDownWords): RenderedEmail {
                     { pausesOn: w.pausesOn, lines: w.lines },
                     pausesPlanOf(w.mode),
                 ),
+                ...domainParagraphs(w.domain, w.mode === "now"),
                 KEEP_EVERYTHING,
             ],
             { label: "Open Plan and billing", href: w.url },
@@ -397,6 +441,42 @@ export function moveDownNotice(
             : `Your business is now on the ${w.planName} plan, and has more than it includes.`;
     return {
         title: `Some things pause on ${w.pausesOn}`,
-        body: `${lead}${pausesSentence({ pausesOn: w.pausesOn, lines: w.lines }, pausesPlanOf(w.mode))} ${KEEP_EVERYTHING}`,
+        body: `${lead}${pausesSentence({ pausesOn: w.pausesOn, lines: w.lines }, pausesPlanOf(w.mode))}${domainSentence(w.domain, w.mode === "now")} ${KEEP_EVERYTHING}`,
+    };
+}
+
+/**
+ * The domain's own email (DEC-139), sent where no notice of the plan's end
+ * carried the line: ahead of a known end, once a plan stopped including a
+ * domain at once, and when the 3 days are up and the domain is paused.
+ */
+export function domainEmail(input: {
+    businessName: string;
+    mode: "ending" | "ended" | "paused";
+    domain: DomainWords;
+    url: string;
+}): RenderedEmail {
+    const { title } = domainNotice(input.mode, input.domain);
+    const many = input.domain.hostnames.length > 1;
+    const subject =
+        input.mode === "paused"
+            ? `${input.businessName}'s ${many ? "domains are" : "domain is"} paused`
+            : `${input.businessName}'s ${many ? "domains stop" : "domain stops"} showing its site on ${input.domain.stopsOn}`;
+    const line =
+        input.mode === "paused"
+            ? domainPausedLine(input.domain)
+            : input.mode === "ended"
+              ? domainEndedLine(input.domain)
+              : domainEndingLine(input.domain);
+    return {
+        subject,
+        html: wrap(
+            title,
+            [
+                line,
+                "Your website, and everything else you made, is kept. To keep your domain showing your site, choose a plan with your own domain in Plan and billing.",
+            ],
+            { label: "Open Plan and billing", href: input.url },
+        ),
     };
 }

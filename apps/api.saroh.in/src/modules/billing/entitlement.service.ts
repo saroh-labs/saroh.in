@@ -58,6 +58,19 @@ export class EntitlementService {
     }
 
     /**
+     * The plan the business reads now, for a refusal that names it; null
+     * for a business the catalogue doesn't reach.
+     */
+    async planOf(
+        organizationId: string,
+    ): Promise<{ id: string; name: string } | null> {
+        const a = await this.access.resolve(organizationId);
+        return a.source === "catalogue"
+            ? { id: a.planId, name: a.planName }
+            : null;
+    }
+
+    /**
      * What the business's plan grants before any raise: the plan it is on
      * (after a plan override), with grants, removals, set limits and
      * add-ons. What an operator's raise must beat (`raiseLimit`).

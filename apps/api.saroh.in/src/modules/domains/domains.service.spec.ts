@@ -20,6 +20,16 @@ jest.mock("@saroh/database", () => {
     };
 });
 
+// Where the business's domain stands against its plan (DEC-139): a stub,
+// so no test here reads a plan.
+const standingOrNull = jest.fn();
+jest.mock("../billing/domain-plan.service", () => ({
+    domainPlan: {
+        standingOrNull: (...args: unknown[]) =>
+            standingOrNull(...args) as unknown,
+    },
+}));
+
 import {
     BadRequestException,
     ConflictException,
@@ -47,6 +57,7 @@ function ent(): EntitlementService {
         can: entCan,
         check: jest.fn().mockResolvedValue(true),
         getEntitlements: jest.fn(),
+        planOf: jest.fn().mockResolvedValue({ id: "free", name: "Free" }),
     } as unknown as EntitlementService;
 }
 
@@ -153,9 +164,21 @@ describe("DomainsService.claim", () => {
         entCan.mockResolvedValueOnce(false); // FREE plan: customDomain is false
         domainFindUnique.mockResolvedValue(null); // hostname is otherwise free
 
-        await expect(
-            service.claim(ctx(), { hostname: "shop.acme.com" }),
-        ).rejects.toBeInstanceOf(ForbiddenException);
+        const refused = service.claim(ctx(), { hostname: "shop.acme.com" });
+        await expect(refused).rejects.toBeInstanceOf(ForbiddenException);
+        // Refused the way every plan refusal is (DEC-139): the code the app
+        // turns into its notice and the way to the plans.
+        await expect(refused).rejects.toMatchObject({
+            response: {
+                message: "Your own domain isn't in your Free plan.",
+                details: {
+                    code: "MODULE_LOCKED",
+                    moduleId: "customDomain",
+                    plan: { id: "free", name: "Free" },
+                    upgradeTo: null,
+                },
+            },
+        });
         expect(entCan).toHaveBeenCalledWith("org_1", "customDomain");
         expect(domainCreate).not.toHaveBeenCalled();
     });
@@ -406,6 +429,74 @@ describe("DomainsService.list", () => {
         expect(domainFindMany).toHaveBeenCalledWith({
             where: { organizationId: "org_1" },
             orderBy: { createdAt: "desc" },
+        });
+    });
+
+    it("says where each domain stands against the plan (DEC-139)", async () => {
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
+        domainFindMany.mockResolvedValue([
+            {
+                id: "dom_1",
+                hostname: "shop.example.com",
+                verificationToken: "tok_abc",
+                status: "VERIFIED",
+            },
+            {
+                id: "dom_2",
+                hostname: "new.example.com",
+                verificationToken: "tok_def",
+                status: "PENDING",
+            },
+        ]);
+        standingOrNull.mockResolvedValueOnce({
+            enforced: true,
+            plan: {
+                state: "paused",
+                since: new Date("2026-11-18T10:00:00.000Z"),
+            },
+            domains: [
+                {
+                    hostname: "shop.example.com",
+                    siteId: "site_1",
+                    subdomain: "yourshop",
+                },
+            ],
+        });
+
+        const listed = await service.list(ctx());
+
+        expect(standingOrNull).toHaveBeenCalledWith("org_1");
+        expect(listed[0].plan).toEqual({
+            state: "paused",
+            stopsAt: "2026-11-18T10:00:00.000Z",
+            sendsTo: "yourshop.saroh.app",
+        });
+        // A domain that serves no website yet has nowhere to send anyone.
+        expect(listed[1].plan).toEqual({
+            state: "paused",
+            stopsAt: "2026-11-18T10:00:00.000Z",
+            sendsTo: null,
+        });
+    });
+
+    it("reads a plan it can't read as including the domain", async () => {
+        const service = new DomainsService(new FakeDomainVerifier(), ent());
+        domainFindMany.mockResolvedValue([
+            {
+                id: "dom_1",
+                hostname: "shop.example.com",
+                verificationToken: "tok_abc",
+                status: "VERIFIED",
+            },
+        ]);
+        standingOrNull.mockResolvedValueOnce(null);
+
+        const listed = await service.list(ctx());
+
+        expect(listed[0].plan).toEqual({
+            state: "included",
+            stopsAt: null,
+            sendsTo: null,
         });
     });
 });

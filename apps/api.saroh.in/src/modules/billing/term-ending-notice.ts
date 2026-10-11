@@ -7,6 +7,9 @@ import { noticeOf } from "../notifications/notice-target";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { freeChosenNotice, termEndingNotice } from "./billing-emails";
 import { FREE_PLAN_ID } from "./catalogue-access.service";
+import { claimDomainToldInTx, domainEndingFor } from "./domain-plan-notice";
+import type { DomainPlanService } from "./domain-plan.service";
+import { domainPlan } from "./domain-plan.service";
 import { pausesForMoveInTx } from "./move-down-notice";
 import type { OverLimitService } from "./over-limit.service";
 import { overLimit } from "./over-limit.service";
@@ -26,18 +29,20 @@ import {
  * (`plan.ending`, opening the plans) and a `TERM_ENDING` billing email,
  * claimed as a `CustomerNotice` on one transaction. One that fails never
  * stops the rest. Returns how many were told. What Free then pauses
- * (#801) is listed too, and starts the 7-day clock.
+ * (#801) is listed too, and starts the 7-day clock; so is the business's
+ * own domain, when Free stops it (DEC-139).
  */
 export async function remindEndingTerms(
     now: Date,
     logger: Pick<Logger, "error">,
     svc: OverLimitService = overLimit,
+    domains: DomainPlanService = domainPlan,
 ): Promise<number> {
     const ids = await termEndingCandidates(prisma, now);
     let told = 0;
     for (const id of ids) {
         try {
-            if (await remindTerm(id, now, svc)) told += 1;
+            if (await remindTerm(id, now, svc, domains)) told += 1;
         } catch (error) {
             logger.error(
                 `term_ending_notice_failed subscription=${id}: ${String(error)}`,
@@ -51,6 +56,7 @@ async function remindTerm(
     subscriptionId: string,
     now: Date,
     svc: OverLimitService,
+    domains: DomainPlanService,
 ): Promise<boolean> {
     const ending = await termEndingOf(prisma, subscriptionId, now);
     if (!ending) return false;
@@ -68,6 +74,13 @@ async function remindTerm(
         term.endsAt,
         now,
     );
+    const domain = await domainEndingFor(
+        organizationId,
+        term.endsAt,
+        zone,
+        now,
+        domains,
+    );
     return prisma.$transaction(async (tx) => {
         const claim = await tx.customerNotice.createMany({
             data: [{ organizationId, eventKey, kind: TERM_ENDING_NOTICE_KIND }],
@@ -82,9 +95,12 @@ async function remindTerm(
             zone,
             now,
         );
+        if (domain) {
+            await claimDomainToldInTx(tx, organizationId, term.endsAt, stage);
+        }
         const words = ending.chosenFree
-            ? freeChosenNotice({ ...said, pauses })
-            : termEndingNotice({ ...said, pauses });
+            ? freeChosenNotice({ ...said, pauses, domain })
+            : termEndingNotice({ ...said, pauses, domain });
         const notice = await tx.notification.create({
             data: {
                 organizationId,
@@ -106,6 +122,7 @@ async function remindTerm(
             endsAt: term.endsAt.toISOString(),
             stage,
             pauses,
+            domain,
         });
         return true;
     });

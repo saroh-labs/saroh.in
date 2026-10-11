@@ -12,6 +12,7 @@ import type { BillingEmailPayload } from "./billing-email-payload";
 import { parseBillingEmailPayload } from "./billing-email-payload";
 import type { RenderedEmail } from "./billing-emails";
 import {
+    domainEmail,
     firstMonthEndingEmail,
     invoiceEmail,
     moveDownEmail,
@@ -20,6 +21,8 @@ import {
     termEndingEmail,
     trialEndingEmail,
 } from "./billing-emails";
+import type { DomainPlanService } from "./domain-plan.service";
+import { domainPlan } from "./domain-plan.service";
 import { paidFirstMonth } from "./offers";
 import { MOVE_DOWN_CLAIM_KIND } from "./over-limit";
 import { composeRenewalReminder } from "./renewal-reminder";
@@ -36,7 +39,8 @@ type Tx = Prisma.TransactionClient;
  * or a free trial ending (queued by U16), a plan about to renew (#804), a
  * plan that ends on a date (#805), a 12-month term that ends (DEC-100) and
  * a move to a lower plan
- * that pauses things (#801), all queued by the billing sweep. Written on the caller's transaction (the outbox),
+ * that pauses things (#801), and the business's own domain stopping with
+ * its plan (DEC-139), all queued by the billing sweep. Written on the caller's transaction (the outbox),
  * so the invoice or the failed charge and its email commit together, and a
  * mail provider that is down never undoes either: a send that fails throws,
  * and the queue retries it with backoff.
@@ -123,6 +127,8 @@ export class BillingEmailHandler {
         @Optional()
         @Inject(SAROH_BILLING_SENDER)
         private readonly send: SarohBillingSender = sendSarohBillingEmail,
+        @Optional()
+        private readonly domains: DomainPlanService = domainPlan,
     ) {}
 
     readonly handle = async (job: Job): Promise<void> => {
@@ -135,6 +141,7 @@ export class BillingEmailHandler {
         if (p.kind === "PLAN_ENDING") return this.planEnding(job, p);
         if (p.kind === "TERM_ENDING") return this.termEnding(job, p);
         if (p.kind === "MOVE_DOWN") return this.moveDown(job, p);
+        if (p.kind === "DOMAIN") return this.domain(job, p);
         if (p.kind === "RENEWAL") {
             // 3 days before an autopay charge (#804), re-read as the sweep
             // read it (`renewal-reminder.ts`).
@@ -334,6 +341,7 @@ export class BillingEmailHandler {
                 nextPlanName: p.nextPlanName,
                 endsOn: p.endsOn,
                 pauses: p.pauses,
+                domain: p.domain,
             });
         });
     }
@@ -377,6 +385,7 @@ export class BillingEmailHandler {
                 payUrl: `${appBase()}/settings/billing#change-plan`,
                 chosenFree: ending.chosenFree,
                 pauses: p.pauses,
+                domain: p.domain,
             });
         });
     }
@@ -414,6 +423,43 @@ export class BillingEmailHandler {
                 movesOn: p.movesOn,
                 pausesOn: p.pausesOn,
                 lines: p.lines,
+                domain: p.domain,
+                url: `${appBase()}/settings/billing#change-plan`,
+            });
+        });
+    }
+
+    /**
+     * The domain's own notice (DEC-139), sent once. Re-read: a business
+     * whose domain no longer stands where the notice said (it chose a plan
+     * with a domain, or the end moved) hears nothing.
+     */
+    private domain(
+        job: Job,
+        p: Extract<BillingEmailPayload, { kind: "DOMAIN" }>,
+    ): Promise<void> {
+        const eventKey = `saroh-billing:${p.eventKey}`;
+        return this.once(job, p.organizationId, eventKey, async () => {
+            const plan = await this.domains.stateOf(p.organizationId);
+            const stands =
+                p.mode === "ending"
+                    ? plan.state === "ending"
+                    : p.mode === "ended"
+                      ? plan.state === "grace"
+                      : plan.state === "paused";
+            if (!stands) return "domain_plan_changed";
+            const org = await prisma.organization.findUnique({
+                where: { id: p.organizationId },
+                select: { name: true },
+            });
+            return domainEmail({
+                businessName: org?.name ?? "your business",
+                mode: p.mode,
+                domain: {
+                    hostnames: p.hostnames,
+                    stopsOn: p.stopsOn,
+                    address: p.address,
+                },
                 url: `${appBase()}/settings/billing#change-plan`,
             });
         });
