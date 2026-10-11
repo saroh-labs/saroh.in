@@ -67,6 +67,13 @@ export interface FieldProps extends Omit<
     /** The label is for screen readers only (a cell in a table of fields). */
     labelHidden?: boolean;
     /**
+     * Say so when the label or the hint names a record (a customer, a
+     * courier, a product's own option): the whole field is then masked in a
+     * session recording. Left out, the label, the hint and the error are
+     * read as Saroh's own words. The control never is.
+     */
+    holdsData?: boolean;
+    /**
      * One control (it is given the wiring), a function that places the
      * wiring itself, or several controls, which the label then names as a
      * group.
@@ -86,6 +93,7 @@ function Field({
     htmlFor,
     group: asGroup = false,
     labelHidden = false,
+    holdsData = false,
     className,
     children,
     ...props
@@ -149,6 +157,7 @@ function Field({
             className={cn("min-w-0 space-y-1.5", className)}
             data-slot="field"
             data-invalid={invalid ? "" : undefined}
+            {...(holdsData ? { "data-ph-mask": "" } : {})}
             {...(group
                 ? {
                       role: "group",
@@ -161,6 +170,8 @@ function Field({
             {group ? (
                 <div
                     id={labelId}
+                    // A group's name, read as `Label`'s is.
+                    data-ph-unmask=""
                     className={cn(
                         "text-[0.78125rem] font-medium leading-none",
                         labelHidden && "sr-only",
@@ -201,6 +212,9 @@ const FieldError = React.forwardRef<
             ref={ref}
             role="alert"
             data-slot="field-error"
+            // What was wrong, in the form's own words: a session recording
+            // may read it. Digits and emails are hidden even here.
+            data-ph-unmask=""
             className={cn(
                 "text-[0.78125rem] font-medium leading-snug text-destructive",
                 className,
@@ -221,6 +235,9 @@ const FieldHint = React.forwardRef<
     <p
         ref={ref}
         data-slot="field-hint"
+        // Help text is Saroh's own words: a recording may read it. One that
+        // names a record says `data-ph-mask` (or the field `holdsData`).
+        data-ph-unmask=""
         className={cn(
             "text-[0.78125rem] leading-snug text-muted-foreground",
             className,

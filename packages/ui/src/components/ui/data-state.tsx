@@ -107,6 +107,13 @@ interface StateCardProps extends Omit<
     tone?: StateTone;
     /** Dashed reads as "a space waiting to be filled"; solid as "a wall". */
     outline?: "dashed" | "solid";
+    /**
+     * The title shows a record's own data (a search someone typed, a
+     * business's name), so a session recording masks it and still reads the
+     * description and the note. To mask the whole card, put `data-ph-mask`
+     * on it instead.
+     */
+    titleHoldsData?: boolean;
 }
 
 /** A title is a sentence once it sits in a line of them. */
@@ -129,9 +136,14 @@ function StateCard({
     note,
     tone = "neutral",
     outline = "dashed",
+    titleHoldsData = false,
     className,
     ...props
 }: StateCardProps) {
+    // One or the other on the title, never neither (`data-ph-mask` wins).
+    const titleMark = titleHoldsData
+        ? { "data-ph-mask": "" }
+        : { "data-ph-unmask": "" };
     if (size === "inline") {
         // One line: what is true, then the way on. The state's meaning is
         // in the words, since there is no border or shape left to carry it.
@@ -161,6 +173,7 @@ function StateCard({
                     where it is used: on the root, it wins over this. */}
                 <p data-ph-unmask="" className="min-w-0 text-pretty">
                     <span
+                        {...titleMark}
                         className={
                             tone === "danger"
                                 ? "font-medium text-foreground"
@@ -217,14 +230,14 @@ function StateCard({
                 is used. */}
             {panel ? (
                 <h3
-                    data-ph-unmask=""
+                    {...titleMark}
                     className="font-display text-[15px] font-semibold tracking-[-0.015em]"
                 >
                     {title}
                 </h3>
             ) : (
                 <h2
-                    data-ph-unmask=""
+                    {...titleMark}
                     className="font-display text-[19px] font-semibold tracking-[-0.025em]"
                 >
                     {title}
@@ -431,6 +444,12 @@ export function EmptyState(props: EmptyStateProps) {
                 tone="neutral"
                 icon={icon ?? (size === "page" ? <Search /> : undefined)}
                 title={title ?? noResultsTitle(things, cause, query)}
+                // Its own title repeats what was typed.
+                titleHoldsData={
+                    title === undefined &&
+                    cause === "search" &&
+                    Boolean(query?.trim())
+                }
                 action={action ?? clear}
                 {...rest}
             />
@@ -707,6 +726,8 @@ export function PausedState({
             data-state="paused"
             icon={icon}
             title={title ?? paused.title(business)}
+            // Its own title names the business.
+            titleHoldsData={title === undefined && Boolean(business?.trim())}
             description={description}
             note={note}
             outline="solid"
