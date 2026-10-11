@@ -17,6 +17,13 @@ import type { PublicInvoiceView } from "../payments/public-invoices.service";
 import { invoicePaper } from "../payments/public-invoices.service";
 import { PLANS_ON_SALE } from "../subscriptions/plan-on-sale";
 import {
+    readChanges,
+    readCourses,
+    readInvoicesDue,
+    readLinkPending,
+    readWaitlist,
+} from "./account-details-reads";
+import {
     readClasses,
     readLatestOrders,
     readNextBooking,
@@ -25,6 +32,7 @@ import {
 import { ownOrdersWhere } from "./account-orders.service";
 import type { AccountOffers } from "./account-tabs";
 import { accountTabs } from "./account-tabs";
+import { readVisit } from "./account-visit";
 import type { CustomerContext } from "./customer-context.decorator";
 import type {
     AccountBooking,
@@ -49,6 +57,7 @@ import { unreadCount } from "./thread-store";
 /**
  * The account area's reads and the customer's own changes to their details
  * (round-2 plan A, A5; ADR-011): Me, Home, receipts and health notes.
+ * Home also carries what DEC-142 added, read in `account-details-reads.ts`.
  *
  * Every read is scoped to the signed-in customer's business **and** contact
  * (`CustomerContext`, from `CustomerSessionGuard`), and runs in that
@@ -252,7 +261,19 @@ export class AccountHomeService {
 
     async home(ctx: Ctx, now: Date = new Date()): Promise<AccountHome> {
         const offers = await this.offers(ctx);
-        const [nextBooking, classes, orders, plan] = await Promise.all([
+        // When they were last here (DEC-142); reading Home moves the mark.
+        const visit = await block("visit", () => readVisit(ctx, now));
+        const [
+            nextBooking,
+            classes,
+            orders,
+            plan,
+            changes,
+            invoicesDue,
+            waitlist,
+            courses,
+            linkPending,
+        ] = await Promise.all([
             offers.appointments
                 ? block("next-booking", () => this.nextBooking(ctx, now))
                 : Promise.resolve(null),
@@ -261,8 +282,30 @@ export class AccountHomeService {
                 ? block("orders", () => this.latestOrders(ctx))
                 : Promise.resolve(null),
             block("plan", () => this.plan(ctx)),
+            // A visit that couldn't be read can't say what changed since.
+            visit.ok
+                ? block("changes", () => readChanges(ctx, visit.value))
+                : Promise.resolve<Block<never>>({ ok: false }),
+            block("invoices-due", () => readInvoicesDue(ctx, now)),
+            offers.appointments
+                ? block("waitlist", () => readWaitlist(ctx, now))
+                : Promise.resolve(null),
+            block("courses", () => readCourses(ctx, now)),
+            // Only words on an empty Home hang on it: unknown reads as no.
+            readLinkPending(ctx).catch(() => false),
         ]);
-        return { nextBooking, classes, orders, plan };
+        return {
+            nextBooking,
+            classes,
+            orders,
+            plan,
+            changes,
+            since: visit.ok ? (visit.value?.toISOString() ?? null) : null,
+            invoicesDue,
+            waitlist,
+            courses,
+            linkPending,
+        };
     }
 
     /** The next confirmed booking from now on, or null. */

@@ -7,6 +7,12 @@ import { goesByCourier, typeOf } from "../orders/fulfilment";
 import { isServiceLine, lineName } from "../orders/order-line";
 import type { PickupPlace } from "../stores/pickup-place";
 import { pickupPlaceOf } from "../stores/pickup-place";
+import type {
+    AccountChange,
+    AccountCourse,
+    AccountInvoiceDue,
+    AccountWaitlistPlace,
+} from "./account-details-view";
 import type { AccountTab } from "./account-tabs";
 import type { TrackState, TrackStep } from "./account-track";
 import { orderTrack, REFUND_LINE } from "./account-track";
@@ -28,6 +34,9 @@ import { orderTrack, REFUND_LINE } from "./account-track";
 export * from "./account-bookings-view";
 // A11's packs on sale and pack purchases: the same.
 export * from "./account-packs-view";
+// Invoices to pay, a class's line, courses, email choices and what changed
+// since the last visit (DEC-142): the same.
+export * from "./account-details-view";
 
 /** A read that failed says so; it never reads as "none" (A5). */
 export type Block<T> = { ok: true; value: T } | { ok: false };
@@ -298,6 +307,24 @@ export interface AccountHome {
     /** Null when the business doesn't sell. */
     orders: Block<AccountOrder[]> | null;
     plan: Block<AccountPlan | null>;
+    /**
+     * What changed since they were last here (DEC-142), newest first; none
+     * on a first visit. `since` is the visit it counts from.
+     */
+    changes: Block<AccountChange[]>;
+    since: string | null;
+    /** Their open invoices, the one due soonest first. */
+    invoicesDue: Block<AccountInvoiceDue[]>;
+    /** Their places in a class's line; null when the business takes no bookings. */
+    waitlist: Block<AccountWaitlistPlace[]> | null;
+    /** The courses they hold a seat on. */
+    courses: Block<AccountCourse[]>;
+    /**
+     * This account is on a separate contact until staff link it to the
+     * record the business already had (DEC-049, DEC-055): an empty Home
+     * says earlier orders and bookings may be waiting for that.
+     */
+    linkPending: boolean;
 }
 
 export interface AccountReceipt {

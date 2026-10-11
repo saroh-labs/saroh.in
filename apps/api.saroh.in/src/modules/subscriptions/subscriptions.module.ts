@@ -12,6 +12,10 @@ import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { chargeUnderWayOn } from "../payments/charge-under-way";
 import { PaymentsModule } from "../payments/payments.module";
+import {
+    AccountInvoicesController,
+    AccountInvoicesService,
+} from "../site-accounts/account-invoices.controller";
 import { AccountPlanController } from "../site-accounts/account-plan.controller";
 import type { AutopayChargePending } from "../site-accounts/account-plan.service";
 import {
@@ -71,6 +75,8 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         SubscriptionsController,
         PublicPlansController,
         AccountPlanController,
+        // The customer's open invoices and their "Pay now" (DEC-142).
+        AccountInvoicesController,
         AccountPlanJoinController,
         AccountAutopayController,
     ],
@@ -80,6 +86,7 @@ const CHAIN_CHECK_MS = 15 * 60 * 1000;
         SubscriptionRenewHandler,
         OrganizationGuard,
         AccountPlanService,
+        AccountInvoicesService,
         PublicPlanJoinService,
         // The customer turns autopay on from their account (D12).
         AccountAutopayService,

@@ -7,15 +7,17 @@ import type { NoticeKind } from "./notify-templates";
 /**
  * The way back from a notice's email to what it is about, on the
  * business's own site: the order's page for an order just placed, the
- * customer's bookings for a booking made or moved.
+ * booking's page for a booking made or moved.
  *
  * - **The customer's own site.** The one they last signed in on (a business
  *   may have more than one), at its primary address: its verified custom
  *   domain when it has one, else its Saroh address (`siteOriginOf`).
- * - **Only a page that is there.** The order's page shows a site order to
- *   whoever placed it, signed in, and asks a signed-out visitor to sign in.
- *   The bookings page exists only while the account area is on
- *   (`SITE_ACCOUNT_AREA`): off, a booking's email carries no link rather
+ * - **Only a page that is there.** While the account area is on
+ *   (`SITE_ACCOUNT_AREA`), both lead to the thing's own page in the account
+ *   (`/account/orders/‹id›`, `/account/bookings/‹id›`, DEC-142), which asks
+ *   a signed-out visitor to sign in and then stays on that page. Off, an
+ *   order's email leads to the shop's order page, which shows a site order
+ *   to whoever placed it, and a booking's email carries no link rather
  *   than one that opens a "not found".
  * - **Never a secret.** The address names the order by its id and nothing
  *   else: opening it shows nothing to anyone but its signed-in customer.
@@ -68,7 +70,12 @@ export function pathOf(subject: {
     bookingId?: string;
 }): string | null {
     if (subject.kind === "ORDER_PLACED" && subject.orderId) {
-        return `/shop/order/${encodeURIComponent(subject.orderId)}`;
+        const order = encodeURIComponent(subject.orderId);
+        // The order's own page in the account (DEC-142) while the area is
+        // on; off, the shop's order page, which is always there.
+        return accountAreaOn()
+            ? `/account/orders/${order}`
+            : `/shop/order/${order}`;
     }
     if (
         (subject.kind === "BOOKING_CONFIRMED" ||
@@ -76,7 +83,8 @@ export function pathOf(subject: {
         subject.bookingId &&
         accountAreaOn()
     ) {
-        return "/account/bookings";
+        // The booking's own page (DEC-142), so the email opens the thing.
+        return `/account/bookings/${encodeURIComponent(subject.bookingId)}`;
     }
     return null;
 }
