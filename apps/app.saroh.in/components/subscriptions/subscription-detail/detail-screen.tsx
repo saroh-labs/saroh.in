@@ -139,6 +139,7 @@ export function SubscriptionDetail({
         toggleSkip,
         newPayLink,
         chargeAgain,
+        rateStep,
     } = useSubscriptionActions(sub, plans, now, () => setStep(null));
 
     // The step came in the address; once opened, a refresh shouldn't reopen it.
@@ -476,6 +477,7 @@ export function SubscriptionDetail({
                 }}
                 onCancel={cancel}
             />
+            {rateStep}
             {canWrite && tab === "cancelled" ? (
                 <SubscribeDialog
                     open={restarting}

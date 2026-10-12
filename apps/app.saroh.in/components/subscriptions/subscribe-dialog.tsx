@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -34,6 +35,11 @@ function ymd(d: Date): string {
  * The first invoice is issued as they subscribe, so the button says so —
  * unless the start is still ahead, when it waits for that day.
  * The subscription keeps the browser's timezone for its renewal days.
+ *
+ * A GST-registered business's plan with no GST rate is asked for one here,
+ * in place (12 Oct 2026): the rate is saved on the plan, where it also
+ * reaches the members already on it at their next renewal, and the same
+ * subscription goes through.
  */
 export function SubscribeDialog({
     open,
@@ -63,6 +69,10 @@ export function SubscribeDialog({
     );
     const [start, setStart] = useState<Date | undefined>(new Date());
     const [busy, setBusy] = useState(false);
+    const rates = useGstRateStep({
+        then: "subscribe them",
+        continueLabel: "Save and subscribe",
+    });
 
     const plan = active.find((p) => p.id === planId);
     const person = contacts.find((c) => c.id === contactId);
@@ -75,16 +85,20 @@ export function SubscribeDialog({
     async function save() {
         if (!contactId) return showError("Choose who is subscribing.");
         if (!plan) return showError("Choose a plan.");
+        // No GST rate on the plan: chosen here, saved on it, then joined.
         const res = await runAction(
             () =>
-                subscribe({
-                    contactId,
-                    planId: plan.id,
-                    ...(start ? { startDate: ymd(start) } : {}),
-                    timezone: viewerTimeZone(),
-                }),
+                rates.run(() =>
+                    subscribe({
+                        contactId,
+                        planId: plan.id,
+                        ...(start ? { startDate: ymd(start) } : {}),
+                        timezone: viewerTimeZone(),
+                    }),
+                ),
             { setBusy },
         );
+        // Unreached, or the rate sheet was closed: nobody was subscribed.
         if (!res) return;
         if (!res.ok) {
             // The plan's notice replaces this sheet, with the way up.
@@ -104,73 +118,76 @@ export function SubscribeDialog({
     }
 
     return (
-        <FormSheet
-            open={open}
-            title="Subscribe someone"
-            description={renewalWords(autopayOffered).subscribe}
-            pending={busy}
-            doneOnly={active.length === 0}
-            doneLabel="Close"
-            saveLabel={startsLater ? "Subscribe" : "Subscribe and invoice"}
-            savingLabel="Subscribing…"
-            fieldsClassName="block"
-            onClose={() => onOpenChange(false)}
-            onSubmit={save}
-        >
-            {active.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">
-                    There is no plan to put anyone on yet. Make one in Plans
-                    first.
-                </p>
-            ) : (
-                <div className="grid gap-4">
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.who}>Who</Label>
-                        <ContactPicker
-                            id={ids.who}
-                            contacts={contacts}
-                            value={contactId}
-                            onValueChange={setContactId}
-                        />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.plan}>Plan</Label>
-                        <OptionSelect
-                            id={ids.plan}
-                            value={planId}
-                            onValueChange={setPlanId}
-                            options={active.map((p) => ({
-                                value: p.id,
-                                label: `${p.name} · ${formatMoneyMajor(p.price, p.currency, { decimals: "always" })} ${intervalWords(p.interval).per}`,
-                            }))}
-                        />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.start}>Starting</Label>
-                        <DatePicker
-                            id={ids.start}
-                            value={start}
-                            onValueChange={setStart}
-                            className="w-full"
-                            aria-describedby={`${ids.start}-help`}
-                        />
-                        {help ? (
-                            <p
-                                id={`${ids.start}-help`}
-                                className="text-[12px] leading-[1.5] text-muted-foreground"
-                            >
-                                {help}
-                            </p>
-                        ) : null}
-                    </div>
-                    <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
-                        The price is copied onto the subscription. Changing the
-                        plan later will not change what{" "}
-                        {person ? person.name.split(" ")[0] : "they"} pay
-                        {person ? "s" : ""}.
+        <>
+            <FormSheet
+                open={open}
+                title="Subscribe someone"
+                description={renewalWords(autopayOffered).subscribe}
+                pending={busy}
+                doneOnly={active.length === 0}
+                doneLabel="Close"
+                saveLabel={startsLater ? "Subscribe" : "Subscribe and invoice"}
+                savingLabel="Subscribing…"
+                fieldsClassName="block"
+                onClose={() => onOpenChange(false)}
+                onSubmit={save}
+            >
+                {active.length === 0 ? (
+                    <p className="text-[13px] text-muted-foreground">
+                        There is no plan to put anyone on yet. Make one in Plans
+                        first.
                     </p>
-                </div>
-            )}
-        </FormSheet>
+                ) : (
+                    <div className="grid gap-4">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor={ids.who}>Who</Label>
+                            <ContactPicker
+                                id={ids.who}
+                                contacts={contacts}
+                                value={contactId}
+                                onValueChange={setContactId}
+                            />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor={ids.plan}>Plan</Label>
+                            <OptionSelect
+                                id={ids.plan}
+                                value={planId}
+                                onValueChange={setPlanId}
+                                options={active.map((p) => ({
+                                    value: p.id,
+                                    label: `${p.name} · ${formatMoneyMajor(p.price, p.currency, { decimals: "always" })} ${intervalWords(p.interval).per}`,
+                                }))}
+                            />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor={ids.start}>Starting</Label>
+                            <DatePicker
+                                id={ids.start}
+                                value={start}
+                                onValueChange={setStart}
+                                className="w-full"
+                                aria-describedby={`${ids.start}-help`}
+                            />
+                            {help ? (
+                                <p
+                                    id={`${ids.start}-help`}
+                                    className="text-[12px] leading-[1.5] text-muted-foreground"
+                                >
+                                    {help}
+                                </p>
+                            ) : null}
+                        </div>
+                        <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
+                            The price is copied onto the subscription. Changing
+                            the plan later will not change what{" "}
+                            {person ? person.name.split(" ")[0] : "they"} pay
+                            {person ? "s" : ""}.
+                        </p>
+                    </div>
+                )}
+            </FormSheet>
+            {rates.step}
+        </>
     );
 }

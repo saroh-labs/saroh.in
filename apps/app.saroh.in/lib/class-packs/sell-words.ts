@@ -1,5 +1,7 @@
 import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { addedGst, addedGstWords } from "@/lib/gst/item-words";
 import { METHOD_WORD } from "@/lib/payments/method-words";
 import { absentText } from "@saroh/ui/lib/absent";
 
@@ -53,6 +55,35 @@ export interface SellPack {
     currency: string;
     kind?: PackKind;
     firstPackOnly?: boolean;
+    /** GST (12 Oct 2026): its rate, and its own way of carrying it. */
+    gstRate?: string | null;
+    gstPriceMode?: string | null;
+}
+
+/**
+ * What the desk takes for a pack: its price, or with GST on top where GST
+ * is added (the preview mirror in `lib/gst/price-mode.ts`; the invoice the
+ * API writes is the truth). `gst` is the business's standing; without it
+ * the price stands as typed.
+ */
+export function packToPay(pack: SellPack, gst?: GstAsk | null): string {
+    const added = addedGst(pack.price, pack, gst);
+    return added
+        ? formatMoney(added.payCents, pack.currency)
+        : formatMoneyMajor(pack.price, pack.currency);
+}
+
+/**
+ * "₹1,500 + ₹270 GST (18%) = ₹1,770 to pay", under the dialog's fields
+ * where GST is added to the pack's price. Null otherwise: the price is the
+ * amount to pay and nothing more is said.
+ */
+export function packGstLine(
+    pack: SellPack,
+    gst?: GstAsk | null,
+): string | null {
+    const added = addedGst(pack.price, pack, gst);
+    return added ? addedGstWords(added, pack.currency) : null;
 }
 
 const DAY_MS = 86_400_000;
@@ -158,11 +189,15 @@ export function sellFailure(error: string, packName: string, who: string) {
  * The line above the buttons. With Payments on, the plan's "Books nothing ·
  * invoice ₹X"; with it off, no invoice is mentioned, because none is made.
  */
-export function sellNote(pack: SellPack, invoicesOnSale: boolean): string {
+export function sellNote(
+    pack: SellPack,
+    invoicesOnSale: boolean,
+    gst?: GstAsk | null,
+): string {
     const kind = packKind(pack);
     const theirs = `The ${unitWord(kind, 2)} are on their account straight away.`;
     return invoicesOnSale
-        ? `Books nothing · invoice ${formatMoneyMajor(pack.price, pack.currency)}. ${theirs} Saroh doesn't send the invoice. Open it from Invoices to print it or mark it paid.`
+        ? `Books nothing · invoice ${packToPay(pack, gst)}. ${theirs} Saroh doesn't send the invoice. Open it from Invoices to print it or mark it paid.`
         : `Books nothing. ${theirs}`;
 }
 
@@ -171,9 +206,10 @@ export function sellLabel(
     pack: SellPack | undefined,
     paidBy: DeskPaidBy | "",
     invoicesOnSale: boolean,
+    gst?: GstAsk | null,
 ): string {
     if (pack && paidBy && paidBy !== "NONE") {
-        return `Take ${formatMoneyMajor(pack.price, pack.currency)}`;
+        return `Take ${packToPay(pack, gst)}`;
     }
     return invoicesOnSale ? "Sell and invoice" : "Sell";
 }

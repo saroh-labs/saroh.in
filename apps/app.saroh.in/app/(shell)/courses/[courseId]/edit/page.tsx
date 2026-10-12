@@ -7,6 +7,7 @@ import { CourseForm } from "@/components/courses/course-form";
 import { PageContainer } from "@/components/shared/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { getCourse } from "@/lib/courses/service";
+import { readMissingRates } from "@/lib/gst-rates/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Edit course" };
@@ -30,7 +31,12 @@ export default async function EditCoursePage({
         },
     });
     if (access.denied) return access.denied;
-    const course = await getCourse(courseId);
+    const [course, rates] = await Promise.all([
+        getCourse(courseId),
+        // Registered or not, and the business's way of carrying GST, as the
+        // Service Editor reads them. Unread asks for nothing.
+        readMissingRates(),
+    ]);
     if (!course) notFound();
 
     return (
@@ -72,6 +78,10 @@ export default async function EditCoursePage({
                     ]}
                     course={course}
                     defaultCurrency={course.currency}
+                    gst={{
+                        asked: rates?.registered === true,
+                        priceMode: rates?.priceMode ?? null,
+                    }}
                 />
             </div>
         </PageContainer>

@@ -93,8 +93,9 @@ export interface PlanEditorView {
      * that moves them bills the plan's price, and a price above a member's
      * limit is never charged (MANDATE_LIMIT_LOW) — they authorise again. The
      * editor warns as the price is typed. Members already on the plan keep
-     * the price they agreed to, so their autopay is never affected. Empty
-     * for a draft, which nobody can switch to.
+     * the price they joined at; what a change to the plan's GST does to
+     * their renewals, and to their autopay, is `renewalChange`. Empty for
+     * a draft, which nobody can switch to.
      */
     autopayLimits: AutopayLimit[];
     /**

@@ -4,8 +4,9 @@
  *
  * A GST-registered business chooses whether the prices it types include
  * GST or have GST added to them: once in Settings › Business › Tax and
- * invoices, and on a single service or product that is priced the other
- * way. A business that is not registered is never asked and is shown none
+ * invoices, and on a single service, product, course, class pack or
+ * membership plan that is priced the other way. A business that is not
+ * registered is never asked and is shown none
  * of these words.
  *
  * The maths here mirrors the API's rule in
@@ -113,9 +114,15 @@ export const PRICE_MODE_CHOICES: readonly {
     },
 ];
 
-/** Under the choices: what the choice covers, and what it leaves alone. */
+/**
+ * Under the choices: what the choice covers, and what it leaves alone. It
+ * covers everything sold with a rate of its own (12 Oct 2026: a course, a
+ * class pack and a membership plan too). A member keeps the price they
+ * joined at and pays by the choice from their next renewal, and nothing
+ * already charged or invoiced changes.
+ */
 export const PRICE_MODE_SMALL_PRINT =
-    "This is for the prices of your services and products. You can set a single service or product differently where you edit it. A delivery charge, a course, a class pack, a membership plan and a line you type on an invoice are charged as typed, with GST included. Orders and bookings already made keep what they were charged.";
+    "This is for the prices of your services, products, courses, class packs and membership plans. You can set any one of them differently where you edit it. Members already on a plan with a GST rate pay this way from their next renewal. Invoices already issued don't change, and orders and bookings already made keep what they were charged. A delivery charge and a line you type on an invoice are charged as typed, with GST included.";
 
 /** What the Settings save says. */
 export const PRICE_MODE_SAVED: Record<GstPriceMode, string> = {

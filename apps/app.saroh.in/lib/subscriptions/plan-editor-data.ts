@@ -1,3 +1,5 @@
+import { readMissingRates } from "@/lib/gst-rates/service";
+import type { GstAsk } from "@/lib/gst/item-words";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 
 import { plansShowClasses } from "./plan-cards";
@@ -14,9 +16,14 @@ import { getAutopayOffer, listPlans } from "./service";
  * - the currency a new plan is shown in: the API makes it the business's,
  *   and the newest plan's is the best guess before the first save;
  * - whether the business offers autopay (D14), so "how it's paid" promises
- *   it only then; a failed or older read is not offered.
+ *   it only then; a failed or older read is not offered;
+ * - for a plan not saved yet, whether it is asked for GST (a registered
+ *   business) and the business's own way of carrying it, from the
+ *   missing-rates read as the Service Editor's is. A saved plan's own read
+ *   says so itself. Unread asks for nothing.
  */
 export async function planEditorContext(planId: string | null): Promise<{
+    gst: GstAsk;
     takenNames: string[];
     withClasses: boolean;
     currency: string;
@@ -24,10 +31,11 @@ export async function planEditorContext(planId: string | null): Promise<{
     plan: Plan | null;
     autopayOffered: boolean;
 }> {
-    const [plans, modules, autopay] = await Promise.all([
+    const [plans, modules, autopay, rates] = await Promise.all([
         listPlans({ drafts: true }),
         modulesOrUnknown(),
         getAutopayOffer(),
+        planId === null ? readMissingRates() : Promise.resolve(null),
     ]);
     const appointments = modules
         ? modules.some(
@@ -45,5 +53,9 @@ export async function planEditorContext(planId: string | null): Promise<{
                 ?.currency ?? "INR",
         plan: mine[0] ?? null,
         autopayOffered: autopay?.offered ?? false,
+        gst: {
+            asked: rates?.registered === true,
+            priceMode: rates?.priceMode ?? null,
+        },
     };
 }

@@ -49,6 +49,14 @@ export interface Plan {
      * business's setting.
      */
     autopayChargeTiming?: AutopayChargeTiming | null;
+    /**
+     * GST (12 Oct 2026): the rate its price carries ("18"; null is not
+     * set), its SAC code, and its own way of carrying GST (null is the
+     * business's). Absent from an API before it.
+     */
+    gstRate?: string | null;
+    sacCode?: string | null;
+    gstPriceMode?: "INCLUDED" | "ADDED" | null;
 }
 
 /** One price people on a plan pay, and how many pay it. */

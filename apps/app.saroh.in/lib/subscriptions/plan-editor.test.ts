@@ -19,6 +19,7 @@ import {
     publishedText,
     whoPays,
 } from "./plan-editor";
+import type { RenewalChange } from "./renewal-change";
 
 const form = (over: Partial<PlanForm> = {}): PlanForm => ({
     name: "Monthly",
@@ -27,6 +28,9 @@ const form = (over: Partial<PlanForm> = {}): PlanForm => ({
     currency: "INR",
     interval: "MONTH",
     classes: "8",
+    gstRate: "",
+    sacCode: "",
+    gstPriceMode: "",
     ...over,
 });
 
@@ -50,6 +54,9 @@ const live: PlanEditorRecord = {
         currency: "INR",
         interval: "MONTH",
         classesPerMonth: 10,
+        gstRate: null,
+        sacCode: null,
+        gstPriceMode: null,
     },
     published: {
         name: "Monthly",
@@ -58,6 +65,9 @@ const live: PlanEditorRecord = {
         currency: "INR",
         interval: "MONTH",
         classesPerMonth: 8,
+        gstRate: null,
+        sacCode: null,
+        gstPriceMode: null,
     },
     canDelete: false,
     problems: [],
@@ -305,5 +315,199 @@ describe("how it's paid, and the side panel", () => {
             { label: "On it now", value: "0" },
             { label: "Coming in a month", value: "—" },
         ]);
+    });
+});
+
+describe("a plan's GST (12 Oct 2026)", () => {
+    const ADDS: RenewalChange = {
+        members: 12,
+        groups: [
+            { members: 12, currency: "INR", from: "1200.00", to: "1416.00" },
+        ],
+        changed: 12,
+        aboveAutopayLimit: 0,
+    };
+    const SAME: RenewalChange = {
+        members: 12,
+        groups: [
+            { members: 12, currency: "INR", from: "1200.00", to: "1200.00" },
+        ],
+        changed: 0,
+        aboveAutopayLimit: 0,
+    };
+
+    it("reads the API's values into the fields, and nothing as not set", () => {
+        expect(
+            formOf({
+                ...live.values,
+                gstRate: "18.00",
+                sacCode: "999723",
+                gstPriceMode: "ADDED",
+            }),
+        ).toMatchObject({
+            gstRate: "18",
+            sacCode: "999723",
+            gstPriceMode: "ADDED",
+        });
+        expect(formOf(live.values)).toMatchObject({
+            gstRate: "",
+            sacCode: "",
+            gstPriceMode: "",
+        });
+        expect(EMPTY_PLAN).toMatchObject({
+            gstRate: "",
+            sacCode: "",
+            gstPriceMode: "",
+        });
+    });
+
+    it("sends them as the API takes them: null is not set, or the same as the business", () => {
+        expect(payloadOf(form())).toMatchObject({
+            gstRate: null,
+            sacCode: null,
+            gstPriceMode: null,
+        });
+        expect(
+            payloadOf(
+                form({
+                    gstRate: "18",
+                    sacCode: " 9997 23 ",
+                    gstPriceMode: "ADDED",
+                }),
+            ),
+        ).toMatchObject({
+            gstRate: "18",
+            sacCode: "999723",
+            gstPriceMode: "ADDED",
+        });
+        // Exempt is a rate of its own, never "not set".
+        expect(payloadOf(form({ gstRate: "0" })).gstRate).toBe("0");
+    });
+
+    it("leaves out a SAC code the API would refuse, so the rest still saves", () => {
+        const sent = payloadOf(form({ gstRate: "18", sacCode: "99" }));
+        expect("sacCode" in sent).toBe(false);
+        expect(sent.gstRate).toBe("18");
+    });
+
+    it("asks a registered business's priced plan for its rate, and takes 0%", () => {
+        const asked = ctx({ gstAsked: true });
+        expect(planProblems(form(), asked)).toContainEqual({
+            field: "gstRate",
+            // The shell ends the sentence itself, as it does "Add the price".
+            message: "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
+        });
+        expect(planProblems(form({ gstRate: "0" }), asked)).toEqual([]);
+        expect(planProblems(form({ gstRate: "18" }), asked)).toEqual([]);
+        // Not priced yet: the price is asked for, the rate isn't.
+        expect(
+            planProblems(form({ price: "" }), asked).map((p) => p.field),
+        ).toEqual(["price"]);
+    });
+
+    it("never asks a business that isn't registered, and never blocks it", () => {
+        expect(planProblems(form(), ctx())).toEqual([]);
+        expect(planProblems(form(), ctx({ gstAsked: false }))).toEqual([]);
+        expect(planProblems(form({ sacCode: "99" }), ctx())).toEqual([]);
+    });
+
+    it("says a SAC code that isn't four to eight digits", () => {
+        expect(
+            planProblems(
+                form({ gstRate: "18", sacCode: "99" }),
+                ctx({ gstAsked: true }),
+            ),
+        ).toEqual([
+            { field: "sacCode", message: "A SAC code is 4 to 8 digits" },
+        ]);
+    });
+
+    it("lists a GST change under When you publish", () => {
+        expect(planChanges(form(), form({ gstRate: "18" }), true)).toEqual([
+            "GST rate not set → 18%",
+        ]);
+        expect(
+            planChanges(
+                form({ gstRate: "18" }),
+                form({ gstRate: "18", gstPriceMode: "ADDED" }),
+                true,
+            ),
+        ).toEqual(["GST on this price: GST is added"]);
+        expect(
+            planChanges(
+                form({ gstRate: "18", sacCode: "999723" }),
+                form({ gstRate: "12", sacCode: "" }),
+                true,
+            ),
+        ).toEqual(["GST rate 18% → 12%", "SAC code 999723 → not set"]);
+    });
+
+    it("never says members keep what they pay when their renewal changes", () => {
+        const note = changesNote(form(), form({ gstRate: "18" }), 12, ADDS);
+        expect(note).toBe(
+            "The 12 already on it keep the price they joined at. The GST changes what they pay from their next renewal.",
+        );
+        expect(note).not.toContain("Nobody's price changes");
+        expect(changesNote(form(), form({ gstRate: "18" }), 12, SAME)).toBe(
+            "The 12 already on it keep the price they joined at. Their next renewal stays the same amount.",
+        );
+        // With no GST change, as it always was.
+        expect(changesNote(form(), form({ price: "1500" }), 12)).toBe(
+            "The 12 already on it keep what they agreed to. Nobody's price changes under them.",
+        );
+    });
+
+    it("says what a publish did to the members on it", () => {
+        expect(publishedText("Monthly", true, 12, ADDS)).toBe(
+            "Changes published. The 12 already on it pay the new amount from their next renewal.",
+        );
+        expect(publishedText("Monthly", true, 12, SAME)).toBe(
+            "Changes published. The 12 already on it pay the same amount at their next renewal.",
+        );
+        expect(publishedText("Monthly", true, 12)).toBe(
+            "Changes published. The 12 already on it keep what they pay now.",
+        );
+        expect(publishedText("Monthly", false, 0, ADDS)).toBe(
+            "Monthly is open for sign-ups.",
+        );
+    });
+
+    it("warns switchers by the amount with GST on top, where GST is added", () => {
+        const limits = [{ limit: "1300.00", members: 2 }];
+        // ₹1,200 is under the limit as typed.
+        expect(autopayLimitWarning(form(), limits, "INR")).toBe("");
+        expect(
+            autopayLimitWarning(form({ gstRate: "18" }), limits, "INR", {
+                asked: true,
+                priceMode: "INCLUDED",
+            }),
+        ).toBe("");
+        // ₹1,200 + 18% is ₹1,416: over it.
+        expect(
+            autopayLimitWarning(form({ gstRate: "18" }), limits, "INR", {
+                asked: true,
+                priceMode: "ADDED",
+            }),
+        ).toBe(
+            "Autopay covers up to ₹1,300, so 2 members will need to authorise again",
+        );
+        // The plan's own way wins over the business's.
+        expect(
+            autopayLimitWarning(
+                form({ gstRate: "18", gstPriceMode: "ADDED" }),
+                limits,
+                "INR",
+                { asked: true, priceMode: "INCLUDED" },
+            ),
+        ).toContain("2 members will need to authorise again");
+        // Not registered: the typed price stands.
+        expect(
+            autopayLimitWarning(
+                form({ gstRate: "18", gstPriceMode: "ADDED" }),
+                limits,
+                "INR",
+                { asked: false, priceMode: null },
+            ),
+        ).toBe("");
     });
 });

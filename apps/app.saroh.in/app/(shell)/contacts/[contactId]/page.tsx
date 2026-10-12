@@ -169,6 +169,7 @@ export default async function PersonPage({
                               ? {
                                     packs: choices.packs,
                                     invoicesOnSale: choices.invoicesOnSale,
+                                    gst: choices.gst,
                                 }
                               : null,
                   )
@@ -243,6 +244,7 @@ export default async function PersonPage({
                     enrollments={enrollments}
                     courses={holdings.choices.courses}
                     invoicesOnEnrol={panels.paymentsOn}
+                    gst={holdings.choices.gst}
                     mentionInvoices={panels.mentionInvoices}
                 />
             ),

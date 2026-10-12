@@ -6,6 +6,9 @@ import type {
     EditorResult,
 } from "@/lib/editor-shell/types";
 
+import type { GstAsk, GstValues } from "@/lib/gst/item-words";
+
+import type { RenewalChange } from "./renewal-change";
 import type { Interval } from "./service";
 
 /**
@@ -19,8 +22,13 @@ import type { Interval } from "./service";
  * price) carries `field`.
  */
 
-/** A plan's publishable values. `price` is null on a draft not priced yet. */
-export interface PlanValues {
+/**
+ * A plan's publishable values. `price` is null on a draft not priced yet.
+ * Its GST (12 Oct 2026) is published with the price: the rate ("18"; null
+ * is not set), the SAC code, and the plan's own way of carrying GST (null
+ * is the business's).
+ */
+export interface PlanValues extends GstValues {
     name: string;
     description: string | null;
     price: string | null;
@@ -43,6 +51,18 @@ export type PlanEditorRecord = EditorRecord<PlanValues> & {
      * (D13), lowest first. Absent from an API before it; empty for a draft.
      */
     autopayLimits?: AutopayLimit[];
+    /**
+     * Whether the editor asks for GST: only a registered business's plan
+     * carries a rate. `priceMode` is the business's own way. Absent from an
+     * API before it, which asks for nothing.
+     */
+    gst?: GstAsk;
+    /**
+     * What publishing the GST shown does to the next renewal of the members
+     * already on the plan, said before Publish. Null when nobody is on it,
+     * or its GST is as published.
+     */
+    renewalChange?: RenewalChange | null;
 };
 
 /** Members whose autopay covers up to `limit` ("1500.00"). */

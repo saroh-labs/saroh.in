@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { setPackArchived } from "@/lib/class-packs/actions";
 import type { CardNote } from "@/lib/class-packs/pack-card-notes";
@@ -17,6 +18,8 @@ import type { PackListItem } from "@/lib/class-packs/pack-cards";
 import { orderForList, packCard } from "@/lib/class-packs/pack-cards";
 import type { MembershipPlan } from "@/lib/class-packs/packs-page";
 import type { HeldPack } from "@/lib/class-packs/sell-words";
+import type { MissingRates } from "@/lib/gst-rates/missing";
+import { gstAskOf } from "@/lib/gst-rates/missing";
 
 import { runAction } from "@/lib/api/run-action";
 import { ClassPacksTabs } from "./class-packs-tabs";
@@ -52,7 +55,13 @@ export function PacksScreen({
     rules,
     memberships,
     openSell,
+    missingRates = null,
 }: {
+    /**
+     * What is on sale with a price and no GST rate, for a GST-registered
+     * business; null when it couldn't be told, which draws nothing.
+     */
+    missingRates?: MissingRates | null;
     packs: PackListItem[];
     /** Each card's lines under its figures, by pack id (running out first). */
     notes?: Record<string, CardNote[]>;
@@ -161,6 +170,9 @@ export function PacksScreen({
                 className="mb-0"
             />
             <ClassPacksTabs current="packs" />
+            {/* Priced things on sale with no GST rate, for a registered
+                business: one line, and the sheet to choose them in. */}
+            <MissingRatesNotice missing={missingRates} />
 
             <p className="text-pretty text-[13px] text-foreground/80">
                 Changing a pack only changes what&apos;s sold next. Packs people
@@ -213,6 +225,7 @@ export function PacksScreen({
                     initialPackId={selling.packId}
                     invoicesOnSale={invoicesOnSale}
                     held={held}
+                    gst={gstAskOf(missingRates)}
                 />
             ) : null}
         </>

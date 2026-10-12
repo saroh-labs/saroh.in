@@ -1,6 +1,7 @@
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { gstHistoryLines } from "@/lib/gst/item-words";
 import { absentText } from "@saroh/ui/lib/absent";
 import type {
     Interval,
@@ -185,7 +186,12 @@ function classesSide(v: PlanEventValue | undefined): string {
     return typeof v === "number" && v > 0 ? `${v} a month` : "unlimited";
 }
 
-/** Each changed field as a phrase, in the order the plan reads. */
+/**
+ * Each changed field as a phrase, in the order the plan reads. A change to
+ * the plan's GST (12 Oct 2026) is recorded as a price change that may hold
+ * no price at all: its rate, its way of carrying GST and its SAC code are
+ * each said in their own words.
+ */
 function editPhrases(changes: Changes, currency: string): string[] {
     const out: string[] = [];
     const name = changes.name;
@@ -196,6 +202,7 @@ function editPhrases(changes: Changes, currency: string): string[] {
     }
     const price = pricePhrase(changes, currency);
     if (price) out.push(price);
+    out.push(...gstHistoryLines(changes));
     const cls = changes.classesPerMonth;
     if (cls) {
         out.push(

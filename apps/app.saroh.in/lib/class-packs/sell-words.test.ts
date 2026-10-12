@@ -5,6 +5,8 @@ import {
     DESK_PAID_BY,
     firstPackBlock,
     holdingNow,
+    packGstLine,
+    packToPay,
     paidByLabel,
     sellFailure,
     sellLabel,
@@ -153,5 +155,53 @@ describe("the note and the button", () => {
         expect(soldMessage("Asha Rao", ten, NOW, true)).toMatch(
             /The invoice is issued\.$/,
         );
+    });
+});
+
+describe("what the desk takes where GST is added (12 Oct 2026)", () => {
+    const ADDED = { asked: true, priceMode: "ADDED" } as const;
+    const INCLUDED = { asked: true, priceMode: "INCLUDED" } as const;
+    const rated: SellPack = { ...ten, gstRate: "18" };
+
+    it("adds the GST to the button, the invoice and a line of its own", () => {
+        expect(packToPay(rated, ADDED)).toBe("₹1,770");
+        expect(packGstLine(rated, ADDED)).toBe(
+            "₹1,500 + ₹270 GST (18%) = ₹1,770 to pay",
+        );
+        expect(sellLabel(rated, "UPI", true, ADDED)).toBe("Take ₹1,770");
+        expect(sellNote(rated, true, ADDED)).toContain(
+            "Books nothing · invoice ₹1,770.",
+        );
+    });
+
+    it("says nothing extra where the price includes GST", () => {
+        expect(packToPay(rated, INCLUDED)).toBe("₹1,500");
+        expect(packGstLine(rated, INCLUDED)).toBeNull();
+        expect(sellLabel(rated, "UPI", true, INCLUDED)).toBe("Take ₹1,500");
+    });
+
+    it("follows the pack's own way over the business's", () => {
+        expect(packToPay({ ...rated, gstPriceMode: "INCLUDED" }, ADDED)).toBe(
+            "₹1,500",
+        );
+        expect(packGstLine({ ...rated, gstPriceMode: "ADDED" }, INCLUDED)).toBe(
+            "₹1,500 + ₹270 GST (18%) = ₹1,770 to pay",
+        );
+    });
+
+    it("says the price as typed with no rate, an exempt one, or a business that isn't registered or wasn't read", () => {
+        expect(packGstLine(ten, ADDED)).toBeNull();
+        expect(packGstLine({ ...ten, gstRate: "0" }, ADDED)).toBeNull();
+        expect(
+            packGstLine(
+                { ...rated, gstPriceMode: "ADDED" },
+                { asked: false, priceMode: null },
+            ),
+        ).toBeNull();
+        expect(packGstLine(rated, null)).toBeNull();
+        expect(packGstLine(rated)).toBeNull();
+        expect(packGstLine(rated, { asked: true, priceMode: null })).toBeNull();
+        expect(sellLabel(rated, "UPI", true)).toBe("Take ₹1,500");
+        expect(sellNote(rated, true)).toContain("invoice ₹1,500.");
     });
 });

@@ -18,7 +18,8 @@ import {
 
 /**
  * One quiet line for a GST-registered business with priced things on sale
- * and no GST rate on them (12 Oct 2026): how many, and a button that opens
+ * (services, products, plans, class packs, courses) and no GST rate on them
+ * (12 Oct 2026): how many, and a button that opens
  * the sheet where each rate is chosen in its row. Nothing is drawn when
  * nothing is missing, when the business isn't registered, or when the read
  * couldn't tell (`missing` null). The sheet says whether the prices include
@@ -72,6 +73,7 @@ export function MissingRatesNotice({
                 saveLabel="Save"
                 requireAll={false}
                 note={listNote(mode, missing.more)}
+                priceMode={mode}
                 save={async (chosen) => {
                     const res = await saveGstRates(chosen);
                     return res.ok ? { ok: true } : res;

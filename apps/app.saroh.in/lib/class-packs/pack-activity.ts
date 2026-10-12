@@ -1,6 +1,7 @@
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { gstActivityWords } from "@/lib/gst/item-words";
 
 import type { PackKind } from "./pack-cards";
 import { unitWord } from "./pack-cards";
@@ -137,6 +138,12 @@ function changeWords(
                   : null;
         case "currency":
             return isStr(now) ? `currency ${now}` : null;
+        // The pack's GST (12 Oct 2026): its rate, its own way of carrying
+        // GST, and its SAC code.
+        case "gstRate":
+        case "gstPriceMode":
+        case "sacCode":
+            return gstActivityWords(field, was, now);
         default:
             return null;
     }

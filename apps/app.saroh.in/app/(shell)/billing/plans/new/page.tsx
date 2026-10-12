@@ -90,6 +90,7 @@ export default async function NewPlanPage() {
             withClasses={context.withClasses}
             autopayOffered={context.autopayOffered}
             currency={context.currency}
+            gst={context.gst}
             canEdit
         />
     );
