@@ -13,6 +13,66 @@ day. Until that deploy the site is exactly what it was the day before.
 Opening is the owner's call. This file lists what to do, in order, and what
 to look at afterwards. It changes no setting itself.
 
+## It opens by the clock: `LAUNCH_AT`
+
+The owner's call was made on 12 Oct 2026: early access opens on **17 Oct
+2026 at 16:00 IST (10:30 UTC)** with nobody doing anything at that moment.
+One line says so, `"LAUNCH_AT": "2026-10-17T16:00:00+05:30"`, in the
+production `vars` of three files: `apps/accounts.saroh.in/wrangler.jsonc`,
+`apps/saroh.in/wrangler.jsonc` and `apps/app.saroh.in/wrangler.jsonc`.
+The hand steps under "On the day" are now the fallback, not the plan.
+
+| What                              | How it opens                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Sign-up (accounts' prelaunch key) | At the instant, by itself: the gate reads the clock on every request. No deploy.                     |
+| "Start free", Sign in, Pricing    | The first production build of `web` at or after the instant is given `NEXT_PUBLIC_LAUNCH_MODE=open`. |
+| Plan and billing in the workspace | The first production build of `application` at or after the instant is given `NEXT_PUBLIC_PLANS=on`. |
+| That build                        | Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026, the only scheduled deploys there are.   |
+
+On the day, in UTC:
+
+- **09:45** the first run is due. GitHub starts schedules late, so it is
+  early on purpose: it waits for 10:30, then builds and deploys every app
+  to production from `main`. If GitHub starts it after 10:30 it deploys at
+  once.
+- **10:30** accounts opens. Until the site's new build is live (some
+  minutes), the site still says "Join the waitlist": sign-up is open and
+  nothing links to it yet. Never the loop: accounts always opens first.
+- **10:35** the second run is due. It deploys only an app whose live build
+  is not the open one, so nothing when the first run worked. It queues
+  behind the first run if that is still going.
+
+If neither run starts (GitHub drops schedules now and then), accounts is
+open all the same, and any production deploy of `web` and `application`
+after 10:30 opens them: Actions › "Build and deploy apps on Cloudflare" ›
+Run workflow (`app: all`, `environment: production`), the admin console's
+Deployments page, a pricing version going live (the API starts the site's
+deploy), or the next merge to `main`.
+
+Before the day, as well as the list below: the release holding `LAUNCH_AT`
+and the workflow's `schedule` is on `main` (schedules run from `main`) and
+deployed, so the accounts Worker has the value.
+
+**To move the launch:** change the three `LAUNCH_AT` lines (`pnpm run
+check:deploy-env` refuses three that differ) and the two cron lines in
+`deploy-frontends.yml` to match, and release before the old time: accounts
+reads the value its Worker was deployed with. The scheduled runs do nothing
+when `LAUNCH_AT` is more than 90 minutes away.
+**To call it off:** remove the three lines and release; delete the
+`schedule` block too. **To hold one app back whatever the date:** write its
+switch in its production `vars` (`"NEXT_PUBLIC_LAUNCH_MODE": "waitlist"`,
+`"NEXT_PUBLIC_PLANS": "off"`); for accounts, remove its `LAUNCH_AT`, and
+then hold the site back too.
+**To close again after opening:** the same, then deploy that app; accounts
+needs its deploy as well, since the gate reads the value on the Worker.
+
+**After the launch:** delete the `schedule` block and the `schedule)` case
+from `deploy-frontends.yml` (a cron line can't name a year; the job checks
+for 2026, but the lines should go), set accounts' `PRELAUNCH_GATE` to
+`"off"` so the unused key leaves the Worker, and write the switches into
+`vars` (`"NEXT_PUBLIC_LAUNCH_MODE": "open"`, `"NEXT_PUBLIC_PLANS": "on"`)
+before removing `LAUNCH_AT`.
+
 ## What is dated, and what is switched
 
 | Thing                        | What brings it                                                           | Where                                               |
@@ -43,6 +103,11 @@ the running build doesn't have.
 
 ## On the day, after 00:00 IST
 
+With `LAUNCH_AT` set, steps 1 and 2 happen by themselves at 16:00 IST and
+are here for opening by hand (sooner, or after the date was called off). A
+production deploy of `web` before 16:00 IST still brings the dated pages
+(step 3) and leaves the site in waitlist mode.
+
 Do these in order. Steps 1 and 2 are one change each to a `wrangler.jsonc`,
 merged to `main`; a merge to `main` deploys the apps whose build changed.
 
@@ -71,6 +136,9 @@ merged to `main`; a merge to `main` deploys the apps whose build changed.
 
 4. **Leave plans and templates off** unless the owner says otherwise today:
     - `NEXT_PUBLIC_PLANS` stays out of `apps/app.saroh.in/wrangler.jsonc`.
+      **Since 12 Oct the workspace's `LAUNCH_AT` turns plans on at
+      16:00 IST.** To keep them off, write `"NEXT_PUBLIC_PLANS": "off"`
+      there (or remove that file's `LAUNCH_AT`) before the day.
     - `NEXT_PUBLIC_TEMPLATES` stays out of both `wrangler.jsonc` files.
     - No catalogue is published and `PLAN_ENFORCEMENT` stays off
       (`PRICING_ROLLOUT.md`).

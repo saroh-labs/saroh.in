@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DEV_ACCESS_COOKIE, withDevAccess } from "./dev-access";
+import { DEV_ACCESS_COOKIE, launchInstant, withDevAccess } from "./dev-access";
 
 const KEY = "a-long-random-dev-key";
 
@@ -130,5 +130,93 @@ describe("withDevAccess — the dev environment's key", () => {
         vi.stubEnv("DEV_REDIRECT_ORIGIN", "");
         const res = await gate(request("https://app.saroh.io/"));
         expect(res.status).toBe(404);
+    });
+
+    it("stays shut with no LAUNCH_AT, whatever the time — the dev environment", async () => {
+        vi.stubEnv("LAUNCH_AT", "");
+        const late = withDevAccess(next, () => Date.UTC(2099, 0, 1));
+        const res = await late(request("https://app.saroh.io/orders"));
+        expect(res.status).toBe(307);
+        expect(next).not.toHaveBeenCalled();
+    });
+});
+
+describe("withDevAccess — accounts opens at LAUNCH_AT", () => {
+    const LAUNCH_AT = "2031-03-04T16:00:00+05:30";
+    const AT = Date.UTC(2031, 2, 4, 10, 30, 0);
+    const next = vi.fn(() => NextResponse.next());
+    let clock = 0;
+    const gate = withDevAccess(next, () => clock);
+    const signup = () => gate(request("https://accounts.saroh.in/signup"));
+
+    beforeEach(() => {
+        next.mockClear();
+        vi.stubEnv("DEV_ACCESS_KEY", KEY);
+        vi.stubEnv("DEV_REDIRECT_ORIGIN", "https://www.saroh.in");
+        vi.stubEnv("DEV_REDIRECT_PATH", "/waitlist");
+        vi.stubEnv("LAUNCH_AT", LAUNCH_AT);
+    });
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("reads the instant with its offset", () => {
+        expect(launchInstant(LAUNCH_AT)).toBe(AT);
+        expect(launchInstant("2031-03-04T10:30:00Z")).toBe(AT);
+        expect(launchInstant(" 2031-03-04T10:30Z ")).toBe(AT);
+    });
+
+    it("is locked the second before: no key, the waitlist", async () => {
+        clock = AT - 1000;
+        const res = await signup();
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toBe(307);
+        expect(res.headers.get("location")).toBe(
+            "https://www.saroh.in/waitlist",
+        );
+    });
+
+    it("still takes the key before it opens", async () => {
+        clock = AT - 1000;
+        const res = await gate(
+            request("https://accounts.saroh.in/signup", {
+                cookie: `${DEV_ACCESS_COOKIE}=${await digest(KEY)}`,
+            }),
+        );
+        expect(next).toHaveBeenCalledOnce();
+        expect(res.headers.get("X-Robots-Tag")).toBe("noindex, nofollow");
+    });
+
+    it("is open to everyone at the instant", async () => {
+        clock = AT;
+        await signup();
+        expect(next).toHaveBeenCalledOnce();
+    });
+
+    it("is open afterwards, to a form post too, and asks for no key", async () => {
+        clock = AT + 86_400_000;
+        const res = await gate(
+            request("https://accounts.saroh.in/signup?access=wrong", {
+                method: "POST",
+            }),
+        );
+        expect(next).toHaveBeenCalledOnce();
+        expect(res.status).toBe(200);
+        expect(res.headers.get("set-cookie")).toBeNull();
+    });
+
+    it.each([
+        "soon",
+        "2031-03-04",
+        "2031-03-04T16:00:00",
+        "2031-03-04 16:00:00+05:30",
+        "2031-13-40T16:00:00Z",
+        "1900000000000",
+        "true",
+    ])("stays locked on a LAUNCH_AT it can't read: %s", async (bad) => {
+        vi.stubEnv("LAUNCH_AT", bad);
+        expect(launchInstant(bad)).toBeNull();
+        clock = Date.UTC(2099, 0, 1);
+        const res = await signup();
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toBe(307);
     });
 });

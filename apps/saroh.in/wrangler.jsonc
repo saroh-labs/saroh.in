@@ -91,6 +91,15 @@
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
                 "NEXT_PUBLIC_GA_MEASUREMENT_ID": "G-7KKPRQXCJX",
+                // When early access opens: 17 Oct 2026, 4:00 pm in India
+                // (10:30 UTC). A build made at or after it is given
+                // NEXT_PUBLIC_LAUNCH_MODE "open" ("Start free", Sign in,
+                // Pricing; scripts/cf-env.mjs); a build before it is the
+                // waitlist site. The same line is in apps/accounts.saroh.in
+                // (its gate opens at this instant) and apps/app.saroh.in.
+                // To force either way whatever the date, write
+                // "NEXT_PUBLIC_LAUNCH_MODE": "waitlist" or "open" here.
+                "LAUNCH_AT": "2026-10-17T16:00:00+05:30",
                 // The Templates gallery is off while this is left out
                 // (DEC-135). To bring it back: "NEXT_PUBLIC_TEMPLATES": "on".
                 // Ad conversions (DEC-127): Google Ads and the Meta Pixel,

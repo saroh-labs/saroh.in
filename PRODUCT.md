@@ -99,6 +99,10 @@ SUGGESTION — so the first thing on screen is the most consequential.
   www.saroh.in; `off` and the next deploy takes the key away), and
   `saroh.in` sends every start button to `/waitlist` and shows no Sign in or
   Pricing until `NEXT_PUBLIC_LAUNCH_MODE` is `open` (`apps/saroh.in/lib/links.ts`).
+  The owner made the call on 12 Oct 2026 by setting a time: both open at
+  `LAUNCH_AT` in the apps' production vars (the gate at that instant, the
+  site with its first build after it;
+  `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`).
   Until then people join the waitlist (`WaitlistSignup`), and staff invite
   from it in `admin.saroh.in` (`waitlist:invite`); the invitation's sign-up
   link works once accounts is open

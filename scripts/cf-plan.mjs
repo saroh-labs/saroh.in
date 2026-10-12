@@ -14,6 +14,7 @@
  *   node scripts/cf-plan.mjs development            # JSON list to deploy
  *   node scripts/cf-plan.mjs production web,sites   # only these, if changed
  *   FORCE=1 node scripts/cf-plan.mjs development web  # deploy regardless
+ *   node scripts/cf-plan.mjs --launch-wait            # seconds to LAUNCH_AT
  *
  * Needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to read the live
  * fingerprints; without them, or when a Worker can't be read, the app counts
@@ -23,7 +24,7 @@ import { execFileSync } from "node:child_process";
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { appVars, parseJsonc } from "./cf-env.mjs";
+import { appVars, buildVars, launchInstant, parseJsonc } from "./cf-env.mjs";
 
 /** Turbo package name -> app directory. */
 export const APPS = {
@@ -44,9 +45,15 @@ export function workerName(dir, environment) {
         : config.name;
 }
 
-/** Turbo's hash of the app's build, with the environment's settings set. */
-export function fingerprint(pkg, environment) {
-    const env = { ...process.env, ...appVars(APPS[pkg], environment) };
+/**
+ * Turbo's hash of the app's build, with the environment's settings set: the
+ * ones a build would get now (`buildVars`). So the fingerprint changes when
+ * `LAUNCH_AT` passes, and the first push after it deploys the apps it opens
+ * instead of calling them unchanged. That needs every launch switch among
+ * turbo.json's hashed `globalEnv`, which scripts/cf-env.test.mjs checks.
+ */
+export function fingerprint(pkg, environment, now = new Date()) {
+    const env = { ...process.env, ...buildVars(APPS[pkg], environment, now) };
     const out = execFileSync(
         "pnpm",
         [
@@ -67,6 +74,26 @@ export function fingerprint(pkg, environment) {
     return `${environment}-${task.hash}`;
 }
 
+/** The scheduled launch run sleeps this long at most; further off, it isn't the launch. */
+export const LAUNCH_WAIT_MAX_SECONDS = 90 * 60;
+
+/**
+ * For the one-time scheduled launch run: how many seconds until every
+ * production app's `LAUNCH_AT` has passed (0 when it already has; a few
+ * seconds over, so the build's own clock is past it too), or "none" when the
+ * run should deploy nothing: no app has a `LAUNCH_AT`, one can't be read, or
+ * the launch is more than `LAUNCH_WAIT_MAX_SECONDS` away (it was moved).
+ */
+export function launchWait(launchAts, now) {
+    if (launchAts.length === 0) return "none";
+    const instants = launchAts.map(launchInstant);
+    if (instants.includes(null)) return "none";
+    const ms = Math.max(...instants) - now.getTime();
+    if (ms <= 0) return 0;
+    const seconds = Math.ceil(ms / 1000) + 5;
+    return seconds > LAUNCH_WAIT_MAX_SECONDS ? "none" : seconds;
+}
+
 async function liveFingerprint(worker) {
     const token = process.env.CLOUDFLARE_API_TOKEN;
     const account = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -84,6 +111,13 @@ async function liveFingerprint(worker) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+    if (process.argv[2] === "--launch-wait") {
+        const launchAts = Object.values(APPS)
+            .map((dir) => appVars(dir, "production").LAUNCH_AT)
+            .filter((value) => value !== undefined);
+        console.log(launchWait(launchAts, new Date()));
+        process.exit(0);
+    }
     const [environment, only] = process.argv.slice(2);
     if (environment !== "development" && environment !== "production") {
         console.error(
