@@ -73,6 +73,7 @@ export default async function ServiceEditorPage({
         hasPage,
         hasStorefront,
         payment,
+        gstRegistered,
         canEdit,
         timezone,
         currency,
@@ -95,6 +96,7 @@ export default async function ServiceEditorPage({
             hasStorefront={hasStorefront}
             paymentsLock={rowLock(access, "payments")}
             payment={payment}
+            gstRegistered={gstRegistered}
         />
     );
 }

@@ -309,6 +309,10 @@ module.exports = {
         // DEC-068: which business details are missing — pure (the refusals
         // and the flag after money are in business-details.db.spec.ts).
         "<rootDir>/src/modules/invoices/business-details.spec.ts",
+        // A tax invoice's unset GST rate: the refusal (pure), and the
+        // missing-rates read and save with a jest-mocked Prisma.
+        "<rootDir>/src/modules/invoices/gst-rate-required.spec.ts",
+        "<rootDir>/src/modules/invoices/gst-rates.service.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.

@@ -1,6 +1,7 @@
 import { InvoicesScreen } from "@/components/invoices/invoices-screen";
 import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
+import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import {
     listInvoicesIn,
@@ -54,7 +55,7 @@ export default async function InvoicesPage({
     const { tab, view, since } = query;
     const paidSince = sinceParam({ since });
     const only = scopeFromQuery(query);
-    const [{ rows: invoices, truncated }, business, paid, scope] =
+    const [{ rows: invoices, truncated }, business, paid, scope, missingRates] =
         await Promise.all([
             only ? listInvoicesIn(only) : listInvoices(),
             getInvoiceBusiness(),
@@ -62,6 +63,8 @@ export default async function InvoicesPage({
             // newest page `listInvoices` reads.
             paidSince ? listInvoicesPaidSince(paidSince) : null,
             only ? scopeWithName(only) : null,
+            // What is on sale with no GST rate; null draws no notice.
+            readMissingRates(),
         ]);
     const canWrite = permits(organization, "invoice:write");
 
@@ -88,6 +91,7 @@ export default async function InvoicesPage({
                 paidSinceInvoices={paid}
                 // Dates as the paper prints them: the business's zone (#836).
                 timeZone={invoiceZone(business)}
+                missingRates={missingRates}
             />
         </PageContainer>
     );

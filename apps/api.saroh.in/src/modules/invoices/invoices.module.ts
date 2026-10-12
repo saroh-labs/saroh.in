@@ -7,6 +7,8 @@ import { CommunicationsModule } from "../communications/communications.module";
 import { MediaModule } from "../media/media.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AccountThreadPosterService } from "../site-accounts/thread-poster";
+import { GstRatesController } from "./gst-rates.controller";
+import { GstRatesService } from "./gst-rates.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
 import { InvoiceSendService } from "./invoice-send.service";
 import { InvoicesController } from "./invoices.controller";
@@ -25,9 +27,11 @@ import { InvoicesService } from "./invoices.service";
         // Storage, for the business logo on the invoice PDF.
         MediaModule,
     ],
-    controllers: [InvoicesController],
+    controllers: [InvoicesController, GstRatesController],
     providers: [
         InvoicesService,
+        // The GST rates still to choose, and the save that chooses them.
+        GstRatesService,
         InvoiceSendService,
         InvoicePdfService,
         OrganizationGuard,

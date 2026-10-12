@@ -1,6 +1,8 @@
 import { isRoleRefusal, roleDeniedMessage } from "@/lib/api/role-denied";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import { planRefusalOf } from "@/lib/billing/refusal";
+import type { RateItem } from "@/lib/gst-rates/missing";
+import { rateItemsOf } from "@/lib/gst-rates/missing";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
 import { missingDetailsOf } from "@/lib/organizations/business-details";
 
@@ -28,6 +30,11 @@ export interface ApiFailure {
     field?: string;
     missing?: BusinessDetail[];
     plan?: PlanRefusal;
+    /**
+     * What has no GST rate (`GST_RATE_MISSING`): asked for in place, then
+     * the action runs again (`use-gst-rate-step.tsx`).
+     */
+    rates?: RateItem[];
     /** Refused by role: nothing broke. Shown as a notice (`reportFailure`). */
     denied?: true;
 }
@@ -55,6 +62,7 @@ export function toFailure(body: unknown, fallback: string): ApiFailure {
     const field = fieldOf(inner?.details) ?? fieldOf(b.details);
     const missing = missingDetailsOf(inner?.details ?? b.details);
     const plan = planRefusalOf(inner?.details ?? b.details, message);
+    const rates = rateItemsOf(inner?.details ?? b.details);
     const denied = roleDeniedMessage(body);
     const said = typeof message === "string" && message ? message : fallback;
     // An endpoint that words its own refusal ("Your role can't change
@@ -66,6 +74,7 @@ export function toFailure(body: unknown, fallback: string): ApiFailure {
         ...(field ? { field } : {}),
         ...(missing ? { missing } : {}),
         ...(plan ? { plan } : {}),
+        ...(rates ? { rates } : {}),
         ...(refused ? { denied: true as const } : {}),
     };
 }

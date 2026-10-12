@@ -56,6 +56,11 @@ export interface ProductEditorProps {
     currency: string;
     /** The business is GST-registered: Basics asks for a rate and HSN. */
     gstRegistered: boolean;
+    /**
+     * Known to be registered: a priced product can't be saved without its
+     * GST rate. Absent or false asks for nothing.
+     */
+    gstRateNeeded?: boolean;
     categories: CategoryChoice[];
     categoriesHref: string;
     options: ProductOptionView[];
@@ -122,6 +127,7 @@ function EditorBody({
     storeName,
     currency,
     gstRegistered,
+    gstRateNeeded = false,
     categories,
     categoriesHref,
     options,
@@ -373,6 +379,7 @@ function EditorBody({
                         storeId={storeId}
                         currency={currency}
                         gstRegistered={gstRegistered}
+                        gstRateNeeded={gstRateNeeded}
                         categories={categories}
                         manageCategoriesHref={categoriesHref}
                         onCategoryChange={(id) => void categoryChanged(id)}

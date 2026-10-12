@@ -11,7 +11,7 @@
 
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
-import { rateOption } from "@/lib/invoices/gst";
+import { GST_RATE_NEEDED, rateOption } from "@/lib/invoices/gst";
 import type { BookingPayment } from "@/lib/staff/types";
 import { absentText } from "@saroh/ui/lib/absent";
 
@@ -187,6 +187,40 @@ function isHttps(link: string): boolean {
     }
 }
 
+/**
+ * Whether the draft still has to choose its GST rate: a GST-registered
+ * business's service with a price above nothing and no rate. 0% is a rate
+ * ("exempt or nil-rated"); a free service is never asked, and neither is a
+ * business that isn't registered.
+ */
+export function needsGstRate(
+    draft: Pick<ServiceDraft, "price" | "gstRate">,
+    gstRegistered: boolean,
+): boolean {
+    if (!gstRegistered || draft.gstRate !== "") return false;
+    const price = toMinor(draft.price);
+    return price !== null && !Number.isNaN(price) && price > 0;
+}
+
+/**
+ * Where the GST rate and the SAC code sit. Beside the price for a
+ * registered business, which has to answer it. For a business that isn't
+ * registered they aren't drawn at all, unless one was saved before: that
+ * stays in view under More settings (00-universal §15). When the page
+ * couldn't tell (`null`), they stay under More settings as they were, and
+ * nothing is asked.
+ */
+export function gstPlace(
+    gstRegistered: boolean | null,
+    saved: Pick<ServiceDraft, "gstRate" | "sacCode">,
+): "price" | "more" | "none" {
+    if (gstRegistered === true) return "price";
+    if (gstRegistered === null) return "more";
+    return saved.gstRate !== "" || saved.sacCode.trim() !== ""
+        ? "more"
+        : "none";
+}
+
 /** The field a problem is about: where its sentence is shown. */
 export type ServiceField =
     | "name"
@@ -196,6 +230,7 @@ export type ServiceField =
     | "places"
     | "meetingUrl"
     | "price"
+    | "gstRate"
     | "staffIds"
     | "bufferBefore"
     | "timezone"
@@ -221,6 +256,11 @@ export function serviceFieldProblems(
     noStorefront = false,
     /** Exactly one person is on the diary. */
     onePerson = false,
+    /**
+     * The business is GST-registered: a priced service needs the rate its
+     * price includes, or its tax invoice shows no GST (12 Oct 2026).
+     */
+    gstRegistered = false,
 ): ServiceProblem[] {
     const problems: ServiceProblem[] = [];
     const say = (field: ServiceField, message: string) =>
@@ -266,6 +306,7 @@ export function serviceFieldProblems(
             "A deposit is part of the price. Set a price first, or take nothing at booking.",
         );
     }
+    if (needsGstRate(draft, gstRegistered)) say("gstRate", GST_RATE_NEEDED);
     if (hasStaff && !onePerson && draft.staffIds.length === 0) {
         say("staffIds", "Pick who takes it.");
     }
@@ -297,10 +338,16 @@ export function serviceProblems(
     noStorefront = false,
     /** Exactly one person is on the diary. */
     onePerson = false,
+    /** The business is GST-registered. */
+    gstRegistered = false,
 ): string[] {
-    return serviceFieldProblems(draft, hasStaff, noStorefront, onePerson).map(
-        (p) => p.message,
-    );
+    return serviceFieldProblems(
+        draft,
+        hasStaff,
+        noStorefront,
+        onePerson,
+        gstRegistered,
+    ).map((p) => p.message);
 }
 
 /** The first problem for a field (or a row of the hours), if it has one. */
@@ -409,14 +456,26 @@ export function changedParts(
     };
 }
 
-/** The sections whose fields differ from the saved draft, in page order. */
+/** The GST fields: under More settings, or beside the price (`gstPlace`). */
+const GST_KEYS: (keyof ServiceDraft)[] = ["gstRate", "sacCode"];
+
+/**
+ * The sections whose fields differ from the saved draft, in page order.
+ * `gstWithPrice`: the GST rate and SAC code are drawn under Price (a
+ * GST-registered business), so a change to them is named there.
+ */
 export function changedSections(
     saved: ServiceDraft,
     draft: ServiceDraft,
+    gstWithPrice = false,
 ): string[] {
-    return SECTIONS.filter(([, keys]) =>
-        keys.some((k) => !same(saved, draft, k)),
-    ).map(([name]) => name);
+    return SECTIONS.map(([name, keys]): [string, (keyof ServiceDraft)[]] => {
+        if (!gstWithPrice) return [name, keys];
+        if (name === "Price") return [name, [...keys, ...GST_KEYS]];
+        return [name, keys.filter((k) => !GST_KEYS.includes(k))];
+    })
+        .filter(([, keys]) => keys.some((k) => !same(saved, draft, k)))
+        .map(([name]) => name);
 }
 
 function bookingsCount(n: number): string {

@@ -14,6 +14,7 @@ import {
     WRITE_TIMEOUT_MS,
 } from "@/lib/api/unreached";
 import type { PlanRefusal } from "@/lib/billing/refusal";
+import type { RateItem } from "@/lib/gst-rates/missing";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
 import { pickActive } from "@/lib/organizations/choose";
 
@@ -55,6 +56,8 @@ export type CrmResult<T> =
           missing?: BusinessDetail[];
           /** Its plan refused it (U13); shown as the notice (`reportFailure`). */
           plan?: PlanRefusal;
+          /** What has no GST rate; asked for in place (`failure.ts`). */
+          rates?: RateItem[];
           /** Refused by role (`role-denied.ts`): a notice, not an error. */
           denied?: true;
           /**
@@ -305,12 +308,13 @@ export async function mutate<T>(
             return { ok: true, data: (data ?? {}) as T };
         }
         const by = saidBy(res);
-        const { missing, plan, denied } = toFailure(data, fallback);
+        const { missing, plan, rates, denied } = toFailure(data, fallback);
         return {
             ok: false,
             error: readError(data, fallback),
             ...(missing ? { missing } : {}),
             ...(plan ? { plan } : {}),
+            ...(rates ? { rates } : {}),
             ...(denied ? { denied } : {}),
             ...(by === "signed-out" ? { expired: true as const } : {}),
             ...(by === "unreached" ? { unreached: true as const } : {}),

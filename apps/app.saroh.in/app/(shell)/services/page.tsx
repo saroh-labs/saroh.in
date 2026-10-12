@@ -5,6 +5,7 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { ServicesScreen } from "@/components/services/services-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { whoCanChange } from "@/components/shared/who-can-change";
+import { readMissingRates } from "@/lib/gst-rates/service";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -27,7 +28,9 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
  * the bookings read (how each is used) and the sites read (whether there is
  * a booking page) degrade on their own and say so. The module list, for
  * "Also sell" (E12), leaves the card out when it can't be read; how people
- * pay (DEC-088) marks nothing when it can't.
+ * pay (DEC-088) marks nothing when it can't. A GST-registered business with
+ * priced things on sale and no GST rate reads one line saying so, with the
+ * sheet to choose them in; unread, it says nothing.
  */
 export const metadata = { title: "Services" };
 
@@ -43,7 +46,7 @@ async function servicesDenied() {
 
 export default async function ServicesPage() {
     await requireSession();
-    const [read, staffList, hasPage, canEdit, modules, payment] =
+    const [read, staffList, hasPage, canEdit, modules, payment, missingRates] =
         await Promise.all([
             readServices(),
             readStaffOrNull(),
@@ -51,6 +54,8 @@ export default async function ServicesPage() {
             readCanEditServices(),
             modulesOrUnknown(),
             readBookingPayment(),
+            // What is on sale with no GST rate; null draws no notice.
+            readMissingRates(),
         ]);
 
     if (!read.ok) {
@@ -110,6 +115,7 @@ export default async function ServicesPage() {
                     payment={payment}
                     alsoSell={alsoSellFeatures(modules)}
                     modules={modules ?? []}
+                    missingRates={missingRates}
                 />
             </div>
         </PageContainer>
