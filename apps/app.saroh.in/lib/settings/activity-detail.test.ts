@@ -314,6 +314,20 @@ describe("activityDetail — what changed", () => {
         ]);
         expect(
             rows({
+                action: "gst-rate.set",
+                targetId: "svc1",
+                metadata: {
+                    kind: "SERVICE",
+                    name: "Personal Training",
+                    from: null,
+                    to: "18",
+                },
+            }),
+        ).toEqual([
+            { label: "Personal Training", before: "Not set", after: "18%" },
+        ]);
+        expect(
+            rows({
                 action: "product.sold-out.mark",
                 targetId: "p1",
                 metadata: { product: "Rye loaf", storefront: "Hill Road" },

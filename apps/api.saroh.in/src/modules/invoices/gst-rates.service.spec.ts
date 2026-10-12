@@ -6,9 +6,13 @@ jest.mock("@saroh/database", () => {
     const client = {
         service: {
             findMany: jest.fn(),
+            // The name and the rate before, for the activity log.
+            findFirst: jest.fn(),
             updateMany: jest.fn(),
             count: jest.fn(),
         },
+        // Who chose a service's, a product's or a course's rate.
+        auditEvent: { create: jest.fn() },
         product: {
             findMany: jest.fn(),
             // What the MRP rule reads before a product's rate is saved.
@@ -32,6 +36,7 @@ jest.mock("@saroh/database", () => {
         packEvent: { create: jest.fn() },
         course: {
             findMany: jest.fn(),
+            findFirst: jest.fn(),
             updateMany: jest.fn(),
             count: jest.fn(),
         },
@@ -392,6 +397,38 @@ describe("saving rates", () => {
             where: { id: "prod_bread", organizationId: "org_1" },
             data: { gstRate: "0" },
         });
+    });
+
+    it("keeps who chose a service's rate, with the rate before and after", async () => {
+        services.findFirst!.mockResolvedValue({
+            name: "Personal Training",
+            gstRate: null,
+        });
+        await rates.set(owner, one("SERVICE", "18"));
+        expect(db.auditEvent!.create).toHaveBeenCalledTimes(1);
+        expect(db.auditEvent!.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "gst-rate.set",
+                actorUserId: owner.userId,
+                organizationId: "org_1",
+                targetType: "service",
+                metadata: {
+                    kind: "SERVICE",
+                    name: "Personal Training",
+                    from: null,
+                    to: "18",
+                },
+            }),
+        });
+    });
+
+    it("keeps nothing when no rate was written", async () => {
+        services.updateMany!.mockResolvedValue({ count: 0 });
+        services.count!.mockResolvedValue(1);
+        await rates
+            .set(owner, { ...one("SERVICE", "18"), fill: true })
+            .catch(() => undefined);
+        expect(db.auditEvent!.create).not.toHaveBeenCalled();
     });
 
     it("refuses a rate GST does not have, before anything is written", async () => {

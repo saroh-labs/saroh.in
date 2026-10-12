@@ -83,6 +83,9 @@ export const ACTIVITY_ACTIONS = [
     "customer.details.changed",
     "customer.removed",
     "member.alerts.update",
+    // A GST rate chosen for a service, a product or a course from the rates
+    // sheet: whoever was at the desk can fill a missing one (12 Oct 2026).
+    "gst-rate.set",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -157,6 +160,57 @@ const business = (tab?: BusinessTab) => ({
         ? `/settings/organization?${BUSINESS_TAB_PARAM}=${tab}`
         : "/settings/organization",
 });
+
+/** "18%", "0%", as a GST rate is said in a sentence. */
+export function gstRateSaid(rate: unknown): string | null {
+    const said = text(rate);
+    return said ? `${said}%` : null;
+}
+
+const RATED_WORD: Readonly<Partial<Record<string, string>>> = {
+    SERVICE: "service",
+    PRODUCT: "product",
+    COURSE: "course",
+};
+
+/**
+ * A GST rate chosen for something sold, as the rest of a sentence: "set the
+ * GST rate of Personal Training to 18%". A rate that was already there is
+ * said too: "changed … from 5% to 18%".
+ */
+function gstRateWhat(meta: Record<string, unknown>): string {
+    const what =
+        text(meta.name) ?? `a ${RATED_WORD[text(meta.kind) ?? ""] ?? "price"}`;
+    const to = gstRateSaid(meta.to) ?? "a rate";
+    const from = gstRateSaid(meta.from);
+    return from
+        ? `changed the GST rate of ${what} from ${from} to ${to}`
+        : `set the GST rate of ${what} to ${to}`;
+}
+
+/** Where a rated thing is edited: its own page, or its list. */
+function gstRatePlace(
+    id: string | null,
+    meta: Record<string, unknown>,
+): ActivityLine["where"] {
+    const name = text(meta.name);
+    switch (text(meta.kind)) {
+        case "SERVICE":
+            return {
+                label: name ?? "Services",
+                href: id ? `/services/${id}` : "/services",
+            };
+        case "COURSE":
+            return { label: name ?? "Courses", href: "/courses" };
+        default:
+            return id
+                ? {
+                      label: name ?? "Product",
+                      href: productHref(null, id),
+                  }
+                : PRODUCTS;
+    }
+}
 
 /** The product a Sold out change was about, at the storefront it was made. */
 function productPlace(
@@ -384,6 +438,8 @@ export function activityLine(
             return line(mergedWhat(meta), customerPlace(event.targetId));
         case "customer.details.changed":
             return line(detailsWhat(meta), customerPlace(event.targetId));
+        case "gst-rate.set":
+            return line(gstRateWhat(meta), gstRatePlace(event.targetId, meta));
         // Their page is gone (C11): the line leads to the list.
         case "customer.removed":
             return line(removedWhat(meta), customerPlace(null));

@@ -7,7 +7,12 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
+import {
+    AuditAction,
+    auditMetadata,
+    AuditOutcome,
+    PLATFORM_OPERATOR_ROLE_KEY,
+} from "../audit/audit.service";
 import type { OrgAction } from "../organizations/organization-actions";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { OverMrpRead } from "../products/over-mrp";
@@ -409,33 +414,77 @@ async function saveRate(
     const rate = bpsToRate(rateToBps(item.rate) ?? 0);
     const unsaved = (there: number) => (there === 0 ? "missing" : "kept");
 
+    // Who chose a service's, a product's or a course's rate is kept in the
+    // activity log, in this transaction: with nothing saved, nothing is
+    // said. (A plan's and a pack's go to their own histories, below.)
+    const noted = async (
+        targetType: "service" | "product" | "course",
+        had: { name: string; gstRate: { toString(): string } | null } | null,
+    ) => {
+        await tx.auditEvent.create({
+            data: {
+                action: AuditAction.GstRateSet,
+                actorUserId: ctx.userId,
+                organizationId,
+                targetType,
+                targetId: item.id,
+                outcome: AuditOutcome.Success,
+                metadata: auditMetadata(ctx.roleKey, {
+                    kind: item.kind,
+                    name: had?.name ?? null,
+                    from: had?.gstRate ? had.gstRate.toString() : null,
+                    to: rate,
+                }),
+            },
+        });
+    };
+    const before = { name: true, gstRate: true } as const;
+
     if (item.kind === "SERVICE") {
         const owned = { id: item.id, organizationId, deletedAt: null };
+        const had = await tx.service.findFirst({
+            where: owned,
+            select: before,
+        });
         const { count } = await tx.service.updateMany({
             where: { ...owned, ...unsetOnly },
             data: { gstRate: item.rate },
         });
-        if (count > 0) return "saved";
-        return unsaved(await tx.service.count({ where: owned }));
+        if (count === 0) {
+            return unsaved(await tx.service.count({ where: owned }));
+        }
+        await noted("service", had);
+        return "saved";
     }
     if (item.kind === "PRODUCT") {
         const owned = { id: item.id, organizationId };
         await assertRateWithinMrp(tx, organizationId, item, fill);
+        const had = await tx.product.findFirst({
+            where: owned,
+            select: before,
+        });
         const { count } = await tx.product.updateMany({
             where: { ...owned, ...unsetOnly },
             data: { gstRate: item.rate },
         });
-        if (count > 0) return "saved";
-        return unsaved(await tx.product.count({ where: owned }));
+        if (count === 0) {
+            return unsaved(await tx.product.count({ where: owned }));
+        }
+        await noted("product", had);
+        return "saved";
     }
     if (item.kind === "COURSE") {
         const owned = { id: item.id, organizationId };
+        const had = await tx.course.findFirst({ where: owned, select: before });
         const { count } = await tx.course.updateMany({
             where: { ...owned, ...unsetOnly },
             data: { gstRate: item.rate },
         });
-        if (count > 0) return "saved";
-        return unsaved(await tx.course.count({ where: owned }));
+        if (count === 0) {
+            return unsaved(await tx.course.count({ where: owned }));
+        }
+        await noted("course", had);
+        return "saved";
     }
     const actor = actorFromContext(ctx);
     if (item.kind === "PLAN") {

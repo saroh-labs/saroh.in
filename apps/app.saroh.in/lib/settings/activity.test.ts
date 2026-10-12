@@ -383,6 +383,52 @@ describe("activityLine — values a save recorded (#509)", () => {
         ).toBe("Sanjay moved the plan from Free to Pro → Plan and billing");
     });
 
+    it("says who set a GST rate, and on what (12 Oct 2026)", () => {
+        // Whoever is at the desk can fill a missing rate: the log keeps who.
+        expect(
+            said({
+                action: "gst-rate.set",
+                targetType: "service",
+                targetId: "svc1",
+                metadata: {
+                    kind: "SERVICE",
+                    name: "Personal Training",
+                    from: null,
+                    to: "18",
+                },
+            }),
+        ).toBe(
+            "Sanjay set the GST rate of Personal Training to 18% → Personal Training",
+        );
+        expect(
+            said({
+                action: "gst-rate.set",
+                targetType: "product",
+                targetId: "p1",
+                metadata: {
+                    kind: "PRODUCT",
+                    name: "Rye loaf",
+                    from: "5",
+                    to: "0",
+                },
+            }),
+        ).toBe(
+            "Sanjay changed the GST rate of Rye loaf from 5% to 0% → Rye loaf",
+        );
+        // A course is edited from its list.
+        expect(
+            activityLine(
+                event({
+                    action: "gst-rate.set",
+                    targetType: "course",
+                    targetId: "c1",
+                    metadata: { kind: "COURSE", name: "Beginners", to: "18" },
+                }),
+                {},
+            )?.where,
+        ).toEqual({ label: "Beginners", href: "/courses" });
+    });
+
     it("says a product marked sold out by hand, or available again (#515)", () => {
         expect(
             said({

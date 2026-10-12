@@ -7,7 +7,7 @@ import {
 } from "@/lib/notifications/preferences";
 
 import type { AuditEventRow, RoleLabels } from "./activity";
-import { personName, roleName } from "./activity";
+import { gstRateSaid, personName, roleName } from "./activity";
 import type { ChangeValue, RecordedChange } from "./activity-changes";
 import {
     countOf,
@@ -350,6 +350,17 @@ function detailRows(
                 withoutValues: false,
             };
         }
+        case "gst-rate.set":
+            return {
+                rows: [
+                    row(
+                        text(meta.name) ?? "GST rate",
+                        gstRateSaid(meta.from) ?? "Not set",
+                        gstRateSaid(meta.to),
+                    ),
+                ],
+                withoutValues: false,
+            };
         case "product.stock-tracking.on":
         case "product.stock-tracking.off":
             return {
