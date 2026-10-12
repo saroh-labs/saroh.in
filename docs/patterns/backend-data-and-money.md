@@ -283,6 +283,15 @@
   `gstPriceMode`), null when no GST was charged. Never recompute a sold
   line's price from the product, and never read the business's choice to
   explain a line already sold.
+- **A stored amount is the amount to pay; a paper may read it before GST.**
+  `InvoiceLine.unitPrice` and `amount` are GST and all on every line, and
+  nothing rewrites them. A line GST was added to prints the typed price as
+  its rate and its frozen taxable value as its amount
+  (`invoices/added-line.ts`, the only place that reading is made, from the
+  line's own frozen sums). Never print quantity × rate as an amount: the
+  frozen taxable value is what the totals use, and the two can differ by
+  under half a paisa a unit (`backend-billing-and-classes.md` → A paper
+  prints the typed price).
 - **Plans, class packs and courses** (12 Oct 2026). `SubscriptionPlan.price`,
   `ClassPack.price` and `Course.price` are what the business typed, each
   with its own `gstRate`, `sacCode` and `gstPriceMode`. A

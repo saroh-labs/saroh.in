@@ -325,6 +325,52 @@ payCents }`, or null when nothing is said: not registered, no rate, or
       the same rule and takes the API's order as the truth. The search
       engines' structured data (`product-json-ld.ts`, `service-json-ld.ts`)
       publishes the amount to pay.
+    - **A paper prints the typed price as the rate of a line GST was added
+      to** (12 Oct 2026, the owner's rule: "If the business says prices
+      include GST, ₹1,000 will be the full amount. If they say exclude,
+      then ₹1,000 + GST"). The stored `unitPrice` and `amount` stay the
+      amount to pay, on every line; only the reading changes, and it is one
+      file, `invoices/added-line.ts`:
+        - **Rate:** the price typed, before GST, read back from the frozen
+          unit amount and rate (the taxable value of one unit's amount is
+          the typed price to the paisa, for every price and rate above 0;
+          `added-line.spec.ts` checks each rate). An order's line prints
+          its own record of it, `OrderItem.listPrice`.
+        - **Amount:** the line's frozen taxable value, never quantity ×
+          rate. So the lines add up to the taxable value, and the taxable
+          value and the GST to the total.
+        - **Where the units do not multiply out, the paper says both.** GST
+          is rounded on one unit and the line's tax is derived from the
+          whole line, so 7 × ₹99.99 at 18% is ₹699.93 while the line's
+          taxable value is ₹699.94 (7 × ₹117.99 = ₹825.93, less ₹125.99).
+          The gap is under half a paisa a unit (100 × ₹99.99 is 15 paise
+          short of ₹9,999.15). The line then also says what one comes to
+          with GST, which does multiply out: "₹99.99 each, ₹117.99 with
+          GST".
+        - **A discount is printed before GST** (what stands between
+          quantity × rate and the amount), so the line still reads across:
+          ₹1,000 less ₹100 is ₹900, + ₹162.
+        - **The sentence under the total** is "Prices include GST." when no
+          line had GST added, "GST is added to these prices." when every
+          line that carries GST had, and none on a paper with both, where
+          each line says its own: "GST 18% added, ₹180" and "GST 18%
+          included · taxable ₹50.85" (a delivery charge beside an added
+          item is the usual one). A nil-rated line and one with no rate
+          have no say.
+        - **A line recorded as "includes", or with no mode (everything
+          sold before the choice), prints exactly as it always has.** A
+          credit note and a supplementary invoice copy their original's
+          mode and unit amount, so they print the rate it printed.
+        - **Where it is drawn** (change them together): the PDF
+          (`paperView`, `lineGstNote`, `lineEachNote` in
+          `invoices/invoice-paper-view.ts`), Invoice Detail's paper and
+          the quick look in the app (`addedGst` on each line of
+          `GET /invoices/:id`; `lib/invoices/paper-title.ts`), the
+          customer's pay page and receipt (`invoicePaper` serves the rate,
+          the amount and `unitPay` already read that way) and the order's
+          pay page (`orderLineOnPaper`). The site formats and never works
+          one out. The order confirmation and the bag print no rate and
+          keep the amount to pay with the words under it.
     - **A change to the choice, the registration, the GSTIN or the state
       revalidates the business's published pages** (`prices`,
       `backend-jobs.md` → Site page cache).
@@ -411,7 +457,9 @@ payCents }`, or null when nothing is said: not registered, no rate, or
     - One rule, twice: `lineGstNote` in `invoices/invoice-paper-view.ts` (the
       PDF) and in the app's `lib/invoices/paper-title.ts` (Invoice Detail's
       paper). Change both together. Stored rates are never rewritten to
-      match.
+      match. The same pair holds how a line GST was added to reads
+      (`lineEachNote`, `paperPrices`, `pricesSentence`; above, "A paper
+      prints the typed price").
 - **A tax invoice someone at the business starts never goes out with a rate
   nobody chose** (12 Oct 2026). Null is "not set" and 0 is a rate ("Exempt
   or nil-rated"), so only null is asked about, and only of a registered

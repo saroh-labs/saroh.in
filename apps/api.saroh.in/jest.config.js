@@ -313,6 +313,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
         // DEC-072: a line's GST note on the paper and the PDF — pure.
         "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
+        // How a paper prints a line GST was added to (12 Oct 2026): the
+        // typed price as the rate, the taxable value as the amount.
+        "<rootDir>/src/modules/invoices/added-line.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
         // DEC-068: which business details are missing — pure (the refusals
         // and the flag after money are in business-details.db.spec.ts).

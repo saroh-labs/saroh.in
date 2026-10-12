@@ -330,6 +330,8 @@ describe("paying from an order's pay link (real database)", () => {
                     quantity: 2,
                     unitPrice: "250.00",
                     amount: "500.00",
+                    // Only a line GST was added to ever carries one.
+                    unitPay: null,
                     // Not GST-registered: no GST words for the line.
                     gst: null,
                 },

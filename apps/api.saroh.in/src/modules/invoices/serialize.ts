@@ -1,5 +1,7 @@
 import { toMoneyString } from "../../common/money";
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
+import type { AddedLine } from "./added-line";
+import { addedLine } from "./added-line";
 import { stateName } from "./gst-states";
 import type { InvoiceStanding } from "./invoice-state";
 import { invoiceStanding } from "./invoice-state";
@@ -106,6 +108,9 @@ export const INVOICE_DETAIL_SELECT = {
             cgst: true,
             sgst: true,
             igst: true,
+            // How the line's price carried GST, for how the paper prints
+            // its rate and amount (`added-line.ts`).
+            gstPriceMode: true,
             orderItemId: true,
         },
     },
@@ -189,6 +194,7 @@ export interface InvoiceRow {
         cgst?: Money;
         sgst?: Money;
         igst?: Money;
+        gstPriceMode?: string | null;
         orderItemId?: string | null;
     }[];
     _count?: { lines: number };
@@ -211,6 +217,13 @@ export interface InvoiceLineView {
         sgst: string;
         igst: string;
     } | null;
+    /**
+     * How the paper prints a line GST was added to (`added-line.ts`): its
+     * rate before GST, its taxable value as the amount, and its GST. Null
+     * for every other line, which prints `unitPrice` and `amount` as they
+     * are. `unitPrice` and `amount` are the amount to pay either way.
+     */
+    addedGst: AddedLine | null;
     orderItemId: string | null;
 }
 
@@ -536,6 +549,19 @@ export function serializeInvoice(
                                     igst: toMoneyString(l.igst ?? "0"),
                                 }
                               : null,
+                      addedGst: row.sellerGstin
+                          ? addedLine({
+                                quantity: l.quantity,
+                                unitPrice: l.unitPrice ?? "0",
+                                discount: l.discount,
+                                gstRate: l.gstRate,
+                                taxableValue: l.taxableValue,
+                                cgst: l.cgst,
+                                sgst: l.sgst,
+                                igst: l.igst,
+                                gstPriceMode: l.gstPriceMode,
+                            })
+                          : null,
                       orderItemId: l.orderItemId ?? null,
                   })),
               }

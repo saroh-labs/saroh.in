@@ -28,7 +28,9 @@ import {
     mintedLink,
 } from "@/lib/invoices/minted-links";
 import {
+    addedLineOf,
     isExemptPaper,
+    lineRate,
     paperTitle,
     showsGstTotals,
 } from "@/lib/invoices/paper-title";
@@ -325,22 +327,12 @@ export function InvoiceQuickLook({
                     />
                 ) : full?.lines ? (
                     full.lines.map((l) => (
-                        <div
+                        <LineRow
                             key={l.id}
-                            className="flex items-baseline gap-2.5 border-b border-border/70 px-4 py-[9px]"
-                        >
-                            <span className="min-w-0 flex-1 text-[13px]">
-                                {l.description}
-                            </span>
-                            {l.quantity > 1 ? (
-                                <span className="text-[12px] tabular-nums text-muted-foreground">
-                                    {l.quantity} × {money(l.unitPrice)}
-                                </span>
-                            ) : null}
-                            <span className="min-w-[70px] text-right text-[13px] font-semibold tabular-nums">
-                                {money(l.amount)}
-                            </span>
-                        </div>
+                            line={l}
+                            taxed={Boolean(i.gst && !isExemptPaper(i))}
+                            money={money}
+                        />
                     ))
                 ) : (
                     <div
@@ -432,6 +424,37 @@ export function ShownLink({
                 Kept here until you close this tab. Copying it again
                 doesn&apos;t make a new link.
             </p>
+        </div>
+    );
+}
+
+/**
+ * One line of the quick look: its name, "3 × ₹780" for more than one, and
+ * its amount. A line GST was added to reads before GST, as on its paper
+ * (`addedLineOf`): the rows under the lines add the GST.
+ */
+export function LineRow({
+    line: l,
+    taxed,
+    money,
+}: {
+    line: NonNullable<Invoice["lines"]>[number];
+    /** The paper charges GST: a tax invoice, not a receipt or bill of supply. */
+    taxed: boolean;
+    money: (a: string) => string;
+}) {
+    const added = addedLineOf(taxed, l);
+    return (
+        <div className="flex items-baseline gap-2.5 border-b border-border/70 px-4 py-[9px]">
+            <span className="min-w-0 flex-1 text-[13px]">{l.description}</span>
+            {l.quantity > 1 ? (
+                <span className="text-[12px] tabular-nums text-muted-foreground">
+                    {l.quantity} × {money(lineRate(l, added))}
+                </span>
+            ) : null}
+            <span className="min-w-[70px] text-right text-[13px] font-semibold tabular-nums">
+                {money(added ? added.amount : l.amount)}
+            </span>
         </div>
     );
 }
