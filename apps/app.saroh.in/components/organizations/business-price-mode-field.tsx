@@ -54,6 +54,11 @@ export function BusinessPriceModeField({
 }) {
     const chosen = useWatch({ control, name: "priceMode" });
     const { defaultValues } = useFormState({ control });
+    // While the list of products over their MRP is on the sheet it is the
+    // whole of what a refused save has to say: the refusal's own sentence
+    // would say it twice, and no choice is the one in error.
+    const [listed, setListed] = useState(false);
+    const said = chosen === "ADDED" && listed;
     return (
         <FormField
             control={control}
@@ -69,17 +74,19 @@ export function BusinessPriceModeField({
                         options={OPTIONS}
                         value={field.value}
                         onChange={field.onChange}
-                        invalid={Boolean(fieldState.error)}
+                        invalid={Boolean(fieldState.error) && !said}
                     />
                     {chosen === "ADDED" ? (
                         <BusinessOverMrp
                             switching={defaultValues?.priceMode !== "ADDED"}
+                            refused={Boolean(fieldState.error)}
+                            onListed={setListed}
                         />
                     ) : null}
                     <FormDescription id="business-price-mode-note">
                         {PRICE_MODE_SMALL_PRINT}
                     </FormDescription>
-                    <FormMessage />
+                    {said ? null : <FormMessage />}
                 </FormItem>
             )}
         />
@@ -96,7 +103,17 @@ export function BusinessPriceModeField({
  * `switching` is false for a business already saved as "GST is added": the
  * list is then what is over as things stand.
  */
-export function BusinessOverMrp({ switching }: { switching: boolean }) {
+export function BusinessOverMrp({
+    switching,
+    refused = false,
+    onListed,
+}: {
+    switching: boolean;
+    /** A save was just refused for these: the notice is the error. */
+    refused?: boolean;
+    /** Told whether there is a list on the sheet. */
+    onListed?: (listed: boolean) => void;
+}) {
     const [read, setRead] = useState<OverMrpRead | null>(null);
     useEffect(() => {
         let live = true;
@@ -111,10 +128,17 @@ export function BusinessOverMrp({ switching }: { switching: boolean }) {
         };
     }, []);
     const words = overMrpWords(read, switching);
+    const listed = words !== null;
+    useEffect(() => {
+        onListed?.(listed);
+        return () => onListed?.(false);
+    }, [listed, onListed]);
     if (!words) return null;
     return (
         <Notice
-            tone="warning"
+            // After a refused save it is the reason, and is read out.
+            tone={refused ? "error" : "warning"}
+            role={refused ? "alert" : undefined}
             title={words.title}
             data-over-mrp=""
             className="mt-1"

@@ -122,10 +122,28 @@ export function overMrpWords(
     if (!read || read.products <= 0 || read.items.length === 0) return null;
     const one = read.products === 1;
     const products = count(read.products, "product");
+    // An option that costs what its product costs, against the same MRP,
+    // is the product's own line said twice (a product with one size).
+    const items = read.items.filter(
+        (item) =>
+            item.option === null ||
+            !read.items.some(
+                (own) =>
+                    own.option === null &&
+                    own.productId === item.productId &&
+                    own.payCents === item.payCents &&
+                    own.mrpCents === item.mrpCents,
+            ),
+    );
+    // Options are counted only when one of them has a line of its own, or
+    // the list is too long to tell.
     const options =
-        read.options > 0 ? ` (${count(read.options, "option")})` : "";
-    const rows = read.items.slice(0, OVER_MRP_NAMED).map(overMrpRow);
-    const left = read.items.length - rows.length;
+        read.options > 0 &&
+        (read.more || items.some((item) => item.option !== null))
+            ? ` (${count(read.options, "option")})`
+            : "";
+    const rows = items.slice(0, OVER_MRP_NAMED).map(overMrpRow);
+    const left = items.length - rows.length;
     return {
         title: switching
             ? `With GST added, ${products}${options} would cost more than ${one ? "its" : "their"} MRP.`
