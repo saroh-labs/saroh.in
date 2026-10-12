@@ -166,6 +166,9 @@ test.describe("subscriptions", () => {
         await page
             .getByRole("searchbox", { name: "Search subscriptions" })
             .fill("Priya");
+        // The list has narrowed before the row is opened: a click that
+        // lands while it is still narrowing meets a row being redrawn.
+        await expect(page.getByText(/^1 of \d+ subscriptions$/)).toBeVisible();
         await page.getByRole("button", { name: /Priya Raman/ }).click();
         const look = page.getByRole("dialog", { name: "Priya Raman" });
         await expect(look.getByText("Next charge")).toBeVisible();
