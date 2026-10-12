@@ -135,6 +135,7 @@ export function PackEditor({
                         values={values}
                         services={services}
                         sold={sold}
+                        gst={gst}
                     />
                 </>
             )}

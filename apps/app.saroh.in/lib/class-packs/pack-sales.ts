@@ -1,5 +1,6 @@
 import { formatDate, formatMonth, localDateKey } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { paidAtPrice, setPriceWords } from "@/lib/gst/on-price";
 import { customerHref, invoiceHref } from "@/lib/invoices/links";
 import { absentText } from "@saroh/ui/lib/absent";
 
@@ -146,9 +147,15 @@ function priceChanges(events: PackEventsPage): PriceChange[] {
  * and each earlier one, with how many were bought at it. People keep the
  * price they paid. A pack older than its history, or one whose history is
  * longer than the page read, says so rather than claiming it never changed.
+ *
+ * Each entry is a price the business set, so it says "+ GST" where GST is
+ * added to the pack's price today. A sale holds what was paid, GST and
+ * all, so it counts under a price when it paid that price or that price
+ * with the pack's GST on top (`paidAtPrice`). A sale made while the pack
+ * carried another GST rate matches neither and is counted under none.
  */
 export function priceHistory(
-    pack: Pick<PackDetail, "price" | "currency">,
+    pack: Pick<PackDetail, "price" | "currency" | "gst">,
     events: PackEventsPage,
     sales: readonly PackSale[] | null,
     timeZone: string,
@@ -161,9 +168,10 @@ export function priceHistory(
             : sales.filter(
                   (s) =>
                       s.currency === pack.currency &&
-                      Number(s.price) === Number(price),
+                      paidAtPrice(s.price, price, pack.gst),
               ).length;
-    const M = (p: string) => formatMoneyMajor(p, pack.currency);
+    const M = (p: string) =>
+        setPriceWords(formatMoneyMajor(p, pack.currency), pack.gst);
     const latest = changes.at(0);
     const nowCount = boughtAt(pack.price);
     const current: PriceEntry = {
@@ -241,7 +249,7 @@ export interface SaleRow {
 
 export function saleRow(
     s: PackSale,
-    pack: Pick<PackDetail, "price" | "currency">,
+    pack: Pick<PackDetail, "price" | "currency" | "gst">,
     opts: { timeZone: string; invoices: boolean },
 ): SaleRow {
     const by = s.soldBy;
@@ -251,9 +259,10 @@ export function saleRow(
         name: s.contact.name,
         href: customerHref(s.contact.id),
         amount: formatMoneyMajor(s.price, s.currency),
+        // What was paid against what today's price comes to, GST and all.
         older:
-            Number(s.price) !== Number(pack.price) ||
-            s.currency !== pack.currency,
+            s.currency !== pack.currency ||
+            !paidAtPrice(s.price, pack.price, pack.gst),
         method: s.paidBy ? paidByLabel(s.paidBy) : "Not recorded",
         soldBy: !by
             ? null

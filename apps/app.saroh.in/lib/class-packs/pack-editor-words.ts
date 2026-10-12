@@ -1,6 +1,7 @@
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
-import { gstChangeLines } from "@/lib/gst/item-words";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { addedGst, addedGstWords, gstChangeLines } from "@/lib/gst/item-words";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackKind, PackServiceOption, PackValues } from "./pack-editor";
@@ -100,7 +101,10 @@ export function publishedToast(
 
 // — The side column ————————————————————————————————————————————————————
 
-/** The drop-in prices of the chosen services, in the pack's currency. */
+/**
+ * The drop-in prices of the chosen services, in the pack's currency: what
+ * one visit costs to pay alone, GST and all (`PackServiceOption`).
+ */
 function dropIns(
     values: PackValues,
     services: readonly PackServiceOption[],
@@ -115,22 +119,56 @@ function dropIns(
         .map((s) => (s.priceCents ?? 0) / 100);
 }
 
-function perCredit(values: PackValues): number | null {
-    const price = priceAmount(values.price);
-    if (!price || !values.credits) return null;
-    return price / values.credits;
+/**
+ * What "GST is added" does to the price being typed, by the preview mirror
+ * (`lib/gst/price-mode.ts`); null whenever the typed price is the amount
+ * to pay. `gst` is the business's standing: without it nothing is added.
+ */
+function addedOf(values: PackValues, gst: GstAsk | null | undefined) {
+    return addedGst(normalPrice(values.price), values, gst);
 }
 
-/** "₹450 a class · drop-in ₹500–₹700", under the price. */
+/**
+ * One visit's share of what the pack costs to pay, GST and all, so it
+ * compares with a drop-in, which is also what is paid.
+ */
+function perCredit(
+    values: PackValues,
+    gst: GstAsk | null | undefined,
+): number | null {
+    const price = priceAmount(values.price);
+    if (!price || !values.credits) return null;
+    const added = addedOf(values, gst);
+    return (added ? added.payCents / 100 : price) / values.credits;
+}
+
+/**
+ * "₹1,500 + ₹270 GST (18%) = ₹1,770 to pay", under the price while GST is
+ * added to it. Null whenever the typed price is the amount to pay.
+ */
+export function priceToPay(
+    values: PackValues,
+    gst: GstAsk | null | undefined,
+): string | null {
+    const added = addedOf(values, gst);
+    return added ? addedGstWords(added, values.currency) : null;
+}
+
+/**
+ * "₹450 a class · drop-in ₹500–₹700", under the price. Both sides are
+ * what is paid: where GST is added to the pack's price the share says so
+ * ("₹531 a class with GST").
+ */
 export function eachNote(
     values: PackValues,
     services: readonly PackServiceOption[],
+    gst: GstAsk | null = null,
 ): string {
-    const each = perCredit(values);
+    const each = perCredit(values, gst);
     if (each === null) return "";
     const m = (n: number) => formatMoneyMajor(Math.round(n), values.currency);
     const drops = dropIns(values, services);
-    let text = `${m(each)} a ${unitOf(values.kind)}`;
+    let text = `${m(each)} a ${unitOf(values.kind)}${addedOf(values, gst) ? " with GST" : ""}`;
     if (drops.length) {
         const lo = Math.min(...drops);
         const hi = Math.max(...drops);
@@ -139,13 +177,17 @@ export function eachNote(
     return text;
 }
 
-/** At a glance: per class, the saving against drop-in, and sold so far. */
+/**
+ * At a glance: per class, the saving against drop-in, and sold so far. The
+ * share and the drop-in are both what is paid, GST and all.
+ */
 export function glance(
     values: PackValues,
     services: readonly PackServiceOption[],
     sold: number | null,
+    gst: GstAsk | null = null,
 ): [string, string][] {
-    const each = perCredit(values);
+    const each = perCredit(values, gst);
     const drops = dropIns(values, services);
     let saving = absentText();
     if (each !== null && drops.length) {
@@ -159,7 +201,7 @@ export function glance(
             `Per ${unitOf(values.kind)}`,
             each === null
                 ? absentText()
-                : formatMoneyMajor(Math.round(each), values.currency),
+                : `${formatMoneyMajor(Math.round(each), values.currency)}${addedOf(values, gst) ? " with GST" : ""}`,
         ],
         ["Saving vs drop-in", saving],
         ["Sold so far", sold === null ? absentText() : String(sold)],

@@ -3,6 +3,7 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { GstValues } from "@/lib/gst/item-words";
+import type { GstOnPrice } from "@/lib/gst/on-price";
 import type { InvoiceStanding } from "@/lib/invoices/service";
 
 /**
@@ -50,6 +51,12 @@ export interface Course {
     gstRate?: GstValues["gstRate"];
     sacCode?: GstValues["sacCode"];
     gstPriceMode?: GstValues["gstPriceMode"];
+    /**
+     * The GST on its price as an enrolment is charged today, and the
+     * amount to pay; null when nothing is said about GST. `price` is the
+     * price the business set. Absent from an API before it.
+     */
+    gst?: GstOnPrice | null;
 }
 
 export interface Enrollment {
@@ -57,6 +64,7 @@ export interface Enrollment {
     course: { id: string; name: string };
     contact: { id: string; name: string; email: string };
     status: "ACTIVE" | "CANCELLED";
+    /** What they were charged, GST and all. */
     price: string;
     currency: string;
     /** Their sessions still to come that are booked. */

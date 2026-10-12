@@ -166,7 +166,11 @@ describe("monthlyTotal", () => {
 describe("olderPrice", () => {
     it("notes a subscriber who keeps an older price", () => {
         const plans = [{ id: "p1", price: "1400.00", currency: "INR" }];
-        expect(olderPrice(sub(), plans)).toEqual({ listPrice: "1400.00" });
+        // No GST on top: what a new sign-up pays is the plan's price.
+        expect(olderPrice(sub(), plans)).toEqual({
+            listPrice: "1400.00",
+            listPay: "1400.00",
+        });
         expect(olderPrice(sub({ price: "1400.00" }), plans)).toBeNull();
     });
 });

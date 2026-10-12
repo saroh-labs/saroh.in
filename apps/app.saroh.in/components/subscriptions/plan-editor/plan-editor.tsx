@@ -180,6 +180,7 @@ export function PlanEditor({
                     glance={glance(
                         { ...values, currency: values.currency || currency },
                         figures,
+                        gst,
                     )}
                 />
             )}

@@ -24,11 +24,13 @@ import {
     collectionRows,
     failWhy,
     initials,
+    keepsLine,
     listTab,
     longPrice,
     olderPrice,
     pausedText,
     sortCharges,
+    subscriptionPay,
     TAB_LABEL,
     TAB_TONE,
 } from "@/lib/subscriptions/view";
@@ -87,7 +89,8 @@ export function SubscriptionQuickLook({
             </QuickLook>
         );
     }
-    const price = longPrice(sub.price, sub.currency, sub.interval);
+    // What they pay a period, GST and all.
+    const price = longPrice(subscriptionPay(sub), sub.currency, sub.interval);
     return (
         <QuickLook
             open
@@ -143,10 +146,10 @@ function Body({
     const next = sub.pendingPlan ?? sub;
     const nextBig =
         tab === "active" && sub.nextRenewalAt && !sub.endsAt
-            ? formatMoneyMajor(next.price, next.currency)
+            ? formatMoneyMajor(subscriptionPay(next), next.currency)
             : tab === "failed"
               ? formatMoneyMajor(
-                    sub.failedCharge?.total ?? sub.price,
+                    sub.failedCharge?.total ?? subscriptionPay(sub),
                     sub.currency,
                 )
               : null;
@@ -196,10 +199,7 @@ function Body({
                 </p>
                 {older ? (
                     <p className="mt-1.5 text-[12px] text-foreground">
-                        Keeps {formatMoneyMajor(sub.price, sub.currency)}. The
-                        plan is{" "}
-                        {formatMoneyMajor(older.listPrice, sub.currency)} for
-                        new sign-ups
+                        {keepsLine(sub, older)}
                     </p>
                 ) : null}
                 {sub.pendingPlan && tab !== "cancelled" ? (

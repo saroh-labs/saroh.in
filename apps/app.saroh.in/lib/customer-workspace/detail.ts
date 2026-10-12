@@ -99,7 +99,13 @@ export interface DetailSubscription {
     plan: { id: string; name: string };
     status: string;
     interval: Interval;
+    /** The typed price they joined at. */
     price: string;
+    /**
+     * What a period comes to for them, GST and all: what the tab shows.
+     * Absent from an API before it.
+     */
+    pay?: string;
     currency: string;
     currentPeriodStart: string;
     currentPeriodEnd: string;

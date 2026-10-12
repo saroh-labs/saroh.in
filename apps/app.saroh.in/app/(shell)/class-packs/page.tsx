@@ -69,6 +69,9 @@ export default async function ClassPacksPage({
                                 kind: packKind(p),
                                 price: p.price,
                                 currency: p.currency,
+                                // For "bought at an older price": what
+                                // today's price comes to, GST and all.
+                                gst: p.gst,
                             },
                             purchases,
                             now,

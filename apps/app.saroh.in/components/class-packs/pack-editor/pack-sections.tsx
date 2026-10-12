@@ -25,6 +25,7 @@ import {
     eachNote,
     glance,
     packRules,
+    priceToPay,
 } from "@/lib/class-packs/pack-editor-words";
 
 import { GstFields } from "@/components/services/service-editor/gst-fields";
@@ -171,7 +172,8 @@ export function CreditsAndPrice({
         price: useId(),
         priceErr: useId(),
     };
-    const note = eachNote(values, services ?? []);
+    const note = eachNote(values, services ?? [], gst);
+    const toPay = priceToPay(values, gst);
     return (
         <PackSection title="Credits and price">
             <div className="flex flex-wrap items-end gap-3">
@@ -219,6 +221,9 @@ export function CreditsAndPrice({
             </div>
             <FieldError id={ids.creditsErr}>{errors.credits}</FieldError>
             <FieldError id={ids.priceErr}>{errors.price}</FieldError>
+            {/* The price above is the business's own; where GST is added
+                to it, what a customer pays is said right under it. */}
+            {toPay ? <p className={cn(HELP, "tabular-nums")}>{toPay}</p> : null}
             {note ? <p className={HELP}>{note}</p> : null}
             {gst.asked ? (
                 <div className="mt-3 flex flex-wrap items-start gap-3">
@@ -293,16 +298,19 @@ export function PackGlance({
     values,
     services,
     sold,
+    gst = NOT_ASKED,
 }: {
     values: PackValues;
     services: PackServiceOption[] | null;
     sold: number | null;
+    /** The business's GST standing, for what the pack costs to pay. */
+    gst?: GstAsk;
 }) {
     return (
         <>
             <PackSection title="At a glance" tight>
                 <dl className="m-0">
-                    {glance(values, services ?? [], sold).map(([k, v]) => (
+                    {glance(values, services ?? [], sold, gst).map(([k, v]) => (
                         <div
                             key={k}
                             className="flex gap-2.5 border-t border-border/60 py-[7px] text-[13px]"

@@ -2,6 +2,7 @@ import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { gstHistoryLines } from "@/lib/gst/item-words";
+import { setPriceWords } from "@/lib/gst/on-price";
 import { absentText } from "@saroh/ui/lib/absent";
 import type {
     Interval,
@@ -17,6 +18,7 @@ import {
     listTab,
     longPrice,
     olderPrice,
+    subscriptionPay,
     TAB_LABEL,
     TAB_TONE,
 } from "./view";
@@ -84,7 +86,8 @@ export function planHeader(plan: Plan, withClasses: boolean): PlanHeader {
     const archived = plan.status === "ARCHIVED";
     const n = plan.subscriberCount;
     const parts = [
-        `${formatMoneyMajor(plan.price, plan.currency)} every ${EVERY[plan.interval]}`,
+        // The price the business set, saying so where GST comes on top.
+        `${setPriceWords(formatMoneyMajor(plan.price, plan.currency), plan.gst)} every ${EVERY[plan.interval]}`,
         ...(withClasses ? [lower(classesText(plan.classesPerMonth))] : []),
         count(n, "person on it", "people on it"),
     ];
@@ -384,7 +387,8 @@ export function subscriberRows(
                 name: s.contact.name,
                 since: `Since ${d(s.startedAt)}`,
                 status: { label: TAB_LABEL[tab], tone: TAB_TONE[tab] },
-                price: longPrice(s.price, s.currency, s.interval),
+                // What they pay a period, GST and all.
+                price: longPrice(subscriptionPay(s), s.currency, s.interval),
                 olderPrice: olderPrice(s, [plan]) !== null,
                 when,
             };

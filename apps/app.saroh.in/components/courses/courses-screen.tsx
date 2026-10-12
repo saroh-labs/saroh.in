@@ -22,6 +22,7 @@ import {
 } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
 import type { MissingRates } from "@/lib/gst-rates/missing";
+import { setPriceWords } from "@/lib/gst/on-price";
 
 const BADGE: Record<CourseTab, "success" | "warning" | "neutral" | "info"> = {
     OPEN: "success",
@@ -106,8 +107,14 @@ export function CoursesScreen({
             numeric: true,
             money: true,
             sortValue: (c) => Number(c.price),
+            // The price the business set, saying so where GST comes on top.
             cell: (c) =>
-                formatMoneyMajor(c.price, c.currency, { decimals: "always" }),
+                setPriceWords(
+                    formatMoneyMajor(c.price, c.currency, {
+                        decimals: "always",
+                    }),
+                    c.gst,
+                ),
         },
         {
             id: "status",

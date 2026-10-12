@@ -25,6 +25,7 @@ import {
     INTERVAL_LABEL,
     MAIN_INTERVALS,
     MORE_INTERVALS,
+    priceToPay,
 } from "@/lib/subscriptions/plan-editor";
 import type { RenewalChange } from "@/lib/subscriptions/renewal-change";
 import {
@@ -88,6 +89,7 @@ export function PriceSection({
         currency,
         gst,
     );
+    const toPay = priceToPay(values, currency, gst);
     const renewalLines = gst.asked
         ? renewalChangeLines(renewal, {
               gstInside: (rateBps(values.gstRate) ?? 0) > 0,
@@ -135,6 +137,11 @@ export function PriceSection({
                         businessPriceMode={gst.priceMode}
                     />
                 </div>
+            ) : null}
+            {/* The price above is the business's own; where GST is added
+                to it, what a member pays is said right under it. */}
+            {toPay ? (
+                <p className={cn(HELP, "mt-2 tabular-nums")}>{toPay}</p>
             ) : null}
             {/* Said before Publish: a GST change reaches the members already
                 on the plan at their next renewal. */}

@@ -1,7 +1,6 @@
 "use client";
 
 import { FormDialog } from "@/components/shared/form-dialog";
-import { formatMoneyMajor } from "@/lib/format/money";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -26,6 +25,7 @@ import {
     firstPackBlock,
     holdingNow,
     packGstLine,
+    packSetPrice,
     sellFailure,
     sellLabel,
     sellNote,
@@ -168,7 +168,7 @@ export function SellPackDialog({
                 title={fixed ? `Sell ${fixed.name}` : "Sell a pack"}
                 description={
                     pack
-                        ? sellTerms(pack, today)
+                        ? sellTerms(pack, today, gst)
                         : "Classes come off when they book and go back if they cancel in time."
                 }
                 pending={busy}
@@ -223,7 +223,7 @@ export function SellPackDialog({
                                     aria-describedby={`${ids.pack}-help`}
                                     options={onSale.map((p) => ({
                                         value: p.id,
-                                        label: `${p.name} · ${formatMoneyMajor(p.price, p.currency)}`,
+                                        label: `${p.name} · ${packSetPrice(p, gst)}`,
                                     }))}
                                 />
                                 {pack ? (

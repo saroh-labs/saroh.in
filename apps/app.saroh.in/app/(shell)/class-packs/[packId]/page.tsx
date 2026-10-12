@@ -145,7 +145,8 @@ export default async function PackDetailPage({
                 dropIns={
                     own?.map((s) => ({
                         id: s.id,
-                        priceCents: s.priceCents,
+                        // What one visit costs to pay, GST and all.
+                        priceCents: s.payCents ?? s.priceCents,
                         currency: s.currency,
                     })) ?? null
                 }
