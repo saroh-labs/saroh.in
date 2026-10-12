@@ -21,6 +21,8 @@ import {
     renderAutopaySetupLink,
 } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import type { RatedSale } from "../invoices/sale-price";
+import { RATED_SALE_SELECT, saleChargeInTx } from "../invoices/sale-price";
 import { authorize } from "../organizations/organization-policy";
 import type { AutopayCheck } from "../payments/autopay.service";
 import { AutopayService } from "../payments/autopay.service";
@@ -178,8 +180,10 @@ export class SubscriptionAutopayService {
                 price: true,
                 currency: true,
                 timezone: true,
-                plan: { select: { name: true } },
-                pendingPlan: { select: { price: true } },
+                plan: { select: { name: true, ...RATED_SALE_SELECT } },
+                pendingPlan: {
+                    select: { price: true, ...RATED_SALE_SELECT },
+                },
                 contact: { select: { firstName: true } },
             },
         });
@@ -222,9 +226,19 @@ export class SubscriptionAutopayService {
             },
             select: { total: true },
         });
+        // What a renewal comes to, with GST added where the business adds
+        // it (`sale-price.ts`): theirs now, and the booked plan's.
+        const renewal = async (
+            price: { toString(): string },
+            plan: RatedSale,
+        ) =>
+            (await saleChargeInTx(prisma, organizationId, toMinor(price), plan))
+                .payCents;
         const coverCents = Math.max(
-            toMinor(sub.price),
-            sub.pendingPlan ? toMinor(sub.pendingPlan.price) : 0,
+            await renewal(sub.price, sub.plan),
+            sub.pendingPlan
+                ? await renewal(sub.pendingPlan.price, sub.pendingPlan)
+                : 0,
             ...unpaid.map((i) => toMinor(i.total)),
             1,
         );

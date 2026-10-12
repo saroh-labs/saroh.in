@@ -3,6 +3,7 @@ import {
     PACK_DRAFT_HOURS,
     packExpiry,
     packLineDescription,
+    packPay,
     packTermsOf,
     readPackTerms,
     sameTerms,
@@ -69,6 +70,92 @@ describe("the pack's terms, as sold", () => {
         expect(packExpiry(packTermsOf(PACK), paid).toISOString()).toBe(
             "2026-11-30T10:00:00.000Z",
         );
+    });
+});
+
+describe("the GST a pack is bought with (12 Oct 2026)", () => {
+    /** ₹4,500 at 18% with GST added: ₹5,310 to pay (`sale-price.ts`). */
+    const added = {
+        pay: "5310.00",
+        mode: "ADDED" as const,
+        line: {
+            unitPrice: "5310.00",
+            gstRate: "18",
+            hsnSac: "999723",
+            priceMode: "ADDED" as const,
+        },
+    };
+    /** No rate, or not registered: the price, and nothing said. */
+    const plain = {
+        pay: "4500.00",
+        mode: null,
+        line: { unitPrice: "4500.00" },
+    };
+
+    it("the snapshot keeps the typed price and the amount to pay beside it", () => {
+        expect(packTermsOf(PACK, added)).toEqual({
+            packId: "pack_1",
+            name: "10-class pack",
+            credits: 10,
+            validityDays: 60,
+            price: "4500.00",
+            currency: "INR",
+            pay: "5310.00",
+            gstRate: "18",
+            sacCode: "999723",
+            gstPriceMode: "ADDED",
+        });
+        expect(packPay(packTermsOf(PACK, added))).toBe("5310.00");
+    });
+
+    it("with no GST charged, what is paid is the price, as before", () => {
+        const terms = packTermsOf(PACK, plain);
+        expect(terms).toMatchObject({
+            price: "4500.00",
+            pay: "4500.00",
+            gstRate: null,
+            sacCode: null,
+            gstPriceMode: null,
+        });
+        expect(packPay(terms)).toBe("4500.00");
+    });
+
+    it("a draft from before packs carried GST pays its price", () => {
+        const old = readPackTerms({ ...packTermsOf(PACK) });
+        expect(old).not.toHaveProperty("pay");
+        expect(old && packPay(old)).toBe("4500.00");
+    });
+
+    it("reads the GST back from a stored snapshot, dropping anything malformed", () => {
+        const terms = packTermsOf(PACK, added);
+        expect(readPackTerms({ ...terms })).toEqual(terms);
+        const odd = readPackTerms({
+            ...terms,
+            pay: "lots",
+            gstPriceMode: "SOMETIMES",
+        });
+        expect(odd).not.toHaveProperty("pay");
+        expect(odd).not.toHaveProperty("gstPriceMode");
+    });
+
+    it("a rate set, or the choice changed, since paying started is not the same terms: the draft is started again", () => {
+        const before = packTermsOf(PACK, plain);
+        expect(sameTerms(before, packTermsOf(PACK, plain))).toBe(true);
+        expect(sameTerms(before, packTermsOf(PACK, added))).toBe(false);
+        // The same amount under another rate or mode is still a new paper.
+        const included = packTermsOf(PACK, {
+            pay: "4500.00",
+            mode: "INCLUDED",
+            line: {
+                unitPrice: "4500.00",
+                gstRate: "18",
+                hsnSac: null,
+                priceMode: "INCLUDED",
+            },
+        });
+        expect(sameTerms(before, included)).toBe(false);
+        // A draft from before the field existed matches one with no GST.
+        expect(sameTerms(packTermsOf(PACK), before)).toBe(true);
     });
 });
 

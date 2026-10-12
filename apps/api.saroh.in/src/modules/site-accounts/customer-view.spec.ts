@@ -505,6 +505,8 @@ describe("the account's allow-list", () => {
             name: "Unlimited",
             price: "2500.00",
             currency: "INR",
+            // Nothing said about GST unless the caller worked it out.
+            gst: null,
             interval: "MONTH",
             status: "ACTIVE",
             renewsAt: "2026-10-18T00:00:00.000Z",
@@ -667,6 +669,7 @@ describe("the account's allow-list", () => {
                 name: "Unlimited",
                 price: "2500.00",
                 currency: "INR",
+                gst: null,
                 interval: "MONTH",
                 timezone: "Asia/Kolkata",
                 status: "ACTIVE",
@@ -871,8 +874,74 @@ describe("the rest of their details (DEC-142)", () => {
             currency: "INR",
             billOfSupply: false,
             pay: "online",
+            // Two lines: its pay page says the GST line by line.
+            gst: null,
         });
         expect(leaks(view)).toEqual([]);
+    });
+
+    it("an open invoice for one thing says the GST in its total, from the paper's frozen sums", () => {
+        const renewal = (line: Record<string, unknown>) =>
+            invoiceDueView(
+                {
+                    id: "inv_2",
+                    number: "RC/26-27/0007",
+                    status: "ISSUED",
+                    issuedAt: new Date("2026-10-10T05:00:00Z"),
+                    dueAt: new Date("2026-10-17T05:00:00Z"),
+                    total: "2360.00",
+                    currency: "INR",
+                    kind: "INVOICE",
+                    sellerGstin: "29ABCDE1234F1Z5",
+                    lines: [{ description: "Gym monthly · October", ...line }],
+                } as never,
+                "online",
+                now,
+            ).gst;
+        // GST is added: ₹2,000 + ₹360 GST (18%) is ₹2,360 to pay.
+        expect(
+            renewal({
+                amount: "2360.00",
+                gstRate: "18.00",
+                taxableValue: "2000.00",
+                cgst: "180.00",
+                sgst: "180.00",
+                igst: "0.00",
+                gstPriceMode: "ADDED",
+            }),
+        ).toEqual({
+            mode: "ADDED",
+            rate: "18",
+            listCents: 200_000,
+            gstCents: 36_000,
+            payCents: 236_000,
+        });
+        // Includes GST: ₹2,000 to pay, ₹305.08 GST inside it.
+        expect(
+            renewal({
+                amount: "2000.00",
+                gstRate: "18.00",
+                taxableValue: "1694.92",
+                cgst: "152.54",
+                sgst: "152.54",
+                igst: "0.00",
+                gstPriceMode: "INCLUDED",
+            }),
+        ).toEqual({
+            mode: "INCLUDED",
+            rate: "18",
+            listCents: 200_000,
+            gstCents: 30_508,
+            payCents: 200_000,
+        });
+        // No rate on the line: nothing is said.
+        expect(
+            renewal({
+                amount: "2000.00",
+                gstRate: null,
+                taxableValue: "2000.00",
+            }),
+        ).toBeNull();
     });
 
     it("an invoice not yet due isn't overdue, and one with no lines says nothing about what it bills", () => {

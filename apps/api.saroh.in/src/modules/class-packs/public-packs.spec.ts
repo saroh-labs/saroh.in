@@ -73,6 +73,37 @@ describe("a pack as the site shows it", () => {
             currency: "INR",
             kind: "CLASSES",
             singlePrice: "500.00",
+            // No rate on the pack: nothing is said about GST.
+            gst: null,
+        });
+    });
+
+    it("says the GST a customer pays, by the business's choice (12 Oct 2026)", () => {
+        const rated = { ...row, gstRate: "18" };
+        // Not registered: never said.
+        expect(publicPackView(rated).gst).toBeNull();
+        // Includes GST: ₹4,500 to pay, ₹686.44 of it GST.
+        expect(
+            publicPackView(rated, { registered: true, mode: "INCLUDED" }).gst,
+        ).toEqual({
+            mode: "INCLUDED",
+            rate: "18",
+            listCents: 450_000,
+            gstCents: 68_644,
+            payCents: 450_000,
+        });
+        // GST is added: ₹4,500 + ₹810 is ₹5,310 to pay.
+        const added = publicPackView(rated, {
+            registered: true,
+            mode: "ADDED",
+        });
+        expect(added.price).toBe("4500.00");
+        expect(added.gst).toEqual({
+            mode: "ADDED",
+            rate: "18",
+            listCents: 450_000,
+            gstCents: 81_000,
+            payCents: 531_000,
         });
     });
 

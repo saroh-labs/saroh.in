@@ -3,6 +3,9 @@ import { prisma } from "@saroh/database";
 import { DateTime, IANAZone } from "luxon";
 
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { rateToBps } from "../invoices/gst";
+import type { GstPriceMode } from "../invoices/gst-price";
+import { isGstPriceMode } from "../invoices/gst-price";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -10,6 +13,7 @@ import {
     numberFor,
     writeDocumentLines,
 } from "../invoices/order-invoicing";
+import type { SaleCharge } from "../invoices/sale-price";
 import { toCents } from "../invoices/totals";
 import { allowanceData } from "./classes-allowance";
 import type { Interval } from "./periods";
@@ -72,9 +76,25 @@ export interface PlanTerms {
     classesPerMonth: number | null;
     /** The site account that joined: the subscription's log names it. */
     accountId: string;
+    /**
+     * What the first period costs as it was shown (12 Oct 2026): the price,
+     * or the price with its GST added where the business adds it. Absent on
+     * a draft from before plans carried GST, which paid the price.
+     */
+    pay?: string;
+    /** The rate and SAC code its line carries; absent or null: none. */
+    gstRate?: string | null;
+    sacCode?: string | null;
+    /** What it was charged under; null when no GST is charged on it. */
+    gstPriceMode?: GstPriceMode | null;
 }
 
-/** The terms of a plan as it is on sale now (its published columns). */
+/**
+ * The terms of a plan as it is on sale now (its published columns), and
+ * what joining it costs today (`charge`, from `sale-price.ts`). `price`
+ * stays the typed price: it is what the subscription keeps, and each
+ * renewal works its own amount out from it.
+ */
 export function planTermsOf(
     plan: {
         id: string;
@@ -85,6 +105,7 @@ export function planTermsOf(
         classesPerMonth: number | null;
     },
     accountId: string,
+    charge?: Pick<SaleCharge, "pay" | "mode" | "line">,
 ): PlanTerms | null {
     const interval = INTERVALS.find((i) => i === plan.interval);
     if (!interval) return null;
@@ -96,7 +117,20 @@ export function planTermsOf(
         interval,
         classesPerMonth: plan.classesPerMonth,
         accountId,
+        ...(charge
+            ? {
+                  pay: charge.pay,
+                  gstRate: charge.line.gstRate ?? null,
+                  sacCode: charge.line.hsnSac ?? null,
+                  gstPriceMode: charge.mode,
+              }
+            : {}),
     };
+}
+
+/** What the draft's one line is charged: the amount shown, else the price. */
+export function planJoinPayCents(terms: PlanTerms): number {
+    return toCents(terms.pay ?? terms.price);
 }
 
 const isText = (v: unknown): v is string =>
@@ -137,10 +171,22 @@ export function readPlanTerms(
         interval,
         classesPerMonth: perMonth,
         accountId: v.accountId,
+        ...(isText(v.pay) && Number.isFinite(Number(v.pay))
+            ? { pay: v.pay }
+            : {}),
+        ...(isText(v.gstRate) ? { gstRate: v.gstRate } : {}),
+        ...(isText(v.sacCode) ? { sacCode: v.sacCode } : {}),
+        ...(isGstPriceMode(v.gstPriceMode)
+            ? { gstPriceMode: v.gstPriceMode }
+            : {}),
     };
 }
 
-/** Whether two snapshots join the same plan on the same terms. */
+/**
+ * Whether two snapshots join the same plan on the same terms: the same
+ * amount to pay under the same GST, so a rate set since a join was started
+ * starts it again at what is now shown.
+ */
 export function samePlanTerms(a: PlanTerms, b: PlanTerms): boolean {
     return (
         a.planId === b.planId &&
@@ -148,7 +194,10 @@ export function samePlanTerms(a: PlanTerms, b: PlanTerms): boolean {
         toCents(a.price) === toCents(b.price) &&
         a.currency === b.currency &&
         a.interval === b.interval &&
-        a.classesPerMonth === b.classesPerMonth
+        a.classesPerMonth === b.classesPerMonth &&
+        planJoinPayCents(a) === planJoinPayCents(b) &&
+        rateToBps(a.gstRate ?? null) === rateToBps(b.gstRate ?? null) &&
+        (a.gstPriceMode ?? null) === (b.gstPriceMode ?? null)
     );
 }
 
@@ -173,8 +222,9 @@ export function openPlanJoinsWhere(
 
 /**
  * The draft a customer pays: billed to their contact, one line for the
- * plan's first period, priced from the snapshot (GST inside the price, as
- * a period's invoice is). The period is named when it is paid.
+ * plan's first period, charged the amount the snapshot shows at the rate
+ * and under the mode it froze (`sale-price.ts`), as a period's invoice is.
+ * The period is named when it is paid.
  */
 export async function createPlanJoinDraftInTx(
     tx: Tx,
@@ -192,9 +242,10 @@ export async function createPlanJoinDraftInTx(
             {
                 description: input.terms.name,
                 quantity: 1,
-                unitCents: toCents(input.terms.price),
-                rateBps: null,
-                code: null,
+                unitCents: planJoinPayCents(input.terms),
+                rateBps: rateToBps(input.terms.gstRate ?? null),
+                code: input.terms.sacCode ?? null,
+                priceMode: input.terms.gstPriceMode ?? null,
             },
         ],
         profile,

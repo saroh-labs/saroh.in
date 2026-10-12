@@ -45,6 +45,8 @@ describe("a pack on sale", () => {
             price: "4500.00",
             currency: "INR",
             kind: "CLASSES",
+            // Nothing said about GST unless the caller worked it out.
+            gst: null,
         });
     });
 
@@ -103,6 +105,7 @@ describe("a started pack payment", () => {
             pack: { name: "10-class pack", credits: 10, validityDays: 60 },
             total: "4500.00",
             currency: "INR",
+            gst: null,
             payment,
         });
     });

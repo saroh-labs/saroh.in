@@ -35,6 +35,8 @@ jest.mock("@saroh/database", () => {
         },
         bookingEvent: { createMany: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
+        // Whether the business is registered, asked at an enrolment.
+        businessProfile: { findUnique: jest.fn() },
     };
     return {
         ...actual,
@@ -255,7 +257,8 @@ describe("enrolling", () => {
         expect(reserveInTx).toHaveBeenCalledTimes(6);
         expect(issueInTx.mock.calls[0]![2].lines[0]).toMatchObject({
             description: "Beginners' wheel · 6 sessions",
-            unitPrice: "6000",
+            // The price typed for them, written as money.
+            unitPrice: "6000.00",
         });
         // Only future sessions were asked for.
         expect(
@@ -646,5 +649,138 @@ describe("who may", () => {
                 where: { id: "course_other", organizationId: "org_1" },
             }),
         );
+    });
+});
+
+// — GST on a course (12 Oct 2026) ————————————————————————————————————
+//
+// A course carries a GST rate, a SAC code and its own way of carrying GST.
+// An enrolment takes its amount to pay from `invoices/sale-price.ts`; the
+// enrolment and its invoice both keep that amount.
+describe("GST on a course enrolment", () => {
+    const registered = (gstPriceMode: "INCLUDED" | "ADDED") => ({
+        gstRegistered: true,
+        taxId: "29ABCDE1234F1Z5",
+        gstState: "29",
+        gstPriceMode,
+    });
+    const business = (profile: Record<string, unknown> | null) =>
+        tx.businessProfile!.findUnique!.mockResolvedValue(profile);
+    const course = (gst: Record<string, unknown>) =>
+        tx.course!.findFirst!.mockResolvedValue(
+            lockedCourse({ gstRate: null, sacCode: null, ...gst }),
+        );
+    const enrol = (price?: string) =>
+        service.enrol(owner, "course_1", {
+            contactId: "c_1",
+            ...(price ? { price } : {}),
+        });
+    const enrolled = () => tx.courseEnrollment!.create!.mock.calls[0]![0].data;
+    const line = () => issueInTx.mock.calls[0]![2].lines[0];
+
+    it("a business that is not registered enrols unchanged to the paisa, whatever the course's rate", async () => {
+        business({ gstRegistered: false });
+        course({ gstRate: decimal("18.00") });
+        await enrol();
+        expect(enrolled().price).toBe("8000.00");
+        expect(issueInTx.mock.calls[0]![2].lines).toEqual([
+            {
+                description: "Beginners' wheel · 8 sessions",
+                quantity: 1,
+                unitPrice: "8000.00",
+            },
+        ]);
+    });
+
+    it("refuses a registered business's course with no rate, naming it, before anyone is enrolled or booked", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: null });
+        const err = await enrol().catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(ConflictException);
+        expect((err as ConflictException).getResponse()).toEqual({
+            message:
+                "Beginners' wheel has no GST rate. Choose one to issue this invoice.",
+            details: {
+                reason: "GST_RATE_MISSING",
+                items: [
+                    {
+                        kind: "COURSE",
+                        id: "course_1",
+                        name: "Beginners' wheel",
+                    },
+                ],
+            },
+        });
+        expect(tx.courseEnrollment!.create).not.toHaveBeenCalled();
+        expect(reserveInTx).not.toHaveBeenCalled();
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("with Payments off writes no invoice, so nothing is asked", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: null });
+        tx.organizationModule!.findFirst!.mockResolvedValue({ id: "mod_1" });
+        await expect(enrol()).resolves.toBeDefined();
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("a free course asks for no rate: there is no tax to choose", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: null, price: decimal("0") });
+        await expect(enrol()).resolves.toBeDefined();
+        expect(enrolled().price).toBe("0.00");
+    });
+
+    it("includes GST: ₹8,000 to pay, and the line carries the rate so the paper shows the split", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: decimal("18.00"), sacCode: "999293" });
+        await enrol();
+        expect(enrolled().price).toBe("8000.00");
+        expect(line()).toEqual({
+            description: "Beginners' wheel · 8 sessions",
+            quantity: 1,
+            unitPrice: "8000.00",
+            gstRate: "18",
+            hsnSac: "999293",
+            priceMode: "INCLUDED",
+        });
+    });
+
+    it("GST is added: ₹8,000 at 18% is ₹9,440 to pay, on the enrolment and its invoice", async () => {
+        business(registered("ADDED"));
+        course({ gstRate: decimal("18.00") });
+        await enrol();
+        expect(enrolled().price).toBe("9440.00");
+        expect(line()).toEqual({
+            description: "Beginners' wheel · 8 sessions",
+            quantity: 1,
+            unitPrice: "9440.00",
+            gstRate: "18",
+            hsnSac: null,
+            priceMode: "ADDED",
+        });
+    });
+
+    it("a price typed for one person is a typed price too: ₹6,000 for a late start is ₹7,080 where GST is added", async () => {
+        business(registered("ADDED"));
+        course({ gstRate: decimal("18.00") });
+        await enrol("6000");
+        expect(enrolled().price).toBe("7080.00");
+        expect(line().unitPrice).toBe("7080.00");
+    });
+
+    it("and stays ₹6,000 where prices include GST", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: decimal("18.00") });
+        await enrol("6000");
+        expect(enrolled().price).toBe("6000.00");
+    });
+
+    it("a course priced the other way from the business follows its own choice", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: decimal("12.00"), gstPriceMode: "ADDED" });
+        await enrol();
+        // ₹8,000 + 12% = ₹8,960.
+        expect(enrolled().price).toBe("8960.00");
     });
 });

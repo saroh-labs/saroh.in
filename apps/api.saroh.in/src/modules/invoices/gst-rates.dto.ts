@@ -10,8 +10,17 @@ import {
     ValidateNested,
 } from "class-validator";
 
-/** What carries a saved GST rate: a service or a product. */
-export const RATED_KINDS = ["SERVICE", "PRODUCT"] as const;
+/**
+ * What carries a saved GST rate: a service, a product, a membership plan,
+ * a class pack or a course.
+ */
+export const RATED_KINDS = [
+    "SERVICE",
+    "PRODUCT",
+    "PLAN",
+    "PACK",
+    "COURSE",
+] as const;
 export type RatedKind = (typeof RATED_KINDS)[number];
 
 /** The most rates one save sets: a sheet's worth. */

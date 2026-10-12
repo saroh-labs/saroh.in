@@ -91,7 +91,17 @@ export async function readInvoicesDue(
             sellerGstin: true,
             lines: {
                 orderBy: { position: "asc" },
-                select: { description: true, gstRate: true },
+                select: {
+                    description: true,
+                    gstRate: true,
+                    // The GST in a one-line paper's total, as it froze it.
+                    amount: true,
+                    taxableValue: true,
+                    cgst: true,
+                    sgst: true,
+                    igst: true,
+                    gstPriceMode: true,
+                },
             },
         },
     });

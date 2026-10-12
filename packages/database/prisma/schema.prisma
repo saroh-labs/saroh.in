@@ -5902,6 +5902,18 @@ model SubscriptionPlan {
   // A membership's classes a month (U3). Null: as many as they like.
   classesPerMonth Int?
 
+  // GST (12 Oct 2026, as a service's): the rate the price carries and the
+  // SAC code. A null rate is "not set": a registered business's plan is
+  // asked for one, and until then its invoice carries no tax.
+  gstRate      Decimal? @db.Decimal(5, 2)
+  sacCode      String?
+  // How this plan's price carries GST when it differs from the
+  // business's way: INCLUDED or ADDED. Null: same as the business
+  // (`BusinessProfile.gstPriceMode`).
+  // Read at every renewal, so a rate set today reaches the next invoice of
+  // a member who joined before it; paper already issued never changes.
+  gstPriceMode String?
+
   subscriptions   CustomerSubscription[]
   // Subscriptions switching to this plan at their next renewal.
   pendingSwitches CustomerSubscription[] @relation("PendingPlan")
@@ -6377,6 +6389,16 @@ model Course {
   seats       Int // never more than the service's capacity
   status      String  @default("DRAFT") // DRAFT | OPEN | CLOSED | ARCHIVED
 
+  // GST (12 Oct 2026, as a service's): the rate the price carries and the
+  // SAC code. A null rate is "not set": a registered business's course is
+  // asked for one, and until then its invoice carries no tax.
+  gstRate      Decimal? @db.Decimal(5, 2)
+  sacCode      String?
+  // How this course's price carries GST when it differs from the
+  // business's way: INCLUDED or ADDED. Null: same as the business
+  // (`BusinessProfile.gstPriceMode`).
+  gstPriceMode String?
+
   sessions    CourseSession[]
   enrollments CourseEnrollment[]
 
@@ -6444,6 +6466,16 @@ model ClassPack {
   price        Decimal @db.Decimal(12, 2)
   currency     String
   status       String  @default("ACTIVE") // DRAFT | ACTIVE | ARCHIVED (E14)
+
+  // GST (12 Oct 2026, as a service's): the rate the price carries and the
+  // SAC code. A null rate is "not set": a registered business's pack is
+  // asked for one, and until then its invoice carries no tax.
+  gstRate      Decimal? @db.Decimal(5, 2)
+  sacCode      String?
+  // How this pack's price carries GST when it differs from the
+  // business's way: INCLUDED or ADDED. Null: same as the business
+  // (`BusinessProfile.gstPriceMode`).
+  gstPriceMode String?
 
   services  ClassPackService[]
   purchases PackPurchase[]

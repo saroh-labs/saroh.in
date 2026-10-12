@@ -9,6 +9,15 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
+import { NO_GST_TERMS } from "../invoices/gst-price";
+import type { RatedSale } from "../invoices/sale-price";
+import {
+    priceTermsFor,
+    RATED_SALE_SELECT,
+    saleCharge,
+} from "../invoices/sale-price";
+import { toCents } from "../invoices/totals";
 import { siteTakingOrders, withPause } from "../orders/checkout-paused";
 import { PACKS_ON_SALE } from "./pack-on-sale";
 import { packsOffered } from "./packs-offered";
@@ -62,6 +71,13 @@ export interface PublicPack {
      * when none has a price.
      */
     singlePrice: string | null;
+    /**
+     * The GST on the price, as the customer is told it before buying (12
+     * Oct 2026): the typed price, the GST in or on it and the amount to
+     * pay. Null when nothing is said about GST: the price is what is paid.
+     * Added beside the rest, so an older site shows the price as before.
+     */
+    gst: GstOnPrice | null;
 }
 
 export interface PublicPacks {
@@ -112,18 +128,24 @@ export function singlePriceOf(
     return cheapest === null ? null : (cheapest / 100).toFixed(2);
 }
 
-/** A pack row as the read selects it, shaped for the site. Pure. */
-export function publicPackView(row: {
-    id: string;
-    name: string;
-    description: string | null;
-    credits: number;
-    validityDays: number;
-    price: { toString(): string };
-    currency: string;
-    kind: string;
-    services: readonly CoveredService[];
-}): PublicPack {
+/**
+ * A pack row as the read selects it, shaped for the site. Pure. `terms` is
+ * the business's GST standing; without it nothing is said about GST.
+ */
+export function publicPackView(
+    row: {
+        id: string;
+        name: string;
+        description: string | null;
+        credits: number;
+        validityDays: number;
+        price: { toString(): string };
+        currency: string;
+        kind: string;
+        services: readonly CoveredService[];
+    } & RatedSale,
+    terms: PriceTerms = NO_GST_TERMS,
+): PublicPack {
     const description = row.description?.trim() ?? "";
     return {
         id: row.id,
@@ -135,6 +157,7 @@ export function publicPackView(row: {
         currency: row.currency,
         kind: row.kind === "ONE_TO_ONE" ? "ONE_TO_ONE" : "CLASSES",
         singlePrice: singlePriceOf(row.currency, row.services),
+        gst: saleCharge(toCents(toMoneyString(row.price)), row, terms).gst,
     };
 }
 
@@ -166,11 +189,11 @@ export class PublicPacksService {
         if (!site) notFound();
         const { organizationId } = site;
 
-        const [rows, payOnline, taking] = await runInOrgContext(
+        const [rows, payOnline, taking, terms] = await runInOrgContext(
             organizationId,
             async () => {
                 if (!(await packsOffered(organizationId))) notFound();
-                return Promise.all([
+                const [packs, takes, takingOrders] = await Promise.all([
                     prisma.classPack.findMany({
                         where: { organizationId, ...PACKS_ON_SALE },
                         take: MAX_PACKS,
@@ -189,6 +212,7 @@ export class PublicPacksService {
                             price: true,
                             currency: true,
                             kind: true,
+                            ...RATED_SALE_SELECT,
                             services: {
                                 select: {
                                     service: {
@@ -207,10 +231,18 @@ export class PublicPacksService {
                     // A website a lower plan paused sells nothing (#800).
                     siteTakingOrders(organizationId, siteId),
                 ]);
+                return [
+                    packs,
+                    takes,
+                    takingOrders,
+                    // How the business's prices carry GST; read only when
+                    // a pack has a rate.
+                    await priceTermsFor(prisma, organizationId, packs),
+                ] as const;
             },
         );
         return withPause(
-            { payOnline, packs: rows.map(publicPackView) },
+            { payOnline, packs: rows.map((r) => publicPackView(r, terms)) },
             taking,
         );
     }

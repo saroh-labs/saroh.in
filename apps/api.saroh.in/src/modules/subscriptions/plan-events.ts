@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { bpsToRate, rateToBps } from "../invoices/gst";
 import { PLAN_EVENTS_PAGE_MAX } from "./dto";
 import type { EventActor, EventActorView } from "./event-actors";
 import { actorFromContext, actorView, teamNames } from "./event-actors";
@@ -45,6 +46,11 @@ export const PLAN_EVENT_FIELDS = [
     "currency",
     "interval",
     "classesPerMonth",
+    // GST (12 Oct 2026): the rate, the SAC code, and the plan's own way of
+    // carrying GST. They change what a member pays or what the paper says.
+    "gstRate",
+    "sacCode",
+    "gstPriceMode",
     "status",
 ] as const;
 export type PlanEventField = (typeof PLAN_EVENT_FIELDS)[number];
@@ -67,6 +73,9 @@ export const NO_PLAN: PlanSnapshot = {
     currency: null,
     interval: null,
     classesPerMonth: null,
+    gstRate: null,
+    sacCode: null,
+    gstPriceMode: null,
     status: null,
 };
 
@@ -78,6 +87,9 @@ export const PLAN_SNAPSHOT_SELECT = {
     currency: true,
     interval: true,
     classesPerMonth: true,
+    gstRate: true,
+    sacCode: true,
+    gstPriceMode: true,
     status: true,
 } as const;
 
@@ -88,7 +100,18 @@ export interface PlanRowForEvents {
     currency: string;
     interval: string;
     classesPerMonth: number | null;
+    gstRate?: { toString(): string } | string | null;
+    sacCode?: string | null;
+    gstPriceMode?: string | null;
     status: string;
+}
+
+/** A stored GST rate as it is written: "18", "0.25"; null when not set. */
+export function planRate(
+    rate: { toString(): string } | string | null | undefined,
+): string | null {
+    const bps = rateToBps(rate);
+    return bps === null ? null : bpsToRate(bps);
 }
 
 export function planSnapshot(row: PlanRowForEvents): PlanSnapshot {
@@ -99,6 +122,9 @@ export function planSnapshot(row: PlanRowForEvents): PlanSnapshot {
         currency: row.currency,
         interval: row.interval,
         classesPerMonth: row.classesPerMonth,
+        gstRate: planRate(row.gstRate),
+        sacCode: row.sacCode ?? null,
+        gstPriceMode: row.gstPriceMode ?? null,
         status: row.status,
     };
 }
@@ -110,9 +136,11 @@ export function diffPlan(
 ): PlanChanges {
     const changes: PlanChanges = {};
     for (const field of PLAN_EVENT_FIELDS) {
-        if (before[field] !== after[field]) {
-            changes[field] = [before[field], after[field]];
-        }
+        // A snapshot from before a field existed has none: that is "not
+        // set", never a change.
+        const was = before[field] ?? null;
+        const now = after[field] ?? null;
+        if (was !== now) changes[field] = [was, now];
     }
     return changes;
 }
@@ -123,6 +151,11 @@ const EDIT_KIND: Record<Exclude<PlanEventField, "status">, PlanEventKind> = {
     currency: "PRICE_CHANGED",
     interval: "PRICE_CHANGED",
     classesPerMonth: "CLASSES_CHANGED",
+    // GST is part of what the plan costs: no kind of its own, so every
+    // reader that knows PRICE_CHANGED already knows these.
+    gstRate: "PRICE_CHANGED",
+    sacCode: "PRICE_CHANGED",
+    gstPriceMode: "PRICE_CHANGED",
     name: "RENAMED",
     description: "DESCRIPTION_CHANGED",
 };

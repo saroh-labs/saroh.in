@@ -53,6 +53,8 @@ jest.mock("@saroh/database", () => {
         },
         organizationModule: { findFirst: jest.fn() },
         booking: { updateMany: jest.fn() },
+        // How the business's prices carry GST, read when a pack has a rate.
+        businessProfile: { findUnique: jest.fn() },
     };
     return {
         ...actual,
@@ -67,6 +69,8 @@ jest.mock("@saroh/database", () => {
             service: { count: jest.fn(), findFirst: jest.fn() },
             membership: { findMany: jest.fn() },
             user: { findMany: jest.fn() },
+            // Whether the business is registered, asked at a desk sale.
+            businessProfile: { findUnique: jest.fn() },
             organizationModule: { findFirst: jest.fn() },
             booking: { findFirst: jest.fn() },
             $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
@@ -979,5 +983,138 @@ describe("kind, first pack only, paid by and the reads (E13)", () => {
             people: 0,
             takings: [],
         });
+    });
+});
+
+// — GST on a pack (12 Oct 2026) ——————————————————————————————————————
+//
+// A pack carries a GST rate, a SAC code and its own way of carrying GST.
+// A sale takes its amount to pay from `invoices/sale-price.ts`; the
+// purchase and its invoice both keep that amount.
+describe("GST on a pack sold at the desk", () => {
+    const registered = (gstPriceMode: "INCLUDED" | "ADDED") => ({
+        gstRegistered: true,
+        taxId: "29ABCDE1234F1Z5",
+        gstState: "29",
+        gstPriceMode,
+    });
+    const business = (profile: Record<string, unknown> | null) => {
+        db.businessProfile!.findUnique!.mockResolvedValue(profile);
+        tx.businessProfile!.findUnique!.mockResolvedValue(profile);
+    };
+    const pack = (gst: Record<string, unknown>) => {
+        const row = { ...PACK, gstRate: null, sacCode: null, ...gst };
+        db.classPack!.findFirst!.mockResolvedValue(row);
+        tx.classPack!.findFirst!.mockResolvedValue(row);
+    };
+    const sell = () => service.sell(owner, "pack_1", { contactId: "c_1" });
+    const sold = () => tx.packPurchase!.create!.mock.calls[0]![0].data;
+    const line = () => issueInTx.mock.calls[0]![2].lines[0];
+
+    it("a business that is not registered sells it unchanged to the paisa, whatever the pack's rate", async () => {
+        business({ gstRegistered: false });
+        pack({ gstRate: decimal("18.00") });
+        await sell();
+        expect(sold().price).toBe("4500.00");
+        expect(issueInTx.mock.calls[0]![2].lines).toEqual([
+            {
+                description: "10-class pack · 10 classes",
+                quantity: 1,
+                unitPrice: "4500.00",
+            },
+        ]);
+    });
+
+    it("refuses a registered business's pack with no rate, naming it, before anything is written", async () => {
+        business(registered("INCLUDED"));
+        pack({ gstRate: null });
+        const err = await sell().catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(ConflictException);
+        expect((err as ConflictException).getResponse()).toEqual({
+            message:
+                "10-class pack has no GST rate. Choose one to issue this invoice.",
+            details: {
+                reason: "GST_RATE_MISSING",
+                items: [{ kind: "PACK", id: "pack_1", name: "10-class pack" }],
+            },
+        });
+        expect(tx.packPurchase!.create).not.toHaveBeenCalled();
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("refuses it when the desk has already been paid too: the paper would still be a tax invoice", async () => {
+        business(registered("INCLUDED"));
+        pack({ gstRate: null });
+        await expect(
+            service.sell(owner, "pack_1", { contactId: "c_1", paidBy: "CASH" }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(tx.packPurchase!.create).not.toHaveBeenCalled();
+    });
+
+    it("with Payments off writes no invoice, so nothing is asked", async () => {
+        business(registered("INCLUDED"));
+        pack({ gstRate: null });
+        // Payments off (Class packs stays on): nothing is invoiced, before
+        // the sale or in it.
+        const paymentsOff = (args: { where: { moduleKey: string } }) =>
+            Promise.resolve(
+                args.where.moduleKey === "PAYMENTS" ? { id: "mod_1" } : null,
+            );
+        db.organizationModule!.findFirst!.mockImplementation(paymentsOff);
+        tx.organizationModule!.findFirst!.mockImplementation(paymentsOff);
+        await expect(sell()).resolves.toBeDefined();
+        expect(issueInTx).not.toHaveBeenCalled();
+        expect(sold().price).toBe("4500.00");
+    });
+
+    it("includes GST: ₹4,500 to pay, and the line carries the rate so the paper shows the split", async () => {
+        business(registered("INCLUDED"));
+        pack({ gstRate: decimal("18.00"), sacCode: "999723" });
+        await sell();
+        expect(sold().price).toBe("4500.00");
+        expect(line()).toEqual({
+            description: "10-class pack · 10 classes",
+            quantity: 1,
+            unitPrice: "4500.00",
+            gstRate: "18",
+            hsnSac: "999723",
+            priceMode: "INCLUDED",
+        });
+    });
+
+    it("GST is added: ₹4,500 at 18% is ₹5,310 to pay, on the purchase, its invoice and its history", async () => {
+        business(registered("ADDED"));
+        pack({ gstRate: decimal("18.00") });
+        await sell();
+        expect(sold().price).toBe("5310.00");
+        expect(line()).toEqual({
+            description: "10-class pack · 10 classes",
+            quantity: 1,
+            unitPrice: "5310.00",
+            gstRate: "18",
+            hsnSac: null,
+            priceMode: "ADDED",
+        });
+        expect(tx.packEvent!.create!.mock.calls[0]![0].data).toMatchObject({
+            kind: "SOLD",
+            details: expect.objectContaining({ price: "5310.00" }),
+        });
+    });
+
+    it("a pack priced the other way from the business follows its own choice", async () => {
+        business(registered("INCLUDED"));
+        pack({ gstRate: decimal("5.00"), gstPriceMode: "ADDED" });
+        await sell();
+        // ₹4,500 + 5% = ₹4,725.
+        expect(sold().price).toBe("4725.00");
+        expect(line()).toMatchObject({ gstRate: "5", priceMode: "ADDED" });
+    });
+
+    it("an exempt pack (0%) has a rate: sold at the typed price", async () => {
+        business(registered("ADDED"));
+        pack({ gstRate: decimal("0.00") });
+        await sell();
+        expect(sold().price).toBe("4500.00");
+        expect(line()).toMatchObject({ gstRate: "0", priceMode: null });
     });
 });

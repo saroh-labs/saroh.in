@@ -3,9 +3,12 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import type { GstPriceMode } from "../invoices/gst-price";
+import { isGstPriceMode } from "../invoices/gst-price";
 import type { AutopayChargeTiming } from "./autopay-timing";
 import { isAutopayChargeTiming } from "./autopay-timing";
 import type { Interval } from "./periods";
+import { planRate } from "./plan-events";
 import type { PlanFigures, PriceGroup } from "./plan-figures";
 import { planFigures } from "./plan-figures";
 
@@ -39,6 +42,13 @@ export interface PlanView extends PlanFigures {
      * business's setting.
      */
     autopayChargeTiming: AutopayChargeTiming | null;
+    /**
+     * GST (12 Oct 2026): the rate its price carries ("18"; null: not set),
+     * its SAC code, and its own way of carrying GST (null: the business's).
+     */
+    gstRate: string | null;
+    sacCode: string | null;
+    gstPriceMode: GstPriceMode | null;
 }
 
 const PLAN_SELECT = {
@@ -53,6 +63,9 @@ const PLAN_SELECT = {
     pendingChangedAt: true,
     createdAt: true,
     autopayChargeTiming: true,
+    gstRate: true,
+    sacCode: true,
+    gstPriceMode: true,
 } as const;
 
 type PlanRow = Prisma.SubscriptionPlanGetPayload<{
@@ -124,6 +137,11 @@ function planView(row: PlanRow, groups: readonly PriceGroup[]): PlanView {
         createdAt: row.createdAt.toISOString(),
         autopayChargeTiming: isAutopayChargeTiming(row.autopayChargeTiming)
             ? row.autopayChargeTiming
+            : null,
+        gstRate: planRate(row.gstRate),
+        sacCode: row.sacCode,
+        gstPriceMode: isGstPriceMode(row.gstPriceMode)
+            ? row.gstPriceMode
             : null,
         ...planFigures(row, groups),
     };
