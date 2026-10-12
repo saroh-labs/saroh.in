@@ -2,11 +2,15 @@
 # Every label below was checked against the real screens on 6 Oct 2026
 # (R7), in the code and in the captured shots. Sources, from the repo root:
 #   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Payments ›
-#         Subscriptions); lib/subscriptions/view.ts (tabs Active, Payment
-#         failed, Paused, Cancelled, Plans)
-#   PLANS apps/app.saroh.in/components/subscriptions/plans-tab.tsx ("New
-#         plan"; "Changing a price only changes what's sold next. Everyone
-#         already on a plan keeps what they agreed to.")
+#         Subscriptions); components/subscriptions/subscriptions-screen.tsx
+#         (tabs Subscribers and Plans); lib/subscriptions/view.ts (the
+#         list's views Need you, Active, Paused, Cancelled, All
+#         subscriptions; a row's status "Payment failed")
+#   PLANS apps/app.saroh.in/components/subscriptions/subscriptions-screen.tsx
+#         ("New plan", the page's button on the Plans tab);
+#         plans-tab.tsx (plans as rows). The tip under step 2 stood on the
+#         Plans tab until 12 Oct 2026; it is a fact of how plans work
+#         (lib/subscriptions/view.ts, `olderPrice`).
 #   EDIT  .../subscriptions/plan-editor/details-section.tsx ("Details",
 #         "Name", "What's included", "One line. It's what people read on
 #         the booking page and their receipt."); price-section.tsx ("Price
@@ -45,12 +49,12 @@ order: 10
 intro: "A plan is something you sell on repeat: a monthly membership, a weekly loaf. You make the plan once, put people on it, and each renewal makes its own invoice. This takes about three minutes."
 description: "Make a monthly plan in Saroh, put a customer on it, and see how each renewal is invoiced and paid with a pay link."
 readMinutes: 3
-updated: "2026-10-06"
+updated: "2026-10-12"
 publishOn: "2026-10-17"
 steps:
     # NAV, PLANS.
     - title: Open Plans
-      body: "In Saroh, open Payments › Subscriptions in the sidebar, then the Plans tab, and press New plan. With no plans yet, the button says Make a plan."
+      body: "In Saroh, open Payments › Subscriptions in the sidebar, then the Plans tab, and press New plan. Your plans are listed there, one to a row, with what each costs and who is on it."
       shot: help-monthly-plan-1
       caption: "Plans at Rye & Co. (demo bakery), with New plan."
       marker: New plan
@@ -82,7 +86,7 @@ steps:
       marker: The month's invoice
     # FAIL.
     - title: When a renewal isn't paid
-      body: "A renewal that isn't paid by its due day shows under Payment failed, and nothing more is collected until it's paid. Saroh doesn't charge a card or try again on its own. Press Try again with a new pay link and send the link yourself, Record a payment you took, or pause or cancel it."
+      body: "A renewal that isn't paid by its due day is marked Payment failed, and nothing more is collected until it's paid. Subscriptions opens on the people who need you, with what they owe at the top. Saroh doesn't charge a card or try again on its own. Press Try again with a new pay link and send the link yourself, Record a payment you took, or pause or cancel it."
       shot: help-monthly-plan-6
       caption: "Arjun Mehta's renewal at Rye & Co. (demo bakery), not paid yet."
       marker: Try again with a new pay link

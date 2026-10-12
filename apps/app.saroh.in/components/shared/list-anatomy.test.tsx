@@ -35,10 +35,6 @@ import {
 } from "@/components/stores/catalogue/catalogue-toolbar";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import { StorefrontList } from "@/components/stores/storefront-list";
-import {
-    SUBSCRIPTION_COLS,
-    SUBSCRIPTION_ROW,
-} from "@/components/subscriptions/subscription-row";
 import type { CustomersPage } from "@/lib/customers/list";
 import { readListQuery as readCustomersQuery } from "@/lib/customers/list";
 import { FACT_DOT, joinFacts } from "@/lib/format/join";
@@ -620,13 +616,11 @@ describe("a hand-built table takes the one look", () => {
         );
     });
 
-    it("Invoices and Subscriptions: one card, a head band over the rows' own columns", () => {
+    // Subscriptions drew a row of its own here until 12 Oct 2026: it is
+    // the shared list now (`subscriptions-screen.test.tsx`).
+    it("Invoices: one card, a head band over the rows' own columns", () => {
         // The head and every row share the columns, so they line up.
         expect(INVOICE_GRID).toContain("md:grid-cols-[");
-        expect(SUBSCRIPTION_ROW).toContain("flex");
-        expect(SUBSCRIPTION_COLS.price.split(" ")).toEqual(
-            expect.arrayContaining(["text-right", "tabular-nums"]),
-        );
         const row = html(
             <InvoiceRow
                 invoice={

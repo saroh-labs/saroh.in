@@ -32,9 +32,9 @@ import {
     initials,
     keepsLine,
     listTab,
-    longPrice,
     olderPrice,
     paysBy,
+    recurringPrice,
     retryOffer,
     sortCharges,
     subscriptionPay,
@@ -288,7 +288,7 @@ export function SubscriptionDetail({
                     description={[
                         sub.plan.name,
                         // What they pay a period, GST and all.
-                        longPrice(
+                        recurringPrice(
                             subscriptionPay(sub),
                             sub.currency,
                             sub.interval,
@@ -427,7 +427,7 @@ export function SubscriptionDetail({
                         <PlanCard
                             name={sub.plan.name}
                             what={plan?.description ?? null}
-                            price={longPrice(
+                            price={recurringPrice(
                                 subscriptionPay(sub),
                                 sub.currency,
                                 sub.interval,

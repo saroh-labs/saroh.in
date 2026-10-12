@@ -260,7 +260,7 @@ describe("eventWhat", () => {
                 }),
                 "INR",
             ),
-        ).toBe("Changed the price from ₹1,200 / month to ₹12,000 / year");
+        ).toBe("Changed the price from ₹1,200 a month to ₹12,000 a year");
         expect(
             eventWhat(
                 event({ changes: { interval: ["MONTH", "QUARTER"] } }),
@@ -332,7 +332,7 @@ describe("eventWhat", () => {
                 }),
                 "INR",
             ),
-        ).toBe("Created at ₹1,500 / month");
+        ).toBe("Created at ₹1,500 a month");
         expect(eventWhat(event({ kind: "ARCHIVED", changes: {} }), "INR")).toBe(
             "Archived, closed to new sign-ups",
         );
@@ -484,7 +484,7 @@ describe("subscriberRows", () => {
             name: "Ananya Rao",
             since: "Since 4 Jan",
             status: { label: "Active", tone: "ok" },
-            price: "₹1,200 / month",
+            price: "₹1,200 a month",
             olderPrice: true,
             when: "Next 4 Oct",
         });

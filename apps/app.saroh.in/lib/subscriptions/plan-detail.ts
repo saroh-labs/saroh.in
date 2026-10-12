@@ -16,8 +16,8 @@ import type { Tone } from "./view";
 import {
     classesText,
     listTab,
-    longPrice,
     olderPrice,
+    recurringPrice,
     subscriptionPay,
     TAB_LABEL,
     TAB_TONE,
@@ -145,7 +145,7 @@ function touchesPrice(changes: Changes): boolean {
     return "price" in changes || "currency" in changes || "interval" in changes;
 }
 
-/** "₹1,200", "₹1,200 / month" — a side of a price change. */
+/** "₹1,200", "₹1,200 a month": a side of a price change. */
 function priceSide(
     price: string | null,
     currency: string,
@@ -153,7 +153,7 @@ function priceSide(
 ): string {
     if (price === null) return "no price";
     return interval
-        ? longPrice(price, currency, interval)
+        ? recurringPrice(price, currency, interval)
         : formatMoneyMajor(price, currency);
 }
 
@@ -347,7 +347,7 @@ export interface SubscriberRow {
     /** "Since 4 Jan". */
     since: string;
     status: { label: string; tone: Tone };
-    /** "₹2,500 / month". */
+    /** "₹2,500 a month". */
     price: string;
     /** They keep a price the plan no longer sells at. */
     olderPrice: boolean;
@@ -388,7 +388,11 @@ export function subscriberRows(
                 since: `Since ${d(s.startedAt)}`,
                 status: { label: TAB_LABEL[tab], tone: TAB_TONE[tab] },
                 // What they pay a period, GST and all.
-                price: longPrice(subscriptionPay(s), s.currency, s.interval),
+                price: recurringPrice(
+                    subscriptionPay(s),
+                    s.currency,
+                    s.interval,
+                ),
                 olderPrice: olderPrice(s, [plan]) !== null,
                 when,
             };

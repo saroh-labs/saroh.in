@@ -48,20 +48,68 @@ export const TAB_TONE: Record<ListTab, Tone> = {
     cancelled: "off",
 };
 
-/** `?tab=` (the design) or `?view=` (older links; "overdue" was the old name). */
-export function tabFromQuery(value: string | undefined): ListTab {
+/**
+ * The list's views, which its one dropdown switches between: each status,
+ * and everything. "Need you" is the payment failed set (`listTab`), under
+ * the words the header says it in.
+ */
+export type ListView = ListTab | "all";
+
+export const VIEW_LABEL: Record<ListView, string> = {
+    failed: "Need you",
+    active: "Active",
+    paused: "Paused",
+    cancelled: "Cancelled",
+    all: "All subscriptions",
+};
+
+/**
+ * `?view=` (and `?tab=`, which older links and Home's still carry;
+ * "overdue" was the old name): the view someone chose, or null when the
+ * address chooses none and the list opens on its default.
+ */
+export function viewFromQuery(value: string | undefined): ListView | null {
     if (value === "overdue") return "failed";
-    return value === "failed" || value === "paused" || value === "cancelled"
+    return value === "failed" ||
+        value === "active" ||
+        value === "paused" ||
+        value === "cancelled" ||
+        value === "all"
         ? value
-        : "active";
+        : null;
 }
 
-/** The screen's tabs: the four lists, then Plans (D3). */
-export type ScreenTab = ListTab | "plans";
+type Standing = Pick<Subscription, "status" | "paymentFailed">;
 
-/** `?tab=plans` opens Plans; anything else is a list tab. */
+/**
+ * Where the list opens when nobody chose: on who needs the owner, when
+ * anyone does, else on the active ones.
+ */
+export function defaultView(subs: readonly Standing[]): ListView {
+    return subs.some((s) => listTab(s) === "failed") ? "failed" : "active";
+}
+
+/**
+ * The views in the dropdown's order, the default first: the shared list
+ * opens on its first view, and "Clear filters" goes back to it.
+ */
+export function listViews(subs: readonly Standing[]): ListView[] {
+    return defaultView(subs) === "failed"
+        ? ["failed", "active", "paused", "cancelled", "all"]
+        : ["active", "failed", "paused", "cancelled", "all"];
+}
+
+/** Whether a subscription is in a view. */
+export function inView(sub: Standing, view: ListView): boolean {
+    return view === "all" || listTab(sub) === view;
+}
+
+/** The screen's two tabs: who is subscribed, and the plans on sale (D3). */
+export type ScreenTab = "subscribers" | "plans";
+
+/** `?tab=plans` opens Plans; anything else is the subscribers. */
 export function screenTabFromQuery(value: string | undefined): ScreenTab {
-    return value === "plans" ? "plans" : tabFromQuery(value);
+    return value === "plans" ? "plans" : "subscribers";
 }
 
 const PER: Record<Interval, { short: string; long: string }> = {
@@ -71,22 +119,21 @@ const PER: Record<Interval, { short: string; long: string }> = {
     YEAR: { short: "yr", long: "year" },
 };
 
-/** "₹1,200/mo" — what a row's member pays a period. */
-export function shortPrice(
+/**
+ * An amount that recurs, in the one form every screen says it in: "₹1,200
+ * a month", "₹12,000 a year". `narrow` is the short form, "₹1,200/mo", for
+ * a column that is narrow on a phone and nowhere else.
+ */
+export function recurringPrice(
     price: string,
     currency: string,
     interval: Interval,
+    narrow = false,
 ): string {
-    return `${formatMoneyMajor(price, currency)}/${PER[interval].short}`;
-}
-
-/** "₹1,200 / month" — the price in a sentence or a card. */
-export function longPrice(
-    price: string,
-    currency: string,
-    interval: Interval,
-): string {
-    return `${formatMoneyMajor(price, currency)} / ${PER[interval].long}`;
+    const money = formatMoneyMajor(price, currency);
+    return narrow
+        ? `${money}/${PER[interval].short}`
+        : `${money} a ${PER[interval].long}`;
 }
 
 /**
@@ -131,6 +178,77 @@ export function monthlyTotal(
             0,
         );
     return { amount: Math.round(amount), currency };
+}
+
+/**
+ * Who needs the owner, and what they owe: how many renewals aren't paid,
+ * and the sum of the invoices unpaid on those subscriptions as the API
+ * counted them (`unpaidTotal`), in the currency most of them are in. No
+ * amount where the read gives none (a role that can't read invoices).
+ */
+export function needYou(
+    subs: readonly Pick<
+        Subscription,
+        "status" | "paymentFailed" | "unpaidTotal" | "currency"
+    >[],
+): { count: number; unpaid: { amount: number; currency: string } | null } {
+    const failed = subs.filter((s) => listTab(s) === "failed");
+    if (!failed.length) return { count: 0, unpaid: null };
+    const counts: Record<string, number> = {};
+    for (const s of failed) counts[s.currency] = (counts[s.currency] ?? 0) + 1;
+    const currency = Object.keys(counts).sort(
+        (a, b) => counts[b] - counts[a],
+    )[0];
+    // Whole paise, so a sum of amounts never drifts as a float.
+    const cents = failed
+        .filter((s) => s.currency === currency)
+        .reduce((n, s) => n + Math.round(Number(s.unpaidTotal) * 100), 0);
+    return {
+        count: failed.length,
+        unpaid: cents > 0 ? { amount: cents / 100, currency } : null,
+    };
+}
+
+/**
+ * The header's summary: what needs the owner first ("8 need you · ₹6,600
+ * unpaid"), then the quieter count ("12 active · about ₹14,000 a month").
+ * `lead` is null when nobody needs them.
+ */
+export function listSummary(
+    subs: readonly Pick<
+        Subscription,
+        | "status"
+        | "paymentFailed"
+        | "unpaidTotal"
+        | "price"
+        | "pay"
+        | "currency"
+        | "interval"
+    >[],
+): { lead: string | null; rest: string } {
+    const need = needYou(subs);
+    const active = subs.filter((s) => listTab(s) === "active").length;
+    const total = monthlyTotal(subs);
+    return {
+        lead: need.count
+            ? [
+                  `${need.count} ${plural(need.count, "needs", "need")} you`,
+                  need.unpaid
+                      ? `${formatMoneyMajor(need.unpaid.amount, need.unpaid.currency)} unpaid`
+                      : "",
+              ]
+                  .filter(Boolean)
+                  .join(" · ")
+            : null,
+        rest: [
+            `${active} active`,
+            total
+                ? `about ${formatMoneyMajor(total.amount, total.currency)} a month`
+                : "",
+        ]
+            .filter(Boolean)
+            .join(" · "),
+    };
 }
 
 function daysLate(dueAt: string, now: Date): number {
@@ -341,7 +459,7 @@ function people(n: number): string {
 
 /**
  * Who pays what, as Plan Detail says it: "12 people · current price" and
- * "₹1,500 / month", then each older price the API lists. The amount is
+ * "₹1,500 a month", then each older price the API lists. The amount is
  * what each pays a period, GST and all (₹2,360 for a ₹2,000 price with
  * 18% added), since it is money coming in.
  */
@@ -350,7 +468,7 @@ export function payRows(
 ): { label: string; amount: string; older: boolean }[] {
     return plan.byPrice.map((b) => ({
         label: `${people(b.count)} · ${b.current ? "current price" : "older price"}`,
-        amount: longPrice(subscriptionPay(b), b.currency, b.interval),
+        amount: recurringPrice(subscriptionPay(b), b.currency, b.interval),
         older: !b.current,
     }));
 }
