@@ -1939,7 +1939,7 @@ describe("GST in the bag and on the product's button", () => {
         expect(sheet).not.toHaveTextContent("GST");
     });
 
-    it("says + GST on Add to bag when GST comes on top of the price", () => {
+    it("names the amount to pay on Add to bag when GST comes on top of the price", () => {
         render(
             <ProductPage
                 product={{
@@ -1961,7 +1961,8 @@ describe("GST in the bag and on the product's button", () => {
             />,
         );
         expect(
-            screen.getByRole("button", { name: "Add to bag · ₹180 + GST" }),
+            // ₹180 + 5%: the button that takes money says the whole of it.
+            screen.getByRole("button", { name: "Add to bag · ₹189" }),
         ).toBeInTheDocument();
     });
 });

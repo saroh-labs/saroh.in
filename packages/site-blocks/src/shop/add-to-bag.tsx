@@ -136,13 +136,17 @@ export function AddToBag({
     }
 
     // What one more costs, on the button itself.
-    // "₹1,000 + GST" where GST comes on top: the bag shows the sum.
-    const price = selection.currency
-        ? browsePriceWords(
-              formatAmount(selection.price, selection.currency),
-              selection.gstAdded === true,
-          )
-        : "";
+    // The amount to pay where the page knows it ("₹1,180" for ₹1,000 +
+    // 18%): a button that takes money names the whole of it. Without the
+    // sum it is "₹1,000 + GST", and the bag shows the rest.
+    const price = !selection.currency
+        ? ""
+        : selection.payAmount
+          ? formatAmount(selection.payAmount, selection.currency)
+          : browsePriceWords(
+                formatAmount(selection.price, selection.currency),
+                selection.gstAdded === true,
+            );
     const forPrice = price ? ` · ${price}` : "";
 
     return (

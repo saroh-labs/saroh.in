@@ -182,6 +182,11 @@ export interface ProductSelection {
     price: string;
     /** GST comes on top of that price: the action says "+ GST" after it. */
     gstAdded?: boolean;
+    /**
+     * What one of it costs to pay, GST and all, when the page knows the
+     * sum: the action names this instead of "price + GST".
+     */
+    payAmount?: string;
     /** The currency that price is in. */
     currency?: string;
     /** Nothing of it can be sold now: the action is off. */
@@ -584,6 +589,10 @@ export default function ProductPage({
                         name: product.name,
                         price,
                         gstAdded: gst?.mode === "ADDED",
+                        payAmount:
+                            gst?.mode === "ADDED"
+                                ? (gst.payCents / 100).toFixed(2)
+                                : undefined,
                         currency: product.currency,
                         soldOut,
                         left:
