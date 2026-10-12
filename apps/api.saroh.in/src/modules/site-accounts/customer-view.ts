@@ -1,12 +1,19 @@
 import { DateTime } from "luxon";
 
 import { toMoneyString } from "../../common/money";
+import type { GstOnPrice } from "../invoices/gst-price";
 import { isBillOfSupply } from "../invoices/invoice-title";
 import type { OrderStage } from "../orders/dto";
 import { goesByCourier, typeOf } from "../orders/fulfilment";
 import { isServiceLine, lineName } from "../orders/order-line";
 import type { PickupPlace } from "../stores/pickup-place";
 import { pickupPlaceOf } from "../stores/pickup-place";
+import type {
+    AccountChange,
+    AccountCourse,
+    AccountInvoiceDue,
+    AccountWaitlistPlace,
+} from "./account-details-view";
 import type { AccountTab } from "./account-tabs";
 import type { TrackState, TrackStep } from "./account-track";
 import { orderTrack, REFUND_LINE } from "./account-track";
@@ -28,6 +35,9 @@ import { orderTrack, REFUND_LINE } from "./account-track";
 export * from "./account-bookings-view";
 // A11's packs on sale and pack purchases: the same.
 export * from "./account-packs-view";
+// Invoices to pay, a class's line, courses, email choices and what changed
+// since the last visit (DEC-142): the same.
+export * from "./account-details-view";
 
 /** A read that failed says so; it never reads as "none" (A5). */
 export type Block<T> = { ok: true; value: T } | { ok: false };
@@ -162,6 +172,12 @@ export interface AccountPlan {
     name: string;
     price: string;
     currency: string;
+    /**
+     * The GST on the price as the next renewal will charge it (12 Oct
+     * 2026): the price they are on, the GST in or on it, and the amount to
+     * pay. Null when nothing is said about GST: the price is what is paid.
+     */
+    gst: GstOnPrice | null;
     interval: string;
     status: "ACTIVE" | "PAUSED";
     /** The next renewal; null while paused or ending. */
@@ -298,6 +314,24 @@ export interface AccountHome {
     /** Null when the business doesn't sell. */
     orders: Block<AccountOrder[]> | null;
     plan: Block<AccountPlan | null>;
+    /**
+     * What changed since they were last here (DEC-142), newest first; none
+     * on a first visit. `since` is the visit it counts from.
+     */
+    changes: Block<AccountChange[]>;
+    since: string | null;
+    /** Their open invoices, the one due soonest first. */
+    invoicesDue: Block<AccountInvoiceDue[]>;
+    /** Their places in a class's line; null when the business takes no bookings. */
+    waitlist: Block<AccountWaitlistPlace[]> | null;
+    /** The courses they hold a seat on. */
+    courses: Block<AccountCourse[]>;
+    /**
+     * This account is on a separate contact until staff link it to the
+     * record the business already had (DEC-049, DEC-055): an empty Home
+     * says earlier orders and bookings may be waiting for that.
+     */
+    linkPending: boolean;
 }
 
 export interface AccountReceipt {
@@ -626,6 +660,8 @@ export function planView(row: {
     pausedUntil: Date | null;
     timezone: string;
     plan: { name: string };
+    /** The GST on a renewal, worked out by the caller (`sale-price.ts`). */
+    gst?: GstOnPrice | null;
 }): AccountPlan {
     const paused = row.status === "PAUSED";
     return {
@@ -634,6 +670,7 @@ export function planView(row: {
         name: row.plan.name,
         price: toMoneyString(row.price),
         currency: row.currency,
+        gst: row.gst ?? null,
         interval: row.interval,
         status: paused ? "PAUSED" : "ACTIVE",
         renewsAt:

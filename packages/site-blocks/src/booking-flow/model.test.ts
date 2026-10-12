@@ -22,12 +22,15 @@ import {
     laterVisitsText,
     looksLikeEmail,
     orList,
+    payCentsOf,
     payChoices,
     phoneProblem,
     placesText,
     restAfterDeposit,
     rulesText,
+    serviceGstWords,
     serviceLine,
+    servicePickPrice,
     serviceWhere,
     timeIn,
     unpayableText,
@@ -663,5 +666,128 @@ describe("visits (E10)", () => {
                 services: [{ ...service(), visits: "3" }],
             }),
         ).toBe(false);
+    });
+});
+
+describe("GST on a service's price", () => {
+    const adds = {
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+    const includes = {
+        mode: "INCLUDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 15254,
+        payCents: 100000,
+    };
+    /** ₹1,000 typed, ₹180 GST on top: ₹1,180 to pay. */
+    const added = (over: Partial<BookingService> = {}) =>
+        service({
+            priceCents: 100_000,
+            payCents: 118_000,
+            gst: adds,
+            ...over,
+        });
+
+    it("reads the booking page with the new fields, without them, and with a strange GST", () => {
+        const page = {
+            businessName: "Pulse Fitness",
+            open: true,
+            timezone: ZONE,
+            payOnline: true,
+            rules: {
+                bookAheadDays: 21,
+                latestBookingMinutes: 120,
+                freeCancelHours: 12,
+            },
+        };
+        expect(isBookingPage({ ...page, services: [added()] })).toBe(true);
+        expect(isBookingPage({ ...page, services: [service()] })).toBe(true);
+        expect(
+            isBookingPage({
+                ...page,
+                services: [service({ payCents: null, gst: null })],
+            }),
+        ).toBe(true);
+        expect(
+            isBookingPage({ ...page, services: [{ ...added(), gst: "18" }] }),
+        ).toBe(true);
+        expect(
+            isBookingPage({
+                ...page,
+                services: [{ ...added(), payCents: "118000" }],
+            }),
+        ).toBe(false);
+    });
+
+    it("pays the API's amount to pay, never the typed price", () => {
+        expect(payCentsOf(added())).toBe(118_000);
+        // An older API sends none: the price is what is paid.
+        expect(payCentsOf(service())).toBe(120_000);
+        const [now, desk] = payChoices(added(), true, "Kavi Dental");
+        expect(now).toMatchObject({
+            pay: "NOW",
+            label: "Pay ₹1,180 now",
+            amount: "₹1,180",
+        });
+        expect(desk).toMatchObject({ pay: "DESK", amount: "₹1,180" });
+    });
+
+    it("takes the deposit and the rest from the amount to pay", () => {
+        const withDeposit = added({ depositCents: 29_500 });
+        expect(restAfterDeposit(withDeposit)).toBe("₹885");
+        const [deposit, full] = payChoices(withDeposit, true, "Kavi Dental");
+        expect(deposit).toMatchObject({
+            pay: "DEPOSIT",
+            label: "Pay ₹295 deposit now",
+            sub: "The rest (₹885) at Kavi Dental. Refunded if you cancel in time.",
+            amount: "₹295",
+        });
+        expect(full).toMatchObject({
+            pay: "NOW",
+            label: "Pay the full ₹1,180 now",
+        });
+        // A deposit of the whole amount to pay is simply paid now: one
+        // that only covers the typed price is still a deposit.
+        expect(
+            payChoices(added({ depositCents: 118_000 }), true, "Kavi").map(
+                (c) => c.pay,
+            ),
+        ).toEqual(["NOW"]);
+        expect(
+            payChoices(added({ depositCents: 100_000 }), true, "Kavi").map(
+                (c) => c.pay,
+            ),
+        ).toEqual(["DEPOSIT", "NOW"]);
+        expect(restAfterDeposit(added({ depositCents: 118_000 }))).toBeNull();
+    });
+
+    it("writes the sentence for both ways, and nothing when the API said none", () => {
+        expect(serviceGstWords(added())).toBe("₹1,000 + ₹180 GST (18%)");
+        expect(
+            serviceGstWords(
+                service({
+                    priceCents: 100_000,
+                    payCents: 100_000,
+                    gst: includes,
+                }),
+            ),
+        ).toBe("₹1,000, includes ₹152.54 GST (18%)");
+        expect(serviceGstWords(service({ gst: null }))).toBeNull();
+        expect(serviceGstWords(service())).toBeNull();
+        expect(serviceGstWords(null)).toBeNull();
+    });
+
+    it("shows the typed price where a service is picked, with + GST when added", () => {
+        expect(servicePickPrice(added())).toBe("₹1,000 + GST");
+        expect(
+            servicePickPrice(service({ priceCents: 100_000, gst: includes })),
+        ).toBe("₹1,000");
+        expect(servicePickPrice(service())).toBe("₹1,200");
+        expect(servicePickPrice(service({ priceCents: null }))).toBeNull();
     });
 });

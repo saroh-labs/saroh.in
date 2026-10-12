@@ -14,6 +14,12 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanLock } from "@/lib/billing/access";
 import { joinAnd } from "@/lib/editor-shell/state";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
+import type { PriceHistoryPage } from "@/lib/price-history/words";
+import {
+    PRICE_HISTORY_TITLE,
+    priceHistoryShown,
+} from "@/lib/price-history/words";
 import {
     archiveService,
     createService,
@@ -21,13 +27,16 @@ import {
     updateService,
 } from "@/lib/services/actions";
 import type { AvailabilityRule, Service } from "@/lib/services/service";
-import { takingLabel } from "@/lib/services/service-cards";
+import { TAKING_LABEL } from "@/lib/services/service-cards";
 import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
 import {
+    businessModeFor,
     changedParts,
     changedSections,
+    chargedAsSaved,
     draftOf,
     glance,
+    gstPlace,
     hasBookableHours,
     problemFor,
     savedMessage,
@@ -54,6 +63,9 @@ import type {
     WeeklyRange,
 } from "@/lib/staff/types";
 
+import { useTakingBookings } from "@/components/services/use-taking-bookings";
+import { SwitchRow } from "@/components/shared/check-row";
+import { PriceHistoryList } from "@/components/shared/price-history";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
@@ -67,6 +79,8 @@ import {
     WhatItIs,
     WhoTakesIt,
 } from "./editor-sections";
+import { Section } from "./fields";
+import { HoursCard } from "./hours-card";
 import { MoreSettings } from "./more-settings";
 
 const SERVICES_HREF = "/services";
@@ -74,16 +88,22 @@ const SERVICES_HREF = "/services";
 /**
  * The Service Editor (E2, "Saroh Service Editor"): one page for a new
  * service and a saved one, in place of the old dialog and forms. What it
- * is, its time and where, its price, who takes it, the booking page and
- * At a glance; everything else the old forms had is under More settings.
- * One Save, in the header, applies to bookings made after it. It goes in
- * up to three calls: the service, who takes it, and its own weekly hours
- * (`PUT …/rules`). When the service is saved and its hours are not, the
+ * is, its time and where, when it can be booked, its price, who takes it,
+ * the booking page and At a glance; the time zone, the buffer before and
+ * Delete are under More settings. One Save, in the header, applies to
+ * bookings made after it. It goes in up to three calls: the service, who
+ * takes it, and its own weekly hours (`PUT …/rules`). When the service is
+ * saved and its hours are not, the
  * page says exactly that, keeps the hours typed, and Try again sends only
  * the hours.
  *
  * A field says what is wrong once it has been left; Save says the rest and
  * puts the keyboard on the first one.
+ *
+ * "Taking bookings" is a switch beside Save (Bookings audit, 12 Oct
+ * 2026), not part of the draft's Save: it acts as it is flipped, with
+ * Undo, the same as on a row of Bookings › Services, and leaves whatever
+ * else is typed on the page as it is.
  *
  * "At booking, they pay" sits under Price (E8), and Visits under Time
  * (E10): more than one makes it a treatment, which needs a storefront to
@@ -102,7 +122,28 @@ export function ServiceEditor({
     hasStorefront = null,
     paymentsLock = null,
     payment = null,
+    gstRegistered = null,
+    businessPriceMode = null,
+    priceHistory,
 }: {
+    /**
+     * What the service has cost, newest first (12 Oct 2026); null when
+     * that read failed. Left out (a new service), or with nothing kept
+     * yet, nothing is drawn.
+     */
+    priceHistory?: PriceHistoryPage | null;
+    /**
+     * How the business's prices carry GST (12 Oct 2026), for the Price
+     * card's "Same as the business (…)". Null when it couldn't be read.
+     */
+    businessPriceMode?: GstPriceMode | null;
+    /**
+     * Whether the business is GST-registered: its priced services need a
+     * GST rate, asked beside the price. False: no GST field, and nothing
+     * asked. Null when it couldn't be told: GST stays under More settings
+     * and nothing is asked.
+     */
+    gstRegistered?: boolean | null;
     /** Null while creating. */
     service: Service | null;
     /** Null when the service's own hours couldn't be read. */
@@ -162,6 +203,7 @@ export function ServiceEditor({
     );
     const [draft, setDraft] = useState(saved);
     const [saving, setSaving] = useState(false);
+    const taking = useTakingBookings();
     const [confirmDelete, setConfirmDelete] = useState(false);
     // A new service's hours follow its kind until someone changes them.
     const [hoursTouched, setHoursTouched] = useState(false);
@@ -204,13 +246,17 @@ export function ServiceEditor({
         !wasTreatment && (hasStorefront === false || refusedStorefront);
 
     const [tried, setTried] = useState(false);
-    const changed = changedSections(saved, draft);
+    // Where GST is drawn, from what the page opened with: a rate cleared
+    // mid-edit doesn't take its own field away.
+    const [gstAt] = useState(() => gstPlace(gstRegistered, saved));
+    const changed = changedSections(saved, draft, gstAt === "price");
     const dirty = changed.length > 0;
     const problems = serviceFieldProblems(
         draft,
         hasStaff,
         noStorefront,
         people.length === 1,
+        gstRegistered === true,
     );
     const bad = problems.length > 0;
     const problem = (field: ServiceField) =>
@@ -219,7 +265,11 @@ export function ServiceEditor({
         tried || hoursTouched ? problemFor(problems, "hours", row) : null;
     // What is wrong under More settings opens it, so the keyboard can land
     // on it.
-    const inMore = (["timezone", "bufferBefore", "sacCode", "hours"] as const)
+    const inMore = (
+        gstAt === "more"
+            ? (["timezone", "bufferBefore", "sacCode"] as const)
+            : (["timezone", "bufferBefore"] as const)
+    )
         .map((field) => problemFor(problems, field))
         .some((message) => message !== null);
     const comingUp = isNew ? 0 : usage ? usage.comingUp : null;
@@ -440,18 +490,38 @@ export function ServiceEditor({
                     actions={
                         canEdit ? (
                             <div className="flex flex-wrap items-center gap-2">
-                                {isNew ? null : (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-
-                                        disabled={saving}
-                                        onClick={() =>
-                                            set({ taking: !draft.taking })
+                                {serviceId === null ? null : (
+                                    // Its own save, at once, with Undo: it
+                                    // moves the saved state and the draft
+                                    // together, so it is never "unsaved".
+                                    <SwitchRow
+                                        checked={draft.taking}
+                                        disabled={
+                                            saving || taking.busy === serviceId
                                         }
+                                        onChange={(next) =>
+                                            void taking.setTaking(
+                                                {
+                                                    id: serviceId,
+                                                    name: saved.name.trim(),
+                                                },
+                                                next,
+                                                (on) => {
+                                                    setSaved((was) => ({
+                                                        ...was,
+                                                        taking: on,
+                                                    }));
+                                                    setDraft((was) => ({
+                                                        ...was,
+                                                        taking: on,
+                                                    }));
+                                                },
+                                            )
+                                        }
+                                        className="mr-1 whitespace-nowrap font-medium"
                                     >
-                                        {takingLabel(draft.taking)}
-                                    </Button>
+                                        {TAKING_LABEL}
+                                    </SwitchRow>
                                 )}
                                 {dirty ? (
                                     <Button
@@ -531,6 +601,17 @@ export function ServiceEditor({
                         hasStaff={hasStaff}
                         noStorefront={noStorefront}
                     />
+                    <HoursCard
+                        draft={draft}
+                        set={set}
+                        hoursProblem={hoursProblem}
+                        startedFromOpening={
+                            isNew && !hoursTouched && draft.hours.length > 0
+                        }
+                        rules={rules}
+                        people={people}
+                        canEdit={canEdit}
+                    />
                     <PriceSection
                         draft={draft}
                         set={set}
@@ -540,6 +621,13 @@ export function ServiceEditor({
                         savedDeposit={saved.deposit}
                         paymentsLock={paymentsLock}
                         payment={payment}
+                        withGst={gstAt === "price"}
+                        canEdit={canEdit}
+                        businessPriceMode={businessModeFor(
+                            service,
+                            businessPriceMode,
+                        )}
+                        charged={chargedAsSaved(service, draft)}
                     />
                     <WhoTakesIt
                         draft={draft}
@@ -555,14 +643,10 @@ export function ServiceEditor({
                         set={set}
                         problem={problem}
                         leave={leave}
-                        hoursProblem={hoursProblem}
-                        startedFromOpening={
-                            isNew && !hoursTouched && draft.hours.length > 0
-                        }
-                        forceOpen={(tried && inMore) || hoursFailed !== null}
+                        forceOpen={tried && inMore}
                         serviceId={serviceId}
-                        rules={rules}
                         canEdit={canEdit}
+                        withGst={gstAt === "more"}
                         onDelete={() => setConfirmDelete(true)}
                     />
                 </div>
@@ -583,6 +667,14 @@ export function ServiceEditor({
                         }
                     />
                     <AtAGlance rows={glance(draft, usage, currency)} />
+                    {priceHistoryShown(priceHistory) ? (
+                        <Section title={PRICE_HISTORY_TITLE}>
+                            <PriceHistoryList
+                                history={priceHistory}
+                                layout="narrow"
+                            />
+                        </Section>
+                    ) : null}
                     <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
                         Changes apply to bookings made after you save. Bookings
                         already made keep their time and price.
@@ -596,7 +688,7 @@ export function ServiceEditor({
                     open={confirmDelete}
                     onOpenChange={setConfirmDelete}
                     title={`Delete ${service.name}?`}
-                    description="It leaves your services and can no longer be booked. Bookings already made keep it. To stop bookings for now, choose Stop taking bookings instead. This cannot be undone."
+                    description="It leaves your services and can no longer be booked. Bookings already made keep it. To stop bookings for now, turn off Taking bookings instead. This cannot be undone."
                     confirmLabel="Delete service"
                     keepLabel="Keep service"
                     onConfirm={remove}

@@ -8,6 +8,7 @@ import { fillContactPhoneInTx } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { recordRedemptionInTx } from "../discounts/redemption";
+import { soldColumns } from "../invoices/gst-price";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
@@ -92,6 +93,8 @@ export async function createCheckoutOrder(
                       variantId: l.variantId,
                       quantity: l.quantity,
                       priceCents: l.unitCents,
+                      listCents: l.listCents,
+                      gstPriceMode: l.gstPriceMode,
                   },
               ]
             : [],
@@ -100,8 +103,9 @@ export async function createCheckoutOrder(
         (sum, l) => sum + l.priceCents * l.quantity,
         0,
     );
-    // A GST-registered business's prices include GST: `tax` records the
-    // GST inside the total instead of adding to it (ADR-008, DEC-023).
+    // Each line is already the amount to pay, GST and all
+    // (`invoices/gst-price.ts`): `tax` records the GST inside the total
+    // instead of adding to it (ADR-008, DEC-023).
     const profile = await loadTaxProfile(prisma, scope.organizationId);
     const address = shipsToAddress(type) ? (dto.address ?? null) : null;
     // What the code takes off the lines, never more than they come to.
@@ -287,6 +291,10 @@ export async function createCheckoutOrder(
                                     variantId: l.variantId,
                                     quantity: l.quantity,
                                     price: fromCents(l.priceCents),
+                                    ...soldColumns({
+                                        listCents: l.listCents,
+                                        mode: l.gstPriceMode,
+                                    }),
                                 })),
                             },
                         },

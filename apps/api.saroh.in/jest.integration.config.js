@@ -100,6 +100,16 @@ module.exports = {
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
         "<rootDir>/src/modules/products/product-rules.spec.ts",
+        // GST is part of MRP (12 Oct 2026): pure, or a jest-mocked Prisma.
+        // mrp-includes-gst.db.spec.ts runs here.
+        "<rootDir>/src/modules/products/products.mrp.spec.ts",
+        "<rootDir>/src/modules/products/over-mrp.spec.ts",
+        "<rootDir>/src/modules/imports/product-mrp.spec.ts",
+        "<rootDir>/src/modules/imports/imports.mrp.spec.ts",
+        // Price history (12 Oct 2026): a jest-mocked Prisma, unit project.
+        // price-history.db.spec.ts runs here.
+        "<rootDir>/src/modules/products/products.price-history.spec.ts",
+        "<rootDir>/src/modules/imports/imports.price-history.spec.ts",
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",
@@ -128,6 +138,14 @@ module.exports = {
         // invoice builder — pure.
         "<rootDir>/src/modules/invoices/gst.spec.ts",
         "<rootDir>/src/modules/invoices/gst-states.spec.ts",
+        // How a price carries GST (12 Oct 2026): the one sum, pure.
+        "<rootDir>/src/modules/invoices/gst-price.spec.ts",
+        // The paper, the bag and a staff order's lines under each mode,
+        // and a credit note after the business changes its mind: pure, or
+        // a jest-mocked Prisma. gst-price-mode.db.spec.ts needs Postgres.
+        "<rootDir>/src/modules/invoices/order-invoice-price-mode.spec.ts",
+        "<rootDir>/src/modules/orders/checkout-quote-gst.spec.ts",
+        "<rootDir>/src/modules/orders/order-pricing-gst.spec.ts",
         "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         // D18: pure; list-filter.db.spec.ts runs here.
         "<rootDir>/src/modules/invoices/list-filter.spec.ts",

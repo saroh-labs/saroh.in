@@ -11,10 +11,13 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { holdState } from "../bookings/booking-hold";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { addedLine } from "../invoices/added-line";
+import type { GstOnPrice } from "../invoices/gst-price";
 import { printedSeller } from "../invoices/invoice-paper-view";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
+import { invoiceLineGst } from "../invoices/line-gst-words";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
 import { invoicePayOnline, NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { hashPayToken } from "../invoices/pay-token";
@@ -64,8 +67,25 @@ export interface PublicInvoiceView {
     lines: {
         description: string;
         quantity: number;
+        /**
+         * The rate and the amount as the paper prints them
+         * (`invoices/added-line.ts`): the amount to pay, GST and all, or
+         * on a line GST was added to (`gst.mode` "ADDED") the typed price
+         * and the line's taxable value, with the GST in `gst`.
+         */
         unitPrice: string;
         amount: string;
+        /**
+         * One unit with its GST, only on a line GST was added to whose
+         * units do not multiply out to its amount to the paisa; else null.
+         */
+        unitPay: string | null;
+        /**
+         * How the line's amount carries GST, from what the invoice froze
+         * (`invoices/line-gst-words.ts`); null on a receipt, and on a line
+         * with no rate or an exempt one.
+         */
+        gst: GstOnPrice | null;
     }[];
     tax: string;
     total: string;
@@ -183,7 +203,14 @@ export async function invoicePaper(
                     quantity: true,
                     unitPrice: true,
                     amount: true,
+                    // Read for the line's reading only; never served.
+                    discount: true,
                     gstRate: true,
+                    taxableValue: true,
+                    cgst: true,
+                    sgst: true,
+                    igst: true,
+                    gstPriceMode: true,
                 },
             },
         },
@@ -207,12 +234,19 @@ export async function invoicePaper(
         number: invoice.number,
         issuedAt: invoice.issuedAt?.toISOString() ?? null,
         dueAt: invoice.dueAt?.toISOString() ?? null,
-        lines: invoice.lines.map((l) => ({
-            description: l.description,
-            quantity: l.quantity,
-            unitPrice: toMoneyString(l.unitPrice),
-            amount: toMoneyString(l.amount),
-        })),
+        lines: invoice.lines.map((l) => {
+            // A line GST was added to prints the typed price and its
+            // taxable value; every other line, what it always has.
+            const added = invoice.sellerGstin ? addedLine(l) : null;
+            return {
+                description: l.description,
+                quantity: l.quantity,
+                unitPrice: added ? added.unitPrice : toMoneyString(l.unitPrice),
+                amount: added ? added.amount : toMoneyString(l.amount),
+                unitPay: added?.unitPay ?? null,
+                gst: invoiceLineGst(l),
+            };
+        }),
         tax: toMoneyString(invoice.tax),
         total: toMoneyString(invoice.total),
         currency: invoice.currency,

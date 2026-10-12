@@ -27,8 +27,8 @@ import { CAPTURED } from "@/content/shots.captured";
 import { helpArticles, loadHelpArticle } from "@/lib/help-docs";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
-import { pageMetadata, SITE_URL } from "@/lib/seo";
-import { howToLd } from "@/lib/structured-data";
+import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
+import { breadcrumbLd, howToLd, techArticleLd } from "@/lib/structured-data";
 
 /**
  * One Help article (Resources plan U5, design 2a): the product areas down
@@ -64,7 +64,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const article = liveArticle(slug, resourcesContext());
     if (!article) return {};
     const meta = pageMetadata({
-        title: `${article.title} · Saroh help`,
+        title: pageTitle(`${article.title} · Help`),
         socialTitle: article.title,
         description: article.description,
         path: helpHref(slug),
@@ -112,18 +112,33 @@ export default async function HelpArticlePage({ params }: Props) {
         >
             <article className="grid max-w-[680px] gap-7">
                 <JsonLd
-                    data={howToLd({
-                        name: fm.title,
-                        description: fm.description,
-                        url: `${SITE_URL}${path}`,
-                        totalMinutes: fm.readMinutes,
-                        steps: fm.steps.map((s, i) => ({
-                            name: s.title,
-                            text: s.body,
-                            url: `${SITE_URL}${path}#${stepId(i)}`,
-                            image: `${SITE_URL}${CAPTURED[s.shot].src}`,
-                        })),
-                    })}
+                    data={[
+                        howToLd({
+                            name: fm.title,
+                            description: fm.description,
+                            url: `${SITE_URL}${path}`,
+                            totalMinutes: fm.readMinutes,
+                            steps: fm.steps.map((s, i) => ({
+                                name: s.title,
+                                text: s.body,
+                                url: `${SITE_URL}${path}#${stepId(i)}`,
+                                image: `${SITE_URL}${CAPTURED[s.shot].src}`,
+                            })),
+                        }),
+                        techArticleLd({
+                            headline: fm.title,
+                            description: fm.description,
+                            path,
+                            publishOn: fm.publishOn,
+                            updated: fm.updated,
+                        }),
+                        // The trail drawn below, ending on this article.
+                        breadcrumbLd([
+                            { name: "Help", path: HELP_PATH },
+                            { name: fm.area },
+                            { name: fm.title, path },
+                        ]),
+                    ]}
                 />
                 <Breadcrumbs
                     crumbs={[

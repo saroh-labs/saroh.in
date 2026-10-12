@@ -77,11 +77,18 @@ export default async function TemplateRenderPage({
                     />
                 }
                 footer={
-                    <SiteFooter footer={render.footer} name={render.name} />
+                    <SiteFooter
+                        footer={render.footer}
+                        name={render.name}
+                        // The header's menu again at the foot, as live.
+                        navigation={render.navigation}
+                        shopServes={render.shopServes}
+                    />
                 }
             >
                 <PageSections
                     sections={render.sections}
+                    siteName={render.name}
                     bookHref="/book"
                     journal={render.journal}
                     plans={render.plans}

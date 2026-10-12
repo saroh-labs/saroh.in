@@ -95,7 +95,7 @@ describe("a site's template (KTD-7)", () => {
         expect(site).toEqual({
             templateId: "personal",
             templateVersion: personalVersion,
-            templateStyleId: null,
+            templateStyleId: "stone",
         });
 
         // And the site read says so.
@@ -103,7 +103,7 @@ describe("a site's template (KTD-7)", () => {
         expect(read.template).toEqual({
             id: "personal",
             version: personalVersion,
-            styleId: null,
+            styleId: "stone",
         });
     });
 

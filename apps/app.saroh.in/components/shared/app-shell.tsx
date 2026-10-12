@@ -33,8 +33,8 @@ import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import { closingOrNull } from "@/lib/organizations/closing-service";
 import {
-    listOrganizations,
-    resolveActiveOrganization,
+    activeOrganizationOnce,
+    organizationsOnce,
 } from "@/lib/organizations/service";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
@@ -61,7 +61,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const session = await getServerSession(await headers());
     if (!session) return <>{children}</>;
 
-    const organizations = await listOrganizations();
+    // Read once for the request: the layout's tab title uses the same two.
+    const organizations = await organizationsOnce();
 
     // Zero-org onboarding: no sidebar yet — just a slim top bar (brand +
     // sign-out) so the funnel stays uncluttered.
@@ -75,7 +76,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     // Reuse the already-fetched list instead of re-fetching it (#102).
-    const activeOrg = await resolveActiveOrganization(organizations);
+    const activeOrg = await activeOrganizationOnce();
 
     // Every business they're in has paused their access (#800): the API
     // would refuse each read, so say why once instead of a page of denials.

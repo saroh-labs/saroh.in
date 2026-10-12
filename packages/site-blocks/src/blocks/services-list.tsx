@@ -7,6 +7,9 @@ import { resolveVariant } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import { quietFill } from "../booking-flow/styles";
+import type { GstOnPrice } from "../lib/gst-price";
+import { browsePriceWords, gstOnPriceOf } from "../lib/gst-price";
 import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
 import { useQrSource, withQrSource } from "../qr-source";
@@ -42,6 +45,12 @@ export interface PublicService {
     durationMinutes: number;
     priceCents: number | null;
     currency: string | null;
+    /**
+     * The GST in or on the price; null for none. Absent from an older API.
+     * The list only browses, so it reads the mode alone: "+ GST" after a
+     * price GST is added to.
+     */
+    gst?: GstOnPrice | null;
 }
 
 type LoadState =
@@ -60,6 +69,20 @@ function isPublicService(value: unknown): value is PublicService {
         (v.priceCents === null || typeof v.priceCents === "number") &&
         (v.currency === null || typeof v.currency === "string")
     );
+}
+
+/**
+ * A service's price as the list shows it: the price the business typed,
+ * with "+ GST" after it when GST comes on top. Null for none to show.
+ */
+export function servicePriceWords(
+    service: Pick<PublicService, "priceCents" | "currency" | "gst">,
+    locale?: string,
+): string | null {
+    const price = formatPrice(service.priceCents, service.currency, locale);
+    return price === null
+        ? null
+        : browsePriceWords(price, gstOnPriceOf(service.gst)?.mode === "ADDED");
 }
 
 /** "30 min", "1 hr", "1 hr 30 min". */
@@ -201,9 +224,35 @@ export default function ServicesListSection({
             ) : null}
 
             {state.kind === "loading" ? (
-                <p className="text-site-muted mt-8 text-sm">
-                    Loading services…
-                </p>
+                // The list's own shape while it is read, so the section
+                // holds its place and nothing under it jumps.
+                <div
+                    role="status"
+                    aria-label="Loading services"
+                    data-services-loading=""
+                    className="border-site-border mt-8 border-t"
+                >
+                    {[0, 1, 2].map((i) => (
+                        <div
+                            key={i}
+                            aria-hidden="true"
+                            className="border-site-border grid gap-2.5 border-b py-5"
+                        >
+                            <span
+                                className={cn(
+                                    "block h-4 w-2/5 rounded",
+                                    quietFill,
+                                )}
+                            />
+                            <span
+                                className={cn(
+                                    "block h-3 w-3/4 rounded",
+                                    quietFill,
+                                )}
+                            />
+                        </div>
+                    ))}
+                </div>
             ) : state.kind === "error" ? (
                 <div className="mt-8">
                     <p role="alert" className={destructiveAlertClasses}>
@@ -238,10 +287,7 @@ export default function ServicesListSection({
                     <ul className="border-site-border mt-8 border-t">
                         {state.services.map((service) => {
                             const price = showPrices
-                                ? formatPrice(
-                                      service.priceCents,
-                                      service.currency,
-                                  )
+                                ? servicePriceWords(service)
                                 : null;
                             return (
                                 <li
@@ -282,7 +328,10 @@ export default function ServicesListSection({
                                                         ? `${label}: ${service.name}`
                                                         : `Book ${service.name}`
                                                 }
-                                                className="text-site-fg ml-3 font-semibold underline underline-offset-4"
+                                                className={cn(
+                                                    "text-site-fg coarse:min-h-11 ml-3 inline-flex cursor-pointer items-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline active:opacity-70",
+                                                    focusRing,
+                                                )}
                                             >
                                                 {label ?? "Book"}
                                             </a>
@@ -334,9 +383,12 @@ function serviceHref(
 const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
-/* The design's card button: the merchant's accent, the site's radius. */
+/*
+ * The design's card button: the merchant's accent, the site's radius.
+ * 38px under a mouse, 44px under a finger.
+ */
 const cardButton =
-    "inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] bg-site-accent px-3.5 text-[13.5px] font-bold text-site-accent-fg";
+    "coarse:h-11 inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] bg-site-accent px-3.5 text-[13.5px] font-bold text-site-accent-fg";
 
 /**
  * "Show as: Cards" (G16): the services side by side, as the Customer Site
@@ -362,9 +414,7 @@ function ServiceCards({
     return (
         <ul className="mt-8 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]">
             {services.map((service) => {
-                const price = showPrices
-                    ? formatPrice(service.priceCents, service.currency)
-                    : null;
+                const price = showPrices ? servicePriceWords(service) : null;
                 return (
                     <li
                         key={service.id}
@@ -530,9 +580,7 @@ function PriceCard({
 }) {
     const source = useQrSource();
     const price =
-        content.showPrices !== false
-            ? formatPrice(service.priceCents, service.currency)
-            : null;
+        content.showPrices !== false ? servicePriceWords(service) : null;
     const duration = formatDuration(service.durationMinutes);
     const mode = said(content.modeLine);
     const followUp = said(content.followUpLine);
@@ -574,7 +622,7 @@ function PriceCard({
                         aria-label={`${words}: ${service.name}`}
                         className={cn(
                             button,
-                            "cursor-pointer transition-opacity hover:opacity-90",
+                            "cursor-pointer transition-[opacity,transform] duration-100 ease-out hover:opacity-90 active:scale-[0.98]",
                             focusRing,
                         )}
                     >

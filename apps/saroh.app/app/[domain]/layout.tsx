@@ -25,6 +25,7 @@ import { headerAction } from "@/lib/header-action";
 import { liveMenu } from "@/lib/in-page-menu";
 import { dontCachePage, pageCacheRules } from "@/lib/page-cache/site-rules";
 import {
+    getDomainPausedTo,
     getMovedTo,
     getSiteForHost,
     shareImages,
@@ -183,6 +184,10 @@ export default async function SiteLayout({
     const release =
         test.mode === "test" ? await getTestRelease(test.host) : null;
     if (release && !release.ok) {
+        // The test host of a domain its plan has paused follows the domain
+        // (DEC-139): on to the Saroh address's own test host.
+        const pausedTo = await pausedHere(domain, true);
+        if (pausedTo) redirect(pausedTo);
         return (
             <TestReleaseGate
                 reason={release.reason}
@@ -194,8 +199,13 @@ export default async function SiteLayout({
     const resolved = await getSiteForHost(domain);
 
     if (!resolved) {
-        // Nothing live here. An old address still forwarding sends the
-        // visitor to the same page on the new one; anything else 404s.
+        // Nothing live here. The business's own domain, paused by its plan
+        // (DEC-139), sends the visitor to the same page on its Saroh
+        // address.
+        const pausedTo = await pausedHere(domain, test.mode === "test");
+        if (pausedTo) redirect(pausedTo);
+        // An old address still forwarding sends the visitor to the same
+        // page on the new one; anything else 404s.
         // Never on a test host: `test--<address>` names a release, not an
         // old address (DEC-071), so it 404s rather than forwarding.
         if (test.mode !== "test") {
@@ -257,7 +267,14 @@ export default async function SiteLayout({
         catalogueFailed:
             catalogue?.ok === false && catalogue.reason === "unavailable",
     });
-    const action = headerAction({ booking, shopServes });
+    // The site's one primary action: Book, else Order, else its contact
+    // page (`sitePrimaryAction`). The menu beside it leaves that page out.
+    const action = headerAction({
+        booking,
+        shopServes,
+        pages: snapshot.pages,
+        modules: resolved.modules,
+    });
 
     /*
      * The bag (G13), only where the site takes an online order now: the
@@ -388,6 +405,11 @@ export default async function SiteLayout({
                             // off (G15).
                             modules={resolved.modules}
                             action={action}
+                            // The business's mark beside its name: the
+                            // site's own icon, else its logo (DEC-124),
+                            // as the site read resolved it. Neither: the
+                            // name alone.
+                            logo={resolved.icon}
                             // A Shop entry in the menu while /shop serves (P4).
                             shopServes={shopServes}
                             account={account}
@@ -398,12 +420,24 @@ export default async function SiteLayout({
                         <SiteFooter
                             footer={snapshot.site.footer}
                             name={snapshot.site.name}
+                            // The header's own menu, listed again at the
+                            // foot with every page in it.
+                            navigation={navigation}
+                            modules={resolved.modules}
+                            shopServes={shopServes}
                             contact={{
                                 phone: contact?.phone ?? null,
                                 email: contact?.email ?? null,
                                 address: null,
                                 places: contact?.places ?? [],
                                 social: contact?.social ?? [],
+                                // Today is marked on the business's own
+                                // clock (DEC-033). The contact read names
+                                // no zone; the booking page's does, and
+                                // without one the footer reads India.
+                                timeZone: booking?.ok
+                                    ? booking.page.timezone
+                                    : null,
                             }}
                             // "Made with Saroh" on Free only (DEC-102).
                             // "Report" rides with it: no Saroh link on a
@@ -434,6 +468,34 @@ export default async function SiteLayout({
                 </SiteChromeFrame>
             </div>
         </TestReleaseProvider>
+    );
+}
+
+/**
+ * Where a domain its plan has paused sends this visitor, or null (DEC-139).
+ *
+ * The same page on the business's Saroh address: the path and query the
+ * middleware named, kept only as a path on that host
+ * (`lib/request-path.ts`). A test host's rewrite names no path, so it lands
+ * on the root.
+ *
+ * `redirect()` answers 307, never 308: the domain shows the site again the
+ * moment the business is back on a plan with one, so nothing may remember
+ * this hop. The Worker adds `Cache-Control: no-store` to every temporary
+ * redirect (`lib/page-cache/worker.ts`), and keeps no page that isn't a 200.
+ * Nothing of Saroh's is drawn: the visitor sees only the business's site,
+ * at its other address.
+ */
+async function pausedHere(
+    domain: string,
+    testHost: boolean,
+): Promise<string | null> {
+    const to = await getDomainPausedTo(domain);
+    if (!to) return null;
+    const requestHeaders = await headers();
+    return movedLocation(
+        to,
+        testHost ? null : requestHeaders.get(REQUEST_PATH_HEADER),
     );
 }
 

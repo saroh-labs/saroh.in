@@ -33,7 +33,7 @@ export interface OnlineProblem {
     blocked: boolean;
     /** The whole sentence, for the Service Editor. */
     text: string;
-    /** The short one, for a Services card: "Can't be booked online: …". */
+    /** The short one, for a Services row: "Can't be booked online: …". */
     line: string;
     fix: OnlineFix;
 }

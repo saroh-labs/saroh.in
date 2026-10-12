@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { readBag } from "../shop/bag-store";
 import type { ShopListingCard } from "./shop-listing";
-import ShopListing, { categoriesOf } from "./shop-listing";
+import ShopListing, { categoriesOf, ShopUnavailable } from "./shop-listing";
 
 const sourdough: ShopListingCard = {
     slug: "sourdough",
@@ -61,7 +61,8 @@ describe("ShopListing (G11)", () => {
         const focaccia = screen.getByRole("link", { name: /Focaccia/ });
         expect(focaccia).toHaveTextContent("Sold out");
         expect(focaccia).toHaveTextContent("MRP ₹350");
-        expect(focaccia).toHaveTextContent("No photo yet");
+        // An owner's note never reaches a customer.
+        expect(focaccia).not.toHaveTextContent("No photo yet");
         expect(screen.getByRole("link", { name: /Bun/ })).not.toHaveTextContent(
             "MRP",
         );
@@ -277,5 +278,382 @@ describe("browsing the shop by category", () => {
         const photo = container.querySelector("img");
         expect(photo?.parentElement?.className).toContain("aspect-square");
         expect(photo?.parentElement?.className).not.toContain("h-[140px]");
+    });
+});
+
+describe("a product with no photo (starter audit)", () => {
+    const plain = (slug: string, more: Partial<ShopListingCard> = {}) => ({
+        ...sourdough,
+        slug,
+        name: slug,
+        image: null,
+        variantTitles: [],
+        priceFrom: false,
+        ...more,
+    });
+
+    it("draws a shop with no photos as text cards: no frame, no panel, no owner's note", () => {
+        const { container } = render(
+            <ShopListing products={[plain("crate"), plain("pallet")]} />,
+        );
+        expect(container.querySelectorAll("img")).toHaveLength(0);
+        expect(container.querySelector("[data-name-plate]")).toBeNull();
+        expect(container.querySelector(".aspect-square")).toBeNull();
+        expect(container).not.toHaveTextContent("No photo yet");
+        expect(
+            Array.from(container.querySelectorAll("[data-card]")).map((a) =>
+                a.getAttribute("data-card"),
+            ),
+        ).toEqual(["text", "text"]);
+        // The card still says what it is and what it costs.
+        const crate = screen.getByRole("link", { name: /crate/ });
+        expect(crate).toHaveAttribute("href", "/shop/crate");
+        expect(crate).toHaveTextContent("₹250");
+    });
+
+    it("gives it the photo's own square in a mixed grid, so the row lines up", () => {
+        const { container } = render(
+            <ShopListing products={[sourdough, plain("crate")]} />,
+        );
+        const photo = container.querySelector("img")?.parentElement;
+        const plate = container.querySelector("[data-name-plate]");
+        expect(photo?.className).toContain("aspect-square");
+        expect(plate?.className).toContain("aspect-square");
+        // Decoration: the card's own words name it, once.
+        expect(plate).toHaveAttribute("aria-hidden", "true");
+        expect(screen.getByRole("link", { name: /crate/ })).toHaveAttribute(
+            "data-card",
+            "plate",
+        );
+        expect(container).not.toHaveTextContent("No photo yet");
+    });
+
+    it("goes back to text cards when the category shown has no photos", () => {
+        const { container } = render(
+            <ShopListing
+                products={[
+                    { ...sourdough, categoryName: "Bread" },
+                    plain("crate", { categoryName: "Packing" }),
+                ]}
+            />,
+        );
+        expect(container.querySelector("[data-name-plate]")).not.toBeNull();
+        fireEvent.click(screen.getByRole("radio", { name: "Packing" }));
+        expect(container.querySelector("[data-name-plate]")).toBeNull();
+        expect(container.querySelector("img")).toBeNull();
+    });
+});
+
+describe("the shop's cards", () => {
+    it("keeps each photo's room before it arrives, and waits for those below the first row", () => {
+        const many = Array.from({ length: 6 }, (_, i) => ({
+            ...sourdough,
+            slug: `loaf-${i}`,
+            name: `Loaf ${i}`,
+        }));
+        const { container } = render(<ShopListing products={many} />);
+        const photos = Array.from(container.querySelectorAll("img"));
+        expect(photos).toHaveLength(6);
+        for (const photo of photos) {
+            expect(photo).toHaveAttribute("width", "600");
+            expect(photo).toHaveAttribute("height", "600");
+        }
+        expect(photos.map((p) => p.getAttribute("loading"))).toEqual([
+            "eager",
+            "eager",
+            "eager",
+            "eager",
+            "lazy",
+            "lazy",
+        ]);
+    });
+
+    it("puts the button under the price, 44px and as wide as the card, quiet when it can't be pressed", () => {
+        window.localStorage.clear();
+        const offered: ShopListingCard = {
+            ...sourdough,
+            variantTitles: [],
+            listingId: "listing-sourdough",
+            bagVariantId: null,
+        };
+        render(
+            <ShopListing
+                products={[
+                    offered,
+                    {
+                        ...offered,
+                        slug: "bun",
+                        name: "Bun",
+                        listingId: "listing-bun",
+                        soldOut: true,
+                    },
+                ]}
+                bagSite="site-1"
+            />,
+        );
+        const add = screen.getByRole("button", {
+            name: "Add Sourdough to your bag",
+        });
+        expect(add.className).toContain("h-11");
+        expect(add.className).toContain("inset-x-3.5");
+        expect(add.className).toContain("bg-site-accent");
+        const off = screen.getByRole("button", { name: "Bun: sold out" });
+        expect(off).toBeDisabled();
+        // Quiet, not faded: its words still read.
+        expect(off.className).not.toContain("bg-site-accent");
+        expect(off.className).not.toContain("opacity-50");
+        // The price keeps its own line: nothing is held back beside it.
+        expect(
+            screen.getByRole("link", { name: /Sourdough/ }).innerHTML,
+        ).not.toContain("pr-36");
+    });
+
+    it("keeps a row's names level: the options row is on every card when any card has one", () => {
+        const { container } = render(
+            <ShopListing
+                products={[
+                    sourdough,
+                    {
+                        ...sourdough,
+                        slug: "bun",
+                        name: "Bun",
+                        variantTitles: [],
+                    },
+                ]}
+            />,
+        );
+        expect(container.querySelectorAll(".min-h-5")).toHaveLength(2);
+    });
+});
+
+describe("the line under the shop's heading", () => {
+    it("says how an order reaches the customer when the page was given it", () => {
+        const { container } = render(
+            <ShopListing
+                products={[sourdough]}
+                lead="Order online for pick-up or local delivery."
+            />,
+        );
+        const lead = container.querySelector("[data-shop-lead]");
+        expect(lead).toHaveTextContent(
+            "Order online for pick-up or local delivery.",
+        );
+        // What a customer decides on: the body colour, 16px.
+        expect(lead?.className).toContain("text-site-body");
+        expect(lead?.className).toContain("text-base");
+    });
+
+    it("draws no line, and no empty paragraph, without one", () => {
+        const { container } = render(<ShopListing products={[sourdough]} />);
+        expect(container.querySelector("[data-shop-lead]")).toBeNull();
+        expect(container.querySelector("h1 + p")).toBeNull();
+    });
+});
+
+describe("a shop with nothing to show", () => {
+    it("says nothing is on sale yet, with the ways to reach the business", () => {
+        const { container } = render(
+            <ShopListing
+                products={[]}
+                business="Northwind Supply"
+                reach={{ phone: "+918040992210", whatsapp: null }}
+            />,
+        );
+        expect(
+            screen.getByRole("heading", { level: 1, name: "Shop" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { level: 2, name: "No products yet" }),
+        ).toBeInTheDocument();
+        expect(container).toHaveTextContent(
+            "Northwind Supply hasn't put anything on sale here yet.",
+        );
+        expect(screen.getByRole("link", { name: /^Call / })).toHaveAttribute(
+            "href",
+            "tel:+918040992210",
+        );
+        expect(screen.queryByRole("list")).toBeNull();
+    });
+
+    it("says a failed read as a failure, never as an empty shop, and offers another go", () => {
+        render(
+            <ShopUnavailable
+                business="Northwind Supply"
+                retryHref="/shop"
+                reach={{ phone: "+918040992210", whatsapp: null }}
+            />,
+        );
+        const alert = screen.getByRole("alert");
+        expect(alert).toHaveAttribute("data-page-state", "failed");
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "We couldn't open the shop",
+            }),
+        ).toBeInTheDocument();
+        expect(alert).not.toHaveTextContent("No products yet");
+        expect(screen.getByRole("link", { name: "Try again" })).toHaveAttribute(
+            "href",
+            "/shop",
+        );
+        expect(screen.getByRole("link", { name: /^Call / })).toBeVisible();
+    });
+
+    it("draws nothing to press when it was given no way on", () => {
+        render(<ShopUnavailable business="Northwind Supply" />);
+        expect(screen.queryByRole("link")).toBeNull();
+        expect(screen.queryByRole("button")).toBeNull();
+    });
+});
+
+describe("a card's price when GST comes on top", () => {
+    it("says + GST after the price, and nothing otherwise", () => {
+        render(
+            <ShopListing
+                products={[
+                    { ...sourdough, gstAdded: true },
+                    {
+                        ...sourdough,
+                        slug: "rye",
+                        name: "Rye loaf",
+                        price: "180.00",
+                        priceFrom: false,
+                        variantTitles: [],
+                        gstAdded: false,
+                    },
+                    {
+                        ...sourdough,
+                        slug: "bun",
+                        name: "Milk bun",
+                        price: "40.00",
+                        priceFrom: false,
+                        variantTitles: [],
+                    },
+                ]}
+            />,
+        );
+        expect(
+            screen.getByRole("link", { name: /Sourdough/ }),
+        ).toHaveTextContent("From ₹250 + GST");
+        const rye = screen.getByRole("link", { name: /Rye loaf/ });
+        expect(rye).toHaveTextContent("₹180");
+        expect(rye).not.toHaveTextContent("GST");
+        // An older API sends no word about it: no GST words.
+        expect(
+            screen.getByRole("link", { name: /Milk bun/ }),
+        ).not.toHaveTextContent("GST");
+    });
+});
+
+/**
+ * GST is part of MRP (12 Oct 2026): a card strikes an MRP through only
+ * where it is above the amount to pay, GST and all, as the API says.
+ */
+describe("a card's MRP is compared with the amount to pay", () => {
+    const card = (over: Partial<ShopListingCard>): ShopListingCard => ({
+        ...sourdough,
+        priceFrom: false,
+        variantTitles: [],
+        price: "1000.00",
+        mrp: "1475.00",
+        ...over,
+    });
+    const struck = (link: HTMLElement) => link.querySelector("[data-card-mrp]");
+
+    it("strikes the MRP through under both ways of carrying GST when there is a saving", () => {
+        render(
+            <ShopListing
+                products={[
+                    // Includes GST: ₹1,000 against ₹1,475.
+                    card({
+                        slug: "a",
+                        name: "Almond oil",
+                        saving: { mrp: "1475.00", percent: 32 },
+                    }),
+                    // GST added: ₹1,180 to pay against ₹1,475.
+                    card({
+                        slug: "b",
+                        name: "Body butter",
+                        gstAdded: true,
+                        saving: { mrp: "1475.00", percent: 20 },
+                    }),
+                ]}
+            />,
+        );
+        const oil = screen.getByRole("link", { name: /Almond oil/ });
+        const butter = screen.getByRole("link", { name: /Body butter/ });
+        expect(struck(oil)).toHaveTextContent("MRP ₹1,475");
+        expect(struck(butter)).toHaveTextContent("MRP ₹1,475");
+        expect(butter).toHaveTextContent("₹1,000 + GST");
+    });
+
+    it("strikes nothing where the amount to pay is the MRP, or above it", () => {
+        render(
+            <ShopListing
+                products={[
+                    // ₹1,000 + 18% is ₹1,180 to pay: the MRP exactly.
+                    card({
+                        slug: "c",
+                        name: "Clay mask",
+                        mrp: "1180.00",
+                        gstAdded: true,
+                        saving: null,
+                    }),
+                    // Already over its MRP: ₹1,180 against ₹1,100.
+                    card({
+                        slug: "d",
+                        name: "Day cream",
+                        mrp: "1100.00",
+                        gstAdded: true,
+                        saving: null,
+                    }),
+                ]}
+            />,
+        );
+        const cream = screen.getByRole("link", { name: /Day cream/ });
+        expect(
+            struck(screen.getByRole("link", { name: /Clay mask/ })),
+        ).toBeNull();
+        expect(struck(cream)).toBeNull();
+        // It still sells, at its price with GST on top.
+        expect(cream).toHaveTextContent("₹1,000 + GST");
+        expect(cream).not.toHaveTextContent("MRP");
+    });
+
+    it("with no saving from the API, claims none beside a price GST is still to be added to", () => {
+        render(
+            <ShopListing
+                products={[
+                    card({ slug: "e", name: "Eye gel", gstAdded: true }),
+                    card({ slug: "f", name: "Face mist" }),
+                ]}
+            />,
+        );
+        // The card holds no amount to pay for it: nothing is claimed.
+        expect(
+            struck(screen.getByRole("link", { name: /Eye gel/ })),
+        ).toBeNull();
+        // Its price is the amount to pay: 1,475 against 1,000, as before.
+        expect(
+            struck(screen.getByRole("link", { name: /Face mist/ })),
+        ).toHaveTextContent("MRP ₹1,475");
+    });
+
+    it("a From price shows no MRP, whatever is sent", () => {
+        render(
+            <ShopListing
+                products={[
+                    card({
+                        slug: "g",
+                        name: "Gift set",
+                        priceFrom: true,
+                        saving: { mrp: "1475.00", percent: 32 },
+                    }),
+                ]}
+            />,
+        );
+        expect(
+            struck(screen.getByRole("link", { name: /Gift set/ })),
+        ).toBeNull();
     });
 });

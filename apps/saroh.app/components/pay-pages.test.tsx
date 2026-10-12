@@ -188,3 +188,171 @@ describe("an order's pay link", () => {
         expect(text(html)).toContain("Pay Rye & Co. directly");
     });
 });
+
+describe("the GST on a pay page's lines", () => {
+    const adds = {
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+    const includes = {
+        mode: "INCLUDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 15254,
+        payCents: 100000,
+    };
+
+    it("says it under an invoice's line, in the words the checkout uses", () => {
+        const added = text(
+            renderToStaticMarkup(
+                <InvoicePay
+                    token="tok"
+                    invoice={{
+                        ...INVOICE,
+                        lines: [{ ...INVOICE.lines[0], gst: adds }],
+                    }}
+                />,
+            ),
+        );
+        expect(added).toContain("₹1,000 + ₹180 GST (18%)");
+        const inside = text(
+            renderToStaticMarkup(
+                <InvoicePay
+                    token="tok"
+                    invoice={{
+                        ...INVOICE,
+                        lines: [{ ...INVOICE.lines[0], gst: includes }],
+                    }}
+                />,
+            ),
+        );
+        expect(inside).toContain("includes ₹152.54 GST (18%)");
+    });
+
+    it("says it under a plan renewal's line, a pack's and a course's, with the amount to pay", () => {
+        // ₹2,000 at 18% added is ₹2,360; ₹2,000 including 18% has ₹305.08.
+        const renewalAdds = {
+            mode: "ADDED" as const,
+            rate: "18",
+            listCents: 200000,
+            gstCents: 36000,
+            payCents: 236000,
+        };
+        const insideIt = {
+            mode: "INCLUDED" as const,
+            rate: "18",
+            listCents: 200000,
+            gstCents: 30508,
+            payCents: 200000,
+        };
+        const renewal = text(
+            renderToStaticMarkup(
+                <InvoicePay
+                    token="tok"
+                    invoice={{
+                        ...INVOICE,
+                        lines: [
+                            {
+                                description: "Monthly unlimited, November",
+                                quantity: 1,
+                                unitPrice: "2000.00",
+                                amount: "2360.00",
+                                gst: renewalAdds,
+                            },
+                        ],
+                        tax: "360.00",
+                        total: "2360.00",
+                        // A plan's invoice: the page offers autopay too.
+                        autopay: {
+                            plan: "Monthly unlimited",
+                            methods: ["UPI"],
+                            on: null,
+                            checks: {},
+                        },
+                    }}
+                />,
+            ),
+        );
+        expect(renewal).toContain("Monthly unlimited, November");
+        expect(renewal).toContain("₹2,000 + ₹360 GST (18%)");
+        expect(renewal).toContain("₹2,360.00");
+        for (const description of ["10 classes", "Pottery, four weeks"]) {
+            const html = text(
+                renderToStaticMarkup(
+                    <InvoicePay
+                        token="tok"
+                        invoice={{
+                            ...INVOICE,
+                            lines: [
+                                {
+                                    description,
+                                    quantity: 1,
+                                    unitPrice: "2000.00",
+                                    amount: "2000.00",
+                                    gst: insideIt,
+                                },
+                            ],
+                            total: "2000.00",
+                        }}
+                    />,
+                ),
+            );
+            expect(html).toContain(description);
+            expect(html).toContain("includes ₹305.08 GST (18%)");
+            expect(html).toContain("₹2,000.00");
+        }
+    });
+
+    it("says it under an order's line", () => {
+        const html = text(
+            renderToStaticMarkup(
+                <OrderPay
+                    token="tok"
+                    order={{
+                        ...ORDER,
+                        lines: [{ ...ORDER.lines[0], gst: adds }],
+                    }}
+                />,
+            ),
+        );
+        expect(html).toContain("₹1,000 + ₹180 GST (18%)");
+    });
+
+    it("says nothing where the API said none, sent nothing, or sent something strange", () => {
+        for (const gst of [null, undefined, { mode: "ADDED" }]) {
+            const invoice = renderToStaticMarkup(
+                <InvoicePay
+                    token="tok"
+                    invoice={{
+                        ...INVOICE,
+                        lines: [
+                            {
+                                ...INVOICE.lines[0],
+                                gst: gst as PayInvoice["lines"][number]["gst"],
+                            },
+                        ],
+                    }}
+                />,
+            );
+            expect(invoice).not.toContain("data-line-gst");
+            const order = renderToStaticMarkup(
+                <OrderPay
+                    token="tok"
+                    order={{
+                        ...ORDER,
+                        lines: [
+                            {
+                                ...ORDER.lines[0],
+                                gst: gst as PayOrder["lines"][number]["gst"],
+                            },
+                        ],
+                    }}
+                />,
+            );
+            expect(order).not.toContain("data-line-gst");
+        }
+    });
+});

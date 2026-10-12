@@ -15,6 +15,7 @@ import {
 } from "../../common/drafts/draft-record";
 import { toMoneyString } from "../../common/money";
 import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
+import { isGstRate } from "../invoices/gst";
 import { businessCurrency } from "../stores/currency";
 import type { PlanDraftDto, PlanInputDto } from "./dto";
 import type { PlanDraftRow, PlanValues } from "./plan-draft-view";
@@ -34,6 +35,7 @@ import type { PlanActor } from "./plan-events";
 import {
     diffPlan,
     NO_PLAN,
+    planRate,
     recordPlanEdit,
     recordPlanEvent,
 } from "./plan-events";
@@ -106,6 +108,17 @@ function patchOf(dto: PlanInputDto): DraftPatch<PlanValues> {
     if (typeof patch.price === "string") {
         patch.price = toMoneyString(patch.price);
     }
+    // A rate is one GST has, written the one way ("18", "0.25"), so the
+    // same rate typed twice is never a change.
+    if (typeof patch.gstRate === "string") {
+        if (!isGstRate(patch.gstRate)) {
+            fieldError(
+                `${patch.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+                "gstRate",
+            );
+        }
+        patch.gstRate = planRate(patch.gstRate);
+    }
     return patch;
 }
 
@@ -136,6 +149,9 @@ export async function createPlanDraft(
             currency,
             interval: patch.interval ?? "MONTH",
             classesPerMonth: patch.classesPerMonth ?? null,
+            gstRate: patch.gstRate ?? null,
+            sacCode: patch.sacCode ?? null,
+            gstPriceMode: patch.gstPriceMode ?? null,
         };
         const plan = await tx.subscriptionPlan.create({
             data: {

@@ -503,6 +503,8 @@ describe("a plan's figures and name (D1, real database)", () => {
         expect(read.byPrice).toEqual([
             {
                 price: "1500.00",
+                // Not GST-registered: what they pay is the price.
+                pay: "1500.00",
                 currency: "INR",
                 interval: "MONTH",
                 count: 12,
@@ -510,6 +512,7 @@ describe("a plan's figures and name (D1, real database)", () => {
             },
             {
                 price: "1200.00",
+                pay: "1200.00",
                 currency: "INR",
                 interval: "MONTH",
                 count: 3,

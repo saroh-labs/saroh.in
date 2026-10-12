@@ -5,10 +5,15 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { howToPayLines } from "@/lib/invoices/how-to-pay";
 import {
+    addedLineOf,
     isExemptPaper,
+    lineEachNote,
     lineGstNote,
+    lineRate,
     paperFooter,
+    paperPrices,
     paperTitle,
+    pricesSentence,
     showsGstTotals,
 } from "@/lib/invoices/paper-title";
 import { printedSeller } from "@/lib/invoices/seller";
@@ -107,6 +112,10 @@ export function InvoicePaper({
 
     // No line with a rate set: no GST rows, just the total (DEC-072).
     const gstRows = taxed && showsGstTotals(i) ? taxed : null;
+    // Whether its prices include GST, have it added, or both: the
+    // sentence under the total, and what each line says on a mixed paper.
+    const prices = paperPrices(taxed ? i.lines : []);
+    const sentence = gstRows ? pricesSentence(prices) : null;
     const sums: [string, string][] = gstRows
         ? [
               ["Taxable value", money(i.subtotal)],
@@ -241,12 +250,22 @@ export function InvoicePaper({
                     <span className="text-right">Amount</span>
                 </div>
                 {(i.lines ?? []).map((l) => {
-                    const discount = Number(l.discount ?? 0);
+                    // A line GST was added to prints its rate and its
+                    // amount before GST, and its discount likewise.
+                    const added = addedLineOf(Boolean(taxed), l);
+                    const discount = Number(
+                        added ? added.discount : (l.discount ?? 0),
+                    );
                     const gstNote = lineGstNote(
                         Boolean(taxed),
                         l.gst ?? null,
                         money,
+                        {
+                            added: added?.gst ?? null,
+                            mixed: prices === "MIXED",
+                        },
                     );
+                    const each = lineEachNote(l, added, money);
                     const less =
                         discount > 0
                             ? `less ${money(String(discount))} discount`
@@ -254,16 +273,16 @@ export function InvoicePaper({
                     const code = gst ? spacedCode(l.gst?.hsnSac) : "";
                     // The desk's note under the name: HSN and Qty have
                     // columns of their own there.
-                    const sub = [
-                        gstNote,
-                        l.quantity > 1 ? `${money(l.unitPrice)} each` : null,
-                        less,
-                    ].filter(Boolean);
+                    const sub = [gstNote, each, less].filter(Boolean);
                     // A phone's second line carries what the columns would.
                     const phoneSub = [
                         code ? `HSN ${code}` : null,
                         l.quantity > 1
-                            ? `${l.quantity} × ${money(l.unitPrice)}`
+                            ? `${l.quantity} × ${money(lineRate(l, added))}${
+                                  added?.unitPay
+                                      ? `, ${money(added.unitPay)} each with GST`
+                                      : ""
+                              }`
                             : null,
                         gstNote,
                         less,
@@ -309,7 +328,7 @@ export function InvoicePaper({
                                 {l.quantity}
                             </span>
                             <span className="text-right font-semibold tabular-nums">
-                                {money(l.amount)}
+                                {money(added ? added.amount : l.amount)}
                             </span>
                             {phoneSub.length ? (
                                 <span
@@ -343,9 +362,9 @@ export function InvoicePaper({
                         </span>
                         <span className="tabular-nums">{money(i.total)}</span>
                     </div>
-                    {gstRows ? (
+                    {sentence ? (
                         <p className="mt-1 text-[11.5px] text-muted-foreground">
-                            Prices include GST.
+                            {sentence}
                         </p>
                     ) : null}
                 </div>

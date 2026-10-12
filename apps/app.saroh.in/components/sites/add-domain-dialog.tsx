@@ -5,10 +5,14 @@ import { Refusal } from "@/components/shared/refusal";
 import { Badge } from "@saroh/ui/badge";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { Notice } from "@saroh/ui/notice";
 import { useState } from "react";
 
+import { BareDomainStep } from "@/components/sites/bare-domain-step";
 import { DomainRecords } from "@/components/sites/domain-records";
 import { runAction } from "@/lib/api/run-action";
+import type { BareView } from "@/lib/domains/bare-view";
+import { BARE_WORDS, connectedAsWww } from "@/lib/domains/bare-view";
 import type { DomainView } from "@/lib/domains/domain-view";
 import { bareHostname } from "@/lib/domains/hostname";
 import type { SiteDomain } from "@/lib/domains/service";
@@ -24,9 +28,11 @@ const NEEDS_DOMAIN = "Enter the domain to add.";
  * new domain's card under the dialog to carry on.
  *
  * A refusal stays here with what was typed, in the api's own words: a
- * taken hostname (409), a plan without custom domains (403), a malformed
- * name (400, plain since UX-066). Each says what to do. Mounted per
- * opening (`key`), so each one starts empty.
+ * taken hostname (409), a malformed name (400, plain since UX-066). Each
+ * says what to do. A plan without its own domain (403) is the plan's
+ * notice instead, as every plan refusal is, and this dialog closes for it
+ * (DEC-139); while plans aren't shown (DEC-136) it is said here like the
+ * others. Mounted per opening (`key`), so each one starts empty.
  */
 export function AddDomainDialog({
     open,
@@ -41,7 +47,13 @@ export function AddDomainDialog({
     /** No domain yet: the note names an example instead of "another". */
     first: boolean;
     /** The domain this opening added, as the list now has it, and its view. */
-    added: { domain: SiteDomain; view: DomainView; line: string | null } | null;
+    added: {
+        domain: SiteDomain;
+        view: DomainView;
+        line: string | null;
+        /** Its bare domain's forwarding step (DEC-140), for a `www` one. */
+        bare?: BareView | null;
+    } | null;
     /** A check on the added domain is on its way. */
     checking: boolean;
     /** Claims the hostname; the refusal comes back to be said here. */
@@ -80,7 +92,7 @@ export function AddDomainDialog({
             title={added ? `${added.domain.hostname} added` : "New domain"}
             description={
                 added
-                    ? "One step left, at your registrar. You can close this and come back: the records stay under the domain."
+                    ? "The rest is at your registrar. You can close this and come back: the steps stay under the domain."
                     : "Point a domain you own at this site. Visitors see no change until it's verified."
             }
             pending={adding}
@@ -97,6 +109,16 @@ export function AddDomainDialog({
                                 {added.view.badge.label}
                             </Badge>
                         </div>
+                        {/* DEC-140: a bare domain was typed, and its
+                            `www` is what was added. Said plainly, first. */}
+                        {added.bare?.hostname === bareHostname(hostname) ? (
+                            <Notice tone="info">
+                                {connectedAsWww(
+                                    added.bare.hostname,
+                                    added.bare.www,
+                                )}
+                            </Notice>
+                        ) : null}
                         {added.view.problem ? (
                             <p className="rounded-md bg-warning-subtle px-3 py-2 text-sm text-warning-subtle-foreground">
                                 {added.view.problem}
@@ -106,6 +128,12 @@ export function AddDomainDialog({
                             domain={added.domain}
                             view={added.view}
                         />
+                        {added.bare ? (
+                            <BareDomainStep
+                                view={added.bare}
+                                target={added.view.cname.value}
+                            />
+                        ) : null}
                         {added.line ? (
                             <p
                                 className="text-xs text-muted-foreground"
@@ -163,7 +191,7 @@ export function AddDomainDialog({
                                 className="text-xs text-muted-foreground"
                             >
                                 {first
-                                    ? "A domain you already own, like www.yourshop.in."
+                                    ? BARE_WORDS.fieldHint
                                     : "Add another domain for this site."}
                             </p>
                         )}

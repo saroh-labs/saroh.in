@@ -10,6 +10,7 @@ import {
     readMembershipPlans,
 } from "@/lib/class-packs/packs-page";
 import { getSellingTerms, listPurchases } from "@/lib/class-packs/service";
+import { readMissingRates } from "@/lib/gst-rates/service";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -43,13 +44,15 @@ export default async function ClassPacksPage({
     // never drawn (DEC-057). Unknown fails open, as the rail does.
     const paymentsOn =
         modules?.find((m) => m.key === "PAYMENTS")?.readiness !== "DISABLED";
-    const [contacts, terms, freeCancelHours, memberships, timeZone] =
+    const [contacts, terms, freeCancelHours, memberships, timeZone, rates] =
         await Promise.all([
             canSell ? contactPickerOptions() : Promise.resolve([]),
             getSellingTerms(),
             readFreeCancelHours(),
             paymentsOn ? readMembershipPlans() : Promise.resolve(null),
             readBusinessZone(),
+            // What is on sale with no GST rate; null draws no notice.
+            readMissingRates(),
         ]);
     const now = new Date();
 
@@ -66,6 +69,9 @@ export default async function ClassPacksPage({
                                 kind: packKind(p),
                                 price: p.price,
                                 currency: p.currency,
+                                // For "bought at an older price": what
+                                // today's price comes to, GST and all.
+                                gst: p.gst,
                             },
                             purchases,
                             now,
@@ -87,6 +93,7 @@ export default async function ClassPacksPage({
                 rules={rulesNote(freeCancelHours)}
                 memberships={memberships}
                 openSell={canSell && params.sell === "1"}
+                missingRates={rates}
             />
         </PageContainer>
     );

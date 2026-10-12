@@ -56,6 +56,8 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { contactReviews } from "@/lib/product-reviews/service";
 import { requireSession } from "@/lib/session";
 
+// "Contact", never their name: a tab's title shows in a screen share, in
+// history and in bookmarks (`lib/page-title.ts`).
 export const metadata = { title: "Contact" };
 
 /**
@@ -167,6 +169,7 @@ export default async function PersonPage({
                               ? {
                                     packs: choices.packs,
                                     invoicesOnSale: choices.invoicesOnSale,
+                                    gst: choices.gst,
                                 }
                               : null,
                   )
@@ -241,6 +244,7 @@ export default async function PersonPage({
                     enrollments={enrollments}
                     courses={holdings.choices.courses}
                     invoicesOnEnrol={panels.paymentsOn}
+                    gst={holdings.choices.gst}
                     mentionInvoices={panels.mentionInvoices}
                 />
             ),

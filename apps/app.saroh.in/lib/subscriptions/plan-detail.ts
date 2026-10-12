@@ -1,6 +1,8 @@
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { gstHistoryLines } from "@/lib/gst/item-words";
+import { setPriceWords } from "@/lib/gst/on-price";
 import { absentText } from "@saroh/ui/lib/absent";
 import type {
     Interval,
@@ -14,8 +16,9 @@ import type { Tone } from "./view";
 import {
     classesText,
     listTab,
-    longPrice,
     olderPrice,
+    recurringPrice,
+    subscriptionPay,
     TAB_LABEL,
     TAB_TONE,
 } from "./view";
@@ -83,7 +86,8 @@ export function planHeader(plan: Plan, withClasses: boolean): PlanHeader {
     const archived = plan.status === "ARCHIVED";
     const n = plan.subscriberCount;
     const parts = [
-        `${formatMoneyMajor(plan.price, plan.currency)} every ${EVERY[plan.interval]}`,
+        // The price the business set, saying so where GST comes on top.
+        `${setPriceWords(formatMoneyMajor(plan.price, plan.currency), plan.gst)} every ${EVERY[plan.interval]}`,
         ...(withClasses ? [lower(classesText(plan.classesPerMonth))] : []),
         count(n, "person on it", "people on it"),
     ];
@@ -141,7 +145,7 @@ function touchesPrice(changes: Changes): boolean {
     return "price" in changes || "currency" in changes || "interval" in changes;
 }
 
-/** "₹1,200", "₹1,200 / month" — a side of a price change. */
+/** "₹1,200", "₹1,200 a month": a side of a price change. */
 function priceSide(
     price: string | null,
     currency: string,
@@ -149,7 +153,7 @@ function priceSide(
 ): string {
     if (price === null) return "no price";
     return interval
-        ? longPrice(price, currency, interval)
+        ? recurringPrice(price, currency, interval)
         : formatMoneyMajor(price, currency);
 }
 
@@ -185,7 +189,12 @@ function classesSide(v: PlanEventValue | undefined): string {
     return typeof v === "number" && v > 0 ? `${v} a month` : "unlimited";
 }
 
-/** Each changed field as a phrase, in the order the plan reads. */
+/**
+ * Each changed field as a phrase, in the order the plan reads. A change to
+ * the plan's GST (12 Oct 2026) is recorded as a price change that may hold
+ * no price at all: its rate, its way of carrying GST and its SAC code are
+ * each said in their own words.
+ */
 function editPhrases(changes: Changes, currency: string): string[] {
     const out: string[] = [];
     const name = changes.name;
@@ -196,6 +205,7 @@ function editPhrases(changes: Changes, currency: string): string[] {
     }
     const price = pricePhrase(changes, currency);
     if (price) out.push(price);
+    out.push(...gstHistoryLines(changes));
     const cls = changes.classesPerMonth;
     if (cls) {
         out.push(
@@ -337,7 +347,7 @@ export interface SubscriberRow {
     /** "Since 4 Jan". */
     since: string;
     status: { label: string; tone: Tone };
-    /** "₹2,500 / month". */
+    /** "₹2,500 a month". */
     price: string;
     /** They keep a price the plan no longer sells at. */
     olderPrice: boolean;
@@ -377,7 +387,12 @@ export function subscriberRows(
                 name: s.contact.name,
                 since: `Since ${d(s.startedAt)}`,
                 status: { label: TAB_LABEL[tab], tone: TAB_TONE[tab] },
-                price: longPrice(s.price, s.currency, s.interval),
+                // What they pay a period, GST and all.
+                price: recurringPrice(
+                    subscriptionPay(s),
+                    s.currency,
+                    s.interval,
+                ),
                 olderPrice: olderPrice(s, [plan]) !== null,
                 when,
             };

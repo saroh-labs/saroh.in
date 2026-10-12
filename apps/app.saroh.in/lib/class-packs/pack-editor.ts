@@ -1,4 +1,13 @@
 import type { EditorCopy, EditorProblem } from "@/lib/editor-shell/types";
+import type { GstValues } from "@/lib/gst/item-words";
+import {
+    rateMissingNote,
+    SAC_SHAPE_PROBLEM,
+    sacOk,
+    shellProblem,
+    tidySac,
+} from "@/lib/gst/item-words";
+import { GST_RATE_NEEDED } from "@/lib/invoices/gst";
 
 /*
  * The Pack Editor's rules, pure (round-2 E18, after Saroh Pack Editor.dc.html):
@@ -14,8 +23,13 @@ import type { EditorCopy, EditorProblem } from "@/lib/editor-shell/types";
 /** What a pack's credits pay for (E13, default 45). */
 export type PackKind = "CLASSES" | "ONE_TO_ONE";
 
-/** A pack's publishable values, as the editor holds them. */
-export interface PackValues extends Record<string, unknown> {
+/**
+ * A pack's publishable values, as the editor holds them. Its GST (12 Oct
+ * 2026) is published with the price: the rate ("18"; null is not set), the
+ * SAC code as typed, and the pack's own way of carrying GST (null is the
+ * business's).
+ */
+export interface PackValues extends Record<string, unknown>, GstValues {
     name: string;
     description: string | null;
     /** How many classes or sessions; null while not set. */
@@ -37,6 +51,10 @@ export interface PackServiceOption {
     name: string;
     /** More than one person at a time is a class (E13's `packKindFor`). */
     capacity: number;
+    /**
+     * What one visit costs to pay alone, GST and all (the service's
+     * `payCents`): the drop-in the pack's "a class" figure is compared with.
+     */
     priceCents: number | null;
     currency: string | null;
     /** Taking bookings; a paused one is offered only if the pack names it. */
@@ -99,6 +117,9 @@ export const PACK_FIELD_LABELS: Partial<Record<keyof PackValues, string>> = {
     serviceIds: "what it's good for",
     kind: "what credits are for",
     firstPackOnly: "who can buy it",
+    gstRate: "GST rate",
+    sacCode: "SAC code",
+    gstPriceMode: "GST on this price",
 };
 
 // — Reading what is typed ——————————————————————————————————————————————
@@ -176,6 +197,9 @@ export function newPackValues(
         serviceIds: defaultServiceIds(kind, services),
         kind,
         firstPackOnly: false,
+        gstRate: null,
+        sacCode: null,
+        gstPriceMode: null,
     };
 }
 
@@ -227,6 +251,11 @@ export function packProblems(
         services: readonly PackServiceOption[] | null;
         sold: number | null;
         published: PackValues | null;
+        /**
+         * The business is GST-registered: a priced pack needs its rate, as
+         * the API's own check at Publish says. Absent asks for nothing.
+         */
+        gstAsked?: boolean;
     },
 ): EditorProblem[] {
     const out: EditorProblem[] = [];
@@ -253,6 +282,22 @@ export function packProblems(
         out.push({ field: "price", message: "A price like 4000 or 4000.50" });
     } else if (!price) {
         out.push({ field: "price", message: "Add the price" });
+    }
+    if (context.gstAsked) {
+        // Asked of a priced pack only, and 0% is an answer.
+        if (price && values.gstRate === null) {
+            out.push({
+                field: "gstRate",
+                message: shellProblem(GST_RATE_NEEDED),
+                note: rateMissingNote("pack"),
+            });
+        }
+        if (!sacOk(values.sacCode)) {
+            out.push({
+                field: "sacCode",
+                message: shellProblem(SAC_SHAPE_PROBLEM),
+            });
+        }
     }
     if (
         values.validityDays === null ||
@@ -303,6 +348,11 @@ export function packBlocker(values: PackValues): string | null {
  * as null (a draft not finished yet). A field holding something the API
  * would refuse — "4500.", 5 days, 0 classes — is left out, so the rest still
  * saves; its problem keeps Publish off until it is fixed.
+ *
+ * The GST fields go as the API takes them: null is "not set" for the rate
+ * and the SAC code, and "same as the business" for the way. A SAC code that
+ * isn't four to eight digits is left out like any other the API would
+ * refuse.
  */
 export function packPayload(values: PackValues): Partial<PackValues> {
     const out: Partial<PackValues> = {
@@ -310,7 +360,10 @@ export function packPayload(values: PackValues): Partial<PackValues> {
         serviceIds: values.serviceIds,
         kind: values.kind,
         firstPackOnly: values.firstPackOnly,
+        gstRate: values.gstRate === "" ? null : values.gstRate,
+        gstPriceMode: values.gstPriceMode,
     };
+    if (sacOk(values.sacCode)) out.sacCode = tidySac(values.sacCode) || null;
     const name = values.name.trim();
     if (name) out.name = name.slice(0, 120);
     const description = values.description?.trim() ?? "";

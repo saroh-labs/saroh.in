@@ -28,6 +28,7 @@ import {
     logoCardUndo,
     useSettingsUndo,
 } from "@/components/organizations/use-settings-undo";
+import { businessModeOf } from "@/lib/gst/price-mode";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { BusinessTab } from "@/lib/organizations/business-rows";
 import {
@@ -224,7 +225,11 @@ export function OrganizationSettingsForm({
                     onClose={sheets.close}
                     onSaved={(next, sent) => {
                         undo.offer(
-                            savedWords(editing.which, words),
+                            savedWords(
+                                editing.which,
+                                words,
+                                businessModeOf(next.tax?.priceMode),
+                            ),
                             cardUndo(settings, next, sent, applySaved),
                         );
                         applySaved(next);

@@ -43,24 +43,38 @@ function db(
 beforeEach(() => areaOn.mockReturnValue(true));
 
 describe("the page a notice leads back to", () => {
-    it("is the order's own page for an order placed", () => {
+    it("is the order's own page in the account for an order placed, and the shop's while the area is off", () => {
+        expect(pathOf({ kind: "ORDER_PLACED", orderId: "ord_1" })).toBe(
+            "/account/orders/ord_1",
+        );
+        expect(pathOf({ kind: "ORDER_PLACED" })).toBeNull();
+        areaOn.mockReturnValue(false);
+        // Never a link to a page that isn't there.
         expect(pathOf({ kind: "ORDER_PLACED", orderId: "ord_1" })).toBe(
             "/shop/order/ord_1",
         );
-        expect(pathOf({ kind: "ORDER_PLACED" })).toBeNull();
     });
 
-    it("is their bookings for a booking made or moved, only while the account area is on", () => {
+    it("is the booking's own page for a booking made or moved, only while the account area is on", () => {
         expect(pathOf({ kind: "BOOKING_CONFIRMED", bookingId: "b_1" })).toBe(
-            "/account/bookings",
+            "/account/bookings/b_1",
         );
         expect(pathOf({ kind: "BOOKING_MOVED", bookingId: "b_1" })).toBe(
-            "/account/bookings",
+            "/account/bookings/b_1",
         );
         areaOn.mockReturnValue(false);
         expect(
             pathOf({ kind: "BOOKING_CONFIRMED", bookingId: "b_1" }),
         ).toBeNull();
+    });
+
+    it("names the thing by its id alone, escaped", () => {
+        expect(pathOf({ kind: "ORDER_PLACED", orderId: "a/b?c" })).toBe(
+            "/account/orders/a%2Fb%3Fc",
+        );
+        expect(pathOf({ kind: "BOOKING_MOVED", bookingId: "a b" })).toBe(
+            "/account/bookings/a%20b",
+        );
     });
 
     it("is nothing for a notice with nowhere to go", () => {
@@ -85,7 +99,7 @@ describe("the address it is on", () => {
     it("is the site the customer last signed in on, at its Saroh address", async () => {
         const fake = db({ session: { siteId: "site_b" } });
         await expect(noticeLink(fake as never, "org_1", order)).resolves.toBe(
-            "https://rye-cakes.saroh.app/shop/order/ord_1",
+            "https://rye-cakes.saroh.app/account/orders/ord_1",
         );
         expect(fake.customerSession.findFirst.mock.calls[0][0]).toMatchObject({
             where: { organizationId: "org_1", account: { contactId: "c_1" } },
@@ -99,13 +113,13 @@ describe("the address it is on", () => {
             domain: { hostname: "ryeandco.example" },
         });
         await expect(noticeLink(fake as never, "org_1", order)).resolves.toBe(
-            "https://ryeandco.example/shop/order/ord_1",
+            "https://ryeandco.example/account/orders/ord_1",
         );
     });
 
     it("falls back to the business's first published site, and to no link with none", async () => {
         await expect(noticeLink(db() as never, "org_1", order)).resolves.toBe(
-            "https://rye.saroh.app/shop/order/ord_1",
+            "https://rye.saroh.app/account/orders/ord_1",
         );
         await expect(
             noticeLink(db({ sites: {} }) as never, "org_1", order),

@@ -27,6 +27,7 @@ import {
     PACK_DRAFT_FIELDS,
     PACK_DRAFT_SELECT,
     packProblems,
+    packRateOf,
     pendingOf,
     revised,
     revisedBy,
@@ -128,6 +129,10 @@ async function patchOf(
     if (typeof patch.price === "string") {
         patch.price = toMoneyString(patch.price);
     }
+    // One GST has, written the one way, so the same rate is never a change.
+    if (typeof patch.gstRate === "string") {
+        patch.gstRate = packRateOf(patch.gstRate, fieldError);
+    }
     if (patch.serviceIds !== undefined) {
         patch.serviceIds = await assertPackServices(
             prisma,
@@ -186,6 +191,9 @@ export async function createPackDraft(
             serviceIds: patch.serviceIds ?? [],
             kind: patch.kind ?? DEFAULT_PACK_KIND,
             firstPackOnly: patch.firstPackOnly ?? false,
+            gstRate: patch.gstRate ?? null,
+            sacCode: patch.sacCode ?? null,
+            gstPriceMode: patch.gstPriceMode ?? null,
         };
         const now = new Date();
         // Revision 0: the editor's first answer carries it.

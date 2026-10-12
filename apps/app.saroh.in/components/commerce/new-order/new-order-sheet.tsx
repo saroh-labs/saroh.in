@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { Chip } from "@/components/shared/chip";
 import {
@@ -137,6 +138,12 @@ function NewOrderBody({
         then: "make the order and its pay link",
         continueLabel: "Save and create order",
     });
+    // Paid at the counter, with a product that has no GST rate: chosen
+    // here and saved to the product, then the order is made as it was.
+    const rates = useGstRateStep({
+        then: "take this payment",
+        continueLabel: "Save and create order",
+    });
     const [failed, setFailed] = useState<{
         key: string;
         message: string;
@@ -167,7 +174,10 @@ function NewOrderBody({
         // A pay link waits for the registered address (DEC-068): asked in
         // place, then the order is made.
         const res = await runAction(
-            () => details.run(() => makeNewOrder(o.storeId, request(o))),
+            () =>
+                rates.run(() =>
+                    details.run(() => makeNewOrder(o.storeId, request(o))),
+                ),
             { setBusy: setSaving },
         );
         if (!res) return;
@@ -208,6 +218,7 @@ function NewOrderBody({
     return (
         <>
             {details.step}
+            {rates.step}
             {/*
               Rows are max-content: the Items card clips its corners
               (overflow-hidden), which lets a grid row shrink it to nothing

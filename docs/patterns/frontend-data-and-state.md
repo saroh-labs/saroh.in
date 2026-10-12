@@ -85,13 +85,32 @@ add or change there may be served to the next visitor without rendering.
   read. The Worker already passes by private paths
   (`lib/private-paths.ts`), previews, review links, test hosts and any
   request with a session cookie (`lib/page-cache/request-rules.ts`); a new
-  private path goes in `private-paths.ts`.
+  private path goes in `private-paths.ts`. That one list also decides what
+  `robots.txt` disallows and which responses carry
+  `X-Robots-Tag: noindex, nofollow` (`privatePathHeaders`, set by the
+  middleware; DEC-142), so a new private path needs nothing else.
+- **The customer's account streams a held layout; a public page does not.**
+  Every page under `[domain]/account` has a `loading.tsx` (DEC-142). They
+  are private and never indexed, so the 200 a streamed "not found" answers
+  with costs nothing there. A public page still renders before its first
+  byte so `notFound()` answers 404 (DEV_LEARNINGS, UX-071): no `loading.tsx`
+  above one.
+- **A constant a server page reads lives in a plain module.** An export of
+  a `"use client"` file reaches a server component as a reference, not its
+  value: the account's addresses are in `site-blocks/account/hrefs.ts` for
+  that reason, not in the tab bar.
 - **A live read outside the publication shortens the page's life.** The
   head (trackers, codes; DEC-108) keeps it 60 seconds at most
   (`keepPageAtMost`). Everything else lives `SITE_PAGE_CACHE_TTL` (five
   minutes) unless the API revalidates its tags: a new API write that
   changes what a published page shows queues `site.pages.revalidate`
   (`backend-jobs.md` → Site page cache).
+- **A temporary redirect is never kept, by anyone.** Only a 200 goes in
+  the cache, and the Worker marks every 302, 303 and 307 `no-store`
+  (`neverStoreTemporaryRedirect`), cache on or off: an old address that
+  forwards (DEC-069) and a domain its plan has paused (DEC-139) both stop
+  being true. Use `redirect()` for a hop like these, never
+  `permanentRedirect()`.
 - **Where a visit came from is not part of the page.** The key drops
   `utm_*`, `fbclid`, `gclid`, `igshid` and `src` (a QR scan's tag), and a
   page that may be kept is drawn for the address without them

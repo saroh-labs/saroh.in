@@ -48,8 +48,8 @@ function building(): boolean {
 
 /**
  * The published catalogue, or null when there is none to show. Read when the
- * page is built: the marketing site is static, rebuilt on every deploy, every
- * night and whenever pricing is published.
+ * page is built: the marketing site is static, rebuilt on every deploy and
+ * whenever pricing is published (nothing rebuilds it on a schedule).
  *
  * - No `API_URL`, or a 404 (no version installed): null, the placeholder.
  * - The API down, an error answer or a snapshot that doesn't validate: a

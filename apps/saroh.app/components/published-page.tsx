@@ -84,6 +84,8 @@ export async function PublishedPage({
             thread={thread}
             productGrids={productGrids}
             reach={reachOf(contact)}
+            // For a closing band whose content gives no heading.
+            siteName={snapshot.site.name}
         />
     );
 }

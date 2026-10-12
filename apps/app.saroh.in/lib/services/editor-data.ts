@@ -1,4 +1,6 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
+import { readMissingRates } from "@/lib/gst-rates/service";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listSites } from "@/lib/sites/service";
 import type { BookingPaymentView, StaffList } from "@/lib/staff/service";
@@ -80,6 +82,18 @@ export interface EditorContext {
      * (DEC-088); null when unknown, which warns about nothing.
      */
     payment: BookingPaymentView | null;
+    /**
+     * Whether the business is GST-registered: its priced services need a
+     * GST rate (12 Oct 2026). Null when it couldn't be told, which asks
+     * for nothing.
+     */
+    gstRegistered: boolean | null;
+    /**
+     * How a registered business's prices carry GST (12 Oct 2026), for the
+     * editor's "Same as the business (…)". Null when the business isn't
+     * registered, or it couldn't be read (a role without the settings).
+     */
+    businessPriceMode: GstPriceMode | null;
     canEdit: boolean;
     /** The business's zone: the diary's, else its services', else India. */
     timezone: string;
@@ -90,7 +104,7 @@ export interface EditorContext {
 export async function loadEditorContext(): Promise<
     { ok: true; context: EditorContext } | { ok: false; forbidden: boolean }
 > {
-    const [read, staff, hasPage, canEdit, hasStorefront, payment] =
+    const [read, staff, hasPage, canEdit, hasStorefront, payment, rates] =
         await Promise.all([
             readServices(),
             readStaffOrNull(),
@@ -98,6 +112,9 @@ export async function loadEditorContext(): Promise<
             readCanEditServices(),
             readHasStorefront(),
             readBookingPayment(),
+            // Registered or not comes with the missing-rates read, which a
+            // role that can't read the business's settings can still make.
+            readMissingRates(),
         ]);
     if (!read.ok) return read;
     return {
@@ -108,6 +125,8 @@ export async function loadEditorContext(): Promise<
             hasPage,
             hasStorefront,
             payment,
+            gstRegistered: rates?.registered ?? null,
+            businessPriceMode: rates?.priceMode ?? null,
             canEdit,
             timezone:
                 staff?.timezone ??

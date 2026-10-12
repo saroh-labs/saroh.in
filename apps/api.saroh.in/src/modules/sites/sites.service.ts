@@ -27,6 +27,7 @@ import {
 } from "../orders/checkout-readiness";
 import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import { allows, authorize } from "../organizations/organization-policy";
+import { domainPausedHere } from "./domain-paused";
 import type {
     CreateApprovalDto,
     CreateCommentDto,
@@ -107,6 +108,8 @@ import {
     checkShop,
     checkSite,
     FLAGS_AWAITING_NAVIGATION,
+    hasOwnerNote,
+    OWNER_NOTE_MESSAGE,
 } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
 import { footerAfterUpdate, parseSiteFooter } from "./site-footer";
@@ -2055,6 +2058,18 @@ export class SitesService {
         const publishedAt = new Date();
         const snapshot = this.buildSnapshot(site, publishedAt);
         /*
+         * A template's note to the owner never goes live (DEC-141): the
+         * first starters put "Say what you do and where, in one line." under
+         * every headline, and customers read it. Refused in the words the
+         * pre-publish check uses, which names the block.
+         */
+        if (hasOwnerNote(snapshot.pages)) {
+            throw new ConflictException({
+                message: OWNER_NOTE_MESSAGE,
+                details: { reason: "ownerNote" },
+            });
+        }
+        /*
          * Approval gates nothing, and says so (#199, #278). The epic's rule: if
          * a review was asked for and has not been answered for THIS draft,
          * publishing is RECORDED as a bypass, not prevented.
@@ -2149,6 +2164,10 @@ export class SitesService {
      * VERIFIED, and only a VERIFIED row routes — a PENDING claim on someone
      * else's hostname resolves nothing. Same read guarantees as
      * {@link getPublicationBySubdomain}.
+     *
+     * A domain its plan has paused (DEC-139) shows nothing either: the 404
+     * says so and names the site's Saroh address (`domain-paused.ts`), and
+     * the renderer sends the visitor there.
      */
     async getPublicationByHostname(hostname: string): Promise<PublicSiteView> {
         // A test host is never served the live site (DEC-071, KTD-7).
@@ -2159,13 +2178,18 @@ export class SitesService {
         }
         const domain = await prisma.domain.findUnique({
             where: { hostname: hostname.trim().toLowerCase() },
-            select: { status: true, siteId: true },
+            select: { status: true, siteId: true, organizationId: true },
         });
         if (domain?.status !== "VERIFIED" || !domain.siteId) {
             throw new NotFoundException(
                 `No published site found for hostname "${hostname}"`,
             );
         }
+        const paused = await domainPausedHere({
+            organizationId: domain.organizationId,
+            siteId: domain.siteId,
+        });
+        if (paused) throw paused;
         return this.resolveCurrentPublication(
             { id: domain.siteId, deletedAt: null },
             `hostname "${hostname}"`,

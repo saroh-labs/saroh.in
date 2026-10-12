@@ -17,8 +17,22 @@ import {
 } from "../bookings/booking-access";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { assertBusinessDetails } from "../invoices/business-details";
+import type {
+    GstOnPrice,
+    GstPriceMode,
+    PriceTerms,
+} from "../invoices/gst-price";
+import { isGstPriceMode } from "../invoices/gst-price";
+import { assertSaleRated } from "../invoices/gst-rate-required";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
+import { loadPriceTerms } from "../invoices/price-terms";
+import {
+    hasRate,
+    priceTermsFor,
+    saleCharge,
+    saleChargeInTx,
+} from "../invoices/sale-price";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows } from "../organizations/organization-policy";
@@ -41,6 +55,8 @@ import {
     lockPack,
     PACK_DRAFT_FIELDS,
     PACK_DRAFT_SELECT,
+    packRate,
+    packRateOf,
     readPackEditor,
     revised,
     timesSold,
@@ -102,6 +118,23 @@ function fieldError(message: string, field: string): never {
     throw new BadRequestException({ message, details: { field } });
 }
 
+/**
+ * The GST columns a save through the old form names (12 Oct 2026): a rate
+ * GST has, or null to clear it; the SAC code; the pack's own way of
+ * carrying GST.
+ */
+function gstColumns(dto: PackInputDto) {
+    return {
+        ...(dto.gstRate !== undefined
+            ? { gstRate: packRateOf(dto.gstRate, fieldError) }
+            : {}),
+        ...(dto.sacCode !== undefined ? { sacCode: dto.sacCode } : {}),
+        ...(dto.gstPriceMode !== undefined
+            ? { gstPriceMode: dto.gstPriceMode }
+            : {}),
+    };
+}
+
 function notFound(what: string, field?: string): never {
     throw new NotFoundException(
         field
@@ -142,6 +175,21 @@ export interface PackView {
     kind: PackKind;
     /** Sold only to someone who has never bought a pack of its kind (E13). */
     firstPackOnly: boolean;
+    /**
+     * GST (12 Oct 2026): the rate its price carries ("18"; null: not set),
+     * its SAC code, and its own way of carrying GST (null: the business's).
+     */
+    gstRate: string | null;
+    sacCode: string | null;
+    gstPriceMode: GstPriceMode | null;
+    /**
+     * The GST on its price as it is sold today: the typed price, the GST in
+     * or on it and the amount to pay. Null when nothing is said about GST
+     * (not registered, no rate, exempt): the price is the amount to pay.
+     * `takings` and every purchase's `price` are amounts paid, so the app
+     * compares them with this amount to pay, never with the typed price.
+     */
+    gst: GstOnPrice | null;
 }
 
 /** One pack with Pack Detail's Overview figures (E13). */
@@ -240,11 +288,16 @@ export class ClassPacksService {
             orderBy: [{ status: "asc" }, { createdAt: "asc" }],
             include: PACK_INCLUDE,
         });
-        const holders = await packCounts(
-            ctx.organizationId,
-            rows.map((r) => r.id),
-        );
-        return rows.map((r) => this.packView(r, holders.get(r.id)));
+        const [holders, terms] = await Promise.all([
+            packCounts(
+                ctx.organizationId,
+                rows.map((r) => r.id),
+            ),
+            // How the business's prices carry GST; read only when a pack
+            // has a rate.
+            priceTermsFor(prisma, ctx.organizationId, rows),
+        ]);
+        return rows.map((r) => this.packView(r, holders.get(r.id), terms));
     }
 
     /**
@@ -299,6 +352,7 @@ export class ClassPacksService {
             dto.serviceIds,
         );
         const { name, credits, validityDays, price, currency } = dto;
+        const gst = gstColumns(dto);
 
         const id = await prisma.$transaction(async (tx) => {
             const created = await tx.classPack.create({
@@ -312,6 +366,7 @@ export class ClassPacksService {
                     currency,
                     kind,
                     firstPackOnly: dto.firstPackOnly ?? false,
+                    ...gst,
                 },
                 select: { id: true },
             });
@@ -353,6 +408,7 @@ export class ClassPacksService {
         if (serviceIds?.length === 0) {
             fieldError("Choose the classes it pays for", "serviceIds");
         }
+        const gst = gstColumns(dto);
 
         await prisma.$transaction(async (tx) => {
             // A draft is edited only through its revision-checked autosave
@@ -402,6 +458,7 @@ export class ClassPacksService {
                     ...(dto.firstPackOnly !== undefined
                         ? { firstPackOnly: dto.firstPackOnly }
                         : {}),
+                    ...gst,
                 },
             });
             if (serviceIds) {
@@ -553,7 +610,13 @@ export class ClassPacksService {
         const [found, contact] = await Promise.all([
             prisma.classPack.findFirst({
                 where: { id: packId, organizationId },
-                select: { id: true, status: true },
+                select: {
+                    id: true,
+                    status: true,
+                    name: true,
+                    price: true,
+                    gstRate: true,
+                },
             }),
             prisma.contact.findFirst({
                 where: { id: dto.contactId, organizationId },
@@ -567,11 +630,23 @@ export class ClassPacksService {
         // Its invoice still to be paid is refused without the business
         // details; money the desk has already taken is recorded, and Home
         // asks for them (DEC-068).
-        if (
-            !paidAlready(dto.paidBy) &&
-            (await paymentsOn(prisma, organizationId))
-        ) {
+        const invoices = await paymentsOn(prisma, organizationId);
+        if (!paidAlready(dto.paidBy) && invoices) {
             await assertBusinessDetails(prisma, organizationId);
+        }
+        // The desk is selling it, and with Payments on the sale writes a tax
+        // invoice: a registered business's pack with no GST rate is asked
+        // for one first (409 GST_RATE_MISSING), and the app asks in place.
+        // A pack bought on the site is never refused for it.
+        if (invoices && !hasRate(found)) {
+            const terms = await loadPriceTerms(prisma, organizationId);
+            assertSaleRated(terms.registered, {
+                kind: "PACK",
+                id: found.id,
+                name: found.name,
+                rate: found.gstRate,
+                priceCents: toCents(toMoneyString(found.price)),
+            });
         }
 
         const id = await prisma.$transaction(async (tx) => {
@@ -585,7 +660,16 @@ export class ClassPacksService {
             });
             if (!pack) notFound("Class pack");
             assertPackOnSale(pack);
-            const price = toMoneyString(pack.price);
+            // What it is sold for: the typed price, or with its GST added
+            // where the business adds it (`sale-price.ts`). The purchase
+            // keeps the amount to pay, as its invoice does.
+            const charge = await saleChargeInTx(
+                tx,
+                organizationId,
+                toCents(toMoneyString(pack.price)),
+                pack,
+            );
+            const price = charge.pay;
             // Merged since the page loaded (C9)? Sell to the survivor.
             const buyer = await resolveContact(tx, contact.id, organizationId);
             if (!buyer || buyer.removed) notFound("Contact", "contactId");
@@ -627,7 +711,7 @@ export class ClassPacksService {
                         {
                             description: `${pack.name} · ${pack.credits} ${unit}`,
                             quantity: 1,
-                            unitPrice: price,
+                            ...charge.line,
                         },
                     ],
                     source: "PACK",
@@ -932,8 +1016,11 @@ export class ClassPacksService {
             include: PACK_INCLUDE,
         });
         if (!row) notFound("Class pack");
-        const holders = await packCounts(organizationId, [id]);
-        return this.packView(row, holders.get(id));
+        const [holders, terms] = await Promise.all([
+            packCounts(organizationId, [id]),
+            priceTermsFor(prisma, organizationId, [row]),
+        ]);
+        return this.packView(row, holders.get(id), terms);
     }
 
     /** The pack is this business's, or it is a 404. */
@@ -976,8 +1063,12 @@ export class ClassPacksService {
             pendingChangedAt?: Date | null;
             kind: string;
             firstPackOnly: boolean;
+            gstRate?: { toString(): string } | null;
+            sacCode?: string | null;
+            gstPriceMode?: string | null;
         },
         holders: PackCounts | undefined,
+        terms: PriceTerms,
     ): PackView {
         const pending =
             row.status !== PACK_DRAFT &&
@@ -1005,6 +1096,13 @@ export class ClassPacksService {
             createdAt: row.createdAt.toISOString(),
             kind: readPackKind(row.kind),
             firstPackOnly: row.firstPackOnly,
+            gstRate: packRate(row.gstRate),
+            sacCode: row.sacCode ?? null,
+            gstPriceMode: isGstPriceMode(row.gstPriceMode)
+                ? row.gstPriceMode
+                : null,
+            // The sum a sale uses (`sell`, `sale-price.ts`).
+            gst: saleCharge(toCents(toMoneyString(row.price)), row, terms).gst,
         };
     }
 

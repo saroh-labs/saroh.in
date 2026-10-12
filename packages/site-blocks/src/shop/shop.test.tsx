@@ -1886,3 +1886,121 @@ describe("parseBagDraft", () => {
         ).toBe("");
     });
 });
+
+describe("GST in the bag and on the product's button", () => {
+    it("says the GST inside the total under it, as the API summed it", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    lines: [
+                        {
+                            ...quoteOf().lines[0],
+                            unitPrice: "1180.00",
+                            amount: "2360.00",
+                            gst: {
+                                mode: "ADDED",
+                                rate: "18",
+                                listCents: 100000,
+                                gstCents: 18000,
+                                payCents: 118000,
+                            },
+                        },
+                    ],
+                    subtotal: "2360.00",
+                    total: "2360.00",
+                    gst: "360.00",
+                }),
+            },
+        });
+        await openTheBag();
+        const sheet = screen.getByRole("dialog", { name: "Your bag" });
+        expect(sheet.querySelector("[data-total-gst]")).toHaveTextContent(
+            /^Includes ₹360 GST$/,
+        );
+        expect(sheet.querySelector("[data-line-gst]")).toHaveTextContent(
+            "₹1,000 + ₹180 GST (18%)",
+        );
+        // The button pays the API's total, never a sum made here.
+        expect(
+            screen.getByRole("button", { name: "Place order · ₹2,360" }),
+        ).toBeEnabled();
+    });
+
+    it("says nothing about GST in a bag that has none", async () => {
+        setup({
+            signedIn: true,
+            quote: { ok: true, data: quoteOf({ gst: null }) },
+        });
+        await openTheBag();
+        const sheet = screen.getByRole("dialog", { name: "Your bag" });
+        expect(sheet.querySelector("[data-total-gst]")).toBeNull();
+        expect(sheet).not.toHaveTextContent("GST");
+    });
+
+    it("leads with the amount to pay beside a struck-through MRP when GST comes on top", () => {
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...bread,
+                    gst: null,
+                    saving: null,
+                    variants: bread.variants.map((v) => ({
+                        ...v,
+                        mrp: "200.00",
+                        // ₹180 + 5% is ₹189 to pay: 5% off an MRP of ₹200.
+                        saving: { mrp: "200.00", percent: 5 },
+                        gst: {
+                            mode: "ADDED" as const,
+                            rate: "5",
+                            listCents: 18000,
+                            gstCents: 900,
+                            payCents: 18900,
+                        },
+                    })),
+                }}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        // The big figure is what is paid, so "5% off" is true of it.
+        expect(container.querySelector("[data-price-lead]")?.textContent).toBe(
+            "₹189",
+        );
+        expect(container.querySelector("[data-price-off]")?.textContent).toBe(
+            "5% off",
+        );
+        // And the price before GST is said in full under it.
+        expect(container.querySelector("[data-price-gst]")?.textContent).toBe(
+            "₹180 + ₹9 GST (5%)",
+        );
+    });
+
+    it("names the amount to pay on Add to bag when GST comes on top of the price", () => {
+        render(
+            <ProductPage
+                product={{
+                    ...bread,
+                    gst: null,
+                    variants: bread.variants.map((v) => ({
+                        ...v,
+                        gst: {
+                            mode: "ADDED" as const,
+                            rate: "5",
+                            listCents: 18000,
+                            gstCents: 900,
+                            payCents: 18900,
+                        },
+                    })),
+                }}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        expect(
+            // ₹180 + 5%: the button that takes money says the whole of it.
+            screen.getByRole("button", { name: "Add to bag · ₹189" }),
+        ).toBeInTheDocument();
+    });
+});

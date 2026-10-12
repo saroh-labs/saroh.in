@@ -1638,3 +1638,235 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Retention and erasure are unchanged, because there is none for a report: no job deletes `BusinessReport` rows, a report is kept when its business is deleted (DEC-121), and it is in no data export or privacy-removal plan (it is reachable from neither `Contact` nor `Customer`). So the number is kept exactly as long as the email already was. Open, for the owner: how long a report, and the email and number on it, should be kept.
 - What Privacy still says (`apps/saroh.in/content/privacy.ts`; legal text, not changed here): it does not mention a report at all. "What we collect" has no row for a report's email and mobile number. Its "Account" row names a phone, but for Saroh's own users, to sign in. Its "Messages" row covers "What you write to contact@saroh.in", which a report is not. "How long we keep it" has no row for a report. Nothing in it calls the email optional, so no sentence is now false; the page is silent where the form now requires two personal details from someone who need not have an account.
 - A session recording masks what is typed (every input, by the recorder's own rule, DEC-125); the form's thanks says none of it back.
+
+## DEC-139 A business's own domain is paused, not removed, when its plan stops including one
+
+**Status: Accepted — 2026-10-12** · owner (closes the first open question on #862)
+
+- Context: connecting your own domain belongs to a paid plan. Nothing said what happens to the domain when a business moves to a plan without it.
+- The business is told before the paid period ends, in the app and by email, that the domain will stop on a named day.
+- For 3 days after the plan ends the domain still shows the site, and the notice stays up.
+- After the 3 days the domain is paused: it stops showing the site and sends a visitor on to the business's Saroh address, so the business's customers can still reach it. The connection is kept: its DNS check, its certificate and its record with the host.
+- When the business is on a plan with a domain again, the domain shows the site again at once. Nobody reconnects anything. A business that goes back to the free plan does not have to remove its domain first.
+- This follows how a downgrade already treats everything else (DEC-131): things pause and come back, and nothing is deleted. Removing the domain would make the business that returns redo its DNS and wait for a certificate.
+- It applies only while plan enforcement is on (`PLAN_ENFORCEMENT`), as every plan rule does (DEC-136).
+- Amended 2026-10-12, as built. What had to be settled to build it:
+    - **What says a plan includes a domain.** The entitlement `customDomain`, the key connecting a domain has always asked. No catalogue row sells it: it is on with any plan that has a price and off on one without (`PAID_PLAN_SWITCHES`, `billing/catalogue-access.ts`). Nothing was added to the catalogue and no column was added.
+    - **What "the plan ends" means.** The moment the plan the business reads stops including a domain, however it gets there: a plan given until a date (the launch offer, or one an operator set) at that date; a move the business chose for its period's end, then; a 12-month term nobody paid for again, at its end; and at once for a payment that failed for good, a cancel now, or an operator taking a plan away. A business moved by an operator is treated as any other.
+    - **Nothing is stored on the domain.** One rule (`billing/domain-plan.ts`) answers included, ending, grace or paused from the plan read now, an end known ahead, and a clock. The clock is the one stored thing, as the 7-day clock of DEC-114 is: a `CustomerNotice` (`DOMAIN_PLAN_ENDED`) dated at the end the business was told about, else when the hourly billing sweep first sees the plan without a domain. A plan with a domain again reads included at the next request, with no job.
+    - **Told ahead** 30, 7 and 1 days before, by a line in the notice and email that end already sends (a plan that ends on a date, a term that ends, a move down), not a second email. Where none of those is sent (a chosen move that pauses nothing else) the domain has its own notice. The app names the day from 30 days ahead.
+    - **A plan that ended at once can't be told ahead.** It is told within the hour, and its 3 days count from that notice, so the business always has 3 days after it was told. This is the reading taken; say if the 3 days should count from the end itself.
+    - **Paused** is a 307 to the same path and query on `<address>.saroh.app`, marked `Cache-Control: no-store`, and nothing of Saroh's is drawn. While paused the Saroh address is the site's canonical address and the one in every link Saroh builds (pay links, autopay returns, notices, QR codes, an old address that forwards, the links in Web address). A pay link already sent on the domain still opens: its page goes on to the same pay page on the Saroh address, as it does from any address that is no longer the site's own. The domain's test host (`test.<domain>`) follows it to `test--<address>`.
+    - **Who is told.** The business's owners, by Saroh's billing mail, and an inbox notice that opens Plan and billing: once when the domain is paused, and the notices above before.
+    - **In the app** the domain's card says the day, then "Paused" and where visitors are sent, with the way to the plans. None of it is drawn while plans are hidden (DEC-136), so with enforcement on and plans hidden a paused domain's card would still read Live: turn plans on first, as DEC-136 already says.
+    - **Connecting a new domain** on a plan without one is refused as every plan refusal is (`MODULE_LOCKED`), with the plans offered. No plan is named as the one to move to, because no catalogue row says which plans include a domain.
+    - **When enforcement is switched on**, a business already on a plan without a domain is told within the hour and paused 3 days later, as DEC-114 does for limits.
+- Open: back on a plan with a domain, the host serves again within 30 seconds (the answer is kept that long per business, as other pauses are), and pages kept from before name the domain as canonical again within five minutes, or at the next hourly sweep. "Any plan with a price includes a domain" is a rule in code, not a row in the catalogue, so the catalogue can't say otherwise for one plan; a row would also let the refusal name the plan to move to.
+
+## DEC-140 A bare domain is connected through `www` for now, and by two records later
+
+**Status: Accepted — 2026-10-12** · owner (closes the second and third open questions on #862)
+
+- Context: a business connects its domain with a CNAME record, and many providers do not allow one on a bare domain (`example.com`). This will come up often.
+- Now: the business connects `www.example.com`, and the connect steps guide it to forward the bare domain to `www` at its provider. Where a provider can point a bare domain the way a CNAME does (an ALIAS or flattened record), the bare domain is accepted as it is. The daily re-check says when a bare domain is not forwarding.
+- Known weakness: some providers forward only `http://`, so `https://example.com` warns until the visitor uses `www`.
+- Later, if this keeps coming up: every business adds two records, one for the bare domain and one for `www`, which works at every provider. That needs a forwarding service of Saroh's own on an address that never changes. How it would be built is worked out before it is started.
+- Merchant sites stay on the host's free plan for now. The paid plan for the merchant-site domain is looked at again at about 40 to 50 paying businesses, with real traffic from India to measure (amends DEC-107's open question).
+- **Amended 2026-10-12, as built (the "Now" half only):**
+    - **What is bare** is asked of the Public Suffix List (`tldts`, in `domains/bare-domain.ts`), never a list of our own: `example.co.in` is bare, `shop.example.co.in` is not. A suffix a company sells names under (`uk.com`) counts. `www.` on a bare domain is the address it forwards to; `www.shop.example.com` is an ordinary subdomain.
+    - **Typing a bare domain claims `www.<domain>`.** The API decides (`hostnameToConnect`), from DNS and never from what the app sends, and its answer carries the hostname it claimed. The app says "Your site will live at www.‹domain›. ‹domain› will forward to it" and shows a third step, "Forward ‹domain› to www.‹domain›", in provider-neutral words. No provider is named, because nobody checked their screens. Any other subdomain keeps its one CNAME and no forwarding step.
+    - **A bare domain is kept as it is when its DNS already reaches the hosting**: its addresses are the ones the CNAME target answers with, which is what an ALIAS, ANAME or flattened CNAME gives. It is then an ordinary domain with its own TXT check. A `www` domain whose bare domain is seen pointing that way offers "Add ‹domain›" on its row. Nothing is registered with the host without that check: a hostname still reaches a site only through its own verified row.
+    - **The canonical host does not change.** A site answers on every verified domain it has and names the oldest as canonical (`sites/primary-host.ts`), so a business that connected `www` first and added its bare domain later keeps `www` as the address named canonical to search engines and the one a QR code lands on. The bare domain serves the same site and is not redirected. The test-release host stays `test.<the connected hostname>`.
+    - **Stored:** `Domain.bareStatus` and `Domain.bareCheckedAt` on the `www` row (migration `20261117110000_domain_bare_forwarding`), one of FORWARDS, FORWARDS_HTTP_ONLY, POINTS_HERE or NOT_FORWARDING. Null on any other hostname and before the first check.
+    - **The check** runs wherever a verified domain is checked: "Check now" and the `domains.recheck` chain, so a live domain's bare domain is looked at once a day. It asks `http://` and `https://` on the bare domain, follows at most two redirects, reads no body, and goes through the link-preview guard (`link-preview/ssrf-guard.ts`). A secure address that forwards counts as forwarding. It is a notice on the row and never changes the `www` domain's state; nobody is emailed about it.
+    - **Known limit:** a bare domain behind the same network as the hosting, on someone else's account, can share an address with it and read as pointing here. The row then offers to add it, and its own check says it isn't live.
+
+## DEC-142 The customer's account shows what they have, in the order it matters, and what changed since they were last here
+
+**Status: Accepted — 2026-10-12** · owner ("they should stay logged in on the URL, and they should be able to see what is happening, all their details") · builds on [ADR-011](./adr/ADR-011-customer-accounts-on-merchant-sites.md) · amends DEC-073 ("Site and accounts": a past appointment) · keeps DEC-042, DEC-049, DEC-055, DEC-083
+
+- Context: the UX audit of 12 Oct found the account led with what a customer didn't have ("Next booking: Nothing booked" above their one order), named a tab "Me", read "Booked" on bookings that were over, and was a phone column with a bar pinned to the foot of a wide window. The owner asked that a business's customers see everything of theirs.
+- **Staying signed in is unchanged.** The session is 30 days, sliding, 90 at most, in a host-only `__Host-` cookie (ADR-011). Nothing here touches the cookie, its scope or its lifetimes.
+- **Home is ordered by what this customer has** (`site-blocks/account/home-order.ts`):
+    - first what is in progress: a place held for them in a class, an invoice to pay, a booking coming up, an order on its way, a message they haven't opened;
+    - then what is recent: their latest orders, classes left, their plan, their courses, a line they wait in;
+    - last, "Book a time" and "Go to the shop", each only when the business offers it, the site can serve it, and the customer has none of it under way.
+    - With nothing at all there is one welcome block that says what will show here. A block whose read failed still says so; it never reads as "nothing".
+- **"Since you were last here"** leads Home when something changed: an order the business moved a step or cancelled, a booking the business moved or cancelled, messages the team wrote that are unopened, an invoice issued and unpaid. It names the business, never the person on its team, and never a staff note. What the customer did themselves is left out.
+    - It is read from what is already stored: order events, booking events, the thread, an invoice's issue date.
+    - "Last here" needed a mark of its own: a session's `lastSeenAt` is moved by the guard before any read runs. `CustomerAccount.lastVisitAt` and `previousVisitAt` (migration `20261118100000_customer_account_visits`) are moved only by Home's read. Opening Home again within 30 minutes is the same visit, so the changes stay through a refresh and go once the customer has been away and come back (`site-accounts/account-visit.ts`). On the account, so a phone and a laptop agree.
+- **What the customer now sees, all through the allow-list** (`customer-view.ts`, third file `account-details-view.ts`):
+    - **Invoices to pay**, on Home and on Your details beside the receipts. "Pay now" makes a new pay link when it is pressed, so a customer never meets an old one. An invoice the business can't take online says to pay it directly; one autopay is charging offers no second way to pay.
+    - **One order and one booking each have a page**: `/account/orders/‹ref›` and `/account/bookings/‹ref›`. The Orders sheet and the Bookings sheets still work. Order and booking emails link to these pages while the account area is on; off, an order's email still links to the shop's order page and a booking's carries no link.
+    - **Their places in a class's line**: where they wait, a place held for them with its deadline and the way to book it, and leaving.
+    - **Their courses**, read-only: the course, its dates, their sessions attended, missed and still to come.
+    - **Whether the business may email them**: one switch over the EMAIL consent that already exists. No new kind of consent. Sign-in codes are not the business's to stop.
+- **Left out on purpose:** saved addresses beyond the checkout's own prefill, a language switch, and data export or removal (staff remove a customer's details, DEC-042).
+- **Words.**
+    - The tab "Me" is "Your details". Its address stays `/account/me`.
+    - The Plan tab shows only when the customer has a plan or a pack, or the business sells one. That was already the API's rule (`AccountOffers.plans`); it is now tested as such.
+    - **A booking that is over never reads "Booked".** It reads its date alone, and "Attended" or "Missed" only when the business marked it. This replaces DEC-073's "a past appointment with no attendance recorded still reads Booked"; it still never claims "Attended". The same holds for a treatment's past visits.
+    - "Sign out everywhere" waits behind "More". "Sign out" stays a button.
+- **Titles name the business, never the customer:** "Your orders · ‹Business›", "Your bookings · ‹Business›", "Your plan · ‹Business›", "Messages · ‹Business›", "Your details · ‹Business›", "Receipt ‹number› · ‹Business›", "Order #‹number› · ‹Business›", "Your booking · ‹Business›", and "Sign in · ‹Business›" signed out. The account layout sets the template and a share card that carries the business's name alone, so a pasted private link never wears the home page's card.
+- **Private pages say so on the response.** Every path in `PRIVATE_PATH_PREFIXES` answers with `X-Robots-Tag: noindex, nofollow` (the middleware, from the one list `robots.txt` reads), as well as the page's own `<meta>`.
+- **From tablet width up the account is not a phone app on a desk.** One layout: the header, the tabs, the page, in that order in the document at every width. On a phone the tabs are the bar at the foot; from 768px they are a row under the header that stays at the top, Home has two columns, and lists have room.
+- **Every account page has a held layout while it loads** and its own "couldn't be loaded" block. Known cost: a page under a held layout has started answering before it can say "not found", so an account address that isn't there answers 200 with the not-found words and `noindex`, where a public page answers 404 (DEV_LEARNINGS, UX-071). These pages are private and never indexed. One order or booking that isn't the customer's says "not found" inside the account, with the way back.
+- **A first sign-in that staff haven't linked** (DEC-049, DEC-055) is unchanged: nothing merges on its own. When the account stands on a contact of its own because the business already held that email unproven, an empty Home says earlier bookings and orders aren't on the account until the business has checked it's them, and how to ask. Nothing of the other record is shown.
+- **Not decided here, the owner's to decide:**
+    - turning the account area on in production (`SITE_ACCOUNT_AREA`, the API first, then the site);
+    - making a business's own domain the one place its customers sign in. Today each address holds its own cookie, as ADR-011 says.
+
+## DEC-143 saroh.in says to a search engine what a page is, in the words people search with
+
+**Status: Accepted — 2026-10-12** · owner (asked for the 12 Oct SEO audit's findings to be fixed before early access; the choices under Open are the build's own and wait for the owner)
+
+- Context: the audit found the site technically sound (one host, single-hop redirects, real 404s, a clean sitemap, honest structured data) and its words wrong for search: titles were slogans ("Orders — Every order in one list, and none slip. · Saroh"), descriptions were the page's own lead at 165 to 225 characters, three title patterns were in use, and Website and Salons had no page.
+- **Every main page has search words of its own** (`SearchWords` in `apps/saroh.in/content/types.ts`): a plain category `phrase`, a `seoTitle` that leads with it, and a one-sentence `seoDescription` that opens with it. The page's headline keeps its voice, and its first screen says the phrase in plain words (the lead, or Home's eyebrow).
+- **One title pattern: "‹what the page is› · Saroh"** (`pageTitle`, `lib/seo.ts`), 60 characters or fewer, the brand once and last. A description is one sentence of 150 characters or fewer. Help articles and changelog entries are "‹title› · Help · Saroh" and "‹title› · Changelog · Saroh". A share card keeps the page's headline (`socialTitle`).
+- **A feature page owns "‹X› software"; a solution page owns "software for ‹trade›"**, so the two never ask for the same search. No feature's phrase names a trade.
+- **Search words are claims.** They follow `MARKETING_CLAIMS.md` (§16.3) like any line, and name no price and no plan. Two phrases the audit suggested are not used because the product doesn't back them today: "online ordering" (the site's shop waits for `SITE_SHOP`) and "CRM" for the Customers page.
+- **Website is the ninth feature page and Salons the fourth solution page**, in the nav, the footer, the sitemap and `llms.txt` (which now lists every feature and solution page). `/website` and `/modules/website` go to `/features/website`. Neither has a design yet. Salons has no screenshot, because no salon is seeded or captured, and shows no other trade's in its place: a solution's hero and a segment's shot are optional (`Solution.hero`, `SolutionSegment.shot`).
+- **Home and the waitlist no longer share an h1.** The acronym line is Home's; on the waitlist it is a display line under a small h1 that says what that page is.
+- **Screenshots are files, not optimizer requests.** Each capture has smaller copies made once and committed (`scripts/shot-sizes.mjs`, `lib/shot-sources.ts`), served in a `srcset`; `public/_headers` lets a browser keep them, and Next's fingerprinted files for a year.
+- **What is dated appears with a deploy, and launch day is written down.** `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. In open mode `/waitlist` moves to sign-up for good (301), and help.saroh.in answers 308 once the running build has Help (it asks the build's own moment, `SAROH_BUILT_AT`, not the clock).
+- Open, for the owner: the phrases themselves (they are a first reading of what an owner in India types, with no search data behind them yet); screenshots for both new pages; whether production has the hosting variables the own-domain claim needs (W4); and the three ledger rows found stale and left alone (BK2, CAP2, LP6).
+
+## DEC-141 The starter has everything a business has switched on, the system pages are part of it, and every existing starter site gets the new look
+
+**Status: Accepted — 2026-10-12** · owner (three decisions, after an audit of the starter site and the customer's side of it) · builds on [DEC-090](#dec-090-a-template-carries-its-own-exact-palette-and-type-scale), DEC-057, DEC-069 (L13), DEC-070, DEC-135
+
+- Context: with the template choice switched off (DEC-135), every new business's website is the starter. It looked unstyled and half empty: the system font, one accent, three of twenty section types, nothing of what the business sells or books, no hours or place, and under every headline a note to the owner ("Say what you do and where, in one line.") that customers read.
+- **The owner's three decisions.**
+    1. **The starter has everything.** Every page, section and flow a business site can have, each shown only when the business has it: its module on, its data there.
+    2. **The system pages are in scope**: the shop, a product, the bag and checkout, an order, booking, the customer's account, the header and the footer. A change to them reaches every site that has those features on.
+    3. **Every existing starter site gets the new look**, not only new ones.
+- **`starter@4`** (`packages/templates/src/templates/starter-v4.ts`), beside v1 to v3, which are never edited.
+    - **A look of its own** (`starter-look.ts`): three colourways with exact palettes (Stone, the default; Harbour; Clay), Source Serif 4 over Inter, a type scale (56px display, 17px body, a 64-character line in a 1120px column) and roomier spacing. Each choice is reasoned in the file. It adds no font: both faces were already loaded.
+    - **Home follows the modules**, in this order, each only where its condition holds: the headline with the business's line and one button; a product grid (it sells online); a services list (Bookings on, with a service); the week's classes; plans; class packs; "Good to know" (what a visitor can do here, from what is on, with two or more to say); the place with its hours and directions, or the hours alone; and a closing section.
+    - **One primary action**, from what is on: Book where it takes bookings, the shop where it sells online, otherwise the Contact page. The same rule, order and addresses as the header's own button (`sitePrimaryAction`). The headline's button and the closing band carry the same one; nothing else on the page asks for anything. The template gives the closing band its button alone: the call-to-action block writes the band's heading and line from where the button goes. Where a message is the action, Home ends in the message form itself and has no band above it.
+    - **Module pages are made by the one path that makes them** (`addModulePageIfMissing`): the manifest only names which a business gets (`modulePages`: Shop, Book, Prices, and always Contact). So a site made today and a site whose business switches the module on next month hold the same page.
+    - **Nothing is written that is not true of this business.** The stock paragraphs go. Every sentence is the business's own fact or says only what the page below it shows. Where there is nothing true to say, the section, or the page, is left out: no About until there is a line and two facts to put on it; no testimonials, since the block holds typed quotes and the starter has none; no Journal page until there are posts.
+    - **It needs no photograph**: a centred headline, a price list rather than cards. Two image briefs say which photo to add where; a brief is never drawn on the live site.
+- **The business's line is composed, not asked for.** Nothing ever told a template what a business does, so the headline's line could only be a prompt. The business has already said it: `buildTemplateContext` joins its services' names (where it takes bookings) or the categories it has products on sale in, and its town, in its own words and spelling ("Haircut, Colour and Bridal styling in Bengaluru", `composeBusinessLine`). Nothing named, no line. **No new question is put to the owner and no column is added**; the headline's line stays theirs to rewrite in the editor. A field of its own, asked once at setup, is the next step if composed lines read poorly in practice.
+- **A note to the owner can no longer go live.** The pre-publish check raises a blocking flag for a headline line that is still v3's prompt, and publishing is refused in the same words (`hasOwnerNote`). The first three starters' stock sentences, and two Personal lines the check missed, are named as placeholders (advisory, as every placeholder is: a sentence the owner decides to keep is theirs).
+- **Personal and Portfolio** (the templates "Just me" and "A site for my work" start from) get a second version in the starter's look. Their pages, and the placeholder lines in them, are unchanged.
+- **A site follows its business's modules** (`sites/template-sync.ts`). Switching a module on, by any route, brings a site whose template follows the modules the module's page and its Home section, in the switch's own transaction. A Home nobody has edited becomes the Home a site made that day would have; an edited one gains only the bound section. It is never the reason a module cannot be switched on: the site's changes sit in a savepoint, and if they fail they are undone alone, the switch commits and the failure is logged.
+- **Existing sites are upgraded in the draft, never live** (`sites/template-upgrade.ts`, run by hand: `docs/architecture/runbooks/TEMPLATE_UPGRADE.md`). The rule is to never destroy something a merchant wrote or chose.
+    - **Look**: applied when the site's style is still the one its template started it in. A style the owner changed is kept, and Website › Style then offers the new colourways, since they are its template's.
+    - **Footer**: applied when the site's footer is still its template's.
+    - **Pages**: a page nobody has edited becomes the new version's. A page somebody edited keeps every section, in its order, and gains only the bound sections it has nothing like (a product grid, a services list, the place): they show the business's own data and carry no words of the template's. A heading, a paragraph or a button is never added to an edited page. The one thing taken off an edited page is the note to the owner.
+    - **"Edited" is read from data.** A page is untouched when its draft has never been saved (its revision is 0; every save goes through one write that counts it), or when its sections equal what its template produces for the business. Anything else is edited.
+    - **A page the new version no longer makes** (v3's About, for a business with nothing yet to put on one) is hidden if untouched, never deleted.
+    - **The record** moves to the new version in the same transaction, with an audit event (`site.template.upgrade`, actor `system:template-upgrade`, counts only). That is also what makes a second run skip the site.
+- **Why the draft, even for a site nobody touched.** A live site is its Publication: an immutable snapshot of its pages, style and footer together, put live by a person through one path that also holds "Publishing needs approval" (DEC-071). A publish made by nobody would have no author, would step round that setting, and could not carry the look without the pages. So the owner opens the editor, sees the new look with changes waiting, and publishes. Nothing live changes, so no kept page is told to stop serving.
+- **Open.**
+    - A live site that still shows v3's prompt keeps showing it until its owner publishes: the snapshot is immutable. The fix that reaches those visitors today is in the hero block (do not draw a line that `isOwnerNote`), which belongs to the blocks' own change.
+    - Owners are not told their draft has a new look waiting, beyond the changes shown in the workspace. An inbox notice is the obvious addition.
+
+## DEC-144 Updates in Messages are on for every business, and each business can turn them off
+
+**Status: Accepted — 2026-10-12** · owner ("all businesses, and they can select")
+
+- Context: a customer's account on a business's site has a Messages tab. Saroh's own posts into it (an order's steps, a booking moved or cancelled, an invoice sent) were behind the instance switch and a per-business rollout flag that is off until an operator sets it. A business with no email provider has no other way to tell a customer their order is ready.
+- **On for everyone when customer accounts go live.** The operator turns the `ACCOUNT_THREAD` rollout flag on for every business from the console. The flag's default and how rollout flags resolve are unchanged.
+- **Each business can turn its updates off, and on again**, on Settings › Providers ("Updates in Messages", `comms:manage`). The choice is `BusinessProfile.accountUpdates`, on by default.
+- **Saroh posts only when three things hold:** the account area is on for the instance (`SITE_ACCOUNT_AREA`), the rollout flag is on for the business, and the business has not turned its updates off. The rule is one function, `accountThreadOn`, and every caller goes through it.
+- **Off stops only Saroh's own posts, from the next one on.** What is already in Messages stays, customers can still write, the team's replies still reach them, and so does a note a team member chooses to send when changing or cancelling an order.
+- **With updates off, each update goes as it did before Messages was live:** by email through the business's own provider where one is connected, otherwise not at all, and the workspace says so.
+- **The row is shown only while the choice can have an effect**, and it tells a business with no email provider what turning it off costs.
+- Amends ADR-011's "always goes into their account".
+- **Open.** The email prompt on Providers and Home still says "Your customers see their updates only in their account", which is untrue for a business that turned updates off.
+
+## DEC-145 Test mode is a test business behind a Live / Test switch
+
+**Status: Accepted — 2026-10-12, not built** · owner (asked for a test environment like a payment provider's, and agreed the test business) · tracked in #939
+
+- Context: an owner trying Saroh has nowhere safe to take a payment, issue an invoice or send a confirmation. Trying it for real issues a numbered tax invoice and can message a real customer. The same need comes with the public API and MCP: a developer or an agent needs a place to try calls.
+- **A test business, not a mark on every record.** Each business gets a twin, and a Live / Test switch in the header moves between them. The business is already the tenant root (ADR-001), so the twin is isolated by the same wall that separates two businesses. A live/test column on every order, booking and invoice would make every read in the API filter by it, and one missed filter would show test data to a real customer.
+- **What a test business does differently:** payments use only the provider's test keys; emails and WhatsApp go only to the owner and the team; invoices are marked TEST and use their own number series, so the live series keeps no gaps; the site is labelled and not indexed; it does not count against the live business's limits; it can copy the live business's setup without its customers, and it can be reset.
+- **A test key belongs to the test business and a live key to the live one.** A key never crosses.
+- **When:** after early access opens, planned together with API keys. Nothing is built by this entry.
+- **Open.** One test business per live business or several; which roles see the switch; what "copy my live setup" does when the live business changes later; whether a provider's test-mode webhooks need their own endpoint or secret.
+
+## DEC-146 A GST-registered business gives every priced item a GST rate, and decides whether its prices include GST
+
+**Status: Accepted — 2026-10-12, built** · owner ("the business add their prices, and decides the GST is inclusive or exclusive… they should have freedom to decide") · amends ADR-008
+
+- Context: a tax invoice went out with no tax on it, because the service had no GST rate. A missing rate was read as "no GST".
+- **No rate is "not set", never 0%.** For a GST-registered business the rate sits beside the price and is required with it. An item priced before this keeps working until someone bills it: a staff-raised invoice or pay link for an unrated item is refused (`GST_RATE_MISSING`) and the rate is asked for in place, in the screen that was open. A notice lists what is still unrated, and one sheet sets them, with "One rate for all".
+- **The business chooses how it prices.** One setting for the business, "My prices include GST" (the default) or "GST is added to my prices", and each item can say otherwise. Included: ₹1,000 typed is ₹1,000 paid. Added: ₹1,000 typed is ₹1,000 plus GST paid. Saroh does not choose for the business.
+- **The customer sees the GST before paying.** Under "added", the booking page, product page, bag and checkout show the price, the GST and the amount to pay.
+- **One sum.** The API works out the charge in one place (`invoices/gst-price.ts`); the sites and the app only format what it returns.
+- **Who can set a rate:** whoever can set the item's price. A rate is part of a price.
+
+## DEC-147 Memberships, class packs and courses charge GST from the next invoice
+
+**Status: Accepted — 2026-10-12, built** · owner ("it should be charging from the new invoices, already added ones wont be edited")
+
+- Plans, class packs and courses carry a GST rate and a price mode, as services and products do (DEC-146).
+- **New invoices only.** An invoice already issued is never edited. A renewal raised after the rate is set carries it, so a member's renewal amount can change under "added"; the plan editor says how many members that reaches.
+- Not built: telling the member beforehand that the renewal amount changes.
+
+## DEC-148 GST is part of the MRP
+
+**Status: Accepted — 2026-10-12, built** · owner ("the GST is part of MRP")
+
+- An MRP includes all taxes. The amount a customer pays for one, GST and all, is never more than the product's MRP.
+- The product editor and the import refuse a price that goes over once GST is added. Switching the whole business to "GST is added" is refused while any product would go over; the sheet names the first few and says how to put each right.
+
+## DEC-149 One figure, one kind; the invoice prints the price as typed
+
+**Status: Accepted — 2026-10-12, built** · owner (confirmed the typed price as the rate on paper; agreed the figures should be consistent)
+
+- **Money taken or expected is the amount to pay.** Sales totals, order totals, what a customer owes: all with GST.
+- **A price being set is the typed price**, with "+ GST" beside it when GST is added. Two figures compared on one screen are the same kind.
+- **On paper under "added", the rate column is the price the business typed**, GST is its own line, and the total is the amount to pay, with "GST is added to these prices."
+- Open, for the accountant: rounding GST per unit or per line, and whether a discount comes off before or after GST.
+
+## DEC-150 Prices keep a history
+
+**Status: Accepted — 2026-10-12, built** · owner ("prices for products should have history… this way merchant can see the rate changes")
+
+- Every change to a price, an MRP, a GST rate or a price mode on a product (and its options), a service or a course is recorded in the transaction that makes it: what it was, what it is, who, when. The item's first entry is what it was created at.
+- The item's own page shows it as "Price history", newest first; nothing is drawn for an item with no history yet. Settings › Activity lists the changes with every other change to the business.
+- History starts from this release. Earlier changes were not recorded and are not invented.
+- The audit action `gst-rate.set` is no longer written; `price.changed` covers it. Rows already written still read.
+
+## DEC-151 A site on its own domain answers there only
+
+**Status: Accepted — 2026-10-12, not built** · owner (chose the redirect over serving both addresses)
+
+- Once a business's own domain is connected and live, its `saroh.app` address redirects to it, path for path, with a temporary redirect (307) so a domain that is later removed leaves nothing cached.
+- Not redirected: test hosts, pay links and previews.
+
+## DEC-152 Bookings: the diary, hours and services each answer one question
+
+**Status: Accepted — 2026-10-12, built** · owner (agreed the audit and a combination of its references)
+
+- **Calendar** shows who is booked when; a short booking keeps to one line and an empty filter offers "Show all".
+- **Availability** is where a person's hours are set, with a preview of the week a customer would see.
+- **A service says what gives it its times** in a card of its own: the people who take it, or its own weekly hours for a class or a service nobody takes yet. It is not under "More settings".
+- A task is finished where it was opened (rows read first, edit in a sheet); no screen sends the merchant elsewhere halfway.
+
+## DEC-153 Subscriptions opens on who needs you, and plans are rows
+
+**Status: Accepted — 2026-10-12, built** · owner (agreed the audit and all four units)
+
+- Payments › Subscriptions lands on renewals that aren't paid when there are any, and the header leads with how many and what is unpaid; otherwise it lands on Active. A view someone chose (`?view=`) always wins.
+- Where a subscription stands is the shared list's one dropdown with counts, not tabs or tiles.
+- Plans are rows of the shared list with views Live, Archived, Drafts and All; the tab's badge counts live plans only. Archive and Sell again are in the row's menu.
+- "Members can pause from their account" and "When autopay charges" are read-first rows under the list, each edited in its own sheet.
+- When renewals last ran is said only when they are late.
+- An amount that recurs is written "₹900 a month" everywhere; "₹900/mo" only in a column that is narrow on a phone.
+- A plan's editor opens on its first unanswered question, and says what a price change does where the price is changed.
+
+## DEC-154 Early access opens by the clock
+
+**Status: Accepted — 2026-10-12, built, not yet rehearsed** · owner ("that should happen without me interfering"; "one time launch schedule is fine")
+
+- Early access opens on 17 Oct 2026 at 16:00 IST without anyone acting at that moment. One instant, `LAUNCH_AT`, is written in the production vars of saroh.in, accounts and the workspace, the same in each (`check:deploy-env` refuses a difference, and refuses one in development).
+- **Accounts opens at runtime.** Its prelaunch gate reads the clock on every request and steps aside at the instant, with no deploy. A value that cannot be read keeps it shut.
+- **The site and the workspace open with a build.** A production build made at or after the instant is given its launch switch (`NEXT_PUBLIC_LAUNCH_MODE=open`, `NEXT_PUBLIC_PLANS=on`) by `scripts/cf-env.mjs`. A switch written in vars still wins. The build fingerprint changes at the instant, so any later deploy opens what is not yet open.
+- **One exception to "no scheduled deploys" (DEC-107), once.** Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026 only: the first starts early, waits for the instant and deploys every app; the second deploys only what is still unopened. Both do nothing in another year and are deleted after launch. The rule stands for everything else.
+- Plans show in the workspace at launch, which DEC-136 left open.
+- Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.

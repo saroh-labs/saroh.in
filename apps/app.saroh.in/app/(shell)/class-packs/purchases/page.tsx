@@ -10,7 +10,7 @@ import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Who holds a class pack" };
+export const metadata = { title: "Class pack holders" };
 
 /** Class packs → who holds one, with classes left and when it runs out. */
 export default async function PackPurchasesPage({
@@ -40,6 +40,7 @@ export default async function PackPurchasesPage({
                 contacts={contacts}
                 canWrite={canWrite}
                 invoicesOnSale={terms.invoicesOnSale}
+                gst={terms.gst}
                 initialFilterId={params.view}
             />
         </PageContainer>

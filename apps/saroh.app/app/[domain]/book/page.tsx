@@ -24,6 +24,8 @@ import {
     isBookingDeepLink,
     moduleLabel,
     moduleRoute,
+    NOT_FOR_SEARCH,
+    routeHasNothing,
 } from "@/lib/module-pages";
 import { dontCachePage } from "@/lib/page-cache/site-rules";
 import { getSiteForHost, siteOriginFor } from "@/lib/publication";
@@ -85,6 +87,11 @@ import {
  * flow as before. While Appointments is off (or not rolled out) the Book
  * page's address says "This isn't available right now" with a link home.
  * A site with no Book page gets today's flow, unchanged.
+ *
+ * A booking page with nothing to book (the module is off, the read failed,
+ * online booking isn't open or offers no service) is kept out of search: it
+ * answers 200, and "not available" is not a page to rank. One paused at its
+ * plan's monthly limit stays indexed: it opens again by itself.
  */
 
 export async function generateMetadata({
@@ -110,7 +117,20 @@ export async function generateMetadata({
         business: name,
         services: booking?.ok ? booking.page.services.map((s) => s.name) : [],
     });
+    const route = moduleRoute(
+        resolved.snapshot.pages,
+        resolved.modules,
+        "BOOK",
+    );
     return shareable(resolved, {
+        ...(routeHasNothing(
+            route,
+            !booking?.ok ||
+                !booking.page.open ||
+                booking.page.services.length === 0,
+        )
+            ? NOT_FOR_SEARCH
+            : {}),
         title: `${label} · ${name}`,
         description,
         openGraph: {
@@ -200,7 +220,15 @@ export default async function BookPage({
         if (lookup.reason === "missing") notFound();
         // A failed read is not kept by the page cache (#863).
         dontCachePage("booking unavailable");
-        return <BookingUnavailable business={resolved.snapshot.site.name} />;
+        return (
+            <BookingUnavailable
+                business={resolved.snapshot.site.name}
+                // The address as it was opened, so "Try again" lands on
+                // the same service, day and time.
+                retryHref={bookHref({ service, date, start })}
+                reach={reachOf(contact)}
+            />
+        );
     }
     // What can be booked here, for search engines: only what the page
     // shows. Not on a test release, which is never indexed.
@@ -257,4 +285,18 @@ export default async function BookPage({
             />
         </>
     );
+}
+
+/** `/book` with the choices it was opened on, for "Try again". */
+function bookHref(params: {
+    service?: string | string[];
+    date?: string | string[];
+    start?: string | string[];
+}): string {
+    const query = new URLSearchParams();
+    for (const [name, value] of Object.entries(params)) {
+        if (typeof value === "string" && value !== "") query.set(name, value);
+    }
+    const search = query.toString();
+    return search ? `/book?${search}` : "/book";
 }

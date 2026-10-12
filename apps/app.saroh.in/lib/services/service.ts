@@ -27,6 +27,19 @@ export type LocationType = "IN_PERSON" | "ONLINE" | "EITHER";
  */
 export type DepositMode = "NONE" | "PERCENT_25" | "PERCENT_50" | "FULL";
 
+/** A service's price as the API charges it: the mode in force and the sums. */
+export interface ServiceGst {
+    mode: GstPriceMode;
+    /** Percent, e.g. "18". */
+    rate: string;
+    /** The price as typed. */
+    listCents: number;
+    /** The GST in it, or on it. */
+    gstCents: number;
+    /** The amount to pay. */
+    payCents: number;
+}
+
 /** A bookable Service (mirror of the api's Service row, JSON-serialized). */
 export interface Service {
     id: string;
@@ -43,6 +56,22 @@ export interface Service {
     /** GST the price includes, in percent, and its SAC code (ADR-008). */
     gstRate?: string | null;
     sacCode?: string | null;
+    /**
+     * How this price carries GST when it differs from the business's way
+     * (12 Oct 2026); null is "same as the business". Absent from an older
+     * API.
+     */
+    gstPriceMode?: GstPriceMode | null;
+    /**
+     * What a customer pays for one booking, GST and all, worked out by the
+     * API; null with no price. Absent from an older API.
+     */
+    payCents?: number | null;
+    /**
+     * The GST words for the price as the API charges it today; null when
+     * none apply (not registered, no rate, exempt, no price).
+     */
+    gst?: ServiceGst | null;
     timezone: string;
     status: ServiceStatus;
     locationType: LocationType;
@@ -53,7 +82,10 @@ export interface Service {
     /** Visits one booking of it is, 1 to 12 (E1; honoured from E9/E10). */
     visits: number;
     depositMode: DepositMode;
-    /** What is paid at booking, in paise, worked out by the API; null for none. */
+    /**
+     * What is paid at booking, in paise, worked out by the API as a share
+     * of the amount to pay; null for none.
+     */
     depositCents: number | null;
     /** Whether the booking page offers it; staff book it either way. */
     showOnBookingPage: boolean;
@@ -75,6 +107,8 @@ export interface AvailabilityRule {
 // which imports nothing — the bookings TABLE is a client component and this
 // module reaches next/headers through the CRM HTTP plumbing. Imported for use
 // below AND re-exported, so server callers still have one place to look.
+import type { GstPriceMode } from "@/lib/gst/price-mode";
+
 import type { BookingMoney, CancelMoney } from "./booking-money";
 import type { BookingOutcome, BookingStatus } from "./booking-state";
 import type { DeskPayment, DeskPaymentInput } from "./desk-pay";
@@ -204,6 +238,8 @@ export interface CreateServiceInput {
     currency?: string;
     gstRate?: string | null;
     sacCode?: string | null;
+    /** Null: priced the business's way. */
+    gstPriceMode?: GstPriceMode | null;
     timezone: string;
     locationType?: LocationType;
     meetingUrl?: string | null;
@@ -224,6 +260,8 @@ export interface UpdateServiceInput {
     currency?: string;
     gstRate?: string | null;
     sacCode?: string | null;
+    /** Null goes back to "same as the business". */
+    gstPriceMode?: GstPriceMode | null;
     timezone?: string;
     status?: ServiceStatus;
     locationType?: LocationType;

@@ -597,6 +597,7 @@ export function OrderDetail({
                 onClose={closePanel}
                 returnFocus={returnFocus}
             />
+            {kitchen.rateStep}
         </main>
     );
 }

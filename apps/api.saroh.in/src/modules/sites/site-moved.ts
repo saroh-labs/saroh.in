@@ -2,6 +2,7 @@ import { HttpException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { domainPlan } from "../billing/domain-plan.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { publicSiteOnline } from "../organizations/organization-lifecycle.policy";
 import { platformOrigin } from "./site-origin";
@@ -90,7 +91,11 @@ export async function siteMovedTo(
         orderBy: { verifiedAt: "asc" },
         select: { hostname: true },
     });
-    if (domain) return { to: `https://${domain.hostname}` };
+    // A domain its plan has paused sends visitors to the Saroh address
+    // (DEC-139): forward there, not through the domain.
+    if (domain && !(await domainPlan.paused(site.organizationId))) {
+        return { to: `https://${domain.hostname}` };
+    }
     // Never forward an address to itself: a site whose address is this one
     // again would loop (a change back deletes the row, but be sure).
     if (!site.subdomain || site.subdomain === address) notFound();

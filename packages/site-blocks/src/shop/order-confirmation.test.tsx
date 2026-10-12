@@ -323,3 +323,70 @@ describe("the order page says whether a message is coming", () => {
         expect(document.body.textContent).not.toMatch(/emailed|saved in/);
     });
 });
+
+describe("the GST on a placed order's lines", () => {
+    it("says it under each line that has some, in the bag's words", () => {
+        const { container } = render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        lines: [
+                            {
+                                name: "Sourdough",
+                                variant: "Large",
+                                quantity: 1,
+                                amount: "1180.00",
+                                gst: {
+                                    mode: "ADDED" as const,
+                                    rate: "18",
+                                    listCents: 100000,
+                                    gstCents: 18000,
+                                    payCents: 118000,
+                                },
+                            },
+                            {
+                                name: "Rye loaf",
+                                variant: null,
+                                quantity: 1,
+                                amount: "1000.00",
+                                gst: {
+                                    mode: "INCLUDED" as const,
+                                    rate: "18",
+                                    listCents: 100000,
+                                    gstCents: 15254,
+                                    payCents: 100000,
+                                },
+                            },
+                            {
+                                name: "Milk",
+                                variant: null,
+                                quantity: 1,
+                                amount: "60.00",
+                                gst: null,
+                            },
+                        ],
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(
+            Array.from(container.querySelectorAll("[data-line-gst]")).map(
+                (n) => n.textContent,
+            ),
+        ).toEqual(["₹1,000 + ₹180 GST (18%)", "includes ₹152.54 GST (18%)"]);
+    });
+
+    it("says nothing on an order with none", () => {
+        const { container } = render(
+            <OrderConfirmation
+                lookup={{ ok: true, order: ORDER }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(container.querySelector("[data-line-gst]")).toBeNull();
+        expect(container.textContent).not.toContain("GST");
+    });
+});

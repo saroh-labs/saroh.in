@@ -1,11 +1,14 @@
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { domainPlan } from "../billing/domain-plan.service";
 import { rendererHost } from "./site-origin";
 
 /**
  * The host a published site is primarily served at: its verified custom
  * domain when it has one (the oldest, as `siteOriginOf` picks), else its
- * Saroh address on the renderer's apex. Null when it has neither.
+ * Saroh address on the renderer's apex. Null when it has neither. A domain
+ * its plan has paused (DEC-139) shows no site, so the Saroh address is the
+ * primary one until the plan includes a domain again.
  *
  * One site answers on both. The renderer names this one as canonical on
  * every page, so search engines index one address, and lands a QR code's
@@ -34,7 +37,10 @@ export async function primaryHostOf(site: {
             }),
         );
         const own = domain?.hostname.trim().toLowerCase() ?? "";
-        return own === "" ? platform : own;
+        if (own === "") return platform;
+        return platform && (await domainPlan.paused(site.organizationId))
+            ? platform
+            : own;
     } catch {
         return platform;
     }

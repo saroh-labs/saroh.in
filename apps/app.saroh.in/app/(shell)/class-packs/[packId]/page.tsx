@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import type { SellContext } from "@/components/class-packs/pack-detail/pack-detail";
 import { PackDetailScreen } from "@/components/class-packs/pack-detail/pack-detail";
@@ -25,10 +26,26 @@ import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { recordTitle } from "@/lib/page-title";
 import { readServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Pack" };
+// One read for the tab's title and the page.
+const readPack = cache((packId: string) => getPackDetail(packId));
+
+/** The pack's own name in the tab; "Class pack" when it can't be read. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ packId: string }>;
+}) {
+    const { packId } = await params;
+    return recordTitle(
+        () => readPack(packId),
+        (pack) => pack.name,
+        "Class pack",
+    );
+}
 
 const FALLBACK_ZONE = "Asia/Kolkata";
 
@@ -62,7 +79,7 @@ export default async function PackDetailPage({
     }
 
     const [pack, modules] = await Promise.all([
-        getPackDetail(packId),
+        readPack(packId),
         modulesOrUnknown(),
     ]);
     if (!pack) notFound();
@@ -128,7 +145,8 @@ export default async function PackDetailPage({
                 dropIns={
                     own?.map((s) => ({
                         id: s.id,
-                        priceCents: s.priceCents,
+                        // What one visit costs to pay, GST and all.
+                        priceCents: s.payCents ?? s.priceCents,
                         currency: s.currency,
                     })) ?? null
                 }
@@ -161,5 +179,6 @@ async function readSell(): Promise<SellContext> {
         })),
         packs: context.packs,
         invoicesOnSale: terms.invoicesOnSale,
+        gst: terms.gst,
     };
 }

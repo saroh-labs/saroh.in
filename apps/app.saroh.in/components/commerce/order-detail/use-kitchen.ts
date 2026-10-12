@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { formatMoney } from "@/lib/format/money";
 import {
     editBeforePreparing,
@@ -331,11 +332,20 @@ export function useKitchen({
         });
     };
 
+    // Units added to an order whose tax invoice is out go on a new paper:
+    // a product with no GST rate is chosen here and saved to the product,
+    // then the edit is saved as it was made.
+    const rates = useGstRateStep({
+        then: "save this change",
+        continueLabel: "Save and update order",
+    });
+
     const saveEdit = (input: EditOrderInput) => {
         startTransition(async () => {
             const res = await runAction(() =>
-                editBeforePreparing(order.id, input),
+                rates.run(() => editBeforePreparing(order.id, input)),
             );
+            // Unreached, or the rate wasn't chosen: nothing was changed.
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
@@ -430,6 +440,8 @@ export function useKitchen({
         startRefund,
         retryRefund,
         saveEdit,
+        /** The GST rate ask an edit may open; draw it once. */
+        rateStep: rates.step,
         handOver,
         saveCourier,
     };

@@ -219,11 +219,13 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             }),
         );
         // Paid by hand: the order's invoice is made in the same
-        // transaction, the way a payment webhook would (ADR-008).
+        // transaction, the way a payment webhook would (ADR-008). Someone
+        // at the business recorded it, so an item with no GST rate chosen
+        // is asked for there (`invoices/gst-rate-required.ts`).
         expect(ensureOrderInvoice).toHaveBeenCalledWith(
             expect.anything(),
             ORDER,
-            { method: "RECORDED" },
+            { method: "RECORDED", refuseUnsetRate: true },
         );
         // Record as paid counts on Insights' orders figure, in the same
         // transaction (#867).
@@ -260,7 +262,7 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
         expect(ensureOrderInvoice).toHaveBeenCalledWith(
             expect.anything(),
             ORDER,
-            { method: "UPI" },
+            { method: "UPI", refuseUnsetRate: true },
         );
         expect(eventCreate).toHaveBeenCalledWith({
             data: expect.objectContaining({

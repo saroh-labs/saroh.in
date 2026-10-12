@@ -1,6 +1,7 @@
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
+import { payOf, setPriceWords } from "@/lib/gst/on-price";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
@@ -47,20 +48,68 @@ export const TAB_TONE: Record<ListTab, Tone> = {
     cancelled: "off",
 };
 
-/** `?tab=` (the design) or `?view=` (older links; "overdue" was the old name). */
-export function tabFromQuery(value: string | undefined): ListTab {
+/**
+ * The list's views, which its one dropdown switches between: each status,
+ * and everything. "Need you" is the payment failed set (`listTab`), under
+ * the words the header says it in.
+ */
+export type ListView = ListTab | "all";
+
+export const VIEW_LABEL: Record<ListView, string> = {
+    failed: "Need you",
+    active: "Active",
+    paused: "Paused",
+    cancelled: "Cancelled",
+    all: "All subscriptions",
+};
+
+/**
+ * `?view=` (and `?tab=`, which older links and Home's still carry;
+ * "overdue" was the old name): the view someone chose, or null when the
+ * address chooses none and the list opens on its default.
+ */
+export function viewFromQuery(value: string | undefined): ListView | null {
     if (value === "overdue") return "failed";
-    return value === "failed" || value === "paused" || value === "cancelled"
+    return value === "failed" ||
+        value === "active" ||
+        value === "paused" ||
+        value === "cancelled" ||
+        value === "all"
         ? value
-        : "active";
+        : null;
 }
 
-/** The screen's tabs: the four lists, then Plans (D3). */
-export type ScreenTab = ListTab | "plans";
+type Standing = Pick<Subscription, "status" | "paymentFailed">;
 
-/** `?tab=plans` opens Plans; anything else is a list tab. */
+/**
+ * Where the list opens when nobody chose: on who needs the owner, when
+ * anyone does, else on the active ones.
+ */
+export function defaultView(subs: readonly Standing[]): ListView {
+    return subs.some((s) => listTab(s) === "failed") ? "failed" : "active";
+}
+
+/**
+ * The views in the dropdown's order, the default first: the shared list
+ * opens on its first view, and "Clear filters" goes back to it.
+ */
+export function listViews(subs: readonly Standing[]): ListView[] {
+    return defaultView(subs) === "failed"
+        ? ["failed", "active", "paused", "cancelled", "all"]
+        : ["active", "failed", "paused", "cancelled", "all"];
+}
+
+/** Whether a subscription is in a view. */
+export function inView(sub: Standing, view: ListView): boolean {
+    return view === "all" || listTab(sub) === view;
+}
+
+/** The screen's two tabs: who is subscribed, and the plans on sale (D3). */
+export type ScreenTab = "subscribers" | "plans";
+
+/** `?tab=plans` opens Plans; anything else is the subscribers. */
 export function screenTabFromQuery(value: string | undefined): ScreenTab {
-    return value === "plans" ? "plans" : tabFromQuery(value);
+    return value === "plans" ? "plans" : "subscribers";
 }
 
 const PER: Record<Interval, { short: string; long: string }> = {
@@ -70,33 +119,43 @@ const PER: Record<Interval, { short: string; long: string }> = {
     YEAR: { short: "yr", long: "year" },
 };
 
-/** "₹1,200/mo" — a row's price. */
-export function shortPrice(
+/**
+ * An amount that recurs, in the one form every screen says it in: "₹1,200
+ * a month", "₹12,000 a year". `narrow` is the short form, "₹1,200/mo", for
+ * a column that is narrow on a phone and nowhere else.
+ */
+export function recurringPrice(
     price: string,
     currency: string,
     interval: Interval,
+    narrow = false,
 ): string {
-    return `${formatMoneyMajor(price, currency)}/${PER[interval].short}`;
-}
-
-/** "₹1,200 / month" — the price in a sentence or a card. */
-export function longPrice(
-    price: string,
-    currency: string,
-    interval: Interval,
-): string {
-    return `${formatMoneyMajor(price, currency)} / ${PER[interval].long}`;
+    const money = formatMoneyMajor(price, currency);
+    return narrow
+        ? `${money}/${PER[interval].short}`
+        : `${money} a ${PER[interval].long}`;
 }
 
 /**
- * About what the running subscriptions bring in a month, in the currency
- * most of them are in. An estimate by design ("about"): a yearly plan counts
- * a twelfth, a weekly one 52 twelfths.
+ * What one period comes to for someone, GST and all: the API's `pay`, the
+ * amount their next invoice is written for. Every figure that is money
+ * expected or charged reads this, never `price` (the price the business
+ * set, before GST where GST is added). An API before `pay` has only the
+ * price, which was the amount then.
+ */
+export function subscriptionPay(sub: { price: string; pay?: string }): string {
+    return sub.pay ?? sub.price;
+}
+
+/**
+ * About what the running subscriptions bring in a month, GST and all, in
+ * the currency most of them are in. An estimate by design ("about"): a
+ * yearly plan counts a twelfth, a weekly one 52 twelfths.
  */
 export function monthlyTotal(
     subs: readonly Pick<
         Subscription,
-        "status" | "paymentFailed" | "price" | "currency" | "interval"
+        "status" | "paymentFailed" | "price" | "pay" | "currency" | "interval"
     >[],
 ): { amount: number; currency: string } | null {
     const running = subs.filter((s) => listTab(s) === "active");
@@ -114,8 +173,82 @@ export function monthlyTotal(
     };
     const amount = running
         .filter((s) => s.currency === currency)
-        .reduce((n, s) => n + Number(s.price) * factor[s.interval], 0);
+        .reduce(
+            (n, s) => n + Number(subscriptionPay(s)) * factor[s.interval],
+            0,
+        );
     return { amount: Math.round(amount), currency };
+}
+
+/**
+ * Who needs the owner, and what they owe: how many renewals aren't paid,
+ * and the sum of the invoices unpaid on those subscriptions as the API
+ * counted them (`unpaidTotal`), in the currency most of them are in. No
+ * amount where the read gives none (a role that can't read invoices).
+ */
+export function needYou(
+    subs: readonly Pick<
+        Subscription,
+        "status" | "paymentFailed" | "unpaidTotal" | "currency"
+    >[],
+): { count: number; unpaid: { amount: number; currency: string } | null } {
+    const failed = subs.filter((s) => listTab(s) === "failed");
+    if (!failed.length) return { count: 0, unpaid: null };
+    const counts: Record<string, number> = {};
+    for (const s of failed) counts[s.currency] = (counts[s.currency] ?? 0) + 1;
+    const currency = Object.keys(counts).sort(
+        (a, b) => counts[b] - counts[a],
+    )[0];
+    // Whole paise, so a sum of amounts never drifts as a float.
+    const cents = failed
+        .filter((s) => s.currency === currency)
+        .reduce((n, s) => n + Math.round(Number(s.unpaidTotal) * 100), 0);
+    return {
+        count: failed.length,
+        unpaid: cents > 0 ? { amount: cents / 100, currency } : null,
+    };
+}
+
+/**
+ * The header's summary: what needs the owner first ("8 need you · ₹6,600
+ * unpaid"), then the quieter count ("12 active · about ₹14,000 a month").
+ * `lead` is null when nobody needs them.
+ */
+export function listSummary(
+    subs: readonly Pick<
+        Subscription,
+        | "status"
+        | "paymentFailed"
+        | "unpaidTotal"
+        | "price"
+        | "pay"
+        | "currency"
+        | "interval"
+    >[],
+): { lead: string | null; rest: string } {
+    const need = needYou(subs);
+    const active = subs.filter((s) => listTab(s) === "active").length;
+    const total = monthlyTotal(subs);
+    return {
+        lead: need.count
+            ? [
+                  `${need.count} ${plural(need.count, "needs", "need")} you`,
+                  need.unpaid
+                      ? `${formatMoneyMajor(need.unpaid.amount, need.unpaid.currency)} unpaid`
+                      : "",
+              ]
+                  .filter(Boolean)
+                  .join(" · ")
+            : null,
+        rest: [
+            `${active} active`,
+            total
+                ? `about ${formatMoneyMajor(total.amount, total.currency)} a month`
+                : "",
+        ]
+            .filter(Boolean)
+            .join(" · "),
+    };
 }
 
 function daysLate(dueAt: string, now: Date): number {
@@ -326,25 +459,30 @@ function people(n: number): string {
 
 /**
  * Who pays what, as Plan Detail says it: "12 people · current price" and
- * "₹1,500 / month", then each older price the API lists.
+ * "₹1,500 a month", then each older price the API lists. The amount is
+ * what each pays a period, GST and all (₹2,360 for a ₹2,000 price with
+ * 18% added), since it is money coming in.
  */
 export function payRows(
     plan: Pick<Plan, "byPrice">,
 ): { label: string; amount: string; older: boolean }[] {
     return plan.byPrice.map((b) => ({
         label: `${people(b.count)} · ${b.current ? "current price" : "older price"}`,
-        amount: longPrice(b.price, b.currency, b.interval),
+        amount: recurringPrice(subscriptionPay(b), b.currency, b.interval),
         older: !b.current,
     }));
 }
 
-/** A plan card's notes: "3 still on ₹1,200 — they keep it". */
-export function olderPriceNotes(plan: Pick<Plan, "byPrice">): string[] {
+/**
+ * A plan card's notes: "3 still on ₹1,200, and they keep it". The price is
+ * the one the business set, so it says "+ GST" where GST is added to it.
+ */
+export function olderPriceNotes(plan: Pick<Plan, "byPrice" | "gst">): string[] {
     return plan.byPrice
         .filter((b) => !b.current)
         .map(
             (b) =>
-                `${b.count} still on ${formatMoneyMajor(b.price, b.currency)}, and they keep it`,
+                `${b.count} still on ${setPriceWords(formatMoneyMajor(b.price, b.currency), plan.gst)}, and they keep it`,
         );
 }
 
@@ -355,13 +493,29 @@ export function olderPriceNotes(plan: Pick<Plan, "byPrice">): string[] {
  */
 export function olderPrice(
     sub: Pick<Subscription, "price" | "currency" | "plan">,
-    plans: readonly Pick<Plan, "id" | "price" | "currency">[],
-): { listPrice: string } | null {
+    plans: readonly Pick<Plan, "id" | "price" | "currency" | "gst">[],
+): { listPrice: string; listPay: string } | null {
     const plan = plans.find((p) => p.id === sub.plan.id);
     if (plan?.currency !== sub.currency) return null;
+    // Two prices the business set, compared as typed.
     return Number(plan.price) !== Number(sub.price)
-        ? { listPrice: plan.price }
+        ? {
+              listPrice: plan.price,
+              // What a new sign-up pays a period, GST and all.
+              listPay: payOf(plan.price, plan.gst),
+          }
         : null;
+}
+
+/**
+ * "Keeps ₹2,360. The plan is ₹2,950 for new sign-ups": what they pay
+ * beside what a new sign-up pays, both GST and all, so the two compare.
+ */
+export function keepsLine(
+    sub: Pick<Subscription, "price" | "pay" | "currency">,
+    older: { listPay: string },
+): string {
+    return `Keeps ${formatMoneyMajor(subscriptionPay(sub), sub.currency)}. The plan is ${formatMoneyMajor(older.listPay, sub.currency)} for new sign-ups`;
 }
 
 /**
@@ -386,14 +540,16 @@ export function headline(
     const pill = ending
         ? { tone: "accent" as const, label: `Ends ${d(ending)}` }
         : { tone: TAB_TONE[tab], label: TAB_LABEL[tab] };
+    // The next charge is money expected: what it comes to, GST and all.
     const next = sub.pendingPlan ?? sub;
+    const nextPay = formatMoneyMajor(subscriptionPay(next), next.currency);
     const charging = chargingText(sub, now);
     if (tab === "failed") {
         const due = sub.failedCharge?.dueAt;
         return {
             pill,
             big: formatMoneyMajor(
-                sub.failedCharge?.total ?? sub.price,
+                sub.failedCharge?.total ?? subscriptionPay(sub),
                 sub.currency,
             ),
             when: due ? `failed ${d(due)}` : "failed",
@@ -429,7 +585,7 @@ export function headline(
     if (sub.startsAt) {
         return {
             pill,
-            big: formatMoneyMajor(sub.price, sub.currency),
+            big: formatMoneyMajor(subscriptionPay(sub), sub.currency),
             when: `starts ${d(sub.startsAt)}`,
             line: `Starts ${d(sub.startsAt)}. Nothing is charged before then.`,
         };
@@ -445,11 +601,11 @@ export function headline(
     const on = d(sub.nextRenewalAt);
     return {
         pill,
-        big: formatMoneyMajor(next.price, next.currency),
+        big: nextPay,
         when: on,
         line: charging
-            ? `${charging} for this period. Next: ${formatMoneyMajor(next.price, next.currency)} on ${on}`
-            : `${formatMoneyMajor(next.price, next.currency)} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
+            ? `${charging} for this period. Next: ${nextPay} on ${on}`
+            : `${nextPay} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
     };
 }
 
@@ -661,10 +817,18 @@ export function paysBy(charges: readonly SubscriptionCharge[]): string | null {
 export function gstNote(
     charges: readonly SubscriptionCharge[],
     where: "detail" | "list" = "detail",
+    /**
+     * True where the page knows the business is GST-registered. Its
+     * invoices can still show no GST (a plan with no rate yet, or invoices
+     * from before it registered), and "Not GST-registered" would then be
+     * untrue: nothing is said, and the missing-rates notice says the rest.
+     */
+    registered: boolean | null = null,
 ): string {
     const issued = charges.filter((c) => c.status !== "DRAFT");
     if (!issued.length) return "";
     if (issued.some((c) => c.gst)) return "Each renewal makes a GST invoice.";
+    if (registered === true) return "";
     return where === "list"
         ? "Not GST-registered. Renewals make receipts."
         : "Not GST-registered. Receipts, not tax invoices.";

@@ -6,14 +6,15 @@ import { clinicTemplate } from "./templates/clinic";
 import { developerTemplate } from "./templates/developer";
 import { dieticianTemplate } from "./templates/dietician";
 import { gymTemplate } from "./templates/gym";
-import { personalTemplate } from "./templates/personal";
-import { portfolioTemplate } from "./templates/portfolio";
+import { personalTemplate, personalTemplateV1 } from "./templates/personal";
+import { portfolioTemplate, portfolioTemplateV1 } from "./templates/portfolio";
 import { salonTemplate } from "./templates/salon";
 import {
-    starterTemplate,
     starterTemplateV1,
     starterTemplateV2,
+    starterTemplateV3,
 } from "./templates/starter";
+import { starterTemplate } from "./templates/starter-v4";
 import { studioTemplate } from "./templates/studio";
 import { writingTemplate } from "./templates/writing";
 
@@ -36,8 +37,11 @@ const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
     [
         starterTemplateV1,
         starterTemplateV2,
+        starterTemplateV3,
         starterTemplate,
+        personalTemplateV1,
         personalTemplate,
+        portfolioTemplateV1,
         portfolioTemplate,
         writingTemplate,
         blogsTemplate,

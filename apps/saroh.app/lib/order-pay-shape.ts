@@ -1,4 +1,4 @@
-import type { PayInstructions } from "@saroh/site-blocks";
+import type { GstOnPrice, PayInstructions } from "@saroh/site-blocks";
 
 import type { PayContact } from "./invoice-pay-shape";
 
@@ -14,8 +14,24 @@ export type OrderPayStatus = (typeof ORDER_PAY_STATUSES)[number];
 export interface PayOrderLine {
     name: string;
     quantity: number;
+    /**
+     * The rate and the amount as the API says the page prints them: the
+     * amount to pay, or on a line GST was added to, the price before GST
+     * and the line before GST, with the GST in `gst`.
+     */
     unitPrice: string;
     amount: string;
+    /**
+     * One unit with its GST, sent only where a line GST was added to does
+     * not multiply out to its amount to the paisa; else null. Absent from
+     * an older API.
+     */
+    unitPay?: string | null;
+    /**
+     * The GST in or on the line's whole amount; null for none. Absent from
+     * an older API. Narrowed where it is drawn (`gstOnPriceOf`).
+     */
+    gst?: GstOnPrice | null;
 }
 
 /** Exactly what the API's allow-list sends; nothing else is read. */

@@ -14,6 +14,11 @@ jest.mock("@saroh/database", () => {
             productListing: { findMany: jest.fn() },
             storeSettings: { findUnique: jest.fn() },
             stockLevel: { findMany: jest.fn() },
+            // The business's GST standing: none here (no profile).
+            businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+            organization: {
+                findUnique: jest.fn().mockResolvedValue({ name: "Rye" }),
+            },
         },
     };
 });
@@ -50,6 +55,10 @@ const quoted = (over: Partial<QuotedLine> = {}): QuotedLine => ({
     variantTitle: null,
     image: null,
     unitCents: 20_000,
+    listCents: 20_000,
+    gstPriceMode: null,
+    rateBps: null,
+    gst: null,
     quantity: 2,
     state: "ok",
     available: null,

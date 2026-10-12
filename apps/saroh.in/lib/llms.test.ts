@@ -169,4 +169,34 @@ describe("llmsText", () => {
         expect(links.length).toBeGreaterThan(10);
         for (const l of links) expect(l).toMatch(/^- \[[^\]]+\]\([^)]+\): \S/);
     });
+
+    it("lists every feature and solution page once its route is built, Website and Salons among them", () => {
+        const routes = [...ALL_ROUTES, "/features/[slug]", "/solutions/[slug]"];
+        for (const when of [BEFORE, AFTER]) {
+            const text = llmsText(BASE, at(when, { routes }), articles);
+            const paths = linked(text);
+            expect(
+                paths.filter((p) => p.startsWith("/features/")),
+            ).toHaveLength(9);
+            expect(
+                paths.filter((p) => p.startsWith("/solutions/")),
+            ).toHaveLength(4);
+            expect(text).toContain(
+                "- [Website](https://www.saroh.in/features/website): A website builder for small businesses in India",
+            );
+            expect(text).toContain(
+                "- [Salons and parlours](https://www.saroh.in/solutions/salons): Salon booking software",
+            );
+            // Nothing about a plan, a price or a template (DEC-135, DEC-136).
+            const section = text.slice(
+                text.indexOf("## Features"),
+                text.indexOf("## Resources"),
+            );
+            expect(section).not.toMatch(/template|pricing|\bplans?\b|\u20B9/i);
+        }
+        // A build without the routes never links them.
+        const without = linked(llmsText(BASE, at(AFTER), articles));
+        expect(without.some((p) => p.startsWith("/features/"))).toBe(false);
+        expect(without.some((p) => p.startsWith("/solutions/"))).toBe(false);
+    });
 });

@@ -2,7 +2,9 @@
 # Every label below was checked against the real screens on 6 Oct 2026
 # (R7), in the code and in the captured shots. Sources, from the repo root:
 #   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Bookings ›
-#         Services, /services); app/(shell)/services/page.tsx ("Edit")
+#         Services, /services); components/services/services-screen.tsx
+#         (a row opens its service; rows since 12 Oct 2026, cards with an
+#         "Edit" button before)
 #   PRICE apps/app.saroh.in/components/services/service-editor/editor-sections.tsx
 #         ("Price", "Price (₹)"); .../service-editor/deposit-field.tsx ("At
 #         booking, they pay": "Nothing, they pay at the visit", "25%
@@ -39,7 +41,7 @@
 #         one in Settings › Providers", "Change it in Booking rules"), shown
 #         under At booking, they pay (deposit-field.tsx); only the Online
 #         only case is marked "Can't be booked online: …" on the Services
-#         card (services-screen.tsx); DEC-088, DEC-089, #821
+#         row (services-screen.tsx); DEC-088, DEC-089, #821
 #   RULE  apps/app.saroh.in/lib/services/availability-rules.ts PAY_WAY ("How
 #         people pay when they book": Both, Online, At the desk); booking
 #         page shows no payment line when it can't take the deposit under
@@ -63,15 +65,15 @@ order: 20
 intro: "A deposit holds the time: the customer pays part of the price, or all of it, when they book on your site, and the rest at the visit. You set it on each service. This takes about two minutes."
 description: "Ask for a deposit, or the full price, when customers book a service on your site, and see what they see when they pay."
 readMinutes: 3
-updated: "2026-10-06"
+updated: "2026-10-12"
 publishOn: "2026-10-17"
 steps:
     # NAV.
     - title: Open the service
-      body: "In Saroh, open Bookings › Services in the sidebar, and press Edit on the service you want a deposit for."
+      body: "In Saroh, open Bookings › Services in the sidebar, and press the service you want a deposit for. Each service is a row, and the row opens it."
       shot: help-take-deposit-1
-      caption: "Services at Kavi Dental (demo clinic), with Edit on the root canal."
-      marker: Edit
+      caption: "Services at Kavi Dental (demo clinic), with the root canal's row."
+      marker: Root canal treatment
     # PRICE, NOTE.
     - title: Choose what they pay at booking
       body: "Under Price, At booking, they pay has four choices: Nothing, they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If it can't be taken online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says right under it that it's paid at the desk instead, with a link to what fixes it. If your booking rules take payment online only, it says people can't book it online."

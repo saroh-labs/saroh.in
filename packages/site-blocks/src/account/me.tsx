@@ -5,8 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
+import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import type { SignInOptions } from "./api";
+import type { AccountInvoiceDue, AccountNotices } from "./details-model";
+import { TO_PAY_ID } from "./details-model";
+import { EmailChoice } from "./email-choice";
+import { InvoicesDue } from "./invoices-due";
 import type { MeApi } from "./me-api";
 import { DetailsSheet, NoteSheet } from "./me-sheets";
 import type { AccountNote, AccountReceipt, AccountView, Block } from "./model";
@@ -22,9 +27,10 @@ import {
 import { SignInSheet } from "./sign-in-sheet";
 
 /**
- * Me, in the customer's account (round-2 plan A, A5; Saroh Customer Site
- * design): their details, a health note for the team, receipts, and
- * signing out.
+ * Your details, in the customer's account (round-2 plan A, A5; Saroh
+ * Customer Site design; the tab was "Me" until DEC-142): their details,
+ * what is still to pay, receipts, a health note for the team, whether the
+ * business may email them, and signing out.
  *
  * - **Details:** a name and a phone, kept as a contact detail and never a
  *   way to sign in (default 75). The email changes only with a code sent to
@@ -32,7 +38,13 @@ import { SignInSheet } from "./sign-in-sheet";
  * - **Health notes** (default 12) arrive as a suggestion the team confirms,
  *   and show only once the team can act on them (C12): `healthNotes`. The
  *   card is worded by what the business is (`notesKind`, UX-040).
+ * - **To pay:** their open invoices, each with "Pay now" where the business
+ *   takes payment online (DEC-142), above the receipts.
  * - **Receipts:** paid invoices, each opening its paper.
+ * - **Emails:** their own yes or no to email from the business: the consent
+ *   that already exists (DEC-142).
+ * - **Signing out:** "Sign out" is the button. "Sign out everywhere" is
+ *   rare, so it waits behind "More" (DEC-142).
  * - There is no "Remove my details" (user, 2026-09-27): a customer asks the
  *   business by message or in person.
  *
@@ -67,11 +79,21 @@ const NOTES_WORDS = {
     },
 } as const;
 
+/** "More": a quiet control, 44px to press, that opens what is rarely needed. */
+const quietButton = cn(
+    "text-site-fg inline-flex h-11 cursor-pointer items-center rounded-[calc(var(--site-radius)+8px)] px-3 text-[14px] font-semibold underline-offset-[3px] transition-opacity duration-150 [transition-timing-function:var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] hover:underline active:opacity-70 motion-reduce:transition-none",
+    focusRing,
+);
+
 export interface MeProps {
     account: AccountView;
     receipts: Block<AccountReceipt[]>;
     /** Null while health notes are closed (C12). */
     notes: Block<AccountNote[]> | null;
+    /** Their open invoices (DEC-142). Left out by an older caller: none drawn. */
+    invoices?: Block<AccountInvoiceDue[]>;
+    /** Whether the business may email them (DEC-142); null draws no card. */
+    notices?: Block<AccountNotices> | null;
     /** For the email change's sheet: the phone line and the challenge. */
     options: SignInOptions;
     api: MeApi;
@@ -83,6 +105,8 @@ export function Me({
     account: initial,
     receipts,
     notes,
+    invoices,
+    notices = null,
     options,
     api,
 }: MeProps) {
@@ -91,6 +115,8 @@ export function Me({
     const [open, setOpen] = useState<Open>(null);
     const [sent, setSent] = useState<AccountNote[]>([]);
     const [signingOut, setSigningOut] = useState<"one" | "all" | null>(null);
+    // "Sign out everywhere" waits behind More (DEC-142).
+    const [more, setMore] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
     const [said, setSaid] = useState<string | null>(null);
 
@@ -128,14 +154,14 @@ export function Me({
     const shownNotes = notes?.ok ? [...sent, ...notes.value] : sent;
 
     return (
-        <div className="grid gap-3.5">
+        <div className="grid gap-3.5 md:gap-4">
             {said ? (
-                <p role="status" className="text-site-body text-sm">
+                <p role="status" className="text-site-body text-[15px]">
                     {said}
                 </p>
             ) : null}
 
-            <AccountCard labelledBy="me-details" title="My details">
+            <AccountCard labelledBy="me-details" title="Name and contact">
                 <AccountRow
                     title={account.name ?? "Add your name"}
                     sub={contact}
@@ -190,6 +216,16 @@ export function Me({
                 </AccountCard>
             ) : null}
 
+            {invoices ? (
+                <InvoicesDue
+                    id={TO_PAY_ID}
+                    invoices={invoices}
+                    businessName={account.businessName}
+                    payNow={api.payInvoice}
+                    whenNone="Nothing to pay."
+                />
+            ) : null}
+
             <AccountCard
                 labelledBy="me-receipts"
                 title="Receipts"
@@ -197,28 +233,6 @@ export function Me({
                     receipts.ok && receipts.value.length === 0
                         ? "No receipts yet."
                         : undefined
-                }
-                actions={
-                    <>
-                        <button
-                            type="button"
-                            className={smallButton}
-                            disabled={signingOut !== null}
-                            onClick={() => void signOut(false)}
-                        >
-                            {signingOut === "one" ? "Signing out…" : "Sign out"}
-                        </button>
-                        <button
-                            type="button"
-                            className={smallButton}
-                            disabled={signingOut !== null}
-                            onClick={() => void signOut(true)}
-                        >
-                            {signingOut === "all"
-                                ? "Signing out…"
-                                : "Sign out everywhere"}
-                        </button>
-                    </>
                 }
             >
                 {receipts.ok ? (
@@ -246,6 +260,64 @@ export function Me({
                 ) : (
                     <Unavailable what="Receipts" />
                 )}
+            </AccountCard>
+
+            {notices ? (
+                <EmailChoice
+                    notices={notices}
+                    account={account}
+                    save={api.saveNotices}
+                />
+            ) : null}
+
+            <section
+                aria-label="Signing out"
+                className="border-site-border mt-1 border-t pt-4"
+            >
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        className={buttonClasses(false)}
+                        disabled={signingOut !== null}
+                        onClick={() => void signOut(false)}
+                    >
+                        {signingOut === "one" ? "Signing out…" : "Sign out"}
+                    </button>
+                    <button
+                        type="button"
+                        className={quietButton}
+                        aria-expanded={more}
+                        aria-controls="me-sign-out-more"
+                        onClick={() => setMore((m) => !m)}
+                    >
+                        More
+                        <span
+                            aria-hidden="true"
+                            className={cn(
+                                "ml-1 inline-block transition-transform duration-150 [transition-timing-function:var(--site-ease,cubic-bezier(0.2,0.8,0.2,1))] motion-reduce:transition-none",
+                                more && "rotate-180",
+                            )}
+                        >
+                            ▾
+                        </span>
+                    </button>
+                </div>
+                <div id="me-sign-out-more" hidden={!more} className="mt-3">
+                    <p className="text-site-body max-w-[60ch] text-[14px] leading-normal">
+                        Signed in on a phone or computer you no longer use? This
+                        signs you out on every one of them.
+                    </p>
+                    <button
+                        type="button"
+                        className={cn(smallButton, "mt-2")}
+                        disabled={signingOut !== null}
+                        onClick={() => void signOut(true)}
+                    >
+                        {signingOut === "all"
+                            ? "Signing out…"
+                            : "Sign out everywhere"}
+                    </button>
+                </div>
                 {problem ? (
                     <p
                         role="alert"
@@ -254,7 +326,7 @@ export function Me({
                         {problem}
                     </p>
                 ) : null}
-            </AccountCard>
+            </section>
 
             <DetailsSheet
                 open={open === "details"}

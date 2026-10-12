@@ -147,28 +147,48 @@ test.describe("bookings calendar", () => {
         await expect(
             page.getByRole("heading", { level: 1, name: /· today$/ }),
         ).toBeVisible();
-        await expect(page.getByRole("radio", { name: /Day/ })).toHaveAttribute(
-            "aria-checked",
-            "true",
+        // One switch for every view of the bookings: the layouts and the
+        // list. Each is a link, and the open one says so.
+        const views = page.getByRole("navigation", { name: "Bookings view" });
+        await expect(views.getByRole("link", { name: /Day/ })).toHaveAttribute(
+            "aria-current",
+            "page",
         );
+        await expect(views.getByRole("link", { name: "List" })).toBeVisible();
         await page.goto("/bookings?layout=agenda");
         await expect(
             page.getByRole("group", { name: "Pick a day" }),
         ).toBeVisible();
         await expect(
-            page.getByText(/Customers can book/).first(),
-        ).toBeVisible();
+            views.getByRole("link", { name: "Agenda" }),
+        ).toHaveAttribute("aria-current", "page");
+        // The standing sentence under the diary is gone.
+        await expect(page.getByText(/Customers can book/)).toHaveCount(0);
     });
 
-    test("the legend follows the business: a gym that runs classes shows Class", async ({
+    test("the legend names only what is drawn: free time is the plain page", async ({
         page,
     }) => {
         await signIn(page);
         await page.goto("/bookings");
-        const legend = page.getByRole("listitem");
-        await expect(legend.filter({ hasText: /^One-to-one$/ })).toBeVisible();
-        await expect(legend.filter({ hasText: /^Class$/ })).toBeVisible();
-        await expect(legend.filter({ hasText: /^Free$/ })).toBeVisible();
+        await expect(
+            page.getByRole("navigation", { name: "Bookings view" }),
+        ).toBeVisible();
+        // What it names depends on the day (`legendOf`, unit-tested): never
+        // free time, and nothing the diary does not draw.
+        const key = page.getByRole("list", { name: "Key" });
+        await expect(
+            key.getByRole("listitem").filter({ hasText: /^Free$/ }),
+        ).toHaveCount(0);
+        for (const item of await key.getByRole("listitem").allInnerTexts()) {
+            expect([
+                "One-to-one",
+                "Class",
+                "Closed",
+                "Time off",
+                "Cancelled",
+            ]).toContain(item.trim());
+        }
         await page.goto("/bookings?layout=week");
         await expect(page.getByText(/bookings? this week/)).toBeVisible();
     });
@@ -580,7 +600,17 @@ test.describe("availability and services", () => {
     }) => {
         await signIn(page);
         await page.goto("/services");
-        await page.getByRole("link", { name: "New service" }).click();
+        // New service is one link, and a menu with New course beside it
+        // once Courses is on.
+        const newLink = page.getByRole("link", { name: "New service" });
+        const newMenu = page.getByRole("button", { name: "New service" });
+        await expect(newLink.or(newMenu).first()).toBeVisible();
+        if (await newMenu.isVisible()) {
+            await newMenu.click();
+            await page.getByRole("menuitem", { name: "New service" }).click();
+        } else {
+            await newLink.first().click();
+        }
         await expect(
             page.getByRole("heading", { level: 1, name: "New service" }),
         ).toBeVisible();
@@ -644,7 +674,7 @@ test.describe("the Service Editor on Northwind (E2)", () => {
     const nwApi = (path: string) =>
         `${urls.API_URL}/organizations/${NORTHWIND}${path}`;
 
-    test("an Either service with a price is added, and its card says so", async ({
+    test("an Either service with a price is added, and its row says so", async ({
         page,
     }) => {
         await signIn(page);
@@ -689,11 +719,17 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             ).toBeVisible();
 
             await page.goto("/services");
-            const card = page.getByRole("listitem").filter({ hasText: name });
-            await expect(card).toContainText("In person or online");
+            // A row of the list: a table row at the desk, a list item
+            // on a phone. Taking bookings is a switch on it, on for a
+            // service just added.
+            const row = page
+                .locator("tr, li")
+                .filter({ hasText: name })
+                .filter({ visible: true });
+            await expect(row).toContainText("In person or online");
             await expect(
-                card.getByRole("button", { name: "Stop taking bookings" }),
-            ).toBeVisible();
+                row.getByRole("switch", { name: `Taking bookings, ${name}` }),
+            ).toBeChecked();
         } finally {
             await page.request.delete(nwApi(`/services/${id}`), {
                 headers: { "x-organization-id": NORTHWIND },

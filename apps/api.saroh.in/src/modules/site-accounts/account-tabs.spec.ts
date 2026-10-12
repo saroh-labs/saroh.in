@@ -42,20 +42,38 @@ const keys = (offers: AccountOffers, shipped = ALL_SHIPPED) =>
 
 describe("accountTabs", () => {
     it("a clinic sees Bookings; a bakery sees Orders and no Bookings", () => {
-        expect(keys(clinic)).toEqual(["Home", "Bookings", "Messages", "Me"]);
+        expect(keys(clinic)).toEqual([
+            "Home",
+            "Bookings",
+            "Messages",
+            "Your details",
+        ]);
         expect(keys(bakery)).toEqual([
             "Home",
             "Orders",
             "Plan",
             "Messages",
-            "Me",
+            "Your details",
         ]);
     });
 
     it("the tab is Bookings whatever the pages call them, so it fits a phone (UX-075)", () => {
         expect(
             keys({ ...clinic, plans: true, bookingsLabel: "Bookings" }),
-        ).toEqual(["Home", "Bookings", "Plan", "Messages", "Me"]);
+        ).toEqual(["Home", "Bookings", "Plan", "Messages", "Your details"]);
+    });
+
+    it("Plan shows only when the customer has a plan or pack, or the business sells one (DEC-142)", () => {
+        // `offers.plans` is that rule, worked out per request
+        // (`AccountHomeService.offers`): off, no Plan tab at all.
+        expect(keys({ ...bakery, plans: false })).not.toContain("Plan");
+        expect(keys({ ...clinic, plans: false })).not.toContain("Plan");
+        expect(keys({ ...clinic, plans: true })).toContain("Plan");
+    });
+
+    it("the last tab says what is behind it: Your details, never Me (DEC-142)", () => {
+        expect(keys(clinic).at(-1)).toBe("Your details");
+        expect(keys(clinic)).not.toContain("Me");
     });
 
     it("shows a tab only once its page has shipped: Home and Me in A5, Bookings in A6, Orders in A7, Plan in A8, Messages in A13", () => {
@@ -71,14 +89,14 @@ describe("accountTabs", () => {
             { key: "home", label: "Home" },
             { key: "bookings", label: "Bookings" },
             { key: "messages", label: "Messages" },
-            { key: "me", label: "Me" },
+            { key: "me", label: "Your details" },
         ]);
         expect(accountTabs(bakery)).toEqual([
             { key: "home", label: "Home" },
             { key: "orders", label: "Orders" },
             { key: "plan", label: "Plan" },
             { key: "messages", label: "Messages" },
-            { key: "me", label: "Me" },
+            { key: "me", label: "Your details" },
         ]);
     });
 });

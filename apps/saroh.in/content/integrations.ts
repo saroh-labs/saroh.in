@@ -68,10 +68,10 @@ export const integrationsIndex = {
     notYet: NOT_AVAILABLE_YET,
     askEmail: SAROH_CONTACT_EMAIL,
     seo: {
-        title: "Integrations: Razorpay, Cashfree and your own email · Saroh",
+        title: "Razorpay, Cashfree and email integrations · Saroh",
         socialTitle: "Integrations",
         description:
-            "What Saroh connects to today: your own Razorpay or Cashfree account for payments, and your own email provider for invoices. Plus what's planned and not built yet.",
+            "Integrations with Razorpay, Cashfree and your own email provider: what Saroh connects to today, how to connect each, and what's planned.",
     },
 } as const;
 

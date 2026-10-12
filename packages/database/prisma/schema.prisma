@@ -432,6 +432,13 @@ model BusinessProfile {
   // Delivery on an order's invoice is a taxed line: this rate and SAC.
   deliveryGstRate     Decimal @default(18) @db.Decimal(5, 2)
   deliverySacCode     String?
+  // How the business's prices carry GST (12 Oct 2026, amending ADR-008):
+  // INCLUDED ("My prices include GST") or ADDED ("GST is added to my
+  // prices"). The business's own choice, read only while it is
+  // GST-registered; a service or product may say otherwise
+  // (`gstPriceMode` on each). INCLUDED is what every business meant before
+  // the choice existed. The maths is `invoices/gst-price.ts`.
+  gstPriceMode        String  @default("INCLUDED")
 
   // The logo printed at the top of the business's invoices and receipts: a
   // library object, and the address it is served from, taken when it was
@@ -486,6 +493,15 @@ model BusinessProfile {
   // account shows no Pause and the API refuses a customer's pause (403).
   // Staff pause either way. No profile yet reads as on.
   membersCanPause Boolean @default(true)
+
+  // "Updates in your customers' Messages" (12 Oct 2026): the business's own
+  // choice to have Saroh post order, booking and invoice updates into a
+  // customer's account thread. On by default, and no profile yet reads as
+  // on. It is the third gate, after the instance's SITE_ACCOUNT_AREA and
+  // the ACCOUNT_THREAD rollout flag (`communications/account-thread.ts`).
+  // Off stops only Saroh's own posts: the team's replies and what the
+  // customer writes are untouched.
+  accountUpdates Boolean @default(true)
 
   // When autopay debits a renewal (round-2 D13B, DEC-065): ON_RENEWAL_DATE
   // (the invoice and bank notice go out early so the debit lands on the
@@ -945,8 +961,12 @@ model Product {
 
   // GST (ADR-008, U5): the rate the price includes and the HSN code, printed
   // on a registered business's tax invoice. Null rate: not set (0% on paper).
-  gstRate Decimal? @db.Decimal(5, 2)
-  hsnCode String?
+  gstRate      Decimal? @db.Decimal(5, 2)
+  hsnCode      String?
+  // How this product's price carries GST when it differs from the
+  // business's way: INCLUDED or ADDED. Null: same as the business
+  // (`BusinessProfile.gstPriceMode`).
+  gstPriceMode String?
 
   // SEO — stored and edited; the website renders them later (#473).
   seoTitle       String?
@@ -1840,8 +1860,18 @@ model OrderItem {
   variantId String?
   variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
-  quantity Int
-  price    Decimal @db.Decimal(10, 2)
+  quantity     Int
+  // The amount to pay for one unit, fixed when the line was sold. Under
+  // "GST is added" it is the typed price plus its GST
+  // (`invoices/gst-price.ts`); otherwise the typed price.
+  price        Decimal  @db.Decimal(10, 2)
+  // What the line was charged under, and the price the business had typed
+  // (12 Oct 2026): ADDED with the price before GST, or INCLUDED. Both null
+  // on a line from before the choice existed, on a business that charges no
+  // GST and on an item with no rate or 0%: `price` is the typed price. A
+  // later change to the business's choice never rewrites them.
+  gstPriceMode String?
+  listPrice    Decimal? @db.Decimal(10, 2)
 
   // Where this line's reservation sits, set when the order first holds
   // stock; every later release or fulfil settles on the same row. NONE: the
@@ -3918,6 +3948,15 @@ model Domain {
   hostingError     String?
   hostingCheckedAt DateTime?
 
+  // The bare domain of a `www.` connection (DEC-140): for `www.example.com`,
+  // where `example.com` stood at the last check. FORWARDS (to `www`),
+  // FORWARDS_HTTP_ONLY (`https://example.com` does not), POINTS_HERE (its
+  // DNS reaches the hosting directly, as an ALIAS or a flattened CNAME does)
+  // or NOT_FORWARDING. Null on any other hostname, and until the first
+  // check. A notice only: it never changes whether the `www` site serves.
+  bareStatus    String?
+  bareCheckedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -4419,8 +4458,12 @@ model Service {
   currency   String? // ISO 4217 when priced
 
   // GST (ADR-008, U5): the rate the price includes and the SAC code.
-  gstRate Decimal? @db.Decimal(5, 2)
-  sacCode String?
+  gstRate      Decimal? @db.Decimal(5, 2)
+  sacCode      String?
+  // How this service's price carries GST when it differs from the
+  // business's way: INCLUDED or ADDED. Null: same as the business
+  // (`BusinessProfile.gstPriceMode`).
+  gstPriceMode String?
 
   // IANA timezone the AvailabilityRules are expressed in, e.g. "Asia/Kolkata".
   timezone String
@@ -5859,6 +5902,18 @@ model SubscriptionPlan {
   // A membership's classes a month (U3). Null: as many as they like.
   classesPerMonth Int?
 
+  // GST (12 Oct 2026, as a service's): the rate the price carries and the
+  // SAC code. A null rate is "not set": a registered business's plan is
+  // asked for one, and until then its invoice carries no tax.
+  gstRate      Decimal? @db.Decimal(5, 2)
+  sacCode      String?
+  // How this plan's price carries GST when it differs from the
+  // business's way: INCLUDED or ADDED. Null: same as the business
+  // (`BusinessProfile.gstPriceMode`).
+  // Read at every renewal, so a rate set today reaches the next invoice of
+  // a member who joined before it; paper already issued never changes.
+  gstPriceMode String?
+
   subscriptions   CustomerSubscription[]
   // Subscriptions switching to this plan at their next renewal.
   pendingSwitches CustomerSubscription[] @relation("PendingPlan")
@@ -6246,6 +6301,12 @@ model InvoiceLine {
   cgst         Decimal  @default(0) @db.Decimal(12, 2)
   sgst         Decimal  @default(0) @db.Decimal(12, 2)
   igst         Decimal  @default(0) @db.Decimal(12, 2)
+  // How the price behind this line carried GST when it was charged
+  // (12 Oct 2026): ADDED or INCLUDED, frozen like the rate. Null on a
+  // receipt, a line with no rate, and paper from before the choice existed
+  // (which included GST). `unitPrice` and `amount` are the amount to pay
+  // either way; a correction copies its original's.
+  gstPriceMode String?
 
   // The order line it bills, so a line refund credits the right line.
   orderItemId String?
@@ -6328,6 +6389,16 @@ model Course {
   seats       Int // never more than the service's capacity
   status      String  @default("DRAFT") // DRAFT | OPEN | CLOSED | ARCHIVED
 
+  // GST (12 Oct 2026, as a service's): the rate the price carries and the
+  // SAC code. A null rate is "not set": a registered business's course is
+  // asked for one, and until then its invoice carries no tax.
+  gstRate      Decimal? @db.Decimal(5, 2)
+  sacCode      String?
+  // How this course's price carries GST when it differs from the
+  // business's way: INCLUDED or ADDED. Null: same as the business
+  // (`BusinessProfile.gstPriceMode`).
+  gstPriceMode String?
+
   sessions    CourseSession[]
   enrollments CourseEnrollment[]
 
@@ -6395,6 +6466,16 @@ model ClassPack {
   price        Decimal @db.Decimal(12, 2)
   currency     String
   status       String  @default("ACTIVE") // DRAFT | ACTIVE | ARCHIVED (E14)
+
+  // GST (12 Oct 2026, as a service's): the rate the price carries and the
+  // SAC code. A null rate is "not set": a registered business's pack is
+  // asked for one, and until then its invoice carries no tax.
+  gstRate      Decimal? @db.Decimal(5, 2)
+  sacCode      String?
+  // How this pack's price carries GST when it differs from the
+  // business's way: INCLUDED or ADDED. Null: same as the business
+  // (`BusinessProfile.gstPriceMode`).
+  gstPriceMode String?
 
   services  ClassPackService[]
   purchases PackPurchase[]
@@ -6613,6 +6694,14 @@ model CustomerAccount {
 
   linkedAt       DateTime  @default(now())
   lastSignedInAt DateTime?
+
+  // When the customer last opened their account's Home, and the visit
+  // before that one (DEC-142): Home says what changed since
+  // `previousVisitAt` for as long as the visit that began after it lasts.
+  // Only the Home read moves them (`site-accounts/account-visit.ts`). Null
+  // until a first, then a second, visit.
+  lastVisitAt     DateTime?
+  previousVisitAt DateTime?
 
   sessions CustomerSession[]
 

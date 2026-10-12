@@ -27,7 +27,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { appVars } from "./cf-env.mjs";
+import { appVars, launchInstant } from "./cf-env.mjs";
 import { APPS } from "./cf-plan.mjs";
 
 const WORKFLOW = ".github/workflows/deploy-frontends.yml";
@@ -140,6 +140,38 @@ for (const [pkg, dir] of Object.entries(APPS)) {
             );
     }
 }
+
+// The dated launch (LAUNCH_AT, scripts/cf-env.mjs): one instant, written once
+// per app that opens by it, in production vars only. The apps must agree: a
+// site that opens before accounts does sends /waitlist to sign-up and
+// accounts sends it back, a loop. And the dev environment's key gate must
+// never open by date.
+const launchAts = new Map();
+for (const [pkg, dir] of Object.entries(APPS)) {
+    if (appVars(dir, "development").LAUNCH_AT !== undefined)
+        problems.push(
+            `${dir}/wrangler.jsonc (vars): LAUNCH_AT is production's alone; in the dev environment it would open the key gate`,
+        );
+    const value = appVars(dir, "production").LAUNCH_AT;
+    if (value === undefined) continue;
+    launchAts.set(pkg, launchInstant(value));
+    if (launchInstant(value) === null)
+        problems.push(
+            `${dir}/wrangler.jsonc (env.production.vars): LAUNCH_AT must be an ISO time with its offset, like 2031-03-04T16:00:00+05:30`,
+        );
+}
+if (new Set(launchAts.values()).size > 1)
+    problems.push(
+        `LAUNCH_AT differs between apps (${[...launchAts.keys()].join(", ")}): it is one instant, the same in each wrangler.jsonc`,
+    );
+if (
+    launchAts.has("web") &&
+    !launchAts.has("auth") &&
+    appVars(APPS.auth, "production").PRELAUNCH_GATE === "on"
+)
+    problems.push(
+        "apps/saroh.in has a LAUNCH_AT and the gated apps/accounts.saroh.in has none: the site would open onto a locked sign-up",
+    );
 
 if (problems.length) {
     console.error(`check:deploy-env:\n  ${problems.join("\n  ")}`);

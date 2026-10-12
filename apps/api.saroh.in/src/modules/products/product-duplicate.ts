@@ -1,7 +1,16 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import type { PriceActor } from "../audit/price-history";
+import {
+    optionFacts,
+    productFacts,
+    recordPrices,
+} from "../audit/price-history";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { assertSameCurrency } from "../stores/currency";
+import type { MrpJudged } from "./product-rules";
+import { firstOverMrp, hasMrp, overMrpMessage } from "./product-rules";
 import { readShopFields } from "./serialize";
 
 /**
@@ -68,7 +77,13 @@ async function freeCopyNumber(
  */
 export async function duplicateProduct(
     tx: Tx,
-    input: { organizationId: string; productId: string; storeId: string },
+    input: {
+        organizationId: string;
+        productId: string;
+        storeId: string;
+        /** Who is copying: the copy's price history starts with them. */
+        actor: PriceActor;
+    },
 ): Promise<string> {
     const { organizationId, productId, storeId } = input;
     const source = await tx.product.findFirst({
@@ -91,6 +106,33 @@ export async function duplicateProduct(
         },
     });
     if (!source) throw new NotFoundException("Product not found");
+
+    // The copy takes the original's price, MRP and GST, so it is judged as
+    // any product is (`product-rules.ts`): one whose amount to pay is above
+    // its MRP is fixed first, never copied as it is.
+    const judged: MrpJudged = {
+        price: source.price.toString(),
+        mrp: source.mrp?.toString() ?? null,
+        gstRate: source.gstRate,
+        gstPriceMode: source.gstPriceMode,
+        variants: source.variants.map((v) => ({
+            title: v.title,
+            price: v.price?.toString() ?? null,
+            mrp: v.mrp?.toString() ?? null,
+        })),
+    };
+    if (hasMrp(judged)) {
+        const over = firstOverMrp(
+            judged,
+            await loadPriceTerms(tx, organizationId),
+        );
+        if (over) {
+            throw new BadRequestException({
+                message: `Fix this product's price before you copy it. ${overMrpMessage(over, source.currency)}`,
+                field: "mrp",
+            });
+        }
+    }
 
     const n = await freeCopyNumber(
         tx,
@@ -127,6 +169,7 @@ export async function duplicateProduct(
             shopFields: readShopFields(source.shopFields),
             gstRate: source.gstRate,
             hsnCode: source.hsnCode,
+            gstPriceMode: source.gstPriceMode,
             seoTitle: source.seoTitle,
             seoDescription: source.seoDescription,
             optionId: source.optionId,
@@ -136,8 +179,18 @@ export async function duplicateProduct(
             stockTracked: source.stockTracked,
             stockTrackedAt: source.stockTracked ? new Date() : null,
         },
-        select: { id: true },
+        select: { id: true, name: true },
     });
+    // The copy starts its own price history, at the original's values.
+    const priced = { kind: "PRODUCT", id: copy.id, name: copy.name } as const;
+    await recordPrices(
+        tx,
+        input.actor,
+        { ...priced, currency: source.currency },
+        null,
+        productFacts(source),
+        "copy",
+    );
 
     // Photos and videos by reference, only the business's own media.
     const mediaIds = source.images.flatMap((i) =>
@@ -208,6 +261,19 @@ export async function duplicateProduct(
             select: { id: true },
         });
         variantIds.set(variant.id, made.id);
+        // An option with a price or an MRP of its own starts its history.
+        await recordPrices(
+            tx,
+            input.actor,
+            {
+                ...priced,
+                currency: source.currency,
+                option: { id: made.id, title: variant.title },
+            },
+            null,
+            optionFacts(variant),
+            "copy",
+        );
     }
     const asCopy = (variantId: string | null) =>
         variantId === null ? null : (variantIds.get(variantId) ?? null);

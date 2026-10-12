@@ -12,6 +12,7 @@ import {
     P,
     PRODUCTS,
     rateOf,
+    RATES,
     RYE_KEY,
     ryeId,
     unitPaise,
@@ -751,6 +752,9 @@ export async function seedBakery(
             interval: pl.interval,
             status: "ACTIVE",
             classesPerMonth: null,
+            // A loaf a week is bread: the breads' own rate (exempt, 0%), so
+            // a GST-registered bakery's plans are never "rate not set".
+            gstRate: bpsToRate(RATES.breads.bps),
         };
         await prisma.subscriptionPlan.upsert({
             where: { id: planIds[i] },

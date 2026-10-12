@@ -190,6 +190,58 @@ describe("includedText", () => {
 });
 
 describe("eventWhat", () => {
+    it("says a GST change that holds no price at all", () => {
+        expect(
+            eventWhat(event({ changes: { gstRate: [null, "18"] } }), "INR"),
+        ).toBe("Changed the GST rate from not set to 18%");
+        expect(
+            eventWhat(
+                event({ changes: { gstPriceMode: [null, "ADDED"] } }),
+                "INR",
+            ),
+        ).toBe("Changed GST on this price to GST is added");
+        expect(
+            eventWhat(
+                event({ changes: { gstPriceMode: ["ADDED", null] } }),
+                "INR",
+            ),
+        ).toBe("Changed GST on this price to same as the business");
+        expect(
+            eventWhat(event({ changes: { sacCode: [null, "999723"] } }), "INR"),
+        ).toBe("Changed the SAC code from not set to 999723");
+        expect(
+            eventWhat(
+                event({ kind: "UPDATED", changes: { gstRate: ["18", "0"] } }),
+                "INR",
+            ),
+        ).toBe("Changed the GST rate from 18% to 0%");
+    });
+
+    it("says the price and the GST together, the price first", () => {
+        expect(
+            eventWhat(
+                event({
+                    changes: {
+                        gstRate: [null, "18"],
+                        price: ["1200.00", "1500.00"],
+                        gstPriceMode: [null, "INCLUDED"],
+                    },
+                }),
+                "INR",
+            ),
+        ).toBe(
+            "Changed the price from ₹1,200 to ₹1,500, changed the GST rate from not set to 18%, changed GST on this price to includes GST",
+        );
+    });
+
+    it("never draws half a sentence for a price change with nothing it knows", () => {
+        expect(eventWhat(event({ changes: {} }), "INR")).toBe("Changed");
+        // The same rate written another way is not a change.
+        expect(
+            eventWhat(event({ changes: { gstRate: ["18", "18.00"] } }), "INR"),
+        ).toBe("Changed");
+    });
+
     it("says a price change in the plan's money", () => {
         expect(eventWhat(event(), "INR")).toBe(
             "Changed the price from ₹1,200 to ₹1,500",
@@ -208,7 +260,7 @@ describe("eventWhat", () => {
                 }),
                 "INR",
             ),
-        ).toBe("Changed the price from ₹1,200 / month to ₹12,000 / year");
+        ).toBe("Changed the price from ₹1,200 a month to ₹12,000 a year");
         expect(
             eventWhat(
                 event({ changes: { interval: ["MONTH", "QUARTER"] } }),
@@ -280,7 +332,7 @@ describe("eventWhat", () => {
                 }),
                 "INR",
             ),
-        ).toBe("Created at ₹1,500 / month");
+        ).toBe("Created at ₹1,500 a month");
         expect(eventWhat(event({ kind: "ARCHIVED", changes: {} }), "INR")).toBe(
             "Archived, closed to new sign-ups",
         );
@@ -361,6 +413,22 @@ describe("historyRows", () => {
     });
 });
 
+describe("a GST change in the history", () => {
+    it("is a row like any other, and not counted as a price change", () => {
+        const gst = event({ id: "e2", changes: { gstRate: [null, "18"] } });
+        const rows = historyRows(
+            [gst],
+            { nextCursor: null, earlierUnrecorded: false },
+            "INR",
+            TZ,
+            NOW,
+        );
+        expect(rows[0]?.what).toBe("Changed the GST rate from not set to 18%");
+        expect(priceChangesText(page({ events: [gst] }))).toBe("0");
+        expect(priceChangesText(page({ events: [gst, event()] }))).toBe("1");
+    });
+});
+
 describe("priceChangesText and glanceRows", () => {
     it("counts price changes exactly when the whole history is here", () => {
         const created = event({
@@ -416,7 +484,7 @@ describe("subscriberRows", () => {
             name: "Ananya Rao",
             since: "Since 4 Jan",
             status: { label: "Active", tone: "ok" },
-            price: "₹1,200 / month",
+            price: "₹1,200 a month",
             olderPrice: true,
             when: "Next 4 Oct",
         });

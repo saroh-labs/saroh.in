@@ -273,6 +273,134 @@
 - **The API computes.** Order totals are summed in integer cents server-side
   (`orders.service.ts`), and a payment's amount derives from the Order, never
   from the client. Client arithmetic is for previews and sort keys only.
+- **A stored price says which price it is.** `Product.price` and
+  `Service.priceCents` are what the business typed. `OrderItem.price` and a
+  booking's `snapshot.service.priceCents` are the amount to pay for one,
+  fixed at the sale: the typed price, or with GST added where the business
+  chose that (`invoices/gst-price.ts`, the only place the two are turned
+  into each other; `backend-billing-and-classes.md` → How a price carries
+  GST). The line keeps what was typed and the mode (`listPrice`,
+  `gstPriceMode`), null when no GST was charged. Never recompute a sold
+  line's price from the product, and never read the business's choice to
+  explain a line already sold.
+- **A stored amount is the amount to pay; a paper may read it before GST.**
+  `InvoiceLine.unitPrice` and `amount` are GST and all on every line, and
+  nothing rewrites them. A line GST was added to prints the typed price as
+  its rate and its frozen taxable value as its amount
+  (`invoices/added-line.ts`, the only place that reading is made, from the
+  line's own frozen sums). Never print quantity × rate as an amount: the
+  frozen taxable value is what the totals use, and the two can differ by
+  under half a paisa a unit (`backend-billing-and-classes.md` → A paper
+  prints the typed price).
+- **An MRP includes its taxes** (12 Oct 2026: "GST is part of MRP").
+  `Product.mrp` and `ProductVariant.mrp` (null: the product's) are compared
+  with the amount to pay for one, GST and all, never with the typed
+  `price`: under "GST is added" a ₹1,000 price at 18% needs an MRP of
+  ₹1,180 or more. The comparison is `products/product-rules.ts` and nowhere
+  else; every write of a price, an MRP, a rate or a price mode on a product
+  or a variant goes through it, and so does the business's own switch
+  (`backend-billing-and-classes.md` → GST is part of MRP). A saving is the
+  MRP less the amount to pay, served by the API (`saving`) and null when
+  there is none.
+- **A change to what something costs is recorded where it is made** (owner,
+  12 Oct 2026: "Prices for products should have history"). A product, a
+  product's option, a service and a course keep a price history: the typed
+  price, the MRP (a product's and an option's), the GST rate and "GST on
+  this price", each as it was and as it became, with who changed it and
+  when. Any code that writes one of those columns calls `recordPrices`
+  (`audit/price-history.ts`) **on the same transaction as the write**, with
+  the row's facts before and after (`productFacts`, `optionFacts`,
+  `serviceFacts`, `courseFacts`), so a save that fails or is refused leaves
+  no entry and a save that moves nothing writes none. A write with no
+  transaction of its own gets one.
+    - **Where it is kept:** the audit stream, no table of its own.
+      `price.set` is an item's first entry (made, copied or imported at
+      these values); `price.changed` is every later one. The target is the
+      item (`product`, `service`, `course`); an option's entry is on its
+      product and names the option. Metadata holds the kind, the name, the
+      currency, how it was made (`source`) and `changes`
+      (`{ field, before, after }`, the settings saves' shape). An
+      operator's is marked by `auditMetadata` and reads as Saroh support.
+    - **One entry, one shape.** The rates sheet (`gst-rates.service.ts`)
+      writes `price.changed` like an editor does. It used to write
+      `gst-rate.set` with one `from` and `to`: that action is no longer
+      written, and rows already written are read into the same shape
+      (`changesOf`, and the app's Activity).
+    - **The price is the one typed.** History never works out an amount to
+      pay and never reads the business's setting, so a line reads the same
+      whatever "GST on your prices" says today. The business-wide switch is
+      one settings change (`profile.update`), never an entry per item.
+    - **Read per item** with the permission its own page asks for
+      (`store:read`, `service:read`, `course:read`), scoped to the business,
+      newest first, a page at a time (`readPriceHistory`, behind
+      `GET …/products|services|courses/:id/price-history`). It filters the
+      stream by business and target on `[organizationId, createdAt]`, as
+      the customer timeline does.
+    - **Plans and class packs are not written here:** they keep their own
+      histories (`SubscriptionPlanEvent` `PRICE_CHANGED`, `PackEvent`).
+    - A new write path is pinned by a spec beside it
+      (`products.price-history.spec.ts`, `service-price-history.spec.ts`,
+      `imports.price-history.spec.ts`, `price-history.db.spec.ts`).
+- **Plans, class packs and courses** (12 Oct 2026). `SubscriptionPlan.price`,
+  `ClassPack.price` and `Course.price` are what the business typed, each
+  with its own `gstRate`, `sacCode` and `gstPriceMode`. A
+  `CustomerSubscription.price` is the typed price the member joined at and
+  is never rewritten with GST: every period's invoice works the amount to
+  pay out again from it and the plan's GST as it stands that day
+  (`invoices/sale-price.ts`), which is how a rate set today reaches a
+  member's next renewal while no invoice already issued changes. A
+  `PackPurchase.price` and a `CourseEnrollment.price` are one-off sales, so
+  they hold the amount paid, GST and all, as an order line does. The
+  invoice line freezes the rate and the mode either way.
+- **A customer's sum is the API's.** A public read that shows a price about
+  to be paid serves the GST in or on it and the amount to pay
+  (`GstOnPrice`); the site formats and never adds, multiplies or rounds.
+- **One figure, one kind** (12 Oct 2026). Every money figure a business
+  reads is one of two kinds, and says which. It matters only where GST is
+  added to a price: where it is included, or the business is not
+  registered, the two are the same to the paisa and nothing reads
+  differently.
+    - **Money taken, owed or expected is the amount the customer pays, GST
+      and all:** what a member pays a period, "a month from members",
+      takings, a total, due, paid, a renewal still to come, a to-pay amount.
+      Never sum or show a typed column (`CustomerSubscription.price`, a
+      plan's, pack's, course's or service's price) as money. A sum over a
+      stretch of time is the sum of what was actually charged
+      (`PackPurchase.price`, `CourseEnrollment.price`, `Invoice.total`,
+      `Order.total`, a booking's snapshot): never re-derive an old amount
+      from today's setting.
+    - **A price the business set is the typed price, and says so where GST
+      comes on top:** "₹2,000 + GST" in its own price list
+      (`setPriceWords`), or the whole sum where there is room, "₹2,000 +
+      ₹360 GST (18%) = ₹2,360 to pay" (`addedSum`, the desk dialogs' words).
+      An editor says the sum under the price as it is typed.
+    - **Two figures compared are the same kind, both amounts to pay:** a
+      class in a pack against a class alone, plans in a picker, "keeps
+      ₹1,770, the plan is ₹2,360", a purchase against the pack's price
+      today (`paidAtPrice`: what was paid matches a price when it is that
+      price or that price with its GST on top, so a sale is never "an older
+      price" only because GST is added).
+    - **The API serves both, one place each.** A merchant read of a plan, a
+      pack, a course or a service carries `gst` (`GstOnPrice`, from
+      `saleCharge` or `serviceCharge`: the typed price, the GST and the
+      amount to pay as it is charged today). A subscription carries `pay`
+      beside `price`, by the sum its next invoice uses, and a plan's
+      `byPrice[].pay` and `monthlyFromMembers` are worked from it
+      (`plan-figures.ts`). The calendar's renewal to come and the customer
+      page's Subscriptions tab read the same sum. The diary's price of a
+      booking is its snapshot's. The public packs read serves both sides of
+      "a class instead of" as amounts to pay (`payEach`, `singlePay`).
+    - **The app formats and never works one out**
+      (`apps/app.saroh.in/lib/gst/on-price.ts`: `payOf`, `setPriceWords`,
+      `addedSum`, `paidAtPrice`). The preview mirror
+      (`lib/gst/price-mode.ts`) is only for a price being typed in an
+      editor or a desk dialog, before the API has answered.
+    - **A new money figure picks its kind before it is drawn,** and a new
+      read of something priced serves `gst` with the price.
+    - **Left as typed, on purpose:** a history line ("subscribed at
+      ₹2,000", a price change) records the price that was set, and no mode
+      was recorded with it. The "Download your data" files keep the stored
+      columns, and their README says which price each file holds.
 
 ## Modelling
 

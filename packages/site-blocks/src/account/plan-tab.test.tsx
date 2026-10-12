@@ -59,7 +59,7 @@ const ACCOUNT: AccountView = {
     tabs: [
         { key: "home", label: "Home" },
         { key: "plan", label: "Plan" },
-        { key: "me", label: "Me" },
+        { key: "me", label: "Your details" },
     ],
     offers: { appointments: true, orders: false, plans: true },
     bookingsLabel: "Bookings",

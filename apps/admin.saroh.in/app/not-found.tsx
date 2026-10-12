@@ -6,6 +6,8 @@ import { AdminShell } from "@/components/admin-shell";
 import type { StaffIdentity } from "@/lib/control-plane";
 import { getStaffIdentity } from "@/lib/control-plane";
 
+export const metadata = { title: "Page not found" };
+
 /**
  * The console's 404: an unknown address, or a business, person or run the
  * API has no record of (`notFound()`). Staff see it inside the shell, so the

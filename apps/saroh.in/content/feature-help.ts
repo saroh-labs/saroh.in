@@ -41,6 +41,16 @@ export const FEATURE_HELP: Readonly<
         },
     ],
     billing: [{ slug: "add-your-gstin", label: "How to add your GSTIN" }],
+    website: [
+        {
+            slug: "connect-your-own-domain",
+            label: "How to connect your own domain",
+        },
+        {
+            slug: "make-your-link-look-right-when-shared",
+            label: "How to make your link look right when shared",
+        },
+    ],
 };
 
 export interface FeatureHelpLink {

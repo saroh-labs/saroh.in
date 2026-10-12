@@ -11,18 +11,32 @@ import type {
     SiteHeaderAction,
     SiteNavItem,
 } from "@saroh/site-blocks";
-import type { TemplateContext, TemplateManifest } from "@saroh/templates";
+import type {
+    InstantiatedTemplate,
+    TemplateContext,
+    TemplateManifest,
+    TemplateModulePageKind,
+} from "@saroh/templates";
 import {
+    getTemplate,
     instantiateTemplate,
     listTemplates,
     presetSiteStyle,
+    STARTER_TEMPLATE_ID,
+    templateFooterLineFor,
+    templateModulePageKinds,
     templateStylePreset,
 } from "@saroh/templates";
 
 import type { BriefColours } from "./brief-image";
 import { briefImage, hslOf } from "./brief-image";
 import type { TemplateFixture } from "./fixtures";
-import { FIXTURE_NOW, FIXTURE_TIME_ZONE, TEMPLATE_FIXTURES } from "./fixtures";
+import {
+    FIXTURE_NOW,
+    FIXTURE_TIME_ZONE,
+    STARTER_SAMPLES,
+    TEMPLATE_FIXTURES,
+} from "./fixtures";
 
 /**
  * One page of a gallery template, ready to draw (industry templates U14):
@@ -119,23 +133,116 @@ export interface TemplateRender {
     fixtures: SiteFixtures;
 }
 
+/** What a render is drawn from: a template, and the business it is for. */
+interface RenderSample {
+    template: TemplateManifest;
+    /** The sample business's name: the header's and the footer's. */
+    name: string;
+    context: TemplateContext;
+    fixture: TemplateFixture | undefined;
+    /** The page entries of the site's menu, after its section entries. */
+    menu: (built: InstantiatedTemplate) => SiteNavItem[];
+    /**
+     * Whether each empty photo slot is drawn as its brief. The gallery
+     * does, to show what the design is for. The starter does not: its
+     * renders are a site on its first day, when it has no photograph, so a
+     * slot draws nothing and a product has no picture, as on the live site.
+     */
+    briefsAsPhotos: boolean;
+}
+
+/** The titles the module pages start with (`page-kinds.ts` in the API). */
+const MODULE_PAGE_ENTRIES: Record<
+    TemplateModulePageKind,
+    { label: string; href: string }
+> = {
+    SHOP: { label: "Shop", href: "/shop" },
+    BOOK: { label: "Book", href: "/book" },
+    PRICES: { label: "Prices", href: "/prices" },
+    CONTACT: { label: "Contact", href: "/contact" },
+};
+
 /**
- * Build one page. `null` when the template is not in the gallery, has no
- * such colourway, or lays down no page at `path` for its sample business.
- * `styleId` absent: the first colourway (or none, for a template without).
+ * The menu a starter site is made with (`site-create.ts`): Home, what the
+ * business offers (Shop, Book, Prices), its other pages, Contact last.
+ */
+function starterMenu(
+    template: TemplateManifest,
+    context: TemplateContext,
+    built: InstantiatedTemplate,
+): SiteNavItem[] {
+    const kinds = templateModulePageKinds(template, context);
+    const entry = (kind: TemplateModulePageKind): SiteNavItem => ({
+        ...MODULE_PAGE_ENTRIES[kind],
+        kind,
+    });
+    const pages = built.pages.filter((p) => p.inMenu ?? !p.isHome);
+    const item = (p: (typeof pages)[number]): SiteNavItem => ({
+        label: p.title,
+        href: p.path,
+    });
+    return [
+        ...pages.filter((p) => p.isHome).map(item),
+        ...kinds.filter((k) => k !== "CONTACT").map(entry),
+        ...pages.filter((p) => !p.isHome).map(item),
+        ...kinds.filter((k) => k === "CONTACT").map(entry),
+    ];
+}
+
+/**
+ * The sample a render id names: a gallery template (its one sample
+ * business), or one of the starter's (`STARTER_SAMPLES`: `starter` for a
+ * business with nothing switched on, `starter-shop`, `starter-salon`), which
+ * are drawn from the starter new sites start from. Null for anything else.
+ */
+function renderSample(templateId: string): RenderSample | null {
+    const starter = STARTER_SAMPLES[templateId];
+    if (starter) {
+        const template = getTemplate(STARTER_TEMPLATE_ID);
+        if (!template) return null;
+        const context: TemplateContext = {
+            organizationName: starter.name,
+            ...starter.context,
+        };
+        return {
+            template,
+            name: starter.name,
+            context,
+            fixture: starter.fixture,
+            menu: (built) => starterMenu(template, context, built),
+            briefsAsPhotos: false,
+        };
+    }
+    const template = galleryTemplates().find((t) => t.id === templateId);
+    if (!template) return null;
+    return {
+        template,
+        name: template.sample?.name ?? template.name,
+        context: sampleContext(template),
+        fixture: TEMPLATE_FIXTURES[template.id],
+        menu: () => [],
+        briefsAsPhotos: true,
+    };
+}
+
+/**
+ * Build one page. `null` when the id names neither a gallery template nor a
+ * starter sample, the template has no such colourway, or it lays down no
+ * page at `path` for its sample business. `styleId` absent: the first
+ * colourway (or none, for a template without).
  */
 export function templateRender(
     templateId: string,
     styleId: string | undefined,
     path: string,
 ): TemplateRender | null {
-    const template = galleryTemplates().find((t) => t.id === templateId);
-    if (!template) return null;
+    const sample = renderSample(templateId);
+    if (!sample) return null;
+    const { template, fixture, context } = sample;
     const preset = templateStylePreset(template, styleId);
     if (preset === null) return null;
 
-    const fixture = TEMPLATE_FIXTURES[template.id];
-    const built = instantiateTemplate(template, sampleContext(template));
+    const built = instantiateTemplate(template, context);
     const page = built.pages.find((p) => p.path === path);
     if (!page) return null;
     const home = built.pages.find((p) => p.isHome) ?? page;
@@ -148,18 +255,31 @@ export function templateRender(
         ink: hslOf(styleVariables["--site-muted"], "#57534e"),
     };
 
-    const sections: Section[] = page.sections.map((s, i) => ({
-        type: s.type,
-        content: drawBriefs(
-            patched(fixture, page.path, s.type, nthOfType(page.sections, i), {
-                ...(s.content as Record<string, unknown>),
-            }),
-            colours,
+    const sections: Section[] = page.sections.map((s, i) => {
+        const content = patched(
+            fixture,
+            page.path,
             s.type,
-        ),
-    }));
+            nthOfType(page.sections, i),
+            { ...(s.content as Record<string, unknown>) },
+        );
+        // A real site's message form gets its Form when the site is made
+        // (`site-create.ts`). A sample has none, and the block draws nothing
+        // without one, so the sample names a form that is never sent.
+        if (s.type === "enquiry" && !content.formId) {
+            content.formId = "sample-form";
+        }
+        return {
+            type: s.type,
+            content: sample.briefsAsPhotos
+                ? drawBriefs(content, colours, s.type)
+                : content,
+        };
+    });
 
-    const uses = template.uses ?? [];
+    // What the sample business has on: the template's own list, or, for the
+    // starter, the modules of the business it is drawn for.
+    const uses = template.uses ?? context.modules ?? [];
     const services = fixture?.services ?? [];
     const books = uses.includes("APPOINTMENTS") && services.length > 0;
     const sells =
@@ -174,14 +294,16 @@ export function templateRender(
     return {
         templateId: template.id,
         styleId: preset?.id ?? null,
-        name: template.sample?.name ?? template.name,
+        name: sample.name,
         styleVariables,
-        // A new site has no menu of its own yet: what it publishes with is
-        // its home page's labelled sections (`withInPageNavigation`).
-        navigation: inPageNavigation(home.sections),
+        // A gallery template's site has no menu of its own yet: what it
+        // publishes with is its home page's labelled sections
+        // (`withInPageNavigation`). The starter starts with a real menu of
+        // its pages (`sample.menu`), which those sections lead.
+        navigation: [...inPageNavigation(home.sections), ...sample.menu(built)],
         action,
         shopServes: sells,
-        footer: footerOf(template, fixture),
+        footer: footerOf(template, fixture, context),
         sections,
         journal: fixture?.posts
             ? {
@@ -214,6 +336,7 @@ export function templateRender(
                                   "plates"
                                   ? "upper"
                                   : "centre",
+                              sample.briefsAsPhotos,
                           ),
                       ),
                       basePath: "/shop",
@@ -226,7 +349,7 @@ export function templateRender(
                 ? {
                       source: "business",
                       storeId: null,
-                      name: template.sample?.name ?? template.name,
+                      name: sample.name,
                       timezone: FIXTURE_TIME_ZONE,
                       ...fixture.visit,
                   }
@@ -247,10 +370,17 @@ export function templateRender(
 function footerOf(
     template: TemplateManifest,
     fixture: TemplateFixture | undefined,
+    context: TemplateContext,
 ): SiteFooterContent | null {
     const footer = template.footer;
     if (!footer) return null;
-    const line = (fixture?.footer ?? footer.line ?? "").trim();
+    // The template's own line, or the one it works out from the business
+    // (the starter's, `footer.lineFrom`).
+    const line = (
+        fixture?.footer ??
+        templateFooterLineFor(template, context) ??
+        ""
+    ).trim();
     const layout = footer.layout ?? "centre";
     if (line === "" && layout === "centre") return null;
     return { format: "markdown", value: line, layout };
@@ -281,6 +411,8 @@ function productCard(
     p: NonNullable<TemplateFixture["products"]>[number],
     colours: BriefColours,
     placement: "centre" | "upper",
+    /** Draw its photograph as the brief; false, it has none yet. */
+    photo = true,
 ): ShopListingCard {
     return {
         slug: p.slug,
@@ -289,15 +421,17 @@ function productCard(
         price: p.price,
         mrp: null,
         priceFrom: false,
-        image: {
-            url: briefImage(
-                p.brief,
-                colours,
-                { width: 1000, height: 1000 },
-                placement,
-            ),
-            alt: p.brief,
-        },
+        image: photo
+            ? {
+                  url: briefImage(
+                      p.brief,
+                      colours,
+                      { width: 1000, height: 1000 },
+                      placement,
+                  ),
+                  alt: p.brief,
+              }
+            : null,
         variantTitles: [],
         blurb: p.blurb,
         soldOut: p.soldOut ?? false,

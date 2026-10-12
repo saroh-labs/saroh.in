@@ -98,3 +98,30 @@ describe("the shop's answers (G11)", () => {
         expect(ok.ok).toBe(true);
     });
 });
+
+describe("GST on the shop's answers (the business's price mode)", () => {
+    const adds = {
+        mode: "ADDED",
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+
+    it("reads a card that says GST comes on top, and one that says nothing", () => {
+        for (const gstAdded of [true, false, undefined]) {
+            expect(
+                isCatalogue({
+                    storefront: { name: "Online" },
+                    products: [{ ...card, gstAdded }],
+                }),
+            ).toBe(true);
+        }
+    });
+
+    it("reads a product with its GST, with none, and with nothing", () => {
+        for (const gst of [adds, null, undefined]) {
+            expect(isCatalogueProduct({ ...product, gst })).toBe(true);
+        }
+    });
+});

@@ -28,6 +28,20 @@ describe("company facts", () => {
         expect(REFUNDS.body).toContain(written);
     });
 
+    it("gives the office's parts, for search engines, from that same line", () => {
+        const office = officeLine() ?? "";
+        const postal = COMPANY.postal;
+        expect(postal).toBeDefined();
+        if (!postal) return;
+        // In order, and nothing that the published address doesn't say.
+        expect(office.startsWith(`${postal.street}, ${postal.locality}`)).toBe(
+            true,
+        );
+        expect(office).toContain(`${postal.region} ${postal.postalCode}`);
+        expect(postal.country).toBe("IN");
+        expect(office.endsWith("India")).toBe(true);
+    });
+
     it("holds no placeholder: nothing in brackets, no run of zeros", () => {
         // Every string the facts hold, however deep.
         const strings: string[] = [];

@@ -30,6 +30,19 @@
   `ENVIRONMENT.md`. It hides a feature and protects nothing: what must stay
   private needs the API's flag (below).
 
+- **Current** — **A switch that opens on a date is one instant, not a
+  deploy someone remembers.** `LAUNCH_AT` (early access; an ISO time with its
+  offset, in production `vars` only) is the worked example. What runs per
+  request reads the clock on the server (`withDevAccess`, accounts' gate):
+  nothing to deploy. What is compiled in gets its switch from
+  `scripts/cf-env.mjs` (`AT_LAUNCH`) when the build runs at or after the
+  instant, and a switch written in `vars` still wins. Three rules keep it
+  safe: a value that can't be read opens nothing; every dated switch is in
+  turbo.json's hashed `globalEnv`, so the build fingerprint changes at the
+  instant and a push after it deploys; and tests pass the time in, never
+  read the clock. A static site still needs one build after the instant: any
+  production deploy of it does.
+
 ## A missing production variable fails loudly — **Current**
 
 A fallback to a production address hides a missing variable: the deployment
@@ -82,6 +95,12 @@ session can't touch production's.
   Rotate by changing the key. The API and the merchant sites are not behind it
   — dev holds no real customers and its payments run in sandbox
   (`CASHFREE_ENV=sandbox`).
+- **In every environment**, `withPrivateApp` (`@saroh/auth/private-app`)
+  wraps it in the workspace's, accounts' and the console's middleware:
+  `withPrivateApp(withDevAccess(…))`, outermost, so every answer the
+  middleware gives, the redirect to sign-in among them, says
+  `X-Robots-Tag: noindex, nofollow` and carries the security headers
+  (`frontend-app-structure.md` → Titles, and staying out of search).
 - `AUTH_COOKIE_PREFIX` names dev's session cookie apart from production's, a
   second guard should the domains ever share a parent.
 - The key lives only in the GitHub environment `cloudflare-development`,

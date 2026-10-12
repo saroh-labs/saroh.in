@@ -206,6 +206,10 @@ describe("PublicInvoicesService.read", () => {
                     quantity: 1,
                     unitPrice: "1200.00",
                     amount: "1200.00",
+                    // Only a line GST was added to ever carries one.
+                    unitPay: null,
+                    // A line with no rate says nothing about GST.
+                    gst: null,
                 },
             ],
             tax: "200.00",
@@ -238,6 +242,221 @@ describe("PublicInvoicesService.read", () => {
         ]) {
             expect(select).not.toHaveProperty(hidden);
         }
+    });
+
+    describe("a tax invoice's lines, by how each price carried GST (12 Oct 2026)", () => {
+        /** A registered business's stored line, as issuing froze it. */
+        const stored = (line: Record<string, unknown>) => ({
+            description: "Lip balm",
+            discount: dec("0.00"),
+            gstRate: dec("18.00"),
+            igst: dec("0.00"),
+            ...line,
+        });
+        const read = async (
+            lines: Record<string, unknown>[],
+            tax: string,
+            total: string,
+        ) => {
+            invoiceFindFirst.mockResolvedValue({
+                ...STORED,
+                kind: "INVOICE",
+                sellerGstin: "29ABCDE1234F1Z5",
+                tax: dec(tax),
+                total: dec(total),
+                lines,
+            });
+            return makeService().service.read(TOKEN);
+        };
+        /** Lines, then the tax, are the total: the page's own column. */
+        const adds = (view: {
+            lines: { amount: string }[];
+            tax: string;
+            total: string;
+        }) =>
+            view.lines.reduce(
+                (s, l) => s + Math.round(Number(l.amount) * 100),
+                0,
+            ) +
+                Math.round(Number(view.tax) * 100) ===
+            Math.round(Number(view.total) * 100);
+
+        // ₹1,000, 3 × ₹780 and 7 × ₹99.99 at 18%, sold with GST added:
+        // ₹1,180, 3 × ₹920.40 and 7 × ₹117.99 to pay.
+        const ADDED = [
+            stored({
+                quantity: 1,
+                unitPrice: dec("1180.00"),
+                amount: dec("1180.00"),
+                taxableValue: dec("1000.00"),
+                cgst: dec("90.00"),
+                sgst: dec("90.00"),
+                gstPriceMode: "ADDED",
+            }),
+            stored({
+                quantity: 3,
+                unitPrice: dec("920.40"),
+                amount: dec("2761.20"),
+                taxableValue: dec("2340.00"),
+                cgst: dec("210.60"),
+                sgst: dec("210.60"),
+                gstPriceMode: "ADDED",
+            }),
+            stored({
+                quantity: 7,
+                unitPrice: dec("117.99"),
+                amount: dec("825.93"),
+                taxableValue: dec("699.94"),
+                cgst: dec("63.00"),
+                sgst: dec("62.99"),
+                gstPriceMode: "ADDED",
+            }),
+        ];
+        // The same three typed prices, sold with GST inside them.
+        const included = (mode: string | null) => [
+            stored({
+                quantity: 1,
+                unitPrice: dec("1000.00"),
+                amount: dec("1000.00"),
+                taxableValue: dec("847.46"),
+                cgst: dec("76.27"),
+                sgst: dec("76.27"),
+                gstPriceMode: mode,
+            }),
+            stored({
+                quantity: 3,
+                unitPrice: dec("780.00"),
+                amount: dec("2340.00"),
+                taxableValue: dec("1983.05"),
+                cgst: dec("178.48"),
+                sgst: dec("178.47"),
+                gstPriceMode: mode,
+            }),
+            stored({
+                quantity: 7,
+                unitPrice: dec("99.99"),
+                amount: dec("699.93"),
+                taxableValue: dec("593.16"),
+                cgst: dec("53.39"),
+                sgst: dec("53.38"),
+                gstPriceMode: mode,
+            }),
+        ];
+
+        it("GST added: the typed price as the rate, the line before GST as the amount, and they add up", async () => {
+            const view = await read(ADDED, "727.19", "4767.13");
+            expect(view.lines).toEqual([
+                {
+                    description: "Lip balm",
+                    quantity: 1,
+                    unitPrice: "1000.00",
+                    amount: "1000.00",
+                    unitPay: null,
+                    gst: {
+                        mode: "ADDED",
+                        rate: "18",
+                        listCents: 100_000,
+                        gstCents: 18_000,
+                        payCents: 118_000,
+                    },
+                },
+                {
+                    description: "Lip balm",
+                    quantity: 3,
+                    unitPrice: "780.00",
+                    amount: "2340.00",
+                    unitPay: null,
+                    gst: {
+                        mode: "ADDED",
+                        rate: "18",
+                        listCents: 234_000,
+                        gstCents: 42_120,
+                        payCents: 276_120,
+                    },
+                },
+                {
+                    // 7 × ₹99.99 is ₹699.93; the frozen taxable value is
+                    // ₹699.94, so one unit with its GST is sent too.
+                    description: "Lip balm",
+                    quantity: 7,
+                    unitPrice: "99.99",
+                    amount: "699.94",
+                    unitPay: "117.99",
+                    gst: {
+                        mode: "ADDED",
+                        rate: "18",
+                        listCents: 69_994,
+                        gstCents: 12_599,
+                        payCents: 82_593,
+                    },
+                },
+            ]);
+            // 1,000 + 2,340 + 699.94 = 4,039.94; + 727.19 = 4,767.13.
+            expect(view.tax).toBe("727.19");
+            expect(view.total).toBe("4767.13");
+            expect(adds(view)).toBe(true);
+            // The discount is read for the line's reading, never sent.
+            expect(JSON.stringify(view)).not.toContain("discount");
+        });
+
+        it.each([
+            ["recorded as includes", "INCLUDED"],
+            ["with no mode recorded", null],
+        ])(
+            "a line %s: the amount to pay, exactly as before",
+            async (_name, mode) => {
+                const view = await read(included(mode), "616.26", "4039.93");
+                expect(
+                    view.lines.map((l) => [l.unitPrice, l.amount, l.unitPay]),
+                ).toEqual([
+                    ["1000.00", "1000.00", null],
+                    ["780.00", "2340.00", null],
+                    ["99.99", "699.93", null],
+                ]);
+                expect(view.lines.map((l) => l.gst)).toEqual([
+                    {
+                        mode: "INCLUDED",
+                        rate: "18",
+                        listCents: 100_000,
+                        gstCents: 15_254,
+                        payCents: 100_000,
+                    },
+                    {
+                        mode: "INCLUDED",
+                        rate: "18",
+                        listCents: 234_000,
+                        gstCents: 35_695,
+                        payCents: 234_000,
+                    },
+                    {
+                        mode: "INCLUDED",
+                        rate: "18",
+                        listCents: 69_993,
+                        gstCents: 10_677,
+                        payCents: 69_993,
+                    },
+                ]);
+                expect(view.total).toBe("4039.93");
+            },
+        );
+
+        it("both on one paper: each line reads its own way", async () => {
+            const view = await read(
+                [ADDED[0], included("INCLUDED")[0]],
+                "332.54",
+                "2180.00",
+            );
+            expect(
+                view.lines.map((l) => [l.unitPrice, l.amount, l.gst?.mode]),
+            ).toEqual([
+                ["1000.00", "1000.00", "ADDED"],
+                ["1000.00", "1000.00", "INCLUDED"],
+            ]);
+            // ₹1,000 + ₹180, and ₹1,000 with ₹152.54 inside: ₹2,180.
+            expect(
+                view.lines.reduce((s, l) => s + (l.gst?.payCents ?? 0), 0),
+            ).toBe(218_000);
+        });
     });
 
     it("calls a registered business's exempt paper a bill of supply, sending no GSTIN or rate", async () => {

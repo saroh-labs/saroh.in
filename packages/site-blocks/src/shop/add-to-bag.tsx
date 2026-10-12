@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { focusRing } from "../booking-flow/styles";
+import { focusRing, quietFill } from "../booking-flow/styles";
+import { browsePriceWords } from "../lib/gst-price";
 import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
 import { useProductSelection } from "../product/product-page";
@@ -56,8 +57,25 @@ const BAR_ROOM =
 const bar =
     "max-[699px]:bg-site-surface max-[699px]:border-site-border max-[699px]:fixed max-[699px]:inset-x-0 max-[699px]:bottom-[var(--site-consent-offset,0px)] max-[699px]:z-40 max-[699px]:flex max-[699px]:flex-col-reverse max-[699px]:gap-2 max-[699px]:border-t max-[699px]:px-4 max-[699px]:pb-[calc(12px+env(safe-area-inset-bottom))] max-[699px]:pt-3 max-[699px]:shadow-[0_-8px_24px_hsl(var(--site-fg)/0.12)]";
 
+/*
+ * The product page's one action: the accent, 48px, the page's widest
+ * button. Where it stands alone at a desk it keeps a width of its own
+ * (15rem at least), so "Add to bag · ₹180" and "Sold out" are one size and
+ * nothing beside it moves.
+ */
 export const actionButton = cn(
-    "bg-site-accent text-site-accent-fg inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-[var(--site-radius,2px)] px-5 text-sm font-semibold transition-[opacity,transform] duration-100 hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 sm:w-auto",
+    "bg-site-accent text-site-accent-fg inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-[calc(var(--site-radius,2px)+8px)] px-6 text-[15px] font-semibold tabular-nums transition-[opacity,transform] duration-100 ease-out hover:opacity-90 active:scale-[0.98] sm:w-auto sm:min-w-[15rem]",
+    focusRing,
+);
+
+/**
+ * The same button when it can't be pressed (sold out, all of it in the
+ * bag): quiet, never the accent faded, so its words still read and it is
+ * told from the live one by more than a tint.
+ */
+const actionButtonOff = cn(
+    "text-site-body inline-flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-[calc(var(--site-radius,2px)+8px)] px-6 text-[15px] font-semibold sm:w-auto sm:min-w-[15rem]",
+    quietFill,
     focusRing,
 );
 
@@ -118,9 +136,17 @@ export function AddToBag({
     }
 
     // What one more costs, on the button itself.
-    const price = selection.currency
-        ? formatAmount(selection.price, selection.currency)
-        : "";
+    // The amount to pay where the page knows it ("₹1,180" for ₹1,000 +
+    // 18%): a button that takes money names the whole of it. Without the
+    // sum it is "₹1,000 + GST", and the bag shows the rest.
+    const price = !selection.currency
+        ? ""
+        : selection.payAmount
+          ? formatAmount(selection.payAmount, selection.currency)
+          : browsePriceWords(
+                formatAmount(selection.price, selection.currency),
+                selection.gstAdded === true,
+            );
     const forPrice = price ? ` · ${price}` : "";
 
     return (
@@ -130,7 +156,9 @@ export function AddToBag({
                 type="button"
                 onClick={add}
                 disabled={selection.soldOut || !room}
-                className={cn(actionButton, "max-[699px]:min-h-12")}
+                className={
+                    selection.soldOut || !room ? actionButtonOff : actionButton
+                }
             >
                 {selection.soldOut
                     ? "Sold out"

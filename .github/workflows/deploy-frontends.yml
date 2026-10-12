@@ -7,8 +7,11 @@ name: Build and deploy apps on Cloudflare
 #
 #   push to development   -> the dev Workers (saroh-*-dev, *.saroh.io)
 #   push to main          -> the production Workers (saroh-*, *.saroh.in, saroh.app)
-#   every night 00:00 IST -> the marketing site, both environments, so a page
-#                            dated today appears (the site is static)
+#   no schedule           -> nothing deploys at night; a marketing-site page
+#                            dated today appears with that site's next deploy.
+#                            One exception, once: the two `schedule` lines
+#                            below open early access on 17 Oct 2026 (owner,
+#                            12 Oct 2026). The rule stands for everything else.
 #   manual / the API      -> one app (or all) in one environment, always
 #                            deployed; the API starts the marketing site's build
 #                            when pricing is published, and Platform Owners
@@ -33,6 +36,8 @@ name: Build and deploy apps on Cloudflare
 run-name: >-
     ${{ github.event_name == 'workflow_dispatch'
     && format('Deploy {0} to {1}', inputs.app, inputs.environment)
+    || github.event_name == 'schedule'
+    && 'Open early access (the dated launch)'
     || github.event.head_commit.message }}
 
 on:
@@ -41,6 +46,30 @@ on:
         paths-ignore:
             - "docs/**"
             - "**/*.md"
+    # THE ONE-TIME LAUNCH RUN. DELETE THIS `schedule` BLOCK, and the
+    # `schedule)` case in the plan step, ONCE EARLY ACCESS IS OPEN.
+    #
+    # Early access opens at LAUNCH_AT (production vars of saroh.in, accounts
+    # and the workspace: 17 Oct 2026, 16:00 IST = 10:30 UTC) with nobody doing
+    # anything. Accounts opens by its own clock; the site and the workspace
+    # need a build made after that instant, and these two runs make it:
+    #
+    #   09:45 UTC  starts early on purpose, because GitHub starts schedules
+    #              late (often by many minutes, sometimes an hour). It waits
+    #              for LAUNCH_AT, then deploys every app to production from
+    #              main. An hour late, it has nothing to wait for and deploys
+    #              at once.
+    #   10:35 UTC  the second try: deploys only what the first left unopened
+    #              (apps whose live build differs), so nothing when it worked.
+    #
+    # A cron line can't name a year, so these would fire every 17 Oct: the
+    # plan step deploys nothing unless the year is 2026, and nothing when
+    # LAUNCH_AT is gone or more than 90 minutes away (the launch was called
+    # off or moved; move these lines with it). Schedules run from the default
+    # branch (main), so this file must be on main before the day.
+    schedule:
+        - cron: "45 9 17 10 *"
+        - cron: "35 10 17 10 *"
     workflow_dispatch:
         inputs:
             app:
@@ -74,13 +103,15 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  ref: ${{ github.ref }}
+                  # The launch run plans from what it deploys: main.
+                  ref: ${{ github.event_name == 'schedule' && 'main' || github.ref }}
             - uses: ./.github/actions/setup
               with:
                   prisma: "false"
             - id: plan
               env:
                   EVENT: ${{ github.event_name }}
+                  SCHEDULE: ${{ github.event.schedule }}
                   REF: ${{ github.ref_name }}
                   INPUT_APP: ${{ inputs.app }}
                   INPUT_ENV: ${{ inputs.environment }}
@@ -95,6 +126,25 @@ jobs:
                     push)
                       env=$([ "$REF" = main ] && echo production || echo development)
                       json=$(node scripts/cf-plan.mjs "$env" | jq -c --arg r "$REF" 'map(. + {ref: $r})') ;;
+                    schedule)
+                      # The one-time launch run (see `on.schedule`): 2026 only,
+                      # and only when LAUNCH_AT is at hand. It sleeps until the
+                      # instant has passed, so the plan below and every build
+                      # after it are made on the open side of it. The first
+                      # run deploys every app; the second only what differs
+                      # from what is live.
+                      json='[]'
+                      wait=$(node scripts/cf-plan.mjs --launch-wait)
+                      if [ "$(date -u +%Y)" != 2026 ]; then
+                        echo "::notice::Not 2026: the launch run does nothing. Delete its schedule from this workflow."
+                      elif [ "$wait" = none ]; then
+                        echo "::notice::No LAUNCH_AT within 90 minutes in production vars: the launch run does nothing."
+                      else
+                        echo "Waiting ${wait}s for LAUNCH_AT"
+                        sleep "$wait"
+                        force=$([ "$SCHEDULE" = "45 9 17 10 *" ] && echo 1 || echo 0)
+                        json=$(FORCE=$force node scripts/cf-plan.mjs production | with_ref production)
+                      fi ;;
                   esac
                   echo "matrix=$json" >> "$GITHUB_OUTPUT"
                   echo "To deploy: $json"
@@ -201,13 +251,16 @@ jobs:
 
             # OpenNext's deploy, not wrangler's: it first copies the prebuilt
             # pages into the Worker's static files. The fingerprint label is how
-            # the next plan knows this build is live.
+            # the next plan knows this build is live. LAUNCH_DEPLOY_VARS is
+            # empty until LAUNCH_AT has passed; then it is the launch switches
+            # this build was given (the "Settings" step), for the Worker too.
             - name: Deploy
               working-directory: ${{ matrix.dir }}
               run: >-
                   pnpm exec opennextjs-cloudflare deploy
                   ${{ matrix.env == 'production' && '--env production' || '' }}
                   --var BUILD_FINGERPRINT:${{ matrix.fingerprint }}
+                  ${LAUNCH_DEPLOY_VARS:-}
 
             # A deploy recreates the routes in wrangler.jsonc "fail closed";
             # Wrangler can't say otherwise. Set them to fail open, so a failing

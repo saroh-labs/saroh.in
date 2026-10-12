@@ -9,7 +9,7 @@ import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
 
 export const metadata: Metadata = {
-    title: "Sign up · Saroh",
+    title: "Sign up",
     description: "Sell, take bookings, bill and run your website in one place.",
 };
 

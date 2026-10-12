@@ -19,7 +19,7 @@ import {
     templatesPage,
 } from "@/content/templates";
 import { resourcesContext } from "@/lib/resources-context";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, pageTitle } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
 
 /**
@@ -54,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const t = liveTemplate(slug);
     if (!t) return {};
     return pageMetadata({
-        title: `${t.name} website template — Saroh`,
+        title: pageTitle(`${t.name} website template`),
         socialTitle: `${t.name}: ${t.idea}.`,
         description: t.description,
         path: t.href,

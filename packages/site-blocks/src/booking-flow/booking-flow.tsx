@@ -17,6 +17,7 @@ import { cn } from "../lib/utils";
 import { useQrSource } from "../qr-source";
 import type { BusinessReach } from "../reach-links";
 import { ReachLinks } from "../reach-links";
+import { SitePageState } from "../shop/page-state";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStopSheet } from "../test-release/test-release-stop";
 import { TEST_RELEASE_REASON } from "../test-release/words";
@@ -68,9 +69,11 @@ import {
     formatMoney,
     laterSkip,
     laterWords,
+    payCentsOf,
     payChoices,
     restAfterDeposit,
     rulesText,
+    serviceGstWords,
     unpayableText,
     visitsOf,
     whereText,
@@ -470,9 +473,13 @@ export default function BookingFlow({
             : "join";
     const waiting = waitMode === "join" || waitMode === "waiting";
 
+    // What one booking costs to pay, GST and all: the API's amount, on the
+    // button, the summary and the confirmation. The words about the GST in
+    // or on it go beside it; null when the API said none.
     const price = service
-        ? formatMoney(service.priceCents, service.currency)
+        ? formatMoney(payCentsOf(service), service.currency)
         : null;
+    const gstWords = serviceGstWords(service);
     // A class credit of their own (A10), once signed in with a time chosen:
     // the API says which, and it is offered first.
     const {
@@ -1217,6 +1224,8 @@ export default function BookingFlow({
     const summary = {
         dueLabel,
         due,
+        // Beside an amount of money only: not a credit, nor the waitlist.
+        gstText: waiting || pay === "CREDIT" ? null : gstWords,
         block,
         // A name not typed yet is a next step until they try to book.
         quiet: !touched && block === NAME_LEFT,
@@ -1314,6 +1323,14 @@ export default function BookingFlow({
                                     </>
                                 )}
                             </p>
+                            {/* With no phone in the sentence, the ways the
+                                site does show: a message, at least. */}
+                            {facts.phone ? null : (
+                                <ReachLinks
+                                    reach={callReach}
+                                    className="mt-1"
+                                />
+                            )}
                         </div>
                     ) : !page.open || services.length === 0 ? (
                         <div className={card}>
@@ -1345,6 +1362,7 @@ export default function BookingFlow({
                             }
                             rules={page.rules}
                             visits={visitsOf(service)}
+                            gst={gstWords}
                             onAgain={bookAnother}
                         />
                     ) : phase.kind === "waitlisted" ? (
@@ -1360,6 +1378,7 @@ export default function BookingFlow({
                             zone={zone}
                             headingRef={headingRef}
                             serviceName={service?.name ?? ""}
+                            gst={gstWords}
                             business={page.businessName}
                             booker={{
                                 name: bookerName,
@@ -1488,6 +1507,11 @@ export default function BookingFlow({
                                 <PayStep
                                     choices={choices}
                                     pay={pay}
+                                    gst={
+                                        choices.some((c) => c.pay !== "CREDIT")
+                                            ? gstWords
+                                            : null
+                                    }
                                     onPick={pickPay}
                                 />
                             ) : null}
@@ -1569,20 +1593,29 @@ export default function BookingFlow({
 
 /**
  * The booking page when its business could not be read: said plainly, in the
- * site's palette, with nothing to click that cannot work.
+ * site's palette, with a way to ask again (the address as it was opened)
+ * and the ways to reach the business. Nothing to click that cannot work.
  */
-export function BookingUnavailable({ business }: { business: string }) {
+export function BookingUnavailable({
+    business,
+    retryHref = null,
+    reach = null,
+}: {
+    business: string;
+    /** The page's own address: "Try again" asks for it afresh. */
+    retryHref?: string | null;
+    /** A call and a message, when the site shows them. */
+    reach?: BusinessReach | null;
+}) {
     return (
-        <div className="bg-site-bg mx-auto max-w-[1060px] px-5 py-16">
-            <div className={cn(card, "max-w-xl")}>
-                <h1 className="font-site-heading text-site-fg text-[26px] font-semibold tracking-[-0.03em]">
-                    We couldn&apos;t open the booking page
-                </h1>
-                <p className="text-site-body mt-2 text-sm">
-                    Something went wrong on our side. Try again in a moment, or
-                    get in touch with {business} to book.
-                </p>
-            </div>
-        </div>
+        <SitePageState
+            title="We couldn't open the booking page"
+            failed
+            retryHref={retryHref}
+            reach={reach}
+        >
+            Something went wrong on our side. Try again in a moment, or get in
+            touch with {business} to book.
+        </SitePageState>
     );
 }

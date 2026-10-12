@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import { instantiateTemplate } from "../instantiate";
 import type { TemplateContext } from "../manifest";
+import { getTemplate } from "../registry";
 import {
     PERSONAL_TEMPLATE_ID,
     personalServiceIds,
     personalTemplate,
+    personalTemplateV1,
 } from "./personal";
 
 /**
@@ -71,10 +73,12 @@ const profiles: [string, WithModules][] = [
 ];
 
 describe("personal@1 (DEC-070, K14)", () => {
-    it("is the Personal template, version 1", () => {
+    it("is the Personal template, whose pages are version 1's", () => {
         expect(personalTemplate.id).toBe(PERSONAL_TEMPLATE_ID);
         expect(personalTemplate.id).toBe("personal");
-        expect(personalTemplate.version).toBe(1);
+        expect(personalTemplate.version).toBe(2);
+        expect(personalTemplate.pages).toBe(personalTemplateV1.pages);
+        expect(getTemplate(PERSONAL_TEMPLATE_ID, 1)).toBe(personalTemplateV1);
     });
 
     it.each(profiles)(

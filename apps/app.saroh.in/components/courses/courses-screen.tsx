@@ -7,6 +7,7 @@ import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { GraduationCap } from "lucide-react";
 import Link from "next/link";
 
+import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
 import { DataView } from "@/components/shared/data-view/data-view";
 import type {
     DataColumn,
@@ -20,6 +21,8 @@ import {
     TAB_LABEL,
 } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
+import type { MissingRates } from "@/lib/gst-rates/missing";
+import { setPriceWords } from "@/lib/gst/on-price";
 
 const BADGE: Record<CourseTab, "success" | "warning" | "neutral" | "info"> = {
     OPEN: "success",
@@ -56,7 +59,13 @@ export function CoursesScreen({
     courses,
     canWrite,
     initialFilterId,
+    missingRates = null,
 }: {
+    /**
+     * What is on sale with a price and no GST rate, for a GST-registered
+     * business; null when it couldn't be told, which draws nothing.
+     */
+    missingRates?: MissingRates | null;
     courses: Course[];
     canWrite: boolean;
     initialFilterId?: string;
@@ -98,8 +107,14 @@ export function CoursesScreen({
             numeric: true,
             money: true,
             sortValue: (c) => Number(c.price),
+            // The price the business set, saying so where GST comes on top.
             cell: (c) =>
-                formatMoneyMajor(c.price, c.currency, { decimals: "always" }),
+                setPriceWords(
+                    formatMoneyMajor(c.price, c.currency, {
+                        decimals: "always",
+                    }),
+                    c.gst,
+                ),
         },
         {
             id: "status",
@@ -130,6 +145,9 @@ export function CoursesScreen({
                     ) : undefined
                 }
             />
+            {/* Priced things on sale with no GST rate, for a registered
+                business: one line, and the sheet to choose them in. */}
+            <MissingRatesNotice missing={missingRates} />
             <DataView
                 viewId="courses"
                 rows={courses}

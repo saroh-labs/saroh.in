@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { ProductCollectionsTab } from "@/components/commerce/collections/collections-tab";
@@ -22,6 +23,8 @@ import { activeCut, pausedByCut, pausedWords } from "@/lib/billing/paused";
 import { listCollections } from "@/lib/collections/service";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { recordTitle } from "@/lib/page-title";
+import { readPriceHistory } from "@/lib/price-history/service";
 import { productHref, productTabOf } from "@/lib/products/links";
 import {
     getProductOverview,
@@ -43,7 +46,33 @@ import {
     getStockTracking,
 } from "@/lib/stock/service";
 
-export const metadata = { title: "Product" };
+// One read for the tab's title and the page: the business's product, as
+// the storefront in the address sees it or the first that sells it.
+const readOverview = cache(
+    (storefront: string | undefined, productId: string) =>
+        withStorefrontFallback(storefront, (at) =>
+            getProductOverview(at, productId),
+        ),
+);
+
+/** The product's own name in the tab; "Product" when it can't be read. */
+export async function generateMetadata({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ productId: string }>;
+    searchParams: Promise<{ storefront?: string }>;
+}) {
+    const [{ productId }, { storefront }] = await Promise.all([
+        params,
+        searchParams,
+    ]);
+    return recordTitle(
+        () => readOverview(storefront, productId),
+        (overview) => overview.product.name,
+        "Product",
+    );
+}
 
 const ROLE_WORD = {
     OWNER: "Owner",
@@ -110,9 +139,7 @@ export default async function ProductPage({
     // The business's product (#531), as the storefront in the address sees
     // it — or the first that sells it.
     const [read, business, web, paused] = await Promise.all([
-        withStorefrontFallback(query.storefront, (at) =>
-            getProductOverview(at, productId),
-        ),
+        readOverview(query.storefront, productId),
         // The business's Track stock switch (#515). Optional: unknown, the
         // product's own switch decides.
         getStockTracking().catch(() => null),
@@ -139,30 +166,41 @@ export default async function ProductPage({
     const onStock = view === "team" && tab === "stock" && tracking.counts;
 
     const onCollections = view === "team" && tab === "collections";
-    const [levels, log, checks, categories, collections] = await Promise.all([
-        // Its shelves at every storefront — optional: without them, the
-        // Overview shows the address's storefront and the Stock tab says
-        // it couldn't load.
-        tracking.counts &&
-        view === "team" &&
-        (tab === "overview" || tab === "stock")
-            ? getStockLevels({ product: productId }).catch(() => null)
-            : Promise.resolve(null),
-        onStock
-            ? getStockLog({ product: productId, limit: 100 }).catch(() => null)
-            : Promise.resolve(null),
-        onStock ? getStockChecks().catch(() => null) : Promise.resolve(null),
-        // The details sheet picks a category; only a writer opens it. The
-        // Collections tab says which category put it in an automatic one.
-        overview.canWrite || onCollections
-            ? listCategories().catch(() => [])
-            : Promise.resolve([]),
-        // The Collections tab's sizes and its Edit sheet (#524) — optional:
-        // without them the cards leave the count out and Edit waits.
-        onCollections
-            ? listCollections().catch(() => null)
-            : Promise.resolve(null),
-    ]);
+    const onOverview = view === "team" && tab === "overview";
+    const [levels, log, checks, categories, collections, priceHistory] =
+        await Promise.all([
+            // Its shelves at every storefront — optional: without them, the
+            // Overview shows the address's storefront and the Stock tab says
+            // it couldn't load.
+            tracking.counts &&
+            view === "team" &&
+            (tab === "overview" || tab === "stock")
+                ? getStockLevels({ product: productId }).catch(() => null)
+                : Promise.resolve(null),
+            onStock
+                ? getStockLog({ product: productId, limit: 100 }).catch(
+                      () => null,
+                  )
+                : Promise.resolve(null),
+            onStock
+                ? getStockChecks().catch(() => null)
+                : Promise.resolve(null),
+            // The details sheet picks a category; only a writer opens it. The
+            // Collections tab says which category put it in an automatic one.
+            overview.canWrite || onCollections
+                ? listCategories().catch(() => [])
+                : Promise.resolve([]),
+            // The Collections tab's sizes and its Edit sheet (#524) — optional:
+            // without them the cards leave the count out and Edit waits.
+            onCollections
+                ? listCollections().catch(() => null)
+                : Promise.resolve(null),
+            // What it and its options have cost (12 Oct 2026), under the
+            // Overview. Optional: a read that fails is said in its place.
+            onOverview
+                ? readPriceHistory("products", productId).catch(() => null)
+                : Promise.resolve(undefined),
+        ]);
     const stock: ProductStock | null = levels
         ? productStock(levels, productId)
         : null;
@@ -242,6 +280,7 @@ export default async function ProductPage({
                                 stock={stock}
                                 now={now}
                                 onShop={shopUrl !== null}
+                                priceHistory={priceHistory}
                             />
                         ) : null}
                         {tab === "stock" ? (

@@ -32,6 +32,7 @@ import type {
 } from "./dto";
 import { exemptInvoiceIds } from "./exempt-invoices";
 import { isGstRate, rateToBps } from "./gst";
+import { assertRatesSet } from "./gst-rate-required";
 import { gstinProblem, stateCode } from "./gst-states";
 import type { InvoiceSource } from "./invoice-state";
 import {
@@ -599,6 +600,19 @@ export class InvoicesService {
                 draft.contactId,
             );
             const profile = await loadTaxProfile(tx, ctx.organizationId);
+            // A tax invoice never goes out with a rate nobody chose
+            // (`gst-rate-required.ts`): the lines are named by their
+            // place, and the app asks for each rate where Issue was
+            // pressed. 0 is a rate; only a line with none is refused.
+            assertRatesSet(
+                profile.registered,
+                draft.lines.map((l, place) => ({
+                    kind: "LINE",
+                    id: String(place),
+                    name: l.description,
+                    rate: l.gstRate,
+                })),
+            );
             const doc = this.price(
                 draft.lines.map((l) => ({
                     description: l.description,
@@ -936,6 +950,7 @@ export class InvoicesService {
                 unitCents: toCents(l.unitPrice),
                 rateBps: rateToBps(l.gstRate ?? null),
                 code: l.hsnSac ?? null,
+                priceMode: l.priceMode ?? null,
             })),
             profile,
             gst.billToState,

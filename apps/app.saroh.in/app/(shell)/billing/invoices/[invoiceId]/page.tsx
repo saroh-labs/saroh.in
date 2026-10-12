@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import {
     ConnectedPanel,
@@ -32,9 +33,31 @@ import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { invoiceZone } from "@/lib/invoices/zone";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { recordTitle } from "@/lib/page-title";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Invoice" };
+// One read for the tab's title and the page.
+const readInvoice = cache((invoiceId: string) => getInvoice(invoiceId));
+
+/**
+ * "Invoice INV-0042" in the tab (a credit note says so): its number, never
+ * who it is billed to or its amount. A draft has no number yet: "Invoice".
+ */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ invoiceId: string }>;
+}) {
+    const { invoiceId } = await params;
+    return recordTitle(
+        () => readInvoice(invoiceId),
+        (invoice) =>
+            invoice.number
+                ? `${invoice.kind === "CREDIT_NOTE" ? "Credit note" : "Invoice"} ${invoice.number}`
+                : null,
+        "Invoice",
+    );
+}
 
 /**
  * Payments → Invoices → one invoice, after "Saroh Invoice Detail": the tax
@@ -60,7 +83,7 @@ export default async function InvoicePage({
         );
     }
     const [invoice, business, paymentsOn] = await Promise.all([
-        getInvoice(invoiceId),
+        readInvoice(invoiceId),
         getInvoiceBusiness(),
         paymentsModuleOn(),
     ]);

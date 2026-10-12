@@ -1,11 +1,7 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useId } from "react";
 
-import { setAutopayChargeTiming } from "@/lib/subscriptions/actions";
 import type {
     AutopayChargeTiming,
     AutopayTimingSettings,
@@ -14,67 +10,49 @@ import {
     sampleRenewal,
     timingOptions,
 } from "@/lib/subscriptions/autopay-timing";
+import { TIMING_LABEL } from "@/lib/subscriptions/plan-settings";
 
-import { runAction } from "@/lib/api/run-action";
 import { TimingCard } from "./timing-card";
 
 /**
- * "When autopay charges" (round-2 D13B, DEC-065), on the Plans tab beside
- * "Members can pause": the business's choice of when a renewal's autopay
- * debit happens, as three radio cards, each with what it means and a small
- * timeline for a renewal a week out. Saved as soon as it's picked. A plan
- * can choose its own on Plan Detail.
+ * "When autopay charges" (round-2 D13B, DEC-065): the business's choice of
+ * when a renewal's autopay debit happens, as three radio cards, each with
+ * what it means and a small timeline for a renewal a week out.
  *
- * Shown only when autopay can charge for this business (`available`); a
- * business without it never sees the choice (DEC-057's spirit).
+ * The cards only choose. They sit in the setting's sheet
+ * (`autopay-timing-sheet.tsx`), which saves the choice on Save: the row
+ * under the Plans list reads the saved one in a sentence. A plan can
+ * choose its own on Plan Detail.
  */
 export function AutopayTimingSetting({
     settings,
-    canWrite,
+    value,
+    onChange,
+    disabled = false,
     nowIso,
 }: {
     settings: AutopayTimingSettings;
-    canWrite: boolean;
+    /** The card that is picked. */
+    value: AutopayChargeTiming;
+    onChange: (next: AutopayChargeTiming) => void;
+    disabled?: boolean;
     nowIso: string;
 }) {
-    const router = useRouter();
     const id = useId();
-    const [value, setValue] = useState(settings.chargeTiming);
-    const [pending, start] = useTransition();
     const renewal = sampleRenewal(new Date(nowIso));
     const options = timingOptions(settings);
 
-    function change(next: AutopayChargeTiming) {
-        if (next === value) return;
-        const before = value;
-        setValue(next);
-        start(async () => {
-            const res = await runAction(() => setAutopayChargeTiming(next));
-            if (!res) return setValue(before);
-            if (!res.ok) {
-                setValue(before);
-                showError(res.error);
-                return;
-            }
-            showSuccess(
-                "Timing saved. Renewals from now on charge this way. Charges already on their way keep their date.",
-            );
-            router.refresh();
-        });
-    }
-
     return (
         <fieldset
-            className="mb-3 min-w-0 rounded-[12px] border border-border bg-card px-4 py-3"
+            className="min-w-0"
             aria-describedby={`${id}-hint`}
-            disabled={!canWrite || pending}
+            disabled={disabled}
         >
-            <legend className="float-left w-full text-[14px] font-semibold text-foreground">
-                When autopay charges
-            </legend>
+            {/* The sheet's title says it on screen. */}
+            <legend className="sr-only">{TIMING_LABEL}</legend>
             <p
                 id={`${id}-hint`}
-                className="clear-both mb-2.5 text-pretty pt-0.5 text-[12.5px] text-muted-foreground"
+                className="mb-2.5 text-pretty text-[12.5px] text-muted-foreground"
             >
                 For people who pay by autopay. The bank tells them{" "}
                 {settings.noticeHours} hours before it takes the money. A plan
@@ -89,16 +67,11 @@ export function AutopayTimingSetting({
                         renewal={renewal}
                         settings={settings}
                         checked={value === o.value}
-                        disabled={!canWrite || pending}
-                        onPick={() => change(o.value)}
+                        disabled={disabled}
+                        onPick={() => onChange(o.value)}
                     />
                 ))}
             </div>
-            {!canWrite ? (
-                <p className={cn("mt-2 text-[12px] text-muted-foreground")}>
-                    Only someone who can change subscriptions can change this.
-                </p>
-            ) : null}
         </fieldset>
     );
 }

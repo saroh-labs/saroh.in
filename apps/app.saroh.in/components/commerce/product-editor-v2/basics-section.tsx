@@ -6,8 +6,23 @@ import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import type { MrpPricing } from "@/lib/gst/mrp";
+import { overMrpProblem, toPayLine } from "@/lib/gst/mrp";
+import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
+import {
+    ITEM_MODE_LABEL,
+    itemModeOptions,
+    rateHint,
+    SAME_AS_BUSINESS,
+} from "@/lib/gst/price-mode";
 import type { GstRateValue } from "@/lib/invoices/gst";
-import { GST_RATE_OPTIONS, isHsnSac } from "@/lib/invoices/gst";
+import {
+    GST_RATE_CHOICES,
+    GST_RATE_NEEDED,
+    GST_RATE_OPTIONS,
+    GST_RATE_PLACEHOLDER,
+    isHsnSac,
+} from "@/lib/invoices/gst";
 import { patchProduct } from "@/lib/products/actions";
 import type { BasicsValues } from "@/lib/products/editor-sections";
 import {
@@ -18,7 +33,7 @@ import {
     isMoney,
     joinAnd,
     LIMITS,
-    paise,
+    needsGstRate,
     slugify,
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
@@ -39,6 +54,7 @@ const EMPTY: BasicsValues = {
     mrp: "",
     categoryId: "",
     gstRate: "",
+    gstPriceMode: SAME_AS_BUSINESS,
     hsnCode: "",
 };
 
@@ -49,6 +65,7 @@ const FIELDS = [
     "mrp",
     "categoryId",
     "gstRate",
+    "gstPriceMode",
     "hsnCode",
 ] as const;
 
@@ -63,12 +80,24 @@ const CURRENCY_WORD: Record<string, string> = {
  * Basics: what the product is called, where it lives on the shop, what it
  * sells for and what it is. Creating needs a name and a price and nothing
  * else; the address is made from the name and can be changed afterwards.
+ * A GST-registered business's priced product also needs its GST rate,
+ * asked under the price, and beside it "GST on this price" for the one
+ * product priced differently from the business's own way (12 Oct 2026). A
+ * business that isn't registered is never shown that.
+ *
+ * GST is part of MRP (12 Oct 2026): where GST is added to this price, the
+ * MRP's own line says the amount to pay ("₹1,180 to pay with 18% GST"), and
+ * an MRP under it is refused in place, before Save and by the API
+ * (`lib/gst/mrp.ts`). Nothing changes while the price includes GST, or for
+ * a business that isn't registered.
  */
 export function BasicsSection({
     product,
     storeId,
     currency,
     gstRegistered,
+    gstRateNeeded = false,
+    businessPriceMode = null,
     categories: initialCategories,
     manageCategoriesHref,
     onCategoryChange,
@@ -78,6 +107,13 @@ export function BasicsSection({
     currency: string;
     /** Only a GST-registered business sets a rate and an HSN code. */
     gstRegistered: boolean;
+    /** Known to be registered: a priced product needs its GST rate. */
+    gstRateNeeded?: boolean;
+    /**
+     * How the business's prices carry GST, for "Same as the business (…)";
+     * null when it couldn't be told.
+     */
+    businessPriceMode?: GstPriceMode | null;
     categories: CategoryChoice[];
     manageCategoriesHref: string;
     /** Creating: the category picked, so its defaults can apply. */
@@ -101,7 +137,25 @@ export function BasicsSection({
     const priceBox = form.register("price");
     const mrpBox = form.register("mrp");
     const v = form.watch();
-    const problem = basicsProblem(v, creating);
+    const problem = basicsProblem(v, creating, gstRateNeeded, {
+        businessMode: businessPriceMode,
+        currency,
+    });
+    // What one of it costs to pay, where GST is added to the price: the
+    // MRP is compared with that, never with the price before GST.
+    const pricing: MrpPricing = {
+        registered: gstRateNeeded,
+        businessMode: businessPriceMode,
+        itemMode: v.gstPriceMode,
+        rate: v.gstRate,
+    };
+    const payLine = isMoney(v.price)
+        ? toPayLine(v.price, pricing, currency)
+        : null;
+    // A new product says its rate is missing once the price is in and the
+    // box has been opened or left; a saved one says so at once.
+    const rateMissing = needsGstRate(v, gstRateNeeded);
+    const [rateAsked, setRateAsked] = useState(false);
     const ro = !canWrite;
 
     // Once customers could reach it, a new address breaks the old links.
@@ -121,6 +175,7 @@ export function BasicsSection({
                       [
                           v.name.trim() ? null : "a name",
                           v.price.trim() ? null : "a price",
+                          rateMissing ? "a GST rate" : null,
                       ].filter((x): x is string => x !== null),
                   )
                 : undefined,
@@ -162,10 +217,11 @@ export function BasicsSection({
     const nameEmpty = !creating && !v.name.trim();
     const priceBad =
         v.price.trim() !== "" ? !isMoney(v.price) : !creating && isDirty;
-    const mrpBad =
-        v.mrp.trim() !== "" &&
-        (!isMoney(v.mrp) ||
-            (isMoney(v.price) && paise(v.mrp) < paise(v.price)));
+    const overMrp =
+        isMoney(v.mrp) && isMoney(v.price)
+            ? overMrpProblem(v.price, v.mrp, pricing, currency)
+            : null;
+    const mrpBad = v.mrp.trim() !== "" && (!isMoney(v.mrp) || overMrp !== null);
     const derived = slugify(v.name);
     const hsnBad = v.hsnCode.trim() !== "" && !isHsnSac(v.hsnCode);
 
@@ -295,18 +351,23 @@ export function BasicsSection({
                     />
                 </Field>
                 <Field
+                    // Its line names what this product costs to pay.
+                    holdsData={payLine !== null}
                     label="MRP"
                     className="flex-[1_1_150px]"
                     error={
                         seen("mrp")
                             ? mrpBad
-                                ? isMoney(v.mrp)
-                                    ? "MRP can't be lower than the price it sells for."
-                                    : "A number with at most two decimal places."
+                                ? (overMrp ??
+                                  "A number with at most two decimal places.")
                                 : errors.mrp?.message
                             : null
                     }
-                    hint="The printed price, shown struck through. Leave it empty if it sells at MRP."
+                    hint={
+                        payLine
+                            ? `The printed price, which includes GST. ${payLine}, so the MRP can't be lower.`
+                            : "The printed price, shown struck through. Leave it empty if it sells at MRP."
+                    }
                 >
                     <MoneyInput
                         id="pe-mrp"
@@ -326,6 +387,100 @@ export function BasicsSection({
                     />
                 </Field>
             </div>
+
+            {/* GST (ADR-008): printed on a registered business's tax invoice,
+                so only a registered business is asked. A rate or a code
+                already saved stays in view either way. It sits with the
+                price it is part of, and a registered business's priced
+                product can't be saved without one (12 Oct 2026): 0% is a
+                choice, and the box's placeholder is the only "not set". */}
+            {gstRegistered || v.gstRate !== "" || v.hsnCode.trim() !== "" ? (
+                <div className="mt-4 flex flex-wrap gap-3.5">
+                    <Field
+                        // Saroh's own words, whichever way the price
+                        // carries GST.
+                        holdsData={false}
+                        label="GST rate"
+                        className="flex-[1_1_150px]"
+                        error={
+                            errors.gstRate?.message ??
+                            (rateMissing && (rateAsked || !creating)
+                                ? GST_RATE_NEEDED
+                                : null)
+                        }
+                        hint={rateHint(
+                            businessPriceMode,
+                            gstRateNeeded ? v.gstPriceMode : "INCLUDED",
+                            "Included in the price. Bread and other nil-rated goods are 0%.",
+                        )}
+                    >
+                        <OptionSelect<GstRateValue>
+                            id="pe-gst"
+                            value={v.gstRate as GstRateValue}
+                            onValueChange={(rate) => {
+                                setRateAsked(true);
+                                form.setValue("gstRate", rate, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                });
+                            }}
+                            options={
+                                gstRateNeeded
+                                    ? GST_RATE_CHOICES
+                                    : GST_RATE_OPTIONS
+                            }
+                            placeholder={
+                                gstRateNeeded ? GST_RATE_PLACEHOLDER : undefined
+                            }
+                            disabled={ro}
+                        />
+                    </Field>
+                    {/* Only a business known to be registered chooses how
+                        a price carries GST (12 Oct 2026); most leave it as
+                        the business's own way. */}
+                    {gstRateNeeded ? (
+                        <Field
+                            label={ITEM_MODE_LABEL}
+                            className="flex-[1_1_220px]"
+                            hint="Only if this one is priced differently from the rest."
+                        >
+                            <OptionSelect<ItemModeValue>
+                                id="pe-gst-mode"
+                                value={v.gstPriceMode}
+                                onValueChange={(mode) =>
+                                    form.setValue("gstPriceMode", mode, {
+                                        shouldDirty: true,
+                                        shouldValidate: true,
+                                    })
+                                }
+                                options={itemModeOptions(businessPriceMode)}
+                                disabled={ro}
+                            />
+                        </Field>
+                    ) : null}
+                    <Field
+                        label="HSN code"
+                        className="flex-[1_1_150px]"
+                        error={
+                            seen("hsnCode")
+                                ? hsnBad
+                                    ? "An HSN code is 4 to 8 digits."
+                                    : errors.hsnCode?.message
+                                : null
+                        }
+                        hint="Team only. Printed on tax invoices."
+                    >
+                        <Input
+                            id="pe-hsn"
+                            {...form.register("hsnCode")}
+                            inputMode="numeric"
+                            disabled={ro}
+                            placeholder="1905 90 10"
+                            className="font-mono"
+                        />
+                    </Field>
+                </div>
+            ) : null}
 
             <Field
                 label="Category"
@@ -352,54 +507,6 @@ export function BasicsSection({
                     disabled={ro}
                 />
             </Field>
-
-            {/* GST (ADR-008): printed on a registered business's tax invoice,
-                so only a registered business is asked. A rate or a code
-                already saved stays in view either way. */}
-            {gstRegistered || v.gstRate !== "" || v.hsnCode.trim() !== "" ? (
-                <div className="mt-4 flex flex-wrap gap-3.5">
-                    <Field
-                        label="GST rate"
-                        className="flex-[1_1_150px]"
-                        error={errors.gstRate?.message}
-                        hint="Included in the price. Bread and other nil-rated goods are 0%."
-                    >
-                        <OptionSelect
-                            id="pe-gst"
-                            value={v.gstRate as GstRateValue}
-                            onValueChange={(rate) =>
-                                form.setValue("gstRate", rate, {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                })
-                            }
-                            options={GST_RATE_OPTIONS}
-                            disabled={ro}
-                        />
-                    </Field>
-                    <Field
-                        label="HSN code"
-                        className="flex-[1_1_150px]"
-                        error={
-                            seen("hsnCode")
-                                ? hsnBad
-                                    ? "An HSN code is 4 to 8 digits."
-                                    : errors.hsnCode?.message
-                                : null
-                        }
-                        hint="Team only. Printed on tax invoices."
-                    >
-                        <Input
-                            id="pe-hsn"
-                            {...form.register("hsnCode")}
-                            inputMode="numeric"
-                            disabled={ro}
-                            placeholder="1905 90 10"
-                            className="font-mono"
-                        />
-                    </Field>
-                </div>
-            ) : null}
         </SectionCard>
     );
 }

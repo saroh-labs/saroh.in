@@ -2,6 +2,8 @@ import { NotFound } from "@saroh/ui/not-found";
 
 import { PageContainer } from "@/components/shared/page-container";
 
+export const metadata = { title: "Page not found" };
+
 /**
  * A page the workspace doesn't have, inside the workspace: the rail and the
  * header stay, so the way on is where it always is. Among others, what a

@@ -256,6 +256,26 @@ describe("DataView — the one toolbar and the one table", () => {
         expect(container.querySelector("[data-count-badge]")).toBeNull();
     });
 
+    it("opens the whole list from an empty view, even when the list starts on a subset", () => {
+        setWidth(true);
+        // Bookings opens on "Upcoming", its first view: "Show all" must not
+        // send the list back to the view it is already in.
+        render(
+            filtered({
+                filters: [
+                    { id: "none", label: "Lapsed", predicate: () => false },
+                    { id: "all", label: "All" },
+                ],
+                initialFilterId: "none",
+            }),
+        );
+        expect(screen.queryByText("Asha Rao")).toBeNull();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Show all customers" }),
+        );
+        expect(screen.getAllByText("Asha Rao").length).toBeGreaterThan(0);
+    });
+
     it("narrows the rows when an option is chosen, and says how many are showing", async () => {
         setWidth(true);
         render(filtered());

@@ -9,6 +9,15 @@ import { enqueueBillingEmail } from "./billing-email.job";
 import type { PausesWords } from "./billing-emails";
 import { moveDownNotice } from "./billing-emails";
 import { CatalogueAccessService } from "./catalogue-access.service";
+import type { DomainWords } from "./domain-plan";
+import {
+    claimDomainToldInTx,
+    domainEndedFor,
+    domainEndingFor,
+    startDomainClockInTx,
+} from "./domain-plan-notice";
+import type { DomainPlanService } from "./domain-plan.service";
+import { domainPlan } from "./domain-plan.service";
 import type { PauseMeasure } from "./over-limit";
 import {
     anythingPauses,
@@ -46,6 +55,11 @@ import { termEndingOf } from "./term-ending";
  * set of limits); nothing pauses until 7 days after it, so a move told
  * less than 7 days ahead pauses later than it moves. The plan itself moves
  * on its date as before: only the pause waits.
+ *
+ * A notice sent here also says what happens to the business's own domain
+ * when the move stops it (DEC-139, `domain-plan-notice.ts`), on its own
+ * 3-day clock. A move that pauses nothing else is told by the sweep's
+ * domain step instead.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -116,10 +130,11 @@ export async function noticeMoveDowns(
     logger: Pick<Logger, "error">,
     svc: OverLimitService = overLimit,
     access: CatalogueAccessService = new CatalogueAccessService(),
+    domains: DomainPlanService = domainPlan,
 ): Promise<number> {
     await clearStaleClaims(now, logger, svc);
-    const chosen = await noticeChosenMoves(now, logger, svc);
-    const made = await noticeMovesMade(now, logger, svc, access);
+    const chosen = await noticeChosenMoves(now, logger, svc, domains);
+    const made = await noticeMovesMade(now, logger, svc, access, domains);
     return chosen + made;
 }
 
@@ -188,6 +203,7 @@ export async function noticeChosenMoves(
     now: Date,
     logger: Pick<Logger, "error">,
     svc: OverLimitService = overLimit,
+    domains: DomainPlanService = domainPlan,
 ): Promise<number> {
     const horizon = new Date(now.getTime() + PLAN_ENDING_SHOWN_DAYS * DAY_MS);
     const subs = await prisma.subscription.findMany({
@@ -207,6 +223,7 @@ export async function noticeChosenMoves(
     for (const sub of subs) {
         try {
             if (!sub.pendingFrom) continue;
+            const pendingFrom = sub.pendingFrom;
             if (await termEndingOf(prisma, sub.id, now)) continue;
             const stage = planEndingStage(sub.pendingFrom, now);
             if (!stage) continue;
@@ -215,6 +232,14 @@ export async function noticeChosenMoves(
                 sub.pendingFrom,
             );
             if (!measure || !anythingPauses(measure)) continue;
+            const zone = await businessTimezone(prisma, sub.organizationId);
+            const domain = await domainEndingFor(
+                sub.organizationId,
+                sub.pendingFrom,
+                zone,
+                now,
+                domains,
+            );
             const sent = await tell({
                 organizationId: sub.organizationId,
                 eventKey: `move-down-notice:${sub.id}:${sub.pendingFrom.toISOString()}:${stage}`,
@@ -224,6 +249,19 @@ export async function noticeChosenMoves(
                 nextPlanName: sub.pendingPlan?.name ?? null,
                 effectiveAt: sub.pendingFrom,
                 now,
+                zone,
+                domain: domain
+                    ? {
+                          words: domain,
+                          claimInTx: (tx) =>
+                              claimDomainToldInTx(
+                                  tx,
+                                  sub.organizationId,
+                                  pendingFrom,
+                                  stage,
+                              ),
+                      }
+                    : null,
             });
             if (sent) told += 1;
         } catch (error) {
@@ -246,6 +284,7 @@ export async function noticeMovesMade(
     logger: Pick<Logger, "error">,
     svc: OverLimitService = overLimit,
     access: CatalogueAccessService = new CatalogueAccessService(),
+    domains: DomainPlanService = domainPlan,
 ): Promise<number> {
     let told = 0;
     let after: string | undefined;
@@ -264,6 +303,11 @@ export async function noticeMovesMade(
                 const s = await svc.standing(id, now);
                 if (!s?.over || s.toldAt) continue;
                 const a = await access.resolve(id, now);
+                const zone = await businessTimezone(prisma, id);
+                // The plan stopped including its own domain too, and
+                // nothing has told it: this notice does, and starts the
+                // domain's 3 days.
+                const domain = await domainEndedFor(id, zone, now, domains);
                 const sent = await tell({
                     organizationId: id,
                     eventKey: null,
@@ -273,6 +317,15 @@ export async function noticeMovesMade(
                     nextPlanName: null,
                     effectiveAt: now,
                     now,
+                    zone,
+                    domain: domain
+                        ? {
+                              words: domain,
+                              claimInTx: async (tx) => {
+                                  await startDomainClockInTx(tx, id, now);
+                              },
+                          }
+                        : null,
                 });
                 if (sent) told += 1;
             } catch (error) {
@@ -301,9 +354,14 @@ async function tell(input: {
     nextPlanName: string | null;
     effectiveAt: Date;
     now: Date;
+    zone: string;
+    /** Its own domain, when this move stops it, and the claim that says so. */
+    domain: {
+        words: DomainWords;
+        claimInTx: (tx: Pick<Tx, "customerNotice">) => Promise<void>;
+    } | null;
 }): Promise<boolean> {
-    const { organizationId, measure, now } = input;
-    const zone = await businessTimezone(prisma, organizationId);
+    const { organizationId, measure, now, zone } = input;
     const graceKey = moveDownClaimKey(measure.limits);
     return prisma.$transaction(async (tx) => {
         let eventKey = input.eventKey;
@@ -337,6 +395,7 @@ async function tell(input: {
             now,
         );
         if (!pauses) return false;
+        if (input.domain) await input.domain.claimInTx(tx);
         const said = {
             mode: input.mode,
             planName: input.planName,
@@ -347,6 +406,7 @@ async function tell(input: {
                     : null,
             pausesOn: pauses.pausesOn,
             lines: pauses.lines,
+            domain: input.domain?.words ?? null,
         };
         const words = moveDownNotice(said);
         const notice = await tx.notification.create({

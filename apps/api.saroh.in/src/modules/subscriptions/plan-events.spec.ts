@@ -29,6 +29,7 @@ import {
     listPlanEvents,
     NO_PLAN,
     planActor,
+    planRate,
     planSnapshot,
 } from "./plan-events";
 
@@ -42,6 +43,9 @@ const MONTHLY: PlanSnapshot = {
     currency: "INR",
     interval: "MONTH",
     classesPerMonth: 8,
+    gstRate: null,
+    sacCode: null,
+    gstPriceMode: null,
     status: "ACTIVE",
 };
 
@@ -79,6 +83,41 @@ describe("what a change records", () => {
         });
     });
 
+    it("records a GST rate set, the plan's own choice and its SAC code, each as before and after", () => {
+        expect(
+            diffPlan(MONTHLY, {
+                ...MONTHLY,
+                gstRate: "18",
+                sacCode: "999723",
+                gstPriceMode: "ADDED",
+            }),
+        ).toEqual({
+            gstRate: [null, "18"],
+            sacCode: [null, "999723"],
+            gstPriceMode: [null, "ADDED"],
+        });
+    });
+
+    it("reads a snapshot from before plans carried GST as 'not set', never as a change", () => {
+        // An event written before the columns existed holds none of them.
+        const { gstRate, sacCode, gstPriceMode, ...rest } = MONTHLY;
+        void [gstRate, sacCode, gstPriceMode];
+        const before = rest as PlanSnapshot;
+        expect(diffPlan(before, MONTHLY)).toEqual({});
+        expect(diffPlan(MONTHLY, before)).toEqual({});
+        expect(diffPlan(before, { ...MONTHLY, gstRate: "18" })).toEqual({
+            gstRate: [null, "18"],
+        });
+    });
+
+    it("writes a stored rate the one way, so 18.00 and 18 are the same rate", () => {
+        expect(planRate({ toString: () => "18.00" })).toBe("18");
+        expect(planRate("0.25")).toBe("0.25");
+        expect(planRate({ toString: () => "0.00" })).toBe("0");
+        expect(planRate(null)).toBeNull();
+        expect(planRate(undefined)).toBeNull();
+    });
+
     it("never records a field that isn't one of a plan's", () => {
         const after = { ...MONTHLY, updatedAt: "now" } as PlanSnapshot;
         expect(Object.keys(diffPlan(MONTHLY, after))).toEqual([]);
@@ -94,6 +133,12 @@ describe("what an edit is called", () => {
         [{ name: ["a", "b"] }, "RENAMED"],
         [{ description: [null, "x"] }, "DESCRIPTION_CHANGED"],
         [{ name: ["a", "b"], classesPerMonth: [8, null] }, "UPDATED"],
+        // GST is part of what the plan costs (12 Oct 2026).
+        [{ gstRate: [null, "18"] }, "PRICE_CHANGED"],
+        [{ gstPriceMode: [null, "ADDED"] }, "PRICE_CHANGED"],
+        [{ sacCode: [null, "999723"] }, "PRICE_CHANGED"],
+        [{ price: ["1", "2"], gstRate: ["5", "18"] }, "PRICE_CHANGED"],
+        [{ gstRate: [null, "18"], name: ["a", "b"] }, "UPDATED"],
     ] as const)("%j is %s", (changes, kind) => {
         expect(editKind(changes as Parameters<typeof editKind>[0])).toBe(kind);
     });

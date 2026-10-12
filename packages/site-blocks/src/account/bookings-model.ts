@@ -156,8 +156,24 @@ export function bookingSub(row: AccountBookingRow): string {
         .join(" · ");
 }
 
-export function bookingTag(row: AccountBookingRow): string {
+/**
+ * A booking's tag. One whose time has passed (`past`) with nothing recorded
+ * has none: its date is in its title, and it reads "Attended" or "Missed"
+ * only once the business has marked it (DEC-142, amending DEC-073). Never
+ * "Booked" for something that is over.
+ */
+export function bookingTag(
+    row: AccountBookingRow,
+    past = false,
+): string | null {
+    if (past && row.state === "booked") return null;
     return STATE_TAG[row.state];
+}
+
+/** Whether a booking's time has passed, as its row's end says. */
+export function bookingOver(row: AccountBookingRow, now: Date): boolean {
+    const end = new Date(row.endAt).getTime();
+    return !Number.isNaN(end) && end <= now.getTime();
 }
 
 /**
@@ -325,10 +341,16 @@ export function treatmentVisitWords(
               ]
                   .filter(Boolean)
                   .join(" · ");
+    // Over, and nobody has said how it went: the date alone (DEC-142).
+    const passed =
+        visit.state === "booked" &&
+        !today &&
+        visit.startAt !== null &&
+        new Date(visit.startAt).getTime() < now.getTime();
     return {
         title: `Visit ${visit.number}${when}`,
         sub,
-        tag: today ? "Today" : VISIT_TAG[visit.state],
+        tag: today ? "Today" : passed ? "" : VISIT_TAG[visit.state],
         today,
     };
 }

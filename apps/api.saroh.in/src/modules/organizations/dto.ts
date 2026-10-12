@@ -22,6 +22,8 @@ import {
 import type { SocialNetwork } from "@saroh/block-contract";
 import { MAP_LINK_MAX, SOCIAL_INPUT_MAX } from "@saroh/block-contract";
 
+import type { GstPriceMode } from "../invoices/gst-price";
+import { GST_PRICE_MODES } from "../invoices/gst-price";
 import {
     MAX_COUNTER_DIGITS,
     MIN_COUNTER_DIGITS,
@@ -270,6 +272,17 @@ export class TaxSettingsDto {
     @ValidateNested()
     @Type(() => InvoiceNumberFormatDto)
     invoiceNumber?: InvoiceNumberFormatDto;
+
+    /**
+     * How the business's prices carry GST (12 Oct 2026): INCLUDED ("My
+     * prices include GST") or ADDED ("GST is added to my prices"). Only a
+     * GST-registered business chooses; the service refuses it otherwise.
+     */
+    @IsOptional()
+    @IsIn(GST_PRICE_MODES, {
+        message: "Choose whether your prices include GST or GST is added.",
+    })
+    priceMode?: GstPriceMode;
 }
 
 /**

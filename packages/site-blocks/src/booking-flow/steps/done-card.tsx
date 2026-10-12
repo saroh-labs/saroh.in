@@ -15,7 +15,7 @@ import {
     MOVE_OR_CANCEL,
     payLaterText,
 } from "../model";
-import { card, focusRing } from "../styles";
+import { card, focusRing, quietButton, textAction } from "../styles";
 
 export function DoneCard({
     phase,
@@ -24,6 +24,7 @@ export function DoneCard({
     where,
     rules,
     visits = 1,
+    gst = null,
     soldBy = null,
     email = null,
     onAgain,
@@ -39,6 +40,11 @@ export function DoneCard({
     rules: BookingPageData["rules"];
     /** More than one: visit 1 of a treatment was booked (E10). */
     visits?: number;
+    /**
+     * The price with its GST, as the page said it before booking: "₹1,000
+     * + ₹180 GST (18%)". Null says nothing.
+     */
+    gst?: string | null;
     /** "Run by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
     /** The signed-in customer's address, for "We've emailed ‹address›". */
@@ -83,21 +89,35 @@ export function DoneCard({
             ? payInstructionsOf(booking.payInstructions)
             : null;
     return (
-        <div className={cn(card, "px-[26px] py-7")}>
+        <div
+            data-booking-done=""
+            className={cn(
+                card,
+                "px-[26px] py-7 max-[699px]:px-5 max-[699px]:py-6",
+            )}
+        >
             <div
                 aria-hidden="true"
-                className="bg-site-accent text-site-accent-fg flex size-11 items-center justify-center rounded-full text-[22px] font-bold"
+                className="bg-site-accent text-site-accent-fg flex size-12 items-center justify-center rounded-full"
             >
-                ✓
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+                    <path
+                        d="M5 12.5 10 17.5 19 7.5"
+                        stroke="currentColor"
+                        strokeWidth="2.25"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
             </div>
             <h2
                 ref={headingRef}
                 tabIndex={-1}
-                className="font-site-heading text-site-fg mb-1.5 mt-4 text-[32px] font-semibold tracking-[-0.03em] outline-none"
+                className="font-site-heading text-site-fg mb-1.5 mt-4 text-[calc(clamp(1.625rem,6vw,2rem)*var(--site-heading-scale,1))] font-semibold leading-[1.1] tracking-[-0.03em] outline-none [text-wrap:balance]"
             >
                 You&apos;re booked{phase.first ? `, ${phase.first}` : ""}.
             </h2>
-            <p className="text-site-fg text-[15px] leading-[1.55] opacity-90">
+            <p className="text-site-fg text-base font-medium leading-[1.55]">
                 {[
                     booking.serviceName,
                     firstVisitText(visits),
@@ -110,6 +130,16 @@ export function DoneCard({
             <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
                 {payText}
             </p>
+            {/* The same GST words the page showed before booking; none
+                for a class a credit paid for, or with nothing to pay. */}
+            {gst && phase.price && !phase.creditText ? (
+                <p
+                    data-booking-gst=""
+                    className="text-site-body mt-1 text-[13.5px] tabular-nums leading-[1.55]"
+                >
+                    {gst}
+                </p>
+            ) : null}
             {payAhead ? (
                 <PayInstructionsCard
                     instructions={payAhead}
@@ -147,10 +177,7 @@ export function DoneCard({
                 <button
                     type="button"
                     onClick={addToCalendar}
-                    className={cn(
-                        "border-site-border bg-site-surface text-site-fg h-11 cursor-pointer rounded-[calc(var(--site-radius)+8px)] border px-4 text-sm font-semibold",
-                        focusRing,
-                    )}
+                    className={quietButton}
                 >
                     Add to calendar
                 </button>
@@ -158,26 +185,20 @@ export function DoneCard({
                     href={googleCalendarHref({ ...entry, location: where })}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={cn(
-                        "border-site-border bg-site-surface text-site-fg inline-flex h-11 cursor-pointer items-center rounded-[calc(var(--site-radius)+8px)] border px-4 text-sm font-semibold",
-                        focusRing,
-                    )}
+                    className={quietButton}
                 >
                     Add to Google Calendar
                 </a>
                 <button
                     type="button"
                     onClick={onAgain}
-                    className={cn(
-                        "text-site-fg h-11 cursor-pointer px-4 text-sm font-semibold underline",
-                        focusRing,
-                    )}
+                    className={cn(textAction, "h-11 px-2")}
                 >
                     Book another
                 </button>
             </div>
             {/* Moved or cancelled from their own bookings (UX-055). */}
-            <p className="text-site-muted border-site-border mt-4 border-t pt-3.5 text-[12.5px] leading-[1.55]">
+            <p className="text-site-body border-site-border mt-5 border-t pt-4 text-sm leading-[1.55]">
                 Need to change it?{" "}
                 <a
                     href={BOOKINGS_HREF}

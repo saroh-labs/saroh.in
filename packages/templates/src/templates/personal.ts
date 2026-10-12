@@ -1,5 +1,6 @@
 import type { TemplateContext, TemplateManifest } from "../manifest";
 import { escapeHtml } from "./html";
+import { STARTER_STYLES } from "./starter-look";
 
 /**
  * `personal` — the Personal/consultant template (DEC-070, K14): a site for
@@ -80,7 +81,7 @@ const ENQUIRY_FIELDS = [
     },
 ] as const;
 
-export const personalTemplate: TemplateManifest = {
+export const personalTemplateV1: TemplateManifest = {
     id: PERSONAL_TEMPLATE_ID,
     version: 1,
     name: "Personal",
@@ -220,4 +221,22 @@ export const personalTemplate: TemplateManifest = {
             ],
         },
     ],
+};
+
+/**
+ * `personal@2` (DEC-141): the same three pages in the starter's look, so a
+ * site made for "Just me" is not left in the unstyled page the starter had
+ * before v4. Only the look and the footer are new: a colourway, the font
+ * pair and the type scale (`starter-look.ts`), and the footer set on the
+ * left with one line saying what the person does, where the business has
+ * told Saroh that.
+ *
+ * The pages are v1's, so its placeholder lines are still the owner's to
+ * replace and still named by the pre-publish check.
+ */
+export const personalTemplate: TemplateManifest = {
+    ...personalTemplateV1,
+    version: 2,
+    styles: STARTER_STYLES,
+    footer: { layout: "left", lineFrom: ownWords },
 };

@@ -13,8 +13,11 @@ import {
     MaxLength,
     Min,
     MinLength,
+    ValidateIf,
 } from "class-validator";
 
+import type { GstPriceMode } from "../invoices/gst-price";
+import { GST_PRICE_MODES } from "../invoices/gst-price";
 import type { PackKind, PackPaidBy } from "./pack-kind";
 import { MIN_VALIDITY_DAYS, PACK_KINDS, PACK_PAID_BY } from "./pack-kind";
 
@@ -90,6 +93,34 @@ export class PackInputDto {
     @IsOptional()
     @IsBoolean()
     firstPackOnly?: boolean;
+
+    /**
+     * GST the price carries, in percent (12 Oct 2026), on a registered
+     * business's tax invoice: "0" is exempt or nil-rated, a choice of its
+     * own. Checked against GST's rates in the service. null clears it.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string | null;
+
+    /** SAC code: four to eight digits. null clears it. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
+    sacCode?: string | null;
+
+    /**
+     * How this pack's price carries GST when it differs from the
+     * business's way (`invoices/gst-price.ts`): INCLUDED or ADDED. null is
+     * "same as the business".
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsIn(GST_PRICE_MODES, {
+        message: "Choose whether this price includes GST or GST is added.",
+    })
+    gstPriceMode?: GstPriceMode | null;
 }
 
 /** What the staff list can be filtered to, drafts included (E14). */

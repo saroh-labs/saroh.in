@@ -1,48 +1,71 @@
 "use client";
 
+import { AbsentOr } from "@saroh/ui/absent-value";
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import { countLabel, PageHeader } from "@saroh/ui/page-header";
-import { showError, showUndo } from "@saroh/ui/toast";
+import { EmptyState } from "@saroh/ui/data-state";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@saroh/ui/dropdown-menu";
+import { Notice } from "@saroh/ui/notice";
+import { PageHeader } from "@saroh/ui/page-header";
+import { TextLink } from "@saroh/ui/text-link";
+import { CalendarClock, ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { PlanWay } from "@/components/billing/plan-way";
+import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
 import { AlsoSell } from "@/components/services/also-sell";
+import { useTakingBookings } from "@/components/services/use-taking-bookings";
+import { SwitchRow } from "@/components/shared/check-row";
+import { DataView } from "@/components/shared/data-view/data-view";
+import type { DataColumn } from "@/components/shared/data-view/types";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { runAction } from "@/lib/api/run-action";
 import { isPlanHref } from "@/lib/billing/plan-access";
 import { formatMoney } from "@/lib/format/money";
+import type { MissingRates } from "@/lib/gst-rates/missing";
+import { setPriceWords } from "@/lib/gst/on-price";
 import type { ModuleView } from "@/lib/modules/schema";
-import { updateService } from "@/lib/services/actions";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import { callName } from "@/lib/services/call-name";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { Service } from "@/lib/services/service";
 import {
+    AVAILABILITY_HREF,
+    bookedLine,
     lengthLine,
-    servicesSummary,
-    takingLabel,
-    takingToast,
-    usageLine,
+    nobodyTakesLine,
+    servicesCount,
+    TAKING_LABEL,
 } from "@/lib/services/service-cards";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
-import { EmptyState } from "@saroh/ui/data-state";
-import { TextLink } from "@saroh/ui/text-link";
-import { CalendarClock } from "lucide-react";
+
+const NEW_SERVICE_HREF = "/services/new";
+const NEW_COURSE_HREF = "/courses/new";
+
 /**
- * Bookings › Services (U16, E2, the design's `?view=services`): what people
- * can book, as cards — kind, price, length and the gap after, where, places,
- * who takes it, and how it is being used. New service and Edit (View for a
- * role that can't change services) open the Service Editor; Stop taking
- * bookings takes a service off the booking page and keeps the bookings
- * already made, with Undo. "Also sell" (E12) switches Courses and Class
- * packs on or off, for whoever may switch modules. A service people can't
- * book online as it is paid (DEC-088, #821) says so on its card, with the
- * way to fix it.
+ * Bookings › Services (U16, E2): what people can book, as rows of the
+ * shared list (Bookings audit, 12 Oct 2026; cards before). A row is the
+ * service's name, one line of its length, the gap after, where and its
+ * kind, then its price, who takes it and how it is booked, and it opens
+ * the Service Editor. On a phone it is the shared list's own row.
+ *
+ * "Taking bookings" is a switch on each row, for a role that may change
+ * services: it takes a service off the booking page and keeps the bookings
+ * already made, at once, with Undo. A paused service also says Paused
+ * beside its name. What is true of several services is said once above the
+ * list (nobody takes them yet), never on every row.
+ *
+ * New service is one button, and a menu with New course once Courses is
+ * on. "Also sell" (E12), which switches Courses and Class packs on or off
+ * for whoever may switch modules, is a quiet row under the list. A service
+ * people can't book online as it is paid (DEC-088, #821) says so in its
+ * row, with the way to fix it.
  */
 export function ServicesScreen({
     services,
@@ -54,7 +77,14 @@ export function ServicesScreen({
     payment = null,
     alsoSell,
     modules = [],
+    missingRates = null,
+    canNewCourse = false,
 }: {
+    /**
+     * What is on sale with a price and no GST rate, for a GST-registered
+     * business; null when it couldn't be told, which draws nothing.
+     */
+    missingRates?: MissingRates | null;
     services: Service[];
     /** Null when the staff read failed. */
     staff: StaffView[] | null;
@@ -66,38 +96,161 @@ export function ServicesScreen({
     hasPage: boolean | null;
     /** How people pay when they book (DEC-088); null when unknown. */
     payment?: BookingPaymentView | null;
-    /** Courses and Class packs, on or off; null for no card. */
+    /** Courses and Class packs, on or off; null for no row. */
     alsoSell: AlsoSellFeature[] | null;
     /** Every module, for what "Also sell" brings when it turns one on. */
     modules?: ModuleView[];
+    /** Courses is on and this role may add one: New service is a menu. */
+    canNewCourse?: boolean;
 }) {
-    const router = useRouter();
-    const [busy, setBusy] = useState<string | null>(null);
-    const takers = (id: string) =>
-        (staff ?? []).filter(
-            (p) => p.status === "ACTIVE" && p.serviceIds.includes(id),
-        );
+    const taking = useTakingBookings();
+    // A switch shows what was asked for until the list is read again. Each
+    // is kept against the row it was flipped on (`updatedAt`), so a fresh
+    // read always wins.
+    const [flipped, setFlipped] = useState<
+        Partial<Record<string, { taking: boolean; at: string }>>
+    >({});
+    const rows = services.map((s): Service => {
+        const flip = flipped[s.id];
+        return flip?.at === s.updatedAt
+            ? { ...s, status: flip.taking ? "ACTIVE" : "ARCHIVED" }
+            : s;
+    });
 
-    async function toggle(s: Service) {
-        const wasOn = s.status === "ACTIVE";
-        const res = await runAction(
-            () =>
-                updateService(s.id, {
-                    status: wasOn ? "ARCHIVED" : "ACTIVE",
-                }),
-            { setBusy: (on) => setBusy(on ? s.id : null) },
-        );
-        if (!res) return;
-        if (!res.ok) return showError(res.error);
-        router.refresh();
-        showUndo(takingToast(s.name, wasOn), async () => {
-            const back = await updateService(s.id, {
-                status: wasOn ? "ACTIVE" : "ARCHIVED",
-            });
-            router.refresh();
-            return back;
-        });
-    }
+    const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
+    const takers = (id: string) =>
+        people.filter((p) => p.serviceIds.includes(id));
+    const nobody =
+        staff === null
+            ? null
+            : nobodyTakesLine(
+                  rows.filter((s) => takers(s.id).length === 0).length,
+                  rows.length,
+                  people.length > 0,
+              );
+
+    const columns: DataColumn<Service>[] = [
+        {
+            id: "service",
+            header: "Service",
+            priority: "primary",
+            sortValue: (s) => s.name.toLowerCase(),
+            cell: (s) => (
+                <span className="block min-w-0">
+                    <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-medium">{s.name}</span>
+                        {s.status === "ACTIVE" ? null : (
+                            // Paused in words, not only by the switch.
+                            <StatusBadge thing="service" status="NOT_TAKING" />
+                        )}
+                    </span>
+                    <span className="mt-0.5 block whitespace-normal text-[12.5px] font-normal text-muted-foreground">
+                        {lengthLine(s)}
+                    </span>
+                </span>
+            ),
+        },
+        {
+            id: "price",
+            header: "Price",
+            priority: "secondary",
+            numeric: true,
+            money: true,
+            sortValue: (s) => s.priceCents ?? 0,
+            cell: (s) => (
+                <span className="block">
+                    {/* The price the business set, saying so where GST
+                        comes on top of it ("₹1,000 + GST"). */}
+                    {s.priceCents
+                        ? setPriceWords(
+                              formatMoney(s.priceCents, s.currency ?? currency),
+                              s.gst,
+                          )
+                        : "Free"}
+                    {s.capacity > 1 && s.priceCents ? (
+                        <span className="block font-sans text-[12px] font-normal text-muted-foreground">
+                            or a pack class
+                        </span>
+                    ) : null}
+                </span>
+            ),
+        },
+        {
+            id: "who",
+            header: "Who takes it",
+            priority: "secondary",
+            cell: (s) => {
+                const who = takers(s.id);
+                return staff === null ? (
+                    <span className="text-muted-foreground">
+                        Couldn&apos;t load
+                    </span>
+                ) : who.length ? (
+                    who.map((p) => callName(p.name)).join(", ")
+                ) : (
+                    <span className="text-muted-foreground">Nobody yet</span>
+                );
+            },
+        },
+        {
+            id: "booked",
+            header: "Bookings",
+            priority: "secondary",
+            cell: (s) => {
+                // Only a live service on the booking page is booked online
+                // at all; one paid at the desk instead still books, so only
+                // a service that can't be booked is marked (DEC-089).
+                const found =
+                    s.status === "ACTIVE" && s.showOnBookingPage
+                        ? onlineBookingProblem(s, payment)
+                        : null;
+                const problem = found?.blocked ? found : null;
+                return (
+                    <span className="block min-w-0">
+                        <AbsentOr says="None">
+                            {bookedLine(s, usage === null ? null : usage[s.id])}
+                        </AbsentOr>
+                        {problem ? (
+                            <span className="mt-1.5 block w-fit rounded-[8px] bg-warning-subtle px-2.5 py-1.5 text-[12px] leading-[1.45] text-warning-subtle-foreground">
+                                {problem.line}{" "}
+                                <PlanWay
+                                    when={isPlanHref(problem.fix.href)}
+                                    className="text-[length:inherit] text-inherit"
+                                >
+                                    <TextLink href={problem.fix.href}>
+                                        {problem.fix.label}
+                                    </TextLink>
+                                </PlanWay>
+                            </span>
+                        ) : null}
+                    </span>
+                );
+            },
+        },
+    ];
+
+    const newService = canNewCourse ? (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button>
+                    New service
+                    <ChevronDown aria-hidden className="ml-1 size-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                    <Link href={NEW_SERVICE_HREF}>New service</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <Link href={NEW_COURSE_HREF}>New course</Link>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    ) : (
+        <Button asChild>
+            <Link href={NEW_SERVICE_HREF}>New service</Link>
+        </Button>
+    );
 
     return (
         <>
@@ -105,33 +258,33 @@ export function ServicesScreen({
                 className="mb-5"
                 breadcrumb={["Bookings", "Services"]}
                 title="Services"
-                count={countLabel(services.length, {
-                    one: "service",
-                    other: "services",
-                })}
-                description="What people can book, and who takes it. One-to-one services fill a person's free time. Classes run at set times with a number of places. Changing a price only affects bookings made after."
-                meta={
-                    services.length > 0
-                        ? servicesSummary(services, hasPage)
-                        : undefined
-                }
-                actions={
-                    canEdit ? (
-                        <Button asChild>
-                            <Link href="/services/new">New service</Link>
-                        </Button>
-                    ) : undefined
-                }
+                count={servicesCount(rows, hasPage)}
+                description="What people can book, and who takes it."
+                actions={canEdit ? newService : undefined}
             />
-            {alsoSell ? (
-                <AlsoSell features={alsoSell} modules={modules} />
-            ) : null}
             {canEdit ? null : (
                 <ReadOnlyNote>
                     Your role can see these services but not change them.
                 </ReadOnlyNote>
             )}
-            {services.length === 0 ? (
+            {/* Priced things on sale with no GST rate, for a registered
+                business: one line, and the sheet to choose them in. */}
+            <MissingRatesNotice missing={missingRates} className="mb-3" />
+            {/* Said once, with what fixes it, never on every row. */}
+            {nobody ? (
+                <Notice tone="neutral" className="mb-3" data-ph-unmask="">
+                    {nobody.line}
+                    {nobody.toAvailability && canEdit ? (
+                        <>
+                            {" "}
+                            <TextLink href={AVAILABILITY_HREF}>
+                                Add yourself or your team in Availability
+                            </TextLink>
+                        </>
+                    ) : null}
+                </Notice>
+            ) : null}
+            {rows.length === 0 ? (
                 <EmptyState
                     icon={<CalendarClock />}
                     title="No services yet"
@@ -143,130 +296,53 @@ export function ServicesScreen({
                     action={
                         canEdit ? (
                             <Button asChild>
-                                <Link href="/services/new">New service</Link>
+                                <Link href={NEW_SERVICE_HREF}>New service</Link>
                             </Button>
                         ) : undefined
                     }
                 />
             ) : (
-                <ul className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-3">
-                    {services.map((s) => {
-                        const isClass = s.capacity > 1;
-                        const live = s.status === "ACTIVE";
-                        const price = s.priceCents
-                            ? formatMoney(s.priceCents, s.currency ?? currency)
-                            : "Free";
-                        const who = takers(s.id);
-                        // Only a live service on the booking page is
-                        // booked online at all; one paid at the desk
-                        // instead still books, so only a service that
-                        // can't be booked is marked (DEC-089).
-                        const found =
-                            live && s.showOnBookingPage
-                                ? onlineBookingProblem(s, payment)
-                                : null;
-                        const problem = found?.blocked ? found : null;
-                        return (
-                            <li
-                                key={s.id}
-                                className={cn(
-                                    "rounded-[12px] border bg-card px-4 py-3.5",
-                                    live
-                                        ? "border-border"
-                                        : "border-dashed border-border-strong",
-                                )}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span
-                                        aria-hidden
-                                        className={cn(
-                                            "size-2.5 shrink-0 rounded-full",
-                                            isClass
-                                                ? "bg-diary-class"
-                                                : "bg-diary-one",
-                                        )}
-                                    />
-                                    <Link
-                                        href={`/services/${s.id}`}
-                                        className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground hover:underline"
-                                    >
-                                        {s.name}
-                                    </Link>
-                                    {live ? null : (
-                                        <StatusBadge
-                                            thing="service"
-                                            status="NOT_TAKING"
-                                        />
-                                    )}
-                                    {/* A kind, not a state: the outline tag. */}
-                                    <StatusBadge tone="tag">
-                                        {isClass ? "Class" : "One-to-one"}
-                                    </StatusBadge>
-                                </div>
-                                <div
-                                    className={cn(
-                                        "mt-2.5 font-display text-[20px] font-semibold tabular-nums tracking-[-0.02em]",
-                                        !live && "text-muted-foreground",
-                                    )}
-                                >
-                                    {price}
-                                    {isClass && s.priceCents
-                                        ? " or a pack class"
-                                        : ""}
-                                </div>
-                                <div className="mt-1 text-[12.5px]">
-                                    {lengthLine(s)}
-                                </div>
-                                <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-                                    {staff === null
-                                        ? "Who takes it couldn't be loaded"
-                                        : who.length
-                                          ? `With ${who.map((p) => callName(p.name)).join(", ")}`
-                                          : "Nobody takes it yet. It books in its own hours"}
-                                </div>
-                                {problem ? (
-                                    <p className="mt-2 rounded-[8px] bg-warning-subtle px-2.5 py-1.5 text-[12px] leading-[1.45] text-warning-subtle-foreground">
-                                        {problem.line}{" "}
-                                        <PlanWay
-                                            when={isPlanHref(problem.fix.href)}
-                                            className="text-[length:inherit] text-inherit"
-                                        >
-                                            <TextLink href={problem.fix.href}>
-                                                {problem.fix.label}
-                                            </TextLink>
-                                        </PlanWay>
-                                    </p>
-                                ) : null}
-                                <div className="mt-2 border-t border-border/60 pt-2 text-[12px] text-muted-foreground">
-                                    {usageLine(
-                                        s,
-                                        usage === null ? null : usage[s.id],
-                                    )}
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    <Button asChild variant="outline">
-                                        <Link
-                                            href={`/services/${s.id}`}
-                                            aria-label={`${canEdit ? "Edit" : "View"} ${s.name}`}
-                                        >
-                                            {canEdit ? "Edit" : "View"}
-                                        </Link>
-                                    </Button>
-                                    {canEdit ? (
-                                        <Button
-                                            variant="outline"
-                                            disabled={busy === s.id}
-                                            onClick={() => void toggle(s)}
-                                        >
-                                            {takingLabel(live)}
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            </li>
-                        );
-                    })}
-                </ul>
+                <DataView
+                    viewId="services"
+                    rows={rows}
+                    columns={columns}
+                    rowKey={(s) => s.id}
+                    rowHref={(s) => `/services/${s.id}`}
+                    modes={["table", "list"]}
+                    hideModeToggle
+                    noun={{ one: "service", other: "services" }}
+                    // The header says how many.
+                    showTotal={false}
+                    rowActions={
+                        canEdit
+                            ? (s) => (
+                                  <SwitchRow
+                                      checked={s.status === "ACTIVE"}
+                                      disabled={taking.busy === s.id}
+                                      name={`${TAKING_LABEL}, ${s.name}`}
+                                      onChange={(next) =>
+                                          void taking.setTaking(s, next, (on) =>
+                                              setFlipped((had) => ({
+                                                  ...had,
+                                                  [s.id]: {
+                                                      taking: on,
+                                                      at: s.updatedAt,
+                                                  },
+                                              })),
+                                          )
+                                      }
+                                      className="justify-end whitespace-nowrap"
+                                  >
+                                      {TAKING_LABEL}
+                                  </SwitchRow>
+                              )
+                            : undefined
+                    }
+                />
             )}
+            {alsoSell ? (
+                <AlsoSell features={alsoSell} modules={modules} />
+            ) : null}
         </>
     );
 }

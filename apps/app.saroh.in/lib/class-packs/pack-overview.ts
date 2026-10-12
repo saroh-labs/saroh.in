@@ -1,6 +1,7 @@
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { payOf } from "@/lib/gst/on-price";
 import { invoiceHref, invoicesHref } from "@/lib/invoices/links";
 
 import { packKind, unitWord } from "./pack-cards";
@@ -12,6 +13,7 @@ import {
     detailHeader,
     each,
     people,
+    priceWords,
     runningOut,
     totals,
 } from "./pack-detail";
@@ -75,7 +77,11 @@ export function overviewTiles(pack: PackDetail): Tile[] {
     ];
 }
 
-/** A drop-in price the Overview names beside each service it covers. */
+/**
+ * A drop-in price the Overview names beside each service it covers: what
+ * one visit costs to pay alone, GST and all (the service's `payCents`), so
+ * it compares with the pack's "a class" figure.
+ */
 export interface DropIn {
     id: string;
     priceCents: number | null;
@@ -241,10 +247,7 @@ export function aboutRows(
 ): AboutRow[][] {
     const kind = packKind(pack);
     const unit = unitWord(kind, 1);
-    const price = [
-        formatMoneyMajor(pack.price, pack.currency),
-        each(pack, kind),
-    ]
+    const price = [priceWords(pack), each(pack, kind)]
         .filter(Boolean)
         .join(" · ");
     const first: AboutRow[] = [
@@ -311,6 +314,7 @@ export function customerPreview(
         ]
             .filter(Boolean)
             .join(" · "),
-        price: formatMoneyMajor(pack.price, pack.currency),
+        // A customer is shown what they pay, GST and all.
+        price: formatMoneyMajor(payOf(pack.price, pack.gst), pack.currency),
     };
 }

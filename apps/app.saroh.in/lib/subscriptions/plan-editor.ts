@@ -5,11 +5,33 @@ import type {
 } from "@/lib/editor-shell/types";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import type { GstAsk, GstForm } from "@/lib/gst/item-words";
+import {
+    addedGst,
+    addedGstWords,
+    gstChangeLines,
+    rateMissingNote,
+    SAC_SHAPE_PROBLEM,
+    sacOk,
+    shellProblem,
+    tidySac,
+} from "@/lib/gst/item-words";
+import {
+    effectiveMode,
+    isGstPriceMode,
+    itemModeInput,
+    itemModeValue,
+    SAME_AS_BUSINESS,
+    unitPayCents,
+} from "@/lib/gst/price-mode";
+import { GST_RATE_NEEDED, rateOption } from "@/lib/invoices/gst";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type { AutopayLimit, PlanEditorRecord, PlanValues } from "./plan-drafts";
+import type { RenewalChange } from "./renewal-change";
+import { renewalAmountChanges } from "./renewal-change";
 import type { Interval, Plan } from "./service";
-import { classesText } from "./view";
+import { classesText, subscriptionPay } from "./view";
 
 /*
  * The Plan Editor's rules (plan 2026-09-26-004, D7), after "Saroh Plan
@@ -20,8 +42,13 @@ import { classesText } from "./view";
  * the adapter turns it into D5's `PlanValues` on the way out and back.
  */
 
-/** What the editor's fields hold. `classes` is "" for as many as they like. */
-export interface PlanForm extends Record<string, unknown> {
+/**
+ * What the editor's fields hold. `classes` is "" for as many as they like.
+ * The GST fields (12 Oct 2026) are drawn for a GST-registered business
+ * only: the rate ("" is not chosen), the SAC code as typed, and the plan's
+ * own way of carrying GST ("" is the same as the business).
+ */
+export interface PlanForm extends Record<string, unknown>, GstForm {
     name: string;
     description: string;
     /** As typed: "1,200" and "1200.50" are prices; "" is none yet. */
@@ -40,6 +67,9 @@ export const EMPTY_PLAN: PlanForm = {
     currency: "",
     interval: "MONTH",
     classes: "",
+    gstRate: "",
+    sacCode: "",
+    gstPriceMode: SAME_AS_BUSINESS,
 };
 
 /** The API's limit on classes a month (`PLAN_CLASSES_MAX`). */
@@ -104,12 +134,20 @@ export function formOf(values: PlanValues): PlanForm {
         currency: values.currency,
         interval: values.interval,
         classes: values.classesPerMonth ? String(values.classesPerMonth) : "",
+        gstRate: rateOption(values.gstRate),
+        sacCode: values.sacCode ?? "",
+        gstPriceMode: itemModeValue(values.gstPriceMode),
     };
 }
 
 /**
  * What an autosave sends. Only called once `blockerOf` is null, so the
  * price and classes parse; a new plan leaves the currency to the API.
+ *
+ * The GST fields go as the API takes them: null is "not set" for the rate
+ * and the SAC code, and "same as the business" for the way. A SAC code the
+ * API would refuse is left out, so the rest still saves while its problem
+ * keeps Publish off.
  */
 export function payloadOf(form: PlanForm): Partial<PlanValues> {
     const price = form.price.trim() ? parsePrice(form.price) : null;
@@ -120,6 +158,11 @@ export function payloadOf(form: PlanForm): Partial<PlanValues> {
         ...(form.currency ? { currency: form.currency } : {}),
         interval: form.interval,
         classesPerMonth: form.classes ? parseClasses(form.classes) : null,
+        gstRate: form.gstRate || null,
+        ...(sacOk(form.sacCode)
+            ? { sacCode: tidySac(form.sacCode) || null }
+            : {}),
+        gstPriceMode: itemModeInput(form.gstPriceMode),
     };
 }
 
@@ -166,6 +209,11 @@ export interface ProblemContext {
     /** Other plans' names (not archived), for a clash seen before saving. */
     takenNames: readonly string[];
     clash: NameClash | null;
+    /**
+     * The business is GST-registered: a priced plan needs its rate, as the
+     * API's own check at Publish says. Absent or false asks for nothing.
+     */
+    gstAsked?: boolean;
 }
 
 /** Every rule the form breaks; each stops Publish and marks its field. */
@@ -196,6 +244,22 @@ export function planProblems(
             field: "price",
             message: "A price is a number, with at most two decimals",
         });
+    }
+    if (ctx.gstAsked) {
+        // Asked of a priced plan only, and 0% is an answer.
+        if (price !== null && Number(price) > 0 && form.gstRate === "") {
+            out.push({
+                field: "gstRate",
+                message: shellProblem(GST_RATE_NEEDED),
+                note: rateMissingNote("plan"),
+            });
+        }
+        if (!sacOk(form.sacCode)) {
+            out.push({
+                field: "sacCode",
+                message: shellProblem(SAC_SHAPE_PROBLEM),
+            });
+        }
     }
     if (ctx.withClasses && (ctx.otherClasses || form.classes)) {
         const n = form.classes.trim() ? Number(form.classes.trim()) : 0;
@@ -280,25 +344,41 @@ export function planChanges(
     if (form.description.trim() !== published.description.trim()) {
         out.push("new description");
     }
+    out.push(...gstChangeLines(published, form));
     return out;
 }
 
 /**
  * Said after the changes: what the people already on it keep. A price is
  * theirs until they change plan; classes change at their next renewal (D10).
+ *
+ * GST is not theirs to keep (12 Oct 2026): every invoice reads the plan's
+ * GST as it stands that day, so a change to it reaches them at their next
+ * renewal. `renewal` is the API's word on that (`renewalChange`); while it
+ * is there the note promises only the price they joined at, and the notice
+ * beside the GST fields says the amounts.
  */
 export function changesNote(
     published: PlanForm,
     form: PlanForm,
     subscribers: number,
+    renewal: RenewalChange | null = null,
 ): string {
     if (!subscribers) return "";
     const classes =
         parseClasses(published.classes) !== parseClasses(form.classes) &&
         (!form.classes || parseClasses(form.classes) !== null);
     const who = `The ${subscribers} already on it`;
+    const theirClasses = classes
+        ? " Their classes change from their next renewal."
+        : "";
+    if (renewal) {
+        return renewalAmountChanges(renewal)
+            ? `${who} keep the price they joined at. The GST changes what they pay from their next renewal.${theirClasses}`
+            : `${who} keep the price they joined at. Their next renewal stays the same amount.${theirClasses}`;
+    }
     return classes
-        ? `${who} keep what they pay. Nobody's price changes under them. Their classes change from their next renewal.`
+        ? `${who} keep what they pay. Nobody's price changes under them.${theirClasses}`
         : `${who} keep what they agreed to. Nobody's price changes under them.`;
 }
 
@@ -322,19 +402,39 @@ export function everyNote(form: PlanForm, autopay = false): string {
 
 /**
  * D13's warning under the price: the members booked to switch to this plan
- * whose autopay covers less than the price typed. Their renewal onto it is
- * never charged above what they authorised (MANDATE_LIMIT_LOW), so they
- * will need to authorise again. ₹X is the highest of their limits: none of
- * them covers more. "" when nobody's autopay falls short.
+ * whose autopay covers less than the amount the plan will charge. Their
+ * renewal onto it is never charged above what they authorised
+ * (MANDATE_LIMIT_LOW), so they will need to authorise again. ₹X is the
+ * highest of their limits: none of them covers more. "" when nobody's
+ * autopay falls short.
+ *
+ * The amount is the price typed, or with its GST on top where GST is added
+ * (`gst`, by the preview mirror in `lib/gst/price-mode.ts`). Members already
+ * on the plan are not these: what a GST change does to their renewal is
+ * `renewalChange`, said beside the GST fields.
  */
 export function autopayLimitWarning(
     form: PlanForm,
     limits: readonly AutopayLimit[] | undefined,
     currency: string,
+    gst: GstAsk | null = null,
 ): string {
     const price = parsePrice(form.price);
     if (!price || !limits?.length) return "";
-    const priceMinor = toMinorUnits(price);
+    const typedMinor = toMinorUnits(price);
+    // Added on top only where the way is known: the plan's own, or the
+    // business's.
+    const known =
+        gst?.asked === true &&
+        (gst.priceMode !== null || isGstPriceMode(form.gstPriceMode));
+    const priceMinor = known
+        ? unitPayCents(
+              typedMinor,
+              form.gstRate,
+              effectiveMode(gst.priceMode, form.gstPriceMode),
+              true,
+          )
+        : typedMinor;
     const short = limits.filter((l) => toMinorUnits(l.limit) < priceMinor);
     const members = short.reduce((n, l) => n + l.members, 0);
     if (!members) return "";
@@ -358,22 +458,44 @@ export type PlanFigures = Pick<
     "subscriberCount" | "monthlyFromMembers" | "byPrice" | "currency"
 >;
 
-/** At a glance, in the design's order. */
+/**
+ * "₹2,000 + ₹360 GST (18%) = ₹2,360 to pay", under the price while GST is
+ * added to it: the price typed is the business's own, and this is what a
+ * member pays for a period. Null whenever the typed price is the amount to
+ * pay. A preview by the mirror in `lib/gst/price-mode.ts`; the invoice the
+ * API writes is the truth.
+ */
+export function priceToPay(
+    form: PlanForm,
+    currency: string,
+    gst: GstAsk | null | undefined,
+): string | null {
+    const added = addedGst(parsePrice(form.price), form, gst);
+    return added ? addedGstWords(added, form.currency || currency) : null;
+}
+
+/**
+ * At a glance, in the design's order. "Per month" is the price being set,
+ * so it says "+ GST" where GST is added to it (`gst`, the business's
+ * standing); "Coming in a month" is what the members pay, GST and all.
+ */
 export function glance(
     form: PlanForm,
     figures: PlanFigures | null,
+    gst: GstAsk | null = null,
 ): { label: string; value: string }[] {
     const price = priceOf(form);
     const cur = form.currency || (figures?.currency ?? "INR");
     const coming = figures ? Math.round(Number(figures.monthlyFromMembers)) : 0;
+    const onTop = addedGst(parsePrice(form.price), form, gst) !== null;
     return [
         {
             label: "Per month",
             value: price
-                ? formatMoneyMajor(
+                ? `${formatMoneyMajor(
                       Math.round(price * PER_MONTH[form.interval]),
                       cur,
-                  )
+                  )}${onTop ? " + GST" : ""}`
                 : absentText(),
         },
         { label: "On it now", value: String(figures?.subscriberCount ?? 0) },
@@ -387,13 +509,17 @@ export function glance(
     ];
 }
 
-/** Who pays what: "12 people" at today's price, "3 people · older price". */
+/**
+ * Who pays what: "12 people" at today's price, "3 people · older price".
+ * The figure is what each pays a period, GST and all, as the plan's
+ * published GST bills it.
+ */
 export function whoPays(
     figures: PlanFigures | null,
 ): { label: string; value: string }[] {
     return (figures?.byPrice ?? []).map((b) => ({
         label: `${count(b.count, "person", "people")}${b.current ? "" : " · older price"}`,
-        value: formatMoneyMajor(b.price, b.currency),
+        value: formatMoneyMajor(subscriptionPay(b), b.currency),
     }));
 }
 
@@ -402,16 +528,26 @@ export function planTitle(form: PlanForm, saved: boolean): string {
     return form.name.trim() || (saved ? "Untitled plan" : "New plan");
 }
 
-/** The toast after Publish. */
+/**
+ * The toast after Publish. `renewal` is what the publish did to the next
+ * renewal of the members on it (the read's `renewalChange` as it stood
+ * before Publish): a GST change reaches them, so it never says they keep
+ * what they pay.
+ */
 export function publishedText(
     name: string,
     wasLive: boolean,
     subscribers: number,
+    renewal: RenewalChange | null = null,
 ): string {
     if (!wasLive) return `${name} is open for sign-ups.`;
-    return subscribers
-        ? `Changes published. The ${subscribers} already on it keep what they pay now.`
-        : "Changes published.";
+    if (!subscribers) return "Changes published.";
+    if (renewal) {
+        return renewalAmountChanges(renewal)
+            ? `Changes published. The ${subscribers} already on it pay the new amount from their next renewal.`
+            : `Changes published. The ${subscribers} already on it pay the same amount at their next renewal.`;
+    }
+    return `Changes published. The ${subscribers} already on it keep what they pay now.`;
 }
 
 export const PLAN_COPY: EditorCopy = {
@@ -434,6 +570,9 @@ export const PLAN_FIELD_LABELS: Partial<
     price: "price",
     interval: "billing",
     classes: "classes",
+    gstRate: "GST rate",
+    sacCode: "SAC code",
+    gstPriceMode: "GST on this price",
 };
 
 export const editHref = (id: string) =>

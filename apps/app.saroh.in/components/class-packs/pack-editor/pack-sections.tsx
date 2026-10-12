@@ -25,9 +25,15 @@ import {
     eachNote,
     glance,
     packRules,
+    priceToPay,
 } from "@/lib/class-packs/pack-editor-words";
 
+import { GstFields } from "@/components/services/service-editor/gst-fields";
 import { CheckRow } from "@/components/shared/check-row";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { NOT_ASKED } from "@/lib/gst/item-words";
+import { itemModeInput, itemModeValue } from "@/lib/gst/price-mode";
+import { rateOption } from "@/lib/invoices/gst";
 import { HELP, LABEL, PackChip, PackSection } from "./parts";
 import { ValidityChips } from "./validity-chips";
 
@@ -43,6 +49,8 @@ interface Edit {
     set: (patch: Partial<PackValues>) => void;
     errors: Partial<Record<string, string>>;
 }
+
+const NO_NOTES: Partial<Record<string, string>> = {};
 
 /** Name, a description, and what the credits are for (locked once sold). */
 export function Details({
@@ -141,20 +149,39 @@ export function Details({
     );
 }
 
-/** How many, the price, what each works out at, and how long to use it. */
+/**
+ * How many, the price, what each works out at, and how long to use it. A
+ * GST-registered business answers the pack's GST under the price (12 Oct
+ * 2026), as on a service; the values stay as the API holds them (null is
+ * not set), and the fields read them as the selects' own.
+ */
 export function CreditsAndPrice({
     values,
     set,
     errors,
     services,
-}: Edit & { services: PackServiceOption[] | null }) {
+    gst = NOT_ASKED,
+    disabled = false,
+    notes = NO_NOTES,
+    leave,
+}: Edit & {
+    /** The shell's notes: a problem the pack was opened with, said plainly. */
+    notes?: Partial<Record<string, string>>;
+    /** Say a field was left, so its problem is said as one from then on. */
+    leave?: (field: string) => void;
+    services: PackServiceOption[] | null;
+    /** Whether GST is asked, and the business's own way of carrying it. */
+    gst?: GstAsk;
+    disabled?: boolean;
+}) {
     const ids = {
         credits: useId(),
         creditsErr: useId(),
         price: useId(),
         priceErr: useId(),
     };
-    const note = eachNote(values, services ?? []);
+    const note = eachNote(values, services ?? [], gst);
+    const toPay = priceToPay(values, gst);
     return (
         <PackSection title="Credits and price">
             <div className="flex flex-wrap items-end gap-3">
@@ -202,7 +229,47 @@ export function CreditsAndPrice({
             </div>
             <FieldError id={ids.creditsErr}>{errors.credits}</FieldError>
             <FieldError id={ids.priceErr}>{errors.price}</FieldError>
+            {/* The price above is the business's own; where GST is added
+                to it, what a customer pays is said right under it. */}
+            {toPay ? <p className={cn(HELP, "tabular-nums")}>{toPay}</p> : null}
             {note ? <p className={HELP}>{note}</p> : null}
+            {gst.asked ? (
+                <div className="mt-3 flex flex-wrap items-start gap-3">
+                    <GstFields
+                        draft={{
+                            gstRate: rateOption(values.gstRate),
+                            sacCode: values.sacCode ?? "",
+                            gstPriceMode: itemModeValue(values.gstPriceMode),
+                        }}
+                        set={(patch) =>
+                            set({
+                                ...(patch.gstRate !== undefined
+                                    ? { gstRate: patch.gstRate || null }
+                                    : {}),
+                                ...(patch.sacCode !== undefined
+                                    ? { sacCode: patch.sacCode || null }
+                                    : {}),
+                                ...(patch.gstPriceMode !== undefined
+                                    ? {
+                                          gstPriceMode: itemModeInput(
+                                              patch.gstPriceMode,
+                                          ),
+                                      }
+                                    : {}),
+                            })
+                        }
+                        // The shell says a problem as soon as it is there,
+                        // but for one the pack was opened with: that is a
+                        // note until the field is left or Publish pressed.
+                        problem={(field) => errors[field] ?? null}
+                        note={(field) => notes[field]}
+                        leave={leave}
+                        asked
+                        canEdit={!disabled}
+                        businessPriceMode={gst.priceMode}
+                    />
+                </div>
+            ) : null}
             <ValidityChips
                 value={values.validityDays}
                 onChange={(validityDays) => set({ validityDays })}
@@ -243,16 +310,19 @@ export function PackGlance({
     values,
     services,
     sold,
+    gst = NOT_ASKED,
 }: {
     values: PackValues;
     services: PackServiceOption[] | null;
     sold: number | null;
+    /** The business's GST standing, for what the pack costs to pay. */
+    gst?: GstAsk;
 }) {
     return (
         <>
             <PackSection title="At a glance" tight>
                 <dl className="m-0">
-                    {glance(values, services ?? [], sold).map(([k, v]) => (
+                    {glance(values, services ?? [], sold, gst).map(([k, v]) => (
                         <div
                             key={k}
                             className="flex gap-2.5 border-t border-border/60 py-[7px] text-[13px]"

@@ -2,6 +2,14 @@ import { formatNumber } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
 import { z } from "zod";
 
+import { overMrpProblem } from "@/lib/gst/mrp";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
+import {
+    GST_PRICE_MODES,
+    itemModeInput,
+    itemModeValue,
+    SAME_AS_BUSINESS,
+} from "@/lib/gst/price-mode";
 import { isHsnSac, rateOption } from "@/lib/invoices/gst";
 import { inTableOrder } from "@/lib/products/fulfilment-types";
 import type {
@@ -109,6 +117,9 @@ export const basicsSchema = z
         // GST (ADR-008): the rate the price includes, and the HSN code a
         // registered business prints on its tax invoice.
         gstRate: z.string(),
+        // How this price carries GST when it isn't the business's way
+        // (12 Oct 2026); "" is "same as the business".
+        gstPriceMode: z.enum([SAME_AS_BUSINESS, ...GST_PRICE_MODES]),
         hsnCode: z
             .string()
             .refine(
@@ -134,6 +145,7 @@ export function basicsFrom(p: ProductDetail): BasicsValues {
         mrp: p.mrp ? trimMoney(p.mrp) : "",
         categoryId: p.categoryId ?? "",
         gstRate: rateOption(p.gstRate),
+        gstPriceMode: itemModeValue(p.gstPriceMode),
         hsnCode: p.hsnCode ?? "",
     };
 }
@@ -146,6 +158,9 @@ export function basicsPatch(v: BasicsValues): ProductPatch {
         mrp: nullIfEmpty(v.mrp),
         categoryId: v.categoryId || null,
         gstRate: v.gstRate || null,
+        // Null is "same as the business". A business that isn't registered
+        // is never shown the choice, so what was saved goes back as it was.
+        gstPriceMode: itemModeInput(v.gstPriceMode),
         hsnCode: nullIfEmpty(v.hsnCode.replace(/\s+/g, "")),
     };
 }
@@ -686,7 +701,21 @@ export const SECTION_JUMPS: Record<SectionKey, string> = {
  * What Basics must fix before it can save, in the words its bar uses — one
  * line, the first thing wrong. Empty when it can save.
  */
-export function basicsProblem(v: BasicsValues, creating: boolean): string {
+export function basicsProblem(
+    v: BasicsValues,
+    creating: boolean,
+    /**
+     * A GST-registered business: a priced product needs the rate its price
+     * includes, or its tax invoice shows no GST (12 Oct 2026).
+     */
+    gstRateNeeded = false,
+    /**
+     * How the business's prices carry GST, and the currency the sums are
+     * said in: the MRP is compared with the amount to pay, GST and all
+     * (`lib/gst/mrp.ts`). Left out, with the typed price as it always was.
+     */
+    gst?: { businessMode: GstPriceMode | null; currency: string },
+): string {
     const name = v.name.trim();
     if (!name) return "Add a name first.";
     if (v.name.length > LIMITS.name) return "The name is over 150 characters.";
@@ -701,7 +730,40 @@ export function basicsProblem(v: BasicsValues, creating: boolean): string {
         return "MRP: a number with at most two decimals.";
     if (v.mrp.trim() && paise(v.mrp) < paise(v.price))
         return "MRP can't be lower than the price it sells for.";
+    if (v.mrp.trim() && gst) {
+        const over = overMrpProblem(
+            v.price,
+            v.mrp,
+            {
+                registered: gstRateNeeded,
+                businessMode: gst.businessMode,
+                itemMode: v.gstPriceMode,
+                rate: v.gstRate,
+            },
+            gst.currency,
+        );
+        if (over) return over;
+    }
+    if (needsGstRate(v, gstRateNeeded)) return "Choose a GST rate first.";
     return "";
+}
+
+/**
+ * Whether Basics still has to choose its GST rate: a GST-registered
+ * business's product with a price above nothing and no rate. 0% is a rate
+ * ("nil-rated or exempt"); a free product is never asked, and neither is a
+ * business that isn't registered.
+ */
+export function needsGstRate(
+    v: Pick<BasicsValues, "price" | "gstRate">,
+    gstRateNeeded: boolean,
+): boolean {
+    return (
+        gstRateNeeded &&
+        v.gstRate === "" &&
+        isMoney(v.price) &&
+        paise(v.price) > 0
+    );
 }
 
 /** The first message a zod schema has for these values, or "". */

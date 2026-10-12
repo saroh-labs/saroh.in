@@ -63,6 +63,8 @@ const REACHED_BY_HOLD_AWARE: Record<string, string> = {
         "`removeAllForDeletedBusiness` asks the eraser's hold check before every batch (`mayErase`).",
     "domains/domains.service.ts":
         "`releaseForDeletedBusiness` is called only by the clean-up's `domains` step, which asks about the hold first.",
+    "billing/domain-plan.service.ts":
+        "Deletes no row. Imported by `domains.service.ts` for where a domain stands against the plan (DEC-139); its `.delete(` drops its own in-memory answer for a business (a Map).",
     "bookings/waitlist-merge.ts":
         "`removeWaitlistInTx`, called by `removeDetailsInTx` and so inside the eraser's `inEraseTx`; the eraser empties the waitlist first, so it finds nothing to pass on.",
     "site-accounts/sign-in-codes.service.ts":
@@ -70,11 +72,13 @@ const REACHED_BY_HOLD_AWARE: Record<string, string> = {
 };
 
 /**
- * Listed above for one pure helper: none of their deleting is reached, so
- * the scan doesn't follow their imports.
+ * Listed above for one pure helper, or for a read that deletes no row:
+ * none of their deleting is reached, so the scan doesn't follow their
+ * imports.
  */
 const HELPER_ONLY: readonly string[] = [
     "site-accounts/sign-in-codes.service.ts",
+    "billing/domain-plan.service.ts",
 ];
 
 /** Deleting functions only a hold-aware job may call. */

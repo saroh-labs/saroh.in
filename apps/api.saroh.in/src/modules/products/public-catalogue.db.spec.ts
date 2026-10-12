@@ -256,7 +256,11 @@ describe("public catalogue (G11)", () => {
             name: "Sourdough",
             currency: "INR",
             price: "250.00",
+            // Not GST-registered: nothing comes on top of the price.
+            gstAdded: false,
             mrp: null,
+            // No MRP: no saving to claim (GST is part of MRP, 12 Oct 2026).
+            saving: null,
             priceFrom: true,
             image: null,
             variantTitles: ["Small", "Large"],

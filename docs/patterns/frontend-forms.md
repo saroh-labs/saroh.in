@@ -28,13 +28,21 @@ as its design draws. The page holds one draft; its rules, the problems
 strip, what Save sends and the leave dialog's section names are pure
 functions in `lib/services/service-editor.ts`, tested with vitest. It
 replaced the service dialog and the two react-hook-form service forms.
+What takes effect as it is flipped is not part of that Save: "Taking
+bookings" is a switch beside it (`use-taking-bookings.ts`, 12 Oct 2026)
+that saves at once with Undo and moves the saved state and the draft
+together, so the page is never "unsaved" because of it. A length people
+mostly pick from a few values is chips with Custom (`length-field.tsx`),
+over the same string the number field held.
 
 **Current** — **One Save may be several calls, and says so when one
 fails** (10 Oct). The Service Editor's Save sends the service, then who
 takes it, then its own weekly hours (`PUT …/rules`, which replaces the
 set). The hours are rows of the same draft
 (`lib/services/service-hours-draft.ts`, `hours-field.tsx`): there is no
-"Save availability". A new service starts from the business's opening
+"Save availability". They sit in a card of their own, "When it can be
+booked" (`hours-card.tsx`), which says whose hours a one-to-one someone
+takes books in, with the way to Availability. A new service starts from the business's opening
 hours where its own hours are what gives it times (nobody on the diary
 takes it, or it is a class); a one-to-one someone takes starts with none,
 because its own hours only narrow that person's. When the service is saved
@@ -68,6 +76,18 @@ the rest still saves while that field's problem keeps Publish off. The Plan
 Editor's rules (problems, the save blocker, "When you publish" lines) are pure
 in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
 typed form into the API's values and back.
+
+**Current** — **An editor never opens in an error state over a rule newer
+than the record** (UX audit, 12 Oct). A plan or pack published before a GST
+rate was asked for opens with a plain note beside the field ("This plan has
+no GST rate yet. Choose one before you publish again."): no red field, no
+alert, no count beside Publish. It becomes the error it always was once the
+field is left or Publish is pressed, with the keyboard on the field, and
+Publish stays refused throughout. A rule gives its problem a `note`
+(`EditorProblem` in `lib/editor-shell/types.ts`); the shell holds back only
+what a published record was opened with (`heldAtOpen`, `sayProblems` in
+`state.ts`) and hands the sections `notes` and `leave`. A draft's problems
+and a new record's are said as before. Give any new publish rule a `note`.
 
 **Current** — **One sheet, one dialog, one confirm** (UX audit, 10 Oct).
 Every overlay in `app.saroh.in` is one of three components, by the size of

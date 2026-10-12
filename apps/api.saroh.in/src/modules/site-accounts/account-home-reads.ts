@@ -1,6 +1,8 @@
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { toMinor } from "../../common/money";
+import { RATED_SALE_SELECT, saleChargeInTx } from "../invoices/sale-price";
 import {
     ALLOWANCE_SELECT,
     classesAllowance,
@@ -195,8 +197,17 @@ export async function readPlan(ctx: Ctx): Promise<AccountPlan | null> {
             cancelAtPeriodEnd: true,
             pausedUntil: true,
             timezone: true,
-            plan: { select: { name: true } },
+            plan: { select: { name: true, ...RATED_SALE_SELECT } },
         },
     });
-    return row ? planView(row) : null;
+    if (!row) return null;
+    // What the next renewal comes to: the price they are on under the
+    // plan's GST as it stands now.
+    const renewal = await saleChargeInTx(
+        prisma,
+        ctx.organizationId,
+        toMinor(row.price),
+        row.plan,
+    );
+    return planView({ ...row, gst: renewal.gst });
 }

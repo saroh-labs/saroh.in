@@ -231,7 +231,10 @@ What a recording can hold (`replayConfig`):
   SDK's `ph-no-capture` class).
 - **Still masked, on purpose**: toasts, and a dialog's or sheet's title and
   description (computed far more often than fixed), and every hand-rolled
-  heading, button and label a screen has not marked.
+  heading, button and label a screen has not marked. The tab's title too,
+  which names the business and sometimes a record (`lib/page-title.ts`):
+  `<title>` sits under no `data-ph-unmask`, so never mark `<html>` or
+  `<head>`.
 - Tied to the internal user id and organization id. No name, no email.
 
 The convention, and the test that holds it

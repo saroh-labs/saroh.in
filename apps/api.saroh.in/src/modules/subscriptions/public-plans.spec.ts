@@ -69,8 +69,75 @@ describe("orderPlans (G9)", () => {
             currency: "INR",
             interval: "MONTH",
             mostChosen: true,
+            // No rate on the plan: nothing is said about GST.
+            gst: null,
         });
         expect(plan).not.toHaveProperty("members");
+    });
+
+    describe("the GST a customer is told before joining (12 Oct 2026)", () => {
+        const registered = (mode: "INCLUDED" | "ADDED") => ({
+            registered: true,
+            mode,
+        });
+        const gym = (extra: Record<string, unknown>) => [
+            { ...row("gym", "2000", 3), ...extra },
+        ];
+
+        it("says nothing for a business that isn't registered, whatever the plan's rate", () => {
+            expect(orderPlans(gym({ gstRate: "18" }))[0]?.gst).toBeNull();
+            expect(
+                orderPlans(gym({ gstRate: "18" }), {
+                    registered: false,
+                    mode: "ADDED",
+                })[0]?.gst,
+            ).toBeNull();
+        });
+
+        it("says nothing with no rate chosen, or an exempt plan", () => {
+            expect(orderPlans(gym({}), registered("ADDED"))[0]?.gst).toBeNull();
+            expect(
+                orderPlans(gym({ gstRate: "0" }), registered("ADDED"))[0]?.gst,
+            ).toBeNull();
+        });
+
+        it("includes GST: ₹2,000 to pay, ₹305.08 of it GST", () => {
+            const [plan] = orderPlans(
+                gym({ gstRate: "18" }),
+                registered("INCLUDED"),
+            );
+            expect(plan?.price).toBe("2000.00");
+            expect(plan?.gst).toEqual({
+                mode: "INCLUDED",
+                rate: "18",
+                listCents: 200_000,
+                gstCents: 30_508,
+                payCents: 200_000,
+            });
+        });
+
+        it("GST is added: ₹2,000 + ₹360 is ₹2,360 to pay, and the typed price stays the price", () => {
+            const [plan] = orderPlans(
+                gym({ gstRate: "18" }),
+                registered("ADDED"),
+            );
+            expect(plan?.price).toBe("2000.00");
+            expect(plan?.gst).toEqual({
+                mode: "ADDED",
+                rate: "18",
+                listCents: 200_000,
+                gstCents: 36_000,
+                payCents: 236_000,
+            });
+        });
+
+        it("a plan priced the other way from the business follows its own choice", () => {
+            const [plan] = orderPlans(
+                gym({ gstRate: "18", gstPriceMode: "ADDED" }),
+                registered("INCLUDED"),
+            );
+            expect(plan?.gst?.payCents).toBe(236_000);
+        });
     });
 
     it("is empty for no plans", () => {

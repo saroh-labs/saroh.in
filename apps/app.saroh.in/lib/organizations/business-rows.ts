@@ -36,6 +36,7 @@ export const BUSINESS_SHEETS = [
     "taxId",
     "numbers",
     "delivery",
+    "priceMode",
     "pay",
     "hours",
     "address",
@@ -59,6 +60,7 @@ export const BUSINESS_SHEET_TAB: Record<BusinessSheet, BusinessTab> = {
     taxId: "tax",
     numbers: "tax",
     delivery: "tax",
+    priceMode: "tax",
     pay: "pay",
     hours: "hours",
     address: "address",
@@ -107,6 +109,7 @@ export const BUSINESS_ROW_ID: Record<BusinessSheet, string> = {
     taxId: "business-tax-id",
     numbers: "business-invoice-numbers",
     delivery: "business-delivery-gst",
+    priceMode: "business-gst-on-prices",
     pay: "business-pay-upi",
     hours: "business-opening-hours",
     address: "business-registered-address",
@@ -120,7 +123,9 @@ export const businessEditId = (sheet: BusinessSheet) =>
  * The sheet a request really opens. Someone who can't change the business
  * opens none; hours are kept on the locations, so they need a location and
  * the right to change one; and GST on delivery is only a registered
- * business's, so asking for it asks about the registration first.
+ * business's, so asking for it asks about the registration first. How
+ * prices carry GST is a registered business's too, and one that isn't is
+ * never asked about it: a link for it opens nothing.
  */
 export function businessSheetToOpen(
     which: BusinessSheet,
@@ -129,5 +134,6 @@ export function businessSheetToOpen(
     if (!page.canEdit) return null;
     if (which === "hours") return page.canEditHours ? which : null;
     if (which === "delivery" && !page.registered) return "gst";
+    if (which === "priceMode" && !page.registered) return null;
     return which;
 }

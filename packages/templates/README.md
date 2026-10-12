@@ -38,14 +38,22 @@ const site = instantiateTemplate(template!, {
 
 ## Templates
 
-- **`starter` (v2)** — what a new site starts from: Home (centred hero → what
-  it does → working together → CTA) and About (hero → how it started), all
-  derived from the business profile. Its words fit a business, a person
-  working for themselves or someone showing their work (DEC-070), it carries
-  no image, and every link goes to the contact email or its own About page.
-- **`starter` (v1)** — kept for the sites built from it: company copy and a
-  gallery of `/templates/starter/*.jpg` paths that no app serves. Not listed
-  for new sites; `getTemplate("starter", 1)` still resolves it.
+- **`starter` (v4, DEC-141)** — what a new site starts from
+  (`templates/starter-v4.ts`). A look of its own (three colourways, a font
+  pair and a type scale, `templates/starter-look.ts`). Home lays down a
+  section for what the business has switched on (products, services,
+  classes, plans, packs, its place and hours) around one primary action
+  (`starterPrimaryAction`), and `modulePages` names the module pages it
+  starts with (Shop, Book, Prices, Contact). It writes nothing that is not
+  true of the business: its line is composed from the business's own names
+  (`composeBusinessLine`), and where nothing true can be said the section or
+  page is left out.
+- **`starter` (v1 to v3)** — kept for the sites built from them, never
+  edited, not listed for new sites; `getTemplate("starter", 3)` still
+  resolves one. v1 pointed at images no app serves; v2 and v3 gave every
+  site the same stock paragraphs, and v3 put a note to the owner under the
+  headline. The pre-publish matcher (`placeholders.ts`) knows all of them.
+- **`personal` and `portfolio` (v2)** — v1's pages in the starter's look.
 - **`gym` (v1)** — industry template (plan U6), Services shape: Home (the
   name as a page title → the week's timetable → plans and packs → first
   visit → hours), Timetable, Membership and Trainers. Bound blocks only while
@@ -55,3 +63,14 @@ const site = instantiateTemplate(template!, {
 
 `listTemplates()` returns the latest version of each template (the picker and
 the public catalogue); `getTemplate(id, version)` resolves any registered one.
+
+## A new version and the sites already made
+
+A site's sections are copied into it when it is made, so a new version
+reaches no existing site by itself. `planTemplateUpgrade` (`upgrade.ts`) is
+the rule that brings one up without destroying anything its owner wrote: an
+untouched page becomes the new version's, an edited page keeps everything and
+gains only the bound sections it lacks. The API reads the site and writes the
+plan (`sites/template-sync.ts`), both when a version is released
+(`docs/architecture/runbooks/TEMPLATE_UPGRADE.md`) and when a business
+switches a module on after its site exists.

@@ -100,6 +100,8 @@ const CASES = [
             "createService",
             "listServices",
             "getService",
+            // As the service's own read: its editor is the module's screen.
+            "servicePriceHistory",
             "updateService",
             "removeService",
             "listRules",
@@ -159,7 +161,8 @@ const CASES = [
     {
         controller: CoursesController,
         moduleKey: "COURSES",
-        reads: ["list", "get"],
+        // A course's price history is read with the course.
+        reads: ["list", "get", "priceHistory"],
         windDown: ["cancelEnrollment"],
         gated: ["create", "update", "addSession", "removeSession", "enrol"],
     },

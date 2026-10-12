@@ -5,19 +5,42 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma, Service } from "@saroh/database";
-import { Prisma as PrismaNamespace, prisma } from "@saroh/database";
+import { prisma, Prisma as PrismaNamespace } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { PricedItem, PriceHistoryPage } from "../audit/price-history";
+import {
+    courseFacts,
+    priceActor,
+    readPriceHistory,
+    recordPrices,
+} from "../audit/price-history";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { BookingsService } from "../bookings/bookings.service";
 import { assertBusinessDetails } from "../invoices/business-details";
+import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
+import type {
+    GstOnPrice,
+    GstPriceMode,
+    PriceTerms,
+} from "../invoices/gst-price";
+import { isGstPriceMode } from "../invoices/gst-price";
+import { assertSaleRated } from "../invoices/gst-rate-required";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
+import { loadPriceTerms } from "../invoices/price-terms";
+import {
+    hasRate,
+    priceTermsFor,
+    saleCharge,
+    saleChargeInTx,
+} from "../invoices/sale-price";
 import { contactName } from "../invoices/serialize";
+import { toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
 import type {
     AddSessionDto,
@@ -29,6 +52,30 @@ import type {
 } from "./dto";
 
 type Tx = Prisma.TransactionClient;
+
+/** What a course's price history entry is written from. */
+const PRICED_COURSE = {
+    id: true,
+    name: true,
+    price: true,
+    currency: true,
+    gstRate: true,
+    gstPriceMode: true,
+} as const;
+
+/** A course as its price history entry names it. */
+function pricedCourse(course: {
+    id: string;
+    name: string;
+    currency: string;
+}): PricedItem {
+    return {
+        kind: "COURSE",
+        id: course.id,
+        name: course.name,
+        currency: course.currency,
+    };
+}
 
 const LIST_LIMIT = 500;
 const MINUTE_MS = 60_000;
@@ -76,6 +123,20 @@ export interface CourseView {
     description: string | null;
     price: string;
     currency: string;
+    /**
+     * GST (12 Oct 2026): the rate its price carries ("18"; null: not set),
+     * its SAC code, and its own way of carrying GST (null: the business's).
+     */
+    gstRate: string | null;
+    sacCode: string | null;
+    gstPriceMode: GstPriceMode | null;
+    /**
+     * The GST on its price as an enrolment is charged today: the typed
+     * price, the GST in or on it and the amount to pay. Null when nothing
+     * is said about GST (not registered, no rate, exempt): the price is
+     * the amount to pay. An enrolment's `price` is the amount paid.
+     */
+    gst: GstOnPrice | null;
     seats: number;
     /** People on it now. */
     enrolled: number;
@@ -121,6 +182,9 @@ const COURSE_SELECT = {
     description: true,
     price: true,
     currency: true,
+    gstRate: true,
+    sacCode: true,
+    gstPriceMode: true,
     seats: true,
     status: true,
     createdAt: true,
@@ -202,8 +266,11 @@ export class CoursesService {
             take: LIST_LIMIT,
             select: COURSE_SELECT,
         });
+        // How the business's prices carry GST; read only when a course has
+        // a rate.
+        const terms = await priceTermsFor(prisma, ctx.organizationId, rows);
         const now = new Date();
-        return rows.map((r) => courseView(r, now));
+        return rows.map((r) => courseView(r, now, terms));
     }
 
     async get(ctx: OrganizationContext, id: string): Promise<CourseDetail> {
@@ -214,7 +281,7 @@ export class CoursesService {
             orderBy: [{ status: "asc" }, { createdAt: "asc" }],
             select: ENROLLMENT_SELECT,
         });
-        const [upcoming, booked, invoicesOnEnrol] = await Promise.all([
+        const [upcoming, booked, invoicesOnEnrol, terms] = await Promise.all([
             this.upcomingByEnrollment(enrollments.map((e) => e.id)),
             // A course's bookings share its session's start.
             prisma.booking.groupBy({
@@ -226,12 +293,13 @@ export class CoursesService {
                 _count: { _all: true },
             }),
             paymentsOn(prisma, ctx.organizationId),
+            priceTermsFor(prisma, ctx.organizationId, [row]),
         ]);
         const bookedAt = new Map(
             booked.map((b) => [b.startAt.getTime(), b._count._all]),
         );
         const now = new Date();
-        const view = courseView(row, now);
+        const view = courseView(row, now, terms);
         return {
             ...view,
             sessions: row.sessions.map((s) => ({
@@ -245,6 +313,25 @@ export class CoursesService {
             ),
             invoicesOnEnrol,
         };
+    }
+
+    /**
+     * What the course has cost: each change, who made it and when, newest
+     * first. `course:read`, as the course's own page asks; another
+     * business's course is not found.
+     */
+    async priceHistory(
+        ctx: OrganizationContext,
+        id: string,
+        page: { limit?: number; cursor?: string } = {},
+    ): Promise<PriceHistoryPage> {
+        authorize(ctx, "course:read");
+        const course = await prisma.course.findFirst({
+            where: { id, organizationId: ctx.organizationId },
+            select: { id: true },
+        });
+        if (!course) notFound("Course");
+        return readPriceHistory(ctx.organizationId, "COURSE", id, page);
     }
 
     async create(
@@ -274,21 +361,34 @@ export class CoursesService {
             fieldError("A new course cannot start archived", "status");
         }
 
-        const created = await prisma.course.create({
-            data: {
-                organizationId,
-                serviceId: service.id,
-                name: dto.name,
-                description: dto.description ?? null,
-                price: dto.price,
-                currency,
-                seats: dto.seats,
-                status,
-                sessions: {
-                    create: sessions.map((s) => ({ organizationId, ...s })),
-                },
+        const data = {
+            organizationId,
+            serviceId: service.id,
+            name: dto.name,
+            description: dto.description ?? null,
+            price: dto.price,
+            currency,
+            ...gstColumns(dto),
+            seats: dto.seats,
+            status,
+            sessions: {
+                create: sessions.map((s) => ({ organizationId, ...s })),
             },
-            select: { id: true },
+        };
+        // The course and its first price history entry are made together.
+        const created = await prisma.$transaction(async (tx) => {
+            const made = await tx.course.create({
+                data,
+                select: PRICED_COURSE,
+            });
+            await recordPrices(
+                tx,
+                priceActor(ctx),
+                pricedCourse(made),
+                null,
+                courseFacts(made),
+            );
+            return made;
         });
         return this.get(ctx, created.id);
     }
@@ -311,11 +411,13 @@ export class CoursesService {
                 "sessions",
             );
         }
+        const gst = gstColumns(dto);
         await prisma.$transaction(async (tx) => {
             await lockCourse(tx, organizationId, id);
             const course = await tx.course.findFirst({
                 where: { id, organizationId },
                 select: {
+                    ...PRICED_COURSE,
                     serviceId: true,
                     status: true,
                     service: { select: { capacity: true } },
@@ -372,8 +474,9 @@ export class CoursesService {
                     }
                 }
             }
-            await tx.course.update({
+            const saved = await tx.course.update({
                 where: { id },
+                select: PRICED_COURSE,
                 data: {
                     ...(dto.name !== undefined ? { name: dto.name } : {}),
                     ...(dto.description !== undefined
@@ -390,8 +493,17 @@ export class CoursesService {
                         : {}),
                     ...(dto.seats !== undefined ? { seats: dto.seats } : {}),
                     ...(dto.status !== undefined ? { status: dto.status } : {}),
+                    ...gst,
                 },
             });
+            // In the save's own transaction: nothing moved, nothing kept.
+            await recordPrices(
+                tx,
+                priceActor(ctx),
+                pricedCourse(saved),
+                courseFacts(course),
+                courseFacts(saved),
+            );
         });
         return this.get(ctx, id);
     }
@@ -568,6 +680,9 @@ export class CoursesService {
                     name: true,
                     price: true,
                     currency: true,
+                    gstRate: true,
+                    sacCode: true,
+                    gstPriceMode: true,
                     seats: true,
                     status: true,
                     service: true,
@@ -605,8 +720,26 @@ export class CoursesService {
             if (course._count.enrollments >= course.seats) {
                 throw new ConflictException("The course is full.");
             }
+            // With Payments on the enrolment writes a tax invoice: a
+            // registered business's course with no GST rate is asked for
+            // one first (409 GST_RATE_MISSING), before anything is written,
+            // and the app asks in place and enrols again.
+            const invoices = await paymentsOn(tx, organizationId);
+            if (invoices) {
+                await assertCourseRated(tx, organizationId, course, dto.price);
+            }
 
-            const price = dto.price ?? toMoneyString(course.price);
+            // What they are charged: the course's price, or the one typed
+            // for them, with its GST added where the business adds it
+            // (`sale-price.ts`). The enrolment keeps the amount to pay, as
+            // its invoice does.
+            const charge = await saleChargeInTx(
+                tx,
+                organizationId,
+                toCents(dto.price ?? toMoneyString(course.price)),
+                course,
+            );
+            const price = charge.pay;
             const enrollment = await tx.courseEnrollment.create({
                 data: {
                     organizationId,
@@ -630,7 +763,7 @@ export class CoursesService {
                     "One of the course's sessions has no room left. Raise the service's capacity, or move that session.",
                 );
             }
-            if (await paymentsOn(tx, organizationId)) {
+            if (invoices) {
                 const n = course.sessions.length;
                 await this.invoices.issueInTx(tx, organizationId, {
                     contactId: contact.id,
@@ -639,7 +772,7 @@ export class CoursesService {
                         {
                             description: `${course.name} · ${n} ${n === 1 ? "session" : "sessions"}`,
                             quantity: 1,
-                            unitPrice: price,
+                            ...charge.line,
                         },
                     ],
                     source: "COURSE",
@@ -926,7 +1059,65 @@ function sessionTimes(
     return out.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 }
 
-function courseView(row: CourseRow, now: Date): CourseView {
+/** A stored GST rate as it is written: "18", "0.25"; null when not set. */
+function courseRate(rate: { toString(): string } | null): string | null {
+    const bps = rateToBps(rate);
+    return bps === null ? null : bpsToRate(bps);
+}
+
+/**
+ * The GST columns a save names (12 Oct 2026): a rate GST has, or null to
+ * clear it; the SAC code; the course's own way of carrying GST.
+ */
+function gstColumns(dto: CourseInputDto) {
+    if (
+        dto.gstRate !== undefined &&
+        dto.gstRate !== null &&
+        !isGstRate(dto.gstRate)
+    ) {
+        fieldError(
+            `${dto.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            "gstRate",
+        );
+    }
+    return {
+        ...(dto.gstRate !== undefined ? { gstRate: dto.gstRate } : {}),
+        ...(dto.sacCode !== undefined ? { sacCode: dto.sacCode } : {}),
+        ...(dto.gstPriceMode !== undefined
+            ? { gstPriceMode: dto.gstPriceMode }
+            : {}),
+    };
+}
+
+/**
+ * Refuse enrolling someone at the desk on a registered business's course
+ * that has no GST rate (409 `GST_RATE_MISSING`, kind COURSE), unless it is
+ * free of charge. A course with a rate, and any course of a business that
+ * is not registered, reads nothing more.
+ */
+async function assertCourseRated(
+    db: Pick<Tx, "businessProfile">,
+    organizationId: string,
+    course: {
+        id: string;
+        name: string;
+        price: { toString(): string };
+        gstRate: { toString(): string } | null;
+    },
+    typedPrice: string | undefined,
+): Promise<void> {
+    if (hasRate(course)) return;
+    const terms = await loadPriceTerms(db, organizationId);
+    assertSaleRated(terms.registered, {
+        kind: "COURSE",
+        id: course.id,
+        name: course.name,
+        rate: course.gstRate,
+        priceCents: toCents(typedPrice ?? toMoneyString(course.price)),
+    });
+}
+
+function courseView(row: CourseRow, now: Date, terms: PriceTerms): CourseView {
     const upcoming = row.sessions.filter((s) => s.startAt > now);
     const enrolled = row._count.enrollments;
     return {
@@ -936,6 +1127,13 @@ function courseView(row: CourseRow, now: Date): CourseView {
         description: row.description,
         price: toMoneyString(row.price),
         currency: row.currency,
+        gstRate: courseRate(row.gstRate),
+        sacCode: row.sacCode,
+        gstPriceMode: isGstPriceMode(row.gstPriceMode)
+            ? row.gstPriceMode
+            : null,
+        // The sum an enrolment uses (`enrol`, `sale-price.ts`).
+        gst: saleCharge(toCents(toMoneyString(row.price)), row, terms).gst,
         seats: row.seats,
         enrolled,
         seatsLeft: Math.max(0, row.seats - enrolled),

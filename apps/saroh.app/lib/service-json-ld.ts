@@ -1,3 +1,5 @@
+import { gstOnPriceOf } from "@saroh/site-blocks";
+
 import { jsonLdScript } from "./product-json-ld";
 
 /**
@@ -25,6 +27,12 @@ export interface ServiceJsonLdInput {
         /** In minor units; null or 0 for a service with no price shown. */
         priceCents: number | null;
         currency: string | null;
+        /**
+         * The GST in or on the price, as the booking read sends it; none
+         * when absent, null or strange. Where GST is added, the offer
+         * publishes the API's amount to pay.
+         */
+        gst?: unknown;
     }[];
 }
 
@@ -40,6 +48,12 @@ export function serviceJsonLd({
             typeof service.priceCents === "number" &&
             service.priceCents > 0 &&
             !!service.currency;
+        // What the customer pays: the API's amount to pay where GST is
+        // added to the price, else the price as typed. Nothing is added
+        // up here.
+        const gst = gstOnPriceOf(service.gst);
+        const payCents =
+            gst?.mode === "ADDED" ? gst.payCents : (service.priceCents ?? 0);
         return {
             "@context": SCHEMA,
             "@type": "Service",
@@ -55,7 +69,7 @@ export function serviceJsonLd({
                 ? {
                       offers: {
                           "@type": "Offer",
-                          price: ((service.priceCents ?? 0) / 100).toFixed(2),
+                          price: (payCents / 100).toFixed(2),
                           priceCurrency: service.currency,
                           url,
                       },

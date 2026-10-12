@@ -1,4 +1,5 @@
 import type { StockWord } from "@saroh/site-blocks";
+import { gstOnPriceOf, shownSaving } from "@saroh/site-blocks";
 
 import type { CatalogueProduct } from "./catalogue-shape";
 
@@ -7,6 +8,8 @@ import type { CatalogueProduct } from "./catalogue-shape";
  * what the page itself shows a visitor: the public catalogue answer, which
  * never carries cost, stock counts beyond "Only N left", team-only fields or
  * a hidden review. Nothing here names Saroh — the seller is the merchant.
+ * An offer's price is what the customer pays: where GST is added to the
+ * business's prices, the amount to pay, as the page's button names it.
  *
  * Kept apart from the page so it can be tested without a request; the page
  * renders `productJsonLdScript` in a server-rendered
@@ -49,13 +52,36 @@ function absolute(url: string, origin: string): string {
     }
 }
 
-/** The MRP as a list price, only where the page shows money off. */
-function listPrice(price: string, mrp: string | null, currency: string) {
-    if (mrp === null || !(Number(mrp) > Number(price))) return undefined;
+/**
+ * The price an offer publishes: what the customer pays. Where the business
+ * adds GST to its prices, that is the API's amount to pay (its `payCents`,
+ * written as a decimal); otherwise the typed price, exactly as it came.
+ * Nothing is added up here.
+ */
+function payPrice(typed: string, gst: unknown): string {
+    const on = gstOnPriceOf(gst);
+    return on?.mode === "ADDED" ? (on.payCents / 100).toFixed(2) : typed;
+}
+
+/**
+ * The MRP as a list price, only where it is above the price the offer
+ * publishes: the amount to pay, GST and all, since an MRP includes its
+ * taxes. `saving` is the API's own answer to that (the one the page
+ * strikes through); with none sent, the MRP is compared with the offer's
+ * price here. An offer at its MRP, or above it, publishes no list price.
+ */
+function listPrice(
+    price: string,
+    mrp: string | null,
+    currency: string,
+    saving: unknown,
+) {
+    const shown = shownSaving(saving, price, mrp);
+    if (!shown) return undefined;
     return {
         "@type": "UnitPriceSpecification",
         priceType: `${SCHEMA}/ListPrice`,
-        price: mrp,
+        price: shown.mrp,
         priceCurrency: currency,
     };
 }
@@ -76,12 +102,15 @@ export function productJsonLd({
     const url = absolute(`/shop/${encodeURIComponent(product.slug)}`, origin);
     const seller = { "@type": "Organization", name: business };
     const offer = (
-        price: string,
+        typed: string,
+        gst: unknown,
         mrp: string | null,
+        saving: unknown,
         stock: StockWord | null,
         name?: string,
     ) => {
-        const spec = listPrice(price, mrp, product.currency);
+        const price = payPrice(typed, gst);
+        const spec = listPrice(price, mrp, product.currency, saving);
         return {
             "@type": "Offer",
             ...(name ? { name } : {}),
@@ -99,12 +128,30 @@ export function productJsonLd({
             ? product.variants.map((v) =>
                   offer(
                       v.price ?? product.price,
-                      v.price === null ? product.mrp : v.mrp,
+                      // The option's own GST where the API sent one, else
+                      // the product's while it sells at the product's price:
+                      // the rule the page's price follows (`productGst`).
+                      v.gst !== undefined
+                          ? v.gst
+                          : v.price === null
+                            ? product.gst
+                            : null,
+                      // Its own MRP, else the product's: the page's rule.
+                      v.mrp ?? product.mrp,
+                      v.saving,
                       v.stock,
                       `${product.name} – ${v.title}`,
                   ),
               )
-            : [offer(product.price, product.mrp, product.stock?.word ?? null)];
+            : [
+                  offer(
+                      product.price,
+                      product.gst,
+                      product.mrp,
+                      product.saving,
+                      product.stock?.word ?? null,
+                  ),
+              ];
 
     const images = product.images
         .filter((i) => i.kind !== "video")

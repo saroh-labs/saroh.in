@@ -1,7 +1,7 @@
 /**
  * How each service is being used, from one bookings read (U16, E2): places
  * and bookings held this week, and what is still to come. Pure, so the
- * Services cards and the Service Editor's "At a glance" count the same way.
+ * Services rows and the Service Editor's "At a glance" count the same way.
  */
 
 import type { BookingsCalendar } from "./booking-calendar";

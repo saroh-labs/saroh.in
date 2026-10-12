@@ -5,6 +5,9 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         product: { findMany: jest.fn().mockResolvedValue([]) },
         customer: { findMany: jest.fn().mockResolvedValue([]) },
+        // What the MRP rule reads of the business (`product-mrp.ts`).
+        businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+        storeSettings: { findUnique: jest.fn().mockResolvedValue(null) },
         $transaction: jest.fn(),
     },
 }));

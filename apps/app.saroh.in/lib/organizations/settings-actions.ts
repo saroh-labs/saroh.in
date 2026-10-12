@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { readOverMrpIfAdded } from "@/lib/gst-rates/service";
 import type { OpeningHoursDay } from "@/lib/stores/storefronts";
 import {
     listStorefrontHours,
@@ -58,6 +59,16 @@ export async function saveOrganizationSettings(
         else revalidatePath("/");
     }
     return result;
+}
+
+/**
+ * What switching the business to "GST is added to my prices" would do to
+ * its products' MRPs (12 Oct 2026, `lib/gst-rates/over-mrp.ts`): read by
+ * that sheet when the choice is picked, before anything is saved. Null
+ * when it couldn't be told; the save is checked by the API either way.
+ */
+export async function loadOverMrpIfAdded() {
+    return readOverMrpIfAdded();
 }
 
 /**

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { EditorShell } from "@/components/editor-shell/editor-shell";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { NOT_ASKED } from "@/lib/gst/item-words";
 import { PLANS_HREF } from "@/lib/subscriptions/plan-detail";
 import type { PlanEditorRecord } from "@/lib/subscriptions/plan-drafts";
 import type { NameClash, PlanFigures } from "@/lib/subscriptions/plan-editor";
@@ -26,6 +28,7 @@ import {
     whoPays,
 } from "@/lib/subscriptions/plan-editor";
 import { planEditorAdapter } from "@/lib/subscriptions/plan-editor-adapter";
+import type { RenewalChange } from "@/lib/subscriptions/renewal-change";
 
 import { PlanAside } from "./at-a-glance";
 import { ClassesSection } from "./classes-section";
@@ -48,6 +51,13 @@ import { PriceSection } from "./price-section";
  * - the currency picker → gone: a plan is in the business's currency
  *   (DEC-030 amendment), and an older plan keeps its own.
  *
+ * A GST-registered business answers the plan's GST beside its price (12 Oct
+ * 2026): draft fields, autosaved and published like the price. Whether it
+ * is asked comes with every answer of the server's (`gst`), and from the
+ * page for a plan not saved yet. What publishing the GST does to the
+ * members already on the plan (`renewalChange`) is said under the fields,
+ * as of the last save.
+ *
  * The shell (D6) owns autosave, the banner, Publish, Discard, Delete draft,
  * the failed and conflict states and leaving; this gives it D5's routes,
  * the plan's words and rules, and draws the sections.
@@ -61,7 +71,13 @@ export function PlanEditor({
     canEdit,
     readOnlyText,
     autopayOffered = false,
+    gst: gstOfPage = NOT_ASKED,
 }: {
+    /**
+     * Whether a new plan asks for GST, as the page read it: a saved plan's
+     * own read says so itself, and wins. Unknown asks for nothing.
+     */
+    gst?: GstAsk;
     /** Null on `/billing/plans/new`. */
     initial: PlanEditorRecord | null;
     /** Who is on it and what it brings in; null for a plan not saved yet. */
@@ -94,12 +110,32 @@ export function PlanEditor({
                 first.values.classes,
             ),
     );
-    const adapter = useMemo(
-        () => planEditorAdapter((r) => setClash(clashOf(r))),
-        [],
+    // What the server last said beside the values: whether GST is asked,
+    // and what publishing it does to the members on the plan.
+    const [gstOfRead, setGstOfRead] = useState<GstAsk | null>(
+        () => initial?.gst ?? null,
     );
+    const [renewal, setRenewal] = useState<RenewalChange | null>(
+        () => initial?.renewalChange ?? null,
+    );
+    // Made once: it follows `renewalChange` through every answer, so the
+    // publish toast says what the publish did to the members on the plan.
+    const [adapter] = useState(() =>
+        planEditorAdapter((r) => {
+            setClash(clashOf(r));
+            if (r.gst) setGstOfRead(r.gst);
+            setRenewal(r.renewalChange ?? null);
+        }, initial?.renewalChange ?? null),
+    );
+    const gst = gstOfRead ?? gstOfPage;
     const subscribers = figures?.subscriberCount ?? 0;
-    const ctx = { withClasses, otherClasses: other, takenNames, clash };
+    const ctx = {
+        withClasses,
+        otherClasses: other,
+        takenNames,
+        clash,
+        gstAsked: gst.asked,
+    };
     const pays = first?.status === "DRAFT" ? [] : whoPays(figures);
 
     return (
@@ -123,7 +159,7 @@ export function PlanEditor({
             changesOf={(p, v) => planChanges(p, v, withClasses)}
             changesNote={(r) =>
                 r.published
-                    ? changesNote(r.published, r.values, subscribers)
+                    ? changesNote(r.published, r.values, subscribers, renewal)
                     : ""
             }
             fieldLabels={PLAN_FIELD_LABELS}
@@ -131,7 +167,12 @@ export function PlanEditor({
             viewHrefFor={viewHref}
             afterDeleteHref={PLANS_HREF}
             publishedMessage={(r, wasLive) =>
-                publishedText(r.values.name.trim(), wasLive, subscribers)
+                publishedText(
+                    r.values.name.trim(),
+                    wasLive,
+                    subscribers,
+                    adapter.publishedRenewal(),
+                )
             }
             aside={({ values }) => (
                 <PlanAside
@@ -139,6 +180,7 @@ export function PlanEditor({
                     glance={glance(
                         { ...values, currency: values.currency || currency },
                         figures,
+                        gst,
                     )}
                 />
             )}
@@ -151,6 +193,8 @@ export function PlanEditor({
                         currency={fields.values.currency || currency}
                         autopayOffered={autopayOffered}
                         autopayLimits={initial?.autopayLimits}
+                        gst={gst}
+                        renewal={renewal}
                     />
                     {withClasses ? (
                         <ClassesSection

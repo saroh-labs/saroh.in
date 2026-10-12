@@ -11,9 +11,11 @@ import {
     draftVisits,
     fromMinor,
     glance,
+    gstPlace,
     hasBookableHours,
     HOURS_SECTION,
     hoursNote,
+    needsGstRate,
     needsMeetingLink,
     problemFor,
     savedMessage,
@@ -26,10 +28,12 @@ import {
     stateLine,
     statePill,
     timeNote,
+    timesComeFrom,
     toMinor,
     TREATMENT_NEEDS_STOREFRONT,
     VIEW_ONLY,
     whereNote,
+    whoseHours,
 } from "./service-editor";
 
 describe("VIEW_ONLY (E26)", () => {
@@ -100,6 +104,7 @@ describe("draftOf", () => {
             meetingUrl: "",
             price: "1200",
             deposit: "PERCENT_50",
+            gstPriceMode: "",
             staffIds: ["st_a", "st_b"],
             showOnBookingPage: true,
             taking: true,
@@ -229,6 +234,73 @@ describe("serviceProblems", () => {
     });
 });
 
+describe("the GST rate of a GST-registered business's service", () => {
+    const NEEDED = "Choose a GST rate. Pick 0% if it's exempt or nil-rated.";
+    const problems = (over: Partial<ServiceDraft>, registered: boolean) =>
+        serviceProblems(draft(over), true, false, false, registered);
+
+    it("has to be chosen before a priced service is saved", () => {
+        expect(problems({ gstRate: "" }, true)).toEqual([NEEDED]);
+        expect(
+            problemFor(
+                serviceFieldProblems(
+                    draft({ gstRate: "" }),
+                    true,
+                    false,
+                    false,
+                    true,
+                ),
+                "gstRate",
+            ),
+        ).toBe(NEEDED);
+    });
+
+    it("takes 0% as an answer: exempt is a choice, never the same as none", () => {
+        expect(problems({ gstRate: "0" }, true)).toEqual([]);
+        expect(problems({ gstRate: "18" }, true)).toEqual([]);
+        expect(needsGstRate({ price: "1200", gstRate: "0" }, true)).toBe(false);
+    });
+
+    it("is never asked of a free service, or one with no price typed yet", () => {
+        expect(
+            problems({ gstRate: "", price: "0", deposit: "NONE" }, true),
+        ).toEqual([]);
+        expect(needsGstRate({ price: "", gstRate: "" }, true)).toBe(false);
+        expect(needsGstRate({ price: "twelve", gstRate: "" }, true)).toBe(
+            false,
+        );
+    });
+
+    it("is never asked of a business that isn't registered", () => {
+        expect(problems({ gstRate: "" }, false)).toEqual([]);
+        expect(needsGstRate({ price: "1200", gstRate: "" }, false)).toBe(false);
+    });
+
+    it("sits beside the price for a registered business, and nowhere for one that isn't", () => {
+        const none = { gstRate: "", sacCode: "" };
+        expect(gstPlace(true, none)).toBe("price");
+        expect(gstPlace(false, none)).toBe("none");
+        // One saved before stays in view (00-universal §15).
+        expect(gstPlace(false, { gstRate: "18", sacCode: "" })).toBe("more");
+        expect(gstPlace(false, { gstRate: "", sacCode: "999723" })).toBe(
+            "more",
+        );
+        // Couldn't tell: where it always was, and nothing is asked.
+        expect(gstPlace(null, none)).toBe("more");
+    });
+
+    it("names a change to it under Price when that is where it is drawn", () => {
+        const saved = draft();
+        const changed = { ...saved, gstRate: "5", sacCode: "9997" };
+        expect(changedSections(saved, changed)).toEqual(["More settings"]);
+        expect(changedSections(saved, changed, true)).toEqual(["Price"]);
+        // The rest of More settings is still More settings.
+        expect(
+            changedSections(saved, { ...changed, bufferBefore: "20" }, true),
+        ).toEqual(["Price", "More settings"]);
+    });
+});
+
 describe("serviceInput", () => {
     it("sends the fields as the API takes them, the deposit's mode and the visits", () => {
         const input = serviceInput(
@@ -246,6 +318,7 @@ describe("serviceInput", () => {
             currency: "INR",
             gstRate: "18",
             sacCode: "999723",
+            gstPriceMode: null,
             timezone: "Asia/Kolkata",
             locationType: "EITHER",
             meetingUrl: "https://meet.x/y",
@@ -313,8 +386,10 @@ describe("the words around the editor", () => {
         expect(stateLine({ isNew: false, dirty: false, comingUp: 1 })).toBe(
             "1 booking still to come",
         );
+        // The count is of what is still to come: a service with none may
+        // have been booked many times before, so it never says "yet".
         expect(stateLine({ isNew: false, dirty: false, comingUp: 0 })).toBe(
-            "Nothing booked yet",
+            "Nothing coming up",
         );
         expect(stateLine({ isNew: false, dirty: false, comingUp: null })).toBe(
             "",
@@ -343,7 +418,7 @@ describe("the words around the editor", () => {
                 comingUp: 0,
             }),
         ).toBe(
-            "Check-up added. Give it hours under More settings so customers can book it.",
+            "Check-up added. Give it weekly hours so customers can book it.",
         );
         expect(
             savedMessage({
@@ -363,9 +438,7 @@ describe("the words around the editor", () => {
                 kind: "class",
                 comingUp: 0,
             }),
-        ).toBe(
-            "Yoga added. Set its weekly times under More settings so customers can book it.",
-        );
+        ).toBe("Yoga added. Give it weekly times so customers can book it.");
         expect(
             savedMessage({ isNew: false, name: "x", kind: "one", comingUp: 2 }),
         ).toBe(
@@ -388,7 +461,11 @@ describe("the words around the editor", () => {
         expect(timeNote("class", true)).toBe(
             "A class runs at set times, and people book a place.",
         );
-        expect(timeNote("one", false)).toContain("its own weekly hours");
+        // The hours have a card of their own, which says where the times
+        // come from: Time says only what the gap does.
+        expect(timeNote("one", false)).toBe(
+            "The gap is kept free after each booking.",
+        );
         expect(whereNote("EITHER")).toBe(
             "They pick when booking. Online visits join by the link below.",
         );
@@ -713,8 +790,26 @@ describe("its own weekly hours are part of the draft (one Save)", () => {
             "Weekly windows in Asia/Kolkata, saved with the rest of the page. They start from your opening hours: change them if this runs at other times.",
         );
         expect(hoursNote("Asia/Kolkata", false)).toBe(
-            "Weekly windows in Asia/Kolkata, saved with the rest of the page. With people on the diary, their free time inside these windows is what customers can book.",
+            "Weekly windows in Asia/Kolkata, saved with the rest of the page.",
         );
+        // Someone takes it: its own hours only narrow theirs.
+        expect(hoursNote("Asia/Kolkata", false, true)).toBe(
+            "Weekly windows in Asia/Kolkata, saved with the rest of the page. Only the free time inside these windows is offered.",
+        );
+    });
+
+    it("says what gives a service its times: its own hours, or the people who take it", () => {
+        expect(timesComeFrom("one", 0)).toBe("own");
+        expect(timesComeFrom("one", 2)).toBe("people");
+        // A class runs at its own times, whoever teaches it.
+        expect(timesComeFrom("class", 0)).toBe("own");
+        expect(timesComeFrom("class", 1)).toBe("own");
+        expect(whoseHours(["Asha"])).toBe("Asha's hours");
+        expect(whoseHours(["Asha", "Ravi"])).toBe("Asha's and Ravi's hours");
+        expect(whoseHours(["Asha", "Ravi", "Mo"])).toBe(
+            "the hours of the 3 people who take it",
+        );
+        expect(HOURS_SECTION).toBe("When it can be booked");
     });
 });
 

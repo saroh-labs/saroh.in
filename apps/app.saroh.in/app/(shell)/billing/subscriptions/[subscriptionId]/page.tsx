@@ -18,6 +18,8 @@ import {
 } from "@/lib/subscriptions/service";
 import { ranLine } from "@/lib/subscriptions/view";
 
+// "Subscription", never their name: a tab's title shows in a screen share, in
+// history and in bookmarks (`lib/page-title.ts`).
 export const metadata = { title: "Subscription" };
 
 const STEPS = ["pause", "switch", "cancel", "restart"] as const;

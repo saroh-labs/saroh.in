@@ -7,6 +7,8 @@ import type {
     BookingPaymentView,
     BookingRules,
     Closure,
+    OfferedDays,
+    OfferedRead,
     OffRangeInput,
     StaffList,
     StaffView,
@@ -50,6 +52,55 @@ export async function readBookingPayment(): Promise<BookingPaymentView | null> {
         return asBookingPayment(await res.json());
     } catch {
         return null;
+    }
+}
+
+/**
+ * The business's opening hours for a Server Action: the weekly ranges,
+ * null when none are saved, undefined when they couldn't be read. A bare
+ * fetch, as a 403 in an action is an answer and never the page's
+ * forbidden.
+ */
+export async function readOpeningHours(): Promise<
+    WeeklyRange[] | null | undefined
+> {
+    try {
+        const base = await orgBase();
+        if (!base) return undefined;
+        const res = await apiFetch(`${base}/staff`);
+        if (!res.ok) return undefined;
+        return ((await res.json()) as StaffList).openingHours ?? null;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * The times the booking page offers for a service over its next two weeks,
+ * with one person or whoever is free: the public read the page itself
+ * uses, asked from here so Availability's preview shows what a customer
+ * sees. Never throws.
+ */
+export async function readOffered(
+    serviceId: string,
+    staffId?: string,
+): Promise<OfferedRead> {
+    try {
+        const query = staffId ? `?staffId=${encodeURIComponent(staffId)}` : "";
+        const res = await apiFetch(
+            `/public/services/${encodeURIComponent(serviceId)}/days${query}`,
+        );
+        // Not on the booking page, paused, or bookings switched off.
+        if (res.status === 404 || res.status === 410) {
+            return { ok: false, why: "off" };
+        }
+        if (!res.ok) return { ok: false, why: "failed" };
+        const data = (await res.json()) as OfferedDays;
+        return Array.isArray(data.days)
+            ? { ok: true, data }
+            : { ok: false, why: "failed" };
+    } catch {
+        return { ok: false, why: "failed" };
     }
 }
 
@@ -100,6 +151,23 @@ export interface CreateStaffInput {
 
 export function createStaff(input: CreateStaffInput) {
     return send<StaffView>("/staff", "POST", input, "Couldn't add them.");
+}
+
+/**
+ * "It's just me": the signed-in person on the diary as themselves. The API
+ * reads who they are from the session; they already use a team seat, so
+ * none is added.
+ */
+export function addSelf(input: {
+    serviceIds?: string[];
+    hours?: WeeklyRange[];
+}) {
+    return send<StaffView>(
+        "/staff/me",
+        "POST",
+        input,
+        "Couldn't put you on the diary.",
+    );
 }
 
 export function updateStaff(

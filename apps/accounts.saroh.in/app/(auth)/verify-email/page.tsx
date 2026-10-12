@@ -8,7 +8,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 export const metadata: Metadata = {
-    title: "Check your email · Saroh",
+    title: "Check your email",
     description: "Enter the code we emailed you to finish setting up Saroh.",
 };
 

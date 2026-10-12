@@ -15,6 +15,7 @@ import {
     AuditOutcome,
     auditMetadata,
 } from "../audit/audit.service";
+import { domainPlan } from "../billing/domain-plan.service";
 import { businessTimezone } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
@@ -452,7 +453,12 @@ export class WebAddressService {
               })
             : null;
         const platform = platformOrigin(address);
-        const origin = domain ? `https://${domain.hostname}` : platform;
+        // The links a business shares are the address that shows its site:
+        // the Saroh one while its plan has paused the domain (DEC-139).
+        const origin =
+            domain && !(await domainPlan.paused(organizationId))
+                ? `https://${domain.hostname}`
+                : platform;
         // Live: published, and reachable somewhere — a site that has no
         // address yet (plan L5) and no domain is served nowhere.
         const live =

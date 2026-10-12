@@ -20,6 +20,22 @@ export const GST_RATE_OPTIONS = [
 
 export type GstRateValue = (typeof GST_RATE_OPTIONS)[number]["value"];
 
+/**
+ * The rates alone, for a field that has to be answered: no "Not set" row.
+ * 0% stays a choice of its own ("nil-rated or exempt"), never the same as
+ * no answer, which is the box's placeholder.
+ */
+export const GST_RATE_CHOICES = GST_RATE_OPTIONS.filter(
+    (option) => option.value !== "",
+);
+
+/** What the box says before a rate is chosen. */
+export const GST_RATE_PLACEHOLDER = "Choose a rate";
+
+/** What a priced thing with no rate is told, under its GST rate box. */
+export const GST_RATE_NEEDED =
+    "Choose a GST rate. Pick 0% if it's exempt or nil-rated.";
+
 /** A saved rate ("18.00", "0.25") as its option's value, or "" when unset or unknown. */
 export function rateOption(rate: string | null | undefined): GstRateValue {
     if (rate === null || rate === undefined || rate.trim() === "") return "";

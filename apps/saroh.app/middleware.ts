@@ -5,6 +5,7 @@ import { env } from "@/env";
 import { accountAreaOn, isAccountPath } from "@/lib/account-area-switch";
 import { TEST_HOST_ROBOTS } from "@/lib/crawl";
 import { isPayPath, TENANT_HOST_HEADER } from "@/lib/pay-host";
+import { privatePathHeaders } from "@/lib/private-paths";
 import { REQUEST_PATH_HEADER, requestPathOf } from "@/lib/request-path";
 import { tenantUrl } from "@/lib/tenant-url";
 import {
@@ -131,9 +132,12 @@ export default function middleware(req: NextRequest) {
         const headers = forged ?? new Headers(req.headers);
         headers.set(TENANT_HOST_HEADER, hostname);
         // The same path and query, served by `app/pay/**`.
-        return NextResponse.rewrite(new URL(url.toString()), {
-            request: { headers },
-        });
+        return privately(
+            path,
+            NextResponse.rewrite(new URL(url.toString()), {
+                request: { headers },
+            }),
+        );
     }
 
     // The account area switched off (`lib/account-area.ts`) is not there: a
@@ -150,9 +154,25 @@ export default function middleware(req: NextRequest) {
     // the headers without a forged test-release header (T5).
     const headers = forged ?? new Headers(req.headers);
     headers.set(REQUEST_PATH_HEADER, requestPathOf(url));
-    return NextResponse.rewrite(tenantUrl(hostname, url), {
-        request: { headers },
-    });
+    return privately(
+        path,
+        NextResponse.rewrite(tenantUrl(hostname, url), {
+            request: { headers },
+        }),
+    );
+}
+
+/**
+ * A page about one customer (their account, a checkout, an order, a pay
+ * link, a short link: `lib/private-paths.ts`) says "don't index me" on the
+ * response itself (DEC-142), as well as in its `<meta>`. One list decides
+ * which paths those are, here and in `robots.txt`.
+ */
+function privately(path: string, response: NextResponse): NextResponse {
+    for (const [name, value] of Object.entries(privatePathHeaders(path))) {
+        response.headers.set(name, value);
+    }
+    return response;
 }
 
 /** A test host's robots.txt: disallow everything (#890). */

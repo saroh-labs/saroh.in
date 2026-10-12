@@ -4,7 +4,15 @@ import type {
     AutopayState,
 } from "../autopay/api";
 import { timeWords } from "../lib/clock";
+import type { GstOnPrice } from "../lib/gst-price";
+import { gstUnderWords, payPriceWords } from "../lib/gst-price";
 import { siteMoney } from "../lib/money";
+import type {
+    AccountChange,
+    AccountCourse,
+    AccountInvoiceDue,
+    AccountWaitlistPlace,
+} from "./details-types";
 
 /**
  * The customer account area's data, as the site's server hands it to the
@@ -124,8 +132,15 @@ export interface AccountOrderDetail {
 export interface AccountPlan {
     ref: string;
     name: string;
+    /** The price they are on, as the business typed it. */
     price: string;
     currency: string;
+    /**
+     * The GST on the next renewal as it will be charged, and the amount to
+     * pay; null for none. Absent from an older API. Narrowed where it is
+     * read (`gstOnPriceOf`): anything strange is none said.
+     */
+    gst?: GstOnPrice | null;
     interval: string;
     status: "ACTIVE" | "PAUSED";
     renewsAt: string | null;
@@ -210,6 +225,24 @@ export interface AccountHome {
     classes: Block<AccountClasses | null>;
     orders: Block<AccountOrder[]> | null;
     plan: Block<AccountPlan | null>;
+    // What DEC-142 added. Each is absent from an API before it, and Home
+    // then draws nothing for it: never an empty card, never a failed one.
+    /** What changed since they were last here, newest first. */
+    changes?: Block<AccountChange[]>;
+    /** The visit the changes count from; null on a first visit. */
+    since?: string | null;
+    /** Their open invoices, the one due soonest first. */
+    invoicesDue?: Block<AccountInvoiceDue[]>;
+    /** Their places in a class's line; null when the business takes no bookings. */
+    waitlist?: Block<AccountWaitlistPlace[]> | null;
+    /** The courses they hold a seat on. */
+    courses?: Block<AccountCourse[]>;
+    /**
+     * The account is on a record of its own until the business links it to
+     * the one it already had (DEC-049): earlier orders and bookings may be
+     * waiting for that.
+     */
+    linkPending?: boolean;
 }
 
 export interface AccountReceipt {
@@ -319,10 +352,26 @@ const EVERY: Record<string, string> = {
     YEAR: "year",
 };
 
-/** "₹2,500 / month". */
+/**
+ * "₹2,500 / month": what each renewal costs to pay, so where GST is added
+ * it is the API's amount to pay ("₹2,360 / month" on a ₹2,000 plan at 18%).
+ */
 export function planPrice(plan: AccountPlan): string {
     const every = EVERY[plan.interval] ?? plan.interval.toLowerCase();
-    return `${accountMoney(plan.price, plan.currency)} / ${every}`;
+    const money = payPriceWords(
+        accountMoney(plan.price, plan.currency),
+        plan.gst,
+        plan.currency,
+    );
+    return `${money} / ${every}`;
+}
+
+/**
+ * The GST in or on that amount, on a line of its own: "Includes ₹305.08
+ * GST (18%)" or "₹2,000 + ₹360 GST (18%)". Null when nothing is said.
+ */
+export function planGstLine(plan: AccountPlan): string | null {
+    return gstUnderWords(plan.gst, plan.currency);
 }
 
 /** The line under a plan: when it renews, pauses or ends. */
@@ -408,8 +457,15 @@ const VISIT_STATE: Record<AccountOrderVisit["state"], string> = {
     "to-book": "To book",
 };
 
-/** "Visit 2 · Mon 5 Oct, 10:00 am" and its word. */
-export function visitLine(visit: AccountOrderVisit): {
+/**
+ * "Visit 2 · Mon 5 Oct, 10:00 am" and its word. A visit whose time has
+ * passed with nothing recorded says its date alone: never "Booked", and
+ * never a guess at "Done" (DEC-142).
+ */
+export function visitLine(
+    visit: AccountOrderVisit,
+    now: Date = new Date(),
+): {
     title: string;
     state: string;
 } {
@@ -417,9 +473,13 @@ export function visitLine(visit: AccountOrderVisit): {
         visit.startAt && visit.timezone
             ? ` · ${bookingWhen(visit.startAt, visit.timezone)}`
             : "";
+    const passed =
+        visit.state === "booked" &&
+        visit.startAt !== null &&
+        new Date(visit.startAt).getTime() < now.getTime();
     return {
         title: `Visit ${visit.number}${when}`,
-        state: VISIT_STATE[visit.state],
+        state: passed ? "" : VISIT_STATE[visit.state],
     };
 }
 

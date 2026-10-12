@@ -39,3 +39,19 @@ export function isPrivateSitePath(path: string): boolean {
         (prefix) => path === prefix || path.startsWith(`${prefix}/`),
     );
 }
+
+/**
+ * What every private page answers with, as a header (DEC-142): a crawler
+ * that reaches one anyway is told not to index it or follow its links, on
+ * the response itself and not only in the page's `<meta>` (which a
+ * streamed page sends late, and a file or a redirect never sends at all).
+ * The middleware sets it for every prefix above (`privatePathHeaders`).
+ */
+export const PRIVATE_ROBOTS_TAG = "noindex, nofollow";
+
+/** The headers a private path's response carries; none for a public one. */
+export function privatePathHeaders(path: string): Record<string, string> {
+    return isPrivateSitePath(path)
+        ? { "X-Robots-Tag": PRIVATE_ROBOTS_TAG }
+        : {};
+}

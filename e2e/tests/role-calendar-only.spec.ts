@@ -89,7 +89,10 @@ test.describe("someone who is Calendar only", () => {
             }),
         ).toContainText(WHO_CAN_CHANGE);
         await expectNotOffered(page, "New service");
-        await expect(page.getByRole("link", { name: /^Edit / })).toHaveCount(0);
+        // Nothing on a row changes a service: no Taking bookings switch.
+        await expect(
+            page.getByRole("switch", { name: /^Taking bookings/ }),
+        ).toHaveCount(0);
     });
 
     test("sees their own diary and nobody else's", async ({

@@ -20,7 +20,7 @@ import { requireSession } from "@/lib/session";
  * an owner (`SETTINGS_PAGES`), and anyone else who types the address is
  * told who can, before anything is read.
  */
-export const metadata = { title: "Your data" };
+export const metadata = { title: "Your data · Settings" };
 
 export default async function DataPage() {
     await requireSession();

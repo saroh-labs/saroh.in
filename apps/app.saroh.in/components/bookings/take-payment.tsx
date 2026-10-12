@@ -11,9 +11,11 @@ import { useId, useState } from "react";
 
 import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
 import {
+    LINK_STEP,
     makePayLink,
     PayLinkPanel,
 } from "@/components/bookings/pay-link-panel";
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { Chip } from "@/components/shared/chip";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
@@ -83,6 +85,10 @@ export function TakePayment({
     const [link, setLink] = useState<PayLinkResult | null>(null);
     // What is wrong with the cash given is said once the button is pressed.
     const [tried, setTried] = useState(false);
+    const rates = useGstRateStep({
+        then: "take this payment",
+        continueLabel: "Save and take payment",
+    });
 
     const format = (cents: number) => formatMoney(cents, currency);
     const amount = format(take.cents);
@@ -111,17 +117,28 @@ export function TakePayment({
         setBusy(true);
         setError(null);
         if (choice === "LINK") {
-            const made = await runAction(() => makePayLink(bookingId), {
-                setBusy,
-            });
+            // No GST rate on the service: chosen here, then the link.
+            const made = await runAction(
+                () => rates.run(() => makePayLink(bookingId), LINK_STEP),
+                { setBusy },
+            );
             if (made) setLink(made);
             return;
         }
         try {
-            const res = await takeDeskPayment(
-                bookingId,
-                deskInput(choice, take.cents, given),
+            // The same for the desk: the rate is chosen in place, saved to
+            // the service, and the payment is taken as it was asked.
+            const res = await rates.run(() =>
+                takeDeskPayment(
+                    bookingId,
+                    deskInput(choice, take.cents, given),
+                ),
             );
+            // Closed without choosing: nothing was taken, nothing to say.
+            if (!res) {
+                setBusy(false);
+                return;
+            }
             if (!res.ok) {
                 setError(res.error);
                 setBusy(false);
@@ -286,6 +303,7 @@ export function TakePayment({
                     />
                 )}
             </FormDialog>
+            {rates.step}
         </>
     );
 }

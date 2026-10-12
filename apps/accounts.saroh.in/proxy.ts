@@ -1,6 +1,7 @@
 import { sessionCookiePrefix } from "@saroh/auth/constants";
 import { withDevAccess } from "@saroh/auth/dev-access";
 import { getServerSession } from "@saroh/auth/next";
+import { withPrivateApp } from "@saroh/auth/private-app";
 import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -56,7 +57,11 @@ async function proxy(req: NextRequest) {
 }
 
 // The dev environment admits only browsers holding its key (withDevAccess).
-export default withDevAccess(proxy);
+// Outermost, withPrivateApp: every answer given here, redirects among them,
+// says "noindex, nofollow" and carries the security headers. Nothing on this
+// host is for a search engine: the sign-in page's share card is for a pasted
+// link, which reads the page's tags and not this header.
+export default withPrivateApp(withDevAccess(proxy));
 
 export const config = {
     matcher: [

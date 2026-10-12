@@ -2,6 +2,8 @@ import { apiFetch, orgBase } from "@/lib/api/http";
 import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
 import { getSellingTerms } from "@/lib/class-packs/service";
 import type { Course, Enrollment } from "@/lib/courses/service";
+import { readGstAsk } from "@/lib/gst-rates/service";
+import type { GstAsk } from "@/lib/gst/item-words";
 import type { Invoice } from "@/lib/invoices/service";
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 
@@ -28,6 +30,11 @@ export interface PanelChoices {
     /** Packs to sell them, and whether selling issues an invoice. */
     packs: ClassPack[] | null;
     invoicesOnSale: boolean;
+    /**
+     * The business's GST standing, for the amount to pay the sell and enrol
+     * dialogs say. Null when neither may be opened, or it wasn't read.
+     */
+    gst?: GstAsk | null;
     /** Courses they could be enrolled on. */
     courses: Course[] | null;
 }
@@ -103,6 +110,7 @@ export async function loadContactHoldings(
         packsOnSale,
         selling,
         openCourses,
+        gst,
     ] = await Promise.all([
         wants("subscriptions")
             ? read<Subscription[]>(`${base}/subscriptions?${q}`)
@@ -124,6 +132,8 @@ export async function loadContactHoldings(
         acts("courses")
             ? read<Course[]>(`${base}/courses?status=OPEN`)
             : none<Course[]>(),
+        // One read a request, shared with the selling terms.
+        acts("packs") || acts("courses") ? readGstAsk() : null,
     ]);
 
     return {
@@ -135,6 +145,7 @@ export async function loadContactHoldings(
             plans,
             packs: packsOnSale,
             invoicesOnSale: selling?.invoicesOnSale ?? false,
+            gst,
             courses: openCourses,
         },
     };

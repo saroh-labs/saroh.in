@@ -6,6 +6,8 @@ import type {
     EditorResult,
 } from "@/lib/editor-shell/types";
 
+import type { GstAsk } from "@/lib/gst/item-words";
+
 import type { PackValues } from "./pack-editor";
 import { tidyPrice } from "./pack-editor";
 
@@ -26,6 +28,12 @@ import { tidyPrice } from "./pack-editor";
 export type PackEditorRecord = EditorRecord<PackValues> & {
     problems: EditorProblem[];
     pendingChangedAt: string | null;
+    /**
+     * Whether the editor asks for GST (12 Oct 2026): only a registered
+     * business's pack carries a rate. `priceMode` is the business's own
+     * way. Absent from an API before it, which asks for nothing.
+     */
+    gst?: GstAsk;
 };
 
 const packs = "/class-packs";

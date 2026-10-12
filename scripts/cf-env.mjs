@@ -15,9 +15,16 @@
  *
  * Only `vars` (settings that aren't secret). Secrets come from GitHub and are
  * never printed.
+ *
+ * One setting is a date: `LAUNCH_AT`, the instant early access opens (an ISO
+ * time with its offset, in production `vars`). A build made at or after it
+ * gets that app's launch switches (`AT_LAUNCH` below) without anyone editing
+ * a file; a build before it gets exactly what the file says. A switch written
+ * in `vars` wins either way. `buildVars()` is what a build is given;
+ * `appVars()` is the file as written, which is what the Worker gets.
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 /** JSON with comments and trailing commas, as wrangler.jsonc is written. */
 export function parseJsonc(text) {
@@ -58,6 +65,60 @@ export function appVars(appDir, environment) {
     );
 }
 
+/**
+ * What each app's build switches to once `LAUNCH_AT` has passed, keyed by the
+ * app's folder. Accounts has none: its gate opens by the clock at runtime
+ * (`withDevAccess`, @saroh/auth/dev-access), with no build.
+ */
+export const AT_LAUNCH = {
+    // "Start free", Sign in and Pricing on the marketing site.
+    "saroh.in": { NEXT_PUBLIC_LAUNCH_MODE: "open" },
+    // Plan and billing in the workspace (DEC-136).
+    "app.saroh.in": { NEXT_PUBLIC_PLANS: "on" },
+};
+
+const ISO_INSTANT =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * `LAUNCH_AT` as milliseconds, or null when it isn't a full ISO instant with
+ * its offset ("2026-10-17T16:00:00+05:30", or ending in "Z"). Strict on
+ * purpose: a date with no time or no offset means a different moment on every
+ * machine, and a value that can't be read must leave things locked. The same
+ * rule as `launchInstant` in packages/auth/src/dev-access.ts; keep them alike.
+ */
+export function launchInstant(value) {
+    if (typeof value !== "string" || !ISO_INSTANT.test(value.trim()))
+        return null;
+    const ms = Date.parse(value.trim());
+    return Number.isFinite(ms) ? ms : null;
+}
+
+/** `vars` with the launch switches, as of `now`. A switch already set is kept. */
+export function withLaunch(vars, switches, now) {
+    if (vars.LAUNCH_AT === undefined || !switches) return vars;
+    const at = launchInstant(vars.LAUNCH_AT);
+    if (at === null || now.getTime() < at) return vars;
+    return { ...switches, ...vars };
+}
+
+/** What a build of this app gets: its `vars`, with the launch switches by date. */
+export function buildVars(appDir, environment, now = new Date()) {
+    return withLaunch(
+        appVars(appDir, environment),
+        AT_LAUNCH[basename(appDir)],
+        now,
+    );
+}
+
+/** `--var KEY:VALUE` for each setting the build got that the file doesn't have. */
+export function deployVarFlags(written, built) {
+    return Object.entries(built)
+        .filter(([key]) => !(key in written))
+        .map(([key, value]) => `--var ${key}:${value}`)
+        .join(" ");
+}
+
 /** The routes a deploy gives the Worker: `[{ pattern, zone_name }]`. */
 export function appRoutes(appDir, environment) {
     const config = parseJsonc(
@@ -85,7 +146,20 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         );
         process.exit(2);
     }
-    for (const [key, value] of Object.entries(appVars(appDir, environment))) {
+    const written = appVars(appDir, environment);
+    if (
+        written.LAUNCH_AT !== undefined &&
+        launchInstant(written.LAUNCH_AT) === null
+    )
+        console.error(
+            "LAUNCH_AT can't be read as an ISO time with its offset: nothing opens by date",
+        );
+    const vars = buildVars(appDir, environment);
+    // The switches the date added aren't in wrangler.jsonc, so the deploy
+    // hands them to the Worker itself (`--var`, the workflow's Deploy step):
+    // decided once, here, so the build and the Worker still can't disagree.
+    console.log(`LAUNCH_DEPLOY_VARS=${deployVarFlags(written, vars)}`);
+    for (const [key, value] of Object.entries(vars)) {
         if (/[\r\n]/.test(String(value)))
             throw new Error(`${key} has a line break`);
         console.log(`${key}=${value}`);

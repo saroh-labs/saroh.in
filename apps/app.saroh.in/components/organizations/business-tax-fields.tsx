@@ -153,7 +153,7 @@ export function BusinessTaxFields({
                                 </div>
                                 <FormDescription>
                                     {field.value
-                                        ? "Orders and invoices become tax invoices with your GSTIN, split into CGST + SGST or IGST. Prices include GST."
+                                        ? "Orders and invoices become tax invoices with your GSTIN, split into CGST + SGST or IGST. Whether your prices include GST or have it added is yours to choose, under GST on your prices."
                                         : "Orders and invoices are receipts, with no GST on them."}
                                 </FormDescription>
                                 <FormMessage />

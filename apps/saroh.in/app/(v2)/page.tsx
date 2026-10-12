@@ -24,8 +24,12 @@ import {
     startFreeFaq,
 } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
-import { pageMetadata } from "@/lib/seo";
-import { organizationLd, softwareApplicationLd } from "@/lib/structured-data";
+import { pageMetadata, pageTitle } from "@/lib/seo";
+import {
+    organizationLd,
+    softwareApplicationLd,
+    webSiteLd,
+} from "@/lib/structured-data";
 
 /**
  * `/` (plan U21): the Home design, "saroh" hero and "band" closer. The hero,
@@ -42,8 +46,10 @@ import { organizationLd, softwareApplicationLd } from "@/lib/structured-data";
  */
 
 export const metadata: Metadata = pageMetadata({
-    title: home.metaTitle,
-    description: home.sub,
+    title: pageTitle(home.seoTitle),
+    // The share card keeps the line the page opens with.
+    socialTitle: home.headlineLabel,
+    description: home.seoDescription,
     path: "/",
     image: { url: "/opengraph-image", alt: HOME_OG_ALT },
 });
@@ -59,7 +65,8 @@ export default async function HomePage() {
             <JsonLd
                 data={[
                     organizationLd(),
-                    softwareApplicationLd(catalog, home.sub),
+                    webSiteLd(),
+                    softwareApplicationLd(catalog, home.seoDescription),
                 ]}
             />
             <HomeHero freeLine={freePlanLine(catalog)} />

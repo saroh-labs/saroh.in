@@ -10,6 +10,14 @@ import { prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
+import type { PriceHistoryPage } from "../audit/price-history";
+import {
+    moneyFact,
+    priceActor,
+    productFacts,
+    readPriceHistory,
+    recordPrices,
+} from "../audit/price-history";
 import { planMeter } from "../billing/metering.service";
 import {
     checkProductAllergens,
@@ -21,7 +29,8 @@ import {
     productFieldsFor,
     saveProductFieldValues,
 } from "../catalogue/fields.service";
-import { isGstRate } from "../invoices/gst";
+import { isGstRate, rateToBps } from "../invoices/gst";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { productTypesOf } from "../orders/fulfilment";
 import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { PRODUCT_HAS_STOCK_HISTORY } from "../stock/stock-words";
@@ -43,10 +52,15 @@ import { promisesToMove } from "./open-promises";
 import type { ProductScope } from "./product-access";
 import { ProductAccess } from "./product-access";
 import { duplicateProduct } from "./product-duplicate";
+import type { MrpJudged } from "./product-rules";
 import {
     assertDetailsCoherent,
-    assertMrpAtOrAbovePrice,
+    assertProductWithinMrp,
     cleanShopFields,
+    hasMrp,
+    moneyToCents,
+    overMrp,
+    overMrpMessage,
 } from "./product-rules";
 import type { CatalogueItemDto } from "./serialize";
 import {
@@ -182,6 +196,47 @@ function isLockConflict(error: unknown): boolean {
     if (isSerializationFailure(error)) return true;
     const text = `${JSON.stringify(meta ?? null)} ${typeof message === "string" ? message : ""}`;
     return text.includes("40P01") || text.includes("deadlock detected");
+}
+
+/**
+ * What the MRP rule reads of a stored product: its price and MRP, how its
+ * price carries GST, and each option's own price and MRP.
+ */
+const MRP_SELECT = {
+    price: true,
+    mrp: true,
+    currency: true,
+    gstRate: true,
+    gstPriceMode: true,
+    variants: {
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: { title: true, price: true, mrp: true },
+    },
+} satisfies Prisma.ProductSelect;
+
+type MrpRow = Prisma.ProductGetPayload<{ select: typeof MRP_SELECT }>;
+
+const text = (value: { toString(): string } | null): string | null =>
+    value === null ? null : value.toString();
+
+/** A stored product's options as the MRP rule reads them. */
+function optionsOf(row: Pick<MrpRow, "variants">): MrpJudged["variants"] {
+    return row.variants.map((v) => ({
+        title: v.title,
+        price: text(v.price),
+        mrp: text(v.mrp),
+    }));
+}
+
+/**
+ * Whether a status change puts a product back within reach of a sale: it
+ * is published, or brought back from the archive. Taking one off sale (to
+ * a draft, or archiving it) never is, so a product over its MRP can always
+ * be taken down.
+ */
+function goesOnSale(from: string, to: string | undefined | null): boolean {
+    if (to == null || to === from || to === "ARCHIVED") return false;
+    return to === "PUBLISHED" || from === "ARCHIVED";
 }
 
 /** Never null over the wire in a patch: a null there means "not sent". */
@@ -378,6 +433,25 @@ export class ProductsService {
         return { ...detail, customFields, allergens, variantPromises };
     }
 
+    /**
+     * The product's price history, newest first: its own entries and its
+     * options'. For whoever may read the business's products (the caller
+     * resolved `organizationId` with `store:read`); a product of another
+     * business is not found.
+     */
+    async priceHistory(
+        organizationId: string,
+        productId: string,
+        page: { limit?: number; cursor?: string } = {},
+    ): Promise<PriceHistoryPage> {
+        const product = await prisma.product.findFirst({
+            where: { id: productId, organizationId },
+            select: { id: true },
+        });
+        if (!product) throw new NotFoundException("Product not found");
+        return readPriceHistory(organizationId, "PRODUCT", productId, page);
+    }
+
     /** Store-route alias of `createIn`: made and listed at `storeId`. */
     async create(storeId: string, userId: string, dto: CreateProductDto) {
         return this.createIn(
@@ -399,7 +473,31 @@ export class ProductsService {
         await this.assertSlugFree(organizationId, slug);
         await this.assertCategoryOf(organizationId, dto.categoryId);
         await this.assertOptionOf(organizationId, dto.optionId);
-        assertMrpAtOrAbovePrice(dto.price, dto.mrp ?? null);
+        // GST is part of MRP: the MRP is compared with the amount to pay
+        // (`product-rules.ts`). Only a product with an MRP asks.
+        if (dto.mrp != null) {
+            const over = overMrp(dto.price, dto.mrp, {
+                item: {
+                    gstRate: checkGstRate(dto.gstRate),
+                    gstPriceMode: dto.gstPriceMode,
+                },
+                terms: await loadPriceTerms(prisma, organizationId),
+            });
+            if (over) {
+                // The sums are written in the currency it will be priced in.
+                const currency =
+                    dto.currency ??
+                    (await defaultProductCurrency(prisma, {
+                        storeId,
+                        organizationId,
+                    })) ??
+                    "INR";
+                throw new BadRequestException({
+                    message: overMrpMessage(over, currency),
+                    field: "mrp",
+                });
+            }
+        }
         assertDetailsCoherent({
             madeHere: dto.madeHere ?? true,
             maker: dto.maker ?? null,
@@ -458,6 +556,8 @@ export class ProductsService {
                         supplierCode: dto.supplierCode ?? null,
                         gstRate: checkGstRate(dto.gstRate),
                         hsnCode: dto.hsnCode ?? null,
+                        // Null: priced the business's way.
+                        gstPriceMode: dto.gstPriceMode ?? null,
                         warranty: dto.warranty ?? null,
                         returnsMode: dto.returnsMode ?? "STOREFRONT",
                         returnsText: dto.returnsText ?? null,
@@ -469,13 +569,31 @@ export class ProductsService {
                             dto.fulfilmentTypes ?? [],
                         ),
                     },
-                    select: { id: true },
+                    select: { id: true, currency: true },
                 });
                 await listAt(tx, {
                     organizationId,
                     productId: product.id,
                     storeId,
                 });
+                // Its first price history entry: what it starts at.
+                await recordPrices(
+                    tx,
+                    priceActor(scope),
+                    {
+                        kind: "PRODUCT",
+                        id: product.id,
+                        name: dto.name,
+                        currency: product.currency,
+                    },
+                    null,
+                    productFacts({
+                        price: dto.price,
+                        mrp: dto.mrp,
+                        gstRate: dto.gstRate,
+                        gstPriceMode: dto.gstPriceMode,
+                    }),
+                );
                 return product.id;
             });
         } catch (error) {
@@ -524,10 +642,32 @@ export class ProductsService {
         const { organizationId } = scope;
         const current = await prisma.product.findFirst({
             where: { id: productId, organizationId },
-            select: { slug: true, status: true, currency: true },
+            select: { name: true, slug: true, status: true, ...MRP_SELECT },
         });
         if (!current) {
             throw new NotFoundException("Product not found");
+        }
+        // A new price, or a product coming back on sale, is judged against
+        // its MRP by the amount to pay (`product-rules.ts`).
+        const judged: MrpJudged = {
+            price: dto.price,
+            mrp: text(current.mrp),
+            gstRate: current.gstRate,
+            gstPriceMode: current.gstPriceMode,
+            variants: optionsOf(current),
+        };
+        if (
+            hasMrp(judged) &&
+            (moneyToCents(dto.price) !==
+                moneyToCents(current.price.toString()) ||
+                goesOnSale(current.status, dto.status))
+        ) {
+            assertProductWithinMrp(
+                judged,
+                await loadPriceTerms(prisma, organizationId),
+                current.currency,
+                "price",
+            );
         }
         const slug = slugify(dto.slug);
         // Left out, the product keeps its currency. Changed, every
@@ -555,29 +695,45 @@ export class ProductsService {
             await planMeter.assertRoom(organizationId, "products");
 
         try {
-            await prisma.product.update({
-                where: { id: productId },
-                data: {
-                    name: dto.name,
-                    slug,
-                    description: cleanDescription(dto.description),
-                    image: dto.image ?? null,
-                    categoryId: dto.categoryId ?? null,
-                    price: dto.price,
-                    ...(dto.currency ? { currency: dto.currency } : {}),
-                    ...(dto.status
-                        ? {
-                              status: dto.status,
-                              // As patch() does: stamped on the way in,
-                              // cleared on the way out.
-                              ...(dto.status !== "ARCHIVED"
-                                  ? { archivedAt: null }
-                                  : current.status !== "ARCHIVED"
-                                    ? { archivedAt: new Date() }
-                                    : {}),
-                          }
-                        : {}),
-                },
+            // The save and its price history entry stand or fall together.
+            await prisma.$transaction(async (tx) => {
+                await tx.product.update({
+                    where: { id: productId },
+                    data: {
+                        name: dto.name,
+                        slug,
+                        description: cleanDescription(dto.description),
+                        image: dto.image ?? null,
+                        categoryId: dto.categoryId ?? null,
+                        price: dto.price,
+                        ...(dto.currency ? { currency: dto.currency } : {}),
+                        ...(dto.status
+                            ? {
+                                  status: dto.status,
+                                  // As patch() does: stamped on the way in,
+                                  // cleared on the way out.
+                                  ...(dto.status !== "ARCHIVED"
+                                      ? { archivedAt: null }
+                                      : current.status !== "ARCHIVED"
+                                        ? { archivedAt: new Date() }
+                                        : {}),
+                              }
+                            : {}),
+                    },
+                });
+                const was = productFacts(current);
+                await recordPrices(
+                    tx,
+                    priceActor(scope),
+                    {
+                        kind: "PRODUCT",
+                        id: productId,
+                        name: dto.name,
+                        currency: dto.currency ?? current.currency,
+                    },
+                    was,
+                    { ...was, price: moneyFact(dto.price) },
+                );
             });
             await this.productChanged(organizationId, productId);
             return { id: productId };
@@ -621,9 +777,9 @@ export class ProductsService {
         const current = await prisma.product.findFirst({
             where: { id: productId, organizationId },
             select: {
+                name: true,
                 slug: true,
-                price: true,
-                mrp: true,
+                ...MRP_SELECT,
                 madeHere: true,
                 maker: true,
                 returnsMode: true,
@@ -695,6 +851,7 @@ export class ProductsService {
         if (has("price")) data.price = dto.price;
         if (has("gstRate")) data.gstRate = checkGstRate(dto.gstRate);
         if (has("hsnCode")) data.hsnCode = dto.hsnCode ?? null;
+        if (has("gstPriceMode")) data.gstPriceMode = dto.gstPriceMode ?? null;
         if (has("mrp")) data.mrp = dto.mrp ?? null;
         if (has("status")) {
             // Bringing an archived product back adds one to the plan's cap.
@@ -740,11 +897,44 @@ export class ProductsService {
             data.seoImageId = dto.seoImageId ?? null;
         }
 
-        const price = dto.price ?? current.price.toString();
-        const mrp = has("mrp")
-            ? (dto.mrp ?? null)
-            : (current.mrp?.toString() ?? null);
-        assertMrpAtOrAbovePrice(price, mrp, has("mrp") ? "mrp" : "price");
+        // The MRP is compared with the amount to pay for one, GST and all
+        // (`product-rules.ts`), on the product as it will stand: when this
+        // save changes the price, the MRP, the rate or how the price
+        // carries GST, or brings the product back on sale. A save that
+        // touches none of them is never refused for a sum it did not make.
+        const storedPrice = current.price.toString();
+        const storedMrp = text(current.mrp);
+        const price = dto.price ?? storedPrice;
+        const mrp = has("mrp") ? (dto.mrp ?? null) : storedMrp;
+        const judged: MrpJudged = {
+            price,
+            mrp,
+            gstRate: has("gstRate") ? (dto.gstRate ?? null) : current.gstRate,
+            gstPriceMode: has("gstPriceMode")
+                ? (dto.gstPriceMode ?? null)
+                : current.gstPriceMode,
+            variants: optionsOf(current),
+        };
+        const sumChanged =
+            moneyToCents(price) !== moneyToCents(storedPrice) ||
+            (mrp === null ? null : moneyToCents(mrp)) !==
+                (storedMrp === null ? null : moneyToCents(storedMrp)) ||
+            rateToBps(judged.gstRate) !== rateToBps(current.gstRate) ||
+            (judged.gstPriceMode ?? null) !== (current.gstPriceMode ?? null);
+        if (
+            hasMrp(judged) &&
+            (sumChanged ||
+                (has("status") && goesOnSale(current.status, dto.status)))
+        ) {
+            assertProductWithinMrp(
+                judged,
+                await loadPriceTerms(prisma, organizationId),
+                current.currency,
+                (["mrp", "price", "gstPriceMode", "gstRate"] as const).find(
+                    (key) => has(key),
+                ) ?? "price",
+            );
+        }
         assertDetailsCoherent({
             madeHere: dto.madeHere ?? current.madeHere,
             maker: has("maker") ? (dto.maker ?? null) : current.maker,
@@ -771,7 +961,27 @@ export class ProductsService {
         }
         if (Object.keys(data).length > 0) {
             try {
-                await prisma.product.update({ where: { id: productId }, data });
+                // The save and its price history entry stand or fall
+                // together; a save that moved nothing about the cost
+                // records nothing.
+                await prisma.$transaction(async (tx) => {
+                    await tx.product.update({
+                        where: { id: productId },
+                        data,
+                    });
+                    await recordPrices(
+                        tx,
+                        priceActor(scope),
+                        {
+                            kind: "PRODUCT",
+                            id: productId,
+                            name: dto.name ?? current.name,
+                            currency: current.currency,
+                        },
+                        productFacts(current),
+                        productFacts(judged),
+                    );
+                });
             } catch (error) {
                 if (!isSlugClash(error)) throw error;
                 throw new ConflictException({
@@ -809,6 +1019,7 @@ export class ProductsService {
                     organizationId,
                     productId,
                     storeId,
+                    actor: priceActor(scope),
                 });
             });
         } catch (error) {

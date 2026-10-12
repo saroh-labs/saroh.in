@@ -1,21 +1,24 @@
 "use client";
 
 import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
+import { focusFirstError } from "@saroh/ui/field";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import {
+    heldAtOpen,
     isSettled,
     joinAnd,
     leaveCopy,
     publishState,
+    sayProblems,
     shellActions,
     statePill,
     statusLine,
@@ -39,6 +42,13 @@ export interface EditorFields<V> {
     set: (patch: Partial<V>) => void;
     /** The message to show beside each field, by field name. */
     errors: Partial<Record<string, string>>;
+    /**
+     * A plain note to draw beside a field in place of its error: a problem
+     * the record was opened with, which nobody has acted on yet.
+     */
+    notes: Partial<Record<string, string>>;
+    /** Say a field was left: from then on its problem is said as one. */
+    leave: (field: string) => void;
     /** Null until the first save creates it. */
     record: EditorRecord<V> | null;
     /** Nothing can be changed: no permission, or an action is out. */
@@ -148,7 +158,23 @@ export function EditorShell<V extends Record<string, unknown>>(
         message: string;
     } | null>(null);
 
-    const problems = problemsOf(values, record);
+    const allProblems = problemsOf(values, record);
+    // What a published record was opened with is a note beside its field
+    // until that field is left or Publish is pressed: the page never opens
+    // in an error state over a rule newer than the record.
+    const [held] = useState(() =>
+        heldAtOpen(initial, initial ? problemsOf(initial.values, initial) : []),
+    );
+    const [left, setLeft] = useState<ReadonlySet<string>>(() => new Set());
+    const [tried, setTried] = useState(false);
+    const { shown: problems, notes } = sayProblems({
+        problems: allProblems,
+        held,
+        left,
+        tried,
+    });
+    const holding = problems.length < allProblems.length;
+    const form = useRef<HTMLFieldSetElement>(null);
     const blocker = blockerOf(values);
     const actions = shellActions({ save, record, problems, busy });
     const pill = statePill(record, copy);
@@ -203,8 +229,19 @@ export function EditorShell<V extends Record<string, unknown>>(
         editor.edit(patch);
     };
 
+    const leave = (field: string) => {
+        if (!held.includes(field)) return;
+        setLeft((was) => (was.has(field) ? was : new Set(was).add(field)));
+    };
+
     async function publish() {
         if (!actions.publishOn) return;
+        if (holding) {
+            // Say what is missing, under its field, and go to the first.
+            setTried(true);
+            focusFirstError(form.current);
+            return;
+        }
         const wasLive = publishState(record) !== "draft" && record !== null;
         setBusy(true);
         try {
@@ -282,6 +319,8 @@ export function EditorShell<V extends Record<string, unknown>>(
         values,
         set,
         errors,
+        notes,
+        leave,
         record,
         disabled: !canEdit || busy,
     };
@@ -316,6 +355,7 @@ export function EditorShell<V extends Record<string, unknown>>(
                 </ReadOnlyNote>
             )}
             <fieldset
+                ref={form}
                 disabled={!canEdit || busy}
                 // Leaving a field saves what it holds now, not in 800 ms.
                 onBlur={() => void editor.flush()}

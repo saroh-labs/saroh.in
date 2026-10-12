@@ -2,6 +2,8 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
+import type { GstPriceMode, PriceTerms } from "../invoices/gst-price";
+import { businessPriceMode } from "../invoices/gst-price";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import type {
     NumberFormat,
@@ -33,6 +35,11 @@ export interface TaxSettingsView {
     /** The GST rate on delivery, in percent ("18"). */
     deliveryRate: string;
     deliverySac: string | null;
+    /**
+     * How its prices carry GST (`invoices/gst-price.ts`): INCLUDED until
+     * the business says GST is added. Read only while it is registered.
+     */
+    priceMode: GstPriceMode;
     /** How invoice numbers are built, and where their counters stand. */
     invoiceNumber: InvoiceNumberView;
 }
@@ -74,6 +81,7 @@ export type TaxData = Partial<{
     invoiceNumberFormat: Prisma.InputJsonObject;
     deliveryGstRate: string;
     deliverySacCode: string | null;
+    gstPriceMode: GstPriceMode;
 }>;
 
 /** The stored profile, as far as the tax and address read it. */
@@ -85,6 +93,8 @@ export interface TaxProfileColumns {
     invoiceNumberFormat?: unknown;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
+    /** As stored; absent on a profile read without it: INCLUDED. */
+    gstPriceMode?: string | null;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
@@ -99,6 +109,7 @@ export const TAX_CURRENT_SELECT = {
     country: true,
     invoicePrefix: true,
     invoiceNumberFormat: true,
+    gstPriceMode: true,
     addressLine1: true,
     addressLine2: true,
     city: true,
@@ -112,10 +123,60 @@ export interface TaxCurrent {
     country: string | null;
     invoicePrefix?: string | null;
     invoiceNumberFormat?: unknown;
+    /** As stored; absent or null: INCLUDED. */
+    gstPriceMode?: string | null;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+}
+
+/**
+ * How the business prices before and after a tax save
+ * (`invoices/gst-price.ts`), and whether the save adds GST to prices that
+ * had none added: switching to "GST is added", or becoming registered (a
+ * product can already be set to "GST is added" on its own, and a business
+ * that registered before keeps the choice it made then).
+ *
+ * "Registered" is `loadPriceTerms`' test: the switch, a GSTIN and a state.
+ * A save that adds GST can take products above their MRP, so the settings
+ * service counts them first (`products/over-mrp.ts`). Going back to
+ * "includes GST", or deregistering, never does.
+ */
+export function priceTermsChange(
+    current: TaxCurrent | null,
+    data: TaxData,
+    sentTaxId: string | undefined,
+): { before: PriceTerms; after: PriceTerms; addsGst: boolean } {
+    const terms = (
+        registered: boolean,
+        taxId: string | null | undefined,
+        state: string | null | undefined,
+        mode: unknown,
+    ): PriceTerms => ({
+        registered: Boolean(registered && taxId?.trim() && state),
+        mode: businessPriceMode(mode),
+    });
+    const before = terms(
+        current?.gstRegistered ?? false,
+        current?.taxId,
+        current?.gstState,
+        current?.gstPriceMode,
+    );
+    const after = terms(
+        data.gstRegistered ?? current?.gstRegistered ?? false,
+        sentTaxId ?? current?.taxId,
+        data.gstState !== undefined ? data.gstState : current?.gstState,
+        data.gstPriceMode ?? current?.gstPriceMode,
+    );
+    return {
+        before,
+        after,
+        addsGst:
+            after.registered &&
+            (!before.registered ||
+                (before.mode !== "ADDED" && after.mode === "ADDED")),
+    };
 }
 
 const NO_COUNTERS: Record<NumberRestart, number> = {
@@ -138,6 +199,7 @@ export function taxView(
         invoicePrefix: p?.invoicePrefix ?? null,
         deliveryRate: bpsToRate(bps),
         deliverySac: p?.deliverySacCode ?? null,
+        priceMode: businessPriceMode(p?.gstPriceMode),
         invoiceNumber: {
             ...format,
             custom: readNumberFormat(p?.invoiceNumberFormat) !== null,
@@ -354,6 +416,18 @@ export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
     }
     if (tax?.deliverySac !== undefined) {
         data.deliverySacCode = tax.deliverySac === "" ? null : tax.deliverySac;
+    }
+    // How prices carry GST is a registered business's choice: one that
+    // charges no GST is never asked, and a stray request is refused rather
+    // than stored for the day it registers.
+    if (tax?.priceMode !== undefined) {
+        if (!registered) {
+            taxError(
+                "Only a GST-registered business chooses how its prices carry GST.",
+                "priceMode",
+            );
+        }
+        data.gstPriceMode = tax.priceMode;
     }
     return data;
 }

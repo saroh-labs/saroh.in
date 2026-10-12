@@ -3,6 +3,9 @@ import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { planMeter } from "../billing/metering.service";
+import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
+import { NO_GST_TERMS } from "../invoices/gst-price";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { siteTakingBookings } from "../orders/checkout-paused";
 import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
@@ -35,6 +38,7 @@ import type { BookingLocationType, LocationType } from "./dto";
 import { openingFor } from "./opening-hours";
 import { loadBookableService } from "./reservation";
 import { depositCents } from "./service-fields";
+import { serviceCharge } from "./service-price";
 import {
     businessTimezone,
     loadClosures,
@@ -55,8 +59,15 @@ export interface PublicService {
     name: string;
     description: string | null;
     durationMinutes: number;
+    /** The price the business typed. */
     priceCents: number | null;
     currency: string | null;
+    /**
+     * How that price carries GST, with the amount to pay, worked out here
+     * (`service-price.ts`); null when nothing is said about GST. The site
+     * only formats it.
+     */
+    gst: GstOnPrice | null;
 }
 
 /** How many days the booking page offers at a time (U19). */
@@ -149,11 +160,19 @@ export interface PublicBookingPage {
         durationMinutes: number;
         kind: "one" | "class";
         capacity: number;
+        /** The price the business typed. */
         priceCents: number | null;
         currency: string | null;
+        /** The amount to pay for one booking, GST and all; null: no price. */
+        payCents: number | null;
+        /**
+         * How the price carries GST, for the words under it; null when
+         * nothing is said about GST (not registered, no rate, exempt).
+         */
+        gst: GstOnPrice | null;
         /**
          * What is paid online at booking when the booker pays the deposit
-         * (E8): the service's share of its price, worked out here, or null
+         * (E8): the service's share of the amount to pay, worked out here, or null
          * when it takes none. A service with a deposit is paid at the desk
          * only when online can't take it and the business allows the desk
          * (DEC-089); one whose deposit is the full price is paid now.
@@ -441,7 +460,7 @@ export async function publicBookingPage(
     if (!site) throw new NotFoundException("Site not found");
     const organizationId = site.organizationId;
     const open = await appointmentsOpen(organizationId);
-    const [services, rules, zone, online, paused] = await Promise.all([
+    const [services, rules, zone, online, paused, terms] = await Promise.all([
         open
             ? prisma.service.findMany({
                   where: {
@@ -459,6 +478,8 @@ export async function publicBookingPage(
                       capacity: true,
                       priceCents: true,
                       currency: true,
+                      gstRate: true,
+                      gstPriceMode: true,
                       locationType: true,
                       depositMode: true,
                       visits: true,
@@ -475,6 +496,7 @@ export async function publicBookingPage(
         businessTimezone(prisma, organizationId),
         takesOnlinePayment(organizationId),
         open ? onlineBookingsPaused(organizationId) : Promise.resolve(false),
+        loadPriceTerms(prisma, organizationId),
     ]);
     // People past the plan's team limit (#800) take no new bookings: they
     // aren't named, and a service only they take isn't offered.
@@ -486,7 +508,7 @@ export async function publicBookingPage(
         const { taking } = splitPaused(people, pausedStaff);
         return nobodyTaking({ people: taking, paused: people })
             ? []
-            : [{ ...svc, taking }];
+            : [{ ...svc, taking, charge: serviceCharge(svc, terms) }];
     });
     // A website a move to a lower plan paused takes no bookings (#800): the
     // page says so before the form, as at the monthly cap.
@@ -509,12 +531,14 @@ export async function publicBookingPage(
             capacity: svc.capacity,
             priceCents: svc.priceCents,
             currency: svc.currency,
+            payCents: svc.charge.payCents,
+            gst: svc.charge.gst,
             // A deposit the business can't take online (its plan, Payments
             // off, no provider) isn't served: the service books as one
             // without, at the desk, as `bookOnline` books it — the page
             // never shows a deposit it can't take (`deposit-plan.ts`).
             depositCents: online
-                ? depositCents(svc.priceCents, svc.depositMode)
+                ? depositCents(svc.charge.payCents, svc.depositMode)
                 : null,
             visits: svc.visits,
             online: svc.locationType === "ONLINE",
@@ -585,17 +609,39 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
         },
         select: {
             id: true,
+            organizationId: true,
             name: true,
             description: true,
             durationMinutes: true,
             priceCents: true,
             currency: true,
+            gstRate: true,
+            gstPriceMode: true,
         },
     });
+    // The ids come from one site's section, so this is one business.
+    const terms = new Map<string, PriceTerms>();
+    for (const organizationId of new Set(rows.map((r) => r.organizationId))) {
+        terms.set(organizationId, await loadPriceTerms(prisma, organizationId));
+    }
     const byId = new Map(rows.map((row) => [row.id, row]));
     return ids.flatMap((id) => {
         const row = byId.get(id);
-        return row ? [row] : [];
+        if (!row) return [];
+        return [
+            {
+                id: row.id,
+                name: row.name,
+                description: row.description,
+                durationMinutes: row.durationMinutes,
+                priceCents: row.priceCents,
+                currency: row.currency,
+                gst: serviceCharge(
+                    row,
+                    terms.get(row.organizationId) ?? NO_GST_TERMS,
+                ).gst,
+            },
+        ];
     });
 }
 

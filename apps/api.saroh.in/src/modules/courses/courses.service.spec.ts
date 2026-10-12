@@ -35,20 +35,33 @@ jest.mock("@saroh/database", () => {
         },
         bookingEvent: { createMany: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
+        // Whether the business is registered, asked at an enrolment.
+        businessProfile: { findUnique: jest.fn() },
+        // A course's price history entry, written with its save.
+        auditEvent: { create: jest.fn() },
     };
+    // Making a course is one transaction with its first price history
+    // entry: the specs read the create off either client.
+    const courseCreate = jest.fn();
+    Object.assign(tx.course, { create: courseCreate });
     return {
         ...actual,
         prisma: {
             course: {
                 findFirst: jest.fn(),
                 findMany: jest.fn(),
-                create: jest.fn(),
+                create: courseCreate,
             },
             courseEnrollment: { findMany: jest.fn(), findFirst: jest.fn() },
             booking: { groupBy: jest.fn() },
             contact: { findFirst: jest.fn() },
             service: { findFirst: jest.fn() },
             organizationModule: { findFirst: jest.fn() },
+            // How the business's prices carry GST, for a read's amount to pay.
+            businessProfile: { findUnique: jest.fn() },
+            // A course's price history, as its page reads it.
+            auditEvent: { findMany: jest.fn() },
+            user: { findMany: jest.fn() },
             $transaction: jest.fn(
                 (fn: (t: typeof tx) => unknown, _opts?: unknown) => fn(tx),
             ),
@@ -255,7 +268,8 @@ describe("enrolling", () => {
         expect(reserveInTx).toHaveBeenCalledTimes(6);
         expect(issueInTx.mock.calls[0]![2].lines[0]).toMatchObject({
             description: "Beginners' wheel · 6 sessions",
-            unitPrice: "6000",
+            // The price typed for them, written as money.
+            unitPrice: "6000.00",
         });
         // Only future sessions were asked for.
         expect(
@@ -646,5 +660,364 @@ describe("who may", () => {
                 where: { id: "course_other", organizationId: "org_1" },
             }),
         );
+    });
+});
+
+// — GST on a course (12 Oct 2026) ————————————————————————————————————
+//
+// A course carries a GST rate, a SAC code and its own way of carrying GST.
+// An enrolment takes its amount to pay from `invoices/sale-price.ts`; the
+// enrolment and its invoice both keep that amount.
+describe("GST on a course enrolment", () => {
+    const registered = (gstPriceMode: "INCLUDED" | "ADDED") => ({
+        gstRegistered: true,
+        taxId: "29ABCDE1234F1Z5",
+        gstState: "29",
+        gstPriceMode,
+    });
+    const business = (profile: Record<string, unknown> | null) =>
+        tx.businessProfile!.findUnique!.mockResolvedValue(profile);
+    const course = (gst: Record<string, unknown>) =>
+        tx.course!.findFirst!.mockResolvedValue(
+            lockedCourse({ gstRate: null, sacCode: null, ...gst }),
+        );
+    const enrol = (price?: string) =>
+        service.enrol(owner, "course_1", {
+            contactId: "c_1",
+            ...(price ? { price } : {}),
+        });
+    const enrolled = () => tx.courseEnrollment!.create!.mock.calls[0]![0].data;
+    const line = () => issueInTx.mock.calls[0]![2].lines[0];
+
+    it("a business that is not registered enrols unchanged to the paisa, whatever the course's rate", async () => {
+        business({ gstRegistered: false });
+        course({ gstRate: decimal("18.00") });
+        await enrol();
+        expect(enrolled().price).toBe("8000.00");
+        expect(issueInTx.mock.calls[0]![2].lines).toEqual([
+            {
+                description: "Beginners' wheel · 8 sessions",
+                quantity: 1,
+                unitPrice: "8000.00",
+            },
+        ]);
+    });
+
+    it("refuses a registered business's course with no rate, naming it, before anyone is enrolled or booked", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: null });
+        const err = await enrol().catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(ConflictException);
+        expect((err as ConflictException).getResponse()).toEqual({
+            message:
+                "Beginners' wheel has no GST rate. Choose one to issue this invoice.",
+            details: {
+                reason: "GST_RATE_MISSING",
+                items: [
+                    {
+                        kind: "COURSE",
+                        id: "course_1",
+                        name: "Beginners' wheel",
+                    },
+                ],
+            },
+        });
+        expect(tx.courseEnrollment!.create).not.toHaveBeenCalled();
+        expect(reserveInTx).not.toHaveBeenCalled();
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("with Payments off writes no invoice, so nothing is asked", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: null });
+        tx.organizationModule!.findFirst!.mockResolvedValue({ id: "mod_1" });
+        await expect(enrol()).resolves.toBeDefined();
+        expect(issueInTx).not.toHaveBeenCalled();
+    });
+
+    it("a free course asks for no rate: there is no tax to choose", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: null, price: decimal("0") });
+        await expect(enrol()).resolves.toBeDefined();
+        expect(enrolled().price).toBe("0.00");
+    });
+
+    it("includes GST: ₹8,000 to pay, and the line carries the rate so the paper shows the split", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: decimal("18.00"), sacCode: "999293" });
+        await enrol();
+        expect(enrolled().price).toBe("8000.00");
+        expect(line()).toEqual({
+            description: "Beginners' wheel · 8 sessions",
+            quantity: 1,
+            unitPrice: "8000.00",
+            gstRate: "18",
+            hsnSac: "999293",
+            priceMode: "INCLUDED",
+        });
+    });
+
+    it("GST is added: ₹8,000 at 18% is ₹9,440 to pay, on the enrolment and its invoice", async () => {
+        business(registered("ADDED"));
+        course({ gstRate: decimal("18.00") });
+        await enrol();
+        expect(enrolled().price).toBe("9440.00");
+        expect(line()).toEqual({
+            description: "Beginners' wheel · 8 sessions",
+            quantity: 1,
+            unitPrice: "9440.00",
+            gstRate: "18",
+            hsnSac: null,
+            priceMode: "ADDED",
+        });
+    });
+
+    it("a price typed for one person is a typed price too: ₹6,000 for a late start is ₹7,080 where GST is added", async () => {
+        business(registered("ADDED"));
+        course({ gstRate: decimal("18.00") });
+        await enrol("6000");
+        expect(enrolled().price).toBe("7080.00");
+        expect(line().unitPrice).toBe("7080.00");
+    });
+
+    it("and stays ₹6,000 where prices include GST", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: decimal("18.00") });
+        await enrol("6000");
+        expect(enrolled().price).toBe("6000.00");
+    });
+
+    it("a course priced the other way from the business follows its own choice", async () => {
+        business(registered("INCLUDED"));
+        course({ gstRate: decimal("12.00"), gstPriceMode: "ADDED" });
+        await enrol();
+        // ₹8,000 + 12% = ₹8,960.
+        expect(enrolled().price).toBe("8960.00");
+    });
+});
+
+// — What the merchant reads of a course's price (12 Oct 2026) ————————
+//
+// One figure, one kind: `price` is the price the business set; `gst` says
+// the GST in or on it and what an enrolment comes to, by the sum `enrol`
+// uses. An enrolment's own `price` is what was charged.
+describe("a course's price as the merchant reads it", () => {
+    const registered = (gstPriceMode: "INCLUDED" | "ADDED") => ({
+        gstRegistered: true,
+        taxId: "29ABCDE1234F1Z5",
+        gstState: "29",
+        gstPriceMode,
+    });
+    const read = async (
+        profile: Record<string, unknown> | null,
+        gst: Record<string, unknown>,
+    ) => {
+        db.businessProfile!.findUnique!.mockResolvedValue(profile);
+        db.course!.findFirst!.mockResolvedValue({ ...COURSE_ROW, ...gst });
+        db.courseEnrollment!.findMany!.mockResolvedValue([]);
+        db.booking!.groupBy!.mockResolvedValue([]);
+        return service.get(owner, "course_1");
+    };
+
+    it("GST is added: ₹8,000 is the price, ₹9,440 the amount to pay", async () => {
+        const course = await read(registered("ADDED"), {
+            gstRate: decimal("18.00"),
+        });
+        expect(course.price).toBe("8000.00");
+        expect(course.gst).toEqual({
+            mode: "ADDED",
+            rate: "18",
+            listCents: 800_000,
+            gstCents: 144_000,
+            payCents: 944_000,
+        });
+    });
+
+    it("prices include GST: ₹8,000 is both, with the GST inside it", async () => {
+        const course = await read(registered("INCLUDED"), {
+            gstRate: decimal("18.00"),
+        });
+        expect(course.price).toBe("8000.00");
+        expect(course.gst).toEqual({
+            mode: "INCLUDED",
+            rate: "18",
+            listCents: 800_000,
+            gstCents: 122_034,
+            payCents: 800_000,
+        });
+    });
+
+    it("not registered, or no rate: nothing is said about GST", async () => {
+        expect(
+            (
+                await read(
+                    { gstRegistered: false },
+                    { gstRate: decimal("18.00") },
+                )
+            ).gst,
+        ).toBeNull();
+        db.businessProfile!.findUnique!.mockClear();
+        const unrated = await read(registered("ADDED"), { gstRate: null });
+        expect(unrated.gst).toBeNull();
+        expect(unrated.price).toBe("8000.00");
+        // With no rate there is nothing to work out, and nothing is read.
+        expect(db.businessProfile!.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("the list says the same of each course", async () => {
+        db.businessProfile!.findUnique!.mockResolvedValue(registered("ADDED"));
+        db.course!.findMany!.mockResolvedValue([
+            { ...COURSE_ROW, gstRate: decimal("18.00") },
+        ]);
+        const [course] = await service.list(owner, {});
+        expect(course!.gst?.payCents).toBe(944_000);
+    });
+});
+
+describe("a course's price history (12 Oct 2026)", () => {
+    const entries = () =>
+        tx.auditEvent!.create!.mock.calls.map(
+            (call) => (call[0] as { data: Record<string, unknown> }).data,
+        );
+    /** The course under its lock, as the save reads it. */
+    const locked = (over: Record<string, unknown> = {}) => ({
+        id: "course_1",
+        name: "Beginners' wheel",
+        price: decimal("8000"),
+        currency: "INR",
+        gstRate: null,
+        gstPriceMode: null,
+        serviceId: "svc_1",
+        status: "OPEN",
+        service: { capacity: 10 },
+        _count: { sessions: 8, enrollments: 0 },
+        ...over,
+    });
+
+    beforeEach(() => {
+        tx.course!.findFirst!.mockResolvedValue(locked());
+        // The row a save returns: the course as it was, with what was sent.
+        tx.course!.update!.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) =>
+                Promise.resolve({ ...locked(), ...data }),
+        );
+        db.course!.create!.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) =>
+                Promise.resolve({ id: "course_new", ...data }),
+        );
+    });
+
+    it("a new course starts its history at what it was made at", async () => {
+        await service.create(owner, {
+            serviceId: "svc_1",
+            name: "Wheel",
+            price: "8000",
+            seats: 4,
+            gstRate: "18",
+            gstPriceMode: "ADDED",
+        });
+        expect(entries()).toEqual([
+            {
+                action: "price.set",
+                actorUserId: "user_1",
+                organizationId: "org_1",
+                targetType: "course",
+                targetId: "course_new",
+                outcome: "SUCCESS",
+                metadata: {
+                    kind: "COURSE",
+                    name: "Wheel",
+                    currency: "INR",
+                    source: "editor",
+                    changes: [
+                        { field: "price", before: null, after: "8000.00" },
+                        { field: "gstRate", before: null, after: "18" },
+                        { field: "gstPriceMode", before: null, after: "ADDED" },
+                    ],
+                },
+            },
+        ]);
+    });
+
+    it("a new price and rate are one entry, before and after, on the save's transaction", async () => {
+        await service.update(owner, "course_1", {
+            price: "9000",
+            gstRate: "18",
+        });
+        expect(entries()).toEqual([
+            expect.objectContaining({
+                action: "price.changed",
+                actorUserId: "user_1",
+                targetType: "course",
+                targetId: "course_1",
+                metadata: {
+                    kind: "COURSE",
+                    name: "Beginners' wheel",
+                    currency: "INR",
+                    source: "editor",
+                    changes: [
+                        { field: "price", before: "8000.00", after: "9000.00" },
+                        { field: "gstRate", before: null, after: "18" },
+                    ],
+                },
+            }),
+        ]);
+    });
+
+    it("keeps nothing when the cost did not move", async () => {
+        await service.update(owner, "course_1", {
+            name: "Wheel for beginners",
+            seats: 6,
+            price: "8000.00",
+        });
+        expect(tx.course!.update).toHaveBeenCalledTimes(1);
+        expect(entries()).toEqual([]);
+    });
+
+    it("keeps nothing when the save is refused or fails", async () => {
+        tx.course!.findFirst!.mockResolvedValue(
+            locked({ _count: { sessions: 8, enrollments: 5 } }),
+        );
+        await expect(
+            service.update(owner, "course_1", { seats: 4, price: "9000" }),
+        ).rejects.toThrow("5 people are on this course");
+        await expect(
+            service.update(member, "course_1", { price: "9000" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        tx.course!.findFirst!.mockResolvedValue(locked());
+        tx.course!.update!.mockRejectedValue(new Error("the database went"));
+        await expect(
+            service.update(owner, "course_1", { price: "9000" }),
+        ).rejects.toThrow("the database went");
+        expect(entries()).toEqual([]);
+    });
+
+    it("is read by whoever may read the course, in this business only, newest first", async () => {
+        db.course!.findFirst!.mockResolvedValue({ id: "course_1" });
+        db.auditEvent!.findMany!.mockResolvedValue([]);
+        await expect(
+            service.priceHistory(owner, "course_1", { limit: 5 }),
+        ).resolves.toEqual({ entries: [], nextCursor: null });
+        expect(db.course!.findFirst).toHaveBeenCalledWith({
+            where: { id: "course_1", organizationId: "org_1" },
+            select: { id: true },
+        });
+        expect(db.auditEvent!.findMany!.mock.calls[0]![0]).toMatchObject({
+            where: {
+                organizationId: "org_1",
+                targetType: "course",
+                targetId: "course_1",
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 6,
+        });
+        await expect(
+            service.priceHistory(member, "course_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        db.course!.findFirst!.mockResolvedValue(null);
+        await expect(
+            service.priceHistory(owner, "course_theirs"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(db.auditEvent!.findMany).toHaveBeenCalledTimes(1);
     });
 });

@@ -12,6 +12,15 @@ import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
+import { NO_GST_TERMS } from "../invoices/gst-price";
+import type { RatedSale } from "../invoices/sale-price";
+import {
+    priceTermsFor,
+    RATED_SALE_SELECT,
+    saleCharge,
+} from "../invoices/sale-price";
+import { toCents } from "../invoices/totals";
 import { siteTakingOrders, withPause } from "../orders/checkout-paused";
 import { AutopayService } from "../payments/autopay.service";
 import type { MandateMethod } from "../payments/providers/provider.port";
@@ -68,6 +77,14 @@ export interface PublicPlan {
      * site's "Most chosen" is a fact, not a guess. At most one plan has it.
      */
     mostChosen: boolean;
+    /**
+     * The GST on the price, as the customer is told it before joining (12
+     * Oct 2026): the typed price, the GST in or on it and the amount to pay
+     * each period. Null when nothing is said about GST (not registered, no
+     * rate, exempt): the price is what is paid. Added beside the rest, so
+     * an older site that never reads it shows the price as before.
+     */
+    gst: GstOnPrice | null;
 }
 
 export interface PublicPlans {
@@ -128,10 +145,12 @@ export async function paymentsOffered(
 
 /**
  * Order the plans most-chosen first, then by price, then by name, and mark
- * the leader. Pure, so the rule is testable without a database.
+ * the leader. Pure, so the rule is testable without a database. `terms` is
+ * the business's GST standing, for each plan's GST words; without it
+ * nothing is said about GST.
  */
 export function orderPlans(
-    rows: readonly {
+    rows: readonly ({
         id: string;
         name: string;
         description: string | null;
@@ -139,7 +158,8 @@ export function orderPlans(
         currency: string;
         interval: string;
         members: number;
-    }[],
+    } & RatedSale)[],
+    terms: PriceTerms = NO_GST_TERMS,
 ): PublicPlan[] {
     const sorted = [...rows].sort(
         (a, b) =>
@@ -161,6 +181,7 @@ export function orderPlans(
         currency: row.currency,
         interval: row.interval,
         mostChosen: row.id === leader,
+        gst: saleCharge(toCents(toMoneyString(row.price)), row, terms).gst,
     }));
 }
 
@@ -201,7 +222,7 @@ export class PublicPlansService {
             // all, not even as "Ask about joining". Members already on one
             // keep renewing; the site just stops offering it.
             if (!(await planStartsSubscriptions(organizationId))) return null;
-            return Promise.all([
+            const [plans, takes, takingOrders] = await Promise.all([
                 prisma.subscriptionPlan.findMany({
                     where: { organizationId, ...PLANS_ON_SALE },
                     take: MAX_PLANS,
@@ -214,6 +235,7 @@ export class PublicPlansService {
                         price: true,
                         currency: true,
                         interval: true,
+                        ...RATED_SALE_SELECT,
                         _count: {
                             select: {
                                 subscriptions: {
@@ -230,6 +252,14 @@ export class PublicPlansService {
                 // (#800): the plans show, Join doesn't.
                 siteTakingOrders(organizationId, siteId),
             ]);
+            return [
+                plans,
+                takes,
+                takingOrders,
+                // How the business's prices carry GST, for each plan's
+                // words; read only when a plan has a rate.
+                await priceTermsFor(prisma, organizationId, plans),
+            ] as const;
         });
         if (read === null) {
             return {
@@ -239,7 +269,7 @@ export class PublicPlansService {
                 offered: false,
             };
         }
-        const [rows, takesPayment, taking] = read;
+        const [rows, takesPayment, taking, terms] = read;
         const payOnline = takesPayment && taking;
         // How the join sheet can offer autopay (D12): the provider's own
         // list, only where Join is paid online; a provider that can't say
@@ -263,6 +293,7 @@ export class PublicPlansService {
                         ...row,
                         members: _count.subscriptions,
                     })),
+                    terms,
                 ),
             },
             taking,

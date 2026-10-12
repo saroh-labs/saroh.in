@@ -1,4 +1,10 @@
 import { accountMoney } from "../account/model";
+import type { GstOnPrice } from "../lib/gst-price";
+import {
+    browsePriceWords,
+    gstOnPriceOf,
+    payPriceWords,
+} from "../lib/gst-price";
 
 /**
  * How a class pack is said on a site (G20): what the public packs read
@@ -19,6 +25,50 @@ export interface PublicPack {
     kind: "CLASSES" | "ONE_TO_ONE";
     /** One visit's price to compare with, or null. */
     singlePrice: string | null;
+    /**
+     * The two sides of "₹531 a class instead of ₹708", both as amounts to
+     * pay, GST and all, worked out by the API: one visit's share of the
+     * pack, and the least a covered visit costs alone (null for none).
+     * Absent from an older API, where the typed prices are compared as
+     * before.
+     */
+    payEach?: string | null;
+    singlePay?: string | null;
+    /**
+     * The GST in or on the price, and the amount to pay; null for none.
+     * Absent from an older API. Narrowed where it is read (`gstOnPriceOf`).
+     */
+    gst?: GstOnPrice | null;
+}
+
+/** What a pack's price words read: the pack, and the API's GST on it. */
+interface PricedPack {
+    price: string;
+    currency: string;
+    gst?: unknown;
+}
+
+/**
+ * What a pack costs to pay, beside Buy: "₹4,500", or the API's amount to
+ * pay where GST is added ("₹5,310" for ₹4,500 at 18%).
+ */
+export function packPayPrice(pack: PricedPack): string {
+    return payPriceWords(
+        accountMoney(pack.price, pack.currency),
+        pack.gst,
+        pack.currency,
+    );
+}
+
+/**
+ * The price where a pack is only browsed (no Buy beside it): the typed
+ * price, with "+ GST" after it when GST comes on top.
+ */
+export function packBrowsePrice(pack: PricedPack): string {
+    return browsePriceWords(
+        accountMoney(pack.price, pack.currency),
+        gstOnPriceOf(pack.gst)?.mode === "ADDED",
+    );
 }
 
 function isPublicPack(value: unknown): value is PublicPack {
@@ -88,8 +138,24 @@ export function packEyebrow(pack: PublicPack): string {
 /**
  * "₹450 a class instead of ₹600", so a pack can be compared with a single
  * class; without the comparison when there is nothing cheaper to say.
+ *
+ * Both sides are what is paid, GST and all, and they are the API's
+ * (`payEach`, `singlePay`): ₹4,500 for 10 with 18% added is "₹531 a class
+ * instead of ₹708". Where GST is in the prices, or none is charged, that
+ * is the line it always was. An older API sends neither, and the typed
+ * prices are compared as before.
  */
 export function packPerClass(pack: PublicPack): string | null {
+    if (typeof pack.payEach === "string") {
+        const each = Number(pack.payEach);
+        if (!Number.isFinite(each)) return null;
+        const line = `${accountMoney(pack.payEach, pack.currency)} a ${packUnit(pack.kind)}`;
+        const single =
+            typeof pack.singlePay === "string" ? Number(pack.singlePay) : NaN;
+        return Number.isFinite(single) && single > each
+            ? `${line} instead of ${accountMoney(pack.singlePay ?? "", pack.currency)}`
+            : line;
+    }
     const price = Number(pack.price);
     if (!Number.isFinite(price) || pack.credits <= 0) return null;
     const each = Math.round(price / pack.credits);

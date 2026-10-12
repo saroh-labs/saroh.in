@@ -282,7 +282,7 @@ const KAVI_PRICE = 'section:has(h2:text-is("Price"))';
 /* "Set up a monthly plan": Rye & Co.'s plans and subscribers, looked at;
  * the dialog is opened and closed unsent. The draft plan to publish is
  * Northwind's ("Packing supplies, monthly", made on the throwaway
- * database), opened from its card and never published. */
+ * database), opened from its row's menu and never published. */
 const RYE_PLANS = "/billing/subscriptions?tab=plans";
 
 /* "Connect your own domain" and "Make your link look right when shared":
@@ -383,7 +383,7 @@ const HELP_SHOTS_B: Shot[] = [
         route: AVAILABILITY,
         viewport: { width: 1280, height: 1400 },
         clip: { selector: 'section[aria-labelledby="booking-rules"]', pad: 12 },
-        mark: '[aria-label="How people pay when they book"]',
+        mark: '[data-rule="bookingPayment"]',
         alt: "Booking rules at Kavi Dental (demo clinic): how far ahead people can book, the latest they can book, free cancellation, refunds and how people pay when they book",
         caption: "Kavi Dental's booking rules, for the whole business",
     },
@@ -395,9 +395,9 @@ const HELP_SHOTS_B: Shot[] = [
         role: "owner",
         route: "/services",
         viewport: { width: 1024, height: 760 },
-        mark: 'a[aria-label="Edit Root canal treatment"]',
-        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button",
-        caption: "Services at Kavi Dental, with Edit on the root canal",
+        mark: `a[href="${KAVI_ROOT_CANAL}"]`,
+        alt: "Services at Kavi Dental (demo clinic): a row each, with its length, price and who takes it, and the root canal's row marked",
+        caption: "Services at Kavi Dental, with the root canal's row",
     },
     {
         key: "help-take-deposit-2",
@@ -491,10 +491,15 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-monthly-plan-3",
         business: "northwind",
         role: "owner",
-        route: "/billing/subscriptions?tab=plans",
+        // A draft is in the Plans list's Drafts view, and Edit is in its
+        // row's menu.
+        route: "/billing/subscriptions?tab=plans&view=drafts",
         viewport: { width: 1024, height: 560 },
         steps: [
-            { click: 'a[aria-label="Edit Packing supplies, monthly"]' },
+            {
+                click: 'button[aria-label="More actions for Packing supplies, monthly"]',
+            },
+            { click: '[role="menuitem"]:has-text("Edit")' },
             { waitFor: 'button:text-is("Publish")' },
         ],
         mark: 'button:text-is("Publish"):visible',

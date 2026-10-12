@@ -1,4 +1,6 @@
 import { apiFetch, getActiveOrgId, getList } from "@/lib/api/http";
+import type { PlanRefusal } from "@/lib/billing/refusal";
+import { planRefusalOf } from "@/lib/billing/refusal";
 
 /**
  * A merchant's own domain, as the api reports it (#200).
@@ -30,6 +32,66 @@ export interface SiteDomain {
      * into what the screen shows (#861).
      */
     hosting?: DomainHostingRead;
+    /**
+     * What the hostname is (DEC-140): a bare domain (`yourshop.in`), `www`
+     * on one, or any other subdomain. Absent from an api before it.
+     */
+    hostnameKind?: "bare" | "www" | "subdomain" | (string & {});
+    /**
+     * For a `www` connection, its bare domain and where it stands. Null for
+     * any other hostname. `lib/domains/bare-view.ts` turns it into words.
+     */
+    bare?: BareDomainRead | null;
+    /**
+     * Where the domain stands against the business's plan (DEC-139).
+     * Absent from an api before it, and on a domain just added; both read
+     * as `included`. `lib/domains/domain-plan.ts` words it.
+     */
+    plan?: DomainPlanRead;
+}
+
+/**
+ * - FORWARDS: the bare domain sends visitors on to `www`.
+ * - FORWARDS_HTTP_ONLY: it does, but `https://` on it fails.
+ * - POINTS_HERE: its DNS reaches our hosting directly (an ALIAS or a
+ *   flattened CNAME), so it can be added as a domain of its own.
+ * - NOT_FORWARDING: none of these.
+ *
+ * Null until the api has looked. Free-form on the wire: an unknown value
+ * reads as not looked at.
+ */
+export type BareState =
+    "FORWARDS" | "FORWARDS_HTTP_ONLY" | "POINTS_HERE" | "NOT_FORWARDING";
+
+export interface BareDomainRead {
+    /** The bare domain: `yourshop.in` for `www.yourshop.in`. */
+    hostname: string;
+    /** Where it should forward: `https://www.yourshop.in`. */
+    forwardTo: string;
+    state: BareState | (string & {}) | null;
+    checkedAt: string | null;
+    /** The business has added the bare domain as a domain of its own. */
+    added: boolean;
+}
+
+/**
+ * - included: the plan includes the business's own domain, or no plan rule
+ *   is enforced. Nothing to say.
+ * - ending: the plan still includes it, and is known to end; the domain
+ *   stops showing the site at `stopsAt`, 3 days after that end.
+ * - grace: the plan no longer includes it; the domain shows the site until
+ *   `stopsAt`.
+ * - paused: the domain sends visitors to `sendsTo` since `stopsAt`. It is
+ *   still connected, and shows the site again on a plan with a domain.
+ *
+ * Free-form on the wire: an unknown state says nothing.
+ */
+export interface DomainPlanRead {
+    state: "included" | "ending" | "grace" | "paused" | (string & {});
+    /** ISO; null while the plan includes the domain. */
+    stopsAt: string | null;
+    /** The site's Saroh address as a host ("yourshop.saroh.app"), or null. */
+    sendsTo: string | null;
 }
 
 /**
@@ -55,7 +117,14 @@ export interface DomainHostingRead {
 }
 
 export type DomainsResult<T> =
-    { ok: true; data: T } | { ok: false; error: string; status?: number };
+    | { ok: true; data: T }
+    | {
+          ok: false;
+          error: string;
+          status?: number;
+          /** The plan's refusal, when that is what stopped it (DEC-139). */
+          plan?: PlanRefusal;
+      };
 
 async function domainsBase(): Promise<string | null> {
     const orgId = await getActiveOrgId();
@@ -72,7 +141,7 @@ async function domainsBase(): Promise<string | null> {
 function readError(
     body: unknown,
     fallback: string,
-): { error: string; status?: number } {
+): { error: string; status?: number; plan?: PlanRefusal } {
     const err = (
         body as {
             error?: {
@@ -86,10 +155,14 @@ function readError(
         ? err.details.find((d): d is string => typeof d === "string")
         : undefined;
     const message = typeof err?.message === "string" ? err.message : undefined;
+    // A plan without its own domain refuses the way every plan refusal does
+    // (DEC-139). Null while plans aren't shown (DEC-136): the sentence alone.
+    const plan = planRefusalOf(err?.details, message);
     return {
         error: detail ?? message ?? fallback,
         status:
             typeof err?.statusCode === "number" ? err.statusCode : undefined,
+        ...(plan ? { plan } : {}),
     };
 }
 

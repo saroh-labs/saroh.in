@@ -222,7 +222,8 @@ test("help.saroh.in is sent to Help on www, old pages to their article", async (
     const helpShown = (await request.get(`${WEB}/help`)).status() === 200;
 
     const home = await go("/");
-    expect(home.status()).toBe(307);
+    // For good once Help is shown; until then the answer may still change.
+    expect(home.status()).toBe(helpShown ? 308 : 307);
     expect(home.headers().location).toBe(
         helpShown ? "https://www.saroh.in/help" : "https://www.saroh.in/",
     );

@@ -4,6 +4,7 @@ import { whenWords } from "../../common/words-format";
 import { recordOrderPaidInTx } from "../analytics/order-events";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { rateToBps } from "../invoices/gst";
+import type { GstPriceMode } from "../invoices/gst-price";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -111,9 +112,9 @@ export function holdLineDescription(
 }
 
 /**
- * The hold's invoice: a DRAFT billed to the booker, priced from the service
- * on the server (GST inside the price, at the service's rate and SAC), with
- * a pay token. Returns the token — the only time it exists outside its hash.
+ * The hold's invoice: a DRAFT billed to the booker for the amount the
+ * booking froze on the server (its price or its deposit, GST and all, at
+ * the service's rate and SAC), with a pay token. Returns the token — the only time it exists outside its hash.
  */
 export async function createHoldInvoiceInTx(
     tx: Tx,
@@ -130,6 +131,8 @@ export async function createHoldInvoiceInTx(
             timezone: string;
             gstRate: { toString(): string } | null;
             sacCode: string | null;
+            /** What the booking was charged under (`service-price.ts`). */
+            priceMode?: GstPriceMode | null;
         };
         startAt: Date;
         /**
@@ -153,6 +156,7 @@ export async function createHoldInvoiceInTx(
                 rateBps: rateToBps(input.service.gstRate?.toString() ?? null),
                 code: input.service.sacCode,
                 orderItemId: input.order?.orderItemId ?? null,
+                priceMode: input.service.priceMode ?? null,
             },
         ],
         profile,

@@ -1,7 +1,10 @@
 import { NotFound } from "@saroh/ui/not-found";
 import { Wordmark } from "@saroh/ui/wordmark";
+import type { Metadata } from "next";
 
 import { getAppUrl } from "@/lib/app-urls";
+
+export const metadata: Metadata = { title: "Page not found" };
 
 /**
  * Accounts' 404, on the same backdrop as every other screen here (the root

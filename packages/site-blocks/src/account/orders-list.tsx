@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { orderHref } from "./details-model";
+import { ORDERS_HREF, trackHref } from "./hrefs";
 import type { AccountOrder, Block } from "./model";
 import { orderLine, orderTitle } from "./model";
 import {
@@ -24,14 +26,12 @@ import { TrackSheet } from "./track-sheet";
  *
  * The open order lives in the address (`?order=‹ref›`), so Track can be
  * linked to, and Back closes it. The site's server reads it; this draws.
+ * Each order also has a page of its own (`/account/orders/‹ref›`, DEC-142),
+ * which its title links to and its emails open.
  */
 
-export const ORDERS_HREF = "/account/orders";
-
-/** Where Track for an order opens. */
-export function trackHref(ref: string): string {
-    return `${ORDERS_HREF}?order=${encodeURIComponent(ref)}`;
-}
+// Kept here for the callers that read them from the Orders tab.
+export { ORDERS_HREF, trackHref };
 
 export function AccountOrders({
     orders,
@@ -102,6 +102,8 @@ export function OrderRow({
     return (
         <AccountRow
             title={orderTitle(order)}
+            // The order's own page (DEC-142); Track still opens the sheet.
+            href={orderHref(order.ref)}
             sub={orderLine(order)}
             tag={
                 <Tag tone={order.open ? "accent" : "quiet"}>{order.status}</Tag>

@@ -27,7 +27,7 @@ import {
 } from "@/lib/businesses";
 
 export const metadata: Metadata = {
-    title: "Your businesses · Saroh",
+    title: "Your businesses",
     description:
         "Choose a business to open, see your role in each, and manage your account.",
 };

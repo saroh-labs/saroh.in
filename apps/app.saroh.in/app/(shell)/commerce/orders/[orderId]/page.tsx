@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
@@ -6,7 +7,8 @@ import { OrderReviews } from "@/components/stores/order-reviews";
 import { ownAccountsRoom, takesOnlinePayment } from "@/lib/billing/access";
 import { personHref } from "@/lib/contacts/person-href";
 import { customerHref } from "@/lib/customers/links";
-import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { businessModeOf } from "@/lib/gst/price-mode";
+import { getInvoiceBusiness, hasPaymentProvider } from "@/lib/invoices/tax";
 import {
     orderLockedText,
     orderPowers,
@@ -22,6 +24,7 @@ import { arrivalOf } from "@/lib/orders/row-menu";
 import { sellablesOf } from "@/lib/orders/sellables";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { recordTitle } from "@/lib/page-title";
 import { refundsOnlineOrUnknown } from "@/lib/payments/refunds-online";
 import { getOrderPayments } from "@/lib/payments/service";
 import { invitationState } from "@/lib/product-reviews/service";
@@ -29,7 +32,22 @@ import { listProducts } from "@/lib/products/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Order" };
+// One read for the tab's title and the page.
+const readOrder = cache((orderId: string) => getOrderRead(orderId));
+
+/** "Order #1042" in the tab: its number, never who it is for or its total. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ orderId: string }>;
+}) {
+    const { orderId } = await params;
+    return recordTitle(
+        () => readOrder(orderId),
+        (order) => `Order #${order.orderId}`,
+        "Order",
+    );
+}
 
 /**
  * Sell → Orders → one order, after the "Saroh Order Detail" design, layout
@@ -68,7 +86,7 @@ export default async function OrderPage({
     if (organization && !ordersAccess(organization).open) {
         return <OrderLocked text={orderLockedText(organization)} />;
     }
-    const order = await getOrderRead(orderId);
+    const order = await readOrder(orderId);
     if (!order) notFound();
 
     const may = permitsFor(organization);
@@ -113,8 +131,13 @@ export default async function OrderPage({
             // "Add an item" (B8): only while items can change, for someone who
             // may change them — from the order's own storefront (DEC-032).
             powers.edit && order.next.editable
-                ? listProducts({ storefront: order.store.id })
-                      .then((products) =>
+                ? Promise.all([
+                      listProducts({ storefront: order.store.id }),
+                      // How the business's prices carry GST, as New order
+                      // reads it: unread charges the typed price.
+                      getInvoiceBusiness().catch(() => null),
+                  ])
+                      .then(([products, business]) =>
                           // Set to Not sold (archived): nobody orders it.
                           sellablesOf(
                               products
@@ -128,7 +151,16 @@ export default async function OrderPage({
                                           p.soldOut === true ||
                                           (p.inventory !== null &&
                                               p.inventory.quantity <= 0),
+                                      gstRate: p.gstRate,
+                                      gstPriceMode: p.gstPriceMode,
                                   })),
+                              // Priced as the API will charge it: GST on
+                              // top where the business, or the product,
+                              // has "GST is added".
+                              {
+                                  registered: business?.registered ?? false,
+                                  mode: businessModeOf(business?.priceMode),
+                              },
                           ),
                       )
                       .catch(() => "unavailable" as const)

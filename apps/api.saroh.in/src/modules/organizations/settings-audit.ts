@@ -1,6 +1,7 @@
 import type { AuditValue, FieldChange } from "../audit/audit-changes";
 import { recordableChanges } from "../audit/audit-changes";
 import { bpsToRate, rateToBps } from "../invoices/gst";
+import { businessPriceMode } from "../invoices/gst-price";
 import { stateName } from "../invoices/gst-states";
 import type { NumberRestart } from "../invoices/numbering";
 import { numberFormatFor, seriesFor } from "../invoices/numbering";
@@ -35,6 +36,7 @@ export interface SettingsRow {
         invoiceNumberFormat?: unknown;
         deliveryGstRate?: { toString(): string } | null;
         deliverySacCode?: string | null;
+        gstPriceMode?: string | null;
         addressLine1?: string | null;
         addressLine2?: string | null;
         city?: string | null;
@@ -121,6 +123,8 @@ export function settingsSnapshot(
         invoiceNumberFormat: numberExample(p, at),
         deliveryGstRate: rate === null ? null : `${bpsToRate(rate)}%`,
         deliverySacCode: p.deliverySacCode ?? null,
+        // As stored (INCLUDED, ADDED); the app words it.
+        gstPriceMode: businessPriceMode(p.gstPriceMode),
         registeredAddress: printedAddress(p),
     };
 }

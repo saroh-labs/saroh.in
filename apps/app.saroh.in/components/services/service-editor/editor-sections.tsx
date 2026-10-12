@@ -4,16 +4,21 @@ import { FailedRead } from "@/components/shared/failed-read";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
+import { TextLink } from "@saroh/ui/text-link";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
 import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import type { PlanLock } from "@/lib/billing/access";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
+import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
+import type { ServiceCharged } from "@/lib/services/service-editor";
 import {
     bookingPageNote,
     draftVisits,
+    gstGoesOnTop,
     staffNote,
     timeNote,
     toMinor,
@@ -28,6 +33,8 @@ import { Field, FieldError } from "@saroh/ui/field";
 import { DepositField } from "./deposit-field";
 import type { Edit } from "./fields";
 import { HELP, NumberField, Section } from "./fields";
+import { GstFields } from "./gst-fields";
+import { LengthField } from "./length-field";
 import { VisitsField, VisitsStorefrontNote } from "./visits-field";
 import { WhereField } from "./where-field";
 
@@ -106,15 +113,14 @@ export function TimeSection({
 }) {
     return (
         <Section title="Time">
-            <div className="flex flex-wrap gap-3">
-                <NumberField
-                    label="Each visit (min)"
-                    value={draft.minutes}
-                    onChange={(minutes) => set({ minutes })}
-                    width="w-[120px]"
-                    error={problem("minutes")}
-                    onLeave={() => leave("minutes")}
-                />
+            {/* The usual lengths as chips, and Custom for any other. */}
+            <LengthField
+                value={draft.minutes}
+                onChange={(minutes) => set({ minutes })}
+                error={problem("minutes")}
+                onLeave={() => leave("minutes")}
+            />
+            <div className="mt-3 flex flex-wrap gap-3">
                 <NumberField
                     label="Gap after (min)"
                     value={draft.gap}
@@ -178,8 +184,19 @@ export function PriceSection({
     savedDeposit,
     paymentsLock = null,
     payment,
+    withGst = false,
+    canEdit = true,
+    businessPriceMode = null,
+    charged = null,
 }: Edit & {
     currency: string;
+    /** A GST-registered business: the GST rate and SAC code sit here. */
+    withGst?: boolean;
+    /** How the business's prices carry GST; null when it couldn't be told. */
+    businessPriceMode?: GstPriceMode | null;
+    /** The API's amounts for the price as saved; null once it is changed. */
+    charged?: ServiceCharged | null;
+    canEdit?: boolean;
     /** The deposit the service has saved. */
     savedDeposit?: DepositMode;
     /** The plan's lock on online payments (deposits are taken online). */
@@ -200,19 +217,35 @@ export function PriceSection({
         : null;
     return (
         <Section title="Price">
-            <Field
-                label="Price"
-                className="w-[160px] max-w-full"
-                error={fieldProblem("price")}
-                onBlur={() => leave("price")}
-            >
-                <MoneyInput
-                    id={id}
-                    currency={currency}
-                    value={draft.price}
-                    onValueChange={(price) => set({ price })}
-                />
-            </Field>
+            {/* A GST-registered business answers the rate where the price
+                is (12 Oct 2026): the price includes it, and a priced
+                service can't be saved without one. */}
+            <div className="flex flex-wrap items-start gap-3">
+                <Field
+                    label="Price"
+                    className="w-[160px] max-w-full"
+                    error={fieldProblem("price")}
+                    onBlur={() => leave("price")}
+                >
+                    <MoneyInput
+                        id={id}
+                        currency={currency}
+                        value={draft.price}
+                        onValueChange={(price) => set({ price })}
+                    />
+                </Field>
+                {withGst ? (
+                    <GstFields
+                        draft={draft}
+                        set={set}
+                        problem={fieldProblem}
+                        leave={leave}
+                        asked
+                        canEdit={canEdit}
+                        businessPriceMode={businessPriceMode}
+                    />
+                ) : null}
+            </div>
             <DepositField
                 deposit={draft.deposit}
                 price={draft.price}
@@ -222,6 +255,8 @@ export function PriceSection({
                 paymentsLock={paymentsLock}
                 way={payment?.bookingPayment}
                 problem={problem}
+                charged={charged}
+                gstOnTop={gstGoesOnTop(draft, businessPriceMode, withGst)}
                 onChange={(deposit) => set({ deposit })}
             />
         </Section>
@@ -289,8 +324,10 @@ export function WhoTakesIt({
                 </>
             ) : (
                 <p className={cn(HELP, "mt-0")}>
-                    Nobody is on the diary yet, so it books in its own weekly
-                    hours, under More settings.
+                    Nobody is on the diary yet.{" "}
+                    <TextLink href={AVAILABILITY_HREF}>
+                        Add yourself or your team in Availability
+                    </TextLink>
                 </p>
             )}
         </Section>

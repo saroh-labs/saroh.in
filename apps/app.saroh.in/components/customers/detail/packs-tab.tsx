@@ -20,6 +20,7 @@ import {
     packsEmptyText,
     packTabRows,
 } from "@/lib/customer-workspace/packs";
+import type { GstAsk } from "@/lib/gst/item-words";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
@@ -29,6 +30,8 @@ import { Bar, CARD, Chips, Empty, Failed } from "./parts";
 export interface PackSale {
     packs: readonly SellablePack[];
     invoicesOnSale: boolean;
+    /** The business's GST standing, for the dialog's amount to pay. */
+    gst?: GstAsk | null;
 }
 
 const BAR = { ok: "ok", soon: "accent", ended: "off" } as const;
@@ -316,6 +319,7 @@ export function useCustomerPacks({
                     packs={sale.packs}
                     initialContactId={d.contact.id}
                     invoicesOnSale={sale.invoicesOnSale}
+                    gst={sale.gst}
                     held={heldPacks(d, new Date(nowIso))}
                 />
             ) : null}

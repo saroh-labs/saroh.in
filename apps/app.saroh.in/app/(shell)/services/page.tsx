@@ -5,7 +5,10 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { ServicesScreen } from "@/components/services/services-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { whoCanChange } from "@/components/shared/who-can-change";
+import { canWriteCourses } from "@/lib/courses/access";
+import { readMissingRates } from "@/lib/gst-rates/service";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { rolledOut } from "@/lib/modules/rollout";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { alsoSellFeatures } from "@/lib/services/also-sell";
@@ -22,12 +25,15 @@ import { readBookingPayment } from "@/lib/staff/service";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
- * Bookings › Services (U16, E2): what people can book, as the design's
- * cards. The services read is the page; the staff read (who takes each),
- * the bookings read (how each is used) and the sites read (whether there is
+ * Bookings › Services (U16, E2): what people can book, as rows. The
+ * services read is the page; the staff read (who takes each), the
+ * bookings read (how each is used) and the sites read (whether there is
  * a booking page) degrade on their own and say so. The module list, for
- * "Also sell" (E12), leaves the card out when it can't be read; how people
- * pay (DEC-088) marks nothing when it can't.
+ * "Also sell" (E12) and New course in the New service menu, leaves both
+ * out when it can't be read; how people
+ * pay (DEC-088) marks nothing when it can't. A GST-registered business with
+ * priced things on sale and no GST rate reads one line saying so, with the
+ * sheet to choose them in; unread, it says nothing.
  */
 export const metadata = { title: "Services" };
 
@@ -43,15 +49,33 @@ async function servicesDenied() {
 
 export default async function ServicesPage() {
     await requireSession();
-    const [read, staffList, hasPage, canEdit, modules, payment] =
-        await Promise.all([
-            readServices(),
-            readStaffOrNull(),
-            readHasBookingPage(),
-            readCanEditServices(),
-            modulesOrUnknown(),
-            readBookingPayment(),
-        ]);
+    const [
+        read,
+        staffList,
+        hasPage,
+        canEdit,
+        modules,
+        payment,
+        missingRates,
+        organization,
+    ] = await Promise.all([
+        readServices(),
+        readStaffOrNull(),
+        readHasBookingPage(),
+        readCanEditServices(),
+        modulesOrUnknown(),
+        readBookingPayment(),
+        // What is on sale with no GST rate; null draws no notice.
+        readMissingRates(),
+        resolveActiveOrganization(),
+    ]);
+    // New course joins New service only while Courses is on here and this
+    // role may add one: the same answers the Courses screen gives.
+    const canNewCourse =
+        canWriteCourses(organization) &&
+        rolledOut(modules ?? []).some(
+            (m) => m.key === "COURSES" && m.lifecycle === "ENABLED",
+        );
 
     if (!read.ok) {
         return (
@@ -110,6 +134,8 @@ export default async function ServicesPage() {
                     payment={payment}
                     alsoSell={alsoSellFeatures(modules)}
                     modules={modules ?? []}
+                    missingRates={missingRates}
+                    canNewCourse={canNewCourse}
                 />
             </div>
         </PageContainer>

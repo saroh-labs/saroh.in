@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { rateToBps } from "../invoices/gst";
+import { assertRatesSet } from "../invoices/gst-rate-required";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -11,6 +12,7 @@ import {
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
 import { holdLineDescription, lockBookingInTx } from "./booking-hold";
+import { bookedPriceMode } from "./service-price";
 
 /**
  * "Send a pay link" for a booking made by staff (E4, ADR-007's link path).
@@ -92,6 +94,7 @@ export async function bookingPayLinkInTx(
             snapshot: true,
             service: {
                 select: {
+                    id: true,
                     name: true,
                     priceCents: true,
                     currency: true,
@@ -160,6 +163,17 @@ export async function bookingPayLinkInTx(
     }
 
     const profile = await loadTaxProfile(tx, organizationId);
+    // A bill the business chose to send: a tax invoice never goes out
+    // with a rate nobody chose (`gst-rate-required.ts`). A link already
+    // out, above, is paper already issued and is left as it is.
+    assertRatesSet(profile.registered, [
+        {
+            kind: "SERVICE",
+            id: booking.service.id,
+            name: booking.service.name,
+            rate: booking.service.gstRate,
+        },
+    ]);
     const doc = buildManualInvoice(
         [
             {
@@ -172,6 +186,7 @@ export async function bookingPayLinkInTx(
                 unitCents: terms.priceCents,
                 rateBps: rateToBps(booking.service.gstRate?.toString() ?? null),
                 code: booking.service.sacCode,
+                priceMode: bookedPriceMode(booking.snapshot),
             },
         ],
         profile,

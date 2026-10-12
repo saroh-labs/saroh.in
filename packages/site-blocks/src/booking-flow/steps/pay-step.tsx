@@ -16,10 +16,16 @@ import { StepHead } from "./step-head";
 export function PayStep({
     choices,
     pay,
+    gst = null,
     onPick,
 }: {
     choices: PayChoice[];
     pay: BookPay;
+    /**
+     * The price with its GST, under the choices: "₹1,000 + ₹180 GST
+     * (18%)". Null says nothing.
+     */
+    gst?: string | null;
     onPick: (pay: BookPay) => void;
 }) {
     return (
@@ -37,6 +43,14 @@ export function PayStep({
                     />
                 ))}
             </div>
+            {gst ? (
+                <p
+                    data-booking-gst=""
+                    className="text-site-body mt-3 text-sm tabular-nums"
+                >
+                    {gst}
+                </p>
+            ) : null}
         </div>
     );
 }

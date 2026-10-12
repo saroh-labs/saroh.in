@@ -23,6 +23,10 @@ import {
     treatmentSub,
     treatmentVisitWords,
 } from "./bookings-model";
+import { CoursesCard } from "./courses-card";
+import type { LeaveLine } from "./details-api";
+import type { AccountCourse, AccountWaitlistPlace } from "./details-model";
+import { bookingHref } from "./details-model";
 import type { Block } from "./model";
 import { CallSheet, TimesSheet } from "./move-sheet";
 import {
@@ -33,6 +37,7 @@ import {
     Tag,
     Unavailable,
 } from "./parts";
+import { WaitlistPlaces } from "./waitlist-places";
 
 /**
  * The account's Bookings tab (round-2 plan A, A6; Saroh Customer Site
@@ -50,6 +55,12 @@ import {
  * `?move=‹ref›` or `?cancel=‹ref›` (Home's next booking) opens that sheet.
  * Everything it changes goes through the site's server actions (`api`); the
  * page then reads the lists again.
+ *
+ * DEC-142 adds what else they hold here: their places in a class's line
+ * (and a place held for them, first), and their courses, read-only. Each
+ * booking's title leads to its own page. A booking that is over reads its
+ * date alone until the business marks it attended or missed: never
+ * "Booked".
  */
 
 type Open =
@@ -63,6 +74,10 @@ export function AccountBookingsTab({
     phone,
     api,
     initial = null,
+    waitlist = null,
+    courses,
+    leaveLine,
+    now,
 }: {
     bookings: Block<AccountBookings>;
     businessName: string;
@@ -71,6 +86,13 @@ export function AccountBookingsTab({
     api: BookingsApi;
     /** A sheet to open on arrival (`?move=` or `?cancel=`). */
     initial?: { kind: "move" | "cancel"; ref: string } | null;
+    /** Their places in a class's line (DEC-142); null draws none. */
+    waitlist?: Block<AccountWaitlistPlace[]> | null;
+    /** Their courses (DEC-142); left out, none are drawn. */
+    courses?: Block<AccountCourse[]>;
+    leaveLine?: LeaveLine;
+    /** When the page was drawn (ISO), for the waitlist's words. */
+    now?: string;
 }) {
     const router = useRouter();
     const [said, setSaid] = useState<string | null>(null);
@@ -111,7 +133,8 @@ export function AccountBookingsTab({
 
     const book = (
         <Link href="/book" className={buttonClasses(true)}>
-            Book another
+            {/* "Another" only when there is one already. */}
+            {comingUp.length === 0 ? "Book a time" : "Book another"}
         </Link>
     );
 
@@ -121,6 +144,15 @@ export function AccountBookingsTab({
                 <p role="status" className="text-site-body text-sm">
                     {said}
                 </p>
+            ) : null}
+
+            {waitlist && leaveLine ? (
+                <WaitlistPlaces
+                    places={waitlist}
+                    show="all"
+                    leave={leaveLine}
+                    now={now ?? new Date().toISOString()}
+                />
             ) : null}
 
             {bookings.ok ? (
@@ -165,7 +197,7 @@ export function AccountBookingsTab({
                         }
                     >
                         {bookings.value.past.map((row) => (
-                            <BookingRow key={row.ref} row={row} />
+                            <BookingRow key={row.ref} row={row} past />
                         ))}
                     </AccountCard>
                     {bookings.value.cancelled.length > 0 ? (
@@ -197,6 +229,8 @@ export function AccountBookingsTab({
                     <Unavailable what="Your bookings" />
                 </AccountCard>
             )}
+
+            {courses ? <CoursesCard courses={courses} /> : null}
 
             <TimesSheet
                 open={open?.kind === "move"}
@@ -281,13 +315,17 @@ export function AccountBookingsTab({
 
 function BookingRow({
     row,
+    past = false,
     onMove,
     onCancel,
 }: {
     row: AccountBookingRow;
+    /** Its time has passed: it reads its date alone until it is marked. */
+    past?: boolean;
     onMove?: () => void;
     onCancel?: () => void;
 }) {
+    const tag = bookingTag(row, past);
     const move =
         row.move === "page" ? (
             <Link
@@ -321,8 +359,9 @@ function BookingRow({
     return (
         <AccountRow
             title={bookingTitle(row)}
+            href={bookingHref(row.ref)}
             sub={bookingSub(row) || undefined}
-            tag={<Tag tone="quiet">{bookingTag(row)}</Tag>}
+            tag={tag ? <Tag tone="quiet">{tag}</Tag> : undefined}
             actions={
                 move || cancel ? (
                     <>
@@ -358,9 +397,11 @@ function TreatmentCard({
                         title={words.title}
                         sub={words.sub || undefined}
                         tag={
-                            <Tag tone={words.today ? "accent" : "quiet"}>
-                                {words.tag}
-                            </Tag>
+                            words.tag ? (
+                                <Tag tone={words.today ? "accent" : "quiet"}>
+                                    {words.tag}
+                                </Tag>
+                            ) : undefined
                         }
                         actions={
                             treatment.bookNext === visit.number ? (
