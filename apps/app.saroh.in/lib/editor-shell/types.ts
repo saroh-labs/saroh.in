@@ -111,4 +111,12 @@ export interface EditorCopy {
 export interface EditorProblem {
     field: string;
     message: string;
+    /**
+     * What to say instead, as a plain note beside the field, while the
+     * problem is one a published record was opened with and nobody has
+     * acted on yet: the rule is newer than the record, so it is not the
+     * person's mistake ("This plan has no GST rate yet. Choose one before
+     * you publish again."). A problem without one is said at once.
+     */
+    note?: string;
 }

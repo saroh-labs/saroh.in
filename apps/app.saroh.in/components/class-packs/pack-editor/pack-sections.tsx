@@ -50,6 +50,8 @@ interface Edit {
     errors: Partial<Record<string, string>>;
 }
 
+const NO_NOTES: Partial<Record<string, string>> = {};
+
 /** Name, a description, and what the credits are for (locked once sold). */
 export function Details({
     values,
@@ -160,7 +162,13 @@ export function CreditsAndPrice({
     services,
     gst = NOT_ASKED,
     disabled = false,
+    notes = NO_NOTES,
+    leave,
 }: Edit & {
+    /** The shell's notes: a problem the pack was opened with, said plainly. */
+    notes?: Partial<Record<string, string>>;
+    /** Say a field was left, so its problem is said as one from then on. */
+    leave?: (field: string) => void;
     services: PackServiceOption[] | null;
     /** Whether GST is asked, and the business's own way of carrying it. */
     gst?: GstAsk;
@@ -250,8 +258,12 @@ export function CreditsAndPrice({
                                     : {}),
                             })
                         }
-                        // The shell says a problem as soon as it is there.
+                        // The shell says a problem as soon as it is there,
+                        // but for one the pack was opened with: that is a
+                        // note until the field is left or Publish pressed.
                         problem={(field) => errors[field] ?? null}
+                        note={(field) => notes[field]}
+                        leave={leave}
                         asked
                         canEdit={!disabled}
                         businessPriceMode={gst.priceMode}

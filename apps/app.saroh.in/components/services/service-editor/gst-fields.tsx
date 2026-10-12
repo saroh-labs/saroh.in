@@ -3,6 +3,7 @@
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { OptionSelect } from "@saroh/ui/option-select";
+import type { FocusEvent } from "react";
 
 import type { GstForm } from "@/lib/gst/item-words";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
@@ -33,6 +34,25 @@ export interface GstEdit {
     set: (patch: Partial<GstForm>) => void;
     problem: (field: GstField) => string | null | undefined;
     leave?: (field: GstField) => void;
+    /**
+     * A plain note in place of the rate's help line, while a missing rate
+     * is not yet said as a problem (the editor shell's `notes`: a plan or
+     * pack published before the rate was asked for).
+     */
+    note?: (field: GstField) => string | null | undefined;
+}
+
+/**
+ * Whether a blur is the rate box being left. Opening its list moves the
+ * keyboard into the list, which is not leaving the field, and a blur inside
+ * the list reaches here through React though the list is drawn elsewhere.
+ */
+function leftRate(e: FocusEvent<HTMLElement>): boolean {
+    const from = e.target;
+    if (!e.currentTarget.contains(from)) return false;
+    if (from.getAttribute("aria-expanded") === "true") return false;
+    const to = e.relatedTarget;
+    return !(to instanceof Element && to.closest('[role="listbox"]'));
 }
 
 /**
@@ -57,6 +77,7 @@ export function GstFields({
     set,
     problem,
     leave,
+    note,
     asked,
     canEdit,
     businessPriceMode = null,
@@ -70,6 +91,7 @@ export function GstFields({
      */
     businessPriceMode?: GstPriceMode | null;
 }) {
+    const rateNote = note?.("gstRate");
     return (
         <>
             <Field
@@ -78,14 +100,26 @@ export function GstFields({
                 label="GST rate"
                 className="flex-[1_1_200px]"
                 error={problem("gstRate")}
+                // Where a note may stand in for the problem (the editor
+                // shell), tabbing past the box without choosing is leaving
+                // it. The other pages say the rate's problem as they did.
+                onBlur={(e) => {
+                    if (note && leftRate(e)) leave?.("gstRate");
+                }}
                 hint={
-                    asked
-                        ? rateHint(
-                              businessPriceMode,
-                              draft.gstPriceMode,
-                              "The rate the price includes. It isn't added on top.",
-                          )
-                        : "Included in the price, on a GST invoice."
+                    rateNote ? (
+                        // Not an error and not small print: ink, so it is
+                        // read, with no red and no alert.
+                        <span className="text-foreground">{rateNote}</span>
+                    ) : asked ? (
+                        rateHint(
+                            businessPriceMode,
+                            draft.gstPriceMode,
+                            "The rate the price includes. It isn't added on top.",
+                        )
+                    ) : (
+                        "Included in the price, on a GST invoice."
+                    )
                 }
             >
                 <OptionSelect<GstRateValue>

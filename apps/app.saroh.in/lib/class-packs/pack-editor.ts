@@ -1,6 +1,7 @@
 import type { EditorCopy, EditorProblem } from "@/lib/editor-shell/types";
 import type { GstValues } from "@/lib/gst/item-words";
 import {
+    rateMissingNote,
     SAC_SHAPE_PROBLEM,
     sacOk,
     shellProblem,
@@ -288,6 +289,7 @@ export function packProblems(
             out.push({
                 field: "gstRate",
                 message: shellProblem(GST_RATE_NEEDED),
+                note: rateMissingNote("pack"),
             });
         }
         if (!sacOk(values.sacCode)) {

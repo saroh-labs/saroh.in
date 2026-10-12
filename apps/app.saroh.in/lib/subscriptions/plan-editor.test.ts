@@ -396,6 +396,9 @@ describe("a plan's GST (12 Oct 2026)", () => {
             field: "gstRate",
             // The shell ends the sentence itself, as it does "Add the price".
             message: "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
+            // What a published plan opened without one says instead, until
+            // the field is left or Publish is pressed.
+            note: "This plan has no GST rate yet. Choose one before you publish again.",
         });
         expect(planProblems(form({ gstRate: "0" }), asked)).toEqual([]);
         expect(planProblems(form({ gstRate: "18" }), asked)).toEqual([]);
