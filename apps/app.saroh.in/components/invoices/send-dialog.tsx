@@ -6,13 +6,14 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { HeldResult } from "@/components/shared/use-hold";
 import { useHold } from "@/components/shared/use-hold";
-import { issueInvoice } from "@/lib/invoices/actions";
+import { issueInvoice, setInvoiceLineRates } from "@/lib/invoices/actions";
 import { remindWithLink, sendWithLink } from "@/lib/invoices/link-actions";
 import { sendConfirmLine, sendOutcome } from "@/lib/invoices/send";
 import type { InvoiceSend } from "@/lib/invoices/service";
@@ -46,7 +47,7 @@ export function useInvoiceSend({
     start: (reminder: boolean) => void;
     /** A draft: ask once, then issue and send. */
     askDraft: () => void;
-    /** The draft's confirm and the business-details step. Render once. */
+    /** The draft's confirm and the steps it may open. Render once. */
     overlays: ReactNode;
 } {
     const router = useRouter();
@@ -57,6 +58,13 @@ export function useInvoiceSend({
     const details = useBusinessDetailsStep({
         then: "send it",
         continueLabel: "Save and send",
+    });
+    // A draft's line with no GST rate on a tax invoice: each is chosen
+    // here and saved to the draft, then it is issued and sent.
+    const rates = useGstRateStep({
+        then: "issue and send this invoice",
+        continueLabel: "Save and send",
+        saveLines: (chosen) => setInvoiceLineRates(invoice.id, chosen),
     });
 
     /** Send it now; what was said comes back for whoever asked. */
@@ -98,7 +106,10 @@ export function useInvoiceSend({
     }
 
     async function issueAndSend(): Promise<ConfirmResult> {
-        const issued = await details.run(() => issueInvoice(invoice.id));
+        const issued = await rates.run(() =>
+            details.run(() => issueInvoice(invoice.id)),
+        );
+        // A sheet was closed without saving: still a draft, nothing sent.
         if (!issued) return true;
         if (!issued.ok) return { ok: false, error: issued.error };
         const number = issued.data.number ?? invoice.number;
@@ -128,6 +139,7 @@ export function useInvoiceSend({
                 />
             ) : null}
             {details.step}
+            {rates.step}
         </>
     );
 

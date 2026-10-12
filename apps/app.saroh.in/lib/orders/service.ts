@@ -1,3 +1,4 @@
+import type { ApiFailure } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch } from "@/lib/api/http";
 import type { PaymentMethod } from "@/lib/invoices/service";
@@ -32,9 +33,12 @@ export interface UpdateOrderInput {
     refundAmount?: string;
 }
 
-export type OrderResult =
-    | { ok: true; data: { id: string } }
-    | { ok: false; error: string; field?: string };
+/**
+ * A refusal keeps what `toFailure` read off it: the field it is about, and
+ * the items with no GST rate when recording a payment was refused for one
+ * (`use-gst-rate-step.tsx`).
+ */
+export type OrderResult = { ok: true; data: { id: string } } | ApiFailure;
 
 async function mutate(
     path: string,

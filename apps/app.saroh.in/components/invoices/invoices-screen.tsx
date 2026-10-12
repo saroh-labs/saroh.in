@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
 import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
 import { INVOICE_GRID, InvoiceRow } from "@/components/invoices/invoice-row";
 import { ScopeNotice, SourceFilter } from "@/components/invoices/source-filter";
@@ -21,6 +22,7 @@ import {
 } from "@/components/shared/list-toolbar";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { formatMoneyMajor } from "@/lib/format/money";
+import type { MissingRates } from "@/lib/gst-rates/missing";
 import { invoicesHref } from "@/lib/invoices/links";
 import { exemptNote } from "@/lib/invoices/paper-title";
 import type { Invoice } from "@/lib/invoices/service";
@@ -84,7 +86,14 @@ export function InvoicesScreen({
     paidSince = null,
     paidSinceInvoices = null,
     timeZone,
+    missingRates = null,
 }: {
+    /**
+     * What is on sale with a price and no GST rate, for a GST-registered
+     * business: a tax invoice for one shows no GST. Null when it couldn't
+     * be told, which draws nothing.
+     */
+    missingRates?: MissingRates | null;
     /**
      * The business's zone, which the invoice's dates are written in
      * (#836), as on the paper the customer gets. Absent, the viewer's.
@@ -215,6 +224,7 @@ export function InvoicesScreen({
                           : " Not GST-registered. No tax is charged."
                       : null}
             </p>
+            <MissingRatesNotice missing={missingRates} className="mb-3" />
 
             {/* The one list toolbar, in one row: an invoice's standing and
                 what it was for are its two dropdown filters. */}

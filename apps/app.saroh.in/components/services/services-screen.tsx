@@ -9,12 +9,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { PlanWay } from "@/components/billing/plan-way";
+import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
 import { AlsoSell } from "@/components/services/also-sell";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { isPlanHref } from "@/lib/billing/plan-access";
 import { formatMoney } from "@/lib/format/money";
+import type { MissingRates } from "@/lib/gst-rates/missing";
 import type { ModuleView } from "@/lib/modules/schema";
 import { updateService } from "@/lib/services/actions";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
@@ -54,7 +56,13 @@ export function ServicesScreen({
     payment = null,
     alsoSell,
     modules = [],
+    missingRates = null,
 }: {
+    /**
+     * What is on sale with a price and no GST rate, for a GST-registered
+     * business; null when it couldn't be told, which draws nothing.
+     */
+    missingRates?: MissingRates | null;
     services: Service[];
     /** Null when the staff read failed. */
     staff: StaffView[] | null;
@@ -131,6 +139,9 @@ export function ServicesScreen({
                     Your role can see these services but not change them.
                 </ReadOnlyNote>
             )}
+            {/* Priced things on sale with no GST rate, for a registered
+                business: one line, and the sheet to choose them in. */}
+            <MissingRatesNotice missing={missingRates} className="mb-3" />
             {services.length === 0 ? (
                 <EmptyState
                     icon={<CalendarClock />}

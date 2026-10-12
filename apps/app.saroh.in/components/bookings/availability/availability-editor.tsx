@@ -26,14 +26,16 @@ import type { LocalDate } from "@/lib/services/diary";
 import {
     addClosure,
     addExtraHours,
+    addMyself,
     addTimeOff,
     removeClosures,
     removeExtraHours,
     removeTimeOffMany,
     replaceStaffHours,
-    updateBookingRules,
+    updateStaff,
 } from "@/lib/staff/actions";
 import type { TimeOffInput } from "@/lib/staff/service";
+import { hasOpening, weekLines } from "@/lib/staff/starting-week";
 import type { OffLine } from "@/lib/staff/time-off";
 import type {
     BookingBrief,
@@ -44,13 +46,13 @@ import type {
     WeeklyRange,
 } from "@/lib/staff/types";
 import { EmptyState } from "@saroh/ui/data-state";
-import { Users } from "lucide-react";
 
 import { ChipGroup } from "@/components/shared/choice-group";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "./add-person-dialog";
+import { BookablePreview } from "./bookable-preview";
 import { BookingRulesCard } from "./booking-rules-card";
 import { OffRow, TimeOffCard } from "./time-off-card";
 import { WeeklyHours } from "./weekly-hours";
@@ -93,23 +95,24 @@ function rangeOfLine(line: OffLine, closed: boolean): TimeOffInput {
 
 const card = "rounded-[12px] border border-border bg-card px-4 py-[13px]";
 
-/** Only the booking rules changed: no hours, time off or extra hours. */
-function rulesOnly(ops: readonly SaveOp[]): boolean {
-    return ops.length > 0 && ops.every((op) => op.kind === "rules");
+/**
+ * The save bar's line: what saving will do. Only hours, time off and extra
+ * hours wait for Save now; a booking rule saves in its own sheet.
+ */
+export function unsavedText(): string {
+    return "Unsaved. New free times show on the calendar and the booking page when you save. Bookings already made don't move.";
 }
 
-/** The save bar's line: what saving will do. */
-export function unsavedText(ops: readonly SaveOp[]): string {
-    return rulesOnly(ops)
-        ? "Unsaved. New bookings follow the rules when you save. Bookings already made keep theirs."
-        : "Unsaved. New free times show on the calendar and the booking page when you save. Bookings already made don't move.";
+/** The toast once the page's draft is saved. */
+export function savedText(): string {
+    return "Saved. The calendar and booking page use them now.";
 }
 
-/** The toast once saved: never "Hours saved" for a rule (UX-022). */
-export function savedText(ops: readonly SaveOp[]): string {
-    return rulesOnly(ops)
-        ? "Booking rules saved. New bookings follow them now."
-        : "Saved. The calendar and booking page use them now.";
+/** "It's just me", once they are on the diary: which week they started with. */
+export function joinedText(week: "opening" | "default"): string {
+    return week === "opening"
+        ? "You're on the diary with your opening hours."
+        : "You're on the diary with a starting week.";
 }
 
 /** Settings › Hours, where the business's opening hours are kept. */
@@ -117,18 +120,29 @@ const HOURS = "/settings/organization?section=hours";
 const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
 
 /**
- * Bookings › Availability (U16, the design's `?view=avail`): when each person
- * can be booked. Weekly hours, time off, one-off extra hours and the
- * business's booking rules are a draft until "Save"; saving writes
- * what changed, and Undo puts it all back. Hours never move a booking — the
- * ones left outside are listed and kept. The booking rules show with nobody
- * on the diary too (UX-022): a solo owner sets how people pay and cancel.
+ * Bookings › Availability (U16, the design's `?view=avail`): when people
+ * can book. Each person's weekly hours, time off and one-off extra hours
+ * are a draft until "Save"; saving writes what changed, and Undo puts it
+ * all back. Hours never move a booking: the ones left outside are listed
+ * and kept. Beside the week, "What customers see" shows the times the
+ * booking page offers. Under it, the business's booking rules are
+ * sentences in rows, each changed in its own sheet, so a rule never
+ * raises the page's unsaved bar.
+ *
+ * With nobody on the diary the screen still answers the question: "It's
+ * just me" puts the signed-in person on it in one press with the opening
+ * hours as their week, "Add my team" opens the add-person dialog, and
+ * under them is the week customers can book today, from each service's
+ * own hours. The booking rules show there too (UX-022).
  */
 export function AvailabilityEditor({
     staff,
     closures,
     openingHours,
     rules,
+    serviceHours = null,
+    services = [],
+    seatNote = null,
     timezone,
     today,
     kept,
@@ -142,7 +156,18 @@ export function AvailabilityEditor({
     closures: Closure[];
     /** When the business is open (DEC-087, DEC-096), or null with no hours saved. */
     openingHours: WeeklyRange[] | null;
-    rules: BookingRules;
+    /** The saved booking rules, or null when they couldn't be read. */
+    rules: BookingRules | null;
+    /**
+     * With nobody on the diary: the services' own weekly hours together,
+     * as the calendar's "Service hours" column reads them; null when no
+     * service on the booking page has hours.
+     */
+    serviceHours?: WeeklyRange[] | null;
+    /** The services the booking page offers, for "What customers see". */
+    services?: { id: string; name: string }[];
+    /** Said in the add-person dialog only when the plan counts seats. */
+    seatNote?: string | null;
     timezone: string;
     today: LocalDate;
     /** This week's live bookings by person, or null when unread. */
@@ -164,10 +189,11 @@ export function AvailabilityEditor({
     const [draft, setDraft] = useState<AvailabilityDraft | null>(null);
     const [saving, setSaving] = useState(false);
     const [adding, setAdding] = useState(false);
+    const [joining, setJoining] = useState(false);
 
-    const base = draftFrom(staff, rules);
+    const base = draftFrom(staff);
     const d = draft ?? base;
-    const ops = saveOps(staff, rules, d, closures, timezone);
+    const ops = saveOps(staff, d, closures, timezone);
     const dirty = ops.length > 0;
     const me = people.find((p) => p.id === who) ?? people.at(0);
     const edit = (fn: (x: AvailabilityDraft) => void) => {
@@ -207,12 +233,10 @@ export function AvailabilityEditor({
                             ? await removeTimeOffMany(op.staffId, op.before.ids)
                             : op.kind === "removeClosure"
                               ? await removeClosures(op.before.ids)
-                              : op.kind === "removeExtra"
-                                ? await removeExtraHours(
-                                      op.staffId,
-                                      op.before.id,
-                                  )
-                                : await updateBookingRules(op.rules),
+                              : await removeExtraHours(
+                                    op.staffId,
+                                    op.before.id,
+                                ),
                 // Said below, with what did save.
                 { quiet: true },
             );
@@ -254,7 +278,7 @@ export function AvailabilityEditor({
             return;
         }
         setDraft(null);
-        showUndo(savedText(ops), async () => {
+        showUndo(savedText(), async () => {
             await undo(done);
             router.refresh();
         });
@@ -293,13 +317,11 @@ export function AvailabilityEditor({
                                 ...rangeOfLine(op.before, true),
                                 fromDate: op.before.fromDate,
                             })
-                          : op.kind === "removeExtra"
-                            ? await addExtraHours(op.staffId, {
-                                  date: op.before.date.slice(0, 10),
-                                  startMinute: op.before.startMinute,
-                                  endMinute: op.before.endMinute,
-                              })
-                            : await updateBookingRules(op.before);
+                          : await addExtraHours(op.staffId, {
+                                date: op.before.date.slice(0, 10),
+                                startMinute: op.before.startMinute,
+                                endMinute: op.before.endMinute,
+                            });
             if (res && !res.ok) {
                 showError(res.error, "Undo stopped part of the way.");
                 return;
@@ -307,11 +329,42 @@ export function AvailabilityEditor({
         }
     }
 
-    // Hours, time off and rules wait for "Save": a way off the
-    // page asks first.
+    /**
+     * "It's just me": the signed-in person goes on the diary with the
+     * opening hours as their week, and lands on it here. Undo takes them
+     * off again (archived, as the API has no other way off the diary).
+     */
+    async function justMe() {
+        const res = await runAction(() => addMyself(), {
+            setBusy: setJoining,
+        });
+        if (!res) return;
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        const { staff: mine, week } = res.data;
+        setWho(mine.id);
+        router.refresh();
+        showUndo(
+            joinedText(week),
+            async () => {
+                const back = await updateStaff(mine.id, {
+                    status: "ARCHIVED",
+                });
+                if (!back.ok) return back;
+                router.refresh();
+                return { ok: true };
+            },
+            { description: "Your week is below. Change it any time." },
+        );
+    }
+
+    // Hours, time off and extra hours wait for "Save": a way off the page
+    // asks first. A booking rule saves in its own sheet.
     const guard = useLeaveGuard({
         dirty: canEdit && dirty && !saving,
-        lost: "Your changes to hours, time off or booking rules aren't saved, and will be lost.",
+        lost: "Your changes to hours or time off aren't saved, and will be lost.",
     });
 
     const saveBar = dirty ? (
@@ -320,7 +373,7 @@ export function AvailabilityEditor({
                 role="status"
                 className="flex-[1_1_240px] text-[12.5px] text-foreground"
             >
-                {unsavedText(ops)}
+                {unsavedText()}
             </span>
             <Button
                 variant="outline"
@@ -339,10 +392,27 @@ export function AvailabilityEditor({
         </div>
     ) : null;
 
+    const dialog = (
+        <AddPersonDialog
+            open={adding}
+            onOpenChange={setAdding}
+            onAdded={(id) => setWho(id)}
+            week={hasOpening(openingHours) ? "opening" : "default"}
+            seatNote={seatNote}
+        />
+    );
+    const rulesCard = (
+        <BookingRulesCard
+            rules={rules}
+            canEdit={canEdit}
+            onlineBlocker={onlineBlocker}
+        />
+    );
+
     if (!me) {
-        // Nobody on the diary yet — a solo owner whose services keep their
-        // own hours. The business's booking rules still apply to every
-        // booking, so they are here all the same (UX-022).
+        // Nobody on the diary yet: most often a solo owner, whose services
+        // keep their own hours until they put themselves on it.
+        const week = serviceHours?.length ? weekLines(serviceHours) : null;
         return (
             <>
                 <PageHeader
@@ -355,41 +425,92 @@ export function AvailabilityEditor({
                         Your role can see these rules but not change them.
                     </ReadOnlyNote>
                 )}
-                <div className="flex flex-wrap items-start gap-4">
-                    <div className="min-w-0 flex-[3_1_320px]">
-                        <EmptyState
-                            icon={<Users />}
-                            title="No one takes bookings yet"
-                            description={
-                                canEdit
-                                    ? "Add the people who can be booked, and until then customers book each service in its own weekly hours."
-                                    : "Until someone is added, customers book each service in its own weekly hours."
-                            }
-                            action={
-                                canEdit ? (
-                                    <Button onClick={() => setAdding(true)}>
-                                        Add someone
-                                    </Button>
-                                ) : undefined
-                            }
-                        />
-                        <AddPersonDialog
-                            open={adding}
-                            onOpenChange={setAdding}
-                            onAdded={(id) => setWho(id)}
-                        />
-                    </div>
-                    <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3">
-                        <BookingRulesCard
-                            rules={d.rules}
-                            canEdit={canEdit}
-                            onlineBlocker={onlineBlocker}
-                            onChange={(fn) => edit((x) => fn(x.rules))}
-                        />
-                    </div>
+                <div className="grid max-w-[760px] gap-5">
+                    <section
+                        aria-labelledby="availability-start"
+                        className="rounded-[12px] border border-border bg-card px-4 py-4 sm:px-5"
+                    >
+                        <h2
+                            id="availability-start"
+                            className="font-display text-[17px] font-semibold tracking-[-0.02em]"
+                        >
+                            When can people book you?
+                        </h2>
+                        <p className="mt-1 max-w-[56ch] text-pretty text-[13px] text-muted-foreground">
+                            {!canEdit
+                                ? "Nobody is on the diary yet."
+                                : hasOpening(openingHours)
+                                  ? "Put yourself on the diary with your opening hours, or add your team."
+                                  : "Put yourself on the diary with a starting week, or add your team."}
+                        </p>
+                        {canEdit ? (
+                            <div className="mt-3.5 flex flex-col gap-2 sm:flex-row">
+                                <Button
+                                    onClick={() => void justMe()}
+                                    busy={joining}
+                                    busyLabel="Adding you…"
+                                >
+                                    It&apos;s just me
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    disabled={joining}
+                                    onClick={() => setAdding(true)}
+                                >
+                                    Add my team
+                                </Button>
+                            </div>
+                        ) : null}
+                        <div className="mt-4 border-t border-border pt-3.5">
+                            <h3 className="text-[13px] font-semibold">
+                                What customers can book now
+                            </h3>
+                            {week ? (
+                                <>
+                                    <p className="mt-0.5 text-pretty text-[12.5px] text-muted-foreground">
+                                        With nobody on the diary, each service
+                                        is booked in its own hours. Together
+                                        they cover:
+                                    </p>
+                                    <dl
+                                        data-testid="bookable-week"
+                                        className="mt-2 grid gap-y-1 text-[13px] tabular-nums"
+                                    >
+                                        {week.map((line) => (
+                                            <div
+                                                key={line.days}
+                                                className="flex flex-wrap gap-x-3"
+                                            >
+                                                <dt className="w-[11rem] shrink-0 font-medium">
+                                                    {line.days}
+                                                </dt>
+                                                <dd
+                                                    className={cn(
+                                                        "min-w-0",
+                                                        !line.hours &&
+                                                            "text-muted-foreground",
+                                                    )}
+                                                >
+                                                    {line.hours ??
+                                                        "Not bookable"}
+                                                </dd>
+                                            </div>
+                                        ))}
+                                    </dl>
+                                </>
+                            ) : (
+                                <EmptyState
+                                    size="inline"
+                                    className="mt-0.5"
+                                    title="Nothing yet"
+                                    description="No service on your booking page has hours."
+                                />
+                            )}
+                        </div>
+                    </section>
+                    {rulesCard}
                 </div>
-                {saveBar}
-                {guard.dialog}
+                {dialog}
             </>
         );
     }
@@ -459,6 +580,7 @@ export function AvailabilityEditor({
 
             <div className="flex flex-wrap items-start gap-4">
                 <WeeklyHours
+                    key={me.id}
                     staffId={me.id}
                     hours={hours}
                     opening={openingHours}
@@ -471,6 +593,23 @@ export function AvailabilityEditor({
                     }
                 />
                 <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3">
+                    <BookablePreview
+                        key={me.id}
+                        person={me}
+                        services={services.filter((x) =>
+                            me.serviceIds.includes(x.id),
+                        )}
+                        today={today}
+                        timezone={timezone}
+                        stamp={JSON.stringify([
+                            me.hours,
+                            me.extraHours,
+                            me.timeOff,
+                            closures,
+                            rules,
+                        ])}
+                        dirty={dirty}
+                    />
                     <TimeOffCard
                         key={me.id}
                         me={me}
@@ -548,22 +687,15 @@ export function AvailabilityEditor({
                             />
                         ) : null}
                     </section>
-
-                    <BookingRulesCard
-                        rules={d.rules}
-                        canEdit={canEdit}
-                        onlineBlocker={onlineBlocker}
-                        onChange={(fn) => edit((x) => fn(x.rules))}
-                    />
                 </div>
             </div>
 
+            {/* Under the week, not beside it: rules are set once and read
+                often, and they aren't availability. */}
+            <div className="mt-6 max-w-[760px]">{rulesCard}</div>
             {saveBar}
-            <AddPersonDialog
-                open={adding}
-                onOpenChange={setAdding}
-                onAdded={(id) => setWho(id)}
-            />
+            {dialog}
+            {guard.dialog}
         </>
     );
 }

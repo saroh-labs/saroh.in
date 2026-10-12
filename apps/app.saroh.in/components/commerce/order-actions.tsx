@@ -10,6 +10,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { PaymentMethod } from "@/lib/invoices/service";
@@ -24,6 +25,10 @@ import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
 
 import { IconButton } from "@saroh/ui/icon-button";
 import { RecordPaidDialog } from "./record-paid-dialog";
+
+/** Said where recording a payment stopped at the GST rate ask. */
+const RATE_NOT_CHOSEN =
+    "Not recorded. Choose the GST rate to record this payment.";
 
 type Pending =
     | { kind: "cancel" }
@@ -85,6 +90,10 @@ export function OrderActions({
 }) {
     const router = useRouter();
     const setPending = onPendingChange;
+    const rates = useGstRateStep({
+        then: "record this payment",
+        continueLabel: "Save and record payment",
+    });
     // Recording a payment by hand is for money that moved outside Saroh —
     // cash, a bank transfer. A card refund goes through Refund instead, which
     // actually sends the money back. Each move is offered only to someone
@@ -100,24 +109,31 @@ export function OrderActions({
         how?: PaymentMethod,
         amount?: string,
     ): Promise<{ ok: true } | { ok: false; error: string }> {
-        const res = await updateOrder(
-            storeId,
-            orderId,
-            p.kind === "payment"
-                ? {
-                      paymentStatus: p.to,
-                      ...(how
-                          ? p.to === "REFUNDED"
-                              ? { refundedHow: how }
-                              : { paidHow: how }
-                          : {}),
-                      // Another amount handed back (#865).
-                      ...(p.to === "REFUNDED" && amount
-                          ? { refundAmount: amount }
-                          : {}),
-                  }
-                : { status: "CANCELLED" },
+        // Recorded as paid with an item that has no GST rate: the rate is
+        // chosen here and saved to the item, then it is recorded as asked.
+        const res = await rates.run(() =>
+            updateOrder(
+                storeId,
+                orderId,
+                p.kind === "payment"
+                    ? {
+                          paymentStatus: p.to,
+                          ...(how
+                              ? p.to === "REFUNDED"
+                                  ? { refundedHow: how }
+                                  : { paidHow: how }
+                              : {}),
+                          // Another amount handed back (#865).
+                          ...(p.to === "REFUNDED" && amount
+                              ? { refundAmount: amount }
+                              : {}),
+                      }
+                    : { status: "CANCELLED" },
+            ),
         );
+        // The rate wasn't chosen: nothing was recorded, and the dialog
+        // that asked stays open with what was picked.
+        if (!res) return { ok: false, error: RATE_NOT_CHOSEN };
         if (!res.ok) return { ok: false, error: res.error };
         // In part, the order stays paid: the toast says how much went back.
         const part =
@@ -200,6 +216,7 @@ export function OrderActions({
                     }}
                 />
             ) : null}
+            {rates.step}
             {confirm ? (
                 <ConfirmDialog
                     open

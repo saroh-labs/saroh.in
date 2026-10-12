@@ -131,3 +131,50 @@ export interface BookingBrief {
     serviceName: string;
     bookerName: string | null;
 }
+
+/** A start a customer is offered on the booking page. */
+export interface OfferedStart {
+    startAt: string;
+    endAt: string;
+    staffId: string | null;
+    staffName: string | null;
+    /** A class's places left; null for a one-to-one. */
+    placesLeft: number | null;
+}
+
+/** One local day of the booking page's two weeks. */
+export interface OfferedDay {
+    /** `YYYY-MM-DD` in the business's zone. */
+    date: string;
+    /** The hours alone would offer a start that day. */
+    open: boolean;
+    /** The business itself is closed that day. */
+    closed: boolean;
+    starts: OfferedStart[];
+}
+
+/**
+ * The booking page's next two weeks for one service, as the public API
+ * answers them (`GET public/services/:id/days`): the read the booking page
+ * itself draws from, so the preview on Availability can't disagree with it.
+ */
+export interface OfferedDays {
+    timezone: string;
+    kind: "one" | "class";
+    days: OfferedDay[];
+}
+
+/**
+ * The preview's read: the days, or why not. `off` is a service the booking
+ * page doesn't offer now (hidden from it, paused, or bookings switched
+ * off); `failed` is a read that didn't arrive.
+ */
+export type OfferedRead =
+    { ok: true; data: OfferedDays } | { ok: false; why: "off" | "failed" };
+
+/** "It's just me": who went on the diary, and the week they started with. */
+export interface AddedSelf {
+    staff: StaffView;
+    /** Their week came from the opening hours, or the default week. */
+    week: "opening" | "default";
+}

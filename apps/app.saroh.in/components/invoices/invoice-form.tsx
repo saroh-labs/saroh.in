@@ -31,7 +31,7 @@ import {
 } from "@/components/shared/use-leave-guard";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
-import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
+import { PAGE_FORM, toFirstError, toFirstErrorIn } from "@/lib/hooks/page-form";
 import {
     createInvoice,
     issueInvoice,
@@ -45,6 +45,7 @@ import {
     isHsnSac,
     rateOption,
 } from "@/lib/invoices/gst";
+import { LINE_RATE_NEEDED, linesMissingRate } from "@/lib/invoices/line-rates";
 import { newPayLink } from "@/lib/invoices/link-actions";
 import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
@@ -310,6 +311,22 @@ export function InvoiceForm({
 
     async function onSubmit(values: FormValues, want: "issue" | "draft") {
         setIntent(want);
+        // A tax invoice's lines each need their rate before it is issued
+        // (12 Oct 2026): said on the line, before anything is saved. A
+        // draft is kept without them.
+        const unrated =
+            want === "issue" ? linesMissingRate(values.lines, registered) : [];
+        if (unrated.length > 0) {
+            for (const place of unrated) {
+                form.setError(`lines.${place}.gstRate`, {
+                    type: "gst-rate",
+                    message: LINE_RATE_NEEDED,
+                });
+            }
+            // The page holds one form: the first line marked is its own.
+            toFirstErrorIn(null);
+            return;
+        }
         // Missing details are asked for at once, before the save (#838):
         // asked after it, the sheet waited on a save, a refusal and a read.
         // Closed without saving, the draft is still kept, as below.
@@ -681,6 +698,11 @@ export function InvoiceForm({
                                                             disabled={
                                                                 isSubmitting
                                                             }
+                                                            aria-invalid={
+                                                                lineErr?.gstRate
+                                                                    ? true
+                                                                    : undefined
+                                                            }
                                                         />
                                                     )}
                                                 />
@@ -706,6 +728,7 @@ export function InvoiceForm({
                                                     lineErr.quantity?.message ??
                                                     lineErr.unitPrice
                                                         ?.message ??
+                                                    lineErr.gstRate?.message ??
                                                     lineErr.hsnSac?.message}
                                             </p>
                                         ) : null}
@@ -733,8 +756,9 @@ export function InvoiceForm({
                         </Button>
                         {registered ? (
                             <p className="mt-1 text-[12px] text-muted-foreground">
-                                Prices include GST. A line with no rate set is
-                                charged no GST.
+                                Prices include GST. Each line needs its rate
+                                before the invoice is issued: choose 0% for
+                                anything exempt or nil-rated.
                             </p>
                         ) : null}
                     </Card>

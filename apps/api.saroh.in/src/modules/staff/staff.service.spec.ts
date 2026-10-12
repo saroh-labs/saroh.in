@@ -445,6 +445,126 @@ describe("StaffService — who a person is", () => {
     });
 });
 
+describe("StaffService — It's just me", () => {
+    const WEEK = [{ dayOfWeek: 1, startMinute: 540, endMinute: 1080 }];
+    const me = (staffMember: unknown) => ({
+        id: "m_me",
+        user: { name: " Mohit Mehta ", email: "mohit@example.com" },
+        staffMember,
+    });
+
+    it("puts the caller on the diary as their own membership, with the week sent", async () => {
+        db.membership!.findFirst!.mockResolvedValue(me(null));
+        // The seat read: an Owner already uses a seat.
+        db.membership!.findMany!.mockResolvedValue([
+            { id: "m_me", role: "OWNER", extraActions: [] },
+        ]);
+        db.service!.count!.mockResolvedValue(1);
+        db.staffMember!.create!.mockResolvedValue({ id: "staff_1" });
+        await service.addSelf(ctx({ role: "OWNER" }), {
+            hours: WEEK,
+            serviceIds: ["svc_1"],
+        });
+        // Whose membership is read from the session, never sent.
+        expect(db.membership!.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", userId: "user_1" },
+            }),
+        );
+        expect(db.staffMember!.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    name: "Mohit Mehta",
+                    membershipId: "m_me",
+                }),
+            }),
+        );
+        expect(db.staffHours!.createMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({ staffId: "staff_1", ...WEEK[0] })],
+        });
+    });
+
+    it("adds no team seat for someone who already uses one (DEC-105)", async () => {
+        const roles = [{ key: "x", actions: [] }];
+        const members = [{ id: "m_me", role: "OWNER", extraActions: [] }];
+        const { diarySeatDelta } = jest.requireActual("./staff-seats");
+        expect(
+            diarySeatDelta(
+                null,
+                { status: "ACTIVE", membershipId: "m_me" },
+                members,
+                roles,
+            ),
+        ).toBe(0);
+    });
+
+    it("names them from their email when they have no name", async () => {
+        db.membership!.findFirst!.mockResolvedValue({
+            ...me(null),
+            user: { name: null, email: "asha@example.com" },
+        });
+        db.staffMember!.create!.mockResolvedValue({ id: "staff_1" });
+        await service.addSelf(ctx(), {});
+        expect(db.staffMember!.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ name: "asha" }),
+            }),
+        );
+    });
+
+    it("brings back someone archived, with the week only if they had none", async () => {
+        db.membership!.findFirst!.mockResolvedValue(
+            me({
+                id: "staff_1",
+                status: "ARCHIVED",
+                _count: { hours: 0, services: 2 },
+            }),
+        );
+        db.staffMember!.findFirst!.mockResolvedValue({
+            ...ROW,
+            status: "ARCHIVED",
+            membershipId: "m_me",
+        });
+        db.staffMember!.update!.mockResolvedValue({ id: "staff_1" });
+        await service.addSelf(ctx(), { hours: WEEK, serviceIds: ["svc_9"] });
+        expect(db.staffMember!.create).not.toHaveBeenCalled();
+        expect(db.staffMember!.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: "ACTIVE" }),
+            }),
+        );
+        expect(db.staffHours!.createMany).toHaveBeenCalled();
+        // Their services were theirs already: left alone.
+        expect(db.staffService!.createMany).not.toHaveBeenCalled();
+    });
+
+    it("answers someone already on the diary as they are", async () => {
+        db.membership!.findFirst!.mockResolvedValue(
+            me({
+                id: "staff_1",
+                status: "ACTIVE",
+                _count: { hours: 3, services: 1 },
+            }),
+        );
+        const view = await service.addSelf(ctx(), { hours: WEEK });
+        expect(view.id).toBe("staff_1");
+        expect(db.staffMember!.create).not.toHaveBeenCalled();
+        expect(db.staffMember!.update).not.toHaveBeenCalled();
+        expect(db.staffHours!.createMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a Member, and someone who isn't on the team", async () => {
+        await expect(service.addSelf(member, {})).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+        db.membership!.findFirst!.mockResolvedValue(null);
+        await expect(service.addSelf(ctx(), {})).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+        expect(db.staffMember!.create).not.toHaveBeenCalled();
+    });
+});
+
 describe("StaffService — Calendar only sees its own diary (#868)", () => {
     const calendarOnly = ctx({ role: "MEMBER", roleKey: "calendar-only" });
 

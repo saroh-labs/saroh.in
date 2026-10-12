@@ -18,6 +18,7 @@ import {
     mediaFileProblem,
     mediaLimitNote,
     mergeDraft,
+    needsGstRate,
     partitionSections,
     photosFrom,
     photosInput,
@@ -175,6 +176,35 @@ describe("the editor's header and Save all", () => {
         );
         expect(basicsProblem({ ...ok, mrp: "500" }, false)).toBe(
             "MRP can't be lower than the price it sells for.",
+        );
+    });
+
+    it("asks a GST-registered business's priced product for its GST rate, and nobody else", () => {
+        const ok = {
+            name: "Serum",
+            slug: "serum",
+            price: "799",
+            mrp: "",
+            categoryId: "",
+            gstRate: "",
+            hsnCode: "",
+        };
+        // Creating and editing alike.
+        expect(basicsProblem(ok, false, true)).toBe("Choose a GST rate first.");
+        expect(basicsProblem(ok, true, true)).toBe("Choose a GST rate first.");
+        // 0% is an answer: nil-rated or exempt, never "not set".
+        expect(basicsProblem({ ...ok, gstRate: "0" }, false, true)).toBe("");
+        expect(basicsProblem({ ...ok, gstRate: "18" }, false, true)).toBe("");
+        // Not registered, or not known to be: never asked.
+        expect(basicsProblem(ok, false, false)).toBe("");
+        expect(basicsProblem(ok, false)).toBe("");
+        // A free product has no price to include a rate in.
+        expect(needsGstRate({ price: "0", gstRate: "" }, true)).toBe(false);
+        expect(needsGstRate({ price: "", gstRate: "" }, true)).toBe(false);
+        expect(needsGstRate({ price: "799", gstRate: "" }, true)).toBe(true);
+        // The price comes first: one thing at a time.
+        expect(basicsProblem({ ...ok, price: "" }, false, true)).toBe(
+            "Add a price first.",
         );
     });
 });

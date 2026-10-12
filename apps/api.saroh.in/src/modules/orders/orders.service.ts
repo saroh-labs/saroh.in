@@ -678,8 +678,12 @@ export class OrdersService {
                 const byHandCents = await recordPaidByHandInTx(tx, orderId);
                 // How it was paid (#834) is kept on the invoice, the
                 // payment's record (DEC-023); an app before it sends none.
+                // Recorded by someone at the business: an item with no
+                // GST rate chosen is asked for there, not printed on a
+                // tax invoice (`invoices/gst-rate-required.ts`).
                 await ensureOrderInvoice(tx, orderId, {
                     method: dto.paidHow ?? "RECORDED",
+                    refuseUnsetRate: true,
                 });
                 // Insights' orders figure (#867), with the payment.
                 await recordOrderPaidInTx(tx, orderId);

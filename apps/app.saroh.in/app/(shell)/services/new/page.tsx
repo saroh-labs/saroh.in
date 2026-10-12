@@ -32,6 +32,7 @@ export default async function NewServicePage() {
         hasPage,
         hasStorefront,
         payment,
+        gstRegistered,
         canEdit,
         timezone,
         currency,
@@ -57,6 +58,7 @@ export default async function NewServicePage() {
             hasStorefront={hasStorefront}
             paymentsLock={rowLock(access, "payments")}
             payment={payment}
+            gstRegistered={gstRegistered}
         />
     );
 }

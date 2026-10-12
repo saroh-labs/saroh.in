@@ -28,6 +28,7 @@ import {
     changedSections,
     draftOf,
     glance,
+    gstPlace,
     hasBookableHours,
     problemFor,
     savedMessage,
@@ -102,7 +103,15 @@ export function ServiceEditor({
     hasStorefront = null,
     paymentsLock = null,
     payment = null,
+    gstRegistered = null,
 }: {
+    /**
+     * Whether the business is GST-registered: its priced services need a
+     * GST rate, asked beside the price. False: no GST field, and nothing
+     * asked. Null when it couldn't be told: GST stays under More settings
+     * and nothing is asked.
+     */
+    gstRegistered?: boolean | null;
     /** Null while creating. */
     service: Service | null;
     /** Null when the service's own hours couldn't be read. */
@@ -204,13 +213,17 @@ export function ServiceEditor({
         !wasTreatment && (hasStorefront === false || refusedStorefront);
 
     const [tried, setTried] = useState(false);
-    const changed = changedSections(saved, draft);
+    // Where GST is drawn, from what the page opened with: a rate cleared
+    // mid-edit doesn't take its own field away.
+    const [gstAt] = useState(() => gstPlace(gstRegistered, saved));
+    const changed = changedSections(saved, draft, gstAt === "price");
     const dirty = changed.length > 0;
     const problems = serviceFieldProblems(
         draft,
         hasStaff,
         noStorefront,
         people.length === 1,
+        gstRegistered === true,
     );
     const bad = problems.length > 0;
     const problem = (field: ServiceField) =>
@@ -219,7 +232,11 @@ export function ServiceEditor({
         tried || hoursTouched ? problemFor(problems, "hours", row) : null;
     // What is wrong under More settings opens it, so the keyboard can land
     // on it.
-    const inMore = (["timezone", "bufferBefore", "sacCode", "hours"] as const)
+    const inMore = (
+        gstAt === "more"
+            ? (["timezone", "bufferBefore", "sacCode", "hours"] as const)
+            : (["timezone", "bufferBefore", "hours"] as const)
+    )
         .map((field) => problemFor(problems, field))
         .some((message) => message !== null);
     const comingUp = isNew ? 0 : usage ? usage.comingUp : null;
@@ -540,6 +557,8 @@ export function ServiceEditor({
                         savedDeposit={saved.deposit}
                         paymentsLock={paymentsLock}
                         payment={payment}
+                        withGst={gstAt === "price"}
+                        canEdit={canEdit}
                     />
                     <WhoTakesIt
                         draft={draft}
@@ -563,6 +582,7 @@ export function ServiceEditor({
                         serviceId={serviceId}
                         rules={rules}
                         canEdit={canEdit}
+                        withGst={gstAt === "more"}
                         onDelete={() => setConfirmDelete(true)}
                     />
                 </div>

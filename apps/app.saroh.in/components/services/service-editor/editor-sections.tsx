@@ -28,6 +28,7 @@ import { Field, FieldError } from "@saroh/ui/field";
 import { DepositField } from "./deposit-field";
 import type { Edit } from "./fields";
 import { HELP, NumberField, Section } from "./fields";
+import { GstFields } from "./gst-fields";
 import { VisitsField, VisitsStorefrontNote } from "./visits-field";
 import { WhereField } from "./where-field";
 
@@ -178,8 +179,13 @@ export function PriceSection({
     savedDeposit,
     paymentsLock = null,
     payment,
+    withGst = false,
+    canEdit = true,
 }: Edit & {
     currency: string;
+    /** A GST-registered business: the GST rate and SAC code sit here. */
+    withGst?: boolean;
+    canEdit?: boolean;
     /** The deposit the service has saved. */
     savedDeposit?: DepositMode;
     /** The plan's lock on online payments (deposits are taken online). */
@@ -200,19 +206,34 @@ export function PriceSection({
         : null;
     return (
         <Section title="Price">
-            <Field
-                label="Price"
-                className="w-[160px] max-w-full"
-                error={fieldProblem("price")}
-                onBlur={() => leave("price")}
-            >
-                <MoneyInput
-                    id={id}
-                    currency={currency}
-                    value={draft.price}
-                    onValueChange={(price) => set({ price })}
-                />
-            </Field>
+            {/* A GST-registered business answers the rate where the price
+                is (12 Oct 2026): the price includes it, and a priced
+                service can't be saved without one. */}
+            <div className="flex flex-wrap items-start gap-3">
+                <Field
+                    label="Price"
+                    className="w-[160px] max-w-full"
+                    error={fieldProblem("price")}
+                    onBlur={() => leave("price")}
+                >
+                    <MoneyInput
+                        id={id}
+                        currency={currency}
+                        value={draft.price}
+                        onValueChange={(price) => set({ price })}
+                    />
+                </Field>
+                {withGst ? (
+                    <GstFields
+                        draft={draft}
+                        set={set}
+                        problem={fieldProblem}
+                        leave={leave}
+                        asked
+                        canEdit={canEdit}
+                    />
+                ) : null}
+            </div>
             <DepositField
                 deposit={draft.deposit}
                 price={draft.price}

@@ -425,7 +425,14 @@ export async function takeCounterPaymentInTx(
             ...RETIRED_PAY_LINK,
         },
     });
-    await ensureOrderInvoice(tx, orderId, { at, method: kind });
+    // Taken by someone at the counter: a tax invoice with an item whose
+    // GST rate was never chosen is refused, and the app asks for it there
+    // (`invoices/gst-rate-required.ts`).
+    await ensureOrderInvoice(tx, orderId, {
+        at,
+        method: kind,
+        refuseUnsetRate: true,
+    });
     // Insights' orders figure (#867), with the payment.
     await recordOrderPaidInTx(tx, orderId, at);
     if (!organizationId) return;

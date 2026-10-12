@@ -383,7 +383,7 @@ const HELP_SHOTS_B: Shot[] = [
         route: AVAILABILITY,
         viewport: { width: 1280, height: 1400 },
         clip: { selector: 'section[aria-labelledby="booking-rules"]', pad: 12 },
-        mark: '[aria-label="How people pay when they book"]',
+        mark: '[data-rule="bookingPayment"]',
         alt: "Booking rules at Kavi Dental (demo clinic): how far ahead people can book, the latest they can book, free cancellation, refunds and how people pay when they book",
         caption: "Kavi Dental's booking rules, for the whole business",
     },
