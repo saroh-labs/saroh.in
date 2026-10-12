@@ -12,7 +12,11 @@ import {
     MaxLength,
     Min,
     MinLength,
+    ValidateIf,
 } from "class-validator";
+
+import type { GstPriceMode } from "../invoices/gst-price";
+import { GST_PRICE_MODES } from "../invoices/gst-price";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -74,6 +78,34 @@ export class CourseInputDto {
     @IsIn(COURSE_STATUSES)
     status?: CourseStatus;
 
+    /**
+     * GST the price carries, in percent (12 Oct 2026), on a registered
+     * business's tax invoice: "0" is exempt or nil-rated, a choice of its
+     * own. Checked against GST's rates in the service. null clears it.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string | null;
+
+    /** SAC code: four to eight digits. null clears it. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
+    sacCode?: string | null;
+
+    /**
+     * How this course's price carries GST when it differs from the
+     * business's way (`invoices/gst-price.ts`): INCLUDED or ADDED. null is
+     * "same as the business".
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsIn(GST_PRICE_MODES, {
+        message: "Choose whether this price includes GST or GST is added.",
+    })
+    gstPriceMode?: GstPriceMode | null;
+
     /** Session start times, on create only; each runs the service's length. */
     @IsOptional()
     @IsArray()
@@ -101,7 +133,11 @@ export class EnrolDto {
     @IsString()
     contactId!: string;
 
-    /** What they pay, when not the course's price — a late start, say. */
+    /**
+     * The price for them, when not the course's (a late start, say). A
+     * typed price like the course's own: where the business adds GST to its
+     * prices, GST is added to this one too (`invoices/sale-price.ts`).
+     */
     @IsOptional()
     @Transform(trim)
     @Matches(MONEY, { message: "A price has at most two decimal places" })

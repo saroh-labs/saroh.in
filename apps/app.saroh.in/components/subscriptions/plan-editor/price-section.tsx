@@ -3,6 +3,7 @@
 import { Field, FieldError } from "@saroh/ui/field";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
+import { Notice } from "@saroh/ui/notice";
 import { useId, useState } from "react";
 
 import type { EditorFields } from "@/components/editor-shell/editor-shell";
@@ -11,7 +12,11 @@ import {
     LABEL,
     Section,
 } from "@/components/services/service-editor/fields";
+import { GstFields } from "@/components/services/service-editor/gst-fields";
 import { Chip } from "@/components/shared/chip";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { NOT_ASKED } from "@/lib/gst/item-words";
+import { rateBps } from "@/lib/gst/price-mode";
 import type { AutopayLimit } from "@/lib/subscriptions/plan-drafts";
 import type { PlanForm } from "@/lib/subscriptions/plan-editor";
 import {
@@ -21,6 +26,11 @@ import {
     MAIN_INTERVALS,
     MORE_INTERVALS,
 } from "@/lib/subscriptions/plan-editor";
+import type { RenewalChange } from "@/lib/subscriptions/renewal-change";
+import {
+    renewalAmountChanges,
+    renewalChangeLines,
+} from "@/lib/subscriptions/renewal-change";
 
 export const CHIP = "";
 
@@ -31,13 +41,26 @@ export const CHIP = "";
  * so only when the business offers it (D14). A price above what the
  * autopay of members switching to the plan covers warns that they will need
  * to authorise again (D13).
+ *
+ * A GST-registered business answers the GST rate beside the price (12 Oct
+ * 2026), as on a service: required for a priced plan, with 0% for an
+ * exempt one, the plan's own way of carrying GST and an optional SAC code.
+ * A business that isn't registered is shown none of it. What publishing the
+ * GST does to the next renewal of the members already on the plan is said
+ * under the fields, before Publish (`renewal`, the API's sums).
  */
 export function PriceSection({
     fields,
     currency,
     autopayOffered = false,
     autopayLimits,
+    gst = NOT_ASKED,
+    renewal = null,
 }: {
+    /** Whether GST is asked, and the business's own way of carrying it. */
+    gst?: GstAsk;
+    /** What publishing the GST shown does to members' next renewal. */
+    renewal?: RenewalChange | null;
     fields: EditorFields<PlanForm>;
     /** The plan's currency, or the business's for a new one. */
     currency: string;
@@ -46,7 +69,7 @@ export function PriceSection({
     /** What switchers' autopay covers (D13), from the plan's read. */
     autopayLimits?: readonly AutopayLimit[];
 }) {
-    const { values, set, errors } = fields;
+    const { values, set, errors, disabled } = fields;
     const ids = {
         price: useId(),
         priceErr: useId(),
@@ -59,7 +82,17 @@ export function PriceSection({
         ? [...MAIN_INTERVALS, ...MORE_INTERVALS]
         : MAIN_INTERVALS;
     const note = everyNote({ ...values, currency }, autopayOffered);
-    const limitWarning = autopayLimitWarning(values, autopayLimits, currency);
+    const limitWarning = autopayLimitWarning(
+        values,
+        autopayLimits,
+        currency,
+        gst,
+    );
+    const renewalLines = gst.asked
+        ? renewalChangeLines(renewal, {
+              gstInside: (rateBps(values.gstRate) ?? 0) > 0,
+          })
+        : [];
     const describedBy =
         [errors.price ? ids.priceErr : "", limitWarning ? ids.limit : ""]
             .filter(Boolean)
@@ -90,6 +123,38 @@ export function PriceSection({
             >
                 {limitWarning}
             </p>
+            {gst.asked ? (
+                <div className="mt-3.5 flex flex-wrap items-start gap-3">
+                    <GstFields
+                        draft={values}
+                        set={set}
+                        // The shell says a problem as soon as it is there.
+                        problem={(field) => errors[field] ?? null}
+                        asked
+                        canEdit={!disabled}
+                        businessPriceMode={gst.priceMode}
+                    />
+                </div>
+            ) : null}
+            {/* Said before Publish: a GST change reaches the members already
+                on the plan at their next renewal. */}
+            {renewalLines.length > 0 ? (
+                <Notice
+                    tone={renewalAmountChanges(renewal) ? "warning" : "info"}
+                    className="mt-3"
+                    title="Members already on this plan"
+                >
+                    {renewalLines.length === 1 ? (
+                        renewalLines[0]
+                    ) : (
+                        <ul className="m-0 grid list-none gap-0.5 p-0">
+                            {renewalLines.map((line) => (
+                                <li key={line}>{line}</li>
+                            ))}
+                        </ul>
+                    )}
+                </Notice>
+            ) : null}
             <p id={ids.every} className={cn(LABEL, "mt-3.5")}>
                 Charged
             </p>

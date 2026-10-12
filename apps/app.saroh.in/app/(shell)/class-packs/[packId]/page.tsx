@@ -178,5 +178,6 @@ async function readSell(): Promise<SellContext> {
         })),
         packs: context.packs,
         invoicesOnSale: terms.invoicesOnSale,
+        gst: terms.gst,
     };
 }

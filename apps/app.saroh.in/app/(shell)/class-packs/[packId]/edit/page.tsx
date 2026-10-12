@@ -58,6 +58,9 @@ export default async function EditClassPackPage({
             emptyValues={record.values}
             services={context.services}
             sold={sold}
+            // The pack's own read says whether GST is asked; the page's
+            // read stands in for an answer without it.
+            gst={record.gst ?? context.gst}
             canEdit
         />
     );

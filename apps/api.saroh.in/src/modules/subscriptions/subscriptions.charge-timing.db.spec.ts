@@ -143,6 +143,10 @@ async function business(opts: { gst?: boolean } = {}) {
             price: "1200",
             currency: "INR",
             interval: "MONTH",
+            // A registered business's plan needs its GST rate before the
+            // desk sells it (12 Oct 2026). Its prices include GST, so the
+            // amounts below are unchanged.
+            ...(opts.gst ? { gstRate: "18" } : {}),
         })
     ).id;
     return { owner, planId };

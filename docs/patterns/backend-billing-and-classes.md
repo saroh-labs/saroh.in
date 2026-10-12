@@ -271,16 +271,18 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   amending ADR-008). A GST-registered business says "My prices include GST"
   (`INCLUDED`, the default and what every price meant before) or "GST is
   added to my prices" (`ADDED`): `BusinessProfile.gstPriceMode`, with a
-  nullable `gstPriceMode` on `Service` and `Product` for one priced the
-  other way (null: same as the business). A business that is not registered
-  is never asked, and the tax settings refuse the field for it.
+  nullable `gstPriceMode` on `Service`, `Product`, `SubscriptionPlan`,
+  `ClassPack` and `Course` for one priced the other way (null: same as the
+  business). A business that is not registered is never asked, and the tax
+  settings refuse the field for it.
     - **One sum, one file:** `invoices/gst-price.ts`. One unit's amount to
       pay is the typed price, or under `ADDED` the typed price plus its GST
       rounded to the paisa, half up (₹1,000 at 18% is ₹1,180). A line is
       the quantity times that. The tax inside is then derived from the
       amount as every paper derives it (`splitInclusive`). `priceCharge` is
       the whole answer; `sellUnit` (a product), `serviceCharge`
-      (`bookings/service-price.ts`) and `loadPriceTerms`
+      (`bookings/service-price.ts`), `saleCharge` (a plan, a class pack, a
+      course: `invoices/sale-price.ts`) and `loadPriceTerms`
       (`invoices/price-terms.ts`, the same "registered" test as
       `loadTaxProfile`) are how callers reach it. Never add GST to a price
       anywhere else.
@@ -302,11 +304,12 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
       here): `priceOrderLines` (a staff order, lines added by an edit),
       `quoteLines` (the site's bag and checkout), `startTreatmentInTx`
       (a treatment's order), `buildSnapshot` in `reserveInTx` (every
-      booking) and `onlinePrice` (a hold).
+      booking), `onlinePrice` (a hold), and for plans, packs and courses
+      the paths in the table under "Plans, class packs and courses carry
+      GST" below.
     - **Not covered, and charged as typed with GST inside:** a delivery
-      charge, a line typed on a hand-written invoice, and courses, class
-      packs and plans (they have no rate column, so their paper carries no
-      rate either). The settings sheet says so.
+      charge and a line typed on a hand-written invoice. The settings sheet
+      says so.
     - **The customer is told before paying, in one form of words.** Public
       reads serve `GstOnPrice` (`{ mode, rate, listCents, gstCents,
 payCents }`, or null when nothing is said: not registered, no rate, or
@@ -319,10 +322,84 @@ payCents }`, or null when nothing is said: not registered, no rate, or
       ₹152.54 GST (18%)" or "₹1,000 + ₹180 GST (18%)". A browsed price (a
       card, a services list) shows the typed price and "+ GST" when it is
       added (`gstAdded`). The merchant's counter previews its totals with
-      the same rule and takes the API's order as the truth.
+      the same rule and takes the API's order as the truth. The search
+      engines' structured data (`product-json-ld.ts`, `service-json-ld.ts`)
+      publishes the amount to pay.
     - **A change to the choice, the registration, the GSTIN or the state
       revalidates the business's published pages** (`prices`,
       `backend-jobs.md` → Site page cache).
+- **Plans, class packs and courses carry GST** (12 Oct 2026, the owner's
+  decision: "charging from the new invoices; already added ones won't be
+  edited"). Each has a `gstRate`, a `sacCode` and its own `gstPriceMode`,
+  by the same rules as a service. A plan's and a pack's are draft fields,
+  published with the price; a course's are saved with it.
+    - **One helper:** `invoices/sale-price.ts`. `saleCharge` is the amount
+      to pay, the customer's `GstOnPrice` and the invoice line (unit price,
+      rate, SAC, mode); `saleChargeInTx` reads the business's terms only
+      when the item has a rate. **No rate, no change:** a plan, pack or
+      course with no rate, and anything of a business that is not
+      registered, is charged its typed price and written with the line it
+      always had.
+    - **A stored price says which it is.** `CustomerSubscription.price` is
+      the typed price the member joined at, and stays so: each period's
+      amount is worked out again from it. `PackPurchase.price` and
+      `CourseEnrollment.price` are the amount paid, GST and all (a course's
+      "price for them" override is a typed price too: GST is added to it
+      where the business adds GST).
+    - **Every invoice from the day a rate is set carries it, renewals of
+      members who joined before it included.** A period's invoice reads
+      the plan's GST as it stands when it is written (`invoicePeriod` in
+      `subscriptions.service.ts`, the one place: the desk's subscribe, a
+      restart after a pause, an undone skip, the renewal job and its early
+      pass). Under "includes" the member pays the same and the paper shows
+      the split; under "added" they pay more (₹2,000 at 18% renews at
+      ₹2,360). An invoice already issued is never changed.
+    - **A renewal is never refused or stopped for a rate.** With none it
+      is written exactly as before, and the plan is in the missing-rates
+      read, listed while it is on sale or archived with anyone still on it.
+    - **Autopay never takes more than the mandate allows.** The renewal's
+      invoice is the amount to pay, and `MandateChargesService` asks the
+      limit three times (`queueInTx`, `prepareCharge`, `charge`): above it
+      nothing is queued or debited, MANDATE_LIMIT_LOW is written and the
+      invoice goes out with its pay link, as before D13
+      (`mandate-charges.limit.spec.ts`). A new mandate's limit is taken
+      from the renewal's amount to pay (`autopay.service.ts`,
+      `subscription-autopay.service.ts`), not the typed price.
+    - **The business is told before it publishes.** The Plan Editor's read
+      carries `renewalChange` (`plan-draft-view.ts`): how many members are
+      on the plan, what each price group's next renewal is now and would
+      be, how many change, and how many of those have an autopay limit
+      below the new amount. Null when nobody is on it or the GST is as
+      published.
+    - **The member is not told by a notice of their own yet.** No customer
+      notice kind covers a plan (`notify-templates.ts` has bookings, orders
+      and the waitlist). The renewal's invoice, its pay page, the account's
+      Plan tab and "To pay" say the GST; a "your renewal amount changes"
+      notice is a follow-up.
+    - **Every path, and what it does:**
+
+        | Path                                                       | Started by | No rate chosen       | Amount                                          |
+        | ---------------------------------------------------------- | ---------- | -------------------- | ----------------------------------------------- |
+        | Subscribe at the desk (`subscribe`)                        | team       | refused, asked       | `saleCharge`, from the plan                     |
+        | Book a plan change (`changePlan`)                          | team       | refused, asked       | none now; the renewal bills the new plan        |
+        | Renewal, early renewal (`renewOne`, `renewEarlyOne`)       | job        | never refused        | `saleCharge`, the plan's GST that day           |
+        | A pause ending; a resume by hand or by the member          | job, team  | never refused        | as a renewal                                    |
+        | An undone skip that invoices the period                    | team       | never refused        | as a renewal                                    |
+        | Autopay charge and Retry (`queueInTx`)                     | job, team  | not asked            | the invoice's total, never above the limit      |
+        | Join a plan on the site (`public-plan-join.service.ts`)    | customer   | never refused        | `saleCharge`, frozen in `planTerms.pay`         |
+        | Sell a pack at the desk (`ClassPacksService.sell`)         | team       | refused, asked       | `saleCharge`; the purchase keeps the amount     |
+        | Buy a pack on the site (`public-pack-purchase.service.ts`) | customer   | never refused        | `saleCharge`, frozen in `packTerms.pay`         |
+        | Enrol on a course (`CoursesService.enrol`)                 | team       | refused, asked       | `saleCharge`; the enrolment keeps the amount    |
+        | A credit note, a refund, a dropped early invoice           | either     | mirrors its original | the original's frozen lines (`buildCreditNote`) |
+
+        There is no proration, no instalment and no deposit on a plan, a pack
+        or a course, and no course enrolment on the site.
+
+    - **The site says it before the money moves:** the plans and packs
+      reads, the join and pack checkout answers, the account's plan and
+      "To pay" rows serve `GstOnPrice` (`gst`), and a join's or a pack's
+      draft freezes the amount shown, so a rate set while someone is paying
+      starts the draft again (`samePlanTerms`, `sameTerms`).
 - **GST shows only when it applies (DEC-072)** — presentation, on the
   paper, the PDF, the pay page and anything else a customer reads:
     - An unregistered business charges no GST, so its paper shows none: no
@@ -342,9 +419,11 @@ payCents }`, or null when nothing is said: not registered, no rate, or
     - **The rule is one file**, `invoices/gst-rate-required.ts`:
       `assertRatesSet(registered, lines)` throws a 409 `{ reason:
 "GST_RATE_MISSING", items: [{ kind, id, name }] }` before anything is
-      numbered or written. `kind` is `SERVICE` or `PRODUCT` (the rate is
-      saved on the item) or `LINE` (a line typed on an invoice, named by its
-      place).
+      numbered or written. `kind` is `SERVICE`, `PRODUCT`, `PLAN`, `PACK`
+      or `COURSE` (the rate is saved on the item) or `LINE` (a line typed on
+      an invoice, named by its place). `assertSaleRated` is the same
+      refusal for one plan, pack or course sold at the desk; something free
+      is never asked.
     - **The app asks in place and carries on.** `toFailure` and `mutate`
       read `rates` off the failure; `useGstRateStep` opens a sheet with one
       row per item, saves each rate (`PUT …/gst-rates`, or the draft's lines)
@@ -352,19 +431,32 @@ payCents }`, or null when nothing is said: not registered, no rate, or
     - **Refused:** issuing a draft; a booking's desk payment and its pay
       link; a new order paid at the counter; an order recorded as paid; a
       treatment's balance recorded by the team; units added to an order whose
-      invoice is out (`correctOrderInvoiceForEdit`).
+      invoice is out (`correctOrderInvoiceForEdit`); subscribing someone or
+      booking a plan change at the desk; selling a pack and enrolling on a
+      course while Payments is on (with it off no invoice is written, so
+      nothing is asked).
     - **Never refused:** anything a customer's payment or a job writes (the
       webhook's `ensureOrderInvoice`, a booking's hold, a pack or plan
-      bought online, a renewal). Nobody is there to choose, and a payment is
-      never failed for it. `ensureOrderInvoice` asks only when its caller
-      passes `refuseUnsetRate`.
+      bought online, a renewal, a resume). Nobody is there to choose, and a
+      payment is never failed for it; stopping a renewal for a rate would
+      stop the business's income. `ensureOrderInvoice` asks only when its
+      caller passes `refuseUnsetRate`, and a test pins who may call
+      `assertSaleRated` (`gst-rate-required.spec.ts`).
     - **Paper already out is left alone:** a pay link already issued is
       marked paid as it is, and a credit note mirrors what it credits.
     - **Finding them first:** `GET …/gst-rates/missing` lists the priced
-      things on sale with no rate (`gst-rates.service.ts`), drawn as one
-      notice with a count on Services and Invoices, and the editors ask for
-      the rate beside the price. A course, a class pack and a plan have no
-      rate column, so their invoices carry none and they are not listed.
+      things on sale with no rate (`gst-rates.service.ts`): services,
+      products, plans (also an archived one with anyone still on it, with
+      who is on it by price), class packs and open courses, each read with
+      its own permission. It is drawn as one notice with a count on
+      Services, Invoices, Plans, Class packs and Courses, and the editors
+      ask for the rate beside the price (a plan's and a pack's Publish is
+      refused without one for a registered business). `PUT …/gst-rates`
+      saves a rate on any of them: the item's editor may, so may whoever
+      issues invoices, and for a pack whoever sells packs; those others
+      only fill in a rate nobody chose. A plan's and a pack's is written to
+      the published columns under the row lock, with its history event and
+      the editor's revision moved.
     - **A new path that writes a tax invoice picks a side**, as for the
       business's details above: started by the team, call `assertRatesSet`;
       started by a payment, a job or a customer, never.

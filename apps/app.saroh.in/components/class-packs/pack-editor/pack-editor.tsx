@@ -29,6 +29,8 @@ import {
     soldKeepNote,
 } from "@/lib/class-packs/pack-editor-words";
 import type { EditorAdapter } from "@/lib/editor-shell/types";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { NOT_ASKED } from "@/lib/gst/item-words";
 
 import { packCrumbs } from "./pack-crumbs";
 import {
@@ -61,6 +63,11 @@ const ADAPTER: EditorAdapter<PackValues> = {
  * changes until Publish changes, and everyone who bought one keeps what
  * they bought. A sold pack's kind is locked (E13), said beside the choice,
  * and a refusal from Publish lands on its field in the merchant's words.
+ *
+ * A GST-registered business answers the pack's GST beside its price (12 Oct
+ * 2026): draft fields, autosaved and published like the price, and a priced
+ * pack with no rate can't be published. One that isn't registered is shown
+ * none of it.
  */
 export function PackEditor({
     initial,
@@ -68,7 +75,10 @@ export function PackEditor({
     services,
     sold,
     canEdit,
+    gst = NOT_ASKED,
 }: {
+    /** Whether GST is asked, and the business's own way of carrying it. */
+    gst?: GstAsk;
     /** Null while creating. */
     initial: PackEditorRecord | null;
     /** A new pack's starting values. */
@@ -104,6 +114,7 @@ export function PackEditor({
                     services,
                     sold,
                     published: record?.published ?? null,
+                    gstAsked: gst.asked,
                 })
             }
             blockerOf={packBlocker}
@@ -146,6 +157,8 @@ export function PackEditor({
                             set={set}
                             errors={errors}
                             services={services}
+                            gst={gst}
+                            disabled={disabled}
                         />
                         <ServicesPicker
                             kind={values.kind}

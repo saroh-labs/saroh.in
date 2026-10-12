@@ -13,11 +13,18 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { BookingEventType } from "../bookings/booking-event-type";
 import { BookingsService } from "../bookings/bookings.service";
 import { assertBusinessDetails } from "../invoices/business-details";
+import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
+import type { GstPriceMode } from "../invoices/gst-price";
+import { isGstPriceMode } from "../invoices/gst-price";
+import { assertSaleRated } from "../invoices/gst-rate-required";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
+import { loadPriceTerms } from "../invoices/price-terms";
+import { hasRate, saleChargeInTx } from "../invoices/sale-price";
 import { contactName } from "../invoices/serialize";
+import { toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
 import type {
     AddSessionDto,
@@ -76,6 +83,13 @@ export interface CourseView {
     description: string | null;
     price: string;
     currency: string;
+    /**
+     * GST (12 Oct 2026): the rate its price carries ("18"; null: not set),
+     * its SAC code, and its own way of carrying GST (null: the business's).
+     */
+    gstRate: string | null;
+    sacCode: string | null;
+    gstPriceMode: GstPriceMode | null;
     seats: number;
     /** People on it now. */
     enrolled: number;
@@ -121,6 +135,9 @@ const COURSE_SELECT = {
     description: true,
     price: true,
     currency: true,
+    gstRate: true,
+    sacCode: true,
+    gstPriceMode: true,
     seats: true,
     status: true,
     createdAt: true,
@@ -282,6 +299,7 @@ export class CoursesService {
                 description: dto.description ?? null,
                 price: dto.price,
                 currency,
+                ...gstColumns(dto),
                 seats: dto.seats,
                 status,
                 sessions: {
@@ -311,6 +329,7 @@ export class CoursesService {
                 "sessions",
             );
         }
+        const gst = gstColumns(dto);
         await prisma.$transaction(async (tx) => {
             await lockCourse(tx, organizationId, id);
             const course = await tx.course.findFirst({
@@ -390,6 +409,7 @@ export class CoursesService {
                         : {}),
                     ...(dto.seats !== undefined ? { seats: dto.seats } : {}),
                     ...(dto.status !== undefined ? { status: dto.status } : {}),
+                    ...gst,
                 },
             });
         });
@@ -568,6 +588,9 @@ export class CoursesService {
                     name: true,
                     price: true,
                     currency: true,
+                    gstRate: true,
+                    sacCode: true,
+                    gstPriceMode: true,
                     seats: true,
                     status: true,
                     service: true,
@@ -605,8 +628,26 @@ export class CoursesService {
             if (course._count.enrollments >= course.seats) {
                 throw new ConflictException("The course is full.");
             }
+            // With Payments on the enrolment writes a tax invoice: a
+            // registered business's course with no GST rate is asked for
+            // one first (409 GST_RATE_MISSING), before anything is written,
+            // and the app asks in place and enrols again.
+            const invoices = await paymentsOn(tx, organizationId);
+            if (invoices) {
+                await assertCourseRated(tx, organizationId, course, dto.price);
+            }
 
-            const price = dto.price ?? toMoneyString(course.price);
+            // What they are charged: the course's price, or the one typed
+            // for them, with its GST added where the business adds it
+            // (`sale-price.ts`). The enrolment keeps the amount to pay, as
+            // its invoice does.
+            const charge = await saleChargeInTx(
+                tx,
+                organizationId,
+                toCents(dto.price ?? toMoneyString(course.price)),
+                course,
+            );
+            const price = charge.pay;
             const enrollment = await tx.courseEnrollment.create({
                 data: {
                     organizationId,
@@ -630,7 +671,7 @@ export class CoursesService {
                     "One of the course's sessions has no room left. Raise the service's capacity, or move that session.",
                 );
             }
-            if (await paymentsOn(tx, organizationId)) {
+            if (invoices) {
                 const n = course.sessions.length;
                 await this.invoices.issueInTx(tx, organizationId, {
                     contactId: contact.id,
@@ -639,7 +680,7 @@ export class CoursesService {
                         {
                             description: `${course.name} · ${n} ${n === 1 ? "session" : "sessions"}`,
                             quantity: 1,
-                            unitPrice: price,
+                            ...charge.line,
                         },
                     ],
                     source: "COURSE",
@@ -926,6 +967,64 @@ function sessionTimes(
     return out.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 }
 
+/** A stored GST rate as it is written: "18", "0.25"; null when not set. */
+function courseRate(rate: { toString(): string } | null): string | null {
+    const bps = rateToBps(rate);
+    return bps === null ? null : bpsToRate(bps);
+}
+
+/**
+ * The GST columns a save names (12 Oct 2026): a rate GST has, or null to
+ * clear it; the SAC code; the course's own way of carrying GST.
+ */
+function gstColumns(dto: CourseInputDto) {
+    if (
+        dto.gstRate !== undefined &&
+        dto.gstRate !== null &&
+        !isGstRate(dto.gstRate)
+    ) {
+        fieldError(
+            `${dto.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            "gstRate",
+        );
+    }
+    return {
+        ...(dto.gstRate !== undefined ? { gstRate: dto.gstRate } : {}),
+        ...(dto.sacCode !== undefined ? { sacCode: dto.sacCode } : {}),
+        ...(dto.gstPriceMode !== undefined
+            ? { gstPriceMode: dto.gstPriceMode }
+            : {}),
+    };
+}
+
+/**
+ * Refuse enrolling someone at the desk on a registered business's course
+ * that has no GST rate (409 `GST_RATE_MISSING`, kind COURSE), unless it is
+ * free of charge. A course with a rate, and any course of a business that
+ * is not registered, reads nothing more.
+ */
+async function assertCourseRated(
+    db: Pick<Tx, "businessProfile">,
+    organizationId: string,
+    course: {
+        id: string;
+        name: string;
+        price: { toString(): string };
+        gstRate: { toString(): string } | null;
+    },
+    typedPrice: string | undefined,
+): Promise<void> {
+    if (hasRate(course)) return;
+    const terms = await loadPriceTerms(db, organizationId);
+    assertSaleRated(terms.registered, {
+        kind: "COURSE",
+        id: course.id,
+        name: course.name,
+        rate: course.gstRate,
+        priceCents: toCents(typedPrice ?? toMoneyString(course.price)),
+    });
+}
+
 function courseView(row: CourseRow, now: Date): CourseView {
     const upcoming = row.sessions.filter((s) => s.startAt > now);
     const enrolled = row._count.enrollments;
@@ -936,6 +1035,11 @@ function courseView(row: CourseRow, now: Date): CourseView {
         description: row.description,
         price: toMoneyString(row.price),
         currency: row.currency,
+        gstRate: courseRate(row.gstRate),
+        sacCode: row.sacCode,
+        gstPriceMode: isGstPriceMode(row.gstPriceMode)
+            ? row.gstPriceMode
+            : null,
         seats: row.seats,
         enrolled,
         seatsLeft: Math.max(0, row.seats - enrolled),

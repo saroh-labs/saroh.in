@@ -11,7 +11,7 @@ import { linkPendingLine, offersLead, welcomeLead } from "./home-words";
 import { ACCOUNT_TAB_HREF, ORDERS_HREF } from "./hrefs";
 import { InvoicesDue } from "./invoices-due";
 import type { AccountView, AccountHome as Home } from "./model";
-import { classesLine, planLine, planPrice } from "./model";
+import { classesLine, planGstLine, planLine, planPrice } from "./model";
 import { OrderRow } from "./orders-list";
 import {
     AccountCard,
@@ -252,7 +252,12 @@ export function AccountHome({
                         >
                             <AccountRow
                                 title={`${home.plan.value.name} · ${planPrice(home.plan.value)}`}
-                                sub={planLine(home.plan.value)}
+                                sub={
+                                    <PlanSub
+                                        line={planLine(home.plan.value)}
+                                        gst={planGstLine(home.plan.value)}
+                                    />
+                                }
                                 tag={
                                     home.plan.value.status === "PAUSED" ? (
                                         <Tag tone="quiet">Paused</Tag>
@@ -359,5 +364,21 @@ export function AccountHome({
                 <Fragment key={key}>{draw(key)}</Fragment>
             ))}
         </div>
+    );
+}
+
+/**
+ * The line under the plan, and under it the GST in or on what each renewal
+ * costs to pay, where the API said one. Without it, the line alone.
+ */
+function PlanSub({ line, gst }: { line: string; gst: string | null }) {
+    if (!gst) return line;
+    return (
+        <>
+            {line}
+            <span data-price-gst="" className="mt-0.5 block tabular-nums">
+                {gst}
+            </span>
+        </>
     );
 }

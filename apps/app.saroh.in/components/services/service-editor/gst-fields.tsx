@@ -4,6 +4,7 @@ import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import type { GstForm } from "@/lib/gst/item-words";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
 import {
     ITEM_MODE_LABEL,
@@ -17,11 +18,28 @@ import {
     GST_RATE_PLACEHOLDER,
 } from "@/lib/invoices/gst";
 
-import type { Edit } from "./fields";
+/** The two GST fields that can be wrong. */
+export type GstField = "gstRate" | "sacCode";
 
 /**
- * A service's GST rate and SAC code (ADR-008), drawn in one of two places
- * (`gstPlace`).
+ * What the fields need of a draft: the three GST fields, a way to change
+ * them, what is wrong with one, and a way to say one was left (for a page
+ * that holds a problem back until then; the editor shell says one at once
+ * and passes none). The Service Editor's `Edit` fits it, and so do the
+ * Plan Editor's, the Pack Editor's and the course form's own drafts.
+ */
+export interface GstEdit {
+    draft: GstForm;
+    set: (patch: Partial<GstForm>) => void;
+    problem: (field: GstField) => string | null | undefined;
+    leave?: (field: GstField) => void;
+}
+
+/**
+ * The GST rate, "GST on this price" and the SAC code of something sold as a
+ * service is (ADR-008): a service, and since 12 Oct 2026 a membership plan,
+ * a class pack and a course, by the same rules. On a service they are drawn
+ * in one of two places (`gstPlace`).
  *
  * Beside the price, for a GST-registered business (`asked`): the rate is a
  * question with no "Not set" row. The box starts on "Choose a rate", and
@@ -42,8 +60,8 @@ export function GstFields({
     asked,
     canEdit,
     businessPriceMode = null,
-}: Edit & {
-    /** A registered business's: it has to be answered for a priced service. */
+}: GstEdit & {
+    /** A registered business's: it has to be answered for a priced one. */
     asked: boolean;
     canEdit: boolean;
     /**
@@ -74,7 +92,7 @@ export function GstFields({
                     value={draft.gstRate as GstRateValue}
                     onValueChange={(gstRate) => {
                         set({ gstRate });
-                        leave("gstRate");
+                        leave?.("gstRate");
                     }}
                     options={asked ? GST_RATE_CHOICES : GST_RATE_OPTIONS}
                     placeholder={asked ? GST_RATE_PLACEHOLDER : undefined}
@@ -102,7 +120,7 @@ export function GstFields({
                 optional={asked}
                 className="flex-[1_1_160px]"
                 error={problem("sacCode")}
-                onBlur={() => leave("sacCode")}
+                onBlur={() => leave?.("sacCode")}
                 hint="The service code printed on tax invoices."
             >
                 <Input

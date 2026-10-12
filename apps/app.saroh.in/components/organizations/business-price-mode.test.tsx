@@ -163,7 +163,7 @@ describe("the sheet", () => {
             "A ₹1,000 price at 18% is ₹1,180 to pay. Customers see the GST before they pay.",
         );
         expect(text).toContain(
-            "This is for the prices of your services and products. You can set a single service or product differently where you edit it. A delivery charge, a course, a class pack, a membership plan and a line you type on an invoice are charged as typed, with GST included. Orders and bookings already made keep what they were charged.",
+            "This is for the prices of your services, products, courses, class packs and membership plans. You can set any one of them differently where you edit it. Members already on a plan with a GST rate pay this way from their next renewal. Invoices already issued don't change, and orders and bookings already made keep what they were charged. A delivery charge and a line you type on an invoice are charged as typed, with GST included.",
         );
     });
 

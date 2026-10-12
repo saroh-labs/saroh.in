@@ -63,6 +63,9 @@ const TEN: PackValues = {
     serviceIds: ["hatha", "hiit"],
     kind: "CLASSES",
     firstPackOnly: false,
+    gstRate: null,
+    sacCode: null,
+    gstPriceMode: null,
 };
 
 const noContext: Parameters<typeof packProblems>[1] = {
@@ -168,6 +171,9 @@ describe("what an autosave sends", () => {
             serviceIds: ["hatha", "hiit"],
             kind: "CLASSES",
             firstPackOnly: false,
+            gstRate: null,
+            sacCode: null,
+            gstPriceMode: null,
         });
     });
 
@@ -351,5 +357,85 @@ describe("the side column", () => {
             ["Saving vs drop-in", "—"],
             ["Sold so far", "—"],
         ]);
+    });
+});
+
+describe("a pack's GST (12 Oct 2026)", () => {
+    const asked = { ...noContext, gstAsked: true };
+
+    it("starts a new pack with none set", () => {
+        expect(newPackValues("CLASSES", SERVICES, "INR")).toMatchObject({
+            gstRate: null,
+            sacCode: null,
+            gstPriceMode: null,
+        });
+    });
+
+    it("asks a registered business's priced pack for its rate, and takes 0%", () => {
+        expect(packProblems(TEN, asked)).toContainEqual({
+            field: "gstRate",
+            // The shell ends the sentence itself, as it does "Add the price".
+            message: "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
+        });
+        expect(fields({ ...TEN, gstRate: "0" }, asked)).toEqual([]);
+        expect(fields({ ...TEN, gstRate: "18" }, asked)).toEqual([]);
+        // Not priced yet: the price is asked for, the rate isn't.
+        expect(fields({ ...TEN, price: null }, asked)).toEqual(["price"]);
+    });
+
+    it("never asks a business that isn't registered, and never blocks it", () => {
+        expect(fields(TEN)).toEqual([]);
+        expect(fields(TEN, { ...noContext, gstAsked: false })).toEqual([]);
+        expect(fields({ ...TEN, sacCode: "99" })).toEqual([]);
+    });
+
+    it("says a SAC code that isn't four to eight digits", () => {
+        expect(
+            packProblems({ ...TEN, gstRate: "18", sacCode: "99" }, asked),
+        ).toEqual([
+            { field: "sacCode", message: "A SAC code is 4 to 8 digits" },
+        ]);
+    });
+
+    it("sends the three as the API takes them", () => {
+        expect(
+            packPayload({
+                ...TEN,
+                gstRate: "18",
+                sacCode: " 9997 23 ",
+                gstPriceMode: "ADDED",
+            }),
+        ).toMatchObject({
+            gstRate: "18",
+            sacCode: "999723",
+            gstPriceMode: "ADDED",
+        });
+        expect(packPayload({ ...TEN, gstRate: "0" }).gstRate).toBe("0");
+        expect(packPayload({ ...TEN, sacCode: "" }).sacCode).toBeNull();
+    });
+
+    it("leaves out a SAC code the API would refuse, so the rest still saves", () => {
+        const sent = packPayload({ ...TEN, gstRate: "18", sacCode: "99" });
+        expect("sacCode" in sent).toBe(false);
+        expect(sent.gstRate).toBe("18");
+    });
+
+    it("lists a GST change under When you publish", () => {
+        expect(packChanges(TEN, { ...TEN, gstRate: "18" })).toEqual([
+            "GST rate not set → 18%",
+        ]);
+        expect(
+            packChanges(
+                { ...TEN, gstRate: "18" },
+                { ...TEN, gstRate: "18", gstPriceMode: "ADDED" },
+            ),
+        ).toEqual(["GST on this price: GST is added"]);
+        // The same rate written another way is not a change.
+        expect(
+            packChanges(
+                { ...TEN, gstRate: "18" },
+                { ...TEN, gstRate: "18.00" },
+            ),
+        ).toEqual([]);
     });
 });

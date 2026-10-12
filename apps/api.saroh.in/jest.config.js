@@ -321,6 +321,9 @@ module.exports = {
         // missing-rates read and save with a jest-mocked Prisma.
         "<rootDir>/src/modules/invoices/gst-rate-required.spec.ts",
         "<rootDir>/src/modules/invoices/gst-rates.service.spec.ts",
+        // GST on plans, class packs and courses (12 Oct 2026): what one is
+        // charged, pure and with a jest-mocked Prisma for the terms read.
+        "<rootDir>/src/modules/invoices/sale-price.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
@@ -333,6 +336,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/plan-figures.spec.ts",
         // D2: what a plan change records, and reading its history.
         "<rootDir>/src/modules/subscriptions/plan-events.spec.ts",
+        // GST on a plan (12 Oct 2026): what publishing it does to members'
+        // renewals, and the rate a registered business's plan needs.
+        "<rootDir>/src/modules/subscriptions/plan-renewal-change.spec.ts",
         // D9: what a subscription action records, and reading its log.
         "<rootDir>/src/modules/subscriptions/subscription-events.spec.ts",
         // D8: a pause's end date, and the job's resume on it.

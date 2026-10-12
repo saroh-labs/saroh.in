@@ -9,6 +9,7 @@ import { useState } from "react";
 import { EnrolDialog } from "@/components/courses/enrol-dialog";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import type { Course, Enrollment } from "@/lib/courses/service";
+import type { GstAsk } from "@/lib/gst/item-words";
 
 import { ContactPanelSection, ROW_BODY, ROW_RULE } from "./contact-panel";
 
@@ -33,7 +34,10 @@ export function CoursesPanel({
     courses,
     invoicesOnEnrol,
     mentionInvoices,
+    gst = null,
 }: {
+    /** The business's GST standing, for the enrol dialog's amount to pay. */
+    gst?: GstAsk | null;
     contact: ContactOption;
     /** Null when they could not be read. */
     enrollments: Enrollment[] | null;
@@ -129,6 +133,7 @@ export function CoursesPanel({
                     contacts={[contact]}
                     initialContactId={contact.id}
                     invoicesOnEnrol={invoicesOnEnrol}
+                    gst={gst}
                 />
             ) : null}
         </>

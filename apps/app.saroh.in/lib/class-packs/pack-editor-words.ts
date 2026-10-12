@@ -1,5 +1,6 @@
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { gstChangeLines } from "@/lib/gst/item-words";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackKind, PackServiceOption, PackValues } from "./pack-editor";
@@ -70,6 +71,7 @@ export function packChanges(
     ) {
         out.push("new description");
     }
+    out.push(...gstChangeLines(published, values));
     return out;
 }
 

@@ -2,6 +2,9 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
+import { readGstAsk } from "@/lib/gst-rates/service";
+import type { GstAsk, GstValues } from "@/lib/gst/item-words";
+import { NOT_ASKED } from "@/lib/gst/item-words";
 
 import type { PackStanding } from "./balance";
 
@@ -26,6 +29,14 @@ export interface ClassPack {
     /** Sales with classes and time left. */
     activeHolders: number;
     createdAt: string;
+    /**
+     * GST (12 Oct 2026): the rate its price carries ("18"; null is not
+     * set), its SAC code, and its own way of carrying GST (null is the
+     * business's). Absent from an API before it.
+     */
+    gstRate?: GstValues["gstRate"];
+    sacCode?: GstValues["sacCode"];
+    gstPriceMode?: GstValues["gstPriceMode"];
 }
 
 export interface PackPurchase {
@@ -59,6 +70,12 @@ export interface PackInput {
 export interface SellingTerms {
     /** Payments is on: selling issues the invoice there and then. */
     invoicesOnSale: boolean;
+    /**
+     * Whether the business is GST-registered, and its own way of carrying
+     * GST: the sell dialog says the amount to pay where GST is added.
+     * Unread asks for nothing, and the dialog says the price as typed.
+     */
+    gst: GstAsk;
 }
 
 const packPath = (id: string) => `/class-packs/${encodeURIComponent(id)}`;
@@ -92,10 +109,14 @@ export async function listPurchases(): Promise<PackPurchase[]> {
  */
 export async function getSellingTerms(): Promise<SellingTerms> {
     const base = await orgBase();
-    if (!base) return { invoicesOnSale: false };
-    const res = await apiFetch(`${base}/class-packs/selling`).catch(() => null);
-    if (!res?.ok) return { invoicesOnSale: false };
-    return (await res.json()) as SellingTerms;
+    if (!base) return { invoicesOnSale: false, gst: NOT_ASKED };
+    const [res, gst] = await Promise.all([
+        apiFetch(`${base}/class-packs/selling`).catch(() => null),
+        readGstAsk(),
+    ]);
+    if (!res?.ok) return { invoicesOnSale: false, gst };
+    const body = (await res.json()) as { invoicesOnSale?: unknown };
+    return { invoicesOnSale: body.invoicesOnSale === true, gst };
 }
 
 /**

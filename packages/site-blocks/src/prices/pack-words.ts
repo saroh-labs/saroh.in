@@ -1,4 +1,10 @@
 import { accountMoney } from "../account/model";
+import type { GstOnPrice } from "../lib/gst-price";
+import {
+    browsePriceWords,
+    gstOnPriceOf,
+    payPriceWords,
+} from "../lib/gst-price";
 
 /**
  * How a class pack is said on a site (G20): what the public packs read
@@ -19,6 +25,41 @@ export interface PublicPack {
     kind: "CLASSES" | "ONE_TO_ONE";
     /** One visit's price to compare with, or null. */
     singlePrice: string | null;
+    /**
+     * The GST in or on the price, and the amount to pay; null for none.
+     * Absent from an older API. Narrowed where it is read (`gstOnPriceOf`).
+     */
+    gst?: GstOnPrice | null;
+}
+
+/** What a pack's price words read: the pack, and the API's GST on it. */
+interface PricedPack {
+    price: string;
+    currency: string;
+    gst?: unknown;
+}
+
+/**
+ * What a pack costs to pay, beside Buy: "₹4,500", or the API's amount to
+ * pay where GST is added ("₹5,310" for ₹4,500 at 18%).
+ */
+export function packPayPrice(pack: PricedPack): string {
+    return payPriceWords(
+        accountMoney(pack.price, pack.currency),
+        pack.gst,
+        pack.currency,
+    );
+}
+
+/**
+ * The price where a pack is only browsed (no Buy beside it): the typed
+ * price, with "+ GST" after it when GST comes on top.
+ */
+export function packBrowsePrice(pack: PricedPack): string {
+    return browsePriceWords(
+        accountMoney(pack.price, pack.currency),
+        gstOnPriceOf(pack.gst)?.mode === "ADDED",
+    );
 }
 
 function isPublicPack(value: unknown): value is PublicPack {

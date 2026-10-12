@@ -1,4 +1,5 @@
 import { unstable_rethrow } from "next/navigation";
+import { cache } from "react";
 
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, mutate, orgBase } from "@/lib/api/http";
@@ -6,7 +7,10 @@ import { apiFetch, mutate, orgBase } from "@/lib/api/http";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { businessModeOf, isGstPriceMode } from "@/lib/gst/price-mode";
 
+import type { GstAsk } from "@/lib/gst/item-words";
+
 import type { ChosenRate, MissingRates } from "./missing";
+import { gstAskOf } from "./missing";
 
 /**
  * The GST rates a business still has to choose (`missing.ts`), read from
@@ -20,8 +24,22 @@ import type { ChosenRate, MissingRates } from "./missing";
  * and asks for nothing, and the API's own refusal still stands behind it.
  * Read with a bare fetch, so a 403 here is "couldn't tell", never the
  * page's own forbidden.
+ *
+ * One read per request: a page's notice and its dialogs' GST standing
+ * (`readGstAsk`) share it.
  */
-export async function readMissingRates(): Promise<MissingRates | null> {
+export const readMissingRates = cache(readMissing);
+
+/**
+ * Whether the business is asked for GST (registered), and its own way of
+ * carrying it: what an editor or a desk dialog needs to know of the
+ * business. Unread asks for nothing.
+ */
+export async function readGstAsk(): Promise<GstAsk> {
+    return gstAskOf(await readMissingRates());
+}
+
+async function readMissing(): Promise<MissingRates | null> {
     try {
         const base = await orgBase();
         if (!base) return null;
@@ -70,7 +88,7 @@ async function readBusinessPriceMode(
     }
 }
 
-/** Save a rate on each service or product named: all of them, or none. */
+/** Save a rate on each thing named: all of them, or none. */
 export function setGstRates(
     items: readonly ChosenRate[],
 ): Promise<CrmResult<{ saved: number }>> {

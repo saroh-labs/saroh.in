@@ -15,8 +15,9 @@ import { ConflictException } from "@nestjs/common";
  * **Never on a path a customer or a job starts.** Paper written because a
  * customer paid on the business's site, or a renewal ran, is written as
  * before: nobody is there to choose a rate, and a payment is never failed
- * for it. The missing-rates read (`gst-rates.service.ts`) is how the
- * business finds those items first.
+ * for it. A renewal above all: stopping the renewal job for a missing rate
+ * would stop the business's income. The missing-rates read
+ * (`gst-rates.service.ts`) is how the business finds those items first.
  *
  * 0 is a rate: "Exempt (0%)" is a choice, and a paper whose every line is
  * 0 is a bill of supply (`invoice-title.ts`). Only null is "not set".
@@ -25,10 +26,12 @@ import { ConflictException } from "@nestjs/common";
 export const GST_RATE_MISSING = "GST_RATE_MISSING";
 
 /**
- * What a line bills: a service or a product, whose rate is saved on it, or
- * a line typed on an invoice by hand, whose rate is the line's own.
+ * What a line bills: a service, a product, a membership plan, a class pack
+ * or a course, whose rate is saved on it, or a line typed on an invoice by
+ * hand, whose rate is the line's own.
  */
-export type RateItemKind = "SERVICE" | "PRODUCT" | "LINE";
+export type RateItemKind =
+    "SERVICE" | "PRODUCT" | "PLAN" | "PACK" | "COURSE" | "LINE";
 
 export interface RateItem {
     kind: RateItemKind;
@@ -93,4 +96,21 @@ export function assertRatesSet(
     if (!registered) return;
     const items = unratedOf(lines);
     if (items.length > 0) throw gstRateMissing(items);
+}
+
+/**
+ * Refuse selling a plan, a class pack or a course at the desk when it is a
+ * registered business's, priced, and has no rate chosen: the sale writes a
+ * tax invoice. Free of charge it writes no tax, so nothing is asked.
+ */
+export function assertSaleRated(
+    registered: boolean,
+    item: RateItem & {
+        rate: RatedLine["rate"];
+        /** What is charged, in minor units. */
+        priceCents: number;
+    },
+): void {
+    if (item.priceCents <= 0) return;
+    assertRatesSet(registered, [item]);
 }

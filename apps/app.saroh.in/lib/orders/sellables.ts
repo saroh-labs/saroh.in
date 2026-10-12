@@ -1,6 +1,20 @@
+import type { PriceTerms } from "@/lib/gst/price-mode";
+import {
+    effectiveMode,
+    NO_GST_TERMS,
+    unitPayCents,
+} from "@/lib/gst/price-mode";
+
 /**
  * What an order line can be for, from a storefront's catalogue — shared by
  * New order and Order Detail's "Add an item" (B8). Pure.
+ *
+ * A price here is the amount to pay (12 Oct 2026): the API charges an order
+ * line the typed price, plus its GST where the business or the product has
+ * "GST is added". The sum is a preview by the API's own rule
+ * (`lib/gst/price-mode.ts`), as New order's is (`new-order-sellables.ts`);
+ * the order the API reprices is the truth, and only product ids and
+ * quantities are ever sent.
  */
 
 export interface ProductLite {
@@ -15,6 +29,33 @@ export interface ProductLite {
      * asked for.
      */
     soldOut?: boolean;
+    /** GST: the product's rate, and its own way of carrying it. */
+    gstRate?: string | null;
+    gstPriceMode?: string | null;
+}
+
+const MONEY = /^\d+(\.\d{1,2})?$/;
+
+/**
+ * A typed price as the amount to pay: unchanged, to the letter, wherever
+ * the typed price is what is paid; with its GST on top, as "1180.00",
+ * where GST is added.
+ */
+function toPay(
+    price: string,
+    product: Pick<ProductLite, "gstRate" | "gstPriceMode">,
+    terms: PriceTerms,
+): string {
+    if (!MONEY.test(price.trim())) return price;
+    const [whole = "0", frac = ""] = price.trim().split(".");
+    const cents = Number(whole) * 100 + Number((frac + "00").slice(0, 2));
+    const pay = unitPayCents(
+        cents,
+        product.gstRate,
+        effectiveMode(terms.mode, product.gstPriceMode),
+        terms.registered,
+    );
+    return pay === cents ? price : (pay / 100).toFixed(2);
 }
 
 /**
@@ -32,11 +73,16 @@ export interface Sellable {
     variantTitle: string | null;
     /** "Linen Wrap Dress · M". */
     label: string;
+    /** The amount to pay for one, GST and all. */
     price: string;
     soldOut: boolean;
 }
 
-export function sellablesOf(products: readonly ProductLite[]): Sellable[] {
+export function sellablesOf(
+    products: readonly ProductLite[],
+    /** The business's GST standing; none charges the typed price. */
+    terms: PriceTerms = NO_GST_TERMS,
+): Sellable[] {
     return products.flatMap((p): Sellable[] =>
         p.variants && p.variants.length > 0
             ? p.variants.map((v) => ({
@@ -46,7 +92,8 @@ export function sellablesOf(products: readonly ProductLite[]): Sellable[] {
                   name: p.name,
                   variantTitle: v.title,
                   label: `${p.name} · ${v.title}`,
-                  price: v.price ?? p.price,
+                  // A variant is priced under its product's rate and way.
+                  price: toPay(v.price ?? p.price, p, terms),
                   soldOut: p.soldOut ?? false,
               }))
             : [
@@ -56,7 +103,7 @@ export function sellablesOf(products: readonly ProductLite[]): Sellable[] {
                       name: p.name,
                       variantTitle: null,
                       label: p.name,
-                      price: p.price,
+                      price: toPay(p.price, p, terms),
                       soldOut: p.soldOut ?? false,
                   },
               ],

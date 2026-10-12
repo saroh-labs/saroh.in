@@ -8,6 +8,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
+import { RATED_SALE_SELECT, saleChargeInTx } from "../invoices/sale-price";
 import type { CheckView } from "./authorisation-check";
 import { CHECK_VIEW_SELECT, checkViewOf } from "./authorisation-check";
 import { autopayChargeInProgress, chargeUnderWayOn } from "./charge-under-way";
@@ -264,7 +265,7 @@ export class AutopayService {
             subscriptionId: subscription.id,
             method: input.method,
             maxAmountCents: mandateLimitCents(
-                Math.max(toMinor(subscription.price), invoiceCents, 1),
+                Math.max(subscription.renewalCents, invoiceCents, 1),
             ),
             firstAmountCents: pays ? invoiceCents : 0,
             source: input.source,
@@ -339,7 +340,7 @@ export class AutopayService {
             subscriptionId: subscription.id,
             method: input.method,
             maxAmountCents: mandateLimitCents(
-                Math.max(toMinor(subscription.price), 1),
+                Math.max(subscription.renewalCents, 1),
             ),
             // Nothing is owed: nothing is kept. UPI and card take the ₹1
             // check to authorise, refunded once captured (DEC-064).
@@ -537,11 +538,19 @@ export class AutopayService {
                 price: true,
                 currency: true,
                 timezone: true,
-                plan: { select: { name: true } },
+                plan: { select: { name: true, ...RATED_SALE_SELECT } },
             },
         });
         if (!sub) throw new NotFoundException("Subscription not found");
         const renews = sub.status === "ACTIVE" && !sub.cancelAtPeriodEnd;
+        // What the next renewal comes to: the price they are on under the
+        // plan's GST as it stands now (`sale-price.ts`).
+        const renewal = await saleChargeInTx(
+            prisma,
+            organizationId,
+            toMinor(sub.price),
+            sub.plan,
+        );
         return {
             plan: sub.plan.name,
             autopay: await this.line(organizationId, subscriptionId, {
@@ -550,7 +559,7 @@ export class AutopayService {
             }),
             paid,
             nextPaymentAt: renews ? sub.currentPeriodEnd.toISOString() : null,
-            nextAmount: renews ? fromMinor(toMinor(sub.price)) : null,
+            nextAmount: renews ? fromMinor(renewal.payCents) : null,
             currency: sub.currency,
             timezone: sub.timezone,
         };
@@ -559,10 +568,15 @@ export class AutopayService {
     private async liveSubscription(
         organizationId: string,
         subscriptionId: string,
-    ): Promise<{ id: string; price: Prisma.Decimal }> {
+    ): Promise<{ id: string; renewalCents: number }> {
         const subscription = await prisma.customerSubscription.findFirst({
             where: { id: subscriptionId, organizationId },
-            select: { id: true, status: true, price: true },
+            select: {
+                id: true,
+                status: true,
+                price: true,
+                plan: { select: RATED_SALE_SELECT },
+            },
         });
         if (!subscription) {
             throw new NotFoundException("Subscription not found");
@@ -574,7 +588,16 @@ export class AutopayService {
                 details: { reason: "ended" },
             });
         }
-        return subscription;
+        // The limit covers what a renewal comes to: the price they are on
+        // with the plan's GST added where the business adds it, so a
+        // mandate set up today is never too low for its own renewal.
+        const renewal = await saleChargeInTx(
+            prisma,
+            organizationId,
+            toMinor(subscription.price),
+            subscription.plan,
+        );
+        return { id: subscription.id, renewalCents: renewal.payCents };
     }
 
     private async assertOffered(

@@ -1,6 +1,9 @@
 import { toMoneyString } from "../../common/money";
+import type { GstOnPrice } from "../invoices/gst-price";
 import { isPastDue } from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
+import type { IssuedLineForWords } from "../invoices/line-gst-words";
+import { invoiceLineGst } from "../invoices/line-gst-words";
 
 /**
  * The rest of what a signed-in customer may see of their own record
@@ -41,6 +44,13 @@ export interface AccountInvoiceDue {
     /** A registered business's exempt paper (D15), as the pay page says. */
     billOfSupply: boolean;
     pay: AccountInvoicePay;
+    /**
+     * The GST in `total`, from the paper's frozen sums (12 Oct 2026), when
+     * it bills one thing (a plan's renewal, a pack, a course): the row says
+     * it before the customer pays. Null when nothing is said about GST, or
+     * the paper has several lines, which its pay page says line by line.
+     */
+    gst: GstOnPrice | null;
 }
 
 export function invoiceDueView(
@@ -54,14 +64,15 @@ export function invoiceDueView(
         currency: string;
         kind: string;
         sellerGstin: string | null;
-        lines: {
+        lines: ({
             description: string;
             gstRate: { toString(): string } | null;
-        }[];
+        } & Partial<IssuedLineForWords>)[];
     },
     pay: AccountInvoicePay,
     now: Date,
 ): AccountInvoiceDue {
+    const only = row.lines.length === 1 ? row.lines[0] : null;
     const what = row.lines.length > 0 ? row.lines[0].description.trim() : "";
     return {
         ref: row.id,
@@ -74,6 +85,10 @@ export function invoiceDueView(
         currency: row.currency,
         billOfSupply: isBillOfSupply(row),
         pay,
+        gst:
+            only?.amount != null
+                ? invoiceLineGst({ ...only, amount: only.amount })
+                : null,
     };
 }
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { formatMoneyMajor } from "@/lib/format/money";
+import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { FormSheet } from "@/components/shared/form-sheet";
@@ -14,6 +15,8 @@ import { runAction } from "@/lib/api/run-action";
 import { enrol } from "@/lib/courses/actions";
 import { booksLine, seatsLeftLine } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { addedGst, addedGstWords } from "@/lib/gst/item-words";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -30,6 +33,8 @@ export type EnrolCourse = Pick<
     | "seatsLeft"
     | "sessions"
     | "sessionsLeft"
+    | "gstRate"
+    | "gstPriceMode"
 >;
 
 /**
@@ -40,6 +45,12 @@ export type EnrolCourse = Pick<
  * A course page passes its one course; a contact page passes the courses
  * open to them and its own person, and the sheet asks which course instead
  * of who.
+ *
+ * A GST-registered business's course with no GST rate is asked for one
+ * here, in place (12 Oct 2026): the rate is saved on the course and the
+ * same enrolment goes through. Where GST is added to the course's price,
+ * the amount to pay is said under "What they pay", for the price typed
+ * (`gst`): GST is added to a price typed for one person too.
  */
 export function EnrolDialog({
     open,
@@ -48,7 +59,13 @@ export function EnrolDialog({
     contacts,
     initialContactId,
     invoicesOnEnrol,
+    gst = null,
 }: {
+    /**
+     * Whether the business is GST-registered, and its own way of carrying
+     * GST. Absent or unread: the price is said as typed.
+     */
+    gst?: GstAsk | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     /** One course, or the ones to choose from. */
@@ -65,6 +82,10 @@ export function EnrolDialog({
     const [contactId, setContactId] = useState(initialContactId ?? "");
     const [price, setPrice] = useState(first?.price ?? "");
     const [busy, setBusy] = useState(false);
+    const rates = useGstRateStep({
+        then: "enrol them",
+        continueLabel: "Save and enrol",
+    });
     const course = courses.find((c) => c.id === courseId);
     const person = contacts.find((c) => c.id === contactId);
     const priceOk = /^\d{1,9}(\.\d{1,2})?$/.test(price.trim());
@@ -88,21 +109,29 @@ export function EnrolDialog({
     }
 
     const n = course?.sessionsLeft ?? 0;
+    // GST on top of the price typed, where the business or the course adds
+    // it: a preview by the API's own rule, and the invoice is the truth.
+    const added = course && priceOk ? addedGst(price, course, gst) : null;
 
     async function save() {
         if (!course) return showError("Choose a course.");
         if (!contactId) return showError("Choose who is enrolling.");
         if (!priceOk) return showError("Give a price like 240 or 240.50.");
+        // No GST rate on the course: chosen here, saved on it, then
+        // they are enrolled.
         const res = await runAction(
             () =>
-                enrol(course.id, {
-                    contactId,
-                    ...(price.trim() !== course.price
-                        ? { price: price.trim() }
-                        : {}),
-                }),
+                rates.run(() =>
+                    enrol(course.id, {
+                        contactId,
+                        ...(price.trim() !== course.price
+                            ? { price: price.trim() }
+                            : {}),
+                    }),
+                ),
             { setBusy },
         );
+        // Unreached, or the rate sheet was closed: nobody was enrolled.
         if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(
@@ -114,69 +143,93 @@ export function EnrolDialog({
     }
 
     return (
-        <FormSheet
-            open={open}
-            title={
-                initialContactId && person
-                    ? `Enrol ${person.name}`
-                    : "Enrol someone"
-            }
-            description={
-                course
-                    ? `${course.name} · ${seatsLeftLine(course)}`
-                    : "There is no open course with a seat left."
-            }
-            pending={busy}
-            doneOnly={!course}
-            doneLabel="Close"
-            saveLabel="Enrol and book"
-            savingLabel="Enrolling…"
-            fieldsClassName="block"
-            onClose={() => onOpenChange(false)}
-            onSubmit={save}
-        >
-            {course ? (
-                <div className="grid gap-4">
-                    {choosing ? (
+        <>
+            <FormSheet
+                open={open}
+                title={
+                    initialContactId && person
+                        ? `Enrol ${person.name}`
+                        : "Enrol someone"
+                }
+                description={
+                    course
+                        ? `${course.name} · ${seatsLeftLine(course)}`
+                        : "There is no open course with a seat left."
+                }
+                pending={busy}
+                doneOnly={!course}
+                doneLabel="Close"
+                saveLabel="Enrol and book"
+                savingLabel="Enrolling…"
+                fieldsClassName="block"
+                onClose={() => onOpenChange(false)}
+                onSubmit={save}
+            >
+                {course ? (
+                    <div className="grid gap-4">
+                        {choosing ? (
+                            <div className="grid gap-1.5">
+                                <Label htmlFor={ids.course}>Course</Label>
+                                <OptionSelect
+                                    id={ids.course}
+                                    value={courseId}
+                                    onValueChange={chooseCourse}
+                                    options={courses.map((c) => ({
+                                        value: c.id,
+                                        label: `${c.name} · ${seatsLeftLine(c)}`,
+                                    }))}
+                                />
+                            </div>
+                        ) : null}
                         <div className="grid gap-1.5">
-                            <Label htmlFor={ids.course}>Course</Label>
-                            <OptionSelect
-                                id={ids.course}
-                                value={courseId}
-                                onValueChange={chooseCourse}
-                                options={courses.map((c) => ({
-                                    value: c.id,
-                                    label: `${c.name} · ${seatsLeftLine(c)}`,
-                                }))}
+                            <Label htmlFor={ids.who}>Who</Label>
+                            <ContactPicker
+                                id={ids.who}
+                                contacts={contacts}
+                                value={contactId}
+                                onValueChange={setContactId}
                             />
                         </div>
-                    ) : null}
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.who}>Who</Label>
-                        <ContactPicker
-                            id={ids.who}
-                            contacts={contacts}
-                            value={contactId}
-                            onValueChange={setContactId}
-                        />
+                        <Field
+                            label="What they pay"
+                            hint={
+                                added
+                                    ? addedGstWords(added, course.currency)
+                                    : undefined
+                            }
+                        >
+                            <MoneyInput
+                                id={ids.price}
+                                currency={course.currency}
+                                value={price}
+                                onValueChange={setPrice}
+                                aria-invalid={!priceOk}
+                            />
+                        </Field>
+                        <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
+                            {booksLine(course)}
+                            {invoicesOnEnrol
+                                ? ` · invoice ${
+                                      !priceOk
+                                          ? "not set"
+                                          : added
+                                            ? formatMoney(
+                                                  added.payCents,
+                                                  course.currency,
+                                                  { decimals: "always" },
+                                              )
+                                            : formatMoneyMajor(
+                                                  price.trim(),
+                                                  course.currency,
+                                                  { decimals: "always" },
+                                              )
+                                  }. Nothing is charged and nobody is contacted.`
+                                : ". Payments is off, so no invoice is issued."}
+                        </p>
                     </div>
-                    <Field label="What they pay">
-                        <MoneyInput
-                            id={ids.price}
-                            currency={course.currency}
-                            value={price}
-                            onValueChange={setPrice}
-                            aria-invalid={!priceOk}
-                        />
-                    </Field>
-                    <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
-                        {booksLine(course)}
-                        {invoicesOnEnrol
-                            ? ` · invoice ${priceOk ? formatMoneyMajor(price.trim(), course.currency, { decimals: "always" }) : "not set"}. Nothing is charged and nobody is contacted.`
-                            : ". Payments is off, so no invoice is issued."}
-                    </p>
-                </div>
-            ) : null}
-        </FormSheet>
+                ) : null}
+            </FormSheet>
+            {rates.step}
+        </>
     );
 }

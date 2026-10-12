@@ -2,6 +2,7 @@ import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { SubscriptionsScreen } from "@/components/subscriptions/subscriptions-screen";
 import { membershipPlansLock, onlinePaymentsLock } from "@/lib/billing/access";
+import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -66,7 +67,7 @@ export default async function SubscriptionsPage({
             listPlansOptional(),
             modulesOrUnknown(),
         ]);
-    const [contacts, renewals, charges, settings, autopay, access] =
+    const [contacts, renewals, charges, settings, autopay, access, rates] =
         await Promise.all([
             canWrite ? contactPickerOptions() : Promise.resolve([]),
             getRenewals().catch(() => null),
@@ -77,6 +78,8 @@ export default async function SubscriptionsPage({
             // A plan without memberships or online payments starts no new one;
             // the ones it has keep renewing.
             billingAccessOrNull(),
+            // What is on sale with no GST rate; null draws no notice.
+            readMissingRates(),
         ]);
     const plans = planRead.state === "ok" ? planRead.data : null;
     const appointments = modules
@@ -117,6 +120,7 @@ export default async function SubscriptionsPage({
                 autopayOffered={autopay?.offered ?? false}
                 newLocked={onlinePaymentsLock(access, "subscriptions")}
                 plansLocked={membershipPlansLock(access)}
+                missingRates={rates}
             />
         </PageContainer>
     );

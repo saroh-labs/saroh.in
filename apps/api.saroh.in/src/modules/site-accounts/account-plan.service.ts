@@ -7,8 +7,9 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { toMoneyString } from "../../common/money";
+import { toMinor, toMoneyString } from "../../common/money";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
+import { RATED_SALE_SELECT, saleChargeInTx } from "../invoices/sale-price";
 import { AutopayService } from "../payments/autopay.service";
 import { subscriptionChargesUnderWay } from "../payments/charge-under-way";
 import { MandateChargesService } from "../payments/mandate-charges.service";
@@ -179,7 +180,13 @@ export class AccountPlanService {
                     cancelAtPeriodEnd: true,
                     pausedUntil: true,
                     ...ALLOWANCE_SELECT,
-                    plan: { select: { name: true, classesPerMonth: true } },
+                    plan: {
+                        select: {
+                            name: true,
+                            classesPerMonth: true,
+                            ...RATED_SALE_SELECT,
+                        },
+                    },
                 },
             }),
             takesPaymentOnline(prisma, organizationId),
@@ -198,6 +205,13 @@ export class AccountPlanService {
                         : Promise.resolve(null),
                 ]);
                 const underWay = charging.get(row.id) ?? null;
+                // What the next renewal comes to, GST and all.
+                const renewal = await saleChargeInTx(
+                    prisma,
+                    organizationId,
+                    toMinor(row.price),
+                    row.plan,
+                );
                 const payNow =
                     overdue &&
                     !underWay &&
@@ -229,7 +243,7 @@ export class AccountPlanService {
                         : null;
                 return {
                     ...subscriptionView({
-                        row,
+                        row: { ...row, gst: renewal.gst },
                         classes: month,
                         payNow,
                         membersCanPause: pausing,

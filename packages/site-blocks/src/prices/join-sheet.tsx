@@ -11,6 +11,8 @@ import { AutopayMethodChoice, landOnBusinessSite } from "../autopay/choice";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
 import { PayOption } from "../booking-flow/steps/pay-option";
+import type { GstOnPrice } from "../lib/gst-price";
+import { gstUnderWords, payPriceWords } from "../lib/gst-price";
 import { cn } from "../lib/utils";
 import type { JoinApi, JoinResult, PlanJoinStarted } from "./api";
 import { joinedMessage, priceKey, PRICES_OFFLINE } from "./api";
@@ -38,6 +40,11 @@ import { planEvery, planPeriod } from "./plan-words";
  * customer lands on the page on the business's site that says how autopay
  * stands. eMandate: the join is paid first, then authorised (nothing taken).
  * Without autopay methods, nothing here promises automatic renewals.
+ *
+ * **GST is said before paying.** Every amount here is the amount to pay
+ * for the first period, and where the plan (or the started payment)
+ * carries `gst`, the line under it says the GST in or on it: "Includes
+ * ₹305.08 GST (18%)", or "₹2,000 + ₹360 GST (18%)" under ₹2,360.
  */
 
 /** How often, and how long, the sheet asks whether the payment landed. */
@@ -52,6 +59,11 @@ export interface JoinablePlan {
     price: string;
     currency: string;
     interval: string;
+    /**
+     * The GST in or on the price, and the amount to pay; null or absent:
+     * nothing is said about GST. Narrowed where it is read.
+     */
+    gst?: GstOnPrice | null;
 }
 
 type Phase =
@@ -298,7 +310,23 @@ function Join({
         return () => clearTimeout(timer);
     }, [phase]);
 
-    const money = accountMoney(plan.price, plan.currency);
+    // What the first period costs to pay, and the GST in or on it: the
+    // server's own sum once the payment has started, else the plan's as
+    // the page listed it. The API's numbers; nothing is added up here.
+    const underWay =
+        phase.kind === "window" || phase.kind === "confirming"
+            ? phase.started
+            : null;
+    const money = underWay
+        ? accountMoney(underWay.total, underWay.currency)
+        : payPriceWords(
+              accountMoney(plan.price, plan.currency),
+              plan.gst,
+              plan.currency,
+          );
+    const gstLine = underWay
+        ? gstUnderWords(underWay.gst, underWay.currency)
+        : gstUnderWords(plan.gst, plan.currency);
 
     if (phase.kind === "authorising") {
         return (
@@ -397,7 +425,21 @@ function Join({
         <>
             <div className="border-site-border mt-3 flex items-center gap-2.5 border-t py-2.5 text-sm">
                 <span className="min-w-0 flex-1">{every ?? "Price"}</span>
-                <span className="font-semibold tabular-nums">{money}</span>
+                {gstLine ? (
+                    <span className="text-right">
+                        <span className="block font-semibold tabular-nums">
+                            {money}
+                        </span>
+                        <span
+                            data-price-gst=""
+                            className="text-site-muted block text-xs tabular-nums"
+                        >
+                            {gstLine}
+                        </span>
+                    </span>
+                ) : (
+                    <span className="font-semibold tabular-nums">{money}</span>
+                )}
             </div>
             <div className="border-site-border flex items-center gap-2.5 border-t py-2.5 text-sm">
                 <span className="min-w-0 flex-1">Starts</span>

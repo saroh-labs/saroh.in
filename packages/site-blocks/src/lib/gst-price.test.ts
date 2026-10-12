@@ -8,7 +8,9 @@ import {
     gstOnPriceOf,
     gstPayWords,
     gstPriceWords,
+    gstUnderWords,
     isGstOnPrice,
+    payPriceWords,
     startOfLine,
 } from "./gst-price";
 
@@ -97,6 +99,26 @@ describe("a price that is only being browsed", () => {
     it("says + GST only when GST comes on top", () => {
         expect(browsePriceWords("₹1,000", true)).toBe("₹1,000 + GST");
         expect(browsePriceWords("₹1,000", false)).toBe("₹1,000");
+    });
+});
+
+describe("beside a Join, Buy or Pay button", () => {
+    it("names the API's amount to pay when GST is added, else the price as written", () => {
+        expect(payPriceWords("₹1,000", added, "INR")).toBe("₹1,180");
+        expect(payPriceWords("₹1,000", included, "INR")).toBe("₹1,000");
+        for (const none of [null, undefined, "18", { mode: "ADDED" }]) {
+            expect(payPriceWords("₹1,000", none, "INR")).toBe("₹1,000");
+        }
+    });
+
+    it("says the GST in or on that amount on a line of its own, or nothing", () => {
+        expect(gstUnderWords(added, "INR")).toBe("₹1,000 + ₹180 GST (18%)");
+        expect(gstUnderWords(included, "INR")).toBe(
+            "Includes ₹152.54 GST (18%)",
+        );
+        for (const none of [null, undefined, "18", { mode: "ADDED" }]) {
+            expect(gstUnderWords(none, "INR")).toBeNull();
+        }
     });
 });
 

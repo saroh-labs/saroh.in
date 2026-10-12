@@ -48,6 +48,45 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/class-packs/draft-actions", () => actions);
 
+// The product's select opens a portal jsdom can't press: a native select
+// stands in, with the same options, placeholder and wiring.
+vi.mock("@saroh/ui/option-select", () => ({
+    OptionSelect: ({
+        id,
+        value,
+        onValueChange,
+        options,
+        placeholder,
+        disabled,
+        ...aria
+    }: {
+        id?: string;
+        value: string;
+        onValueChange: (v: string) => void;
+        options: { value: string; label: string }[];
+        placeholder?: string;
+        disabled?: boolean;
+        "aria-invalid"?: boolean;
+        "aria-describedby"?: string;
+    }) => (
+        <select
+            id={id}
+            aria-invalid={aria["aria-invalid"]}
+            aria-describedby={aria["aria-describedby"]}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onValueChange(e.target.value)}
+        >
+            {placeholder ? <option value="">{placeholder}</option> : null}
+            {options.map((o) => (
+                <option key={o.value} value={o.value}>
+                    {o.label}
+                </option>
+            ))}
+        </select>
+    ),
+}));
+
 import { PackEditor } from "@/components/class-packs/pack-editor/pack-editor";
 
 const SERVICES: PackServiceOption[] = [
@@ -79,6 +118,9 @@ const TEN: PackValues = {
     serviceIds: ["hatha"],
     kind: "CLASSES",
     firstPackOnly: false,
+    gstRate: null,
+    sacCode: null,
+    gstPriceMode: null,
 };
 
 function rec(over: Partial<PackEditorRecord> = {}): PackEditorRecord {
@@ -133,6 +175,7 @@ function render(
     initial: PackEditorRecord | null,
     sold: number | null = 0,
     empty: PackValues = newPackValues("CLASSES", SERVICES, "INR"),
+    gst?: { asked: boolean; priceMode: "INCLUDED" | "ADDED" | null },
 ) {
     act(() => {
         root.render(
@@ -141,6 +184,7 @@ function render(
                 emptyValues={initial?.values ?? empty}
                 services={SERVICES}
                 sold={sold}
+                gst={gst}
                 canEdit
             />,
         );
@@ -159,6 +203,28 @@ function input(label: string): HTMLInputElement {
         throw new Error(`No field ${label}`);
     }
     return hit;
+}
+
+/** A select by its label, as the GST fields draw them. */
+function select(label: string): HTMLSelectElement {
+    const l = Array.from(host.querySelectorAll("label")).find((x) =>
+        x.textContent.trim().startsWith(label),
+    );
+    const el = l && document.getElementById(l.htmlFor);
+    if (!(el instanceof HTMLSelectElement)) {
+        throw new Error(`No select ${label}`);
+    }
+    return el;
+}
+
+function pick(box: HTMLSelectElement, value: string) {
+    act(() => {
+        Object.getOwnPropertyDescriptor(
+            HTMLSelectElement.prototype,
+            "value",
+        )?.set?.call(box, value);
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+    });
 }
 
 function type(el: HTMLInputElement, value: string) {
@@ -219,6 +285,11 @@ describe("the Pack Editor", () => {
             serviceIds: ["hatha"],
             kind: "CLASSES",
             firstPackOnly: false,
+            // Nothing is asked of a business that isn't registered: its
+            // GST goes as it stands, not set.
+            gstRate: null,
+            sacCode: null,
+            gstPriceMode: null,
         });
         expect(window.location.pathname).toBe("/class-packs/pk-1/edit");
         expect(text()).toContain("Saved as a draft. Not on sale");
@@ -352,5 +423,145 @@ describe("the Pack Editor", () => {
         );
         expect(text()).toContain("Changes not live");
         expect(button("Discard changes")).toBeTruthy();
+    });
+});
+
+describe("a pack's GST (12 Oct 2026)", () => {
+    const ASKED = { asked: true, priceMode: "ADDED" as const };
+
+    it("shows a business that isn't registered none of it, and never holds it up", () => {
+        render(LIVE);
+        expect(text()).not.toContain("GST");
+        expect(text()).not.toContain("SAC code");
+        expect(text()).not.toContain("to fix before publishing");
+    });
+
+    it("asks a registered business for the rate with the price, with the quiet select and the SAC code", () => {
+        render(LIVE, 0, undefined, ASKED);
+        expect(select("GST rate").value).toBe("");
+        expect(select("GST rate").options[0].textContent).toBe("Choose a rate");
+        expect(
+            Array.from(select("GST on this price").options).map(
+                (o) => o.textContent,
+            ),
+        ).toEqual([
+            "Same as the business (GST is added)",
+            "Includes GST",
+            "GST is added",
+        ]);
+        expect(text()).toContain("SAC code (optional)");
+        expect(text()).toContain(
+            "Only if this one is priced differently from the rest.",
+        );
+    });
+
+    it("says what the rate does to the price, by the business's way", () => {
+        render(
+            rec({
+                status: "ACTIVE",
+                revision: 4,
+                canDelete: false,
+                values: { ...TEN, gstRate: "18" },
+                published: { ...TEN, gstRate: "18" },
+            }),
+            0,
+            undefined,
+            ASKED,
+        );
+        expect(text()).toContain("The rate added on top of the price.");
+    });
+
+    it("stops Publish for a priced pack with no rate, beside the field, until one is chosen", async () => {
+        render(LIVE, 0, undefined, ASKED);
+        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(button("Publish changes").disabled).toBe(true);
+        expect(text()).toContain(
+            "1 thing to fix before publishing: choose a GST rate. Pick 0% if it's exempt or nil-rated.",
+        );
+        expect(text()).not.toContain("nil-rated..");
+
+        actions.savePackDraft.mockResolvedValue(
+            ok(
+                rec({
+                    status: "ACTIVE",
+                    revision: 5,
+                    hasPendingChanges: true,
+                    published: TEN,
+                    canDelete: false,
+                    values: { ...TEN, gstRate: "18" },
+                }),
+            ),
+        );
+        pick(select("GST rate"), "18");
+        await wait(900);
+        expect(actions.savePackDraft).toHaveBeenCalledWith(
+            "pk-1",
+            expect.objectContaining({
+                gstRate: "18",
+                sacCode: null,
+                gstPriceMode: null,
+            }),
+            4,
+        );
+        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
+            "true",
+        );
+        expect(button("Publish changes").disabled).toBe(false);
+        expect(text()).toContain("GST rate not set → 18%");
+    });
+
+    it("autosaves exempt, the way and the SAC code as the API takes them", async () => {
+        render(LIVE, 0, undefined, ASKED);
+        actions.savePackDraft.mockResolvedValue(
+            ok(
+                rec({
+                    status: "ACTIVE",
+                    revision: 5,
+                    hasPendingChanges: true,
+                    published: TEN,
+                    canDelete: false,
+                    values: {
+                        ...TEN,
+                        gstRate: "0",
+                        sacCode: "999723",
+                        gstPriceMode: "INCLUDED",
+                    },
+                }),
+            ),
+        );
+        pick(select("GST rate"), "0");
+        pick(select("GST on this price"), "INCLUDED");
+        type(input("SAC code"), "9997 23");
+        await wait(900);
+        expect(actions.savePackDraft).toHaveBeenLastCalledWith(
+            "pk-1",
+            expect.objectContaining({
+                gstRate: "0",
+                sacCode: "999723",
+                gstPriceMode: "INCLUDED",
+            }),
+            4,
+        );
+        expect(text()).not.toContain("Choose a GST rate");
+    });
+
+    it("reads a saved pack's rate back into the box", () => {
+        render(
+            rec({
+                status: "ACTIVE",
+                revision: 4,
+                canDelete: false,
+                values: { ...TEN, gstRate: "18", gstPriceMode: "INCLUDED" },
+                published: { ...TEN, gstRate: "18", gstPriceMode: "INCLUDED" },
+            }),
+            0,
+            undefined,
+            ASKED,
+        );
+        expect(select("GST rate").value).toBe("18");
+        expect(select("GST on this price").value).toBe("INCLUDED");
+        expect(text()).toContain(
+            "The rate the price includes. It isn't added on top.",
+        );
     });
 });

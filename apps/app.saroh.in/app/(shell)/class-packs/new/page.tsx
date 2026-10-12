@@ -45,6 +45,7 @@ export default async function NewClassPackPage({
             )}
             services={context.services}
             sold={0}
+            gst={context.gst}
             canEdit
         />
     );

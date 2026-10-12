@@ -1,11 +1,14 @@
+import type { GstOnPrice } from "../lib/gst-price";
+
 /**
  * The shapes of what DEC-142 added to the customer's account: invoices
  * still to pay, places in a class's line, courses, the email choice and
  * what changed since the last visit. The same shapes the API's allow-list
  * (`site-accounts/account-details-view.ts`) sends.
  *
- * Types only, with no imports, so Home's shape (`model.ts`) and their words
- * (`details-model.ts`) both read them without reading each other.
+ * Types only, importing nothing from the account, so Home's shape
+ * (`model.ts`) and their words (`details-model.ts`) both read them without
+ * reading each other.
  */
 
 export interface AccountInvoiceDue {
@@ -16,8 +19,16 @@ export interface AccountInvoiceDue {
     issuedAt: string | null;
     dueAt: string | null;
     overdue: boolean;
+    /** The amount to pay, GST and all. */
     total: string;
     currency: string;
+    /**
+     * The GST in `total`, when the paper bills one thing (a renewal, a
+     * pack, a course); null for none or for a paper with several lines,
+     * which its pay page says line by line. Absent from an older API.
+     * Narrowed where it is read (`gstOnPriceOf`).
+     */
+    gst?: GstOnPrice | null;
     billOfSupply: boolean;
     /**
      * Through a pay link made when they press "Pay now" ("online"), not

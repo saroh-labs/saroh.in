@@ -162,7 +162,9 @@ export {
     gstOnPriceOf,
     gstPayWords,
     gstPriceWords,
+    gstUnderWords,
     isGstOnPrice,
+    payPriceWords,
     startOfLine,
 } from "./lib/gst-price";
 export type { GstOnPrice } from "./lib/gst-price";

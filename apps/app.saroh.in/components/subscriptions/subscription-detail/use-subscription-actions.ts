@@ -5,6 +5,7 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { useHold } from "@/components/shared/use-hold";
 import { UNREACHED } from "@/lib/api/unreached";
 import { newPayLink as makePayLink } from "@/lib/invoices/link-actions";
@@ -29,6 +30,10 @@ import type { CollectionRow } from "@/lib/subscriptions/view";
  * Its toast carries the Undo (the inverse call), and `showUndo` says how
  * that went. Cancel tells the customer, so it waits ten seconds with Undo
  * before anything is written (`useHold`).
+ *
+ * A change to a plan with no GST rate (a GST-registered business's) is
+ * asked for the rate in place, saved on the plan, and booked again
+ * (`rateStep`, which the screen draws once).
  */
 export function useSubscriptionActions(
     sub: Subscription,
@@ -42,10 +47,18 @@ export function useSubscriptionActions(
     const [busyDate, setBusyDate] = useState<string | null>(null);
     const [payLink, setPayLink] = useState<string | null>(null);
     const { send } = useHold();
+    const rates = useGstRateStep({
+        then: "move them to this plan",
+        continueLabel: "Save and change plan",
+    });
 
-    /** One call, then the page reads again; the toast offers the way back. */
+    /**
+     * One call, then the page reads again; the toast offers the way back.
+     * A call that answers `null` was stopped by the person (the GST rate
+     * sheet was closed): nothing happened and nothing is said.
+     */
     async function run<T extends { ok: boolean; error?: string }>(
-        call: () => Promise<T>,
+        call: () => Promise<T | null>,
         done: (res: T) => void,
     ): Promise<boolean> {
         setBusy(true);
@@ -56,6 +69,7 @@ export function useSubscriptionActions(
             error: UNREACHED,
         }));
         setBusy(false);
+        if (!res) return false;
         if (!res.ok) {
             showError(res.error ?? "That didn't go through. Try again.");
             router.refresh();
@@ -109,7 +123,9 @@ export function useSubscriptionActions(
         const plan = plans.find((p) => p.id === planId);
         const before = sub.pendingPlan?.id ?? null;
         void run(
-            () => changePlan(sub.id, planId),
+            // No GST rate on the plan they move to: chosen here, saved on
+            // it, then the change is booked.
+            () => rates.run(() => changePlan(sub.id, planId)),
             () => {
                 closeStep();
                 showUndo(
@@ -246,5 +262,7 @@ export function useSubscriptionActions(
         toggleSkip,
         newPayLink,
         chargeAgain,
+        /** The GST rate sheet a plan change may open; drawn once. */
+        rateStep: rates.step,
     };
 }

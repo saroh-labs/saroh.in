@@ -59,6 +59,11 @@ vi.mock("@saroh/ui/option-select", () => ({
     ),
 }));
 vi.mock("@/lib/subscriptions/actions", () => actions);
+// The notice's and the rate step's Server Actions reach the API.
+vi.mock("@/lib/gst-rates/actions", () => ({
+    saveGstRates: vi.fn(),
+    loadMissingRates: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),
 }));

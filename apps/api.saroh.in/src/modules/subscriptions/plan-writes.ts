@@ -7,6 +7,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
+import { isGstRate } from "../invoices/gst";
 import { fromCents, toCents } from "../invoices/totals";
 import type { PlanInputDto } from "./dto";
 import type { PlanActor } from "./plan-events";
@@ -40,6 +41,30 @@ function planNotFound(): never {
     throw new NotFoundException("Plan not found");
 }
 
+/**
+ * The GST columns a save names (12 Oct 2026): the rate one GST has, or null
+ * to clear it; the SAC code; the plan's own way of carrying GST.
+ */
+export function gstColumns(dto: PlanInputDto) {
+    if (
+        dto.gstRate !== undefined &&
+        dto.gstRate !== null &&
+        !isGstRate(dto.gstRate)
+    ) {
+        fieldError(
+            `${dto.gstRate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            "gstRate",
+        );
+    }
+    return {
+        ...(dto.gstRate !== undefined ? { gstRate: dto.gstRate } : {}),
+        ...(dto.sacCode !== undefined ? { sacCode: dto.sacCode } : {}),
+        ...(dto.gstPriceMode !== undefined
+            ? { gstPriceMode: dto.gstPriceMode }
+            : {}),
+    };
+}
+
 /** Create a plan and record it; answers with its id. */
 export async function createPlanRow(
     organizationId: string,
@@ -52,6 +77,7 @@ export async function createPlanRow(
     if (!price) fieldError("Set a price", "price");
     if (!currency) fieldError("Choose a currency", "currency");
     if (!interval) fieldError("Choose how often it renews", "interval");
+    const gst = gstColumns(dto);
     const created = await prisma.$transaction(async (tx) => {
         await lockPlanNames(tx, organizationId);
         await assertPlanNameFree(tx, organizationId, name);
@@ -64,6 +90,7 @@ export async function createPlanRow(
                 currency,
                 interval,
                 classesPerMonth: dto.classesPerMonth ?? null,
+                ...gst,
             },
             select: { id: true, ...PLAN_SNAPSHOT_SELECT },
         });
@@ -90,6 +117,7 @@ export async function updatePlanRow(
     id: string,
     dto: PlanInputDto,
 ): Promise<void> {
+    const gst = gstColumns(dto);
     await prisma.$transaction(async (tx) => {
         if (dto.name !== undefined) await lockPlanNames(tx, organizationId);
         // Held to the commit, so the "before" the event records is the plan
@@ -126,6 +154,7 @@ export async function updatePlanRow(
             ...(dto.classesPerMonth !== undefined
                 ? { classesPerMonth: dto.classesPerMonth }
                 : {}),
+            ...gst,
         };
         await tx.subscriptionPlan.updateMany({
             where: { id, organizationId },

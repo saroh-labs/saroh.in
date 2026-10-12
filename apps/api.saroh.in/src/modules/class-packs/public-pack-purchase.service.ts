@@ -7,12 +7,20 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { toMoneyString } from "../../common/money";
 import { notTakingOrders } from "../billing/paused-errors";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import {
+    priceTermsFor,
+    RATED_SALE_SELECT,
+    saleCharge,
+    saleChargeInTx,
+} from "../invoices/sale-price";
 import { contactName } from "../invoices/serialize";
+import { toCents } from "../invoices/totals";
 import { siteTakingOrders, withPause } from "../orders/checkout-paused";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { PaymentsService } from "../payments/payments.service";
@@ -119,14 +127,30 @@ export class PublicPackPurchaseService {
                     price: true,
                     currency: true,
                     kind: true,
+                    ...RATED_SALE_SELECT,
                 },
             }),
             takesOnlinePayment(organizationId),
             // A website a lower plan paused sells nothing online (#800).
             siteTakingOrders(organizationId, customer.siteId),
         ]);
+        // How the business's prices carry GST, for each pack's words; read
+        // only when a pack has a rate.
+        const terms = await priceTermsFor(prisma, organizationId, packs);
         return withPause(
-            { payOnline, packs: packs.map(packOnSaleView) },
+            {
+                payOnline,
+                packs: packs.map((pack) =>
+                    packOnSaleView(
+                        pack,
+                        saleCharge(
+                            toCents(toMoneyString(pack.price)),
+                            pack,
+                            terms,
+                        ).gst,
+                    ),
+                ),
+            },
             taking,
         );
     }
@@ -168,6 +192,7 @@ export class PublicPackPurchaseService {
                 status: true,
                 kind: true,
                 firstPackOnly: true,
+                ...RATED_SALE_SELECT,
             },
         });
         // A draft isn't published and an archived pack isn't sold: to the
@@ -186,7 +211,16 @@ export class PublicPackPurchaseService {
             });
         }
 
-        const terms = packTermsOf(pack);
+        // What it costs today: the price, or with GST added where the
+        // business adds it. Never refused for a missing rate: a customer
+        // can't choose one, and then it is the price, as before.
+        const charge = await saleChargeInTx(
+            prisma,
+            organizationId,
+            toCents(toMoneyString(pack.price)),
+            pack,
+        );
+        const terms = packTermsOf(pack, charge);
         const draft = await prisma.$transaction(async (tx) => {
             // One start at a time per customer, so two tabs can't both slip
             // under the open-attempts limit.
@@ -275,6 +309,7 @@ export class PublicPackPurchaseService {
             total: draft.total,
             currency: draft.currency,
             payment,
+            gst: charge.gst,
         });
     }
 

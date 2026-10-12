@@ -11,7 +11,9 @@ import { useState, useTransition } from "react";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { reportFailure } from "@/components/billing/plan-refusal";
+import { MissingRatesNotice } from "@/components/gst-rates/missing-rates-notice";
 import type { OnlinePaymentsLock } from "@/lib/billing/access";
+import type { MissingRates } from "@/lib/gst-rates/missing";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
@@ -28,6 +30,14 @@ import { MembersPauseRow } from "./members-pause-row";
 const NEW_PLAN_HREF = "/billing/plans/new";
 
 /**
+ * Under the tab, for a GST-registered business: a member keeps the price
+ * they joined at, and the plan's GST as it stands is on every invoice from
+ * then on, renewals included.
+ */
+export const PLANS_KEEP_GST =
+    "Changing a price only changes what's sold next. Everyone already on a plan keeps the price they joined at. A change to a plan's GST reaches them at their next renewal.";
+
+/**
  * Subscriptions → Plans (D3, after "Saroh Subscriptions", Plans tab): one
  * card per plan, which opens Plan Detail. Archive and Sell again act at once
  * and offer Undo, which calls the opposite, for the shared ten-second hold
@@ -41,6 +51,12 @@ const NEW_PLAN_HREF = "/billing/plans/new";
  * notice says so, with the way up, where "New plan" was; the plans stay
  * listed to open, edit and archive, but nothing new goes on sale ("New
  * plan" and "Sell again" are gone; the API refuses them too).
+ *
+ * A GST-registered business with priced things on sale and no GST rate
+ * reads one line saying so, with the sheet to choose them in, as Services
+ * and Invoices do (`missingRates`; unread, it says nothing). For such a
+ * business the line under it also says that a plan's GST reaches the
+ * members already on it at their next renewal.
  */
 export function PlansTab({
     plans,
@@ -49,7 +65,13 @@ export function PlansTab({
     settings = null,
     nowIso,
     locked = null,
+    missingRates = null,
 }: {
+    /**
+     * What is on sale with a price and no GST rate, for a GST-registered
+     * business; null when it couldn't be told, which draws nothing.
+     */
+    missingRates?: MissingRates | null;
     plans: Plan[] | null;
     canWrite: boolean;
     showClasses: boolean;
@@ -134,10 +156,14 @@ export function PlansTab({
                     nowIso={nowIso}
                 />
             ) : null}
+            {/* Priced things on sale with no GST rate, for a registered
+                business: one line, and the sheet to choose them in. */}
+            <MissingRatesNotice missing={missingRates} className="mb-3" />
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
                 <p className="flex-[1_1_280px] text-pretty text-[13px] text-foreground/75">
-                    Changing a price only changes what&apos;s sold next.
-                    Everyone already on a plan keeps what they agreed to.
+                    {missingRates?.registered
+                        ? PLANS_KEEP_GST
+                        : "Changing a price only changes what's sold next. Everyone already on a plan keeps what they agreed to."}
                 </p>
                 {canWrite && !locked ? (
                     <Button asChild>

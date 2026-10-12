@@ -40,6 +40,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useHold } from "@/components/shared/use-hold";
 
 import { runAction } from "@/lib/api/run-action";
+import type { GstAsk } from "@/lib/gst/item-words";
 import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
@@ -71,7 +72,10 @@ export function CoursePage({
     contacts,
     canWrite,
     now,
+    gst = null,
 }: {
+    /** The business's GST standing, for the enrol dialog's amount to pay. */
+    gst?: GstAsk | null;
     course: CourseDetail;
     contacts: ContactOption[];
     canWrite: boolean;
@@ -205,6 +209,7 @@ export function CoursePage({
                     onOpenChange={setEnrolling}
                     courses={[course]}
                     invoicesOnEnrol={course.invoicesOnEnrol}
+                    gst={gst}
                     contacts={contacts.filter(
                         (c) =>
                             !course.enrollments.some(

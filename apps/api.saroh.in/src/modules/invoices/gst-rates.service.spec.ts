@@ -14,6 +14,26 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
             count: jest.fn(),
         },
+        // Plans, class packs and courses carry a rate too (12 Oct 2026).
+        subscriptionPlan: {
+            findMany: jest.fn(),
+            findFirst: jest.fn(),
+            updateMany: jest.fn(),
+        },
+        subscriptionPlanEvent: { create: jest.fn() },
+        classPack: {
+            findMany: jest.fn(),
+            findFirst: jest.fn(),
+            updateMany: jest.fn(),
+        },
+        packEvent: { create: jest.fn() },
+        course: {
+            findMany: jest.fn(),
+            updateMany: jest.fn(),
+            count: jest.fn(),
+        },
+        customerSubscription: { groupBy: jest.fn() },
+        $queryRaw: jest.fn(),
     };
     return {
         ...actual,
@@ -49,6 +69,10 @@ import { loadTaxProfile } from "./order-invoicing";
 const profile = loadTaxProfile as jest.Mock;
 const services = prisma.service as unknown as Record<string, jest.Mock>;
 const products = prisma.product as unknown as Record<string, jest.Mock>;
+const db = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+const plans = db.subscriptionPlan!;
+const packs = db.classPack!;
+const courses = db.course!;
 
 const owner: OrganizationContext = {
     organizationId: "org_1",
@@ -76,6 +100,11 @@ beforeEach(() => {
     products.findMany!.mockResolvedValue([]);
     services.updateMany!.mockResolvedValue({ count: 1 });
     products.updateMany!.mockResolvedValue({ count: 1 });
+    plans.findMany!.mockResolvedValue([]);
+    packs.findMany!.mockResolvedValue([]);
+    courses.findMany!.mockResolvedValue([]);
+    courses.updateMany!.mockResolvedValue({ count: 1 });
+    db.customerSubscription!.groupBy!.mockResolvedValue([]);
 });
 
 describe("what is missing", () => {
@@ -88,6 +117,170 @@ describe("what is missing", () => {
         });
         expect(services.findMany).not.toHaveBeenCalled();
         expect(products.findMany).not.toHaveBeenCalled();
+        expect(plans.findMany).not.toHaveBeenCalled();
+        expect(packs.findMany).not.toHaveBeenCalled();
+        expect(courses.findMany).not.toHaveBeenCalled();
+    });
+
+    it("lists plans, class packs and courses with a price and no rate, after services and products", async () => {
+        services.findMany!.mockResolvedValue([
+            { id: "svc_pt", name: "PT", priceCents: 150_000, currency: "INR" },
+        ]);
+        plans.findMany!.mockResolvedValue([
+            {
+                id: "plan_gym",
+                name: "Gym monthly",
+                price: decimal("2000.00"),
+                currency: "INR",
+                gstPriceMode: "ADDED",
+            },
+        ]);
+        packs.findMany!.mockResolvedValue([
+            {
+                id: "pack_10",
+                name: "10 classes",
+                price: decimal("4500"),
+                currency: "INR",
+                gstPriceMode: null,
+            },
+        ]);
+        courses.findMany!.mockResolvedValue([
+            {
+                id: "course_yoga",
+                name: "Yoga foundations",
+                price: decimal("6000.50"),
+                currency: "INR",
+                gstPriceMode: null,
+            },
+        ]);
+        // Who is on the plan now, by the price each pays.
+        db.customerSubscription!.groupBy!.mockResolvedValue([
+            {
+                planId: "plan_gym",
+                price: decimal("1800"),
+                currency: "INR",
+                _count: { _all: 2 },
+            },
+            {
+                planId: "plan_gym",
+                price: decimal("2000"),
+                currency: "INR",
+                _count: { _all: 10 },
+            },
+        ]);
+        const read = await rates.missing(owner);
+        expect(read.items.map((i) => i.kind)).toEqual([
+            "SERVICE",
+            "PLAN",
+            "PACK",
+            "COURSE",
+        ]);
+        expect(read.items.slice(1)).toEqual([
+            {
+                kind: "PLAN",
+                id: "plan_gym",
+                name: "Gym monthly",
+                priceCents: 200_000,
+                currency: "INR",
+                canSet: true,
+                // Its own way of carrying GST, and who renews at it.
+                priceMode: "ADDED",
+                members: [
+                    { count: 2, price: "1800.00", currency: "INR" },
+                    { count: 10, price: "2000.00", currency: "INR" },
+                ],
+            },
+            {
+                kind: "PACK",
+                id: "pack_10",
+                name: "10 classes",
+                priceCents: 450_000,
+                currency: "INR",
+                canSet: true,
+            },
+            {
+                kind: "COURSE",
+                id: "course_yoga",
+                name: "Yoga foundations",
+                priceCents: 600_050,
+                currency: "INR",
+                canSet: true,
+            },
+        ]);
+        // A plan on sale, or an archived one people still renew on: each
+        // renewal is a tax invoice. Never a draft.
+        expect(plans.findMany!.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            price: { gt: 0 },
+            gstRate: null,
+            OR: [
+                { status: "ACTIVE" },
+                {
+                    status: "ARCHIVED",
+                    subscriptions: {
+                        some: { status: { in: ["ACTIVE", "PAUSED"] } },
+                    },
+                },
+            ],
+        });
+        expect(packs.findMany!.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            status: "ACTIVE",
+            price: { gt: 0 },
+            gstRate: null,
+        });
+        // Only a course taking enrolments.
+        expect(courses.findMany!.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            status: "OPEN",
+            price: { gt: 0 },
+            gstRate: null,
+        });
+    });
+
+    it("reads plans, packs and courses each with its own permission", async () => {
+        await rates.missing(roleWith("subscription:read"));
+        expect(plans.findMany).toHaveBeenCalled();
+        expect(packs.findMany).not.toHaveBeenCalled();
+        expect(courses.findMany).not.toHaveBeenCalled();
+        expect(services.findMany).not.toHaveBeenCalled();
+        jest.clearAllMocks();
+        profile.mockResolvedValue({ registered: true });
+        packs.findMany!.mockResolvedValue([]);
+        courses.findMany!.mockResolvedValue([]);
+        db.customerSubscription!.groupBy!.mockResolvedValue([]);
+        await rates.missing(roleWith("pack:read", "course:read"));
+        expect(packs.findMany).toHaveBeenCalled();
+        expect(courses.findMany).toHaveBeenCalled();
+        expect(plans.findMany).not.toHaveBeenCalled();
+    });
+
+    it("lets whoever sells packs fill in a pack's rate, and nothing else's", async () => {
+        packs.findMany!.mockResolvedValue([
+            {
+                id: "pack_10",
+                name: "10 classes",
+                price: decimal("4500"),
+                currency: "INR",
+                gstPriceMode: null,
+            },
+        ]);
+        courses.findMany!.mockResolvedValue([
+            {
+                id: "course_yoga",
+                name: "Yoga",
+                price: decimal("6000"),
+                currency: "INR",
+                gstPriceMode: null,
+            },
+        ]);
+        const read = await rates.missing(
+            roleWith("pack:read", "pack:sell", "course:read"),
+        );
+        expect(read.items.map((i) => [i.kind, i.canSet])).toEqual([
+            ["PACK", true],
+            ["COURSE", false],
+        ]);
     });
 
     it("lists priced things on sale with no rate, services first", async () => {
@@ -243,6 +436,128 @@ describe("saving rates", () => {
     });
 });
 
+describe("saving a plan's, a pack's and a course's rate", () => {
+    const tx = db;
+
+    it("saves a plan's rate under its lock, moves its revision and records the change", async () => {
+        plans.findFirst!.mockResolvedValue({ gstRate: null });
+        await expect(
+            rates.set(owner, {
+                items: [{ kind: "PLAN", id: "plan_gym", rate: "18" }],
+            }),
+        ).resolves.toEqual({ saved: 1 });
+        expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+        // Written to the published columns: the next invoice reads it.
+        expect(plans.updateMany).toHaveBeenCalledWith({
+            where: { id: "plan_gym", organizationId: "org_1" },
+            data: { gstRate: "18", draftRevision: { increment: 1 } },
+        });
+        expect(tx.subscriptionPlanEvent!.create).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                planId: "plan_gym",
+                kind: "PRICE_CHANGED",
+                actorKind: "TEAM",
+                actorUserId: "user_1",
+                changes: { gstRate: [null, "18"] },
+            },
+        });
+    });
+
+    it("saves a pack's rate with a CHANGED event, and a course's on its row", async () => {
+        packs.findFirst!.mockResolvedValue({ gstRate: null });
+        await rates.set(owner, {
+            items: [
+                { kind: "PACK", id: "pack_10", rate: "5" },
+                { kind: "COURSE", id: "course_yoga", rate: "0" },
+            ],
+        });
+        expect(packs.updateMany!.mock.calls[0][0]).toMatchObject({
+            where: { id: "pack_10", organizationId: "org_1" },
+            data: {
+                gstRate: "5",
+                draftRevision: { increment: 1 },
+                revisedById: "user_1",
+            },
+        });
+        expect(tx.packEvent!.create).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                packId: "pack_10",
+                kind: "CHANGED",
+                actorKind: "TEAM",
+                actorUserId: "user_1",
+                details: { gstRate: [null, "5"] },
+            },
+        });
+        // Exempt (0%) is a rate.
+        expect(courses.updateMany).toHaveBeenCalledWith({
+            where: { id: "course_yoga", organizationId: "org_1" },
+            data: { gstRate: "0" },
+        });
+    });
+
+    it("answers another business's plan, pack or course with a 404", async () => {
+        plans.findFirst!.mockResolvedValue(null);
+        packs.findFirst!.mockResolvedValue(null);
+        courses.updateMany!.mockResolvedValue({ count: 0 });
+        courses.count!.mockResolvedValue(0);
+        for (const kind of ["PLAN", "PACK", "COURSE"] as const) {
+            await expect(
+                rates.set(owner, { items: [{ kind, id: "x_1", rate: "18" }] }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        }
+        expect(plans.updateMany).not.toHaveBeenCalled();
+        expect(packs.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("lets the desk fill in a plan's unset rate and never change one already chosen", async () => {
+        const desk = roleWith("invoice:write");
+        plans.findFirst!.mockResolvedValue({ gstRate: null });
+        await rates.set(desk, {
+            items: [{ kind: "PLAN", id: "plan_gym", rate: "18" }],
+        });
+        expect(plans.updateMany).toHaveBeenCalledTimes(1);
+
+        // It has a rate already: changing it is the plan editor's.
+        plans.updateMany!.mockClear();
+        plans.findFirst!.mockResolvedValue({ gstRate: decimal("12.00") });
+        await expect(
+            rates.set(desk, {
+                items: [{ kind: "PLAN", id: "plan_gym", rate: "18" }],
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(plans.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("lets whoever sells packs fill in a pack's rate, and refuses them a plan's", async () => {
+        const seller = roleWith("pack:sell");
+        packs.findFirst!.mockResolvedValue({ gstRate: null });
+        await expect(
+            rates.set(seller, {
+                items: [{ kind: "PACK", id: "pack_10", rate: "18" }],
+            }),
+        ).resolves.toEqual({ saved: 1 });
+        await expect(
+            rates.set(seller, {
+                items: [{ kind: "PLAN", id: "plan_gym", rate: "18" }],
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(plans.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing and records nothing when the rate is the one it has", async () => {
+        plans.findFirst!.mockResolvedValue({ gstRate: decimal("18.00") });
+        await expect(
+            rates.set(owner, {
+                items: [{ kind: "PLAN", id: "plan_gym", rate: "18" }],
+            }),
+        ).resolves.toEqual({ saved: 1 });
+        expect(plans.updateMany).not.toHaveBeenCalled();
+        expect(tx.subscriptionPlanEvent!.create).not.toHaveBeenCalled();
+    });
+});
+
 describe("what the API accepts", () => {
     const problems = async (body: unknown) =>
         validate(plainToInstance(SetGstRatesDto, body), {
@@ -256,10 +571,18 @@ describe("what the API accepts", () => {
         ).resolves.toHaveLength(0);
     });
 
+    it("takes a plan's, a class pack's and a course's rate", async () => {
+        for (const kind of ["PLAN", "PACK", "COURSE"]) {
+            await expect(
+                problems({ items: [{ kind, id: "x_1", rate: "18" }] }),
+            ).resolves.toHaveLength(0);
+        }
+    });
+
     it("refuses nothing to save, an unknown kind and a missing rate", async () => {
         await expect(problems({ items: [] })).resolves.not.toHaveLength(0);
         await expect(
-            problems({ items: [{ kind: "COURSE", id: "c_1", rate: "18" }] }),
+            problems({ items: [{ kind: "LINE", id: "0", rate: "18" }] }),
         ).resolves.not.toHaveLength(0);
         await expect(
             problems({ items: [{ kind: "SERVICE", id: "s_1", rate: "" }] }),

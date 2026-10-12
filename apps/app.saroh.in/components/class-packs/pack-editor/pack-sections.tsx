@@ -27,7 +27,12 @@ import {
     packRules,
 } from "@/lib/class-packs/pack-editor-words";
 
+import { GstFields } from "@/components/services/service-editor/gst-fields";
 import { CheckRow } from "@/components/shared/check-row";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { NOT_ASKED } from "@/lib/gst/item-words";
+import { itemModeInput, itemModeValue } from "@/lib/gst/price-mode";
+import { rateOption } from "@/lib/invoices/gst";
 import { HELP, LABEL, PackChip, PackSection } from "./parts";
 import { ValidityChips } from "./validity-chips";
 
@@ -141,13 +146,25 @@ export function Details({
     );
 }
 
-/** How many, the price, what each works out at, and how long to use it. */
+/**
+ * How many, the price, what each works out at, and how long to use it. A
+ * GST-registered business answers the pack's GST under the price (12 Oct
+ * 2026), as on a service; the values stay as the API holds them (null is
+ * not set), and the fields read them as the selects' own.
+ */
 export function CreditsAndPrice({
     values,
     set,
     errors,
     services,
-}: Edit & { services: PackServiceOption[] | null }) {
+    gst = NOT_ASKED,
+    disabled = false,
+}: Edit & {
+    services: PackServiceOption[] | null;
+    /** Whether GST is asked, and the business's own way of carrying it. */
+    gst?: GstAsk;
+    disabled?: boolean;
+}) {
     const ids = {
         credits: useId(),
         creditsErr: useId(),
@@ -203,6 +220,39 @@ export function CreditsAndPrice({
             <FieldError id={ids.creditsErr}>{errors.credits}</FieldError>
             <FieldError id={ids.priceErr}>{errors.price}</FieldError>
             {note ? <p className={HELP}>{note}</p> : null}
+            {gst.asked ? (
+                <div className="mt-3 flex flex-wrap items-start gap-3">
+                    <GstFields
+                        draft={{
+                            gstRate: rateOption(values.gstRate),
+                            sacCode: values.sacCode ?? "",
+                            gstPriceMode: itemModeValue(values.gstPriceMode),
+                        }}
+                        set={(patch) =>
+                            set({
+                                ...(patch.gstRate !== undefined
+                                    ? { gstRate: patch.gstRate || null }
+                                    : {}),
+                                ...(patch.sacCode !== undefined
+                                    ? { sacCode: patch.sacCode || null }
+                                    : {}),
+                                ...(patch.gstPriceMode !== undefined
+                                    ? {
+                                          gstPriceMode: itemModeInput(
+                                              patch.gstPriceMode,
+                                          ),
+                                      }
+                                    : {}),
+                            })
+                        }
+                        // The shell says a problem as soon as it is there.
+                        problem={(field) => errors[field] ?? null}
+                        asked
+                        canEdit={!disabled}
+                        businessPriceMode={gst.priceMode}
+                    />
+                </div>
+            ) : null}
             <ValidityChips
                 value={values.validityDays}
                 onChange={(validityDays) => set({ validityDays })}

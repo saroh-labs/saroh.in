@@ -5,6 +5,7 @@ import { CoursePage } from "@/components/courses/course-page";
 import { PageContainer } from "@/components/shared/page-container";
 import { canWriteCourses } from "@/lib/courses/access";
 import { getCourse } from "@/lib/courses/service";
+import { readGstAsk } from "@/lib/gst-rates/service";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
@@ -41,7 +42,11 @@ export default async function CourseDetailPage({
     ]);
     if (!course) notFound();
     const canWrite = canWriteCourses(organization);
-    const contacts = canWrite ? await contactPickerOptions() : [];
+    const [contacts, gst] = await Promise.all([
+        canWrite ? contactPickerOptions() : Promise.resolve([]),
+        // For the enrol dialog's amount to pay; unread says the price typed.
+        canWrite ? readGstAsk() : Promise.resolve(null),
+    ]);
 
     return (
         <PageContainer width="full">
@@ -50,6 +55,7 @@ export default async function CourseDetailPage({
                 contacts={contacts}
                 canWrite={canWrite}
                 now={new Date().toISOString()}
+                gst={gst}
             />
         </PageContainer>
     );

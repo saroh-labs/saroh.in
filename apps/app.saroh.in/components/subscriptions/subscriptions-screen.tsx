@@ -22,6 +22,7 @@ import {
     ListToolbar,
 } from "@/components/shared/list-toolbar";
 import type { OnlinePaymentsLock } from "@/lib/billing/access";
+import type { MissingRates } from "@/lib/gst-rates/missing";
 import { LIST_LIMIT } from "@/lib/lists/capped";
 import { plansOnTab } from "@/lib/subscriptions/plan-cards";
 import type {
@@ -75,7 +76,13 @@ export function SubscriptionsScreen({
     autopayOffered = false,
     newLocked = null,
     plansLocked = null,
+    missingRates = null,
 }: {
+    /**
+     * What is on sale with a price and no GST rate, for the Plans tab's
+     * notice; null when it couldn't be told, which draws nothing.
+     */
+    missingRates?: MissingRates | null;
     subscriptions: Subscription[];
     /** The newest read hit its cap: older cancelled ones are not here. */
     truncated?: boolean;
@@ -304,6 +311,7 @@ export function SubscriptionsScreen({
                         settings={settings}
                         nowIso={nowIso}
                         locked={plansLocked}
+                        missingRates={missingRates}
                     />
                 ) : (
                     <>

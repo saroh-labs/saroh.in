@@ -167,6 +167,113 @@ describe("productJsonLd (#473)", () => {
     });
 });
 
+describe("the price an offer publishes, with GST", () => {
+    const adds = (listCents: number, gstCents: number) => ({
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents,
+        gstCents,
+        payCents: listCents + gstCents,
+    });
+    const includes = (listCents: number, gstCents: number) => ({
+        mode: "INCLUDED" as const,
+        rate: "18",
+        listCents,
+        gstCents,
+        payCents: listCents,
+    });
+    const plain = { ...base, mrp: null, variants: [], stock: null };
+
+    it("GST added: publishes the API's amount to pay, not the typed price", () => {
+        // ₹2,000 at 18% added is ₹2,360.
+        const ld = build({
+            ...plain,
+            price: "2000.00",
+            gst: adds(200000, 36000),
+        });
+        expect(ld.offers).toMatchObject({
+            price: "2360.00",
+            priceCurrency: "INR",
+        });
+    });
+
+    it("GST included, none said, or something strange: the typed price, to the paisa", () => {
+        const typed = build({ ...plain, price: "2000.00" });
+        expect(typed.offers).toMatchObject({ price: "2000.00" });
+        for (const gst of [
+            includes(200000, 30508),
+            null,
+            undefined,
+            { mode: "ADDED" },
+        ]) {
+            const ld = build({
+                ...plain,
+                price: "2000.00",
+                gst: gst as CatalogueProduct["gst"],
+            });
+            expect(ld).toEqual(typed);
+        }
+    });
+
+    it("each option publishes what it costs to pay: its own GST, else the product's on the product's price", () => {
+        const [first, second, third] = build({
+            ...base,
+            gst: adds(25000, 4500),
+            variants: [
+                // On the product's price, an API that sends no GST of its own.
+                base.variants[0],
+                // Its own price and its own GST.
+                { ...base.variants[1], gst: adds(14000, 2520) },
+                // Its own price, and the API says none on it.
+                { ...base.variants[2], gst: null },
+            ],
+        }).offers as Record<string, unknown>[];
+        expect(first.price).toBe("295.00");
+        expect(second.price).toBe("165.20");
+        expect(third.price).toBe("320.00");
+        // The MRP is a list price only while it is above what is paid.
+        expect(first.priceSpecification).toMatchObject({ price: "300.00" });
+        expect(second.priceSpecification).toBeUndefined();
+    });
+
+    it("an option on its own price, from an API that sends it no GST, keeps its typed price", () => {
+        const offers = build({ ...base, gst: adds(25000, 4500) })
+            .offers as Record<string, unknown>[];
+        expect(offers.map((o) => o.price)).toEqual([
+            "295.00",
+            "140.00",
+            "320.00",
+        ]);
+    });
+
+    it("with options and GST included or none, every offer is as before", () => {
+        const before = build();
+        expect(build({ ...base, gst: includes(25000, 3814) })).toEqual(before);
+        expect(build({ ...base, gst: null })).toEqual(before);
+        expect(
+            build({
+                ...base,
+                gst: includes(25000, 3814),
+                variants: base.variants.map((v) => ({
+                    ...v,
+                    gst: includes(14000, 2136),
+                })),
+            }),
+        ).toEqual(before);
+    });
+
+    it("drops an MRP that is not above the amount to pay", () => {
+        // Typed ₹250 under an MRP of ₹280; with GST added ₹295 is paid.
+        const ld = build({
+            ...plain,
+            mrp: "280.00",
+            gst: adds(25000, 4500),
+        });
+        expect(ld.offers).toMatchObject({ price: "295.00" });
+        expect(ld.offers).not.toHaveProperty("priceSpecification");
+    });
+});
+
 describe("jsonLdScript", () => {
     it("cannot close its script tag or open a comment", () => {
         const out = productJsonLdScript({

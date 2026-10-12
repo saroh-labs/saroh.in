@@ -283,6 +283,17 @@
   `gstPriceMode`), null when no GST was charged. Never recompute a sold
   line's price from the product, and never read the business's choice to
   explain a line already sold.
+- **Plans, class packs and courses** (12 Oct 2026). `SubscriptionPlan.price`,
+  `ClassPack.price` and `Course.price` are what the business typed, each
+  with its own `gstRate`, `sacCode` and `gstPriceMode`. A
+  `CustomerSubscription.price` is the typed price the member joined at and
+  is never rewritten with GST: every period's invoice works the amount to
+  pay out again from it and the plan's GST as it stands that day
+  (`invoices/sale-price.ts`), which is how a rate set today reaches a
+  member's next renewal while no invoice already issued changes. A
+  `PackPurchase.price` and a `CourseEnrollment.price` are one-off sales, so
+  they hold the amount paid, GST and all, as an order line does. The
+  invoice line freezes the rate and the mode either way.
 - **A customer's sum is the API's.** A public read that shows a price about
   to be paid serves the GST in or on it and the amount to pay
   (`GstOnPrice`); the site formats and never adds, multiplies or rounds.

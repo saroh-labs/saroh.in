@@ -29,6 +29,13 @@ export interface LineInput {
     gstRate?: string | null;
     /** HSN or SAC. */
     hsnSac?: string | null;
+    /**
+     * How the price behind the line carried GST when it was charged
+     * (`gst-price.ts`): set only by the API's own writers (a plan, a pack,
+     * a course), never taken from a request. `unitPrice` is the amount to
+     * pay either way.
+     */
+    priceMode?: "INCLUDED" | "ADDED" | null;
 }
 
 export interface PricedLine extends LineInput {

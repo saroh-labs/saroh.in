@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 
 import { toMoneyString } from "../../common/money";
+import type { GstOnPrice } from "../invoices/gst-price";
 import { isBillOfSupply } from "../invoices/invoice-title";
 import type { OrderStage } from "../orders/dto";
 import { goesByCourier, typeOf } from "../orders/fulfilment";
@@ -171,6 +172,12 @@ export interface AccountPlan {
     name: string;
     price: string;
     currency: string;
+    /**
+     * The GST on the price as the next renewal will charge it (12 Oct
+     * 2026): the price they are on, the GST in or on it, and the amount to
+     * pay. Null when nothing is said about GST: the price is what is paid.
+     */
+    gst: GstOnPrice | null;
     interval: string;
     status: "ACTIVE" | "PAUSED";
     /** The next renewal; null while paused or ending. */
@@ -653,6 +660,8 @@ export function planView(row: {
     pausedUntil: Date | null;
     timezone: string;
     plan: { name: string };
+    /** The GST on a renewal, worked out by the caller (`sale-price.ts`). */
+    gst?: GstOnPrice | null;
 }): AccountPlan {
     const paused = row.status === "PAUSED";
     return {
@@ -661,6 +670,7 @@ export function planView(row: {
         name: row.plan.name,
         price: toMoneyString(row.price),
         currency: row.currency,
+        gst: row.gst ?? null,
         interval: row.interval,
         status: paused ? "PAUSED" : "ACTIVE",
         renewsAt:

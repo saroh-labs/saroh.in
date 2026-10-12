@@ -6,6 +6,7 @@ import type { RenderedPlans } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import type { AutopayMethod } from "../autopay/api";
+import { gstUnderWords } from "../lib/gst-price";
 import type { PublicPlan } from "../lib/plans-read";
 import {
     isPublicPlan,
@@ -20,7 +21,7 @@ import type { PricesActions } from "../prices/api";
 import { PricesDone, useSignInFirst } from "../prices/flow";
 import type { JoinablePlan } from "../prices/join-sheet";
 import { JoinSheet } from "../prices/join-sheet";
-import { planEvery, planPrice } from "../prices/plan-words";
+import { planBrowsePrice, planEvery, planPrice } from "../prices/plan-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
 
@@ -51,6 +52,13 @@ import { NotTakingOrders } from "../shop/not-taking-orders";
  * "Ask about joining". A site with neither shows no button. No copy here
  * names a way to pay (DEC-059) or promises automatic renewals: autopay is
  * offered only in the join sheet, from the provider's own list (D12).
+ *
+ * **GST is said before Join.** Where the read carries a plan's `gst`, the
+ * amount beside Join is the amount to pay each period, with the GST in or
+ * on it under it: "₹2,360 / month" over "₹2,000 + ₹360 GST (18%)", or
+ * "₹2,000 / month" over "Includes ₹305.08 GST (18%)". A card that is only
+ * browsed (no Join) keeps the typed price, with "+ GST" after it when GST
+ * comes on top. The API's numbers, only written out.
  *
  * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
  */
@@ -373,6 +381,8 @@ function PlanCards({
     const showPrices = content.showPrices !== false;
     // The canvas says what the live site's button will say.
     const joinWords = joins || (canvas && feed.payOnline === true);
+    // Beside Join the price is the amount to pay, with its GST under it.
+    const paying = joinWords;
     const label =
         said(content.buttonLabel) ?? (joinWords ? PLANS_JOIN : PLANS_BUTTON);
 
@@ -405,6 +415,10 @@ function PlanCards({
                     const description = showDescriptions
                         ? said(plan.description)
                         : null;
+                    const gstLine =
+                        showPrices && paying
+                            ? gstUnderWords(plan.gst, plan.currency)
+                            : null;
                     return (
                         <li
                             key={plan.id}
@@ -435,7 +449,19 @@ function PlanCards({
                             ) : null}
                             <span className="mt-1.5 flex items-center gap-2.5">
                                 <span className="flex-1 text-base font-bold">
-                                    {showPrices ? planPrice(plan) : null}
+                                    {showPrices
+                                        ? paying
+                                            ? planPrice(plan)
+                                            : planBrowsePrice(plan)
+                                        : null}
+                                    {gstLine ? (
+                                        <span
+                                            data-price-gst=""
+                                            className="text-site-muted block text-xs font-normal tabular-nums"
+                                        >
+                                            {gstLine}
+                                        </span>
+                                    ) : null}
                                 </span>
                                 {canvas ? (
                                     <span className={joinButton}>{label}</span>
