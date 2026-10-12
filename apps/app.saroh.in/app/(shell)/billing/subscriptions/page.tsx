@@ -95,7 +95,11 @@ export default async function SubscriptionsPage({
     const ran = renewals ? ranLine(renewals, zone, now) : null;
     const gst =
         charges.state === "ok"
-            ? gstNote(Object.values(charges.data).flat(), "list")
+            ? gstNote(
+                  Object.values(charges.data).flat(),
+                  "list",
+                  rates?.registered ?? null,
+              )
             : "";
     const renewNote = ran
         ? { text: [ran.text, gst].filter(Boolean).join(" "), late: ran.late }

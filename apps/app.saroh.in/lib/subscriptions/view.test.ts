@@ -292,6 +292,13 @@ describe("charges", () => {
             "Not GST-registered. Receipts, not tax invoices.",
         );
         expect(gstNote([])).toBe("");
+        // A registered business whose invoices show no GST yet (a plan with
+        // no rate, or invoices from before it registered) is not called
+        // unregistered.
+        expect(gstNote([charge()], "list", true)).toBe("");
+        expect(gstNote([charge()], "list", false)).toBe(
+            "Not GST-registered. Renewals make receipts.",
+        );
     });
 });
 

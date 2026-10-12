@@ -699,10 +699,18 @@ export function paysBy(charges: readonly SubscriptionCharge[]): string | null {
 export function gstNote(
     charges: readonly SubscriptionCharge[],
     where: "detail" | "list" = "detail",
+    /**
+     * True where the page knows the business is GST-registered. Its
+     * invoices can still show no GST (a plan with no rate yet, or invoices
+     * from before it registered), and "Not GST-registered" would then be
+     * untrue: nothing is said, and the missing-rates notice says the rest.
+     */
+    registered: boolean | null = null,
 ): string {
     const issued = charges.filter((c) => c.status !== "DRAFT");
     if (!issued.length) return "";
     if (issued.some((c) => c.gst)) return "Each renewal makes a GST invoice.";
+    if (registered === true) return "";
     return where === "list"
         ? "Not GST-registered. Renewals make receipts."
         : "Not GST-registered. Receipts, not tax invoices.";
