@@ -540,7 +540,7 @@ describe("When it can be booked is its own card", () => {
         });
         expect(windows()).toEqual(["Remove Monday, 10:00 to 16:00"]);
         expect(card("When it can be booked").textContent).toContain(
-            "Its times come from Asha's hours.",
+            "Its times come from Asha's hours, inside its own weekly hours below.",
         );
     });
 

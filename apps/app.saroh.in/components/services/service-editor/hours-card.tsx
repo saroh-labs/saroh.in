@@ -69,7 +69,12 @@ export function HoursCard({
         <Section title={HOURS_SECTION}>
             {narrows ? (
                 <p className={cn(HELP, "mt-0 text-foreground")}>
-                    Its times come from {whoseHours(names)}.{" "}
+                    {/* With hours of its own too, both apply: say so. */}
+                    Its times come from {whoseHours(names)}
+                    {draft.hours.length > 0
+                        ? ", inside its own weekly hours below"
+                        : ""}
+                    .{" "}
                     <TextLink href={AVAILABILITY_HREF}>
                         Change them in Availability
                     </TextLink>

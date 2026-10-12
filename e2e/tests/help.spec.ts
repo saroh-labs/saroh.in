@@ -94,7 +94,10 @@ test("the article draws its five real screens, ringed where a step names a contr
         .allTextContents();
     // One block may hold several things (the HowTo beside the article and
     // its breadcrumb), so each block is read as a list.
-    type Thing = { "@type"?: string; step?: unknown[] };
+    interface Thing {
+        "@type"?: string;
+        step?: unknown[];
+    }
     const howTo = ld
         .flatMap((t) => {
             const parsed = JSON.parse(t) as Thing | Thing[];
