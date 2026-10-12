@@ -5,9 +5,11 @@ import { CoursePage } from "@/components/courses/course-page";
 import { PageContainer } from "@/components/shared/page-container";
 import { canWriteCourses } from "@/lib/courses/access";
 import { getCourse } from "@/lib/courses/service";
+import { readGstAsk } from "@/lib/gst-rates/service";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
+import { readPriceHistory } from "@/lib/price-history/service";
 import { requireSession } from "@/lib/session";
 
 // One read for the tab's title and the page.
@@ -41,7 +43,14 @@ export default async function CourseDetailPage({
     ]);
     if (!course) notFound();
     const canWrite = canWriteCourses(organization);
-    const contacts = canWrite ? await contactPickerOptions() : [];
+    const [contacts, gst, priceHistory] = await Promise.all([
+        canWrite ? contactPickerOptions() : Promise.resolve([]),
+        // For the enrol dialog's amount to pay; unread says the price typed.
+        canWrite ? readGstAsk() : Promise.resolve(null),
+        // What it has cost (12 Oct 2026). Optional: a read that fails is
+        // said in its place.
+        readPriceHistory("courses", courseId).catch(() => null),
+    ]);
 
     return (
         <PageContainer width="full">
@@ -50,6 +59,8 @@ export default async function CourseDetailPage({
                 contacts={contacts}
                 canWrite={canWrite}
                 now={new Date().toISOString()}
+                gst={gst}
+                priceHistory={priceHistory}
             />
         </PageContainer>
     );

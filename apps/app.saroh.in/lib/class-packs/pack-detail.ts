@@ -1,8 +1,10 @@
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 
+import { addedSum } from "@/lib/gst/on-price";
+
 import type { MoneyTotal, PackKind } from "./pack-cards";
-import { editHref, packKind, unitWord } from "./pack-cards";
+import { eachWords, editHref, packKind, unitWord } from "./pack-cards";
 import type { PackDetail, PackHolder, PackOverview } from "./pack-detail-data";
 
 /**
@@ -123,13 +125,26 @@ export function serviceList(services: readonly { name: string }[]): string {
     return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
 }
 
-/** "₹150 a class"; null when there is nothing to divide. */
+/**
+ * "₹150 a class", one visit's share of what the pack costs to pay
+ * (`eachWords`); null when there is nothing to divide.
+ */
 export function each(pack: PackDetail, kind: PackKind): string | null {
-    const price = Number(pack.price);
-    if (!Number.isFinite(price) || price <= 0 || pack.credits <= 0) {
-        return null;
-    }
-    return `${formatMoneyMajor(Math.round(price / pack.credits), pack.currency)} a ${unitWord(kind, 1)}`;
+    return eachWords(pack, kind);
+}
+
+/**
+ * The pack's price as its own page says it: the price the business set,
+ * with the whole sum where GST comes on top of it ("₹1,500 + ₹270 GST
+ * (18%) = ₹1,770 to pay").
+ */
+export function priceWords(
+    pack: Pick<PackDetail, "price" | "currency" | "gst">,
+): string {
+    return (
+        addedSum(pack.gst, pack.currency) ??
+        formatMoneyMajor(pack.price, pack.currency)
+    );
 }
 
 // — Header —————————————————————————————————————————————————————————————
@@ -165,7 +180,7 @@ export function detailHeader(pack: PackDetail): DetailHeader {
     const holders = pack.overview.holders;
     const services = pack.services.map((s) => s.name).join(", ");
     const meta = [
-        formatMoneyMajor(pack.price, pack.currency),
+        priceWords(pack),
         each(pack, kind),
         `use within ${count(pack.validityDays, "day", "days")}`,
         services || null,

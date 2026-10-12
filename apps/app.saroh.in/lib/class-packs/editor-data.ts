@@ -1,3 +1,5 @@
+import { readMissingRates } from "@/lib/gst-rates/service";
+import type { GstAsk } from "@/lib/gst/item-words";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { businessCurrencyOf } from "@/lib/services/editor-data";
 import type { Service } from "@/lib/services/service";
@@ -18,6 +20,13 @@ export interface PackEditorContext {
     services: PackServiceOption[] | null;
     /** The business's currency, for a new pack's price. */
     currency: string;
+    /**
+     * Whether a pack is asked for GST (a registered business) and the
+     * business's own way of carrying it, from the missing-rates read as
+     * the Service Editor's is. A saved pack's own read says so itself.
+     * Unread asks for nothing.
+     */
+    gst: GstAsk;
 }
 
 function toOption(s: Service): PackServiceOption {
@@ -25,16 +34,18 @@ function toOption(s: Service): PackServiceOption {
         id: s.id,
         name: s.name,
         capacity: s.capacity,
-        priceCents: s.priceCents,
+        // What one visit costs to pay, GST and all, as the API charges it.
+        priceCents: s.payCents ?? s.priceCents,
         currency: s.currency,
         active: s.status === "ACTIVE",
     };
 }
 
 export async function loadPackEditorContext(): Promise<PackEditorContext> {
-    const [organization, read] = await Promise.all([
+    const [organization, read, rates] = await Promise.all([
         resolveActiveOrganization(),
         readServices(),
+        readMissingRates(),
     ]);
     return {
         canRead: canReadPacks(organization),
@@ -45,6 +56,10 @@ export async function loadPackEditorContext(): Promise<PackEditorContext> {
                   .sort((a, b) => a.name.localeCompare(b.name))
             : null,
         currency: read.ok ? businessCurrencyOf(read.services) : "INR",
+        gst: {
+            asked: rates?.registered === true,
+            priceMode: rates?.priceMode ?? null,
+        },
     };
 }
 

@@ -1,6 +1,7 @@
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { plural } from "@/lib/format/plural";
+import { paidAtPrice } from "@/lib/gst/on-price";
 import type { PackStanding } from "./balance";
 import type { PackKind } from "./pack-cards";
 import { unitWord } from "./pack-cards";
@@ -40,7 +41,14 @@ const DAY_MS = 86_400_000;
 export const NAMED_RUNNING_OUT = 2;
 
 export function cardNotes(
-    pack: { id: string; kind: PackKind; price: string; currency: string },
+    pack: {
+        id: string;
+        kind: PackKind;
+        price: string;
+        currency: string;
+        /** The API's GST on the price; absent reads as none. */
+        gst?: unknown;
+    },
     purchases: readonly NotePurchase[],
     now: Date,
     timeZone: string,
@@ -73,13 +81,15 @@ export function cardNotes(
         });
     }
 
-    // Sold at a price other than today's: each keeps what they paid.
-    const current = Number(pack.price);
+    // Sold at a price other than today's: each keeps what they paid. What
+    // they paid is compared with what today's price comes to, GST and all
+    // (`paidAtPrice`), never with the price as typed.
     const older = new Map<string, { n: number; currency: string }>();
     for (const p of mine) {
         if (p.currency !== pack.currency) continue;
         const paid = Number(p.price);
-        if (!Number.isFinite(paid) || paid === current) continue;
+        if (!Number.isFinite(paid)) continue;
+        if (paidAtPrice(p.price, pack.price, pack.gst)) continue;
         const key = String(paid);
         const at = older.get(key) ?? { n: 0, currency: p.currency };
         at.n += 1;

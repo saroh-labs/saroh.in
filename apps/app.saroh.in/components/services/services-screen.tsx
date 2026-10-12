@@ -28,6 +28,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { isPlanHref } from "@/lib/billing/plan-access";
 import { formatMoney } from "@/lib/format/money";
 import type { MissingRates } from "@/lib/gst-rates/missing";
+import { setPriceWords } from "@/lib/gst/on-price";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import { callName } from "@/lib/services/call-name";
@@ -158,8 +159,13 @@ export function ServicesScreen({
             sortValue: (s) => s.priceCents ?? 0,
             cell: (s) => (
                 <span className="block">
+                    {/* The price the business set, saying so where GST
+                        comes on top of it ("₹1,000 + GST"). */}
                     {s.priceCents
-                        ? formatMoney(s.priceCents, s.currency ?? currency)
+                        ? setPriceWords(
+                              formatMoney(s.priceCents, s.currency ?? currency),
+                              s.gst,
+                          )
                         : "Free"}
                     {s.capacity > 1 && s.priceCents ? (
                         <span className="block font-sans text-[12px] font-normal text-muted-foreground">

@@ -18,7 +18,8 @@ import {
 
 /**
  * One quiet line for a GST-registered business with priced things on sale
- * and no GST rate on them (12 Oct 2026): how many, and a button that opens
+ * (services, products, plans, class packs, courses) and no GST rate on them
+ * (12 Oct 2026): how many, and a button that opens
  * the sheet where each rate is chosen in its row. Nothing is drawn when
  * nothing is missing, when the business isn't registered, or when the read
  * couldn't tell (`missing` null). The sheet says whether the prices include
@@ -27,13 +28,19 @@ import {
  *
  * The page's read is the list: saving refreshes it, so the count goes down
  * and the notice leaves by itself once the last rate is chosen.
+ *
+ * `also` is one more sentence after the line, for a screen that can say
+ * which things the count means (the Plans tab: how many of the plans are
+ * archived ones people are still on). Left out, the words are as they were.
  */
 export function MissingRatesNotice({
     missing,
     className,
+    also,
 }: {
     missing: MissingRates | null;
     className?: string;
+    also?: string | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -64,6 +71,7 @@ export function MissingRatesNotice({
                 }
             >
                 {line}
+                {also ? ` ${also}` : null}
             </Notice>
             <GstRatesSheet
                 rows={open ? missing.items : null}
@@ -72,6 +80,7 @@ export function MissingRatesNotice({
                 saveLabel="Save"
                 requireAll={false}
                 note={listNote(mode, missing.more)}
+                priceMode={mode}
                 save={async (chosen) => {
                     const res = await saveGstRates(chosen);
                     return res.ok ? { ok: true } : res;

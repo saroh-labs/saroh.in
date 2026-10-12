@@ -6,8 +6,10 @@ import { destructiveAlertClasses } from "../alert";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
 import { PayOption } from "../booking-flow/steps/pay-option";
+import { gstUnderWords } from "../lib/gst-price";
 import { cn } from "../lib/utils";
 import type { PackKind } from "../prices/pack-words";
+import { packPayPrice } from "../prices/pack-words";
 import { NOT_TAKING_ORDERS_TEXT } from "../shop/not-taking-orders";
 import { accountMoney } from "./model";
 import type {
@@ -40,6 +42,11 @@ import { Sheet, sheetAltButton, sheetButton } from "./sheet";
  *
  * A business that takes no payment online sells packs at the desk: the
  * sheet says so, and has no pay button.
+ *
+ * **GST is said before paying.** Every amount here is the amount to pay,
+ * and where the pack (or the started payment) carries `gst`, the line
+ * under the price says the GST in or on it: "Includes ₹686.44 GST (18%)",
+ * or "₹4,500 + ₹810 GST (18%)" under ₹5,310.
  */
 
 /** How often, and how long, the sheet asks whether the payment landed. */
@@ -297,7 +304,20 @@ function BuyPack({
     }
 
     const pack = chosen;
-    const total = pack ? accountMoney(pack.price, pack.currency) : null;
+    // What the pack costs to pay, and the GST in or on it: the server's own
+    // sum once the payment has started, else the pack's as it is listed.
+    // The API's numbers; nothing is added up here.
+    const underWay = phase.kind === "window" ? phase.started : null;
+    const total = underWay
+        ? accountMoney(underWay.total, underWay.currency)
+        : pack
+          ? packPayPrice(pack)
+          : null;
+    const gstLine = underWay
+        ? gstUnderWords(underWay.gst, underWay.currency)
+        : pack
+          ? gstUnderWords(pack.gst, pack.currency)
+          : null;
     const windowStatus = phase.kind === "window" ? phase.status : null;
     const windowOpen = windowStatus === "open";
     const windowProblem =
@@ -328,7 +348,7 @@ function BuyPack({
                                 key={p.ref}
                                 on={pack?.ref === p.ref}
                                 label={p.name}
-                                sub={`${classesText(p.credits, p.kind)} · use within ${p.validityDays} days · ${accountMoney(p.price, p.currency)}`}
+                                sub={`${classesText(p.credits, p.kind)} · use within ${p.validityDays} days · ${packPayPrice(p)}`}
                                 onPick={() => {
                                     if (phase.kind === "window") return;
                                     setChosen(p);
@@ -351,7 +371,23 @@ function BuyPack({
             {pack && total ? (
                 <div className="border-site-border mt-3 flex items-center gap-2.5 border-t py-2.5 text-sm">
                     <span className="min-w-0 flex-1">Price</span>
-                    <span className="font-semibold tabular-nums">{total}</span>
+                    {gstLine ? (
+                        <span className="text-right">
+                            <span className="block font-semibold tabular-nums">
+                                {total}
+                            </span>
+                            <span
+                                data-price-gst=""
+                                className="text-site-muted block text-xs tabular-nums"
+                            >
+                                {gstLine}
+                            </span>
+                        </span>
+                    ) : (
+                        <span className="font-semibold tabular-nums">
+                            {total}
+                        </span>
+                    )}
                 </div>
             ) : null}
             {problem ? (

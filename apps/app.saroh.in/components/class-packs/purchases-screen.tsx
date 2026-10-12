@@ -21,6 +21,7 @@ import type { PackStanding } from "@/lib/class-packs/balance";
 import { paidByLabel } from "@/lib/class-packs/sell-words";
 import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
 import { personHref } from "@/lib/contacts/person-href";
+import type { GstAsk } from "@/lib/gst/item-words";
 
 import { TextLink } from "@saroh/ui/text-link";
 import { ClassPacksTabs } from "./class-packs-tabs";
@@ -55,7 +56,10 @@ export function PurchasesScreen({
     canWrite,
     invoicesOnSale,
     initialFilterId,
+    gst = null,
 }: {
+    /** The business's GST standing, for the sell dialog's amount to pay. */
+    gst?: GstAsk | null;
     purchases: PackPurchase[];
     packs: ClassPack[];
     contacts: ContactOption[];
@@ -222,6 +226,7 @@ export function PurchasesScreen({
                     contacts={contacts}
                     packs={packs}
                     invoicesOnSale={invoicesOnSale}
+                    gst={gst}
                     held={purchases.map((p) => ({
                         contactId: p.contact.id,
                         packId: p.pack.id,

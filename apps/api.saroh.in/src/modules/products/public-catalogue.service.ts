@@ -25,6 +25,7 @@ import { collectionOnSale } from "./grid-collection";
 import type { GridQuery } from "./product-grid";
 import { inGridOrder } from "./product-grid";
 import { ratingSummary } from "./product-overview";
+import { moneyToCents, mrpSaving } from "./product-rules";
 import type {
     PublicCatalogue,
     PublicCatalogueCard,
@@ -347,16 +348,22 @@ export class PublicCatalogueService {
                 mrp: money(p.mrp),
             };
             const cover = p.images.length > 0 ? p.images[0] : null;
+            const shown = priceOf(
+                base,
+                offered.map((v) => ({
+                    price: money(v.price),
+                    mrp: money(v.mrp),
+                })),
+            );
             return {
                 slug: p.slug,
                 name: p.name,
                 currency: p.currency,
-                ...priceOf(
-                    base,
-                    offered.map((v) => ({
-                        price: money(v.price),
-                        mrp: money(v.mrp),
-                    })),
+                ...shown,
+                // The MRP against what is paid for that line, GST and all.
+                saving: mrpSaving(
+                    sellUnit(moneyToCents(shown.price), p, terms).payCents,
+                    shown.mrp,
                 ),
                 // The price is only being browsed here: the card adds
                 // "+ GST" when GST comes on top at checkout.
@@ -494,6 +501,10 @@ export class PublicCatalogueService {
                 currency: p.currency,
                 price: money(p.price) ?? "0.00",
                 mrp: money(p.mrp),
+                saving: mrpSaving(
+                    sellUnit(toMinor(p.price), p, terms).payCents,
+                    money(p.mrp),
+                ),
                 gst: sellUnit(toMinor(p.price), p, terms).gst,
                 categoryName: p.category?.name ?? null,
                 description: p.description,
@@ -535,6 +546,13 @@ export class PublicCatalogueService {
                         title: v.title,
                         price: money(v.price),
                         mrp: money(v.mrp),
+                        // Its own MRP, else the product's, against what is
+                        // paid for it.
+                        saving: mrpSaving(
+                            sellUnit(toMinor(v.price ?? p.price), p, terms)
+                                .payCents,
+                            money(v.mrp ?? p.mrp),
+                        ),
                         // At the price it sells at: its own, else the
                         // product's, as the bag will price it.
                         gst: sellUnit(toMinor(v.price ?? p.price), p, terms)

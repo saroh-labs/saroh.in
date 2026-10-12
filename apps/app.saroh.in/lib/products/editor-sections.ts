@@ -2,6 +2,8 @@ import { formatNumber } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
 import { z } from "zod";
 
+import { overMrpProblem } from "@/lib/gst/mrp";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import {
     GST_PRICE_MODES,
     itemModeInput,
@@ -707,6 +709,12 @@ export function basicsProblem(
      * includes, or its tax invoice shows no GST (12 Oct 2026).
      */
     gstRateNeeded = false,
+    /**
+     * How the business's prices carry GST, and the currency the sums are
+     * said in: the MRP is compared with the amount to pay, GST and all
+     * (`lib/gst/mrp.ts`). Left out, with the typed price as it always was.
+     */
+    gst?: { businessMode: GstPriceMode | null; currency: string },
 ): string {
     const name = v.name.trim();
     if (!name) return "Add a name first.";
@@ -722,6 +730,20 @@ export function basicsProblem(
         return "MRP: a number with at most two decimals.";
     if (v.mrp.trim() && paise(v.mrp) < paise(v.price))
         return "MRP can't be lower than the price it sells for.";
+    if (v.mrp.trim() && gst) {
+        const over = overMrpProblem(
+            v.price,
+            v.mrp,
+            {
+                registered: gstRateNeeded,
+                businessMode: gst.businessMode,
+                itemMode: v.gstPriceMode,
+                rate: v.gstRate,
+            },
+            gst.currency,
+        );
+        if (over) return over;
+    }
     if (needsGstRate(v, gstRateNeeded)) return "Choose a GST rate first.";
     return "";
 }

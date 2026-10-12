@@ -925,6 +925,8 @@ describe("invoices to pay", () => {
                 total: "2500.00",
                 currency: "INR",
                 billOfSupply: false,
+                // Not GST-registered: no GST words.
+                gst: null,
                 // No provider is connected: paid with the business directly.
                 pay: "direct",
             },

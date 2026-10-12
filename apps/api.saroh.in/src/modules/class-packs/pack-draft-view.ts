@@ -11,6 +11,10 @@ import {
 import { toMinor, toMoneyString } from "../../common/money";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
+import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
+import type { GstPriceMode } from "../invoices/gst-price";
+import { isGstPriceMode } from "../invoices/gst-price";
+import { loadPriceTerms } from "../invoices/price-terms";
 import type { PackKind } from "./pack-kind";
 import { KIND_LOCKED, MIN_VALIDITY_DAYS, readPackKind } from "./pack-kind";
 import { PACK_DRAFT } from "./pack-on-sale";
@@ -40,7 +44,42 @@ export const PACK_DRAFT_FIELDS = [
     "serviceIds",
     "kind",
     "firstPackOnly",
+    // GST (12 Oct 2026): published with the price, since under "GST is
+    // added" they change what a buyer pays.
+    "gstRate",
+    "sacCode",
+    "gstPriceMode",
 ] as const;
+
+/** A stored GST rate as it is written: "18", "0.25"; null when not set. */
+export function packRate(
+    rate: { toString(): string } | string | null | undefined,
+): string | null {
+    const bps = rateToBps(rate);
+    return bps === null ? null : bpsToRate(bps);
+}
+
+/**
+ * A rate as a save names it: one GST has, written the one way, or null to
+ * clear it. Anything else is a 400 on the field (the caller's `fail`).
+ */
+export function packRateOf(
+    rate: string | null,
+    fail: (message: string, field: string) => never,
+): string | null {
+    if (rate === null) return null;
+    if (!isGstRate(rate)) {
+        fail(
+            `${rate}% is not a GST rate. Use 0, 0.25, 3, 5, 12, 18, 28 or 40.`,
+            "gstRate",
+        );
+    }
+    return packRate(rate);
+}
+
+/** Said beside the rate, and when Publish is refused for it. */
+export const GST_RATE_NEEDED =
+    "Choose a GST rate. Exempt (0%) is one of the choices.";
 
 /**
  * A pack's publishable values, as the editor sends and shows them. `price`
@@ -57,6 +96,11 @@ export interface PackValues {
     serviceIds: string[];
     kind: PackKind;
     firstPackOnly: boolean;
+    /** "18"; null: not set. */
+    gstRate: string | null;
+    sacCode: string | null;
+    /** The pack's own way of carrying GST; null: the business's. */
+    gstPriceMode: string | null;
 }
 
 /** A reason the pack can't be published yet, beside its field. */
@@ -82,6 +126,13 @@ export interface PackEditorView {
     problems: PackProblem[];
     /** When the draft or the pending set was last saved; null when none. */
     pendingChangedAt: string | null;
+    /**
+     * Whether the editor asks for GST (12 Oct 2026): only a registered
+     * business's pack carries a rate. `priceMode` is how the business's
+     * prices carry GST, for "Same as the business (…)". A business that is
+     * not registered is shown nothing and never held up.
+     */
+    gst: { asked: boolean; priceMode: GstPriceMode | null };
 }
 
 export const PACK_DRAFT_SELECT = {
@@ -100,6 +151,9 @@ export const PACK_DRAFT_SELECT = {
     revisedById: true,
     kind: true,
     firstPackOnly: true,
+    gstRate: true,
+    sacCode: true,
+    gstPriceMode: true,
     services: { select: { serviceId: true } },
 } as const;
 
@@ -127,6 +181,11 @@ export function columnValues(row: PackDraftRow): PackValues {
         serviceIds: serviceSet(row.services.map((s) => s.serviceId)),
         kind: readPackKind(row.kind),
         firstPackOnly: row.firstPackOnly,
+        gstRate: packRate(row.gstRate),
+        sacCode: row.sacCode,
+        gstPriceMode: isGstPriceMode(row.gstPriceMode)
+            ? row.gstPriceMode
+            : null,
     };
 }
 
@@ -151,6 +210,9 @@ export function valueColumns(values: PackValues) {
         currency: values.currency,
         kind: values.kind,
         firstPackOnly: values.firstPackOnly,
+        gstRate: values.gstRate,
+        sacCode: values.sacCode,
+        gstPriceMode: values.gstPriceMode,
     };
 }
 
@@ -197,10 +259,12 @@ export function kindLockOf(row: PackDraftRow): PackKindLock | null {
 
 /**
  * What stops these values being published: a name, how many classes, how
- * long it is valid (at least 7 days, E13), a price above zero, at least one
- * service still offered, and — for a live pack that has been sold — the
- * kind it was sold as (E13 owns that lock). The DTO has already checked
- * each field's shape and range.
+ * long it is valid (at least 7 days, E13), a price above zero, for a
+ * GST-registered business a GST rate (12 Oct 2026; "Exempt (0%)" is one),
+ * at least one service still offered, and — for a live pack that has been
+ * sold — the kind it was sold as (E13 owns that lock). The DTO has already
+ * checked each field's shape and range. A business that is not registered
+ * is never asked for a rate.
  */
 export async function packProblems(
     db: Db,
@@ -232,6 +296,11 @@ export async function packProblems(
     }
     if (!values.price || toMinor(values.price) === 0) {
         problems.push({ field: "price", message: "Set a price" });
+    } else if (
+        values.gstRate === null &&
+        (await loadPriceTerms(db, organizationId)).registered
+    ) {
+        problems.push({ field: "gstRate", message: GST_RATE_NEEDED });
     }
     if (
         lock &&
@@ -317,9 +386,10 @@ export async function packEditorView(
 ): Promise<PackEditorView> {
     const isDraft = row.status === PACK_DRAFT;
     const values = editorValues(row);
-    const [problems, sold] = await Promise.all([
+    const [problems, sold, terms] = await Promise.all([
         packProblems(db, organizationId, values, kindLockOf(row)),
         isDraft ? timesSold(db, organizationId, row.id) : Promise.resolve(0),
+        loadPriceTerms(db, organizationId),
     ]);
     return {
         id: row.id,
@@ -331,6 +401,10 @@ export async function packEditorView(
         canDelete: isDraft && sold === 0,
         problems,
         pendingChangedAt: row.pendingChangedAt?.toISOString() ?? null,
+        gst: {
+            asked: terms.registered,
+            priceMode: terms.registered ? terms.mode : null,
+        },
     };
 }
 

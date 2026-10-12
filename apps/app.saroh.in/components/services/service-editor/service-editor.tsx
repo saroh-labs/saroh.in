@@ -15,6 +15,11 @@ import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanLock } from "@/lib/billing/access";
 import { joinAnd } from "@/lib/editor-shell/state";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
+import type { PriceHistoryPage } from "@/lib/price-history/words";
+import {
+    PRICE_HISTORY_TITLE,
+    priceHistoryShown,
+} from "@/lib/price-history/words";
 import {
     archiveService,
     createService,
@@ -60,6 +65,7 @@ import type {
 
 import { useTakingBookings } from "@/components/services/use-taking-bookings";
 import { SwitchRow } from "@/components/shared/check-row";
+import { PriceHistoryList } from "@/components/shared/price-history";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
@@ -73,6 +79,7 @@ import {
     WhatItIs,
     WhoTakesIt,
 } from "./editor-sections";
+import { Section } from "./fields";
 import { HoursCard } from "./hours-card";
 import { MoreSettings } from "./more-settings";
 
@@ -117,7 +124,14 @@ export function ServiceEditor({
     payment = null,
     gstRegistered = null,
     businessPriceMode = null,
+    priceHistory,
 }: {
+    /**
+     * What the service has cost, newest first (12 Oct 2026); null when
+     * that read failed. Left out (a new service), or with nothing kept
+     * yet, nothing is drawn.
+     */
+    priceHistory?: PriceHistoryPage | null;
     /**
      * How the business's prices carry GST (12 Oct 2026), for the Price
      * card's "Same as the business (…)". Null when it couldn't be read.
@@ -653,6 +667,14 @@ export function ServiceEditor({
                         }
                     />
                     <AtAGlance rows={glance(draft, usage, currency)} />
+                    {priceHistoryShown(priceHistory) ? (
+                        <Section title={PRICE_HISTORY_TITLE}>
+                            <PriceHistoryList
+                                history={priceHistory}
+                                layout="narrow"
+                            />
+                        </Section>
+                    ) : null}
                     <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">
                         Changes apply to bookings made after you save. Bookings
                         already made keep their time and price.

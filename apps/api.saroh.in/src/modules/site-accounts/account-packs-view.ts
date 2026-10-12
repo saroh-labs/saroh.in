@@ -1,5 +1,6 @@
 import { toMoneyString } from "../../common/money";
 import type { PackTerms } from "../class-packs/pack-checkout";
+import type { GstOnPrice } from "../invoices/gst-price";
 import type { CreateIntentResult } from "../payments/payments.service";
 
 /**
@@ -23,6 +24,12 @@ export interface AccountPackOnSale {
     currency: string;
     /** Classes, or one-to-one sessions: how the sheet counts the credits. */
     kind: "CLASSES" | "ONE_TO_ONE";
+    /**
+     * The GST on the price, as the customer is told it before paying (12
+     * Oct 2026); null when nothing is said about GST and the price is what
+     * is paid.
+     */
+    gst: GstOnPrice | null;
 }
 
 /** The packs a customer can buy here, and whether they can pay online. */
@@ -48,6 +55,8 @@ export interface AccountPackCheckout {
     pack: { name: string; credits: number; validityDays: number };
     total: string;
     currency: string;
+    /** The GST inside or on `total`; null when nothing is said. */
+    gst: GstOnPrice | null;
     /** The provider's non-secret handoff; the amount is the draft's. */
     payment: CreateIntentResult;
 }
@@ -64,16 +73,19 @@ export interface AccountPackAttempt {
     expiresAt: string | null;
 }
 
-export function packOnSaleView(pack: {
-    id: string;
-    name: string;
-    description: string | null;
-    credits: number;
-    validityDays: number;
-    price: { toString(): string };
-    currency: string;
-    kind: string;
-}): AccountPackOnSale {
+export function packOnSaleView(
+    pack: {
+        id: string;
+        name: string;
+        description: string | null;
+        credits: number;
+        validityDays: number;
+        price: { toString(): string };
+        currency: string;
+        kind: string;
+    },
+    gst: GstOnPrice | null = null,
+): AccountPackOnSale {
     const description = pack.description?.trim() ?? "";
     return {
         ref: pack.id,
@@ -84,6 +96,7 @@ export function packOnSaleView(pack: {
         price: toMoneyString(pack.price.toString()),
         currency: pack.currency,
         kind: pack.kind === "ONE_TO_ONE" ? "ONE_TO_ONE" : "CLASSES",
+        gst,
     };
 }
 
@@ -93,6 +106,7 @@ export function packCheckoutView(input: {
     total: { toString(): string };
     currency: string;
     payment: CreateIntentResult;
+    gst?: GstOnPrice | null;
 }): AccountPackCheckout {
     return {
         ref: input.invoiceId,
@@ -103,6 +117,7 @@ export function packCheckoutView(input: {
         },
         total: toMoneyString(input.total.toString()),
         currency: input.currency,
+        gst: input.gst ?? null,
         payment: input.payment,
     };
 }

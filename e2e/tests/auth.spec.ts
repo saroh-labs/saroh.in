@@ -28,6 +28,9 @@ async function signIn(page: import("@playwright/test").Page) {
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
         timeout: 30_000,
     });
+    // The landing page has finished loading: a `goto` made while sign-in
+    // is still moving the page on is aborted (net::ERR_ABORTED).
+    await page.waitForLoadState("load");
 }
 
 test.describe("cross-origin session", () => {

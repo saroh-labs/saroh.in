@@ -6,12 +6,14 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { optionFacts, priceActor, recordPrices } from "../audit/price-history";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { variantHasHistory, variantHasStock } from "../stock/stock-words";
 import { recordEntry } from "../stock/stock.service";
 import { COUNTING_ROWS } from "../stock/tracking";
 import type { ProductScope } from "./product-access";
-import { assertMrpAtOrAbovePrice } from "./product-rules";
+import { assertMrpAtOrAbovePrice, moneyToCents } from "./product-rules";
 import { ProductsService } from "./products.service";
 import { serializeVariant } from "./serialize";
 import { lockProduct, lockProductStock } from "./stock-levels";
@@ -95,7 +97,11 @@ export class VariantsService {
         dto: CreateVariantDto,
     ) {
         const { organizationId } = scope;
-        await this.assertCoherent(productId, dto);
+        const product = await this.assertCoherent(
+            organizationId,
+            productId,
+            dto,
+        );
 
         const last = await prisma.productVariant.findFirst({
             where: { productId },
@@ -119,6 +125,21 @@ export class VariantsService {
                         position: (last?.position ?? -1) + 1,
                     },
                 });
+                // An option with a price or an MRP of its own starts its
+                // price history; one that takes the product's has none.
+                await recordPrices(
+                    tx,
+                    priceActor(scope),
+                    {
+                        kind: "PRODUCT",
+                        id: productId,
+                        name: product.name,
+                        currency: product.currency,
+                        option: { id: created.id, title: created.title },
+                    },
+                    null,
+                    optionFacts(created),
+                );
                 // Sold wherever the product is listed.
                 const listings = await tx.productListing.findMany({
                     where: { productId },
@@ -184,24 +205,48 @@ export class VariantsService {
     ) {
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
-            select: { id: true },
+            select: { id: true, price: true, mrp: true },
         });
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
-        await this.assertCoherent(productId, dto);
+        const product = await this.assertCoherent(
+            scope.organizationId,
+            productId,
+            dto,
+            {
+                price: variant.price?.toString() ?? null,
+                mrp: variant.mrp?.toString() ?? null,
+            },
+        );
         try {
-            await prisma.productVariant.update({
-                where: { id: variantId },
-                data: {
-                    sku: dto.sku,
-                    title: dto.title,
-                    price: dto.price ?? null,
-                    mrp: dto.mrp ?? null,
-                    image: dto.image ?? null,
-                    optionValueId: dto.optionValueId ?? null,
-                    imageId: dto.imageId ?? null,
-                },
+            // The save and its price history entry stand or fall together.
+            await prisma.$transaction(async (tx) => {
+                const saved = await tx.productVariant.update({
+                    where: { id: variantId },
+                    data: {
+                        sku: dto.sku,
+                        title: dto.title,
+                        price: dto.price ?? null,
+                        mrp: dto.mrp ?? null,
+                        image: dto.image ?? null,
+                        optionValueId: dto.optionValueId ?? null,
+                        imageId: dto.imageId ?? null,
+                    },
+                });
+                await recordPrices(
+                    tx,
+                    priceActor(scope),
+                    {
+                        kind: "PRODUCT",
+                        id: productId,
+                        name: product.name,
+                        currency: product.currency,
+                        option: { id: variantId, title: saved.title },
+                    },
+                    optionFacts(variant),
+                    optionFacts(saved),
+                );
             });
             // Its price is on the product's page and its cards (#863).
             await enqueuePageRevalidation(prisma, {
@@ -411,15 +456,29 @@ export class VariantsService {
 
     /**
      * A variant's option value belongs to the product's option, its photo is
-     * one of the product's own, and its MRP is not below what it sells for.
+     * one of the product's own, and its MRP is not below what the customer
+     * pays for it: the amount to pay under the product's GST, since GST is
+     * part of MRP (`product-rules.ts`). `stored` is the variant as it is
+     * saved now: a save that changes neither its price nor its MRP is not
+     * refused for a sum it did not make.
      */
     private async assertCoherent(
+        organizationId: string,
         productId: string,
         dto: CreateVariantDto,
-    ): Promise<void> {
+        stored?: { price: string | null; mrp: string | null },
+    ): Promise<{ name: string; currency: string }> {
         const product = await prisma.product.findUniqueOrThrow({
             where: { id: productId },
-            select: { price: true, mrp: true, optionId: true },
+            select: {
+                name: true,
+                price: true,
+                mrp: true,
+                optionId: true,
+                currency: true,
+                gstRate: true,
+                gstPriceMode: true,
+            },
         });
         if (dto.optionValueId) {
             const value = await prisma.productOptionValue.findFirst({
@@ -450,9 +509,27 @@ export class VariantsService {
                 });
             }
         }
+        const cents = (amount: string | null | undefined) =>
+            amount == null ? null : moneyToCents(amount);
+        if (
+            stored &&
+            cents(stored.price) === cents(dto.price) &&
+            cents(stored.mrp) === cents(dto.mrp)
+        ) {
+            return product;
+        }
         const price = dto.price ?? product.price.toString();
         const mrp = dto.mrp ?? product.mrp?.toString() ?? null;
-        assertMrpAtOrAbovePrice(price, mrp, dto.mrp ? "mrp" : "price");
+        if (mrp === null) return product;
+        assertMrpAtOrAbovePrice(price, mrp, dto.mrp ? "mrp" : "price", {
+            item: {
+                gstRate: product.gstRate,
+                gstPriceMode: product.gstPriceMode,
+            },
+            terms: await loadPriceTerms(prisma, organizationId),
+            currency: product.currency,
+        });
+        return product;
     }
 }
 

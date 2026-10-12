@@ -24,6 +24,7 @@ import { listCollections } from "@/lib/collections/service";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
+import { readPriceHistory } from "@/lib/price-history/service";
 import { productHref, productTabOf } from "@/lib/products/links";
 import {
     getProductOverview,
@@ -165,30 +166,41 @@ export default async function ProductPage({
     const onStock = view === "team" && tab === "stock" && tracking.counts;
 
     const onCollections = view === "team" && tab === "collections";
-    const [levels, log, checks, categories, collections] = await Promise.all([
-        // Its shelves at every storefront — optional: without them, the
-        // Overview shows the address's storefront and the Stock tab says
-        // it couldn't load.
-        tracking.counts &&
-        view === "team" &&
-        (tab === "overview" || tab === "stock")
-            ? getStockLevels({ product: productId }).catch(() => null)
-            : Promise.resolve(null),
-        onStock
-            ? getStockLog({ product: productId, limit: 100 }).catch(() => null)
-            : Promise.resolve(null),
-        onStock ? getStockChecks().catch(() => null) : Promise.resolve(null),
-        // The details sheet picks a category; only a writer opens it. The
-        // Collections tab says which category put it in an automatic one.
-        overview.canWrite || onCollections
-            ? listCategories().catch(() => [])
-            : Promise.resolve([]),
-        // The Collections tab's sizes and its Edit sheet (#524) — optional:
-        // without them the cards leave the count out and Edit waits.
-        onCollections
-            ? listCollections().catch(() => null)
-            : Promise.resolve(null),
-    ]);
+    const onOverview = view === "team" && tab === "overview";
+    const [levels, log, checks, categories, collections, priceHistory] =
+        await Promise.all([
+            // Its shelves at every storefront — optional: without them, the
+            // Overview shows the address's storefront and the Stock tab says
+            // it couldn't load.
+            tracking.counts &&
+            view === "team" &&
+            (tab === "overview" || tab === "stock")
+                ? getStockLevels({ product: productId }).catch(() => null)
+                : Promise.resolve(null),
+            onStock
+                ? getStockLog({ product: productId, limit: 100 }).catch(
+                      () => null,
+                  )
+                : Promise.resolve(null),
+            onStock
+                ? getStockChecks().catch(() => null)
+                : Promise.resolve(null),
+            // The details sheet picks a category; only a writer opens it. The
+            // Collections tab says which category put it in an automatic one.
+            overview.canWrite || onCollections
+                ? listCategories().catch(() => [])
+                : Promise.resolve([]),
+            // The Collections tab's sizes and its Edit sheet (#524) — optional:
+            // without them the cards leave the count out and Edit waits.
+            onCollections
+                ? listCollections().catch(() => null)
+                : Promise.resolve(null),
+            // What it and its options have cost (12 Oct 2026), under the
+            // Overview. Optional: a read that fails is said in its place.
+            onOverview
+                ? readPriceHistory("products", productId).catch(() => null)
+                : Promise.resolve(undefined),
+        ]);
     const stock: ProductStock | null = levels
         ? productStock(levels, productId)
         : null;
@@ -268,6 +280,7 @@ export default async function ProductPage({
                                 stock={stock}
                                 now={now}
                                 onShop={shopUrl !== null}
+                                priceHistory={priceHistory}
                             />
                         ) : null}
                         {tab === "stock" ? (

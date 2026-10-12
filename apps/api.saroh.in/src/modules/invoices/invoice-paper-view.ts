@@ -1,8 +1,9 @@
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
+import { paperPrices, pricesSentence } from "./added-line";
 import { rateToBps } from "./gst";
 import { stateName } from "./gst-states";
 import type { InvoiceTitle } from "./invoice-title";
-import type { InvoiceViewModel } from "./serialize";
+import type { InvoiceLineView, InvoiceViewModel } from "./serialize";
 
 /**
  * The invoice's paper as words, laid out the way Invoice Detail prints it
@@ -61,7 +62,10 @@ export function printedSeller(
 
 export interface PaperLine {
     description: string;
-    /** "GST 18% · taxable ₹2,034", "₹450 each", "less ₹50 discount". */
+    /**
+     * "GST 18% · taxable ₹2,034", "₹450 each", "less ₹50 discount"; on a
+     * line GST was added to, "GST 18% added, ₹180".
+     */
     sub: string | null;
     /** "9993", spaced like the screen; empty on an unregistered paper. */
     hsn: string;
@@ -98,7 +102,11 @@ export interface PaperView {
     sums: [string, string][];
     totalLabel: "Total" | "Credited";
     total: string;
-    /** "Prices include GST." on a tax invoice. */
+    /**
+     * "Prices include GST." on a tax invoice, "GST is added to these
+     * prices." when it was added to every line, and null on a paper with
+     * both, where each line says its own (`added-line.ts`).
+     */
     inclusive: string | null;
     footer: string;
     /**
@@ -181,11 +189,17 @@ function isExemptPaper(i: InvoiceViewModel): boolean {
  *   — not "Nil-rated", not "0%". Not set is not a 0% supply.
  * - A rate recorded as exactly 0: "Nil-rated".
  * - Above 0: "GST 18% · taxable ₹2,400".
+ *
+ * A line GST was added to (`added`, its GST as money) prints its taxable
+ * value as its amount, so it says the GST on top: "GST 18% added, ₹180".
+ * On a paper with both kinds (`mixed`) a line that includes GST says so:
+ * "GST 18% included · taxable ₹2,400".
  */
 export function lineGstNote(
     taxed: boolean,
     gst: { rate: string | null; taxableValue: string | null } | null,
     money: (amount: string) => string,
+    opts: { added?: string | null; mixed?: boolean } = {},
 ): string | null {
     if (!taxed || gst?.rate == null || gst.rate.trim() === "") {
         return null;
@@ -193,7 +207,10 @@ export function lineGstNote(
     const bps = rateToBps(gst.rate);
     if (bps === null || !Number.isFinite(bps)) return null;
     if (bps === 0) return "Nil-rated";
-    return `GST ${Number(gst.rate)}% · taxable ${money(gst.taxableValue ?? "0")}`;
+    if (opts.added != null) {
+        return `GST ${Number(gst.rate)}% added, ${money(opts.added)}`;
+    }
+    return `GST ${Number(gst.rate)}%${opts.mixed ? " included" : ""} · taxable ${money(gst.taxableValue ?? "0")}`;
 }
 
 /**
@@ -210,6 +227,25 @@ export function showsGstTotals(i: Pick<InvoiceViewModel, "lines">): boolean {
         const rate = l.gst?.rate;
         return rate != null && rate.trim() !== "";
     });
+}
+
+/**
+ * "₹450 each" under a line of more than one; on a line GST was added to,
+ * the typed price, and where the units do not multiply out to the amount
+ * (`added-line.ts`), what one comes to with GST: "₹99.99 each, ₹117.99
+ * with GST". The app's `lineEachNote` (`lib/invoices/paper-title.ts`) says
+ * the same on the paper.
+ */
+export function lineEachNote(
+    line: Pick<InvoiceLineView, "quantity" | "unitPrice" | "addedGst">,
+    money: (amount: string) => string,
+): string | null {
+    if (line.quantity <= 1) return null;
+    const added = line.addedGst;
+    if (!added) return `${money(line.unitPrice)} each`;
+    return added.unitPay
+        ? `${money(added.unitPrice)} each, ${money(added.unitPay)} with GST`
+        : `${money(added.unitPrice)} each`;
 }
 
 /**
@@ -338,6 +374,13 @@ export function paperView(
     const typedTax = !gst && Number(i.tax) > 0;
     // No line with a rate set: no GST rows, just the total (DEC-072).
     const gstRows = taxed && showsGstTotals(i) ? taxed : null;
+    // Whether its prices include GST, have it added, or both.
+    const prices = paperPrices(
+        (i.lines ?? []).map((l) => ({
+            rate: l.gst?.rate ?? null,
+            added: Boolean(taxed && l.addedGst),
+        })),
+    );
     const sums: [string, string][] = gstRows
         ? [
               ["Taxable value", money(i.subtotal)],
@@ -386,10 +429,16 @@ export function paperView(
             : null,
         hsnColumn: Boolean(gst),
         lines: (i.lines ?? []).map((l) => {
-            const discount = Number(l.discount);
+            // A line GST was added to prints its rate and amount before
+            // GST, and its discount likewise (`added-line.ts`).
+            const added = taxed ? l.addedGst : null;
+            const discount = Number(added ? added.discount : l.discount);
             const sub = [
-                lineGstNote(Boolean(taxed), l.gst, money),
-                l.quantity > 1 ? `${money(l.unitPrice)} each` : null,
+                lineGstNote(Boolean(taxed), l.gst, money, {
+                    added: added?.gst ?? null,
+                    mixed: prices === "MIXED",
+                }),
+                lineEachNote({ ...l, addedGst: added }, money),
                 discount > 0
                     ? `less ${money(String(discount))} discount`
                     : null,
@@ -399,13 +448,13 @@ export function paperView(
                 sub: sub.length ? sub.join(" · ") : null,
                 hsn: gst ? spacedCode(l.gst?.hsnSac) : "",
                 quantity: String(l.quantity),
-                amount: money(l.amount),
+                amount: money(added ? added.amount : l.amount),
             };
         }),
         sums,
         totalLabel: credit ? "Credited" : "Total",
         total: money(i.total),
-        inclusive: gstRows ? "Prices include GST." : null,
+        inclusive: gstRows ? pricesSentence(prices) : null,
         footer: paperFooter(i, business.name),
         howToPay: howToPayLines(i, pay),
     };

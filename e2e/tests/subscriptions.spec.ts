@@ -128,20 +128,47 @@ test.describe("subscriptions", () => {
             name: "Subscription status",
         });
         await expect(standing).toBeVisible();
-        await standing.click();
+        // Rye & Co. has a renewal that isn't paid, so the list opens on
+        // who needs the owner and the header leads with it. Nothing is
+        // said a second time under the tabs. (When renewals last ran is
+        // said only when they are late, which this stack can't promise
+        // either way.)
+        await expect(standing).toContainText("Need you");
+        await expect(page.getByRole("main")).toContainText(/\d+ needs? you/);
         await expect(
-            page.getByRole("option", { name: /^Payment failed/ }),
-        ).toBeVisible();
-        await page.keyboard.press("Escape");
-        await expect(page.getByText(/Renewals last ran/)).toBeVisible();
-
-        // A failed renewal is counted, and the banner takes you to it.
-        await page.getByRole("button", { name: "Show them" }).click();
-        await expect(standing).toContainText("Payment failed");
-        await expect(page).toHaveURL(/tab=failed/);
-
+            page.getByRole("button", { name: "Show them" }),
+        ).toHaveCount(0);
+        await expect(
+            page
+                .locator("[data-list-table]")
+                .locator("tr, li")
+                .filter({ hasText: "Payment failed" })
+                .filter({ visible: true })
+                .first(),
+        ).toContainText(/isn't paid|wasn't collected/);
         await standing.click();
+        for (const view of [
+            /^Need you/,
+            /^Active/,
+            /^Paused/,
+            /^Cancelled/,
+            /^All subscriptions/,
+        ]) {
+            await expect(
+                page.getByRole("option", { name: view }),
+            ).toBeVisible();
+        }
+
+        // A view someone chose is written to the address.
         await page.getByRole("option", { name: /^Active/ }).click();
+        await expect(page).toHaveURL(/view=active/);
+        // The list is searched by the subscriber's name.
+        await page
+            .getByRole("searchbox", { name: "Search subscriptions" })
+            .fill("Priya");
+        // The list has narrowed before the row is opened: a click that
+        // lands while it is still narrowing meets a row being redrawn.
+        await expect(page.getByText(/^1 of \d+ subscriptions$/)).toBeVisible();
         await page.getByRole("button", { name: /Priya Raman/ }).click();
         const look = page.getByRole("dialog", { name: "Priya Raman" });
         await expect(look.getByText("Next charge")).toBeVisible();
@@ -267,29 +294,57 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
         await plansTab.click();
         await expect(plansTab).toHaveAttribute("aria-selected", "true");
         await expect(page).toHaveURL(/tab=plans/);
+        // The sentence about price changes left the tab for the editor.
         await expect(
             page.getByText(/Changing a price only changes what's sold next/),
-        ).toBeVisible();
+        ).toHaveCount(0);
 
-        const card = page.getByRole("article", { name: plan.name });
-        await expect(
-            card.getByRole("link", { name: plan.name, exact: true }),
-        ).toHaveAttribute("href", /\/billing\/plans\/[^/]+$/);
-        await card.getByRole("button", { name: "Archive" }).click();
-        await expect(
-            page.getByText(new RegExp(`^${plan.name} archived\\.`)),
-        ).toBeVisible();
-        await expect(card.getByText("Archived", { exact: true })).toBeVisible();
-        await expect(
-            card.getByRole("button", { name: "Sell again" }),
-        ).toBeVisible();
-        await undo(page);
-        await expect(
-            card.getByRole("button", { name: "Archive" }),
-        ).toBeVisible();
-        await expect(card.getByText("Archived", { exact: true })).toHaveCount(
-            0,
+        // Plans are rows of the shared list, which opens on the live ones.
+        // Every plan, so the row stays in view once it is archived; and
+        // found by name, since Northwind has more plans than a page holds.
+        const views = page.getByRole("combobox", { name: "Plan status" });
+        await expect(views).toContainText("Live");
+        await views.click();
+        await page.getByRole("option", { name: /^All plans/ }).click();
+        await expect(page).toHaveURL(/view=all/);
+        await page
+            .getByRole("searchbox", { name: "Search plans" })
+            .fill(plan.name);
+        // A table row at the desk, a list item on a phone.
+        const row = page
+            .locator("[data-list-table]")
+            .locator("tr, li")
+            .filter({ hasText: plan.name })
+            .filter({ visible: true });
+        await expect(row.locator("a").first()).toHaveAttribute(
+            "href",
+            /\/billing\/plans\/[^/]+$/,
         );
+        // Archive is in the row's menu, never on its face.
+        await expect(
+            row.getByRole("button", { name: "Archive", exact: true }),
+        ).toHaveCount(0);
+        const more = row.getByRole("button", {
+            name: `More actions for ${plan.name}`,
+        });
+        await more.click();
+        await page.getByRole("menuitem", { name: "Archive" }).click();
+        await expect(
+            page.getByText(`${plan.name} archived.`, { exact: false }),
+        ).toBeVisible();
+        await expect(row.getByText("Archived", { exact: true })).toBeVisible();
+        await more.click();
+        await expect(
+            page.getByRole("menuitem", { name: "Sell again" }),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
+        await undo(page);
+        await expect(row.getByText("Archived", { exact: true })).toHaveCount(0);
+        await more.click();
+        await expect(
+            page.getByRole("menuitem", { name: "Archive" }),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
         await archivePlan(page, plan.id);
     });
 
@@ -301,17 +356,29 @@ test.describe("plans, a tab of subscriptions (D3)", () => {
             "aria-selected",
             "true",
         );
-        await expect(page.getByRole("article", { name: PLAN })).toBeVisible();
+        await expect(
+            page
+                .locator("[data-list-table]")
+                .locator("tr, li")
+                .filter({ hasText: PLAN })
+                .filter({ visible: true }),
+        ).toBeVisible();
     });
 
-    test("a plan's card opens its page: Overview, Subscribers, History (D4)", async ({
+    test("a plan's row opens its page: Overview, Subscribers, History (D4)", async ({
         page,
     }) => {
         await signIn(page);
         await page.goto("/billing/subscriptions?tab=plans");
+        // The row is the way in: its name at the desk, the whole row on a
+        // phone.
         await page
-            .getByRole("article", { name: PLAN })
-            .getByRole("link", { name: PLAN, exact: true })
+            .locator("[data-list-table]")
+            .locator("tr, li")
+            .filter({ hasText: PLAN })
+            .filter({ visible: true })
+            .locator("a")
+            .first()
             .click();
         await expect(page).toHaveURL(/\/billing\/plans\/[^/?]+$/);
         await expect(

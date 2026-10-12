@@ -449,3 +449,43 @@ describe("Activity", () => {
         );
     });
 });
+
+describe("a pack's GST in its activity (12 Oct 2026)", () => {
+    const changed = (details: PackEvent["details"]) =>
+        activityText(event({ kind: "CHANGED", details }), PACK, "CLASSES");
+
+    it("says a rate chosen, changed and exempt", () => {
+        expect(changed({ gstRate: [null, "18"] })).toBe(
+            "GST rate 18%, was not set",
+        );
+        expect(changed({ gstRate: ["18", "12"] })).toBe(
+            "GST rate 12%, was 18%",
+        );
+        expect(changed({ gstRate: ["18", "0"] })).toBe("GST rate 0%, was 18%");
+    });
+
+    it("says how the price carries GST, and the SAC code", () => {
+        expect(changed({ gstPriceMode: [null, "ADDED"] })).toBe(
+            "GST on this price: GST is added",
+        );
+        expect(changed({ gstPriceMode: ["ADDED", null] })).toBe(
+            "GST on this price: same as the business",
+        );
+        expect(changed({ sacCode: [null, "999723"] })).toBe(
+            "SAC code 999723, was not set",
+        );
+    });
+
+    it("says it beside the price when both changed", () => {
+        expect(
+            changed({
+                price: ["1200.00", "1500.00"],
+                gstRate: [null, "18"],
+            }),
+        ).toBe("Price ₹1,500, was ₹1,200 · GST rate 18%, was not set");
+    });
+
+    it("falls back to Terms changed for a GST field that didn't move", () => {
+        expect(changed({ gstRate: ["18", "18.00"] })).toBe("Terms changed");
+    });
+});

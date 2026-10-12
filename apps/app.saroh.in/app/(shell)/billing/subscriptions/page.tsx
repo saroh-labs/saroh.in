@@ -2,6 +2,7 @@ import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { SubscriptionsScreen } from "@/components/subscriptions/subscriptions-screen";
 import { membershipPlansLock, onlinePaymentsLock } from "@/lib/billing/access";
+import { readMissingRates } from "@/lib/gst-rates/service";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -18,7 +19,7 @@ import {
     listPlansOptional,
     listSubscriptions,
 } from "@/lib/subscriptions/service";
-import { gstNote, ranLine, screenTabFromQuery } from "@/lib/subscriptions/view";
+import { ranLine, screenTabFromQuery } from "@/lib/subscriptions/view";
 
 export const metadata = { title: "Subscriptions" };
 
@@ -30,6 +31,10 @@ const FALLBACK_ZONE = "Asia/Kolkata";
  * when renewals last ran and each subscription's charges are optional: a
  * Plans tab that says it couldn't read them, a line left out, or a quick
  * look that says its charges could not be read — never the page.
+ *
+ * `?view=` is the view someone chose in either tab's list. Without one,
+ * Subscribers opens on who needs the owner when anyone does, else on the
+ * active ones (`defaultView`).
  */
 export default async function SubscriptionsPage({
     searchParams,
@@ -66,7 +71,7 @@ export default async function SubscriptionsPage({
             listPlansOptional(),
             modulesOrUnknown(),
         ]);
-    const [contacts, renewals, charges, settings, autopay, access] =
+    const [contacts, renewals, charges, settings, autopay, access, rates] =
         await Promise.all([
             canWrite ? contactPickerOptions() : Promise.resolve([]),
             getRenewals().catch(() => null),
@@ -77,6 +82,8 @@ export default async function SubscriptionsPage({
             // A plan without memberships or online payments starts no new one;
             // the ones it has keep renewing.
             billingAccessOrNull(),
+            // What is on sale with no GST rate; null draws no notice.
+            readMissingRates(),
         ]);
     const plans = planRead.state === "ok" ? planRead.data : null;
     const appointments = modules
@@ -90,13 +97,7 @@ export default async function SubscriptionsPage({
     // zone most of them share.
     const zone = subscriptions[0]?.timezone ?? FALLBACK_ZONE;
     const ran = renewals ? ranLine(renewals, zone, now) : null;
-    const gst =
-        charges.state === "ok"
-            ? gstNote(Object.values(charges.data).flat(), "list")
-            : "";
-    const renewNote = ran
-        ? { text: [ran.text, gst].filter(Boolean).join(" "), late: ran.late }
-        : null;
+    const tab = screenTabFromQuery(params.tab ?? params.view);
 
     return (
         <PageContainer width="full">
@@ -107,9 +108,17 @@ export default async function SubscriptionsPage({
                 showClasses={plansShowClasses(appointments, plans ?? [])}
                 contacts={contacts}
                 charges={charges}
-                renewNote={renewNote}
+                // When renewals last ran is the system's status: said
+                // only when they are late, as the warning it is.
+                renewalsLate={ran?.late ? ran.text : null}
                 canWrite={canWrite}
-                initialTab={screenTabFromQuery(params.tab ?? params.view)}
+                initialTab={tab}
+                // The view someone chose: the list's on Subscribers
+                // (`?view=`, or `?tab=` on an older link), the plans' on
+                // Plans.
+                initialView={
+                    params.view ?? (tab === "plans" ? undefined : params.tab)
+                }
                 openSubscribe={canWrite && params.subscribe === "1"}
                 subscribePlanId={params.plan}
                 nowIso={now.toISOString()}
@@ -117,6 +126,7 @@ export default async function SubscriptionsPage({
                 autopayOffered={autopay?.offered ?? false}
                 newLocked={onlinePaymentsLock(access, "subscriptions")}
                 plansLocked={membershipPlansLock(access)}
+                missingRates={rates}
             />
         </PageContainer>
     );

@@ -6,6 +6,7 @@ import type {
 import type { PacksApi } from "../account/packs-api";
 import type { AutopayMethod, AutopayStart } from "../autopay/api";
 import type { PaymentHandoff } from "../booking-flow/api";
+import type { GstOnPrice } from "../lib/gst-price";
 
 /**
  * What the Prices page's Join and Buy ask of the site (round-2 G20). The
@@ -20,8 +21,14 @@ export interface PlanJoinStarted {
     /** The attempt's ref, to ask how it stands. */
     ref: string;
     plan: { name: string; interval: string };
+    /** The amount to pay for the first period, GST and all. */
     total: string;
     currency: string;
+    /**
+     * The GST in or on `total`; null or absent (an older API): nothing is
+     * said about GST.
+     */
+    gst?: GstOnPrice | null;
     payment: PaymentHandoff;
     /**
      * Autopay chosen with the join (D12): the same window authorises it

@@ -44,6 +44,7 @@ import {
     salesByMonth,
 } from "@/lib/class-packs/pack-sales";
 import type { HeldPack } from "@/lib/class-packs/sell-words";
+import type { GstAsk } from "@/lib/gst/item-words";
 import { invoicesHref } from "@/lib/invoices/links";
 
 import { TabStrip } from "@saroh/ui/tabs";
@@ -70,6 +71,8 @@ export interface SellContext {
     held: HeldPack[];
     packs: SellablePack[];
     invoicesOnSale: boolean;
+    /** The business's GST standing, for the dialog's amount to pay. */
+    gst?: GstAsk | null;
 }
 
 /**
@@ -349,6 +352,7 @@ export function PackDetailScreen({
                     packs={sell.packs}
                     initialPackId={pack.id}
                     invoicesOnSale={sell.invoicesOnSale}
+                    gst={sell.gst}
                     held={sell.held}
                 />
             ) : null}

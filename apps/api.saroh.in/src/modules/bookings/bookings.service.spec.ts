@@ -74,6 +74,8 @@ jest.mock("@saroh/database", () => {
         },
         // Whose diary a Calendar only person is (#868); nobody else reads it.
         membership: { findUnique: jest.fn() },
+        // A service's price history entry, written with its save.
+        auditEvent: { create: jest.fn() },
         $queryRaw: jest.fn(),
     };
     return {

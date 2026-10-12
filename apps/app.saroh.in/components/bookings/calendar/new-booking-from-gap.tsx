@@ -304,8 +304,13 @@ function Form({
                         className="mb-3 flex flex-wrap gap-1.5"
                     >
                         {offered.map((s) => {
+                            // What a booking of it costs to pay, GST and
+                            // all, as the API charges it.
                             const price = money
-                                ? formatMoney(s.priceCents, s.currency)
+                                ? formatMoney(
+                                      s.payCents ?? s.priceCents,
+                                      s.currency,
+                                  )
                                 : null;
                             return (
                                 <Chip

@@ -30,12 +30,14 @@ import {
     gstNote,
     headline,
     initials,
+    keepsLine,
     listTab,
-    longPrice,
     olderPrice,
     paysBy,
+    recurringPrice,
     retryOffer,
     sortCharges,
+    subscriptionPay,
 } from "@/lib/subscriptions/view";
 
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -139,6 +141,7 @@ export function SubscriptionDetail({
         toggleSkip,
         newPayLink,
         chargeAgain,
+        rateStep,
     } = useSubscriptionActions(sub, plans, now, () => setStep(null));
 
     // The step came in the address; once opened, a refresh shouldn't reopen it.
@@ -284,7 +287,12 @@ export function SubscriptionDetail({
                     }
                     description={[
                         sub.plan.name,
-                        longPrice(sub.price, sub.currency, sub.interval),
+                        // What they pay a period, GST and all.
+                        recurringPrice(
+                            subscriptionPay(sub),
+                            sub.currency,
+                            sub.interval,
+                        ),
                         `Since ${formatDate(sub.startedAt, tz, { now })}`,
                         bizName,
                     ]
@@ -361,8 +369,11 @@ export function SubscriptionDetail({
                     <div className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5">
                         <span className="flex-[1_1_240px] text-[13px] font-semibold text-foreground">
                             Changes to {pending.name} (
-                            {formatMoneyMajor(pending.price, pending.currency)})
-                            from {formatDate(pending.from, tz, { now })}. No
+                            {formatMoneyMajor(
+                                subscriptionPay(pending),
+                                pending.currency,
+                            )}
+                            ) from {formatDate(pending.from, tz, { now })}. No
                             part-payment.
                         </span>
                         <Button
@@ -416,16 +427,12 @@ export function SubscriptionDetail({
                         <PlanCard
                             name={sub.plan.name}
                             what={plan?.description ?? null}
-                            price={longPrice(
-                                sub.price,
+                            price={recurringPrice(
+                                subscriptionPay(sub),
                                 sub.currency,
                                 sub.interval,
                             )}
-                            older={
-                                older
-                                    ? `Keeps ${formatMoneyMajor(sub.price, sub.currency)}. The plan is ${formatMoneyMajor(older.listPrice, sub.currency)} for new sign-ups`
-                                    : null
-                            }
+                            older={older ? keepsLine(sub, older) : null}
                             // What the customer set up (D12) comes first;
                             // staff manage it from here (D14).
                             paysBy={autopay.line}
@@ -476,6 +483,7 @@ export function SubscriptionDetail({
                 }}
                 onCancel={cancel}
             />
+            {rateStep}
             {canWrite && tab === "cancelled" ? (
                 <SubscribeDialog
                     open={restarting}

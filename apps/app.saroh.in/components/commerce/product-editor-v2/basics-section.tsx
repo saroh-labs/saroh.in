@@ -6,6 +6,8 @@ import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import type { MrpPricing } from "@/lib/gst/mrp";
+import { overMrpProblem, toPayLine } from "@/lib/gst/mrp";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
 import {
     ITEM_MODE_LABEL,
@@ -32,7 +34,6 @@ import {
     joinAnd,
     LIMITS,
     needsGstRate,
-    paise,
     slugify,
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
@@ -83,6 +84,12 @@ const CURRENCY_WORD: Record<string, string> = {
  * asked under the price, and beside it "GST on this price" for the one
  * product priced differently from the business's own way (12 Oct 2026). A
  * business that isn't registered is never shown that.
+ *
+ * GST is part of MRP (12 Oct 2026): where GST is added to this price, the
+ * MRP's own line says the amount to pay ("₹1,180 to pay with 18% GST"), and
+ * an MRP under it is refused in place, before Save and by the API
+ * (`lib/gst/mrp.ts`). Nothing changes while the price includes GST, or for
+ * a business that isn't registered.
  */
 export function BasicsSection({
     product,
@@ -130,7 +137,21 @@ export function BasicsSection({
     const priceBox = form.register("price");
     const mrpBox = form.register("mrp");
     const v = form.watch();
-    const problem = basicsProblem(v, creating, gstRateNeeded);
+    const problem = basicsProblem(v, creating, gstRateNeeded, {
+        businessMode: businessPriceMode,
+        currency,
+    });
+    // What one of it costs to pay, where GST is added to the price: the
+    // MRP is compared with that, never with the price before GST.
+    const pricing: MrpPricing = {
+        registered: gstRateNeeded,
+        businessMode: businessPriceMode,
+        itemMode: v.gstPriceMode,
+        rate: v.gstRate,
+    };
+    const payLine = isMoney(v.price)
+        ? toPayLine(v.price, pricing, currency)
+        : null;
     // A new product says its rate is missing once the price is in and the
     // box has been opened or left; a saved one says so at once.
     const rateMissing = needsGstRate(v, gstRateNeeded);
@@ -196,10 +217,11 @@ export function BasicsSection({
     const nameEmpty = !creating && !v.name.trim();
     const priceBad =
         v.price.trim() !== "" ? !isMoney(v.price) : !creating && isDirty;
-    const mrpBad =
-        v.mrp.trim() !== "" &&
-        (!isMoney(v.mrp) ||
-            (isMoney(v.price) && paise(v.mrp) < paise(v.price)));
+    const overMrp =
+        isMoney(v.mrp) && isMoney(v.price)
+            ? overMrpProblem(v.price, v.mrp, pricing, currency)
+            : null;
+    const mrpBad = v.mrp.trim() !== "" && (!isMoney(v.mrp) || overMrp !== null);
     const derived = slugify(v.name);
     const hsnBad = v.hsnCode.trim() !== "" && !isHsnSac(v.hsnCode);
 
@@ -329,18 +351,23 @@ export function BasicsSection({
                     />
                 </Field>
                 <Field
+                    // Its line names what this product costs to pay.
+                    holdsData={payLine !== null}
                     label="MRP"
                     className="flex-[1_1_150px]"
                     error={
                         seen("mrp")
                             ? mrpBad
-                                ? isMoney(v.mrp)
-                                    ? "MRP can't be lower than the price it sells for."
-                                    : "A number with at most two decimal places."
+                                ? (overMrp ??
+                                  "A number with at most two decimal places.")
                                 : errors.mrp?.message
                             : null
                     }
-                    hint="The printed price, shown struck through. Leave it empty if it sells at MRP."
+                    hint={
+                        payLine
+                            ? `The printed price, which includes GST. ${payLine}, so the MRP can't be lower.`
+                            : "The printed price, shown struck through. Leave it empty if it sells at MRP."
+                    }
                 >
                     <MoneyInput
                         id="pe-mrp"

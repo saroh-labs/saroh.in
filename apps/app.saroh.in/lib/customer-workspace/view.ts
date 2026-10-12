@@ -4,7 +4,7 @@ import { count as countOf } from "@/lib/format/plural";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import { methodLabel } from "@/lib/payments/method-words";
 import type { Review } from "@/lib/product-reviews/service";
-import { shortPrice } from "@/lib/subscriptions/view";
+import { recurringPrice, subscriptionPay } from "@/lib/subscriptions/view";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import { addedLine } from "./added";
@@ -751,7 +751,8 @@ export function subRow(
         when,
         status,
         tone: status === "Active" ? "ok" : "off",
-        price: shortPrice(s.price, s.currency, s.interval),
+        // What they pay a period, GST and all: the short form, for a narrow row.
+        price: recurringPrice(subscriptionPay(s), s.currency, s.interval, true),
     };
 }
 

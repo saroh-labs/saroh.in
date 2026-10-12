@@ -4489,3 +4489,21 @@ flagged "Incomplete string escaping" in `bookings-view-switch.test.tsx`.
   sets its own timeout. A test never builds a pattern from text: find it with
   `includes`, or write the pattern out.
   **Category**: tests · devops · `docs/patterns/devops-tooling-and-deploy.md`
+
+## A browser test that types in a list's search, then clicks a row at once, loses the click
+
+**Symptom**: the gate failed `subscriptions.spec.ts` on desk and phone, on
+both tries: the row was clicked and the quick look never opened. By hand the
+same steps worked every time.
+**Cause**: the shared list narrows a moment after the last keystroke and
+redraws its rows. Playwright clicked the row in that moment, so the press
+landed on a row that was replaced before the click finished. A person cannot
+type and click that fast; a test always does.
+**Fix**: the test waits for the list's own count ("1 of 8 subscriptions")
+before it opens the row.
+**Check**: the test itself. Agents do not run browser specs, so a spec an
+agent edits is run once against the local stack before the gate
+(`playwright test <file> -g "<name>" --no-deps`).
+**Rule**: after typing in a list's search, a browser test waits for the
+count or for the row it does not expect to go, then clicks.
+**Category**: tests · `.agents/skills/saroh-browser-tests/SKILL.md`

@@ -13,6 +13,8 @@ import {
     ValidateIf,
 } from "class-validator";
 
+import type { GstPriceMode } from "../invoices/gst-price";
+import { GST_PRICE_MODES } from "../invoices/gst-price";
 import type { AutopayChargeTiming } from "./autopay-timing";
 import { AUTOPAY_CHARGE_TIMINGS } from "./autopay-timing";
 import type { Interval } from "./periods";
@@ -80,6 +82,34 @@ export class PlanInputDto {
         message: `${PLAN_CLASSES_MAX} a month is the most`,
     })
     classesPerMonth?: number | null;
+
+    /**
+     * GST the price carries, in percent (12 Oct 2026), on a registered
+     * business's tax invoice: "0" is exempt or nil-rated, a choice of its
+     * own. Checked against GST's rates in the service. null clears it.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
+    gstRate?: string | null;
+
+    /** SAC code: four to eight digits. null clears it. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
+    sacCode?: string | null;
+
+    /**
+     * How this plan's price carries GST when it differs from the
+     * business's way (`invoices/gst-price.ts`): INCLUDED or ADDED. null is
+     * "same as the business".
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsIn(GST_PRICE_MODES, {
+        message: "Choose whether this price includes GST or GST is added.",
+    })
+    gstPriceMode?: GstPriceMode | null;
 }
 
 /** What the staff list can be filtered to, drafts included (D5). */

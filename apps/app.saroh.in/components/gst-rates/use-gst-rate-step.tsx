@@ -34,9 +34,10 @@ export type LineRates = Readonly<Record<number, string>>;
  * saving, `run` answers `null`: the person chose not to, so there is
  * nothing to report.
  *
- * A service's or a product's rate is saved on it, so it is asked once. A
- * line typed on an invoice has nowhere but the invoice: its screen passes
- * `saveLines`, which writes the rates to the draft.
+ * The rate of anything sold (a service, a product, a plan, a class pack, a
+ * course) is saved on it, so it is asked once. A line typed on an invoice
+ * has nowhere but the invoice: its screen passes `saveLines`, which writes
+ * the rates to the draft.
  *
  * An action that answers `null` itself (another step it went through was
  * closed) is passed straight on.
@@ -120,7 +121,8 @@ export function useGstRateStep({
             saveLabel={asking?.words.continueLabel ?? continueLabel}
             requireAll
             // The refusal doesn't say how the business's prices carry GST,
-            // so a service or a product isn't told either way here.
+            // so nothing sold is told either way here. A plan's note says
+            // its members carry the rate from their next renewal.
             note={items ? savedWhere(items, null) : undefined}
             save={save}
             onDone={done}

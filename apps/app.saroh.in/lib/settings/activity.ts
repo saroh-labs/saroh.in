@@ -22,6 +22,7 @@ import {
     removedWhat,
 } from "./activity-customers";
 import { extrasWhat } from "./activity-extras";
+import { pricedPlace, priceWhat } from "./activity-prices";
 import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
 
 /**
@@ -51,6 +52,11 @@ import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
  * A customer record merged or its details changed by staff (C10) is told
  * without the customer's name, which the stream never holds (DEC-035), and
  * links to them: `activity-customers.ts`.
+ *
+ * A change to what a product, one of its options, a service or a course
+ * costs (12 Oct 2026) is told with the price before and after, and links
+ * to the item, whose own Price history holds the same entries:
+ * `activity-prices.ts`.
  */
 
 /**
@@ -83,6 +89,14 @@ export const ACTIVITY_ACTIONS = [
     "customer.details.changed",
     "customer.removed",
     "member.alerts.update",
+    // A GST rate chosen for a service, a product or a course from the rates
+    // sheet, as it was written before price history (12 Oct 2026). The
+    // sheet writes `price.changed` now; rows already written still read.
+    "gst-rate.set",
+    // A change to what a product, an option, a service or a course costs:
+    // its price, MRP, GST rate or "GST on this price", from any screen.
+    // (An item's first entry, `price.set`, is its own history's.)
+    "price.changed",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -157,6 +171,33 @@ const business = (tab?: BusinessTab) => ({
         ? `/settings/organization?${BUSINESS_TAB_PARAM}=${tab}`
         : "/settings/organization",
 });
+
+/** "18%", "0%", as a GST rate is said in a sentence. */
+export function gstRateSaid(rate: unknown): string | null {
+    const said = text(rate);
+    return said ? `${said}%` : null;
+}
+
+const RATED_WORD: Readonly<Partial<Record<string, string>>> = {
+    SERVICE: "service",
+    PRODUCT: "product",
+    COURSE: "course",
+};
+
+/**
+ * A GST rate chosen for something sold, as the rest of a sentence: "set the
+ * GST rate of Personal Training to 18%". A rate that was already there is
+ * said too: "changed … from 5% to 18%".
+ */
+function gstRateWhat(meta: Record<string, unknown>): string {
+    const what =
+        text(meta.name) ?? `a ${RATED_WORD[text(meta.kind) ?? ""] ?? "price"}`;
+    const to = gstRateSaid(meta.to) ?? "a rate";
+    const from = gstRateSaid(meta.from);
+    return from
+        ? `changed the GST rate of ${what} from ${from} to ${to}`
+        : `set the GST rate of ${what} to ${to}`;
+}
 
 /** The product a Sold out change was about, at the storefront it was made. */
 function productPlace(
@@ -384,6 +425,10 @@ export function activityLine(
             return line(mergedWhat(meta), customerPlace(event.targetId));
         case "customer.details.changed":
             return line(detailsWhat(meta), customerPlace(event.targetId));
+        case "gst-rate.set":
+            return line(gstRateWhat(meta), pricedPlace(event.targetId, meta));
+        case "price.changed":
+            return line(priceWhat(meta), pricedPlace(event.targetId, meta));
         // Their page is gone (C11): the line leads to the list.
         case "customer.removed":
             return line(removedWhat(meta), customerPlace(null));

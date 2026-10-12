@@ -79,6 +79,14 @@
             // opens and takes their email, rather than on the marketing
             // home with no word of why. "off" here, and the next deploy
             // takes the key off the Worker and opens it.
+            //
+            // It opens by itself at LAUNCH_AT: from that instant the gate
+            // asks nobody for a key, with no deploy (withDevAccess reads the
+            // clock on each request). The same line, with the same value, is
+            // in apps/saroh.in and apps/app.saroh.in, whose builds open from
+            // it; `pnpm run check:deploy-env` keeps the three alike. To move
+            // the launch, change all three and release; to call it off,
+            // remove all three (docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md).
             "vars": {
                 "VERCEL_ENV": "production",
                 "NEXT_PUBLIC_VERCEL_ENV": "production",
@@ -89,6 +97,8 @@
                 "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "PRELAUNCH_GATE": "on",
+                // 17 Oct 2026, 4:00 pm in India (10:30 UTC).
+                "LAUNCH_AT": "2026-10-17T16:00:00+05:30",
                 "DEV_REDIRECT_ORIGIN": "https://www.saroh.in",
                 "DEV_REDIRECT_PATH": "/waitlist",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",

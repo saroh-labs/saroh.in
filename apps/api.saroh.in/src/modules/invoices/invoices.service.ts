@@ -950,6 +950,7 @@ export class InvoicesService {
                 unitCents: toCents(l.unitPrice),
                 rateBps: rateToBps(l.gstRate ?? null),
                 code: l.hsnSac ?? null,
+                priceMode: l.priceMode ?? null,
             })),
             profile,
             gst.billToState,

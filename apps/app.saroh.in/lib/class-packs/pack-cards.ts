@@ -1,5 +1,6 @@
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
+import { gstIsAdded, payOf, setPriceWords } from "@/lib/gst/on-price";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type { PackStanding } from "./balance";
@@ -52,6 +53,23 @@ export function unitWord(kind: PackKind, n: number): string {
     return plural(n, "class", "classes");
 }
 
+/**
+ * "₹150 a class": one visit's share of what the pack costs to pay, to the
+ * whole rupee, so it compares with a single class's price to pay. Where
+ * GST is added to the pack's price it says so ("₹177 a class with GST"),
+ * since the price beside it is the one the business set. Null when there
+ * is nothing to divide.
+ */
+export function eachWords(
+    p: { price: string; credits: number; currency: string; gst?: unknown },
+    kind: PackKind,
+): string | null {
+    const pay = Number(payOf(p.price, p.gst));
+    if (!Number.isFinite(pay) || pay <= 0 || p.credits <= 0) return null;
+    const each = formatMoneyMajor(Math.round(pay / p.credits), p.currency);
+    return `${each} a ${unitWord(kind, 1)}${gstIsAdded(p.gst) ? " with GST" : ""}`;
+}
+
 function moneyTotals(totals: readonly MoneyTotal[]): string {
     return totals
         .map((t) => formatMoneyMajor(t.amount, t.currency))
@@ -68,9 +86,12 @@ export interface PackCardView {
     /** The card's Open button: Pack Detail, for a published pack only. */
     openHref: string | null;
     badges: { label: string; tone: BadgeTone }[];
-    /** "₹1,500", or "No price yet" on a draft still at nothing. */
+    /**
+     * "₹1,500" ("₹1,500 + GST" where GST is added), or "No price yet" on a
+     * draft still at nothing.
+     */
     price: string;
-    /** "₹150 a class"; null when there is nothing to divide. */
+    /** "₹150 a class" ({@link eachWords}); null when nothing to divide. */
     each: string | null;
     /** "10 classes · use within 60 days · HIIT, Yoga". */
     terms: string;
@@ -154,14 +175,13 @@ export function packCard(p: PackListItem, canWrite: boolean): PackCardView {
         href: packHref(p, canWrite),
         openHref: draft ? null : detailHref(p.id),
         badges,
+        // The business's own price list: the price it set, saying so where
+        // GST comes on top.
         price:
             priced || !draft
-                ? formatMoneyMajor(p.price, p.currency)
+                ? setPriceWords(formatMoneyMajor(p.price, p.currency), p.gst)
                 : "No price yet",
-        each:
-            priced && p.credits > 0
-                ? `${formatMoneyMajor(Math.round(price / p.credits), p.currency)} a ${unitWord(kind, 1)}`
-                : null,
+        each: priced ? eachWords(p, kind) : null,
         terms,
         sold: String(p.sold),
         takings,

@@ -2,7 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
-import type { GstPriceMode } from "../invoices/gst-price";
+import type { GstPriceMode, PriceTerms } from "../invoices/gst-price";
 import { businessPriceMode } from "../invoices/gst-price";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import type {
@@ -109,6 +109,7 @@ export const TAX_CURRENT_SELECT = {
     country: true,
     invoicePrefix: true,
     invoiceNumberFormat: true,
+    gstPriceMode: true,
     addressLine1: true,
     addressLine2: true,
     city: true,
@@ -122,10 +123,60 @@ export interface TaxCurrent {
     country: string | null;
     invoicePrefix?: string | null;
     invoiceNumberFormat?: unknown;
+    /** As stored; absent or null: INCLUDED. */
+    gstPriceMode?: string | null;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+}
+
+/**
+ * How the business prices before and after a tax save
+ * (`invoices/gst-price.ts`), and whether the save adds GST to prices that
+ * had none added: switching to "GST is added", or becoming registered (a
+ * product can already be set to "GST is added" on its own, and a business
+ * that registered before keeps the choice it made then).
+ *
+ * "Registered" is `loadPriceTerms`' test: the switch, a GSTIN and a state.
+ * A save that adds GST can take products above their MRP, so the settings
+ * service counts them first (`products/over-mrp.ts`). Going back to
+ * "includes GST", or deregistering, never does.
+ */
+export function priceTermsChange(
+    current: TaxCurrent | null,
+    data: TaxData,
+    sentTaxId: string | undefined,
+): { before: PriceTerms; after: PriceTerms; addsGst: boolean } {
+    const terms = (
+        registered: boolean,
+        taxId: string | null | undefined,
+        state: string | null | undefined,
+        mode: unknown,
+    ): PriceTerms => ({
+        registered: Boolean(registered && taxId?.trim() && state),
+        mode: businessPriceMode(mode),
+    });
+    const before = terms(
+        current?.gstRegistered ?? false,
+        current?.taxId,
+        current?.gstState,
+        current?.gstPriceMode,
+    );
+    const after = terms(
+        data.gstRegistered ?? current?.gstRegistered ?? false,
+        sentTaxId ?? current?.taxId,
+        data.gstState !== undefined ? data.gstState : current?.gstState,
+        data.gstPriceMode ?? current?.gstPriceMode,
+    );
+    return {
+        before,
+        after,
+        addsGst:
+            after.registered &&
+            (!before.registered ||
+                (before.mode !== "ADDED" && after.mode === "ADDED")),
+    };
 }
 
 const NO_COUNTERS: Record<NumberRestart, number> = {

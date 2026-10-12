@@ -322,6 +322,54 @@ export function shellActions(input: {
     };
 }
 
+// ---------------------------------------------------------------------------
+// A problem the record was opened with
+// ---------------------------------------------------------------------------
+
+/**
+ * The fields a published record was opened with a problem in, where that
+ * problem has a plain way of being said (`note`). A rule that is newer
+ * than the record (a GST rate, asked since 12 Oct 2026) is nobody's
+ * mistake, so the page does not open in an error state: no red field, no
+ * count beside Publish. A draft has never been published, so its problems
+ * are its to-do list and are said as before.
+ */
+export function heldAtOpen(
+    record: { published: unknown } | null,
+    problems: readonly EditorProblem[],
+): string[] {
+    if (!record || record.published === null) return [];
+    return problems.filter((p) => p.note).map((p) => p.field);
+}
+
+/**
+ * Which problems are said as problems now, and which are still only a note
+ * beside their field. One opened with stays a note until its field has been
+ * left or Publish has been pressed, as a page says nothing of a field until
+ * then (`frontend-forms.md`). Every one of them still stops Publish: a held
+ * one is said when Publish is pressed.
+ */
+export function sayProblems(input: {
+    problems: readonly EditorProblem[];
+    /** `heldAtOpen`, as the page opened. */
+    held: readonly string[];
+    /** The fields that have been left since. */
+    left: ReadonlySet<string>;
+    /** Publish has been pressed with one held. */
+    tried: boolean;
+}): { shown: EditorProblem[]; notes: Partial<Record<string, string>> } {
+    const { problems, held, left, tried } = input;
+    const shown: EditorProblem[] = [];
+    const notes: Partial<Record<string, string>> = {};
+    for (const p of problems) {
+        const quiet =
+            !tried && !!p.note && held.includes(p.field) && !left.has(p.field);
+        if (quiet) notes[p.field] ??= p.note;
+        else shown.push(p);
+    }
+    return { shown, notes };
+}
+
 function lowerFirst(s: string): string {
     return s ? s[0].toLowerCase() + s.slice(1) : s;
 }

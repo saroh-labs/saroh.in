@@ -42,6 +42,13 @@
         // Compiled into the bundle, so a build with it differs from one
         // without.
         "NEXT_PUBLIC_PLANS",
+        // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
+        // plan sections appear once it is "open"; read at build. Hashed, not
+        // passed through: after LAUNCH_AT the deploy's build is given "open"
+        // with no file changed (scripts/cf-env.mjs), and only a hashed
+        // variable changes the build fingerprint (scripts/cf-plan.mjs), so
+        // unhashed, a push after launch would call the site unchanged.
+        "NEXT_PUBLIC_LAUNCH_MODE",
         // saroh.in: shows Resources pages before their publish date on a
         // preview deployment; ignored on production (plan KTD-2). Hashed, not
         // passed through: a build without it pre-renders /help as a 404, and
@@ -108,9 +115,10 @@
         "NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL",
         "NEXT_PUBLIC_META_PIXEL_ID",
         "NEXT_PUBLIC_SIGNUP_WELCOME_URL",
-        // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
-        // plan sections appear once it is "open"; read at build.
-        "NEXT_PUBLIC_LAUNCH_MODE",
+        // When early access opens (an ISO instant in production vars).
+        // accounts reads it per request (withDevAccess); the builds get
+        // their launch switches from it in scripts/cf-env.mjs.
+        "LAUNCH_AT",
         // Templates' switch (DEC-135): saroh.in's gallery and the merchant
         // app's template picker show only when it is "on"; read at build.
         "NEXT_PUBLIC_TEMPLATES",

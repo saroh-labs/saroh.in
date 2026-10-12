@@ -2,6 +2,8 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
+import type { GstValues } from "@/lib/gst/item-words";
+import type { GstOnPrice } from "@/lib/gst/on-price";
 import type { InvoiceStanding } from "@/lib/invoices/service";
 
 /**
@@ -41,6 +43,20 @@ export interface Course {
     nextSessionAt: string | null;
     createdAt: string;
     updatedAt: string;
+    /**
+     * GST (12 Oct 2026): the rate its price carries ("18"; null is not
+     * set), its SAC code, and its own way of carrying GST (null is the
+     * business's). Absent from an API before it.
+     */
+    gstRate?: GstValues["gstRate"];
+    sacCode?: GstValues["sacCode"];
+    gstPriceMode?: GstValues["gstPriceMode"];
+    /**
+     * The GST on its price as an enrolment is charged today, and the
+     * amount to pay; null when nothing is said about GST. `price` is the
+     * price the business set. Absent from an API before it.
+     */
+    gst?: GstOnPrice | null;
 }
 
 export interface Enrollment {
@@ -48,6 +64,7 @@ export interface Enrollment {
     course: { id: string; name: string };
     contact: { id: string; name: string; email: string };
     status: "ACTIVE" | "CANCELLED";
+    /** What they were charged, GST and all. */
     price: string;
     currency: string;
     /** Their sessions still to come that are booked. */
@@ -78,6 +95,10 @@ export interface CourseInput {
     status?: CourseStatus;
     /** On create only: session start instants, ISO. */
     sessions?: string[];
+    /** GST: null clears the rate or the code, or is "same as the business". */
+    gstRate?: GstValues["gstRate"];
+    sacCode?: GstValues["sacCode"];
+    gstPriceMode?: GstValues["gstPriceMode"];
 }
 
 export async function listCourses(): Promise<Course[]> {

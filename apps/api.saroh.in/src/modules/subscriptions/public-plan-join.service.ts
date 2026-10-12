@@ -13,7 +13,10 @@ import { notTakingOrders } from "../billing/paused-errors";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { contactEmailForDisplay } from "../contacts/contact-email";
+import type { GstOnPrice } from "../invoices/gst-price";
+import { RATED_SALE_SELECT, saleChargeInTx } from "../invoices/sale-price";
 import { contactName } from "../invoices/serialize";
+import { toCents } from "../invoices/totals";
 import { siteTakingOrders } from "../orders/checkout-paused";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import type { AutopayStart } from "../payments/autopay.service";
@@ -92,6 +95,11 @@ export interface AccountPlanJoin {
     plan: { name: string; interval: string };
     total: string;
     currency: string;
+    /**
+     * The GST on what is being paid, said before the window opens (12 Oct
+     * 2026); null when nothing is said (not registered, no rate, exempt).
+     */
+    gst: GstOnPrice | null;
     payment: CreateIntentResult;
     /**
      * Autopay chosen with the join (D12): the same window also authorises
@@ -167,12 +175,22 @@ export class PublicPlanJoinService {
                 interval: true,
                 classesPerMonth: true,
                 status: true,
+                ...RATED_SALE_SELECT,
             },
         });
         // A draft isn't published and an archived plan takes nobody new: to
         // the customer both are plans that aren't there.
         if (plan?.status !== PLAN_ON_SALE) notFound();
-        const terms = planTermsOf(plan, customer.accountId);
+        // What joining costs today: the price, or with GST added where the
+        // business adds it. Never refused for a missing rate: a customer
+        // can't choose one, and then it is the price, as before.
+        const charge = await saleChargeInTx(
+            prisma,
+            organizationId,
+            toCents(toMoneyString(plan.price)),
+            plan,
+        );
+        const terms = planTermsOf(plan, customer.accountId, charge);
         if (!terms) notFound();
 
         const provider = await prisma.merchantPaymentProvider.findFirst({
@@ -278,6 +296,7 @@ export class PublicPlanJoinService {
             plan: { name: terms.name, interval: terms.interval },
             total: toMoneyString(draft.total.toString()),
             currency: draft.currency,
+            gst: charge.gst,
         };
         // Autopay by UPI or card: one window pays and authorises (D12).
         if (autopayMethod && autopayMethod !== "EMANDATE") {

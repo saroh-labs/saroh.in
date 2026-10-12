@@ -180,10 +180,29 @@ pure module, built test-first from worked examples.
 > so a later change of the choice never rewrites a placed order, a made
 > booking or issued paper, and a credit note reverses what was charged.
 >
-> A deposit is a share of the amount to pay. A delivery charge, a line typed
-> on a hand-written invoice, and courses, class packs and plans (which carry
-> no rate) are charged as typed, with GST inside. "A registered business's
-> orders ignore the storefront's old add-on tax" stands.
+> A deposit is a share of the amount to pay. A delivery charge and a line
+> typed on a hand-written invoice are charged as typed, with GST inside. "A
+> registered business's orders ignore the storefront's old add-on tax"
+> stands.
+>
+> **Courses, class packs and membership plans (the owner's decision, the
+> same day).** They carried no rate, so a registered business's invoice for
+> one was a tax invoice with no tax on it. Each now has a GST rate, a SAC
+> code and its own way of carrying GST, by the same rules as a service: the
+> rate is asked for beside the price, the desk is asked in place when it
+> sells one with no rate, and the customer is told the GST before paying.
+> "It should be charging from the new invoices; already added ones won't be
+> edited": once a rate is set, every invoice issued from then on carries
+> it, the renewals of members who joined before it included, and an invoice
+> already issued is never changed. A member keeps the typed price they
+> joined at; under "includes GST" they pay the same and the paper shows the
+> split, and under "GST is added" their next renewal is the price plus its
+> GST (₹2,000 at 18% renews at ₹2,360). A renewal is never refused or
+> stopped for a missing rate: it goes out as before and the plan is listed
+> as needing one. Autopay is never charged above what the customer
+> authorised: a renewal above the mandate's limit goes out as an invoice
+> with a pay link. The rule is `docs/patterns/backend-billing-and-classes.md`
+> → "Plans, class packs and courses carry GST" and `invoices/sale-price.ts`.
 >
 > The customer is told before paying, in one form of words on every page:
 > "₹1,000, includes ₹152.54 GST (18%)" or "₹1,000 + ₹180 GST (18%)", with
@@ -192,6 +211,32 @@ pure module, built test-first from worked examples.
 > taxes" only there. The rule and its one sum are
 > `docs/patterns/backend-billing-and-classes.md` → "How a price carries GST
 > is the business's choice" and `invoices/gst-price.ts`.
+>
+> **What the paper prints as the rate (the owner's rule, the same day).**
+> "If the business says prices include GST, ₹1,000 will be the full
+> amount. If they say exclude, then ₹1,000 + GST." The first paper under
+> "GST is added" printed the amount to pay as the unit price (₹1,180) and
+> still said "Prices include GST." It now reads as the business charges:
+> the rate is the price it typed (₹1,000), the line's amount is its taxable
+> value, and the GST and the total are as frozen, so the lines add up to
+> the taxable value and the taxable value and the GST to the total. Nothing
+> stored changed: a line's unit price and amount are still the amount to
+> pay, and every total, pay link, refund and credit note works from them as
+> before. Only the reading on the paper moved, and only for a line recorded
+> as "added"; a line recorded as "includes", or from before the choice,
+> prints exactly as it did.
+>
+> Because GST is rounded on one unit and a line's tax is derived from the
+> whole line, quantity × the typed price can differ from the frozen taxable
+> value by under half a paisa a unit (7 × ₹99.99 at 18% is ₹699.93; the
+> line's taxable value is ₹699.94). The paper prints the frozen value, and
+> on such a line also what one unit comes to with GST (₹117.99), which does
+> multiply out to the line's total. "Prices include GST." prints only when
+> no line had GST added; "GST is added to these prices." when every line
+> that carries GST had; a paper with both has no sentence and each line
+> says its own. The rule is `invoices/added-line.ts` and
+> `docs/patterns/backend-billing-and-classes.md` → "A paper prints the
+> typed price as the rate of a line GST was added to".
 
 ### Staff and their hours
 

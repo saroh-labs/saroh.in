@@ -24,8 +24,19 @@ export type PayStatus = (typeof PAY_STATUSES)[number];
 export interface PayInvoiceLine {
     description: string;
     quantity: number;
+    /**
+     * The rate and the amount as the API says the paper prints them: the
+     * amount to pay, or on a line GST was added to, the price before GST
+     * and the line before GST, with the GST in `gst`.
+     */
     unitPrice: string;
     amount: string;
+    /**
+     * One unit with its GST, sent only where a line GST was added to does
+     * not multiply out to its amount to the paisa; else null. Absent from
+     * an older API.
+     */
+    unitPay?: string | null;
     /**
      * The GST in or on the line's whole amount, from the invoice's frozen
      * sums; null for none. Absent from an older API. Narrowed where it is
@@ -250,9 +261,27 @@ export function payMoney(amount: string, currency: string): string {
 }
 
 /**
+ * "₹450 each" under a line of more than one, and where the API sent what
+ * one unit comes to with GST, that too: "₹99.99 each, ₹117.99 with GST".
+ * The API's numbers, only written out; null for a line of one.
+ */
+export function payLineEachWords(
+    line: { quantity: number; unitPrice: string; unitPay?: unknown },
+    currency: string,
+): string | null {
+    if (line.quantity <= 1) return null;
+    const each = `${payMoney(line.unitPrice, currency)} each`;
+    return typeof line.unitPay === "string" && line.unitPay !== ""
+        ? `${each}, ${payMoney(line.unitPay, currency)} with GST`
+        : each;
+}
+
+/**
  * The GST in or on a line's amount, under its name on a pay page:
- * "includes ₹152.54 GST (18%)", or "₹1,000 + ₹180 GST (18%)" where it was
- * added. The API's numbers, only written out; null when it said none.
+ * "includes ₹152.54 GST (18%)" under an amount that has it in, or the
+ * whole sum, "₹1,000 + ₹180 GST (18%)", under a line GST was added to,
+ * whose amount is the ₹1,000 before it. The API's numbers, only written
+ * out; null when it said none.
  */
 export function payLineGstWords(gst: unknown, currency: string): string | null {
     const on = gstOnPriceOf(gst);

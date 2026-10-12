@@ -26,6 +26,11 @@ import { prisma } from "@saroh/database";
 
 import { toMinor } from "../../../common/money";
 import type { OrganizationContext } from "../../../common/types/organization-context";
+import {
+    priceActor,
+    recordPrices,
+    serviceFacts,
+} from "../../audit/price-history";
 import type { EntitlementService } from "../../billing/entitlement.service";
 import { assertLegacyLocationRoom } from "../../billing/legacy-location-floor";
 import { planMeter } from "../../billing/metering.service";
@@ -302,8 +307,22 @@ async function writeAppointments(
             timezone: profile?.timezone ?? DEFAULT_TIMEZONE,
             status: "ACTIVE",
         },
-        select: { id: true },
+        select: { id: true, name: true, priceCents: true, currency: true },
     });
+    // A priced first service starts its price history here.
+    await recordPrices(
+        tx,
+        priceActor(ctx),
+        {
+            kind: "SERVICE",
+            id: service.id,
+            name: service.name,
+            currency: service.currency,
+        },
+        null,
+        serviceFacts(service),
+        "setup",
+    );
     // The hours are the service's weekly rules, in its zone — what the
     // booking page offers until staff take it (U3).
     await tx.availabilityRule.createMany({

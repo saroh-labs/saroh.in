@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import {
     assertRatesSet,
+    assertSaleRated,
     GST_RATE_MISSING,
     gstRateMessage,
     unratedOf,
@@ -138,5 +139,59 @@ describe("which writers refuse an unset rate", () => {
             "orders/new-order.ts",
             "orders/orders.service.ts",
         ]);
+    });
+
+    it("only the desk's own sales ask it of a plan, a class pack or a course", () => {
+        // Selling a pack, enrolling on a course, subscribing and booking a
+        // plan change. Never the site's join or pack purchase, their
+        // webhooks, a resume, or the renewal job: nobody is there to
+        // choose, and a renewal is never stopped for a rate.
+        expect(using(/\bassertSaleRated\(/)).toEqual([
+            "class-packs/class-packs.service.ts",
+            "courses/courses.service.ts",
+            "invoices/gst-rate-required.ts",
+            "subscriptions/subscriptions.service.ts",
+        ]);
+    });
+});
+
+describe("selling a plan, a class pack or a course at the desk", () => {
+    const pack = (rate: string | null, priceCents = 450_000) => ({
+        kind: "PACK" as const,
+        id: "pack_1",
+        name: "10 classes",
+        rate,
+        priceCents,
+    });
+
+    it("refuses a registered business's priced item with no rate, naming it by its kind", () => {
+        let refusal: unknown;
+        try {
+            assertSaleRated(true, pack(null));
+        } catch (e) {
+            refusal = e;
+        }
+        expect(refusal).toBeInstanceOf(ConflictException);
+        expect((refusal as ConflictException).getResponse()).toEqual({
+            message:
+                "10 classes has no GST rate. Choose one to issue this invoice.",
+            details: {
+                reason: GST_RATE_MISSING,
+                items: [{ kind: "PACK", id: "pack_1", name: "10 classes" }],
+            },
+        });
+    });
+
+    it("0 is a rate, so an exempt item is sold", () => {
+        expect(() => assertSaleRated(true, pack("0"))).not.toThrow();
+        expect(() => assertSaleRated(true, pack("18.00"))).not.toThrow();
+    });
+
+    it("never asks a business that is not registered", () => {
+        expect(() => assertSaleRated(false, pack(null))).not.toThrow();
+    });
+
+    it("asks nothing of something free: it writes no tax", () => {
+        expect(() => assertSaleRated(true, pack(null, 0))).not.toThrow();
     });
 });

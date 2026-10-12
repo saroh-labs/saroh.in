@@ -7,7 +7,7 @@ import {
 } from "@/lib/notifications/preferences";
 
 import type { AuditEventRow, RoleLabels } from "./activity";
-import { personName, roleName } from "./activity";
+import { gstRateSaid, personName, roleName } from "./activity";
 import type { ChangeValue, RecordedChange } from "./activity-changes";
 import {
     countOf,
@@ -21,6 +21,7 @@ import {
 } from "./activity-changes";
 import { detailsLabels, mergedMoves } from "./activity-customers";
 import { extrasRows } from "./activity-extras";
+import { priceRows } from "./activity-prices";
 
 /**
  * The sheet a Settings › Activity row opens (#509): when, to the minute and
@@ -350,6 +351,20 @@ function detailRows(
                 withoutValues: false,
             };
         }
+        case "gst-rate.set":
+            return {
+                rows: [
+                    row(
+                        text(meta.name) ?? "GST rate",
+                        gstRateSaid(meta.from) ?? "Not set",
+                        gstRateSaid(meta.to),
+                    ),
+                ],
+                withoutValues: false,
+            };
+        case "price.changed":
+            // What it was about, then each field as it was and became.
+            return { rows: priceRows(meta), withoutValues: false };
         case "product.stock-tracking.on":
         case "product.stock-tracking.off":
             return {

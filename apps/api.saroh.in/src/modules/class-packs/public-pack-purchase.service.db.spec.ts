@@ -359,6 +359,8 @@ describe("the packs on sale", () => {
                     price: "4500.00",
                     currency: "INR",
                     kind: "CLASSES",
+                    // Not GST-registered: no GST words.
+                    gst: null,
                 },
             ],
         });

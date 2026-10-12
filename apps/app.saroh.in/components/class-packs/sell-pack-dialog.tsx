@@ -1,13 +1,13 @@
 "use client";
 
 import { FormDialog } from "@/components/shared/form-dialog";
-import { formatMoneyMajor } from "@/lib/format/money";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { ChipGroup } from "@/components/shared/choice-group";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
@@ -24,12 +24,15 @@ import {
     DESK_PAID_BY,
     firstPackBlock,
     holdingNow,
+    packGstLine,
+    packSetPrice,
     sellFailure,
     sellLabel,
     sellNote,
     sellTerms,
     soldMessage,
 } from "@/lib/class-packs/sell-words";
+import type { GstAsk } from "@/lib/gst/item-words";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 /** "Vinyasa, Hatha and Yin". */
@@ -58,6 +61,11 @@ export interface SellablePack extends SellPack {
  *
  * Opened from a card, the pack is fixed and named in the title; opened from
  * "Sell a pack" elsewhere, it is chosen here.
+ *
+ * A GST-registered business's pack with no GST rate is asked for one here,
+ * in place (12 Oct 2026): the rate is saved on the pack and the same sale
+ * goes through. Where GST is added to the pack's price, the button, the
+ * invoice line and a line of their own say the amount to pay (`gst`).
  */
 export function SellPackDialog({
     open,
@@ -68,7 +76,13 @@ export function SellPackDialog({
     initialContactId,
     invoicesOnSale,
     held = [],
+    gst = null,
 }: {
+    /**
+     * Whether the business is GST-registered, and its own way of carrying
+     * GST. Absent or unread: the price is said as typed.
+     */
+    gst?: GstAsk | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     contacts: readonly ContactOption[];
@@ -103,6 +117,10 @@ export function SellPackDialog({
     const [tried, setTried] = useState(false);
     // Read once, when the dialog is made: "today" for the use-by date.
     const [today] = useState(() => Date.now());
+    const rates = useGstRateStep({
+        then: "sell this pack",
+        continueLabel: "Save and sell",
+    });
 
     const pack = fixed ?? onSale.find((p) => p.id === packId);
     const person = contacts.find((c) => c.id === contactId);
@@ -122,10 +140,12 @@ export function SellPackDialog({
     async function save() {
         setTried(true);
         if (!pack || !contactId || !paidBy || blocked) return;
+        // No GST rate on the pack: chosen here, saved on it, then sold.
         const res = await runAction(
-            () => sellPack(pack.id, contactId, paidBy),
+            () => rates.run(() => sellPack(pack.id, contactId, paidBy)),
             { setBusy },
         );
+        // Unreached, or the rate sheet was closed: nothing was sold.
         if (!res) return;
         if (!res.ok) return showError(sellFailure(res.error, pack.name, who));
         showSuccess(soldMessage(who, pack, today, Boolean(res.data.invoiceId)));
@@ -138,131 +158,142 @@ export function SellPackDialog({
 
     const nothingToSell = onSale.length === 0 || (initialPackId && !fixed);
     const nobody = contacts.length === 0;
+    const gstLine = pack ? packGstLine(pack, gst) : null;
 
     return (
-        <FormDialog
-            open={open}
-            size="md"
-            title={fixed ? `Sell ${fixed.name}` : "Sell a pack"}
-            description={
-                pack
-                    ? sellTerms(pack, today)
-                    : "Classes come off when they book and go back if they cancel in time."
-            }
-            pending={busy}
-            doneOnly={Boolean(nothingToSell) || nobody}
-            doneLabel="Close"
-            saveLabel={sellLabel(pack, paidBy, invoicesOnSale)}
-            savingLabel="Selling…"
-            fieldsClassName="block"
-            footNote={
-                tried && missing ? (
-                    <p
-                        id={ids.missing}
-                        role="alert"
-                        className="text-[12.5px] font-medium text-destructive-subtle-foreground"
-                    >
-                        Choose a customer and how they paid.
+        <>
+            <FormDialog
+                open={open}
+                size="md"
+                title={fixed ? `Sell ${fixed.name}` : "Sell a pack"}
+                description={
+                    pack
+                        ? sellTerms(pack, today, gst)
+                        : "Classes come off when they book and go back if they cancel in time."
+                }
+                pending={busy}
+                doneOnly={Boolean(nothingToSell) || nobody}
+                doneLabel="Close"
+                saveLabel={sellLabel(pack, paidBy, invoicesOnSale, gst)}
+                savingLabel="Selling…"
+                fieldsClassName="block"
+                footNote={
+                    tried && missing ? (
+                        <p
+                            id={ids.missing}
+                            role="alert"
+                            className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                        >
+                            Choose a customer and how they paid.
+                        </p>
+                    ) : null
+                }
+                onClose={() => {
+                    setTried(false);
+                    onOpenChange(false);
+                }}
+                onSubmit={save}
+            >
+                {nothingToSell ? (
+                    <p className="text-[13px] text-muted-foreground">
+                        There is no pack on sale yet.{" "}
+                        <Link
+                            href="/class-packs/new"
+                            className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                            Make one
+                        </Link>{" "}
+                        first.
                     </p>
-                ) : null
-            }
-            onClose={() => {
-                setTried(false);
-                onOpenChange(false);
-            }}
-            onSubmit={save}
-        >
-            {nothingToSell ? (
-                <p className="text-[13px] text-muted-foreground">
-                    There is no pack on sale yet.{" "}
-                    <Link
-                        href="/class-packs/new"
-                        className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                        Make one
-                    </Link>{" "}
-                    first.
-                </p>
-            ) : nobody ? (
-                <p className="text-[13px] text-muted-foreground">
-                    A pack is sold to one of your customers, and there is nobody
-                    there yet, or Customers is not open to you. Add them in
-                    Customers first.
-                </p>
-            ) : (
-                <div className="grid gap-3">
-                    {fixed ? null : (
+                ) : nobody ? (
+                    <p className="text-[13px] text-muted-foreground">
+                        A pack is sold to one of your customers, and there is
+                        nobody there yet, or Customers is not open to you. Add
+                        them in Customers first.
+                    </p>
+                ) : (
+                    <div className="grid gap-3">
+                        {fixed ? null : (
+                            <div className="grid gap-1.5">
+                                <Label htmlFor={ids.pack}>Pack</Label>
+                                <OptionSelect
+                                    id={ids.pack}
+                                    value={packId}
+                                    onValueChange={setPackId}
+                                    aria-describedby={`${ids.pack}-help`}
+                                    options={onSale.map((p) => ({
+                                        value: p.id,
+                                        label: `${p.name} · ${packSetPrice(p, gst)}`,
+                                    }))}
+                                />
+                                {pack ? (
+                                    <p
+                                        id={`${ids.pack}-help`}
+                                        className="text-[12px] leading-[1.5] text-muted-foreground"
+                                    >
+                                        Usable on {usableOn(pack.services)}.
+                                    </p>
+                                ) : null}
+                            </div>
+                        )}
                         <div className="grid gap-1.5">
-                            <Label htmlFor={ids.pack}>Pack</Label>
-                            <OptionSelect
-                                id={ids.pack}
-                                value={packId}
-                                onValueChange={setPackId}
-                                aria-describedby={`${ids.pack}-help`}
-                                options={onSale.map((p) => ({
-                                    value: p.id,
-                                    label: `${p.name} · ${formatMoneyMajor(p.price, p.currency)}`,
-                                }))}
+                            <Label htmlFor={ids.who}>Customer</Label>
+                            <ContactPicker
+                                id={ids.who}
+                                contacts={contacts}
+                                value={contactId}
+                                onValueChange={setContactId}
+                                placeholder="Choose a customer"
+                                aria-invalid={blocked ? true : undefined}
+                                aria-describedby={
+                                    blocked ? ids.block : undefined
+                                }
                             />
-                            {pack ? (
+                            {blocked ? (
                                 <p
-                                    id={`${ids.pack}-help`}
-                                    className="text-[12px] leading-[1.5] text-muted-foreground"
+                                    id={ids.block}
+                                    role="alert"
+                                    className="text-[12.5px] font-medium text-destructive-subtle-foreground"
                                 >
-                                    Usable on {usableOn(pack.services)}.
+                                    {blocked}
+                                </p>
+                            ) : holding ? (
+                                <p className="text-[12.5px] text-foreground/80">
+                                    {holding}
                                 </p>
                             ) : null}
                         </div>
-                    )}
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.who}>Customer</Label>
-                        <ContactPicker
-                            id={ids.who}
-                            contacts={contacts}
-                            value={contactId}
-                            onValueChange={setContactId}
-                            placeholder="Choose a customer"
-                            aria-invalid={blocked ? true : undefined}
-                            aria-describedby={blocked ? ids.block : undefined}
-                        />
-                        {blocked ? (
-                            <p
-                                id={ids.block}
-                                role="alert"
-                                className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                        <div className="grid gap-1.5">
+                            <div
+                                id={ids.paid}
+                                className="text-[12.5px] font-medium"
                             >
-                                {blocked}
+                                Paid by
+                            </div>
+                            <ChipGroup
+                                labelledBy={ids.paid}
+                                value={paidBy}
+                                onChange={setPaidBy}
+                                choices={DESK_PAID_BY.map((m) => ({
+                                    value: m.value,
+                                    label: m.label,
+                                }))}
+                            />
+                        </div>
+                        {gstLine ? (
+                            <p className="text-[12.5px] font-medium tabular-nums text-foreground">
+                                {gstLine}
                             </p>
-                        ) : holding ? (
-                            <p className="text-[12.5px] text-foreground/80">
-                                {holding}
+                        ) : null}
+                        {pack ? (
+                            <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                                {sellNote(pack, invoicesOnSale, gst)}
                             </p>
                         ) : null}
                     </div>
-                    <div className="grid gap-1.5">
-                        <div
-                            id={ids.paid}
-                            className="text-[12.5px] font-medium"
-                        >
-                            Paid by
-                        </div>
-                        <ChipGroup
-                            labelledBy={ids.paid}
-                            value={paidBy}
-                            onChange={setPaidBy}
-                            choices={DESK_PAID_BY.map((m) => ({
-                                value: m.value,
-                                label: m.label,
-                            }))}
-                        />
-                    </div>
-                    {pack ? (
-                        <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                            {sellNote(pack, invoicesOnSale)}
-                        </p>
-                    ) : null}
-                </div>
-            )}
-        </FormDialog>
+                )}
+            </FormDialog>
+            {rates.step}
+        </>
     );
 }

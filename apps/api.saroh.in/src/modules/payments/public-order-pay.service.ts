@@ -10,7 +10,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { GstOnPrice } from "../invoices/gst-price";
-import { orderLineGst } from "../invoices/line-gst-words";
+import { orderLineOnPaper } from "../invoices/line-gst-words";
 import { orderPayLinkUrlFor } from "../invoices/pay-link-url";
 import { hashPayToken } from "../invoices/pay-token";
 import { lineName } from "../orders/order-line";
@@ -49,8 +49,19 @@ export interface PublicOrderPayView {
     lines: {
         name: string;
         quantity: number;
+        /**
+         * The rate and the amount as the page prints them: the amount to
+         * pay, GST and all, or on a line GST was added to (`gst.mode`
+         * "ADDED") the typed price and the line before GST, with the GST
+         * in `gst` (`orderLineOnPaper`).
+         */
         unitPrice: string;
         amount: string;
+        /**
+         * One unit with its GST, only on a line GST was added to whose
+         * units do not multiply out to its amount to the paisa; else null.
+         */
+        unitPay: string | null;
         /**
          * How the line's amount carries GST (`invoices/line-gst-words.ts`);
          * null when nothing is said about GST.
@@ -169,6 +180,7 @@ export class PublicOrderPayService {
                             quantity: true,
                             price: true,
                             gstPriceMode: true,
+                            listPrice: true,
                             product: { select: { name: true, gstRate: true } },
                             // A treatment's line names its service (E9).
                             service: { select: { name: true, gstRate: true } },
@@ -203,16 +215,13 @@ export class PublicOrderPayService {
                 orderNumber: order.orderId,
                 firstName: first.length > 0 ? first : null,
                 lines: order.items.map((i) => {
-                    const unit = Math.round(Number(i.price) * 100);
                     const name = lineName(i) ?? "";
                     return {
                         name: i.variant?.title
                             ? `${name} · ${i.variant.title}`
                             : name,
                         quantity: i.quantity,
-                        unitPrice: toMoneyString(i.price),
-                        amount: money(unit * i.quantity),
-                        gst: orderLineGst(i),
+                        ...orderLineOnPaper(i),
                     };
                 }),
                 total: toMoneyString(order.total),

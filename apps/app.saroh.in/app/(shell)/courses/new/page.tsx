@@ -7,6 +7,7 @@ import { CourseForm } from "@/components/courses/course-form";
 import { PageContainer } from "@/components/shared/page-container";
 import { requireCan } from "@/lib/access/require-can";
 import { listCourses } from "@/lib/courses/service";
+import { readMissingRates } from "@/lib/gst-rates/service";
 import { listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
 
@@ -26,9 +27,12 @@ export default async function NewCoursePage() {
         },
     });
     if (access.denied) return access.denied;
-    const [services, courses] = await Promise.all([
+    const [services, courses, rates] = await Promise.all([
         listServices(),
         listCourses(),
+        // Registered or not, and the business's way of carrying GST, as the
+        // Service Editor reads them. Unread asks for nothing.
+        readMissingRates(),
     ]);
     const options: CourseServiceOption[] = services
         .filter((s) => s.status === "ACTIVE")
@@ -82,6 +86,10 @@ export default async function NewCoursePage() {
                         services={options}
                         // The currency the business last priced a course in.
                         defaultCurrency={courses.at(0)?.currency ?? "INR"}
+                        gst={{
+                            asked: rates?.registered === true,
+                            priceMode: rates?.priceMode ?? null,
+                        }}
                     />
                 )}
             </div>

@@ -25,6 +25,7 @@ import type { PayInvoice } from "@/lib/invoice-pay";
 import type { PayContact } from "@/lib/invoice-pay-shape";
 import {
     payDate,
+    payLineEachWords,
     payLineGstWords,
     payMoney,
     payOffer,
@@ -146,11 +147,10 @@ export function InvoicePay({
                             >
                                 <td className="px-4 py-3">
                                     {l.description}
-                                    {l.quantity > 1 ? (
-                                        <span className="block text-xs text-site-muted">
-                                            {money(l.unitPrice)} each
-                                        </span>
-                                    ) : null}
+                                    <LineEach
+                                        line={l}
+                                        currency={invoice.currency}
+                                    />
                                     <LineGst
                                         gst={l.gst}
                                         currency={invoice.currency}
@@ -441,6 +441,20 @@ export function ContactToPay({
             </ul>
         </div>
     );
+}
+
+/** "₹450 each" under a line of more than one, in the API's numbers. */
+function LineEach({
+    line,
+    currency,
+}: {
+    line: { quantity: number; unitPrice: string; unitPay?: unknown };
+    currency: string;
+}) {
+    const words = payLineEachWords(line, currency);
+    return words ? (
+        <span className="block text-xs text-site-muted">{words}</span>
+    ) : null;
 }
 
 /**

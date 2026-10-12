@@ -5,7 +5,19 @@ import type { Interval } from "./periods";
  * A plan's figures for the Plans tab, Plan Detail and the editor's At a
  * glance (plan 2026-09-26-004, D1). Pure: the service reads the rows, this
  * adds them up. Every sum is in minor units, so no float touches a paisa.
+ *
+ * **Which price a figure is** (12 Oct 2026, `backend-data-and-money.md` →
+ * One figure, one kind). `price` on a row and `monthly` are prices the
+ * business set, as typed. `pay` on a row and `monthlyFromMembers` are money
+ * expected: what a member's period comes to, GST and all, by the plan's
+ * GST as it stands (`toPay`, the caller's `saleCharge`). Where GST is in
+ * the price, or none is charged, the two are the same to the paisa.
  */
+
+/** A typed price in minor units as the amount to pay for it. */
+export type ToPay = (minor: number) => number;
+
+const AS_TYPED: ToPay = (minor) => minor;
 
 /** How many of a plan's intervals make a month, as a fraction. */
 const PER_MONTH: Record<Interval, { times: number; per: number }> = {
@@ -35,7 +47,10 @@ export interface PriceGroup {
 
 /** Who pays what: subscribers on a plan grouped by the terms they pay. */
 export interface PriceRow {
+    /** The typed price they joined at. */
     price: string;
+    /** What one period comes to for them, GST and all. */
+    pay: string;
     currency: string;
     interval: Interval;
     /** Active or paused, on these terms. */
@@ -51,9 +66,9 @@ export interface PlanFigures {
     /** The plan's own price as a month's worth. */
     monthly: string;
     /**
-     * What its running (not paused) subscribers pay in a month, each at the
-     * price they bought at, in the plan's currency. Anyone on another
-     * currency is left out: two currencies do not add up.
+     * What its running (not paused) subscribers pay in a month, GST and
+     * all, each from the price they bought at, in the plan's currency.
+     * Anyone on another currency is left out: two currencies do not add up.
      */
     monthlyFromMembers: string;
 }
@@ -65,6 +80,7 @@ export function planFigures(
         interval: string;
     },
     groups: readonly PriceGroup[],
+    toPay: ToPay = AS_TYPED,
 ): PlanFigures {
     const planMinor = toMinor(plan.price);
     const rows = new Map<string, PriceRow & { minor: number }>();
@@ -75,6 +91,7 @@ export function planFigures(
         const key = `${minor}|${g.currency}|${interval}`;
         const row = rows.get(key) ?? {
             price: fromMinor(minor),
+            pay: fromMinor(toPay(minor)),
             currency: g.currency,
             interval,
             count: 0,
@@ -87,7 +104,8 @@ export function planFigures(
         row.count += g.count;
         rows.set(key, row);
         if (g.status === "ACTIVE" && g.currency === plan.currency) {
-            fromMembers += monthlyMinor(minor, interval) * g.count;
+            // A month's worth of what each pays, not of what was typed.
+            fromMembers += monthlyMinor(toPay(minor), interval) * g.count;
         }
     }
     // The price it sells at first, then the most people, then the dearer.
@@ -100,6 +118,7 @@ export function planFigures(
         )
         .map((r) => ({
             price: r.price,
+            pay: r.pay,
             currency: r.currency,
             interval: r.interval,
             count: r.count,

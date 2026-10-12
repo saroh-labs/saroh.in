@@ -24,10 +24,11 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import type { Resolver } from "react-hook-form";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 
+import { GstFields } from "@/components/services/service-editor/gst-fields";
 import {
     lostChanges,
     lostNew,
@@ -35,28 +36,22 @@ import {
 } from "@/components/shared/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import { createCourse, updateCourse } from "@/lib/courses/actions";
+import type { CourseFormValues } from "@/lib/courses/course-form";
+import {
+    courseGstDefaults,
+    courseGstProblems,
+    courseInput,
+    courseSchema,
+} from "@/lib/courses/course-form";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
 import { formatDate, formatTimeRange } from "@/lib/format/datetime";
+import type { GstAsk } from "@/lib/gst/item-words";
+import { addedGst, addedGstWords, NOT_ASKED } from "@/lib/gst/item-words";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-const schema = z.object({
-    serviceId: z.string().min(1, "Choose the service it runs on"),
-    name: z.string().trim().min(1, "Give the course a name").max(120),
-    description: z.string().max(1000),
-    price: z
-        .string()
-        .trim()
-        .regex(/^\d{1,9}(\.\d{1,2})?$/, "A price like 240 or 240.50"),
-    currency: z.string().regex(/^[A-Z]{3}$/),
-    seats: z
-        .string()
-        .trim()
-        .regex(/^\d{1,4}$/, "A whole number of seats")
-        .refine((v) => Number(v) >= 1, "At least one seat"),
-});
-type Values = z.infer<typeof schema>;
+type Values = CourseFormValues;
 
 /** What the editor needs to know about a service it may run on. */
 export interface CourseServiceOption {
@@ -68,19 +63,36 @@ export interface CourseServiceOption {
     currency: string | null;
 }
 
-const FIELDS = new Set(["serviceId", "name", "price", "currency", "seats"]);
+const FIELDS = new Set([
+    "serviceId",
+    "name",
+    "price",
+    "currency",
+    "seats",
+    "gstRate",
+    "sacCode",
+    "gstPriceMode",
+]);
 
 /**
  * Make or change a course. A new one takes its sessions here, as dates and
  * times on the business's own clock; an existing one adds and removes
  * sessions on its page, where each change books or frees everyone on it.
  * Seats stop at what the service takes at once.
+ *
+ * A GST-registered business answers the course's GST under its price
+ * (12 Oct 2026), as on a service: a priced course needs a rate, with 0%
+ * for an exempt one. One that isn't registered is shown none of it and
+ * sends none of it (`lib/courses/course-form.ts`).
  */
 export function CourseForm({
     services,
     course,
     defaultCurrency,
+    gst = NOT_ASKED,
 }: {
+    /** Whether GST is asked, and the business's own way of carrying it. */
+    gst?: GstAsk;
     services: CourseServiceOption[];
     /** The course being changed; absent for a new one. */
     course?: CourseDetail;
@@ -89,8 +101,31 @@ export function CourseForm({
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const first = services.at(0);
+    // The schema's problems and the GST fields' own, in one pass.
+    const resolver = useMemo<Resolver<Values>>(() => {
+        const checked = zodResolver(courseSchema);
+        return async (values, context, options) => {
+            const res = await checked(values, context, options);
+            const gstProblems = Object.entries(
+                courseGstProblems(values, gst.asked),
+            );
+            if (gstProblems.length === 0) return res;
+            return {
+                values: {},
+                errors: {
+                    ...Object.fromEntries(
+                        gstProblems.map(([field, message]) => [
+                            field,
+                            { type: "custom", message },
+                        ]),
+                    ),
+                    ...res.errors,
+                },
+            };
+        };
+    }, [gst.asked]);
     const form = useForm<Values>({
-        resolver: zodResolver(schema),
+        resolver,
         ...PAGE_FORM,
         defaultValues: {
             serviceId: course?.service.id ?? first?.id ?? "",
@@ -99,6 +134,7 @@ export function CourseForm({
             price: course?.price ?? "",
             currency: course?.currency ?? first?.currency ?? defaultCurrency,
             seats: String(course?.seats ?? first?.capacity ?? 1),
+            ...courseGstDefaults(course),
         },
     });
     const serviceId = form.watch("serviceId");
@@ -110,6 +146,17 @@ export function CourseForm({
                   currency: course.currency,
               }
             : undefined);
+
+    // "₹6,000 + ₹1,080 GST (18%) = ₹7,080 to pay" while GST is added to the
+    // price typed: a preview by the mirror, the invoice is the truth.
+    const toPay = addedGst(
+        form.watch("price").trim(),
+        {
+            gstRate: form.watch("gstRate"),
+            gstPriceMode: form.watch("gstPriceMode"),
+        },
+        gst,
+    );
 
     // New courses gather their sessions here.
     const [sessions, setSessions] = useState<string[]>([]);
@@ -128,13 +175,7 @@ export function CourseForm({
             return false;
         }
         setBusy(true);
-        const input = {
-            name: values.name,
-            description: values.description.trim() || null,
-            price: values.price.trim(),
-            currency: values.currency,
-            seats,
-        };
+        const input = courseInput(values, gst);
         const res = await runAction(
             () =>
                 course
@@ -320,6 +361,50 @@ export function CourseForm({
                         {plural(service.capacity, "seat")}. Seats nobody has
                         taken are kept from other bookers while the course is
                         open.
+                    </p>
+                ) : null}
+                {/* A GST-registered business answers the rate with the
+                    price, as on a service. */}
+                {gst.asked ? (
+                    <div className="flex flex-wrap items-start gap-3">
+                        <GstFields
+                            draft={{
+                                gstRate: form.watch("gstRate"),
+                                sacCode: form.watch("sacCode"),
+                                gstPriceMode: form.watch("gstPriceMode"),
+                            }}
+                            set={(patch) => {
+                                for (const key of [
+                                    "gstRate",
+                                    "sacCode",
+                                    "gstPriceMode",
+                                ] as const) {
+                                    const value = patch[key];
+                                    if (value === undefined) continue;
+                                    form.setValue(key, value, {
+                                        shouldDirty: true,
+                                        // Said once the form has been sent,
+                                        // and cleared as it is fixed.
+                                        shouldValidate:
+                                            form.formState.isSubmitted,
+                                    });
+                                }
+                            }}
+                            problem={(field) =>
+                                form.formState.errors[field]?.message
+                            }
+                            leave={(field) => void form.trigger(field)}
+                            asked
+                            canEdit
+                            businessPriceMode={gst.priceMode}
+                        />
+                    </div>
+                ) : null}
+                {/* The price above is the business's own; where GST is
+                    added to it, what someone enrolling pays is said here. */}
+                {toPay ? (
+                    <p className="text-[12.5px] tabular-nums leading-[1.5] text-muted-foreground">
+                        {addedGstWords(toPay, form.watch("currency"))}
                     </p>
                 ) : null}
 

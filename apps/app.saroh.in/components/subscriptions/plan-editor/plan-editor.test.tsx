@@ -39,7 +39,49 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/subscriptions/actions", () => actions);
 
+// The product's select opens a portal jsdom can't press: a native select
+// stands in, with the same options, placeholder and wiring.
+vi.mock("@saroh/ui/option-select", () => ({
+    OptionSelect: ({
+        id,
+        value,
+        onValueChange,
+        options,
+        placeholder,
+        disabled,
+        ...aria
+    }: {
+        id?: string;
+        value: string;
+        onValueChange: (v: string) => void;
+        options: { value: string; label: string }[];
+        placeholder?: string;
+        disabled?: boolean;
+        "aria-invalid"?: boolean;
+        "aria-describedby"?: string;
+    }) => (
+        <select
+            id={id}
+            aria-invalid={aria["aria-invalid"]}
+            aria-describedby={aria["aria-describedby"]}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onValueChange(e.target.value)}
+        >
+            {placeholder ? <option value="">{placeholder}</option> : null}
+            {options.map((o) => (
+                <option key={o.value} value={o.value}>
+                    {o.label}
+                </option>
+            ))}
+        </select>
+    ),
+}));
+
 import { PlanEditor } from "./plan-editor";
+
+// The first test draws the whole editor, and its imports with it.
+vi.setConfig({ testTimeout: 20_000 });
 
 const values = {
     name: "Monthly",
@@ -48,6 +90,9 @@ const values = {
     currency: "INR",
     interval: "MONTH" as const,
     classesPerMonth: 8,
+    gstRate: null,
+    sacCode: null,
+    gstPriceMode: null,
 };
 
 function record(over: Partial<PlanEditorRecord> = {}): PlanEditorRecord {
@@ -112,6 +157,7 @@ function render(
         withClasses?: boolean;
         takenNames?: string[];
         autopayOffered?: boolean;
+        gst?: { asked: boolean; priceMode: "INCLUDED" | "ADDED" | null };
     } = {},
 ) {
     act(() => {
@@ -124,6 +170,7 @@ function render(
                 currency="INR"
                 canEdit
                 autopayOffered={over.autopayOffered}
+                gst={over.gst}
             />,
         );
     });
@@ -136,6 +183,28 @@ function field(label: string): HTMLInputElement {
     const el = l && document.getElementById(l.htmlFor);
     if (!(el instanceof HTMLInputElement)) throw new Error(`No field ${label}`);
     return el;
+}
+
+/** A select by its label, as the GST fields draw them. */
+function select(label: string): HTMLSelectElement {
+    const l = Array.from(host.querySelectorAll("label")).find((x) =>
+        x.textContent.trim().startsWith(label),
+    );
+    const el = l && document.getElementById(l.htmlFor);
+    if (!(el instanceof HTMLSelectElement)) {
+        throw new Error(`No select ${label}`);
+    }
+    return el;
+}
+
+function pick(box: HTMLSelectElement, value: string) {
+    act(() => {
+        Object.getOwnPropertyDescriptor(
+            HTMLSelectElement.prototype,
+            "value",
+        )?.set?.call(box, value);
+        box.dispatchEvent(new Event("change", { bubbles: true }));
+    });
 }
 
 function type(input: HTMLInputElement, value: string) {
@@ -173,6 +242,18 @@ async function wait(ms = 0) {
 
 const text = () => host.textContent;
 
+/** The keyboard leaves a field, as Tab does. */
+function leave(el: HTMLElement) {
+    act(() => {
+        el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+}
+
+const NO_RATE_NOTE =
+    "This plan has no GST rate yet. Choose one before you publish again.";
+const RATE_COUNT =
+    "1 thing to fix before publishing: choose a GST rate. Pick 0% if it's exempt or nil-rated.";
+
 describe("the Plan Editor", () => {
     it("a new plan autosaves as a Draft, and Publish opens it", async () => {
         const draft = record({
@@ -195,6 +276,11 @@ describe("the Plan Editor", () => {
             price: null,
             interval: "MONTH",
             classesPerMonth: null,
+            // Nothing is asked of a business that isn't registered: its
+            // GST goes as it stands, not set.
+            gstRate: null,
+            sacCode: null,
+            gstPriceMode: null,
         });
         expect(text()).toContain("Saved as a draft. Nobody can join it yet");
         expect(button("Publish").disabled).toBe(true);
@@ -306,16 +392,71 @@ describe("the Plan Editor", () => {
         expect(text()).toContain("Price and billing");
     });
 
-    it("keeps week and quarter under More, and opens it for a weekly plan", () => {
+    it("keeps week and quarter behind Another interval, and opens it for a weekly plan", () => {
         render(record());
         expect(() => button("Every week")).toThrow();
-        click(button("More…"));
+        click(button("Another interval"));
         expect(button("Every quarter")).toBeTruthy();
+        // Once they are shown there is nothing more to show.
+        expect(() => button("Another interval")).toThrow();
 
         act(() => root.unmount());
         root = createRoot(host);
         render(record({ values: { ...values, interval: "WEEK" } }));
         expect(button("Every week").getAttribute("aria-checked")).toBe("true");
+    });
+
+    it("draws Another interval as a link beside the choices, not a greyed choice among them", () => {
+        render(record());
+        const more = button("Another interval");
+        // It shows more choices and is not one: no radio, and outside the
+        // group the screen reader counts.
+        expect(more.getAttribute("role")).toBeNull();
+        expect(more.closest("[role=radiogroup]")).toBeNull();
+        expect(more.getAttribute("aria-expanded")).toBe("false");
+        expect(more.disabled).toBe(false);
+        // A link: underlined ink, with no dashed outline and no grey text.
+        const drawn = more.className.split(" ");
+        expect(drawn).toContain("underline");
+        expect(drawn).toContain("text-foreground");
+        expect(drawn).not.toContain("border-dashed");
+        expect(drawn).not.toContain("text-muted-foreground");
+        expect(() => button("More…")).toThrow();
+        const group = host.querySelector("[role=radiogroup]");
+        expect(
+            Array.from(group?.querySelectorAll("button") ?? []).map(
+                (b) => b.textContent,
+            ),
+        ).toEqual(["Every month", "Every year"]);
+    });
+
+    it("says under the price of a published plan who a new price is for", () => {
+        render(record());
+        const says =
+            "A new price is for people who join next. Everyone already on the plan keeps the price they joined at.";
+        const hint = Array.from(host.querySelectorAll("p")).find(
+            (p) => p.textContent === says,
+        );
+        expect(hint).toBeTruthy();
+        // The field's help line: quiet, not an alert, and read with the box.
+        expect(hint?.getAttribute("data-slot")).toBe("field-hint");
+        expect(hint?.getAttribute("role")).toBeNull();
+        expect(
+            field("Price").getAttribute("aria-describedby")?.split(" "),
+        ).toContain(hint?.id);
+        // The GST half is the notice under the GST fields, not said twice.
+        expect(text()).not.toContain("reaches them at their next renewal");
+    });
+
+    it("says nothing of members under the price of a plan nobody can be on yet", () => {
+        render(null);
+        expect(text()).not.toContain("A new price is for people who join next");
+        expect(field("Price").getAttribute("aria-describedby")).toBeNull();
+
+        act(() => root.unmount());
+        root = createRoot(host);
+        render(record({ status: "DRAFT", published: null, canDelete: true }));
+        expect(text()).not.toContain("A new price is for people who join next");
     });
 
     it("Discard changes asks first, then drops the pending set", async () => {
@@ -385,5 +526,370 @@ describe("the price and members' autopay (D13)", () => {
         render(record());
         type(field("Price"), "99999");
         expect(text()).not.toContain("authorise again");
+    });
+});
+
+describe("a plan's GST (12 Oct 2026)", () => {
+    const ASKED = { asked: true, priceMode: "INCLUDED" as const };
+
+    it("shows a business that isn't registered none of it, and never holds it up", () => {
+        render(record());
+        expect(text()).not.toContain("GST");
+        expect(text()).not.toContain("SAC code");
+        expect(text()).not.toContain("to fix before publishing");
+    });
+
+    it("asks a registered business for the rate beside the price, with the quiet select and the SAC code", () => {
+        render(record({ gst: ASKED }));
+        const rate = select("GST rate");
+        expect(rate.value).toBe("");
+        expect(Array.from(rate.options).map((o) => o.textContent)).toEqual([
+            "Choose a rate",
+            "0%, nil-rated or exempt",
+            "0.25%",
+            "3%",
+            "5%",
+            "12%",
+            "18%",
+            "28%",
+            "40%",
+        ]);
+        expect(
+            Array.from(select("GST on this price").options).map(
+                (o) => o.textContent,
+            ),
+        ).toEqual([
+            "Same as the business (includes GST)",
+            "Includes GST",
+            "GST is added",
+        ]);
+        expect(field("SAC code").value).toBe("");
+        expect(text()).toContain("SAC code (optional)");
+    });
+
+    it("opens a live plan nobody has touched with a plain note, not an error", () => {
+        render(record({ gst: ASKED }));
+        // The rule is newer than the plan: said beside the field, in ink.
+        const note = Array.from(host.querySelectorAll("p")).find(
+            (p) => p.textContent === NO_RATE_NOTE,
+        );
+        expect(note?.getAttribute("data-slot")).toBe("field-hint");
+        expect(
+            select("GST rate").getAttribute("aria-describedby")?.split(" "),
+        ).toContain(note?.id);
+        // No red field, no alert, no count, and the header still says so.
+        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
+            "true",
+        );
+        expect(host.querySelector("[data-invalid]")).toBeNull();
+        expect(host.querySelector("[role=alert]")).toBeNull();
+        expect(text()).not.toContain("to fix before publishing");
+        expect(text()).not.toContain("Choose a GST rate");
+        expect(text()).toContain("Open to new sign-ups · no changes");
+        expect(text()).toContain(
+            "Nothing to publish yet. Edits appear here as a draft first.",
+        );
+        expect(button("Publish changes").disabled).toBe(true);
+    });
+
+    it("says the missing rate as an error once Publish is pressed, and goes to it, until one is chosen", async () => {
+        render(
+            record({
+                gst: ASKED,
+                hasPendingChanges: true,
+                values: { ...values, price: "1500.00" },
+                problems: [
+                    {
+                        field: "gstRate",
+                        message:
+                            "Choose a GST rate. Exempt (0%) is one of the choices.",
+                    },
+                ],
+            }),
+        );
+        // Before anything is pressed: the note, and a Publish to press.
+        expect(text()).toContain(NO_RATE_NOTE);
+        expect(text()).not.toContain("to fix before publishing");
+        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
+            "true",
+        );
+        expect(button("Publish changes").disabled).toBe(false);
+
+        click(button("Publish changes"));
+        await wait(20);
+        // Nothing is sent: the plan can't be published without a rate.
+        expect(actions.publishPlan).not.toHaveBeenCalled();
+        expect(button("Publish changes").disabled).toBe(true);
+        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(host.querySelector("[role=alert]")?.textContent).toBe(
+            "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
+        );
+        expect(text()).toContain(RATE_COUNT);
+        expect(text()).not.toContain("nil-rated..");
+        expect(text()).not.toContain(NO_RATE_NOTE);
+        expect(document.activeElement).toBe(select("GST rate"));
+
+        actions.savePlanDraft.mockResolvedValue({
+            ok: true,
+            data: record({
+                gst: ASKED,
+                revision: 5,
+                hasPendingChanges: true,
+                values: { ...values, price: "1500.00", gstRate: "18" },
+            }),
+        });
+        pick(select("GST rate"), "18");
+        await wait(800);
+        expect(actions.savePlanDraft).toHaveBeenCalledWith(
+            "plan_1",
+            expect.objectContaining({
+                gstRate: "18",
+                sacCode: null,
+                gstPriceMode: null,
+            }),
+            4,
+        );
+        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
+            "true",
+        );
+        expect(button("Publish changes").disabled).toBe(false);
+        expect(text()).toContain("GST rate not set → 18%");
+
+        actions.publishPlan.mockResolvedValue({
+            ok: true,
+            data: record({
+                gst: ASKED,
+                revision: 6,
+                values: { ...values, price: "1500.00", gstRate: "18" },
+                published: { ...values, price: "1500.00", gstRate: "18" },
+            }),
+        });
+        click(button("Publish changes"));
+        await wait();
+        expect(actions.publishPlan).toHaveBeenCalledWith("plan_1", 5);
+    });
+
+    it("says it as an error once the rate box is left with nothing chosen", () => {
+        render(record({ gst: ASKED }));
+        leave(select("GST rate"));
+        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(host.querySelector("[role=alert]")?.textContent).toBe(
+            "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
+        );
+        expect(text()).toContain(RATE_COUNT);
+        expect(text()).not.toContain(NO_RATE_NOTE);
+    });
+
+    it("keeps the note while another field is changed and left", async () => {
+        actions.savePlanDraft.mockResolvedValue({
+            ok: true,
+            data: record({
+                gst: ASKED,
+                revision: 5,
+                hasPendingChanges: true,
+                values: { ...values, sacCode: "999723" },
+            }),
+        });
+        render(record({ gst: ASKED }));
+        type(field("SAC code"), "999723");
+        leave(field("SAC code"));
+        await wait(800);
+        expect(text()).toContain(NO_RATE_NOTE);
+        expect(text()).not.toContain("to fix before publishing");
+        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
+            "true",
+        );
+        expect(button("Publish changes").disabled).toBe(false);
+    });
+
+    it("says a new plan's missing rate at once, as before", async () => {
+        actions.createPlanDraft.mockResolvedValue({
+            ok: true,
+            data: record({
+                gst: { asked: true, priceMode: "ADDED" },
+                status: "DRAFT",
+                revision: 1,
+                values: { ...values, description: null },
+                published: null,
+                canDelete: true,
+            }),
+        });
+        render(null, { gst: { asked: true, priceMode: "ADDED" } });
+        // Nothing typed: nothing is wrong yet, and there is no note.
+        expect(host.querySelector("[role=alert]")).toBeNull();
+        expect(text()).not.toContain("has no GST rate yet");
+
+        type(field("Name"), "Monthly");
+        type(field("Price"), "1200");
+        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(text()).not.toContain("has no GST rate yet");
+        await wait(800);
+        expect(button("Publish").disabled).toBe(true);
+        expect(text()).toContain(RATE_COUNT);
+    });
+
+    it("says a draft's missing rate at once when it is opened: it was never published", () => {
+        render(
+            record({
+                gst: ASKED,
+                status: "DRAFT",
+                published: null,
+                canDelete: true,
+            }),
+        );
+        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(text()).toContain(RATE_COUNT);
+        expect(text()).not.toContain("has no GST rate yet");
+        expect(button("Publish").disabled).toBe(true);
+    });
+
+    it("takes exempt (0%) as an answer, and autosaves the way and the SAC code as the API takes them", async () => {
+        render(record({ gst: ASKED }));
+        actions.savePlanDraft.mockResolvedValue({
+            ok: true,
+            data: record({
+                gst: ASKED,
+                revision: 5,
+                hasPendingChanges: true,
+                values: {
+                    ...values,
+                    gstRate: "0",
+                    sacCode: "999723",
+                    gstPriceMode: "ADDED",
+                },
+            }),
+        });
+        pick(select("GST rate"), "0");
+        pick(select("GST on this price"), "ADDED");
+        type(field("SAC code"), "9997 23");
+        await wait(800);
+        expect(actions.savePlanDraft).toHaveBeenLastCalledWith(
+            "plan_1",
+            expect.objectContaining({
+                gstRate: "0",
+                sacCode: "999723",
+                gstPriceMode: "ADDED",
+            }),
+            4,
+        );
+        expect(text()).not.toContain("Choose a GST rate");
+    });
+
+    it("asks on a new plan when the page says the business is registered", () => {
+        render(null, { gst: { asked: true, priceMode: "ADDED" } });
+        expect(select("GST rate")).toBeTruthy();
+        expect(select("GST on this price").options[0].textContent).toBe(
+            "Same as the business (GST is added)",
+        );
+    });
+
+    it("tells the business before it publishes what the GST does to members' next renewal", () => {
+        render(
+            record({
+                gst: { asked: true, priceMode: "ADDED" },
+                hasPendingChanges: true,
+                values: { ...values, gstRate: "18" },
+                renewalChange: {
+                    members: 12,
+                    groups: [
+                        {
+                            members: 12,
+                            currency: "INR",
+                            from: "1200.00",
+                            to: "1416.00",
+                        },
+                    ],
+                    changed: 12,
+                    aboveAutopayLimit: 3,
+                },
+            }),
+        );
+        expect(text()).toContain("Members already on this plan");
+        expect(text()).toContain(
+            "12 members' next renewal changes from ₹1,200 to ₹1,416.",
+        );
+        expect(text()).toContain(
+            "3 of them pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a pay link.",
+        );
+        // The note after "When you publish" no longer says nobody's price
+        // changes.
+        expect(text()).toContain(
+            "The 12 already on it keep the price they joined at. The GST changes what they pay from their next renewal.",
+        );
+        expect(text()).not.toContain("Nobody's price changes under them");
+    });
+
+    it("says the amount stays the same, with the GST inside, where the price includes it", () => {
+        render(
+            record({
+                gst: ASKED,
+                hasPendingChanges: true,
+                values: { ...values, gstRate: "18" },
+                renewalChange: {
+                    members: 12,
+                    groups: [
+                        {
+                            members: 12,
+                            currency: "INR",
+                            from: "1200.00",
+                            to: "1200.00",
+                        },
+                    ],
+                    changed: 0,
+                    aboveAutopayLimit: 0,
+                },
+            }),
+        );
+        expect(text()).toContain(
+            "12 members' next renewal stays the same amount.",
+        );
+        expect(text()).toContain("Their invoice will show the GST inside it.");
+    });
+
+    it("says what the publish did to members, not that they keep what they pay", async () => {
+        const change = {
+            members: 12,
+            groups: [
+                {
+                    members: 12,
+                    currency: "INR",
+                    from: "1200.00",
+                    to: "1416.00",
+                },
+            ],
+            changed: 12,
+            aboveAutopayLimit: 0,
+        };
+        const rated = { ...values, gstRate: "18" };
+        render(
+            record({
+                gst: { asked: true, priceMode: "ADDED" },
+                hasPendingChanges: true,
+                values: rated,
+                renewalChange: change,
+            }),
+        );
+        actions.publishPlan.mockResolvedValue({
+            ok: true,
+            data: record({
+                gst: { asked: true, priceMode: "ADDED" },
+                revision: 5,
+                values: rated,
+                published: rated,
+                renewalChange: null,
+            }),
+        });
+        click(button("Publish changes"));
+        await wait();
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Changes published. The 12 already on it pay the new amount from their next renewal.",
+        );
+        // Once published there is nothing left to tell.
+        expect(text()).not.toContain("Members already on this plan");
+    });
+
+    it("says nothing of members when the GST is as published", () => {
+        render(record({ gst: ASKED, renewalChange: null }));
+        expect(text()).not.toContain("Members already on this plan");
     });
 });

@@ -1,7 +1,13 @@
 import { AbsentOr, AbsentValue } from "@saroh/ui/absent-value";
+import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 
 import { formatMoneyMajor } from "@/lib/format/money";
+import type { PriceHistoryPage } from "@/lib/price-history/words";
+import {
+    PRICE_HISTORY_TITLE,
+    priceHistoryShown,
+} from "@/lib/price-history/words";
 import type { EditorSection, ProductTab } from "@/lib/products/links";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
@@ -16,10 +22,13 @@ import type { ProductTracking } from "@/lib/products/tracking";
 import { canMarkSoldOut } from "@/lib/products/tracking";
 import type { ProductStock } from "@/lib/stock/product-stock";
 
+import { PriceHistoryList } from "@/components/shared/price-history";
+
 import { DraftChecklist } from "./draft-checklist";
 import { ProductDetailsCard } from "./overview-details";
 import { OverviewDescription, OverviewPhotos } from "./overview-media";
 import {
+    CardHead,
     LinkedCard,
     LinkedCardLink,
     LinkedHeadline,
@@ -34,7 +43,8 @@ import { UntrackedStat } from "./untracked-stat";
  * The product at a glance (#522): two cards a merchant checks first — what
  * can be sold (or how short it is) and its variants — then what is linked
  * to it, each opening its own tab, its details in two groups, its photos
- * and its words.
+ * and its words. Last, what it and its options have cost (12 Oct 2026):
+ * drawn only once there is a change to show.
  */
 export function ProductOverviewTab({
     overview,
@@ -45,6 +55,7 @@ export function ProductOverviewTab({
     stock,
     now,
     onShop = false,
+    priceHistory,
 }: {
     overview: ProductOverview;
     storeId: string;
@@ -56,6 +67,11 @@ export function ProductOverviewTab({
     now: Date;
     /** Live on the online shop (UX-082): the Website card says so. */
     onShop?: boolean;
+    /**
+     * What it and its options have cost, newest first; null when that read
+     * failed. Left out, the section isn't drawn.
+     */
+    priceHistory?: PriceHistoryPage | null;
 }) {
     const { product, orders, reviews, discounts, placement } = overview;
     const money = (amount: string) =>
@@ -260,6 +276,14 @@ export function ProductOverviewTab({
             <div className="mt-4">
                 <OverviewDescription overview={overview} storeId={storeId} />
             </div>
+            {priceHistoryShown(priceHistory) ? (
+                <Card className="mt-4 rounded-[12px] p-0">
+                    <CardHead title={PRICE_HISTORY_TITLE} />
+                    <div className="px-[18px] pb-3">
+                        <PriceHistoryList history={priceHistory} />
+                    </div>
+                </Card>
+            ) : null}
         </div>
     );
 }

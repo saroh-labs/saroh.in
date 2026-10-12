@@ -20,7 +20,12 @@ jest.mock("@saroh/database", () => {
         },
         order: { findFirst: jest.fn() },
         invoiceSequence: { findMany: jest.fn().mockResolvedValue([]) },
-        product: { count: jest.fn().mockResolvedValue(0) },
+        product: {
+            count: jest.fn().mockResolvedValue(0),
+            // Products over their MRP once GST is added: none unless a
+            // test says so (`products/over-mrp.ts`).
+            findMany: jest.fn().mockResolvedValue([]),
+        },
         service: { count: jest.fn().mockResolvedValue(0) },
         site: { count: jest.fn().mockResolvedValue(0) },
         invoice: { count: jest.fn().mockResolvedValue(0) },
@@ -1407,5 +1412,166 @@ describe("OrganizationSettingsService", () => {
             expect(await service.listSoleOwned("user_1")).toEqual([]);
             expect(membershipCount).not.toHaveBeenCalled();
         });
+    });
+});
+
+/**
+ * GST is part of MRP (12 Oct 2026): switching the whole business to "GST
+ * is added" is refused while it would take any product above its MRP,
+ * with how many and the first few by name. Switching back never is.
+ */
+describe("switching the business to GST is added, and its products' MRPs", () => {
+    const record = jest.fn().mockResolvedValue(undefined);
+    const service = new OrganizationSettingsService(
+        { record } as unknown as AuditService,
+        { readyObject: jest.fn() } as unknown as MediaService,
+    );
+    const productFindMany = prisma.product.findMany as jest.Mock;
+    const decimal = (value: string) => ({ toString: () => value });
+
+    /** The stored profile of a registered business, priced `mode`. */
+    const registered = (gstPriceMode: "INCLUDED" | "ADDED" | null) => ({
+        gstRegistered: true,
+        gstState: "29",
+        taxId: "29AAGCR4375J1ZU",
+        country: "IN",
+        invoicePrefix: "RC",
+        invoiceNumberFormat: null,
+        gstPriceMode,
+        addressLine1: "14 Hill Road",
+        addressLine2: null,
+        city: "Bengaluru",
+        postalCode: "560038",
+    });
+    /** A product at ₹1,000 and 18%, with this MRP. */
+    const product = (id: string, name: string, mrp: string) => ({
+        id,
+        name,
+        price: decimal("1000"),
+        mrp: decimal(mrp),
+        currency: "INR",
+        gstRate: decimal("18"),
+        gstPriceMode: null,
+        variants: [],
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        orderFindFirst.mockResolvedValue(null);
+        sequenceFindMany.mockResolvedValue([]);
+        productFindMany.mockResolvedValue([]);
+        profileFindUnique.mockResolvedValue(registered("INCLUDED"));
+        orgFindUnique.mockResolvedValue({
+            id: "org_1",
+            name: "Acme",
+            slug: "acme",
+            businessProfile: registered("ADDED"),
+        });
+    });
+
+    it("is refused with the count and the names while any product would go over its MRP", async () => {
+        productFindMany.mockResolvedValue([
+            // 1,000 + 180 = 1,180 > 1,100
+            product("p_cream", "Face cream", "1100"),
+            // 1,180 > 1,150
+            product("p_oil", "Hair oil", "1150"),
+            // 1,180 = 1,180: at its MRP, not counted.
+            product("p_soap", "Rose soap", "1180"),
+        ]);
+        const attempt = service.update(ctx(), { tax: { priceMode: "ADDED" } });
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toMatchObject({
+            response: {
+                message:
+                    'With GST added, 2 products would cost more than their MRP: Face cream and Hair oil. Lower the price or raise the MRP on each, or set each one to "Includes GST", then save this again.',
+                details: {
+                    field: "priceMode",
+                    reason: "OVER_MRP",
+                    products: 2,
+                    options: 0,
+                    more: false,
+                    items: [
+                        {
+                            productId: "p_cream",
+                            name: "Face cream",
+                            payCents: 118_000,
+                            mrpCents: 110_000,
+                        },
+                        {
+                            productId: "p_oil",
+                            name: "Hair oil",
+                            payCents: 118_000,
+                            mrpCents: 115_000,
+                        },
+                    ],
+                },
+            },
+        });
+        expect(profileUpsert).not.toHaveBeenCalled();
+        expect(record).not.toHaveBeenCalled();
+        // Asked of this business only, as it would stand.
+        expect(productFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ organizationId: "org_1" }),
+            }),
+        );
+    });
+
+    it("is saved when none would", async () => {
+        productFindMany.mockResolvedValue([
+            product("p_soap", "Rose soap", "1180"),
+            product("p_wash", "Tea tree wash", "1500"),
+        ]);
+        await service.update(ctx(), { tax: { priceMode: "ADDED" } });
+        expect(profileUpsert).toHaveBeenCalledWith(
+            expect.objectContaining({ update: { gstPriceMode: "ADDED" } }),
+        );
+    });
+
+    it("switching back to includes GST never asks", async () => {
+        profileFindUnique.mockResolvedValue(registered("ADDED"));
+        productFindMany.mockResolvedValue([
+            product("p_cream", "Face cream", "1100"),
+        ]);
+        await service.update(ctx(), { tax: { priceMode: "INCLUDED" } });
+        expect(productFindMany).not.toHaveBeenCalled();
+        expect(profileUpsert).toHaveBeenCalledWith(
+            expect.objectContaining({ update: { gstPriceMode: "INCLUDED" } }),
+        );
+    });
+
+    it("another tax save by a business already on GST is added is not held up by what is over", async () => {
+        profileFindUnique.mockResolvedValue(registered("ADDED"));
+        productFindMany.mockResolvedValue([
+            product("p_cream", "Face cream", "1100"),
+        ]);
+        await service.update(ctx(), { tax: { deliverySac: "996813" } });
+        expect(productFindMany).not.toHaveBeenCalled();
+        expect(profileUpsert).toHaveBeenCalled();
+    });
+
+    it("registering is refused for a product already set to GST is added that it would take over", async () => {
+        profileFindUnique.mockResolvedValue({
+            ...registered("INCLUDED"),
+            gstRegistered: false,
+        });
+        productFindMany.mockResolvedValue([
+            {
+                ...product("p_cream", "Face cream", "1100"),
+                gstPriceMode: "ADDED",
+            },
+        ]);
+        await expect(
+            service.update(ctx(), { tax: { registered: true } }),
+        ).rejects.toMatchObject({
+            response: {
+                details: {
+                    field: "gstRegistered",
+                    reason: "OVER_MRP",
+                    products: 1,
+                },
+            },
+        });
+        expect(profileUpsert).not.toHaveBeenCalled();
     });
 });

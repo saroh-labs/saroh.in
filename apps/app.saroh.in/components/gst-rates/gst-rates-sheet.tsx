@@ -20,10 +20,12 @@ import type { ChosenRate, RateChoices, RateRow } from "@/lib/gst-rates/missing";
 import {
     chosenRates,
     kindWord,
+    membersLines,
     rateKey,
     rowName,
     unchosen,
 } from "@/lib/gst-rates/missing";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { GstRateValue } from "@/lib/invoices/gst";
 import {
     GST_RATE_CHOICES,
@@ -42,7 +44,12 @@ export type RatesSaved = { ok: true } | { ok: false; error: string };
  *   these items. Every row must be answered, and Save carries on with what
  *   was started ("Save and take payment").
  * - **The list**: everything on sale with no rate, from the notice on
- *   Services and Invoices. Save keeps whichever were chosen.
+ *   Services, Invoices, Plans, Class packs and Courses. Save keeps
+ *   whichever were chosen.
+ *
+ * A plan with members on it says, under its row once a rate is chosen, what
+ * that does to their next renewal (`membersLines`): the rate is saved at
+ * once, with no Publish step, so this is where the business is told.
  *
  * 0% is a row in the list of rates like any other. The box starts on its
  * placeholder, which is the only way "not chosen" is drawn.
@@ -54,9 +61,15 @@ export function GstRatesSheet({
     saveLabel,
     requireAll,
     note,
+    priceMode = null,
     save,
     onDone,
 }: {
+    /**
+     * How the business's prices carry GST, for what a plan's rate does to
+     * its members' next renewal. Null when it couldn't be told.
+     */
+    priceMode?: GstPriceMode | null;
     /** What has no rate; the sheet is open while there is a list. */
     rows: readonly RateRow[] | null;
     title: string;
@@ -85,6 +98,7 @@ export function GstRatesSheet({
                     saveLabel={saveLabel}
                     requireAll={requireAll}
                     note={note}
+                    priceMode={priceMode}
                     save={save}
                     onDone={onDone}
                 />
@@ -98,6 +112,7 @@ function RatesDraft({
     saveLabel,
     requireAll,
     note,
+    priceMode,
     save,
     onDone,
 }: {
@@ -105,6 +120,7 @@ function RatesDraft({
     saveLabel: string;
     requireAll: boolean;
     note?: string;
+    priceMode: GstPriceMode | null;
     save: (chosen: ChosenRate[]) => Promise<RatesSaved>;
     onDone: (saved: number | null) => void;
 }) {
@@ -200,36 +216,47 @@ function RatesDraft({
                         tried &&
                         value === "" &&
                         row.canSet !== false;
+                    // A plan's members, once its rate is chosen.
+                    const members = membersLines(row, value, priceMode);
                     return (
-                        <Field
-                            key={key}
-                            // The label is a service's or a product's name.
-                            holdsData
-                            label={name}
-                            hint={
-                                price
-                                    ? `${kindWord(row.kind)} · ${price}`
-                                    : kindWord(row.kind)
-                            }
-                            error={missing ? GST_RATE_NEEDED : null}
-                        >
-                            <OptionSelect<GstRateValue>
-                                value={value}
-                                onValueChange={(rate) => {
-                                    setChoices((had) => ({
-                                        ...had,
-                                        [key]: rate,
-                                    }));
-                                    // No longer one rate for all of them.
-                                    if (rate !== forAll) setForAll("");
-                                    setRefusal(null);
-                                }}
-                                options={GST_RATE_CHOICES}
-                                placeholder={GST_RATE_PLACEHOLDER}
-                                disabled={row.canSet === false || saving}
-                                aria-label={`GST rate for ${name}`}
-                            />
-                        </Field>
+                        <div key={key} className="grid gap-1.5">
+                            <Field
+                                // The label is the name of what is sold.
+                                holdsData
+                                label={name}
+                                hint={
+                                    price
+                                        ? `${kindWord(row.kind)} · ${price}`
+                                        : kindWord(row.kind)
+                                }
+                                error={missing ? GST_RATE_NEEDED : null}
+                            >
+                                <OptionSelect<GstRateValue>
+                                    value={value}
+                                    onValueChange={(rate) => {
+                                        setChoices((had) => ({
+                                            ...had,
+                                            [key]: rate,
+                                        }));
+                                        // No longer one rate for all of them.
+                                        if (rate !== forAll) setForAll("");
+                                        setRefusal(null);
+                                    }}
+                                    options={GST_RATE_CHOICES}
+                                    placeholder={GST_RATE_PLACEHOLDER}
+                                    disabled={row.canSet === false || saving}
+                                    aria-label={`GST rate for ${name}`}
+                                />
+                            </Field>
+                            {members.length > 0 ? (
+                                <p
+                                    aria-live="polite"
+                                    className="text-pretty text-[12.5px] leading-[1.5] text-foreground/80"
+                                >
+                                    {members.join(" ")}
+                                </p>
+                            ) : null}
+                        </div>
                     );
                 })}
                 {note ? (

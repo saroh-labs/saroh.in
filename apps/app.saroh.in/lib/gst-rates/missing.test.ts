@@ -6,9 +6,12 @@ import type { MissingRates, RateRow } from "./missing";
 import {
     askWhy,
     chosenRates,
+    gstAskOf,
     kindWord,
     listNote,
     listWhy,
+    membersChange,
+    membersLines,
     missingLine,
     rateItemsOf,
     rateKey,
@@ -53,13 +56,24 @@ describe("rateItemsOf", () => {
             rateItemsOf({
                 reason: "GST_RATE_MISSING",
                 items: [
-                    { kind: "COURSE", id: "c_1", name: "Yoga course" },
+                    { kind: "VOUCHER", id: "v_1", name: "Gift voucher" },
                     { kind: "SERVICE", name: "No id" },
                     null,
                     { kind: "PRODUCT", id: "p_2" },
                 ],
             }),
         ).toEqual([{ kind: "PRODUCT", id: "p_2", name: "" }]);
+    });
+
+    it("reads a plan, a class pack and a course a refusal names", () => {
+        const items = [
+            { kind: "PLAN", id: "pl_1", name: "Gold monthly" },
+            { kind: "PACK", id: "pk_1", name: "10 classes" },
+            { kind: "COURSE", id: "c_1", name: "Wheel throwing" },
+        ];
+        expect(rateItemsOf({ reason: "GST_RATE_MISSING", items })).toEqual(
+            items,
+        );
     });
 
     it("reaches the client on a failure, in the API's envelope", () => {
@@ -222,5 +236,216 @@ describe("the notice's line", () => {
         expect(missingLine(missing([PT, SERUM], { more: true }))).toBe(
             "More than 1 service and 1 product have no GST rate. Until you choose one, their tax invoices show no GST.",
         );
+    });
+});
+
+describe("plans, class packs and courses (12 Oct 2026)", () => {
+    const GOLD = { kind: "PLAN", id: "pl_1", name: "Gold monthly" } as const;
+    const TEN = { kind: "PACK", id: "pk_1", name: "10 classes" } as const;
+    const WHEEL = {
+        kind: "COURSE",
+        id: "c_1",
+        name: "Wheel throwing",
+    } as const;
+
+    it("names each kind under its row", () => {
+        expect(kindWord("PLAN")).toBe("Plan");
+        expect(kindWord("PACK")).toBe("Class pack");
+        expect(kindWord("COURSE")).toBe("Course");
+    });
+
+    it("keys the kinds apart, even with one id", () => {
+        const keys = (
+            ["SERVICE", "PRODUCT", "PLAN", "PACK", "COURSE"] as const
+        ).map((kind) => rateKey({ kind, id: "x" }));
+        expect(new Set(keys).size).toBe(5);
+    });
+
+    it("sends the new kinds as chosen", () => {
+        expect(
+            chosenRates([GOLD, TEN, WHEEL], {
+                [rateKey(GOLD)]: "18",
+                [rateKey(TEN)]: "0",
+                [rateKey(WHEEL)]: "",
+            }),
+        ).toEqual([
+            { kind: "PLAN", id: "pl_1", rate: "18" },
+            { kind: "PACK", id: "pk_1", rate: "0" },
+        ]);
+    });
+
+    it("says where a pack's and a course's rate is kept", () => {
+        expect(savedWhere([TEN], null)).toBe(
+            "The rate is saved on the class pack, so you're asked once. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(savedWhere([WHEEL], null)).toBe(
+            "The rate is saved on the course, so you're asked once. Choose 0% for anything exempt or nil-rated.",
+        );
+    });
+
+    it("tells whoever is asked in place that a plan's members carry the rate", () => {
+        expect(savedWhere([GOLD], null)).toBe(
+            "The rate is saved on the plan, so you're asked once. Members already on this plan carry its rate from their next renewal. Invoices already issued don't change. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(askWhy([GOLD], "subscribe them")).toBe(
+            "Gold monthly has no GST rate. Choose one to subscribe them.",
+        );
+    });
+
+    it("counts what is missing by kind, in plain plurals", () => {
+        const missing = (items: MissingRates["items"]): MissingRates => ({
+            registered: true,
+            more: false,
+            items,
+        });
+        const svc = (id: string) =>
+            ({ kind: "SERVICE", id, name: id }) as const;
+        expect(missingLine(missing([svc("a"), svc("b"), GOLD, TEN]))).toBe(
+            "2 services, 1 plan and 1 class pack have no GST rate. Until you choose one, their tax invoices show no GST.",
+        );
+        expect(missingLine(missing([GOLD]))).toBe(
+            "1 plan has no GST rate. Until you choose one, its tax invoices show no GST.",
+        );
+        expect(
+            missingLine(
+                missing([
+                    svc("a"),
+                    { kind: "PRODUCT", id: "p", name: "Serum" },
+                    GOLD,
+                    { ...GOLD, id: "pl_2" },
+                    TEN,
+                    { ...TEN, id: "pk_2" },
+                    WHEEL,
+                ]),
+            ),
+        ).toBe(
+            "1 service, 1 product, 2 plans, 2 class packs and 1 course have no GST rate. Until you choose one, their tax invoices show no GST.",
+        );
+        expect(missingLine({ ...missing([WHEEL, TEN]), more: true })).toBe(
+            "More than 1 class pack and 1 course have no GST rate. Until you choose one, their tax invoices show no GST.",
+        );
+    });
+
+    it("reads the business's GST standing off the missing read", () => {
+        expect(gstAskOf(null)).toEqual({ asked: false, priceMode: null });
+        expect(gstAskOf({ registered: true, items: [], more: false })).toEqual({
+            asked: true,
+            priceMode: null,
+        });
+        expect(
+            gstAskOf({
+                registered: true,
+                items: [],
+                more: false,
+                priceMode: "ADDED",
+            }),
+        ).toEqual({ asked: true, priceMode: "ADDED" });
+        expect(gstAskOf({ registered: false, items: [], more: false })).toEqual(
+            { asked: false, priceMode: null },
+        );
+    });
+});
+
+describe("a plan's members, in the sheet", () => {
+    const row = (over: Partial<RateRow> = {}): RateRow => ({
+        kind: "PLAN",
+        id: "pl_1",
+        name: "Gold monthly",
+        members: [{ count: 12, price: "2000.00", currency: "INR" }],
+        ...over,
+    });
+
+    it("says nothing before a rate is chosen, for a plan nobody is on, or for another kind", () => {
+        expect(membersLines(row(), "", "ADDED")).toEqual([]);
+        expect(membersLines(row({ members: [] }), "18", "ADDED")).toEqual([]);
+        expect(
+            membersLines(row({ members: undefined }), "18", "ADDED"),
+        ).toEqual([]);
+        expect(membersLines(row({ kind: "PACK" }), "18", "ADDED")).toEqual([]);
+    });
+
+    it("says from what to what where GST is added: ₹2,000 at 18% is ₹2,360", () => {
+        expect(membersLines(row(), "18", "ADDED")).toEqual([
+            "12 members' next renewal changes from ₹2,000 to ₹2,360.",
+        ]);
+        expect(membersChange(row(), "18", "ADDED")).toEqual({
+            members: 12,
+            groups: [
+                {
+                    members: 12,
+                    currency: "INR",
+                    from: "2000.00",
+                    to: "2360.00",
+                },
+            ],
+            changed: 12,
+            aboveAutopayLimit: 0,
+        });
+    });
+
+    it("lists each price when members pay different ones", () => {
+        expect(
+            membersLines(
+                row({
+                    members: [
+                        { count: 12, price: "2000.00", currency: "INR" },
+                        { count: 1, price: "1500.00", currency: "INR" },
+                    ],
+                }),
+                "18",
+                "ADDED",
+            ),
+        ).toEqual([
+            "13 members' next renewal changes:",
+            "12 members from ₹2,000 to ₹2,360.",
+            "1 member from ₹1,500 to ₹1,770.",
+        ]);
+    });
+
+    it("stays the same amount where the price includes GST", () => {
+        expect(membersLines(row(), "18", "INCLUDED")).toEqual([
+            "12 members' next renewal stays the same amount.",
+            "Their invoice will show the GST inside it.",
+        ]);
+    });
+
+    it("says nothing of GST inside an exempt plan's invoice", () => {
+        expect(membersLines(row(), "0", "ADDED")).toEqual([
+            "12 members' next renewal stays the same amount.",
+        ]);
+    });
+
+    it("follows the plan's own way over the business's", () => {
+        expect(
+            membersLines(row({ priceMode: "INCLUDED" }), "18", "ADDED"),
+        ).toEqual([
+            "12 members' next renewal stays the same amount.",
+            "Their invoice will show the GST inside it.",
+        ]);
+        expect(
+            membersLines(
+                row({
+                    priceMode: "ADDED",
+                    members: [{ count: 1, price: "999.00", currency: "INR" }],
+                }),
+                "5",
+                null,
+            ),
+        ).toEqual(["1 member's next renewal changes from ₹999 to ₹1,048.95."]);
+    });
+
+    it("says only that they carry the rate where the way couldn't be told", () => {
+        expect(membersLines(row(), "18", null)).toEqual([
+            "12 members carry this rate from their next renewal.",
+        ]);
+        expect(
+            membersLines(
+                row({
+                    members: [{ count: 1, price: "2000.00", currency: "INR" }],
+                }),
+                "18",
+                null,
+            ),
+        ).toEqual(["1 member carries this rate from their next renewal."]);
     });
 });

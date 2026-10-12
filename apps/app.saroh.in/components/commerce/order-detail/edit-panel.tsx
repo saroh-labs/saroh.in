@@ -42,7 +42,9 @@ const draftOf = (a: DeliveryAddress | null): AddressDraft => ({
  * change does to the money before you save it: more is due on the order
  * (nothing is sent to the customer — Saroh sends no messages), less goes
  * back to how they paid. The API reprices it; the figure here is what the
- * lines cost.
+ * lines cost. An item added is counted at its amount to pay, with its GST
+ * on top where GST is added to the price (`sellablesOf`, 12 Oct 2026), so
+ * "owes ₹1,180 more" is what the order will ask for.
  *
  * A side sheet over the order: the lines scroll, and what the change does
  * to the money stays at the foot with Save.

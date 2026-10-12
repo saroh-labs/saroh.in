@@ -20,6 +20,7 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { PriceHistoryQueryDto } from "../audit/price-history.dto";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
@@ -111,6 +112,17 @@ export class BookingsController {
         @Param("serviceId") serviceId: string,
     ): Promise<ServiceView> {
         return this.bookings.getService(ctx, serviceId);
+    }
+
+    /** The service's price history, newest first. `service:read`. */
+    @Get(":serviceId/price-history")
+    @RequireModule("APPOINTMENTS")
+    servicePriceHistory(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("serviceId") serviceId: string,
+        @Query() query: PriceHistoryQueryDto,
+    ) {
+        return this.bookings.servicePriceHistory(ctx, serviceId, query);
     }
 
     @Patch(":serviceId")

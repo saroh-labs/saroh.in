@@ -40,6 +40,7 @@ export default async function PackPurchasesPage({
                 contacts={contacts}
                 canWrite={canWrite}
                 invoicesOnSale={terms.invoicesOnSale}
+                gst={terms.gst}
                 initialFilterId={params.view}
             />
         </PageContainer>

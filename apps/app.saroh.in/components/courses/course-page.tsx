@@ -34,12 +34,20 @@ import {
     formatWeekday,
     zoneParts,
 } from "@/lib/format/datetime";
+import { addedSum } from "@/lib/gst/on-price";
+import type { PriceHistoryPage } from "@/lib/price-history/words";
+import {
+    PRICE_HISTORY_TITLE,
+    priceHistoryShown,
+} from "@/lib/price-history/words";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { PriceHistoryList } from "@/components/shared/price-history";
 import { useHold } from "@/components/shared/use-hold";
 
 import { runAction } from "@/lib/api/run-action";
+import type { GstAsk } from "@/lib/gst/item-words";
 import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
@@ -71,7 +79,16 @@ export function CoursePage({
     contacts,
     canWrite,
     now,
+    gst = null,
+    priceHistory,
 }: {
+    /**
+     * What the course has cost, newest first (12 Oct 2026); null when that
+     * read failed. Left out, or with nothing kept yet, nothing is drawn.
+     */
+    priceHistory?: PriceHistoryPage | null;
+    /** The business's GST standing, for the enrol dialog's amount to pay. */
+    gst?: GstAsk | null;
     course: CourseDetail;
     contacts: ContactOption[];
     canWrite: boolean;
@@ -182,9 +199,12 @@ export function CoursePage({
                         : STATUS_LABEL[course.status]}
                 </Badge>
                 {course.service.name} ·{" "}
-                {formatMoneyMajor(course.price, course.currency, {
-                    decimals: "always",
-                })}{" "}
+                {/* The price the business set, with the whole sum where
+                    GST comes on top of it. */}
+                {addedSum(course.gst, course.currency) ??
+                    formatMoneyMajor(course.price, course.currency, {
+                        decimals: "always",
+                    })}{" "}
                 · {count(course.seats, "seat")}
                 {course.description ? ` · ${course.description}` : ""}
             </div>
@@ -199,12 +219,20 @@ export function CoursePage({
                 />
             </div>
 
+            {priceHistoryShown(priceHistory) ? (
+                <section className="flex min-w-0 max-w-[760px] flex-col gap-2.5">
+                    <h2 className="label">{PRICE_HISTORY_TITLE}</h2>
+                    <PriceHistoryList history={priceHistory} framed />
+                </section>
+            ) : null}
+
             {canWrite ? (
                 <EnrolDialog
                     open={enrolling}
                     onOpenChange={setEnrolling}
                     courses={[course]}
                     invoicesOnEnrol={course.invoicesOnEnrol}
+                    gst={gst}
                     contacts={contacts.filter(
                         (c) =>
                             !course.enrollments.some(

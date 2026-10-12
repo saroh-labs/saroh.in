@@ -12,7 +12,11 @@ import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 
 import { startPayment } from "@/app/pay/o/[token]/actions";
-import { payLineGstWords, payMoney } from "@/lib/invoice-pay-shape";
+import {
+    payLineEachWords,
+    payLineGstWords,
+    payMoney,
+} from "@/lib/invoice-pay-shape";
 import type { PayOrder } from "@/lib/order-pay";
 import { orderPayOffer } from "@/lib/order-pay-shape";
 
@@ -101,11 +105,10 @@ export function OrderPay({
                             >
                                 <td className="px-4 py-3">
                                     {l.name}
-                                    {l.quantity > 1 ? (
-                                        <span className="block text-xs text-site-muted">
-                                            {money(l.unitPrice)} each
-                                        </span>
-                                    ) : null}
+                                    <LineEach
+                                        line={l}
+                                        currency={order.currency}
+                                    />
                                     <LineGst
                                         gst={l.gst}
                                         currency={order.currency}
@@ -279,6 +282,20 @@ function StatusBadge({ status }: { status: PayOrder["status"] }) {
             {s.label}
         </span>
     );
+}
+
+/** "₹450 each" under a line of more than one, in the API's numbers. */
+function LineEach({
+    line,
+    currency,
+}: {
+    line: { quantity: number; unitPrice: string; unitPay?: unknown };
+    currency: string;
+}) {
+    const words = payLineEachWords(line, currency);
+    return words ? (
+        <span className="block text-xs text-site-muted">{words}</span>
+    ) : null;
 }
 
 /**

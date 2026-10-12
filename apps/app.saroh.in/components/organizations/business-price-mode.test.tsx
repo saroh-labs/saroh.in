@@ -31,7 +31,10 @@ import {
 
 const save = vi.fn();
 const undoSettings = vi.fn();
+/** What would be over its MRP with GST added; null is "couldn't tell". */
+const overMrp = vi.fn();
 vi.mock("@/lib/organizations/settings-actions", () => ({
+    loadOverMrpIfAdded: (...args: unknown[]) => overMrp(...args) as unknown,
     saveOrganizationSettings: (...args: unknown[]) => save(...args) as unknown,
     undoOrganizationSettings: (...args: unknown[]) =>
         undoSettings(...args) as unknown,
@@ -65,9 +68,10 @@ vi.mock("@/lib/stores/storefront-actions", () => ({
 
 beforeEach(() => {
     mount();
-    for (const mock of [save, undoSettings, showUndo, showError]) {
+    for (const mock of [save, undoSettings, showUndo, showError, overMrp]) {
         mock.mockReset();
     }
+    overMrp.mockResolvedValue(null);
 });
 
 afterEach(unmount);
@@ -109,6 +113,164 @@ const choice = (words: string) =>
             .querySelector(`label[for="${radio.id}"]`)
             ?.textContent.startsWith(words),
     );
+
+/** One product, or an option of one, over its MRP with GST added. */
+const over = (name: string, option: string | null = null) => ({
+    productId: `p_${name}`,
+    name,
+    option,
+    currency: "INR",
+    listCents: 100_000,
+    // ₹1,000 + 18% is ₹1,180 to pay, against an MRP of ₹1,100.
+    payCents: 118_000,
+    mrpCents: 110_000,
+    rate: "18",
+});
+
+const notice = () => sheet()?.querySelector("[data-over-mrp]") ?? null;
+
+describe("GST is part of MRP: what the switch would put over its MRP", () => {
+    it("says nothing while prices include GST, and asks for nothing", async () => {
+        onTab("tax");
+        draw(registered("INCLUDED"));
+        await press(edit(EDIT));
+        await settle();
+        expect(overMrp).not.toHaveBeenCalled();
+        expect(notice()).toBeNull();
+    });
+
+    it("counts the products and options that would go over, names the first few, and says the way out before Save", async () => {
+        overMrp.mockResolvedValue({
+            registered: true,
+            products: 6,
+            options: 1,
+            items: [
+                over("Face cream"),
+                over("Hair oil", "Large"),
+                over("Lip balm"),
+                over("Night serum"),
+                over("Rose soap"),
+                over("Sun lotion"),
+                over("Tea tree wash"),
+            ],
+            more: false,
+        });
+        onTab("tax");
+        draw(registered("INCLUDED"));
+        await press(edit(EDIT));
+        await press(choice("GST is added to my prices"));
+        await settle();
+
+        expect(overMrp).toHaveBeenCalledTimes(1);
+        const text = notice()?.textContent ?? "";
+        expect(text).toContain(
+            "With GST added, 6 products (1 option) would cost more than their MRP.",
+        );
+        // The sums, as the API worked them out: ₹1,000 + ₹180 = ₹1,180.
+        expect(text).toContain("Face cream: ₹1,180 to pay, MRP ₹1,100");
+        expect(text).toContain("Hair oil (Large): ₹1,180 to pay, MRP ₹1,100");
+        // Five named, the other two counted.
+        expect(text).toContain("Rose soap: ₹1,180 to pay, MRP ₹1,100");
+        expect(text).not.toContain("Sun lotion");
+        expect(text).toContain("and 2 more");
+        expect(text).toContain(
+            "An MRP includes GST, so this can't be saved yet. Lower the price or raise the MRP on each, or set each one to \"Includes GST\" in the product's Basics.",
+        );
+        // Going back to included takes the notice away.
+        await press(choice("My prices include GST"));
+        expect(notice()).toBeNull();
+    });
+
+    it("says one product in the singular", async () => {
+        overMrp.mockResolvedValue({
+            registered: true,
+            products: 1,
+            options: 0,
+            items: [over("Face cream")],
+            more: false,
+        });
+        onTab("tax");
+        draw(registered("INCLUDED"));
+        await press(edit(EDIT));
+        await press(choice("GST is added to my prices"));
+        await settle();
+        const text = notice()?.textContent ?? "";
+        expect(text).toContain(
+            "With GST added, 1 product would cost more than its MRP.",
+        );
+        expect(text).toContain(
+            'Lower the price or raise the MRP on it, or set it to "Includes GST" in the product\'s Basics.',
+        );
+        expect(text).not.toContain("more than their");
+    });
+
+    it("draws nothing when none would go over, or when it couldn't be told", async () => {
+        overMrp.mockResolvedValue({
+            registered: true,
+            products: 0,
+            options: 0,
+            items: [],
+            more: false,
+        });
+        onTab("tax");
+        draw(registered("INCLUDED"));
+        await press(edit(EDIT));
+        await press(choice("GST is added to my prices"));
+        await settle();
+        expect(notice()).toBeNull();
+
+        remount();
+        overMrp.mockResolvedValue(null);
+        onTab("tax");
+        draw(registered("INCLUDED"));
+        await press(edit(EDIT));
+        await press(choice("GST is added to my prices"));
+        await settle();
+        expect(notice()).toBeNull();
+    });
+
+    it("the API's refusal of the switch sits under the choice, and nothing is saved", async () => {
+        const refusal =
+            'With GST added, 1 product would cost more than its MRP: Face cream. Lower the price or raise the MRP on it, or set it to "Includes GST", then save this again.';
+        save.mockResolvedValue({
+            ok: false,
+            error: refusal,
+            field: "priceMode",
+        });
+        onTab("tax");
+        draw(registered("INCLUDED"));
+        await press(edit(EDIT));
+        await press(choice("GST is added to my prices"));
+        await press(item("Save"));
+        expect(sheetName()).toBe("GST on your prices");
+        expect(sheet()?.textContent).toContain(refusal);
+        expect(showError).not.toHaveBeenCalled();
+        expect(showUndo).not.toHaveBeenCalled();
+        expect(row(ROW)?.textContent).toContain("Prices include GST");
+    });
+
+    it("a business already on GST is added is told what is over as things stand", async () => {
+        overMrp.mockResolvedValue({
+            registered: true,
+            products: 2,
+            options: 0,
+            items: [over("Face cream"), over("Hair oil")],
+            more: false,
+        });
+        onTab("tax");
+        draw(registered("ADDED"));
+        await press(edit(EDIT));
+        await settle();
+        const text = notice()?.textContent ?? "";
+        expect(text).toContain(
+            "With GST added, 2 products cost more than their MRP.",
+        );
+        expect(text).toContain(
+            "They sell at the amount to pay until then, with no saving shown.",
+        );
+        expect(text).not.toContain("can't be saved yet");
+    });
+});
 
 describe("the row", () => {
     it("says which way prices carry GST, and reads an older API as included", () => {
@@ -163,7 +325,7 @@ describe("the sheet", () => {
             "A ₹1,000 price at 18% is ₹1,180 to pay. Customers see the GST before they pay.",
         );
         expect(text).toContain(
-            "This is for the prices of your services and products. You can set a single service or product differently where you edit it. A delivery charge, a course, a class pack, a membership plan and a line you type on an invoice are charged as typed, with GST included. Orders and bookings already made keep what they were charged.",
+            "This is for the prices of your services, products, courses, class packs and membership plans. You can set any one of them differently where you edit it. Members already on a plan with a GST rate pay this way from their next renewal. Invoices already issued don't change, and orders and bookings already made keep what they were charged. A delivery charge and a line you type on an invoice are charged as typed, with GST included.",
         );
     });
 

@@ -7,12 +7,16 @@ import {
 import { prisma } from "@saroh/database";
 
 import { ActivationEvents } from "../analytics/activation-events";
+import type { PriceFacts } from "../audit/price-history";
+import { productFacts, recordPrices } from "../audit/price-history";
 import { planMeter } from "../billing/metering.service";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { listAt } from "../products/listings.service";
 import { sanitizeRichHtml } from "../sites/sanitize";
 import {
     assertCurrencyChangeAllowed,
     defaultProductCurrency,
+    storefrontCurrency,
 } from "../stores/currency";
 import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
@@ -26,6 +30,8 @@ import {
     suggestMapping,
     writableRows,
 } from "./import-plan";
+import type { ProductMrpContext, StoredProductSums } from "./product-mrp";
+import { productMrpIssues } from "./product-mrp";
 
 /** How many rows are written per transaction. */
 const WRITE_CHUNK = 200;
@@ -183,7 +189,14 @@ export class ImportsService {
                         adding: newProducts(chunk),
                     });
                 for (const row of chunk) {
-                    await this.write(tx, storeId, organizationId, entity, row);
+                    await this.write(
+                        tx,
+                        storeId,
+                        organizationId,
+                        entity,
+                        row,
+                        userId,
+                    );
                     if (row.outcome === "CREATE") created += 1;
                     else updated += 1;
                 }
@@ -255,21 +268,91 @@ export class ImportsService {
                       descriptor.aliases,
                   );
 
+        const policy = dto.policy ?? "SKIP";
+        // A product row is also judged against its MRP by the amount to pay
+        // (`product-mrp.ts`), with the products the business already has.
+        const mrp =
+            entity === "products" && organizationId
+                ? await this.productMrpContext(storeId, organizationId, policy)
+                : null;
         const plan = buildImportPlan({
             records: parsed.records,
             mapping,
-            policy: dto.policy ?? "SKIP",
-            existingKeys: await this.existingKeys(
-                storeId,
-                organizationId,
-                entity,
-            ),
+            policy,
+            existingKeys: mrp
+                ? new Set(mrp.existing.keys())
+                : await this.existingKeys(storeId, organizationId, entity),
             requiredFields: descriptor.requiredFields,
             keyOf: descriptor.keyOf,
-            validateRow: descriptor.validateRow,
+            validateRow: mrp
+                ? (values) => {
+                      const issues = descriptor.validateRow(values);
+                      return issues.length > 0
+                          ? issues
+                          : productMrpIssues(
+                                values,
+                                descriptor.keyOf(values),
+                                mrp,
+                            );
+                  }
+                : descriptor.validateRow,
         });
 
         return { headers: parsed.headers, mapping, plan };
+    }
+
+    /**
+     * What the MRP rule needs of the business to judge a product row: how
+     * its prices carry GST, and each product it has by web address (which
+     * is also every key a row can collide with).
+     */
+    private async productMrpContext(
+        storeId: string,
+        organizationId: string,
+        policy: ProductMrpContext["policy"],
+    ): Promise<ProductMrpContext> {
+        const [rows, terms, currency] = await Promise.all([
+            prisma.product.findMany({
+                where: { organizationId },
+                select: {
+                    slug: true,
+                    mrp: true,
+                    gstRate: true,
+                    gstPriceMode: true,
+                    currency: true,
+                    variants: {
+                        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+                        select: { title: true, price: true, mrp: true },
+                    },
+                },
+            }),
+            loadPriceTerms(prisma, organizationId),
+            // Only for a refusal's sums: the storefront's, else what the
+            // business's products are already priced in.
+            storefrontCurrency(prisma, storeId),
+        ]);
+        const existing = new Map<string, StoredProductSums>();
+        let pricedIn: string | null = currency;
+        for (const r of rows) {
+            pricedIn ??= r.currency;
+            existing.set(r.slug, {
+                mrp: r.mrp?.toString() ?? null,
+                gstRate: r.gstRate?.toString() ?? null,
+                gstPriceMode: r.gstPriceMode,
+                currency: r.currency,
+                variants: r.variants.map((v) => ({
+                    title: v.title,
+                    price: v.price?.toString() ?? null,
+                    mrp: v.mrp?.toString() ?? null,
+                })),
+            });
+        }
+        return {
+            terms,
+            policy,
+            existing,
+            currency: pricedIn ?? "INR",
+        };
     }
 
     private async existingKeys(
@@ -301,6 +384,8 @@ export class ImportsService {
         organizationId: string | null,
         entity: ImportEntity,
         row: WritableRow,
+        /** Who ran the import: each row's price history entry names them. */
+        userId: string,
     ): Promise<void> {
         const v = row.values;
 
@@ -343,13 +428,27 @@ export class ImportsService {
                 // The business's product, sold at this storefront (#510).
                 const product = await tx.product.create({
                     data: { storeId, organizationId, slug, currency, ...data },
-                    select: { id: true },
+                    select: { id: true, currency: true },
                 });
                 await listAt(tx, {
                     organizationId,
                     productId: product.id,
                     storeId,
                 });
+                // The row's first price history entry.
+                await recordPrices(
+                    tx,
+                    { organizationId, userId },
+                    {
+                        kind: "PRODUCT",
+                        id: product.id,
+                        name: data.name,
+                        currency: product.currency,
+                    },
+                    null,
+                    productFacts(data),
+                    "import",
+                );
             } else {
                 // The catalogue's product, now also sold here (a listing it
                 // already has is kept as it is). A blank currency keeps the
@@ -357,7 +456,14 @@ export class ImportsService {
                 // sells it (DEC-030).
                 const current = await tx.product.findUniqueOrThrow({
                     where: { organizationId_slug: { organizationId, slug } },
-                    select: { id: true, currency: true },
+                    select: {
+                        id: true,
+                        currency: true,
+                        price: true,
+                        mrp: true,
+                        gstRate: true,
+                        gstPriceMode: true,
+                    },
                 });
                 if (v.currency && v.currency !== current.currency) {
                     await assertCurrencyChangeAllowed(tx, {
@@ -372,13 +478,29 @@ export class ImportsService {
                         ...data,
                         ...(v.currency ? { currency: v.currency } : {}),
                     },
-                    select: { id: true },
+                    select: { id: true, currency: true },
                 });
                 await listAt(tx, {
                     organizationId,
                     productId: product.id,
                     storeId,
                 });
+                // One entry for the row, when it moved what the product
+                // costs: a blank MRP or rate cell leaves that one as it was.
+                const was = productFacts(current);
+                await recordPrices(
+                    tx,
+                    { organizationId, userId },
+                    {
+                        kind: "PRODUCT",
+                        id: product.id,
+                        name: data.name,
+                        currency: product.currency,
+                    },
+                    was,
+                    { ...was, ...setFacts(productFacts(data), data) },
+                    "import",
+                );
             }
             return;
         }
@@ -420,4 +542,19 @@ export class ImportsService {
         }
         return writable.organizationId;
     }
+}
+
+/**
+ * Of a row's facts, only the ones its cells set: a blank MRP or GST rate
+ * cell writes nothing, so it is no change.
+ */
+function setFacts(
+    facts: PriceFacts,
+    data: { mrp?: string; gstRate?: string },
+): Partial<PriceFacts> {
+    return {
+        price: facts.price,
+        ...(data.mrp !== undefined ? { mrp: facts.mrp } : {}),
+        ...(data.gstRate !== undefined ? { gstRate: facts.gstRate } : {}),
+    };
 }

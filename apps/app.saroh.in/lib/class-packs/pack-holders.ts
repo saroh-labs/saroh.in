@@ -3,6 +3,7 @@ import { personHref } from "@/lib/contacts/person-href";
 import { formatDate } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { paidAtPrice } from "@/lib/gst/on-price";
 
 import type { PackKind } from "./pack-cards";
 import { unitWord } from "./pack-cards";
@@ -71,7 +72,7 @@ export interface HolderRow {
 
 export function holderRow(
     h: PackHolder,
-    pack: Pick<PackDetail, "price" | "currency">,
+    pack: Pick<PackDetail, "price" | "currency" | "gst">,
     now: Date,
     timeZone: string,
 ): HolderRow {
@@ -88,8 +89,10 @@ export function holderRow(
         : h.left === 0
           ? "All used"
           : `Use by ${formatDate(h.expiresAt, timeZone)}${soon ? `, ${count(days, "day", "days")} left` : ""}`;
+    // What they paid against what today's price comes to, GST and all.
     const older =
-        Number(h.price) !== Number(pack.price) || h.currency !== pack.currency;
+        h.currency !== pack.currency ||
+        !paidAtPrice(h.price, pack.price, pack.gst);
     return {
         purchaseId: h.purchaseId,
         contactId: h.contact.id,

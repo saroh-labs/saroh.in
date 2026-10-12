@@ -30,6 +30,19 @@
   `ENVIRONMENT.md`. It hides a feature and protects nothing: what must stay
   private needs the API's flag (below).
 
+- **Current** — **A switch that opens on a date is one instant, not a
+  deploy someone remembers.** `LAUNCH_AT` (early access; an ISO time with its
+  offset, in production `vars` only) is the worked example. What runs per
+  request reads the clock on the server (`withDevAccess`, accounts' gate):
+  nothing to deploy. What is compiled in gets its switch from
+  `scripts/cf-env.mjs` (`AT_LAUNCH`) when the build runs at or after the
+  instant, and a switch written in `vars` still wins. Three rules keep it
+  safe: a value that can't be read opens nothing; every dated switch is in
+  turbo.json's hashed `globalEnv`, so the build fingerprint changes at the
+  instant and a push after it deploys; and tests pass the time in, never
+  read the clock. A static site still needs one build after the instant: any
+  production deploy of it does.
+
 ## A missing production variable fails loudly — **Current**
 
 A fallback to a production address hides a missing variable: the deployment

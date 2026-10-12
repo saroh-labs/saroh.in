@@ -7,7 +7,8 @@ import { OrderReviews } from "@/components/stores/order-reviews";
 import { ownAccountsRoom, takesOnlinePayment } from "@/lib/billing/access";
 import { personHref } from "@/lib/contacts/person-href";
 import { customerHref } from "@/lib/customers/links";
-import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { businessModeOf } from "@/lib/gst/price-mode";
+import { getInvoiceBusiness, hasPaymentProvider } from "@/lib/invoices/tax";
 import {
     orderLockedText,
     orderPowers,
@@ -130,8 +131,13 @@ export default async function OrderPage({
             // "Add an item" (B8): only while items can change, for someone who
             // may change them — from the order's own storefront (DEC-032).
             powers.edit && order.next.editable
-                ? listProducts({ storefront: order.store.id })
-                      .then((products) =>
+                ? Promise.all([
+                      listProducts({ storefront: order.store.id }),
+                      // How the business's prices carry GST, as New order
+                      // reads it: unread charges the typed price.
+                      getInvoiceBusiness().catch(() => null),
+                  ])
+                      .then(([products, business]) =>
                           // Set to Not sold (archived): nobody orders it.
                           sellablesOf(
                               products
@@ -145,7 +151,16 @@ export default async function OrderPage({
                                           p.soldOut === true ||
                                           (p.inventory !== null &&
                                               p.inventory.quantity <= 0),
+                                      gstRate: p.gstRate,
+                                      gstPriceMode: p.gstPriceMode,
                                   })),
+                              // Priced as the API will charge it: GST on
+                              // top where the business, or the product,
+                              // has "GST is added".
+                              {
+                                  registered: business?.registered ?? false,
+                                  mode: businessModeOf(business?.priceMode),
+                              },
                           ),
                       )
                       .catch(() => "unavailable" as const)

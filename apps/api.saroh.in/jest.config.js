@@ -82,6 +82,9 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/capabilities.controller.spec.ts",
         // DEC-068 Turn on: the setup payload's shapes (pure, no DB).
         "<rootDir>/src/modules/capabilities/setup/module-setup.parse.spec.ts",
+        // Price history (12 Oct 2026): the first service Bookings makes
+        // starts its own, on a fake transaction.
+        "<rootDir>/src/modules/capabilities/setup/module-setup.price-history.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
         // #117: the guard's shadow/refused log lines and their throttle, the
@@ -181,6 +184,16 @@ module.exports = {
         "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
+        // GST is part of MRP (12 Oct 2026): the rule on every product and
+        // variant write, and the list the business's switch is refused
+        // with, with a jest-mocked Prisma. mrp-includes-gst.db.spec.ts
+        // needs Postgres.
+        "<rootDir>/src/modules/products/products.mrp.spec.ts",
+        // Price history (12 Oct 2026): one entry on every product and
+        // option write, and the per-item read, with a jest-mocked Prisma.
+        // price-history.db.spec.ts needs Postgres.
+        "<rootDir>/src/modules/products/products.price-history.spec.ts",
+        "<rootDir>/src/modules/products/over-mrp.spec.ts",
         // #519 the Products list's "Needs you": pure.
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
         // The Products list's query: a page by number and its sizes, with a
@@ -313,6 +326,9 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoice-pdf.spec.ts",
         // DEC-072: a line's GST note on the paper and the PDF — pure.
         "<rootDir>/src/modules/invoices/invoice-line-gst.spec.ts",
+        // How a paper prints a line GST was added to (12 Oct 2026): the
+        // typed price as the rate, the taxable value as the amount.
+        "<rootDir>/src/modules/invoices/added-line.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-pdf-logo.spec.ts",
         // DEC-068: which business details are missing — pure (the refusals
         // and the flag after money are in business-details.db.spec.ts).
@@ -321,6 +337,9 @@ module.exports = {
         // missing-rates read and save with a jest-mocked Prisma.
         "<rootDir>/src/modules/invoices/gst-rate-required.spec.ts",
         "<rootDir>/src/modules/invoices/gst-rates.service.spec.ts",
+        // GST on plans, class packs and courses (12 Oct 2026): what one is
+        // charged, pure and with a jest-mocked Prisma for the terms read.
+        "<rootDir>/src/modules/invoices/sale-price.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.
@@ -333,6 +352,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/plan-figures.spec.ts",
         // D2: what a plan change records, and reading its history.
         "<rootDir>/src/modules/subscriptions/plan-events.spec.ts",
+        // GST on a plan (12 Oct 2026): what publishing it does to members'
+        // renewals, and the rate a registered business's plan needs.
+        "<rootDir>/src/modules/subscriptions/plan-renewal-change.spec.ts",
         // D9: what a subscription action records, and reading its log.
         "<rootDir>/src/modules/subscriptions/subscription-events.spec.ts",
         // D8: a pause's end date, and the job's resume on it.

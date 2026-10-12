@@ -1,4 +1,5 @@
 import type { PaymentHandoff } from "../booking-flow/api";
+import type { GstOnPrice } from "../lib/gst-price";
 import type { PackKind } from "../prices/pack-words";
 import { packCount, packUnit } from "../prices/pack-words";
 import type { TestReleaseRefusal } from "../test-release/words";
@@ -24,6 +25,11 @@ export interface AccountPackOnSale {
      * An API from before it said so leaves it out; that reads as classes.
      */
     kind?: PackKind;
+    /**
+     * The GST in or on the price, and the amount to pay; null or absent
+     * (an older API): nothing is said about GST. Narrowed where it is read.
+     */
+    gst?: GstOnPrice | null;
 }
 
 /** The packs a customer can buy here, and whether they can pay online. */
@@ -42,8 +48,11 @@ export interface AccountPacksOnSale {
 export interface AccountPackCheckout {
     ref: string;
     pack: { name: string; credits: number; validityDays: number };
+    /** The amount to pay, GST and all. */
     total: string;
     currency: string;
+    /** The GST in or on `total`; null or absent: nothing is said. */
+    gst?: GstOnPrice | null;
     payment: PaymentHandoff;
 }
 

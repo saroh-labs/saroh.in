@@ -19,6 +19,7 @@ import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import { MediaService } from "../media/media.service";
+import { findOverMrp, overMrpRefusal } from "../products/over-mrp";
 import {
     enqueuePageRevalidation,
     pageCacheRevalidationOn,
@@ -40,6 +41,7 @@ import type {
 } from "./business-tax-settings";
 import {
     addressView,
+    priceTermsChange,
     TAX_CURRENT_SELECT,
     taxChanges,
     taxView,
@@ -429,15 +431,46 @@ export class OrganizationSettingsService {
             country: profileData.country,
             address: dto.registeredAddress,
         };
+        const taxCurrent = touchesTax(taxSent)
+            ? await prisma.businessProfile.findUnique({
+                  where: { organizationId: ctx.organizationId },
+                  select: TAX_CURRENT_SELECT,
+              })
+            : null;
         const taxData = touchesTax(taxSent)
-            ? taxChanges(
-                  await prisma.businessProfile.findUnique({
-                      where: { organizationId: ctx.organizationId },
-                      select: TAX_CURRENT_SELECT,
-                  }),
-                  taxSent,
-              )
+            ? taxChanges(taxCurrent, taxSent)
             : {};
+        // GST is part of MRP (`products/product-rules.ts`): a save that
+        // adds GST to the business's prices is refused while it would take
+        // any product above its MRP, with how many and the first few named.
+        // The sheet reads the same list before it saves.
+        if (touchesTax(taxSent)) {
+            const terms = priceTermsChange(taxCurrent, taxData, taxSent.taxId);
+            if (terms.addsGst) {
+                const over = await findOverMrp(
+                    prisma,
+                    ctx.organizationId,
+                    terms.after,
+                );
+                const message = overMrpRefusal(over);
+                if (message) {
+                    throw new BadRequestException({
+                        message,
+                        details: {
+                            field:
+                                dto.tax?.priceMode !== undefined
+                                    ? "priceMode"
+                                    : "gstRegistered",
+                            reason: "OVER_MRP",
+                            products: over.products,
+                            options: over.options,
+                            items: over.items,
+                            more: over.more,
+                        },
+                    });
+                }
+            }
+        }
         // How to pay us (R32): checked as the bank details will stand.
         const payData = dto.payInstructions
             ? payInstructionsWrite(

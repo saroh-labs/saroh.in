@@ -34,6 +34,8 @@ describe("starting to join (G20)", () => {
             plan: { name: "Monthly unlimited", interval: "MONTH" },
             total: "2500.00",
             currency: "INR",
+            // An API that says nothing about GST: nothing is said.
+            gst: null,
             payment: {
                 provider: "RAZORPAY",
                 providerIntentId: "order_1",
@@ -44,6 +46,38 @@ describe("starting to join (G20)", () => {
             },
             autopay: null,
         });
+    });
+
+    it("carries the GST in or on the total, checked: anything strange is none", () => {
+        const adds = {
+            mode: "ADDED",
+            rate: "18",
+            listCents: 200000,
+            gstCents: 36000,
+            payCents: 236000,
+        };
+        const includes = {
+            mode: "INCLUDED",
+            rate: "18",
+            listCents: 200000,
+            gstCents: 30508,
+            payCents: 200000,
+        };
+        const gstOf = (gst: unknown, total = "2000.00") => {
+            const answer = joinStartAnswer(201, { ...STARTED, total, gst });
+            return answer.ok ? answer.data : null;
+        };
+        expect(gstOf(adds, "2360.00")).toMatchObject({
+            total: "2360.00",
+            gst: adds,
+        });
+        expect(gstOf(includes)).toMatchObject({
+            total: "2000.00",
+            gst: includes,
+        });
+        for (const none of [null, undefined, "18", { mode: "ADDED" }]) {
+            expect(gstOf(none)?.gst).toBeNull();
+        }
     });
 
     it("carries autopay started with the join (D12), checked", () => {

@@ -120,3 +120,32 @@ export function gstLineWords(
 export function startOfLine(words: string): string {
     return words.charAt(0).toUpperCase() + words.slice(1);
 }
+
+/**
+ * The amount to pay beside a Join, Buy or Pay button, where the page has
+ * already written the typed price as money: the API's amount to pay when
+ * GST is added, else that price as it stands (it is the amount to pay).
+ * `value` is the API's answer, narrowed here: anything strange is none.
+ */
+export function payPriceWords(
+    price: string,
+    value: unknown,
+    currency: string,
+    locale = "en-IN",
+): string {
+    const gst = gstOnPriceOf(value);
+    return gst?.mode === "ADDED" ? gstPayWords(gst, currency, locale) : price;
+}
+
+/**
+ * The line of its own under an amount to pay: "Includes ₹305.08 GST (18%)"
+ * or "₹2,000 + ₹360 GST (18%)". Null when the API said nothing about GST.
+ */
+export function gstUnderWords(
+    value: unknown,
+    currency: string,
+    locale = "en-IN",
+): string | null {
+    const gst = gstOnPriceOf(value);
+    return gst ? startOfLine(gstLineWords(gst, currency, locale)) : null;
+}

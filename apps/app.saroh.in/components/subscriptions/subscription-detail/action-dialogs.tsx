@@ -8,6 +8,7 @@ import { useId, useState } from "react";
 
 import { ChipGroup, RadioCards } from "@/components/shared/choice-group";
 import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import { payOf } from "@/lib/gst/on-price";
 import type { PauseOption } from "@/lib/subscriptions/pause";
 import { DEFAULT_PAUSE } from "@/lib/subscriptions/pause";
 import type { Plan } from "@/lib/subscriptions/service";
@@ -169,7 +170,9 @@ function SwitchBody({
                     onChange={setPicked}
                     options={offered.map((p) => ({
                         value: p.id,
-                        label: `${p.name} · ${formatMoneyMajor(p.price, p.currency)}/${PER[p.interval]}`,
+                        // Plans compared with each other: each as what a
+                        // member pays a period, GST and all.
+                        label: `${p.name} · ${formatMoneyMajor(payOf(p.price, p.gst), p.currency)}/${PER[p.interval]}`,
                     }))}
                 />
             ) : (

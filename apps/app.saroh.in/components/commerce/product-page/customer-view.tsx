@@ -78,7 +78,7 @@ export function CustomerView({
             body:
                 product.variants.length > 0
                     ? `Follows the variant picked: ${product.variants.map((v) => `${v.title} ${money(v.price ?? product.price)}`).join(", ")}.${price.mrp ? ` MRP ${money(price.mrp)} is shown struck through.` : ""}`
-                    : `${money(product.price)}${price.mrp ? `, with MRP ${money(price.mrp)} struck through` : ""}.`,
+                    : `${money(product.price)}${price.mrp && price.savingPercent !== null ? `, with MRP ${money(price.mrp)} struck through` : ""}.`,
             action: { label: "Edit", href: edit("basics") },
         },
         {
@@ -241,6 +241,16 @@ export function toShopData(
         currency: product.currency,
         price: product.price,
         mrp: product.mrp,
+        // The product's own saving is the API's: the MRP against the
+        // amount to pay, GST and all (GST is part of MRP, 12 Oct 2026).
+        // None when that is the MRP or more, so nothing is struck through.
+        saving:
+            product.mrp !== null && overview.price.savingPercent !== null
+                ? {
+                      mrp: product.mrp,
+                      percent: overview.price.savingPercent,
+                  }
+                : null,
         categoryName: product.category?.name ?? null,
         description: product.description,
         keyPoints: shown("keyPoints") ? product.keyPoints : [],

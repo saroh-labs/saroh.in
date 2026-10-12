@@ -6,6 +6,9 @@ import { toMoneyString } from "../../common/money";
 import type { ProductPlacement } from "../collections/collections.service";
 import { productPlacement } from "../collections/collections.service";
 import { discountState } from "../discounts/discount-state";
+import type { PriceTerms } from "../invoices/gst-price";
+import { sellUnit } from "../invoices/gst-price";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { orderPartyName } from "../orders/walk-in";
 import type { OrgAction } from "../organizations/organization-policy";
 import { productLines } from "../stock/product-lines";
@@ -22,7 +25,7 @@ import {
     stockNeeds,
     stockTotals,
 } from "./product-overview";
-import { savingPercent } from "./product-rules";
+import { moneyToCents, mrpSaving } from "./product-rules";
 import { ProductsService } from "./products.service";
 import type { ProductDetailDto } from "./serialize";
 
@@ -199,6 +202,7 @@ export class ProductOverviewService {
             canStock,
             canReply,
             needs,
+            terms,
         ] = await Promise.all([
             this.panel(scope, "order:read", "orders", () =>
                 this.orders(productId, now),
@@ -217,6 +221,7 @@ export class ProductOverviewService {
             product.stockTracked
                 ? this.needs(organizationId, productId)
                 : Promise.resolve({ short: 0, low: 0 }),
+            loadPriceTerms(prisma, organizationId),
         ]);
 
         return {
@@ -228,7 +233,7 @@ export class ProductOverviewService {
                 totals,
                 needs,
             },
-            price: priceRange(product),
+            price: priceRange(product, terms),
             lastChanged: lastChanged(product),
             storefront: { id: store.id, name: store.name },
             canWrite: scope.canWrite,
@@ -533,8 +538,15 @@ export class ProductOverviewService {
     }
 }
 
-/** The lowest and highest price a customer can pay, and the MRP beside it. */
-function priceRange(product: ProductDetailDto): ProductOverview["price"] {
+/**
+ * The lowest and highest typed price, and the MRP beside it. The saving is
+ * the MRP against the amount to pay for one, GST and all (GST is part of
+ * MRP, `product-rules.ts`): none when that is the MRP or above it.
+ */
+function priceRange(
+    product: ProductDetailDto,
+    terms: PriceTerms,
+): ProductOverview["price"] {
     const prices = product.variants.length
         ? product.variants.map((v) => v.price ?? product.price)
         : [product.price];
@@ -546,7 +558,11 @@ function priceRange(product: ProductDetailDto): ProductOverview["price"] {
         min,
         max,
         mrp: product.mrp,
-        savingPercent: savingPercent(product.price, product.mrp),
+        savingPercent:
+            mrpSaving(
+                sellUnit(moneyToCents(product.price), product, terms).payCents,
+                product.mrp,
+            )?.percent ?? null,
     };
 }
 
