@@ -22,6 +22,7 @@ import {
     removedWhat,
 } from "./activity-customers";
 import { extrasWhat } from "./activity-extras";
+import { pricedPlace, priceWhat } from "./activity-prices";
 import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
 
 /**
@@ -51,6 +52,11 @@ import { BUSINESS_TAB_PARAM, TEAM_TAB_PARAM } from "./search";
  * A customer record merged or its details changed by staff (C10) is told
  * without the customer's name, which the stream never holds (DEC-035), and
  * links to them: `activity-customers.ts`.
+ *
+ * A change to what a product, one of its options, a service or a course
+ * costs (12 Oct 2026) is told with the price before and after, and links
+ * to the item, whose own Price history holds the same entries:
+ * `activity-prices.ts`.
  */
 
 /**
@@ -84,8 +90,13 @@ export const ACTIVITY_ACTIONS = [
     "customer.removed",
     "member.alerts.update",
     // A GST rate chosen for a service, a product or a course from the rates
-    // sheet: whoever was at the desk can fill a missing one (12 Oct 2026).
+    // sheet, as it was written before price history (12 Oct 2026). The
+    // sheet writes `price.changed` now; rows already written still read.
     "gst-rate.set",
+    // A change to what a product, an option, a service or a course costs:
+    // its price, MRP, GST rate or "GST on this price", from any screen.
+    // (An item's first entry, `price.set`, is its own history's.)
+    "price.changed",
 ] as const;
 
 /** Someone an event names, as they are now; `null` when they are gone. */
@@ -186,30 +197,6 @@ function gstRateWhat(meta: Record<string, unknown>): string {
     return from
         ? `changed the GST rate of ${what} from ${from} to ${to}`
         : `set the GST rate of ${what} to ${to}`;
-}
-
-/** Where a rated thing is edited: its own page, or its list. */
-function gstRatePlace(
-    id: string | null,
-    meta: Record<string, unknown>,
-): ActivityLine["where"] {
-    const name = text(meta.name);
-    switch (text(meta.kind)) {
-        case "SERVICE":
-            return {
-                label: name ?? "Services",
-                href: id ? `/services/${id}` : "/services",
-            };
-        case "COURSE":
-            return { label: name ?? "Courses", href: "/courses" };
-        default:
-            return id
-                ? {
-                      label: name ?? "Product",
-                      href: productHref(null, id),
-                  }
-                : PRODUCTS;
-    }
 }
 
 /** The product a Sold out change was about, at the storefront it was made. */
@@ -439,7 +426,9 @@ export function activityLine(
         case "customer.details.changed":
             return line(detailsWhat(meta), customerPlace(event.targetId));
         case "gst-rate.set":
-            return line(gstRateWhat(meta), gstRatePlace(event.targetId, meta));
+            return line(gstRateWhat(meta), pricedPlace(event.targetId, meta));
+        case "price.changed":
+            return line(priceWhat(meta), pricedPlace(event.targetId, meta));
         // Their page is gone (C11): the line leads to the list.
         case "customer.removed":
             return line(removedWhat(meta), customerPlace(null));

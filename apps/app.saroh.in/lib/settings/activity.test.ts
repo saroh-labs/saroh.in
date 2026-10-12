@@ -415,7 +415,7 @@ describe("activityLine — values a save recorded (#509)", () => {
         ).toBe(
             "Sanjay changed the GST rate of Rye loaf from 5% to 0% → Rye loaf",
         );
-        // A course is edited from its list.
+        // A course has a page of its own, where its price history is.
         expect(
             activityLine(
                 event({
@@ -426,7 +426,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 }),
                 {},
             )?.where,
-        ).toEqual({ label: "Beginners", href: "/courses" });
+        ).toEqual({ label: "Beginners", href: "/courses/c1" });
     });
 
     it("says a product marked sold out by hand, or available again (#515)", () => {
