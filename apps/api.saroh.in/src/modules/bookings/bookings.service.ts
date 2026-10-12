@@ -12,6 +12,13 @@ import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
+import type { PricedItem, PriceHistoryPage } from "../audit/price-history";
+import {
+    priceActor,
+    readPriceHistory,
+    recordPrices,
+    serviceFacts,
+} from "../audit/price-history";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
@@ -230,6 +237,20 @@ function serviceGstRate(rate: string | null | undefined): string | null {
     return rate;
 }
 
+/** A service as its price history entry names it. */
+function pricedService(service: {
+    id: string;
+    name: string;
+    currency: string | null;
+}): PricedItem {
+    return {
+        kind: "SERVICE",
+        id: service.id,
+        name: service.name,
+        currency: service.currency,
+    };
+}
+
 /**
  * Bookable Services, availability rules and the merchant's side of bookings
  * (S4-002). The customer's side — the booking page and the website's
@@ -289,29 +310,40 @@ export class BookingsService {
             },
         );
 
-        const created = await prisma.service.create({
-            data: {
-                organizationId: ctx.organizationId,
-                siteId: dto.siteId ?? null,
-                name: dto.name,
-                description: dto.description ?? null,
-                durationMinutes: dto.durationMinutes,
-                bufferBeforeMinutes: dto.bufferBeforeMinutes ?? 0,
-                bufferAfterMinutes: dto.bufferAfterMinutes ?? 0,
-                capacity: dto.capacity ?? 1,
-                priceCents: dto.priceCents ?? null,
-                currency: dto.currency ?? null,
-                gstRate: serviceGstRate(dto.gstRate),
-                sacCode: dto.sacCode ?? null,
-                // Null: priced the business's way (`service-price.ts`).
-                gstPriceMode: dto.gstPriceMode ?? null,
-                timezone: dto.timezone,
-                ...location,
-                status: "ACTIVE",
-                visits: dto.visits ?? 1,
-                depositMode,
-                showOnBookingPage: dto.showOnBookingPage ?? true,
-            },
+        // The service and its first price history entry are made together.
+        const created = await prisma.$transaction(async (tx) => {
+            const made = await tx.service.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    siteId: dto.siteId ?? null,
+                    name: dto.name,
+                    description: dto.description ?? null,
+                    durationMinutes: dto.durationMinutes,
+                    bufferBeforeMinutes: dto.bufferBeforeMinutes ?? 0,
+                    bufferAfterMinutes: dto.bufferAfterMinutes ?? 0,
+                    capacity: dto.capacity ?? 1,
+                    priceCents: dto.priceCents ?? null,
+                    currency: dto.currency ?? null,
+                    gstRate: serviceGstRate(dto.gstRate),
+                    sacCode: dto.sacCode ?? null,
+                    // Null: priced the business's way (`service-price.ts`).
+                    gstPriceMode: dto.gstPriceMode ?? null,
+                    timezone: dto.timezone,
+                    ...location,
+                    status: "ACTIVE",
+                    visits: dto.visits ?? 1,
+                    depositMode,
+                    showOnBookingPage: dto.showOnBookingPage ?? true,
+                },
+            });
+            await recordPrices(
+                tx,
+                priceActor(ctx),
+                pricedService(made),
+                null,
+                serviceFacts(made),
+            );
+            return made;
         });
         // The business's first bookable service (DEC-125). Stored once by
         // the ledger; it swallows its own errors, as every activation does.
@@ -346,6 +378,21 @@ export class BookingsService {
             await this.requireOwnedService(ctx, serviceId),
             await loadPriceTerms(prisma, ctx.organizationId),
         );
+    }
+
+    /**
+     * What the service has cost: each change, who made it and when, newest
+     * first. `service:read`, as the service's own read asks;
+     * cross-tenant/missing → 404.
+     */
+    async servicePriceHistory(
+        ctx: OrganizationContext,
+        serviceId: string,
+        page: { limit?: number; cursor?: string } = {},
+    ): Promise<PriceHistoryPage> {
+        requireBookingPower(ctx, "service:read");
+        await this.requireOwnedService(ctx, serviceId);
+        return readPriceHistory(ctx.organizationId, "SERVICE", serviceId, page);
     }
 
     /**
@@ -452,8 +499,24 @@ export class BookingsService {
             }
         }
 
+        // The save and its price history entry stand or fall together; a
+        // save that moved nothing about the cost records nothing.
+        const saved = await prisma.$transaction(async (tx) => {
+            const next = await tx.service.update({
+                where: { id: service.id },
+                data,
+            });
+            await recordPrices(
+                tx,
+                priceActor(ctx),
+                pricedService(next),
+                serviceFacts(service),
+                serviceFacts(next),
+            );
+            return next;
+        });
         return toServiceView(
-            await prisma.service.update({ where: { id: service.id }, data }),
+            saved,
             await loadPriceTerms(prisma, ctx.organizationId),
         );
     }

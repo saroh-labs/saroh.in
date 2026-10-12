@@ -9,6 +9,7 @@ import { readGstAsk } from "@/lib/gst-rates/service";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
+import { readPriceHistory } from "@/lib/price-history/service";
 import { requireSession } from "@/lib/session";
 
 // One read for the tab's title and the page.
@@ -42,10 +43,13 @@ export default async function CourseDetailPage({
     ]);
     if (!course) notFound();
     const canWrite = canWriteCourses(organization);
-    const [contacts, gst] = await Promise.all([
+    const [contacts, gst, priceHistory] = await Promise.all([
         canWrite ? contactPickerOptions() : Promise.resolve([]),
         // For the enrol dialog's amount to pay; unread says the price typed.
         canWrite ? readGstAsk() : Promise.resolve(null),
+        // What it has cost (12 Oct 2026). Optional: a read that fails is
+        // said in its place.
+        readPriceHistory("courses", courseId).catch(() => null),
     ]);
 
     return (
@@ -56,6 +60,7 @@ export default async function CourseDetailPage({
                 canWrite={canWrite}
                 now={new Date().toISOString()}
                 gst={gst}
+                priceHistory={priceHistory}
             />
         </PageContainer>
     );

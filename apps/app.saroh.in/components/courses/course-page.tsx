@@ -35,9 +35,15 @@ import {
     zoneParts,
 } from "@/lib/format/datetime";
 import { addedSum } from "@/lib/gst/on-price";
+import type { PriceHistoryPage } from "@/lib/price-history/words";
+import {
+    PRICE_HISTORY_TITLE,
+    priceHistoryShown,
+} from "@/lib/price-history/words";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { PriceHistoryList } from "@/components/shared/price-history";
 import { useHold } from "@/components/shared/use-hold";
 
 import { runAction } from "@/lib/api/run-action";
@@ -74,7 +80,13 @@ export function CoursePage({
     canWrite,
     now,
     gst = null,
+    priceHistory,
 }: {
+    /**
+     * What the course has cost, newest first (12 Oct 2026); null when that
+     * read failed. Left out, or with nothing kept yet, nothing is drawn.
+     */
+    priceHistory?: PriceHistoryPage | null;
     /** The business's GST standing, for the enrol dialog's amount to pay. */
     gst?: GstAsk | null;
     course: CourseDetail;
@@ -206,6 +218,13 @@ export function CoursePage({
                     onCancel={setCancelling}
                 />
             </div>
+
+            {priceHistoryShown(priceHistory) ? (
+                <section className="flex min-w-0 max-w-[760px] flex-col gap-2.5">
+                    <h2 className="label">{PRICE_HISTORY_TITLE}</h2>
+                    <PriceHistoryList history={priceHistory} framed />
+                </section>
+            ) : null}
 
             {canWrite ? (
                 <EnrolDialog

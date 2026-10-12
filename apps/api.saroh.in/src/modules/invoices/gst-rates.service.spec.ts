@@ -399,27 +399,68 @@ describe("saving rates", () => {
         });
     });
 
-    it("keeps who chose a service's rate, with the rate before and after", async () => {
+    it("keeps who chose a service's rate in its price history: one entry, the rate before and after", async () => {
         services.findFirst!.mockResolvedValue({
             name: "Personal Training",
+            currency: "INR",
+            priceCents: 150_000,
             gstRate: null,
+            gstPriceMode: null,
         });
         await rates.set(owner, one("SERVICE", "18"));
+        // One entry, in the shape every other way a rate changes writes:
+        // never a `gst-rate.set` beside it.
         expect(db.auditEvent!.create).toHaveBeenCalledTimes(1);
         expect(db.auditEvent!.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                action: "gst-rate.set",
+            data: {
+                action: "price.changed",
                 actorUserId: owner.userId,
                 organizationId: "org_1",
                 targetType: "service",
+                targetId: "x_1",
+                outcome: "SUCCESS",
                 metadata: {
                     kind: "SERVICE",
                     name: "Personal Training",
-                    from: null,
-                    to: "18",
+                    currency: "INR",
+                    source: "rates",
+                    changes: [{ field: "gstRate", before: null, after: "18" }],
                 },
-            }),
+            },
         });
+    });
+
+    it("a product's rate changed from the sheet says the rate it had", async () => {
+        products.findFirst!.mockResolvedValue({
+            name: "Rye loaf",
+            currency: "INR",
+            price: { toString: () => "780" },
+            mrp: null,
+            gstRate: { toString: () => "5.00" },
+            gstPriceMode: "ADDED",
+            variants: [],
+        });
+        await rates.set(owner, one("PRODUCT", "18"));
+        expect(db.auditEvent!.create).toHaveBeenCalledTimes(1);
+        expect(
+            db.auditEvent!.create.mock.calls[0]![0].data.metadata,
+        ).toMatchObject({
+            kind: "PRODUCT",
+            name: "Rye loaf",
+            changes: [{ field: "gstRate", before: "5", after: "18" }],
+        });
+    });
+
+    it("keeps nothing for a rate saved as it already was", async () => {
+        services.findFirst!.mockResolvedValue({
+            name: "Personal Training",
+            currency: "INR",
+            priceCents: 150_000,
+            gstRate: { toString: () => "18.00" },
+            gstPriceMode: null,
+        });
+        await rates.set(owner, one("SERVICE", "18"));
+        expect(db.auditEvent!.create).not.toHaveBeenCalled();
     });
 
     it("keeps nothing when no rate was written", async () => {

@@ -4,6 +4,7 @@ import { ServiceEditorState } from "@/components/services/service-editor/editor-
 import { ServiceEditor } from "@/components/services/service-editor/service-editor";
 import { rowLock } from "@/lib/billing/access";
 import { recordTitle } from "@/lib/page-title";
+import { readPriceHistory } from "@/lib/price-history/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { loadEditorContext } from "@/lib/services/editor-data";
 import { listRules, readService } from "@/lib/services/service";
@@ -44,12 +45,15 @@ export default async function ServiceEditorPage({
     const { serviceId } = await params;
     await requireSession();
 
-    const [read, context, rules, access] = await Promise.all([
+    const [read, context, rules, access, priceHistory] = await Promise.all([
         readOne(serviceId),
         loadEditorContext(),
         listRules(serviceId),
         // Deposits are taken online: locked on a plan without it.
         billingAccessOrNull(),
+        // What it has cost (12 Oct 2026). Optional: a read that fails is
+        // said in its place.
+        readPriceHistory("services", serviceId).catch(() => null),
     ]);
     if (!read.ok) {
         return (
@@ -99,6 +103,7 @@ export default async function ServiceEditorPage({
             payment={payment}
             gstRegistered={gstRegistered}
             businessPriceMode={businessPriceMode}
+            priceHistory={priceHistory}
         />
     );
 }

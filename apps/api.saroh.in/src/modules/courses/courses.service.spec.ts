@@ -37,14 +37,20 @@ jest.mock("@saroh/database", () => {
         organizationModule: { findFirst: jest.fn() },
         // Whether the business is registered, asked at an enrolment.
         businessProfile: { findUnique: jest.fn() },
+        // A course's price history entry, written with its save.
+        auditEvent: { create: jest.fn() },
     };
+    // Making a course is one transaction with its first price history
+    // entry: the specs read the create off either client.
+    const courseCreate = jest.fn();
+    Object.assign(tx.course, { create: courseCreate });
     return {
         ...actual,
         prisma: {
             course: {
                 findFirst: jest.fn(),
                 findMany: jest.fn(),
-                create: jest.fn(),
+                create: courseCreate,
             },
             courseEnrollment: { findMany: jest.fn(), findFirst: jest.fn() },
             booking: { groupBy: jest.fn() },
@@ -53,6 +59,9 @@ jest.mock("@saroh/database", () => {
             organizationModule: { findFirst: jest.fn() },
             // How the business's prices carry GST, for a read's amount to pay.
             businessProfile: { findUnique: jest.fn() },
+            // A course's price history, as its page reads it.
+            auditEvent: { findMany: jest.fn() },
+            user: { findMany: jest.fn() },
             $transaction: jest.fn(
                 (fn: (t: typeof tx) => unknown, _opts?: unknown) => fn(tx),
             ),
@@ -862,5 +871,153 @@ describe("a course's price as the merchant reads it", () => {
         ]);
         const [course] = await service.list(owner, {});
         expect(course!.gst?.payCents).toBe(944_000);
+    });
+});
+
+describe("a course's price history (12 Oct 2026)", () => {
+    const entries = () =>
+        tx.auditEvent!.create!.mock.calls.map(
+            (call) => (call[0] as { data: Record<string, unknown> }).data,
+        );
+    /** The course under its lock, as the save reads it. */
+    const locked = (over: Record<string, unknown> = {}) => ({
+        id: "course_1",
+        name: "Beginners' wheel",
+        price: decimal("8000"),
+        currency: "INR",
+        gstRate: null,
+        gstPriceMode: null,
+        serviceId: "svc_1",
+        status: "OPEN",
+        service: { capacity: 10 },
+        _count: { sessions: 8, enrollments: 0 },
+        ...over,
+    });
+
+    beforeEach(() => {
+        tx.course!.findFirst!.mockResolvedValue(locked());
+        // The row a save returns: the course as it was, with what was sent.
+        tx.course!.update!.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) =>
+                Promise.resolve({ ...locked(), ...data }),
+        );
+        db.course!.create!.mockImplementation(
+            ({ data }: { data: Record<string, unknown> }) =>
+                Promise.resolve({ id: "course_new", ...data }),
+        );
+    });
+
+    it("a new course starts its history at what it was made at", async () => {
+        await service.create(owner, {
+            serviceId: "svc_1",
+            name: "Wheel",
+            price: "8000",
+            seats: 4,
+            gstRate: "18",
+            gstPriceMode: "ADDED",
+        });
+        expect(entries()).toEqual([
+            {
+                action: "price.set",
+                actorUserId: "user_1",
+                organizationId: "org_1",
+                targetType: "course",
+                targetId: "course_new",
+                outcome: "SUCCESS",
+                metadata: {
+                    kind: "COURSE",
+                    name: "Wheel",
+                    currency: "INR",
+                    source: "editor",
+                    changes: [
+                        { field: "price", before: null, after: "8000.00" },
+                        { field: "gstRate", before: null, after: "18" },
+                        { field: "gstPriceMode", before: null, after: "ADDED" },
+                    ],
+                },
+            },
+        ]);
+    });
+
+    it("a new price and rate are one entry, before and after, on the save's transaction", async () => {
+        await service.update(owner, "course_1", {
+            price: "9000",
+            gstRate: "18",
+        });
+        expect(entries()).toEqual([
+            expect.objectContaining({
+                action: "price.changed",
+                actorUserId: "user_1",
+                targetType: "course",
+                targetId: "course_1",
+                metadata: {
+                    kind: "COURSE",
+                    name: "Beginners' wheel",
+                    currency: "INR",
+                    source: "editor",
+                    changes: [
+                        { field: "price", before: "8000.00", after: "9000.00" },
+                        { field: "gstRate", before: null, after: "18" },
+                    ],
+                },
+            }),
+        ]);
+    });
+
+    it("keeps nothing when the cost did not move", async () => {
+        await service.update(owner, "course_1", {
+            name: "Wheel for beginners",
+            seats: 6,
+            price: "8000.00",
+        });
+        expect(tx.course!.update).toHaveBeenCalledTimes(1);
+        expect(entries()).toEqual([]);
+    });
+
+    it("keeps nothing when the save is refused or fails", async () => {
+        tx.course!.findFirst!.mockResolvedValue(
+            locked({ _count: { sessions: 8, enrollments: 5 } }),
+        );
+        await expect(
+            service.update(owner, "course_1", { seats: 4, price: "9000" }),
+        ).rejects.toThrow("5 people are on this course");
+        await expect(
+            service.update(member, "course_1", { price: "9000" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        tx.course!.findFirst!.mockResolvedValue(locked());
+        tx.course!.update!.mockRejectedValue(new Error("the database went"));
+        await expect(
+            service.update(owner, "course_1", { price: "9000" }),
+        ).rejects.toThrow("the database went");
+        expect(entries()).toEqual([]);
+    });
+
+    it("is read by whoever may read the course, in this business only, newest first", async () => {
+        db.course!.findFirst!.mockResolvedValue({ id: "course_1" });
+        db.auditEvent!.findMany!.mockResolvedValue([]);
+        await expect(
+            service.priceHistory(owner, "course_1", { limit: 5 }),
+        ).resolves.toEqual({ entries: [], nextCursor: null });
+        expect(db.course!.findFirst).toHaveBeenCalledWith({
+            where: { id: "course_1", organizationId: "org_1" },
+            select: { id: true },
+        });
+        expect(db.auditEvent!.findMany!.mock.calls[0]![0]).toMatchObject({
+            where: {
+                organizationId: "org_1",
+                targetType: "course",
+                targetId: "course_1",
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 6,
+        });
+        await expect(
+            service.priceHistory(member, "course_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        db.course!.findFirst!.mockResolvedValue(null);
+        await expect(
+            service.priceHistory(owner, "course_theirs"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(db.auditEvent!.findMany).toHaveBeenCalledTimes(1);
     });
 });

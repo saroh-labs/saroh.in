@@ -21,6 +21,7 @@ import {
 } from "./activity-changes";
 import { detailsLabels, mergedMoves } from "./activity-customers";
 import { extrasRows } from "./activity-extras";
+import { priceRows } from "./activity-prices";
 
 /**
  * The sheet a Settings › Activity row opens (#509): when, to the minute and
@@ -361,6 +362,9 @@ function detailRows(
                 ],
                 withoutValues: false,
             };
+        case "price.changed":
+            // What it was about, then each field as it was and became.
+            return { rows: priceRows(meta), withoutValues: false };
         case "product.stock-tracking.on":
         case "product.stock-tracking.off":
             return {

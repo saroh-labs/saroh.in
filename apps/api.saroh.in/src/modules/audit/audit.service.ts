@@ -105,13 +105,21 @@ export const AuditAction = {
     SiteTemplateUpgrade: "site.template.upgrade",
     // A GST rate chosen for a service, a product or a course from the rates
     // sheet (the notice's list, or the ask where a payment or an invoice was
-    // stopped for a missing rate), written in the save's own transaction.
-    // Whoever is at the desk may fill a missing rate with `invoice:write`
-    // alone, and the rate then goes on every later invoice, so who chose it
-    // is kept (owner, 12 Oct 2026). A plan's and a pack's go to their own
-    // histories. Metadata: the item's kind and name, and the rate before
-    // and after.
+    // stopped for a missing rate). No longer written: the sheet records
+    // `price.changed` like every other way a rate changes. Kept so rows
+    // already written still read (`price-history.ts` `changesOf`).
+    // Metadata: the item's kind and name, and the rate `from` and `to`.
     GstRateSet: "gst-rate.set",
+    // Price history (owner, 12 Oct 2026; `audit/price-history.ts`): what a
+    // product, one of its options, a service or a course costs, written in
+    // the transaction of the change. `price.set` is the item's first entry
+    // (made, copied or imported at these values), `price.changed` every
+    // later one. The target is the item; an option's is its product.
+    // Metadata: the kind, the name, the currency, how it was made
+    // (`source`), the option when it is one, and `changes` (the typed
+    // price, the MRP, the GST rate, "GST on this price": before and after).
+    PriceSet: "price.set",
+    PriceChanged: "price.changed",
     // "Download your data" (DEC-120): an owner asked for the business's
     // zip, and each time one made a link to download it. The target is the
     // export; metadata is counts and sizes, never a link or a key.

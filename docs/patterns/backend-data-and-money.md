@@ -302,6 +302,45 @@
   (`backend-billing-and-classes.md` → GST is part of MRP). A saving is the
   MRP less the amount to pay, served by the API (`saving`) and null when
   there is none.
+- **A change to what something costs is recorded where it is made** (owner,
+  12 Oct 2026: "Prices for products should have history"). A product, a
+  product's option, a service and a course keep a price history: the typed
+  price, the MRP (a product's and an option's), the GST rate and "GST on
+  this price", each as it was and as it became, with who changed it and
+  when. Any code that writes one of those columns calls `recordPrices`
+  (`audit/price-history.ts`) **on the same transaction as the write**, with
+  the row's facts before and after (`productFacts`, `optionFacts`,
+  `serviceFacts`, `courseFacts`), so a save that fails or is refused leaves
+  no entry and a save that moves nothing writes none. A write with no
+  transaction of its own gets one.
+    - **Where it is kept:** the audit stream, no table of its own.
+      `price.set` is an item's first entry (made, copied or imported at
+      these values); `price.changed` is every later one. The target is the
+      item (`product`, `service`, `course`); an option's entry is on its
+      product and names the option. Metadata holds the kind, the name, the
+      currency, how it was made (`source`) and `changes`
+      (`{ field, before, after }`, the settings saves' shape). An
+      operator's is marked by `auditMetadata` and reads as Saroh support.
+    - **One entry, one shape.** The rates sheet (`gst-rates.service.ts`)
+      writes `price.changed` like an editor does. It used to write
+      `gst-rate.set` with one `from` and `to`: that action is no longer
+      written, and rows already written are read into the same shape
+      (`changesOf`, and the app's Activity).
+    - **The price is the one typed.** History never works out an amount to
+      pay and never reads the business's setting, so a line reads the same
+      whatever "GST on your prices" says today. The business-wide switch is
+      one settings change (`profile.update`), never an entry per item.
+    - **Read per item** with the permission its own page asks for
+      (`store:read`, `service:read`, `course:read`), scoped to the business,
+      newest first, a page at a time (`readPriceHistory`, behind
+      `GET …/products|services|courses/:id/price-history`). It filters the
+      stream by business and target on `[organizationId, createdAt]`, as
+      the customer timeline does.
+    - **Plans and class packs are not written here:** they keep their own
+      histories (`SubscriptionPlanEvent` `PRICE_CHANGED`, `PackEvent`).
+    - A new write path is pinned by a spec beside it
+      (`products.price-history.spec.ts`, `service-price-history.spec.ts`,
+      `imports.price-history.spec.ts`, `price-history.db.spec.ts`).
 - **Plans, class packs and courses** (12 Oct 2026). `SubscriptionPlan.price`,
   `ClassPack.price` and `Course.price` are what the business typed, each
   with its own `gstRate`, `sacCode` and `gstPriceMode`. A
