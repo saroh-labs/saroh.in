@@ -1859,3 +1859,14 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - When renewals last ran is said only when they are late.
 - An amount that recurs is written "₹900 a month" everywhere; "₹900/mo" only in a column that is narrow on a phone.
 - A plan's editor opens on its first unanswered question, and says what a price change does where the price is changed.
+
+## DEC-154 Early access opens by the clock
+
+**Status: Accepted — 2026-10-12, built, not yet rehearsed** · owner ("that should happen without me interfering"; "one time launch schedule is fine")
+
+- Early access opens on 17 Oct 2026 at 16:00 IST without anyone acting at that moment. One instant, `LAUNCH_AT`, is written in the production vars of saroh.in, accounts and the workspace, the same in each (`check:deploy-env` refuses a difference, and refuses one in development).
+- **Accounts opens at runtime.** Its prelaunch gate reads the clock on every request and steps aside at the instant, with no deploy. A value that cannot be read keeps it shut.
+- **The site and the workspace open with a build.** A production build made at or after the instant is given its launch switch (`NEXT_PUBLIC_LAUNCH_MODE=open`, `NEXT_PUBLIC_PLANS=on`) by `scripts/cf-env.mjs`. A switch written in vars still wins. The build fingerprint changes at the instant, so any later deploy opens what is not yet open.
+- **One exception to "no scheduled deploys" (DEC-107), once.** Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026 only: the first starts early, waits for the instant and deploys every app; the second deploys only what is still unopened. Both do nothing in another year and are deleted after launch. The rule stands for everything else.
+- Plans show in the workspace at launch, which DEC-136 left open.
+- Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.
