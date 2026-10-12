@@ -578,7 +578,9 @@ the Privacy Policy states both.
   location's name, address, map link, hours or kind: the footer reads them live, DEC-128; cause
   `contact`, `enqueueBusinessSitesRevalidation`), the business's own domain
   pausing or coming back with its plan (every page then names another
-  address as its own, DEC-139; cause `domain`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
+  address as its own, DEC-139; cause `domain`), how the business's prices carry GST (its
+  choice, its registration, its GSTIN or state: every price's GST words are
+  read live; cause `prices`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
   stock row or how a product counts takes `lockStockLevels`, `lockProduct`
   or `lockProducts` (`products/stock-levels.ts`, the lock order), and those
   queue on the same transaction, once per row or product per transaction.

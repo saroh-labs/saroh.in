@@ -1,8 +1,11 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Service } from "@saroh/database";
 
+import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
+import { NO_GST_TERMS } from "../invoices/gst-price";
 import type { DepositMode } from "./dto";
 import { DEPOSIT_MODES } from "./dto";
+import { serviceCharge } from "./service-price";
 
 /*
  * The round-2 service fields (E1): visits, the deposit and "Show on booking
@@ -59,12 +62,29 @@ export function assertDepositPriced(
     });
 }
 
-/** A service as staff read it: the row, plus the deposit it takes. */
-export type ServiceView = Service & { depositCents: number | null };
+/**
+ * A service as staff read it: the row (`priceCents` is the price the
+ * business typed), plus what a customer pays for it and the deposit it
+ * takes, worked out here so no screen does the sum.
+ */
+export type ServiceView = Service & {
+    /** A share of the amount to pay, GST and all. */
+    depositCents: number | null;
+    /** The amount to pay for one booking; null when it has no price. */
+    payCents: number | null;
+    /** The customer's GST words for the price, or null when none are said. */
+    gst: GstOnPrice | null;
+};
 
-export function toServiceView(service: Service): ServiceView {
+export function toServiceView(
+    service: Service,
+    terms: PriceTerms = NO_GST_TERMS,
+): ServiceView {
+    const charge = serviceCharge(service, terms);
     return {
         ...service,
-        depositCents: depositCents(service.priceCents, service.depositMode),
+        depositCents: depositCents(charge.payCents, service.depositMode),
+        payCents: charge.payCents,
+        gst: charge.gst,
     };
 }

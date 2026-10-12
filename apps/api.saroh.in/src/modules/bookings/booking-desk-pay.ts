@@ -6,6 +6,7 @@ import {
 import type { Prisma } from "@saroh/database";
 
 import { rateToBps } from "../invoices/gst";
+import type { GstPriceMode } from "../invoices/gst-price";
 import { assertRatesSet } from "../invoices/gst-rate-required";
 import { buildCorrection, buildManualInvoice } from "../invoices/order-invoice";
 import {
@@ -29,6 +30,7 @@ import {
     paidAtDesk,
     paidOnlineOf,
 } from "./desk-take";
+import { bookedPriceMode } from "./service-price";
 
 /*
  * "Take ₹X" at the desk for a booking (round-2 P2): cash, UPI at the
@@ -256,6 +258,7 @@ export async function takeDeskPaymentInTx(
             cents: take.cents,
             rateBps: rateToBps(booking.service.gstRate?.toString() ?? null),
             code: booking.service.sacCode,
+            priceMode: bookedPriceMode(booking.snapshot),
             actorUserId: input.actorUserId,
             payment: paid,
             now,
@@ -277,6 +280,7 @@ export async function takeDeskPaymentInTx(
                         booking.service.gstRate?.toString() ?? null,
                     ),
                     code: booking.service.sacCode,
+                    priceMode: bookedPriceMode(booking.snapshot),
                 },
             ],
             profile,
@@ -383,6 +387,7 @@ async function balanceInvoice(
         cents: number;
         rateBps: number | null;
         code: string | null;
+        priceMode: GstPriceMode | null;
         actorUserId: string | null;
         payment: {
             status: "PAID";
@@ -401,6 +406,7 @@ async function balanceInvoice(
             rateBps: input.rateBps,
             code: input.code,
             orderItemId: null,
+            priceMode: input.priceMode,
         },
     ]);
     const profile = await loadTaxProfile(tx, input.organizationId);

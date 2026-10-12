@@ -9,6 +9,8 @@ import {
     taxLines,
     taxTypeFor,
 } from "./gst";
+import type { GstPriceMode } from "./gst-price";
+import { isGstPriceMode } from "./gst-price";
 import { stateCode } from "./gst-states";
 import { toCents } from "./totals";
 
@@ -36,6 +38,11 @@ export interface TaxProfile {
     numberFormat?: unknown;
     deliveryRateBps: number;
     deliverySac: string | null;
+    /**
+     * How its prices carry GST unless an item says otherwise
+     * (`gst-price.ts`); absent, they include it.
+     */
+    priceMode?: GstPriceMode;
     /**
      * The registered address as it prints ("12 Hill Road, Bandra West,
      * Mumbai 400050, Maharashtra"); null until the business gives one.
@@ -82,7 +89,10 @@ export interface OrderForInvoice {
     items: {
         id: string;
         quantity: number;
+        /** The amount to pay per unit, as the line was sold. */
         price: Money;
+        /** What the line was charged under; null from before the choice. */
+        gstPriceMode?: string | null;
         /** Null on a treatment's service line (E9, DEC-050). */
         product: {
             name: string;
@@ -208,6 +218,7 @@ export function buildOrderInvoice(
             rateBps: rateToBps(billed.gstRate),
             code: billed.code,
             orderItemId: item.id,
+            priceMode: modeOf(item.gstPriceMode),
         };
     });
     const shippingCents = toCents(order.shipping.toString());
@@ -273,6 +284,11 @@ export function buildOrderInvoice(
     });
 }
 
+/** A stored mode as a line carries it: one of the two, or null. */
+export function modeOf(stored: unknown): GstPriceMode | null {
+    return isGstPriceMode(stored) ? stored : null;
+}
+
 /** Header sums from the frozen lines: subtotal + tax = total, always. */
 export function finish(
     lines: GstLine[],
@@ -312,6 +328,8 @@ export interface IssuedLine {
     gstRate: Money | null;
     hsnSac: string | null;
     orderItemId: string | null;
+    /** What the line was charged under: a correction copies it. */
+    gstPriceMode?: string | null;
 }
 
 /** What a correction is against: the original's GST standing and lines. */
@@ -404,6 +422,7 @@ export function buildCreditNote(
                     rateBps: rateToBps(part.line.gstRate),
                     code: part.line.hsnSac,
                     orderItemId: r.orderItemId,
+                    priceMode: modeOf(part.line.gstPriceMode),
                 });
                 // What the line cost less what comes back: its share of
                 // the discount.
@@ -424,6 +443,7 @@ export function buildCreditNote(
                 rateBps: rateToBps(l.gstRate),
                 code: l.hsnSac,
                 orderItemId: l.orderItemId,
+                priceMode: modeOf(l.gstPriceMode),
             });
         });
         discounts = inputs.map(() => 0);
@@ -527,6 +547,8 @@ export function buildCorrection(
         rateBps: number | null;
         code: string | null;
         orderItemId: string | null;
+        /** What the units were charged under, as their order line says. */
+        priceMode?: GstPriceMode | null;
     }[],
 ): BuiltDocument {
     const registered = original.sellerGstin !== null;
@@ -558,6 +580,8 @@ export function buildManualInvoice(
         code: string | null;
         /** The order line it bills, when it bills one (a treatment's, E9). */
         orderItemId?: string | null;
+        /** What the amount was charged under (a booking's, `gst-price.ts`). */
+        priceMode?: GstPriceMode | null;
     }[],
     profile: Pick<
         TaxProfile,

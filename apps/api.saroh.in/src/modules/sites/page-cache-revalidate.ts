@@ -20,7 +20,9 @@ import { env } from "../../env";
  *    of its own, DEC-124), and the business's phone, contact email, social
  *    links or the address its site shows saved (read live, DEC-128), and
  *    the business's own domain pausing or coming back with its plan
- *    (DEC-139: every page names a different address as its own).
+ *    (DEC-139: every page names a different address as its own), and how
+ *    the business's prices carry GST changing (its registration, its GSTIN
+ *    or state, or its choice: every price's GST words are read live).
  *  - **products** (`productIds`, `stockLevelIds`): every stock flow and
  *    every change to how a product counts takes the product or shelf locks
  *    (`products/stock-levels.ts`, the lock order), so that is where a stock
@@ -40,7 +42,8 @@ export type PageRevalidateCause =
     | "contact"
     | "domain"
     | "stock"
-    | "product";
+    | "product"
+    | "prices";
 
 export interface PageRevalidatePayload {
     cause: PageRevalidateCause;

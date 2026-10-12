@@ -43,6 +43,8 @@ export const VALUE_FIELDS = [
     "invoiceNumberFormat",
     "deliveryGstRate",
     "deliverySacCode",
+    // How prices carry GST (12 Oct 2026): INCLUDED or ADDED.
+    "gstPriceMode",
     "registeredAddress",
     "logo",
     "openingHours",

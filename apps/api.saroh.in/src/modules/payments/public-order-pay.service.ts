@@ -9,6 +9,8 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import type { GstOnPrice } from "../invoices/gst-price";
+import { orderLineGst } from "../invoices/line-gst-words";
 import { orderPayLinkUrlFor } from "../invoices/pay-link-url";
 import { hashPayToken } from "../invoices/pay-token";
 import { lineName } from "../orders/order-line";
@@ -49,6 +51,11 @@ export interface PublicOrderPayView {
         quantity: number;
         unitPrice: string;
         amount: string;
+        /**
+         * How the line's amount carries GST (`invoices/line-gst-words.ts`);
+         * null when nothing is said about GST.
+         */
+        gst: GstOnPrice | null;
     }[];
     total: string;
     /** What paying now charges: the total less what was taken. */
@@ -161,9 +168,10 @@ export class PublicOrderPayService {
                         select: {
                             quantity: true,
                             price: true,
-                            product: { select: { name: true } },
+                            gstPriceMode: true,
+                            product: { select: { name: true, gstRate: true } },
                             // A treatment's line names its service (E9).
-                            service: { select: { name: true } },
+                            service: { select: { name: true, gstRate: true } },
                             variant: { select: { title: true } },
                         },
                     },
@@ -204,6 +212,7 @@ export class PublicOrderPayService {
                         quantity: i.quantity,
                         unitPrice: toMoneyString(i.price),
                         amount: money(unit * i.quantity),
+                        gst: orderLineGst(i),
                     };
                 }),
                 total: toMoneyString(order.total),

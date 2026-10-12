@@ -259,12 +259,70 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   note goes through `creditNoteForRefund` like any other, spread over that
   invoice's own lines, so the pair mirror each other and takings read the
   money in on one day and out on another.
-- **GST:** prices include it; tax is derived per line from the inclusive
-  amount, rounded per line and frozen. Spread an order discount across lines
+- **GST:** a line's amount is what is paid for it, GST and all; tax is
+  derived per line from that amount, rounded per line and frozen. Whether
+  the typed price already is that amount, or GST is added to it first, is
+  the business's choice (next rule). Spread an order discount across lines
   before tax; delivery is a taxed line. Place of supply: bill-to state, else
   delivery state, else the business's state — same state CGST + SGST, else
   IGST. Registered → tax invoice; unregistered → receipt. A registered
   business's orders ignore the storefront's old add-on tax.
+- **How a price carries GST is the business's choice** (12 Oct 2026,
+  amending ADR-008). A GST-registered business says "My prices include GST"
+  (`INCLUDED`, the default and what every price meant before) or "GST is
+  added to my prices" (`ADDED`): `BusinessProfile.gstPriceMode`, with a
+  nullable `gstPriceMode` on `Service` and `Product` for one priced the
+  other way (null: same as the business). A business that is not registered
+  is never asked, and the tax settings refuse the field for it.
+    - **One sum, one file:** `invoices/gst-price.ts`. One unit's amount to
+      pay is the typed price, or under `ADDED` the typed price plus its GST
+      rounded to the paisa, half up (₹1,000 at 18% is ₹1,180). A line is
+      the quantity times that. The tax inside is then derived from the
+      amount as every paper derives it (`splitInclusive`). `priceCharge` is
+      the whole answer; `sellUnit` (a product), `serviceCharge`
+      (`bookings/service-price.ts`) and `loadPriceTerms`
+      (`invoices/price-terms.ts`, the same "registered" test as
+      `loadTaxProfile`) are how callers reach it. Never add GST to a price
+      anywhere else.
+    - **The amount to pay is fixed when something is sold, and nothing
+      after it asks for the mode again.** An order line's `price` and a
+      booking's `snapshot.service.priceCents` ARE the amount to pay; the
+      line keeps what was typed and the mode beside it
+      (`OrderItem.listPrice`, `gstPriceMode`; the snapshot's
+      `listPriceCents`, `gstPriceMode`), and an invoice line freezes the
+      mode with its rate (`InvoiceLine.gstPriceMode`; a correction copies
+      its original's). So totals, deposits, what is due, desk payments, pay
+      links, edits, refunds and credit notes work unchanged from that
+      amount, a later change of the business's choice never rewrites a
+      placed order, a made booking or issued paper, and a credit note
+      reverses exactly what was charged. A deposit is a share of the amount
+      to pay (25% of ₹1,000 + 18% is ₹295), with `depositCents`' own
+      rounding.
+    - **Where a typed price becomes an amount to pay** (add a new one
+      here): `priceOrderLines` (a staff order, lines added by an edit),
+      `quoteLines` (the site's bag and checkout), `startTreatmentInTx`
+      (a treatment's order), `buildSnapshot` in `reserveInTx` (every
+      booking) and `onlinePrice` (a hold).
+    - **Not covered, and charged as typed with GST inside:** a delivery
+      charge, a line typed on a hand-written invoice, and courses, class
+      packs and plans (they have no rate column, so their paper carries no
+      rate either). The settings sheet says so.
+    - **The customer is told before paying, in one form of words.** Public
+      reads serve `GstOnPrice` (`{ mode, rate, listCents, gstCents,
+payCents }`, or null when nothing is said: not registered, no rate, or
+      exempt): the product and its options, each bag line and the GST
+      inside the quote's total, the booking page's services (`payCents`,
+      `gst`), the pay pages' and the confirmation's lines
+      (`invoices/line-gst-words.ts`, from frozen sums). The site only
+      formats them (`gstPriceWords` and friends,
+      `packages/site-blocks/src/lib/gst-price.ts`): "₹1,000, includes
+      ₹152.54 GST (18%)" or "₹1,000 + ₹180 GST (18%)". A browsed price (a
+      card, a services list) shows the typed price and "+ GST" when it is
+      added (`gstAdded`). The merchant's counter previews its totals with
+      the same rule and takes the API's order as the truth.
+    - **A change to the choice, the registration, the GSTIN or the state
+      revalidates the business's published pages** (`prices`,
+      `backend-jobs.md` → Site page cache).
 - **GST shows only when it applies (DEC-072)** — presentation, on the
   paper, the PDF, the pay page and anything else a customer reads:
     - An unregistered business charges no GST, so its paper shows none: no
@@ -361,7 +419,9 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
 - **Every owed or spent sum over invoices spreads `OWED_WHERE`**
   (`invoice-state.ts`): no order paper, no credit notes.
 - **A registered business's `Order.tax` is informational** — the GST inside
-  the total, never added to it (`gstInsideOrder`).
+  the total, never added to it (`gstInsideOrder`). Under "GST is added" it
+  is still inside: the lines it is summed from are already the amount to
+  pay.
 
 ## Orders and the shelf — **Current** (#511, DEC-032)
 
@@ -610,7 +670,9 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
 - **Hold drafts are not the business's paper**: `NOT_A_BOOKING_HOLD` keeps
   an unnumbered booking invoice — and an unnumbered online pack draft
   (A11, below) — out of the invoice list and customer paper.
-- **The price is the service's, on the server.** The book request has no
+- **The price is the service's, on the server.** It is the amount to pay
+  as the business charges it (`service-price.ts`: the typed price, or with
+  GST added), frozen in the booking's snapshot. The book request has no
   amount field (the validation pipe refuses one); pay at the desk books
   CONFIRMED with `paidWith` DESK. A class credit online is below (A10,
   ADR-011).

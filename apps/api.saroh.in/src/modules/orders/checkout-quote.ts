@@ -1,4 +1,11 @@
 import { fromMinor, toMinor } from "../../common/money";
+import { rateToBps, taxLines } from "../invoices/gst";
+import type {
+    GstOnPrice,
+    GstPriceMode,
+    PriceTerms,
+} from "../invoices/gst-price";
+import { NO_GST_TERMS, sellUnit } from "../invoices/gst-price";
 import type { StorefrontFulfilmentType } from "./fulfilment";
 import {
     allowedTypes,
@@ -36,6 +43,9 @@ export interface QuoteListing {
         name: string;
         status: string;
         price: { toString(): string };
+        /** Its GST rate and its own price mode, for the amount to pay. */
+        gstRate?: { toString(): string } | null;
+        gstPriceMode?: string | null;
         /** The collection it sits in, for a collection-wide code. */
         categoryId?: string | null;
         stockTracked: boolean;
@@ -82,7 +92,19 @@ export interface QuotedLine {
     name: string;
     variantTitle: string | null;
     image: { url: string; alt: string } | null;
+    /**
+     * The amount to pay for one: the typed price, or under "GST is added"
+     * the typed price plus its GST (`invoices/gst-price.ts`). Every sum of
+     * the quote, the code and the order is made from it.
+     */
     unitCents: number;
+    /** The price the business typed, and what the line is charged under. */
+    listCents: number;
+    gstPriceMode: GstPriceMode | null;
+    /** The GST rate behind it; null when none was chosen or none applies. */
+    rateBps: number | null;
+    /** The customer's GST words for one unit; null when nothing is said. */
+    gst: GstOnPrice | null;
     quantity: number;
     state: LineState;
     /** How many can be sold, when that is a number (tracked, or sold out). */
@@ -122,6 +144,7 @@ export function quoteLines(
     listings: readonly QuoteListing[],
     shelves: readonly QuoteShelf[],
     businessTracks: boolean,
+    terms: PriceTerms = NO_GST_TERMS,
 ): QuotedLine[] {
     const byId = new Map(listings.map((l) => [l.id, l]));
     const joined = new Map<string, BagLine>();
@@ -153,6 +176,10 @@ export function quoteLines(
             variantTitle: null,
             image: shown?.cover ?? null,
             unitCents: 0,
+            listCents: 0,
+            gstPriceMode: null,
+            rateBps: null,
+            gst: null,
             quantity: line.quantity,
             state: "gone",
             available: 0,
@@ -172,7 +199,11 @@ export function quoteLines(
         } else if (line.variantId) {
             return gone();
         }
-        const unitCents = toMinor(variant?.price ?? product.price);
+        const unit = sellUnit(
+            toMinor(variant?.price ?? product.price),
+            { gstRate: product.gstRate, gstPriceMode: product.gstPriceMode },
+            terms,
+        );
 
         let state: LineState = "ok";
         let available: number | null = null;
@@ -198,7 +229,11 @@ export function quoteLines(
             name: product.name,
             variantTitle: variant?.title ?? null,
             image: product.cover,
-            unitCents,
+            unitCents: unit.payCents,
+            listCents: unit.listCents,
+            gstPriceMode: unit.mode,
+            rateBps: unit.mode ? rateToBps(product.gstRate) : null,
+            gst: unit.gst,
             quantity: line.quantity,
             state,
             available,
@@ -270,8 +305,8 @@ export function freeOverCents(fees: DeliveryFees): number | null {
 /**
  * What a way adds to this order, in minor units. `itemsCents` is what the
  * items come to after any code and before delivery: the bag's Subtotal less
- * its Code line. (A GST-registered business's prices already include GST,
- * ADR-008, so no tax sits between them.) At or above the storefront's "Free
+ * its Code line. (Each line is already the amount to pay, GST and all,
+ * ADR-008 and `invoices/gst-price.ts`, so no tax sits between them.) At or above the storefront's "Free
  * delivery over", Local delivery and Shipping add nothing; Pick-up never
  * adds anything.
  */
@@ -315,7 +350,13 @@ export interface CheckoutQuote {
         name: string;
         variantTitle: string | null;
         image: { url: string; alt: string } | null;
+        /** The amount to pay for one, GST and all. */
         unitPrice: string;
+        /**
+         * How that unit's price carries GST, for the words under it; null
+         * when nothing is said about GST. The site only formats it.
+         */
+        gst: GstOnPrice | null;
         quantity: number;
         amount: string;
         state: LineState;
@@ -336,6 +377,12 @@ export interface CheckoutQuote {
     /** Free delivery over an amount (`deliveryCents`); null when none. */
     freeDelivery: QuoteFreeDelivery | null;
     total: string;
+    /**
+     * The GST inside `total`, worked out as the order's invoice will work
+     * it out (the code spread over the lines first, delivery a taxed
+     * line); null for a business that charges none, or when there is none.
+     */
+    gst: string | null;
     /** Every line can be sold and a way is chosen: it can be paid for now. */
     ready: boolean;
 }
@@ -383,6 +430,11 @@ export function buildQuote(input: {
      * units when it applies.
      */
     discount?: { view: QuoteDiscount; cents: number } | null;
+    /**
+     * The business's GST standing, for the GST inside the total: absent, it
+     * charges none and the quote says nothing about GST.
+     */
+    tax?: { registered: boolean; deliveryRateBps: number } | null;
 }): CheckoutQuote {
     const ways = checkoutWays(input.lines, input.storefrontWays);
     const chosen =
@@ -404,6 +456,34 @@ export function buildQuote(input: {
     const delivery = chosen ? deliveryCents(chosen, input.fees, items) : 0;
     const over = freeOverCents(input.fees);
     const waivable = ways.some((type) => feeCents(type, input.fees) > 0);
+    // The GST inside the total, as the invoice derives it: the code spread
+    // over the lines before tax, delivery a line at the business's rate.
+    const gstCents = input.tax?.registered
+        ? taxLines(
+              [
+                  ...counted.map((l) => ({
+                      description: "",
+                      quantity: l.quantity,
+                      unitCents: l.unitCents,
+                      rateBps: l.rateBps,
+                      code: null,
+                  })),
+                  ...(delivery > 0
+                      ? [
+                            {
+                                description: "",
+                                quantity: 1,
+                                unitCents: delivery,
+                                rateBps: input.tax.deliveryRateBps,
+                                code: null,
+                                discountable: false,
+                            },
+                        ]
+                      : []),
+              ],
+              { registered: true, taxType: "INTRA", discountCents: off },
+          ).totals.taxCents
+        : 0;
     return {
         currency: input.currency,
         lines: input.lines.map((l) => ({
@@ -414,6 +494,7 @@ export function buildQuote(input: {
             variantTitle: l.variantTitle,
             image: l.image,
             unitPrice: fromMinor(l.unitCents),
+            gst: l.state === "gone" ? null : l.gst,
             quantity: l.quantity,
             amount: fromMinor(
                 l.state === "gone" ? 0 : l.unitCents * l.quantity,
@@ -442,6 +523,7 @@ export function buildQuote(input: {
                   }
                 : null,
         total: fromMinor(items + delivery),
+        gst: gstCents > 0 ? fromMinor(gstCents) : null,
         ready:
             input.lines.length > 0 &&
             input.lines.every((l) => l.state === "ok") &&

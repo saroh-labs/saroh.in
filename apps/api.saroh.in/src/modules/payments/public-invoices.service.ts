@@ -11,10 +11,12 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { holdState } from "../bookings/booking-hold";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import type { GstOnPrice } from "../invoices/gst-price";
 import { printedSeller } from "../invoices/invoice-paper-view";
 import type { InvoiceStanding } from "../invoices/invoice-state";
 import { invoiceStanding } from "../invoices/invoice-state";
 import { isBillOfSupply } from "../invoices/invoice-title";
+import { invoiceLineGst } from "../invoices/line-gst-words";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
 import { invoicePayOnline, NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { hashPayToken } from "../invoices/pay-token";
@@ -66,6 +68,12 @@ export interface PublicInvoiceView {
         quantity: number;
         unitPrice: string;
         amount: string;
+        /**
+         * How the line's amount carries GST, from what the invoice froze
+         * (`invoices/line-gst-words.ts`); null on a receipt, and on a line
+         * with no rate or an exempt one.
+         */
+        gst: GstOnPrice | null;
     }[];
     tax: string;
     total: string;
@@ -184,6 +192,11 @@ export async function invoicePaper(
                     unitPrice: true,
                     amount: true,
                     gstRate: true,
+                    taxableValue: true,
+                    cgst: true,
+                    sgst: true,
+                    igst: true,
+                    gstPriceMode: true,
                 },
             },
         },
@@ -212,6 +225,7 @@ export async function invoicePaper(
             quantity: l.quantity,
             unitPrice: toMoneyString(l.unitPrice),
             amount: toMoneyString(l.amount),
+            gst: invoiceLineGst(l),
         })),
         tax: toMoneyString(invoice.tax),
         total: toMoneyString(invoice.total),

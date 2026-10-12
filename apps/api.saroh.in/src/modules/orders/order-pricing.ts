@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { rateToBps } from "../invoices/gst";
+import type { GstPriceMode, PriceTerms } from "../invoices/gst-price";
+import { sellUnit } from "../invoices/gst-price";
 import { currencyMismatch, storefrontCurrency } from "../stores/currency";
 import type { OrderItemInput } from "./dto";
 
@@ -18,7 +20,15 @@ export interface PricedLine {
     productId: string;
     variantId: string | null;
     quantity: number;
+    /**
+     * The amount to pay for one unit: the typed price, or under "GST is
+     * added" the typed price plus its GST (`invoices/gst-price.ts`). What
+     * the order line records as its `price`, and every total is summed from.
+     */
     priceCents: number;
+    /** The price the business typed, and what the line is charged under. */
+    listCents: number;
+    gstPriceMode: GstPriceMode | null;
     categoryId: string | null;
     /** The product's name and the ways it allows (B12), for `assertItemsAllow`. */
     name: string;
@@ -70,7 +80,8 @@ export async function withGstRates(
 
 /**
  * Snapshot each line's price from what was bought: the variant's own price
- * when it has one, else the product's. A product with variants is bought as
+ * when it has one, else the product's, turned into the amount to pay under
+ * the product's own GST mode or the business's (`sellUnit`). A product with variants is bought as
  * one of them, so its line must say which. Shared by placing an order and
  * adding a line to one before preparing (U6), so the two can never price the
  * same thing differently.
@@ -78,6 +89,12 @@ export async function withGstRates(
 export async function priceOrderLines(
     storeId: string,
     items: readonly OrderItemInput[],
+    /**
+     * The business's GST standing, which prices the lines
+     * (`invoices/gst-price.ts`): `NO_GST_TERMS` for a storefront from
+     * before businesses, which charges no GST.
+     */
+    terms: PriceTerms,
 ): Promise<PricedLine[]> {
     const lines: PricedLine[] = [];
     // A business sells in one currency (DEC-030): a backstop for a listing
@@ -96,6 +113,8 @@ export async function priceOrderLines(
                 status: true,
                 categoryId: true,
                 fulfilmentTypes: true,
+                gstRate: true,
+                gstPriceMode: true,
                 variants: {
                     select: {
                         id: true,
@@ -165,11 +184,14 @@ export async function priceOrderLines(
                 field: "items",
             });
         }
+        const unit = sellUnit(toCents(unitPrice), product, terms);
         lines.push({
             productId: item.productId,
             variantId,
             quantity: item.quantity,
-            priceCents: toCents(unitPrice),
+            priceCents: unit.payCents,
+            listCents: unit.listCents,
+            gstPriceMode: unit.mode,
             categoryId: product.categoryId,
             name: product.name,
             fulfilmentTypes: product.fulfilmentTypes,

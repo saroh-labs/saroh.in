@@ -458,6 +458,8 @@ export class ProductsService {
                         supplierCode: dto.supplierCode ?? null,
                         gstRate: checkGstRate(dto.gstRate),
                         hsnCode: dto.hsnCode ?? null,
+                        // Null: priced the business's way.
+                        gstPriceMode: dto.gstPriceMode ?? null,
                         warranty: dto.warranty ?? null,
                         returnsMode: dto.returnsMode ?? "STOREFRONT",
                         returnsText: dto.returnsText ?? null,
@@ -695,6 +697,7 @@ export class ProductsService {
         if (has("price")) data.price = dto.price;
         if (has("gstRate")) data.gstRate = checkGstRate(dto.gstRate);
         if (has("hsnCode")) data.hsnCode = dto.hsnCode ?? null;
+        if (has("gstPriceMode")) data.gstPriceMode = dto.gstPriceMode ?? null;
         if (has("mrp")) data.mrp = dto.mrp ?? null;
         if (has("status")) {
             // Bringing an archived product back adds one to the plan's cap.

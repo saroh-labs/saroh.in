@@ -17,6 +17,9 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { GstPriceMode } from "../invoices/gst-price";
+import { GST_PRICE_MODES } from "../invoices/gst-price";
+
 /** Service lifecycle statuses. ACTIVE is bookable; ARCHIVED is not. */
 export const SERVICE_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
@@ -163,6 +166,18 @@ export class CreateServiceDto {
     @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
     sacCode?: string | null;
 
+    /**
+     * How this service's price carries GST when it differs from the
+     * business's way (`invoices/gst-price.ts`): INCLUDED or ADDED. null is
+     * "same as the business".
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsIn(GST_PRICE_MODES, {
+        message: "Choose whether this price includes GST or GST is added.",
+    })
+    gstPriceMode?: GstPriceMode | null;
+
     /** IANA timezone, e.g. "Asia/Kolkata". Validated against the tz database in the service. */
     @IsString()
     @MinLength(1)
@@ -275,6 +290,18 @@ export class UpdateServiceDto {
     @ValidateIf((_o, v) => v !== null)
     @Matches(/^\d{4,8}$/, { message: "A SAC code is 4 to 8 digits" })
     sacCode?: string | null;
+
+    /**
+     * How this service's price carries GST when it differs from the
+     * business's way (`invoices/gst-price.ts`): INCLUDED or ADDED. null is
+     * "same as the business".
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsIn(GST_PRICE_MODES, {
+        message: "Choose whether this price includes GST or GST is added.",
+    })
+    gstPriceMode?: GstPriceMode | null;
 
     @IsOptional()
     @IsString()

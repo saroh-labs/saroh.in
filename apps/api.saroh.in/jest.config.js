@@ -294,6 +294,14 @@ module.exports = {
         // invoice builder — pure.
         "<rootDir>/src/modules/invoices/gst.spec.ts",
         "<rootDir>/src/modules/invoices/gst-states.spec.ts",
+        // How a price carries GST (12 Oct 2026): the one sum, pure.
+        "<rootDir>/src/modules/invoices/gst-price.spec.ts",
+        // The paper, the bag and a staff order's lines under each mode,
+        // and a credit note after the business changes its mind: pure, or
+        // a jest-mocked Prisma. gst-price-mode.db.spec.ts needs Postgres.
+        "<rootDir>/src/modules/invoices/order-invoice-price-mode.spec.ts",
+        "<rootDir>/src/modules/orders/checkout-quote-gst.spec.ts",
+        "<rootDir>/src/modules/orders/order-pricing-gst.spec.ts",
         "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         // Which refunds make no credit note — a jest-mocked transaction.
         "<rootDir>/src/modules/invoices/order-invoicing.spec.ts",

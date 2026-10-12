@@ -1,3 +1,4 @@
+import type { GstOnPrice } from "../invoices/gst-price";
 import { stockLine } from "./product-overview";
 
 /**
@@ -37,8 +38,14 @@ export interface PublicImage {
 export interface PublicVariant {
     id: string;
     title: string;
+    /** Its own typed price; null is the product's. */
     price: string | null;
     mrp: string | null;
+    /**
+     * How the price this option sells at carries GST, with the amount to
+     * pay; null when nothing is said about GST.
+     */
+    gst: GstOnPrice | null;
     imageId: string | null;
     stock: PublicStockWord;
     left: number | null;
@@ -53,6 +60,12 @@ export interface PublicCatalogueCard {
     price: string;
     mrp: string | null;
     priceFrom: boolean;
+    /**
+     * GST is added to that price at checkout, so the card says "+ GST"
+     * after it (`invoices/gst-price.ts`). False where the price includes
+     * GST, or none is charged.
+     */
+    gstAdded: boolean;
     /** The cover, or null. A video's poster stands in for a video cover. */
     image: { url: string; alt: string } | null;
     /** "Small · Large", when it is chosen by variant. */
@@ -106,8 +119,15 @@ export interface PublicProduct {
     listingId: string;
     name: string;
     currency: string;
+    /** The price the business typed. */
     price: string;
     mrp: string | null;
+    /**
+     * How that price carries GST, with the amount to pay, worked out by the
+     * API; null when nothing is said about GST (not registered, no rate,
+     * exempt). The page only formats it.
+     */
+    gst: GstOnPrice | null;
     categoryName: string | null;
     description: string | null;
     keyPoints: string[];

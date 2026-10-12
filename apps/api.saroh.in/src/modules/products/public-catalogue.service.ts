@@ -7,11 +7,14 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { toMinor } from "../../common/money";
 import { keptByCut } from "../billing/over-limit";
 import { overLimit } from "../billing/over-limit.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { sellUnit } from "../invoices/gst-price";
+import { loadPriceTerms } from "../invoices/price-terms";
 import {
     commerceOpen,
     effectiveStorefront,
@@ -141,6 +144,8 @@ const CARD_SELECT = {
             price: true,
             mrp: true,
             currency: true,
+            gstRate: true,
+            gstPriceMode: true,
             stockTracked: true,
             // The product's own category, for the shop's chips.
             category: { select: { name: true } },
@@ -305,12 +310,13 @@ export class PublicCatalogueService {
         listings: readonly OfferedListing[],
     ): Promise<PublicCatalogueCard[]> {
         if (listings.length === 0) return [];
-        const [rows, businessTracks] = await Promise.all([
+        const [rows, businessTracks, terms] = await Promise.all([
             this.shelves(
                 scope,
                 listings.map((l) => l.product.id),
             ),
             businessTracksStock(prisma, scope.organizationId),
+            loadPriceTerms(prisma, scope.organizationId),
         ]);
         return listings.map(({ listing, offered }) => {
             const p = listing.product;
@@ -352,6 +358,9 @@ export class PublicCatalogueService {
                         mrp: money(v.mrp),
                     })),
                 ),
+                // The price is only being browsed here: the card adds
+                // "+ GST" when GST comes on top at checkout.
+                gstAdded: sellUnit(toMinor(p.price), p, terms).mode === "ADDED",
                 image: cover
                     ? cover.kind === "video"
                         ? cover.posterUrl
@@ -405,6 +414,8 @@ export class PublicCatalogueService {
                     price: true,
                     mrp: true,
                     currency: true,
+                    gstRate: true,
+                    gstPriceMode: true,
                     stockTracked: true,
                     shopFields: true,
                     howToUse: true,
@@ -457,10 +468,11 @@ export class PublicCatalogueService {
             const offered = p.variants.filter((v) => listed.has(v.id));
             if (p.variants.length > 0 && offered.length === 0) notFound();
 
-            const [rows, businessTracks, reviews] = await Promise.all([
+            const [rows, businessTracks, reviews, terms] = await Promise.all([
                 this.shelves(scope, [p.id]),
                 businessTracksStock(prisma, scope.organizationId),
                 this.reviews(scope, p.id, p.variants),
+                loadPriceTerms(prisma, scope.organizationId),
             ]);
             const tracked = p.stockTracked && businessTracks;
             const markedSoldOut = listing.soldOutAt !== null;
@@ -482,6 +494,7 @@ export class PublicCatalogueService {
                 currency: p.currency,
                 price: money(p.price) ?? "0.00",
                 mrp: money(p.mrp),
+                gst: sellUnit(toMinor(p.price), p, terms).gst,
                 categoryName: p.category?.name ?? null,
                 description: p.description,
                 keyPoints: shown("keyPoints") ? p.keyPoints : [],
@@ -522,6 +535,10 @@ export class PublicCatalogueService {
                         title: v.title,
                         price: money(v.price),
                         mrp: money(v.mrp),
+                        // At the price it sells at: its own, else the
+                        // product's, as the bag will price it.
+                        gst: sellUnit(toMinor(v.price ?? p.price), p, terms)
+                            .gst,
                         imageId: v.imageId,
                         stock: stock.word,
                         left: stock.left,
