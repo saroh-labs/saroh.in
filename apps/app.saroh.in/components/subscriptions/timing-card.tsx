@@ -42,9 +42,10 @@ export function TimingCard({
             className={cn(
                 "group relative flex min-w-0 flex-col gap-1 rounded-[10px] border px-3 py-2.5 transition-colors duration-fast",
                 "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
-                checked
-                    ? "border-border-strong bg-foreground"
-                    : "border-border bg-card",
+                // The picked card is marked by its outline and its dot, as
+                // the other choice cards are. It was filled with the text's
+                // own colour, which hid its title.
+                checked ? "border-foreground bg-card" : "border-border bg-card",
                 disabled
                     ? "cursor-default opacity-80"
                     : "cursor-pointer hover:border-foreground/30 hover:bg-muted/50 active:bg-muted",
@@ -65,9 +66,7 @@ export function TimingCard({
                     aria-hidden
                     className={cn(
                         "mt-[3px] grid size-4 shrink-0 place-items-center rounded-full border",
-                        checked
-                            ? "border-border-strong"
-                            : "border-foreground/40",
+                        checked ? "border-foreground" : "border-foreground/40",
                     )}
                 >
                     {checked ? (
