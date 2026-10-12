@@ -119,6 +119,8 @@ describe("applying it", () => {
                 }),
             },
             storeSettings: db.storeSettings,
+            // Each row's price history entry.
+            auditEvent: { create: jest.fn() },
         };
         transaction.mockImplementation((fn: (client: typeof tx) => unknown) =>
             fn(tx),

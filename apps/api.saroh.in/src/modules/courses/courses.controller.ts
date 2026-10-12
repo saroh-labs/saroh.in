@@ -16,6 +16,7 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { PriceHistoryQueryDto } from "../audit/price-history.dto";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { CoursesService } from "./courses.service";
@@ -55,6 +56,16 @@ export class CoursesController {
     @Get(":courseId")
     get(@OrgContext() ctx: OrganizationContext, @Param("courseId") id: string) {
         return this.courses.get(ctx, id);
+    }
+
+    /** The course's price history, newest first. `course:read`. */
+    @Get(":courseId/price-history")
+    priceHistory(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("courseId") id: string,
+        @Query() query: PriceHistoryQueryDto,
+    ) {
+        return this.courses.priceHistory(ctx, id, query);
     }
 
     @Post()

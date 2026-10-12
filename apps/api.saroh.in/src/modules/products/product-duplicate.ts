@@ -1,6 +1,12 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import type { PriceActor } from "../audit/price-history";
+import {
+    optionFacts,
+    productFacts,
+    recordPrices,
+} from "../audit/price-history";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { assertSameCurrency } from "../stores/currency";
 import type { MrpJudged } from "./product-rules";
@@ -71,7 +77,13 @@ async function freeCopyNumber(
  */
 export async function duplicateProduct(
     tx: Tx,
-    input: { organizationId: string; productId: string; storeId: string },
+    input: {
+        organizationId: string;
+        productId: string;
+        storeId: string;
+        /** Who is copying: the copy's price history starts with them. */
+        actor: PriceActor;
+    },
 ): Promise<string> {
     const { organizationId, productId, storeId } = input;
     const source = await tx.product.findFirst({
@@ -167,8 +179,18 @@ export async function duplicateProduct(
             stockTracked: source.stockTracked,
             stockTrackedAt: source.stockTracked ? new Date() : null,
         },
-        select: { id: true },
+        select: { id: true, name: true },
     });
+    // The copy starts its own price history, at the original's values.
+    const priced = { kind: "PRODUCT", id: copy.id, name: copy.name } as const;
+    await recordPrices(
+        tx,
+        input.actor,
+        { ...priced, currency: source.currency },
+        null,
+        productFacts(source),
+        "copy",
+    );
 
     // Photos and videos by reference, only the business's own media.
     const mediaIds = source.images.flatMap((i) =>
@@ -239,6 +261,19 @@ export async function duplicateProduct(
             select: { id: true },
         });
         variantIds.set(variant.id, made.id);
+        // An option with a price or an MRP of its own starts its history.
+        await recordPrices(
+            tx,
+            input.actor,
+            {
+                ...priced,
+                currency: source.currency,
+                option: { id: made.id, title: variant.title },
+            },
+            null,
+            optionFacts(variant),
+            "copy",
+        );
     }
     const asCopy = (variantId: string | null) =>
         variantId === null ? null : (variantIds.get(variantId) ?? null);

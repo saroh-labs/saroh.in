@@ -106,6 +106,10 @@ module.exports = {
         "<rootDir>/src/modules/products/over-mrp.spec.ts",
         "<rootDir>/src/modules/imports/product-mrp.spec.ts",
         "<rootDir>/src/modules/imports/imports.mrp.spec.ts",
+        // Price history (12 Oct 2026): a jest-mocked Prisma, unit project.
+        // price-history.db.spec.ts runs here.
+        "<rootDir>/src/modules/products/products.price-history.spec.ts",
+        "<rootDir>/src/modules/imports/imports.price-history.spec.ts",
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
         "<rootDir>/src/modules/products/product-overview.spec.ts",
         "<rootDir>/src/modules/catalogue/catalogue-defaults.spec.ts",

@@ -10,6 +10,14 @@ import { prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
+import type { PriceHistoryPage } from "../audit/price-history";
+import {
+    moneyFact,
+    priceActor,
+    productFacts,
+    readPriceHistory,
+    recordPrices,
+} from "../audit/price-history";
 import { planMeter } from "../billing/metering.service";
 import {
     checkProductAllergens,
@@ -425,6 +433,25 @@ export class ProductsService {
         return { ...detail, customFields, allergens, variantPromises };
     }
 
+    /**
+     * The product's price history, newest first: its own entries and its
+     * options'. For whoever may read the business's products (the caller
+     * resolved `organizationId` with `store:read`); a product of another
+     * business is not found.
+     */
+    async priceHistory(
+        organizationId: string,
+        productId: string,
+        page: { limit?: number; cursor?: string } = {},
+    ): Promise<PriceHistoryPage> {
+        const product = await prisma.product.findFirst({
+            where: { id: productId, organizationId },
+            select: { id: true },
+        });
+        if (!product) throw new NotFoundException("Product not found");
+        return readPriceHistory(organizationId, "PRODUCT", productId, page);
+    }
+
     /** Store-route alias of `createIn`: made and listed at `storeId`. */
     async create(storeId: string, userId: string, dto: CreateProductDto) {
         return this.createIn(
@@ -542,13 +569,31 @@ export class ProductsService {
                             dto.fulfilmentTypes ?? [],
                         ),
                     },
-                    select: { id: true },
+                    select: { id: true, currency: true },
                 });
                 await listAt(tx, {
                     organizationId,
                     productId: product.id,
                     storeId,
                 });
+                // Its first price history entry: what it starts at.
+                await recordPrices(
+                    tx,
+                    priceActor(scope),
+                    {
+                        kind: "PRODUCT",
+                        id: product.id,
+                        name: dto.name,
+                        currency: product.currency,
+                    },
+                    null,
+                    productFacts({
+                        price: dto.price,
+                        mrp: dto.mrp,
+                        gstRate: dto.gstRate,
+                        gstPriceMode: dto.gstPriceMode,
+                    }),
+                );
                 return product.id;
             });
         } catch (error) {
@@ -597,7 +642,7 @@ export class ProductsService {
         const { organizationId } = scope;
         const current = await prisma.product.findFirst({
             where: { id: productId, organizationId },
-            select: { slug: true, status: true, ...MRP_SELECT },
+            select: { name: true, slug: true, status: true, ...MRP_SELECT },
         });
         if (!current) {
             throw new NotFoundException("Product not found");
@@ -650,29 +695,45 @@ export class ProductsService {
             await planMeter.assertRoom(organizationId, "products");
 
         try {
-            await prisma.product.update({
-                where: { id: productId },
-                data: {
-                    name: dto.name,
-                    slug,
-                    description: cleanDescription(dto.description),
-                    image: dto.image ?? null,
-                    categoryId: dto.categoryId ?? null,
-                    price: dto.price,
-                    ...(dto.currency ? { currency: dto.currency } : {}),
-                    ...(dto.status
-                        ? {
-                              status: dto.status,
-                              // As patch() does: stamped on the way in,
-                              // cleared on the way out.
-                              ...(dto.status !== "ARCHIVED"
-                                  ? { archivedAt: null }
-                                  : current.status !== "ARCHIVED"
-                                    ? { archivedAt: new Date() }
-                                    : {}),
-                          }
-                        : {}),
-                },
+            // The save and its price history entry stand or fall together.
+            await prisma.$transaction(async (tx) => {
+                await tx.product.update({
+                    where: { id: productId },
+                    data: {
+                        name: dto.name,
+                        slug,
+                        description: cleanDescription(dto.description),
+                        image: dto.image ?? null,
+                        categoryId: dto.categoryId ?? null,
+                        price: dto.price,
+                        ...(dto.currency ? { currency: dto.currency } : {}),
+                        ...(dto.status
+                            ? {
+                                  status: dto.status,
+                                  // As patch() does: stamped on the way in,
+                                  // cleared on the way out.
+                                  ...(dto.status !== "ARCHIVED"
+                                      ? { archivedAt: null }
+                                      : current.status !== "ARCHIVED"
+                                        ? { archivedAt: new Date() }
+                                        : {}),
+                              }
+                            : {}),
+                    },
+                });
+                const was = productFacts(current);
+                await recordPrices(
+                    tx,
+                    priceActor(scope),
+                    {
+                        kind: "PRODUCT",
+                        id: productId,
+                        name: dto.name,
+                        currency: dto.currency ?? current.currency,
+                    },
+                    was,
+                    { ...was, price: moneyFact(dto.price) },
+                );
             });
             await this.productChanged(organizationId, productId);
             return { id: productId };
@@ -716,6 +777,7 @@ export class ProductsService {
         const current = await prisma.product.findFirst({
             where: { id: productId, organizationId },
             select: {
+                name: true,
                 slug: true,
                 ...MRP_SELECT,
                 madeHere: true,
@@ -899,7 +961,27 @@ export class ProductsService {
         }
         if (Object.keys(data).length > 0) {
             try {
-                await prisma.product.update({ where: { id: productId }, data });
+                // The save and its price history entry stand or fall
+                // together; a save that moved nothing about the cost
+                // records nothing.
+                await prisma.$transaction(async (tx) => {
+                    await tx.product.update({
+                        where: { id: productId },
+                        data,
+                    });
+                    await recordPrices(
+                        tx,
+                        priceActor(scope),
+                        {
+                            kind: "PRODUCT",
+                            id: productId,
+                            name: dto.name ?? current.name,
+                            currency: current.currency,
+                        },
+                        productFacts(current),
+                        productFacts(judged),
+                    );
+                });
             } catch (error) {
                 if (!isSlugClash(error)) throw error;
                 throw new ConflictException({
@@ -937,6 +1019,7 @@ export class ProductsService {
                     organizationId,
                     productId,
                     storeId,
+                    actor: priceActor(scope),
                 });
             });
         } catch (error) {

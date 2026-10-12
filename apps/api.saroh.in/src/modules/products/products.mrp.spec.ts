@@ -19,6 +19,9 @@ jest.mock("@saroh/database", () => {
         },
         businessProfile: { findUnique: jest.fn() },
         storeSettings: { findUnique: jest.fn() },
+        // A save's price history entry (`audit/price-history.ts`), written
+        // beside it; what it says is `price-history.writes.spec.ts`'s.
+        auditEvent: { create: jest.fn() },
         $transaction: jest.fn(),
     };
     return { prisma: client };
@@ -213,6 +216,13 @@ describe("creating a product", () => {
 
 describe("saving a section of a product", () => {
     const patch = (dto: PatchProductDto) => products.patchIn(scope, "p_1", dto);
+
+    // A section's save writes inside a transaction: run it on the fake.
+    beforeEach(() => {
+        (prisma.$transaction as jest.Mock).mockImplementation(
+            (work: (tx: typeof db) => unknown) => work(db),
+        );
+    });
 
     it("a price that GST takes over the stored MRP is refused on the price", async () => {
         stored({ price: "900", mrp: "1100" });
@@ -483,6 +493,7 @@ describe("copying a product", () => {
             organizationId: "org_1",
             productId: "p_1",
             storeId: "st_1",
+            actor: { organizationId: "org_1", userId: "u_1" },
         });
     /** The copy got past the MRP rule: its next read is the free suffix. */
     const PAST = new Error("past the MRP rule");

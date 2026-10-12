@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { optionFacts, priceActor, recordPrices } from "../audit/price-history";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { variantHasHistory, variantHasStock } from "../stock/stock-words";
@@ -96,7 +97,11 @@ export class VariantsService {
         dto: CreateVariantDto,
     ) {
         const { organizationId } = scope;
-        await this.assertCoherent(organizationId, productId, dto);
+        const product = await this.assertCoherent(
+            organizationId,
+            productId,
+            dto,
+        );
 
         const last = await prisma.productVariant.findFirst({
             where: { productId },
@@ -120,6 +125,21 @@ export class VariantsService {
                         position: (last?.position ?? -1) + 1,
                     },
                 });
+                // An option with a price or an MRP of its own starts its
+                // price history; one that takes the product's has none.
+                await recordPrices(
+                    tx,
+                    priceActor(scope),
+                    {
+                        kind: "PRODUCT",
+                        id: productId,
+                        name: product.name,
+                        currency: product.currency,
+                        option: { id: created.id, title: created.title },
+                    },
+                    null,
+                    optionFacts(created),
+                );
                 // Sold wherever the product is listed.
                 const listings = await tx.productListing.findMany({
                     where: { productId },
@@ -190,22 +210,43 @@ export class VariantsService {
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
-        await this.assertCoherent(scope.organizationId, productId, dto, {
-            price: variant.price?.toString() ?? null,
-            mrp: variant.mrp?.toString() ?? null,
-        });
+        const product = await this.assertCoherent(
+            scope.organizationId,
+            productId,
+            dto,
+            {
+                price: variant.price?.toString() ?? null,
+                mrp: variant.mrp?.toString() ?? null,
+            },
+        );
         try {
-            await prisma.productVariant.update({
-                where: { id: variantId },
-                data: {
-                    sku: dto.sku,
-                    title: dto.title,
-                    price: dto.price ?? null,
-                    mrp: dto.mrp ?? null,
-                    image: dto.image ?? null,
-                    optionValueId: dto.optionValueId ?? null,
-                    imageId: dto.imageId ?? null,
-                },
+            // The save and its price history entry stand or fall together.
+            await prisma.$transaction(async (tx) => {
+                const saved = await tx.productVariant.update({
+                    where: { id: variantId },
+                    data: {
+                        sku: dto.sku,
+                        title: dto.title,
+                        price: dto.price ?? null,
+                        mrp: dto.mrp ?? null,
+                        image: dto.image ?? null,
+                        optionValueId: dto.optionValueId ?? null,
+                        imageId: dto.imageId ?? null,
+                    },
+                });
+                await recordPrices(
+                    tx,
+                    priceActor(scope),
+                    {
+                        kind: "PRODUCT",
+                        id: productId,
+                        name: product.name,
+                        currency: product.currency,
+                        option: { id: variantId, title: saved.title },
+                    },
+                    optionFacts(variant),
+                    optionFacts(saved),
+                );
             });
             // Its price is on the product's page and its cards (#863).
             await enqueuePageRevalidation(prisma, {
@@ -426,10 +467,11 @@ export class VariantsService {
         productId: string,
         dto: CreateVariantDto,
         stored?: { price: string | null; mrp: string | null },
-    ): Promise<void> {
+    ): Promise<{ name: string; currency: string }> {
         const product = await prisma.product.findUniqueOrThrow({
             where: { id: productId },
             select: {
+                name: true,
                 price: true,
                 mrp: true,
                 optionId: true,
@@ -474,11 +516,11 @@ export class VariantsService {
             cents(stored.price) === cents(dto.price) &&
             cents(stored.mrp) === cents(dto.mrp)
         ) {
-            return;
+            return product;
         }
         const price = dto.price ?? product.price.toString();
         const mrp = dto.mrp ?? product.mrp?.toString() ?? null;
-        if (mrp === null) return;
+        if (mrp === null) return product;
         assertMrpAtOrAbovePrice(price, mrp, dto.mrp ? "mrp" : "price", {
             item: {
                 gstRate: product.gstRate,
@@ -487,6 +529,7 @@ export class VariantsService {
             terms: await loadPriceTerms(prisma, organizationId),
             currency: product.currency,
         });
+        return product;
     }
 }
 

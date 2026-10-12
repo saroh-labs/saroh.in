@@ -5,11 +5,18 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma, Service } from "@saroh/database";
-import { Prisma as PrismaNamespace, prisma } from "@saroh/database";
+import { prisma, Prisma as PrismaNamespace } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { PricedItem, PriceHistoryPage } from "../audit/price-history";
+import {
+    courseFacts,
+    priceActor,
+    readPriceHistory,
+    recordPrices,
+} from "../audit/price-history";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { BookingsService } from "../bookings/bookings.service";
 import { assertBusinessDetails } from "../invoices/business-details";
@@ -45,6 +52,30 @@ import type {
 } from "./dto";
 
 type Tx = Prisma.TransactionClient;
+
+/** What a course's price history entry is written from. */
+const PRICED_COURSE = {
+    id: true,
+    name: true,
+    price: true,
+    currency: true,
+    gstRate: true,
+    gstPriceMode: true,
+} as const;
+
+/** A course as its price history entry names it. */
+function pricedCourse(course: {
+    id: string;
+    name: string;
+    currency: string;
+}): PricedItem {
+    return {
+        kind: "COURSE",
+        id: course.id,
+        name: course.name,
+        currency: course.currency,
+    };
+}
 
 const LIST_LIMIT = 500;
 const MINUTE_MS = 60_000;
@@ -284,6 +315,25 @@ export class CoursesService {
         };
     }
 
+    /**
+     * What the course has cost: each change, who made it and when, newest
+     * first. `course:read`, as the course's own page asks; another
+     * business's course is not found.
+     */
+    async priceHistory(
+        ctx: OrganizationContext,
+        id: string,
+        page: { limit?: number; cursor?: string } = {},
+    ): Promise<PriceHistoryPage> {
+        authorize(ctx, "course:read");
+        const course = await prisma.course.findFirst({
+            where: { id, organizationId: ctx.organizationId },
+            select: { id: true },
+        });
+        if (!course) notFound("Course");
+        return readPriceHistory(ctx.organizationId, "COURSE", id, page);
+    }
+
     async create(
         ctx: OrganizationContext,
         dto: CourseInputDto,
@@ -311,22 +361,34 @@ export class CoursesService {
             fieldError("A new course cannot start archived", "status");
         }
 
-        const created = await prisma.course.create({
-            data: {
-                organizationId,
-                serviceId: service.id,
-                name: dto.name,
-                description: dto.description ?? null,
-                price: dto.price,
-                currency,
-                ...gstColumns(dto),
-                seats: dto.seats,
-                status,
-                sessions: {
-                    create: sessions.map((s) => ({ organizationId, ...s })),
-                },
+        const data = {
+            organizationId,
+            serviceId: service.id,
+            name: dto.name,
+            description: dto.description ?? null,
+            price: dto.price,
+            currency,
+            ...gstColumns(dto),
+            seats: dto.seats,
+            status,
+            sessions: {
+                create: sessions.map((s) => ({ organizationId, ...s })),
             },
-            select: { id: true },
+        };
+        // The course and its first price history entry are made together.
+        const created = await prisma.$transaction(async (tx) => {
+            const made = await tx.course.create({
+                data,
+                select: PRICED_COURSE,
+            });
+            await recordPrices(
+                tx,
+                priceActor(ctx),
+                pricedCourse(made),
+                null,
+                courseFacts(made),
+            );
+            return made;
         });
         return this.get(ctx, created.id);
     }
@@ -355,6 +417,7 @@ export class CoursesService {
             const course = await tx.course.findFirst({
                 where: { id, organizationId },
                 select: {
+                    ...PRICED_COURSE,
                     serviceId: true,
                     status: true,
                     service: { select: { capacity: true } },
@@ -411,8 +474,9 @@ export class CoursesService {
                     }
                 }
             }
-            await tx.course.update({
+            const saved = await tx.course.update({
                 where: { id },
+                select: PRICED_COURSE,
                 data: {
                     ...(dto.name !== undefined ? { name: dto.name } : {}),
                     ...(dto.description !== undefined
@@ -432,6 +496,14 @@ export class CoursesService {
                     ...gst,
                 },
             });
+            // In the save's own transaction: nothing moved, nothing kept.
+            await recordPrices(
+                tx,
+                priceActor(ctx),
+                pricedCourse(saved),
+                courseFacts(course),
+                courseFacts(saved),
+            );
         });
         return this.get(ctx, id);
     }

@@ -82,6 +82,9 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/capabilities.controller.spec.ts",
         // DEC-068 Turn on: the setup payload's shapes (pure, no DB).
         "<rootDir>/src/modules/capabilities/setup/module-setup.parse.spec.ts",
+        // Price history (12 Oct 2026): the first service Bookings makes
+        // starts its own, on a fake transaction.
+        "<rootDir>/src/modules/capabilities/setup/module-setup.price-history.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
         // #117: the guard's shadow/refused log lines and their throttle, the
@@ -186,6 +189,10 @@ module.exports = {
         // with, with a jest-mocked Prisma. mrp-includes-gst.db.spec.ts
         // needs Postgres.
         "<rootDir>/src/modules/products/products.mrp.spec.ts",
+        // Price history (12 Oct 2026): one entry on every product and
+        // option write, and the per-item read, with a jest-mocked Prisma.
+        // price-history.db.spec.ts needs Postgres.
+        "<rootDir>/src/modules/products/products.price-history.spec.ts",
         "<rootDir>/src/modules/products/over-mrp.spec.ts",
         // #519 the Products list's "Needs you": pure.
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",

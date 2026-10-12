@@ -16,6 +16,7 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { PriceHistoryQueryDto } from "../audit/price-history.dto";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { SetSoldOutDto, SetStockTrackingDto } from "../stock/dto";
@@ -122,6 +123,20 @@ export class OrganizationProductsController {
             await this.access.read(ctx, productId, storefront),
             productId,
         );
+    }
+
+    /**
+     * What the product and its options have cost: each change, who made it
+     * and when, newest first. `store:read`, as the product page asks.
+     */
+    @Get(":productId/price-history")
+    priceHistory(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("productId") productId: string,
+        @Query() query: PriceHistoryQueryDto,
+    ) {
+        const { organizationId } = this.access.business(ctx);
+        return this.products.priceHistory(organizationId, productId, query);
     }
 
     /** One editor section's save; returns the whole product. */
