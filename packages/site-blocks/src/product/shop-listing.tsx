@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
 import { browsePriceWords } from "../lib/gst-price";
+import type { MrpSaving } from "../lib/mrp-saving";
+import { shownSaving } from "../lib/mrp-saving";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { BusinessReach } from "../reach-links";
@@ -13,7 +15,7 @@ import { addToBag, onBagShown, openBag, useBag } from "../shop/bag-store";
 import { SitePageState } from "../shop/page-state";
 import { NamePlate } from "./name-plate";
 import { chooseLabel, optionSummary } from "./option-summary";
-import { formatAmount, percentOff } from "./product-page";
+import { formatAmount } from "./product-page";
 
 /**
  * The shop on a merchant's site (round-2 G11): `/shop`, a grid of every
@@ -46,6 +48,27 @@ import { formatAmount, percentOff } from "./product-page";
  * full width, 44px, under the price at every width.
  */
 
+/**
+ * The MRP a card strikes through, or null: the API's saving, which compares
+ * the MRP with the amount to pay (`lib/mrp-saving.ts`). A card with "From"
+ * before its price shows none, since the MRP is one option's. With no
+ * answer from the API, a price GST is still to be added to is not the
+ * amount to pay, so no saving is claimed beside it.
+ */
+export function cardSaving(
+    card: Pick<
+        ShopListingCard,
+        "price" | "mrp" | "priceFrom" | "gstAdded" | "saving"
+    >,
+): MrpSaving | null {
+    if (card.priceFrom) return null;
+    return shownSaving(
+        card.saving,
+        card.gstAdded === true ? null : card.price,
+        card.mrp,
+    );
+}
+
 /** One product on the shop, as the public catalogue serves it. */
 export interface ShopListingCard {
     slug: string;
@@ -60,6 +83,13 @@ export interface ShopListingCard {
      * the amount to pay is no surprise. Absent from an older API: no.
      */
     gstAdded?: boolean;
+    /**
+     * The saving against the MRP at what is paid for that price, GST and
+     * all, worked out by the API; null for none. Absent from an older API:
+     * the card then strikes an MRP through only beside a price that is
+     * itself the amount to pay (`cardSaving`).
+     */
+    saving?: MrpSaving | null;
     image: { url: string; alt: string } | null;
     variantTitles: string[];
     /**
@@ -277,6 +307,7 @@ export default function ShopListing({
                             formatAmount(p.price, p.currency, locale),
                             p.gstAdded === true,
                         );
+                        const saving = cardSaving(p);
                         const canAdd = Boolean(bagSite && p.listingId);
                         const href = `${basePath}/${encodeURIComponent(p.slug)}`;
                         // Several options: chosen on the product's page.
@@ -388,16 +419,16 @@ export default function ShopListing({
                                             {p.priceFrom
                                                 ? `From ${amount}`
                                                 : amount}
-                                            {p.mrp &&
-                                            !p.priceFrom &&
-                                            percentOff(p.price, p.mrp) !==
-                                                null ? (
-                                                <span className="text-site-muted text-sm font-normal line-through">
+                                            {saving ? (
+                                                <span
+                                                    data-card-mrp=""
+                                                    className="text-site-muted text-sm font-normal line-through"
+                                                >
                                                     <span className="sr-only">
                                                         MRP{" "}
                                                     </span>
                                                     {formatAmount(
-                                                        p.mrp,
+                                                        saving.mrp,
                                                         p.currency,
                                                         locale,
                                                     )}

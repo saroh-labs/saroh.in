@@ -30,9 +30,10 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
 }));
 
+const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: vi.fn(),
-    showError: vi.fn(),
+    showError: (...args: unknown[]) => showError(...args) as unknown,
 }));
 
 // The category picker opens a popover of its own; it isn't under test.
@@ -85,6 +86,7 @@ beforeEach(() => {
     root = createRoot(host);
     patchProduct.mockReset();
     patchProduct.mockResolvedValue({ ok: true, data: {} });
+    showError.mockReset();
 });
 
 afterEach(() => {
@@ -244,5 +246,121 @@ describe("GST on this price", () => {
     it("is off for someone who can't change products", () => {
         render({ canWrite: false });
         expect(modeSelect()?.disabled).toBe(true);
+    });
+});
+
+/**
+ * GST is part of MRP (12 Oct 2026): where GST is added to this price, the
+ * MRP's own line says the amount to pay, and an MRP under that amount is
+ * said in place, before Save and when the API refuses.
+ */
+describe("the amount to pay beside the MRP", () => {
+    /** The MRP field: its label's own wrapper. */
+    const mrpField = () =>
+        host
+            .querySelector('label[for="pe-mrp"]')
+            ?.closest('[data-slot="field"]') ?? null;
+    const mrpHint = () =>
+        mrpField()?.querySelector('[data-slot="field-hint"]')?.textContent ??
+        null;
+    const mrpError = () =>
+        mrpField()?.querySelector('[data-slot="field-error"]')?.textContent ??
+        null;
+    const OVER =
+        "With 18% GST added this is ₹1,180 to pay, more than its MRP of ₹1,100. Lower the price, raise the MRP, or set this product's price to include GST.";
+
+    it("says what one costs to pay where the business adds GST: ₹1,000 + 18% is ₹1,180", () => {
+        render({ businessPriceMode: "ADDED" });
+        expect(mrpHint()).toBe(
+            "The printed price, which includes GST. ₹1,180 to pay with 18% GST, so the MRP can't be lower.",
+        );
+        expect(mrpError()).toBeNull();
+    });
+
+    it("says it for a product set to GST is added on its own, and not for one set to Includes GST", () => {
+        render({
+            businessPriceMode: "INCLUDED",
+            product: product({ gstPriceMode: "ADDED" }),
+        });
+        expect(mrpHint()).toContain("₹1,180 to pay with 18% GST");
+        render({
+            businessPriceMode: "ADDED",
+            product: product({ gstPriceMode: "INCLUDED" }),
+        });
+        expect(mrpHint()).toBe(
+            "The printed price, shown struck through. Leave it empty if it sells at MRP.",
+        );
+    });
+
+    it("changes nothing while prices include GST, or for a business that isn't registered", () => {
+        render({ businessPriceMode: "INCLUDED" });
+        expect(mrpHint()).toBe(
+            "The printed price, shown struck through. Leave it empty if it sells at MRP.",
+        );
+        expect(host.textContent).not.toContain("to pay");
+        // ₹1,000 against an MRP of ₹1,100 is fine as it always was.
+        render({
+            businessPriceMode: "INCLUDED",
+            product: product({ mrp: "1100.00" }),
+        });
+        expect(mrpError()).toBeNull();
+        render({
+            registered: false,
+            businessPriceMode: null,
+            product: product({ mrp: "1100.00" }),
+        });
+        expect(mrpError()).toBeNull();
+        expect(host.textContent).not.toContain("to pay");
+    });
+
+    it("says an MRP under the amount to pay in place, with the sums, and not one at exactly that amount", () => {
+        render({
+            businessPriceMode: "ADDED",
+            product: product({ mrp: "1100.00" }),
+        });
+        expect(mrpError()).toBe(OVER);
+        render({
+            businessPriceMode: "ADDED",
+            product: product({ mrp: "1180.00" }),
+        });
+        expect(mrpError()).toBeNull();
+        render({
+            businessPriceMode: "ADDED",
+            product: product({ mrp: "1200.00" }),
+        });
+        expect(mrpError()).toBeNull();
+    });
+
+    it("says it as soon as this product is set to GST is added", async () => {
+        render({
+            businessPriceMode: "INCLUDED",
+            product: product({ mrp: "1100.00" }),
+        });
+        expect(mrpError()).toBeNull();
+        await choose("ADDED");
+        expect(mrpError()).toBe(OVER);
+        await choose("INCLUDED");
+        expect(mrpError()).toBeNull();
+    });
+
+    it("puts the API's refusal under the MRP, not in a toast", async () => {
+        // The form sees nothing wrong with what it holds; the API, which
+        // has the last word, refuses on the MRP.
+        patchProduct.mockResolvedValue({
+            ok: false,
+            error: OVER,
+            field: "mrp",
+        });
+        render({
+            businessPriceMode: null,
+            product: product({ mrp: "1100.00" }),
+        });
+        expect(mrpError()).toBeNull();
+        await choose("INCLUDED");
+        expect(mrpError()).toBeNull();
+        await save();
+        expect(patchProduct).toHaveBeenCalledTimes(1);
+        expect(mrpError()).toBe(OVER);
+        expect(showError).not.toHaveBeenCalled();
     });
 });

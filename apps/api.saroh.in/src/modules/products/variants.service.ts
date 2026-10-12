@@ -6,12 +6,13 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { loadPriceTerms } from "../invoices/price-terms";
 import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { variantHasHistory, variantHasStock } from "../stock/stock-words";
 import { recordEntry } from "../stock/stock.service";
 import { COUNTING_ROWS } from "../stock/tracking";
 import type { ProductScope } from "./product-access";
-import { assertMrpAtOrAbovePrice } from "./product-rules";
+import { assertMrpAtOrAbovePrice, moneyToCents } from "./product-rules";
 import { ProductsService } from "./products.service";
 import { serializeVariant } from "./serialize";
 import { lockProduct, lockProductStock } from "./stock-levels";
@@ -95,7 +96,7 @@ export class VariantsService {
         dto: CreateVariantDto,
     ) {
         const { organizationId } = scope;
-        await this.assertCoherent(productId, dto);
+        await this.assertCoherent(organizationId, productId, dto);
 
         const last = await prisma.productVariant.findFirst({
             where: { productId },
@@ -184,12 +185,15 @@ export class VariantsService {
     ) {
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
-            select: { id: true },
+            select: { id: true, price: true, mrp: true },
         });
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
-        await this.assertCoherent(productId, dto);
+        await this.assertCoherent(scope.organizationId, productId, dto, {
+            price: variant.price?.toString() ?? null,
+            mrp: variant.mrp?.toString() ?? null,
+        });
         try {
             await prisma.productVariant.update({
                 where: { id: variantId },
@@ -411,15 +415,28 @@ export class VariantsService {
 
     /**
      * A variant's option value belongs to the product's option, its photo is
-     * one of the product's own, and its MRP is not below what it sells for.
+     * one of the product's own, and its MRP is not below what the customer
+     * pays for it: the amount to pay under the product's GST, since GST is
+     * part of MRP (`product-rules.ts`). `stored` is the variant as it is
+     * saved now: a save that changes neither its price nor its MRP is not
+     * refused for a sum it did not make.
      */
     private async assertCoherent(
+        organizationId: string,
         productId: string,
         dto: CreateVariantDto,
+        stored?: { price: string | null; mrp: string | null },
     ): Promise<void> {
         const product = await prisma.product.findUniqueOrThrow({
             where: { id: productId },
-            select: { price: true, mrp: true, optionId: true },
+            select: {
+                price: true,
+                mrp: true,
+                optionId: true,
+                currency: true,
+                gstRate: true,
+                gstPriceMode: true,
+            },
         });
         if (dto.optionValueId) {
             const value = await prisma.productOptionValue.findFirst({
@@ -450,9 +467,26 @@ export class VariantsService {
                 });
             }
         }
+        const cents = (amount: string | null | undefined) =>
+            amount == null ? null : moneyToCents(amount);
+        if (
+            stored &&
+            cents(stored.price) === cents(dto.price) &&
+            cents(stored.mrp) === cents(dto.mrp)
+        ) {
+            return;
+        }
         const price = dto.price ?? product.price.toString();
         const mrp = dto.mrp ?? product.mrp?.toString() ?? null;
-        assertMrpAtOrAbovePrice(price, mrp, dto.mrp ? "mrp" : "price");
+        if (mrp === null) return;
+        assertMrpAtOrAbovePrice(price, mrp, dto.mrp ? "mrp" : "price", {
+            item: {
+                gstRate: product.gstRate,
+                gstPriceMode: product.gstPriceMode,
+            },
+            terms: await loadPriceTerms(prisma, organizationId),
+            currency: product.currency,
+        });
     }
 }
 

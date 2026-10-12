@@ -374,6 +374,53 @@ payCents }`, or null when nothing is said: not registered, no rate, or
     - **A change to the choice, the registration, the GSTIN or the state
       revalidates the business's published pages** (`prices`,
       `backend-jobs.md` → Site page cache).
+    - **GST is part of MRP** (the owner, 12 Oct 2026). An MRP includes all
+      taxes, so a product's or an option's MRP is compared with the amount
+      to pay for one, GST and all, never with the typed price before GST.
+      Under `INCLUDED`, and for a business that is not registered, that
+      amount is the typed price and the comparison is the one it always
+      was. Equal is allowed. Services, plans, packs and courses have no
+      MRP.
+        - **One rule, one file:** `products/product-rules.ts`, on
+          `sellUnit`. `overMrp` is the comparison, `assertMrpAtOrAbovePrice`
+          (one price) and `assertProductWithinMrp` (a product and its
+          options) the refusals: `{ message, field }`, with the sums where
+          GST is what takes it over ("With 18% GST added this is ₹1,180 to
+          pay, more than its MRP of ₹1,100. Lower the price, raise the MRP,
+          or set this product's price to include GST."), and the old words
+          where the typed price is itself above the MRP. Never compare a
+          price with an MRP anywhere else.
+        - **Every write that can change the sum asks it** (add a new one
+          here): a product's create, whole save and section save
+          (`ProductsService`: the price, the MRP, the rate, "GST on this
+          price", or a status that puts it back on sale), a variant's create
+          and save (`VariantsService.assertCoherent`), the copy
+          (`duplicateProduct`), an import row (`imports/product-mrp.ts`: an
+          error in the preview, never written) and a rate chosen from the
+          missing-rates sheet (`gst-rates.service.ts`). A save that changes
+          none of those is not judged, so a product already over its MRP
+          can still have its name or photos saved. A product's own write is
+          refused for its own price, or for an option GST takes over its
+          MRP, which it names.
+        - **The business's switch is counted first.** A tax save that adds
+          GST to prices (`priceTermsChange`: to `ADDED`, or becoming
+          registered) is refused while any product not archived would go
+          over its MRP: `details: { field, reason: "OVER_MRP", products,
+options, items, more }` and a sentence with the count, the first
+          names and the way out (`products/over-mrp.ts`). The sheet reads
+          the same list before Save (`GET …/gst-rates/over-mrp?mode=ADDED`).
+          Going back to `INCLUDED` never asks. Without `mode` the read lists
+          what is over as the business stands, for one that switched before
+          the rule existed: such a product keeps selling at its amount to
+          pay and shows no saving until it is put right. There is no data
+          migration.
+        - **The saving is the API's.** The public catalogue serves `saving`
+          (`{ mrp, percent }` or null) on a product, each option and each
+          card: the MRP against the amount to pay, whole percent rounded
+          down, null when that amount is the MRP or more (`mrpSaving`). The
+          site strikes through and says "% off" only from it
+          (`packages/site-blocks/src/lib/mrp-saving.ts`), and the structured
+          data's list price is the MRP only then.
 - **Plans, class packs and courses carry GST** (12 Oct 2026, the owner's
   decision: "charging from the new invoices; already added ones won't be
   edited"). Each has a `gstRate`, a `sacCode` and its own `gstPriceMode`,

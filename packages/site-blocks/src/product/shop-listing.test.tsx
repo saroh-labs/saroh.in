@@ -544,3 +544,116 @@ describe("a card's price when GST comes on top", () => {
         ).not.toHaveTextContent("GST");
     });
 });
+
+/**
+ * GST is part of MRP (12 Oct 2026): a card strikes an MRP through only
+ * where it is above the amount to pay, GST and all, as the API says.
+ */
+describe("a card's MRP is compared with the amount to pay", () => {
+    const card = (over: Partial<ShopListingCard>): ShopListingCard => ({
+        ...sourdough,
+        priceFrom: false,
+        variantTitles: [],
+        price: "1000.00",
+        mrp: "1475.00",
+        ...over,
+    });
+    const struck = (link: HTMLElement) => link.querySelector("[data-card-mrp]");
+
+    it("strikes the MRP through under both ways of carrying GST when there is a saving", () => {
+        render(
+            <ShopListing
+                products={[
+                    // Includes GST: ₹1,000 against ₹1,475.
+                    card({
+                        slug: "a",
+                        name: "Almond oil",
+                        saving: { mrp: "1475.00", percent: 32 },
+                    }),
+                    // GST added: ₹1,180 to pay against ₹1,475.
+                    card({
+                        slug: "b",
+                        name: "Body butter",
+                        gstAdded: true,
+                        saving: { mrp: "1475.00", percent: 20 },
+                    }),
+                ]}
+            />,
+        );
+        const oil = screen.getByRole("link", { name: /Almond oil/ });
+        const butter = screen.getByRole("link", { name: /Body butter/ });
+        expect(struck(oil)).toHaveTextContent("MRP ₹1,475");
+        expect(struck(butter)).toHaveTextContent("MRP ₹1,475");
+        expect(butter).toHaveTextContent("₹1,000 + GST");
+    });
+
+    it("strikes nothing where the amount to pay is the MRP, or above it", () => {
+        render(
+            <ShopListing
+                products={[
+                    // ₹1,000 + 18% is ₹1,180 to pay: the MRP exactly.
+                    card({
+                        slug: "c",
+                        name: "Clay mask",
+                        mrp: "1180.00",
+                        gstAdded: true,
+                        saving: null,
+                    }),
+                    // Already over its MRP: ₹1,180 against ₹1,100.
+                    card({
+                        slug: "d",
+                        name: "Day cream",
+                        mrp: "1100.00",
+                        gstAdded: true,
+                        saving: null,
+                    }),
+                ]}
+            />,
+        );
+        const cream = screen.getByRole("link", { name: /Day cream/ });
+        expect(
+            struck(screen.getByRole("link", { name: /Clay mask/ })),
+        ).toBeNull();
+        expect(struck(cream)).toBeNull();
+        // It still sells, at its price with GST on top.
+        expect(cream).toHaveTextContent("₹1,000 + GST");
+        expect(cream).not.toHaveTextContent("MRP");
+    });
+
+    it("with no saving from the API, claims none beside a price GST is still to be added to", () => {
+        render(
+            <ShopListing
+                products={[
+                    card({ slug: "e", name: "Eye gel", gstAdded: true }),
+                    card({ slug: "f", name: "Face mist" }),
+                ]}
+            />,
+        );
+        // The card holds no amount to pay for it: nothing is claimed.
+        expect(
+            struck(screen.getByRole("link", { name: /Eye gel/ })),
+        ).toBeNull();
+        // Its price is the amount to pay: 1,475 against 1,000, as before.
+        expect(
+            struck(screen.getByRole("link", { name: /Face mist/ })),
+        ).toHaveTextContent("MRP ₹1,475");
+    });
+
+    it("a From price shows no MRP, whatever is sent", () => {
+        render(
+            <ShopListing
+                products={[
+                    card({
+                        slug: "g",
+                        name: "Gift set",
+                        priceFrom: true,
+                        saving: { mrp: "1475.00", percent: 32 },
+                    }),
+                ]}
+            />,
+        );
+        expect(
+            struck(screen.getByRole("link", { name: /Gift set/ })),
+        ).toBeNull();
+    });
+});

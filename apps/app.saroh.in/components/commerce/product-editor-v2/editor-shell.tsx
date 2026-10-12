@@ -424,6 +424,8 @@ function EditorBody({
                                 sku={sku}
                                 stores={stores}
                                 listings={listings}
+                                gstRegistered={gstRateNeeded}
+                                businessPriceMode={businessPriceMode}
                             />
                             {businessTracks ? (
                                 <StockSection

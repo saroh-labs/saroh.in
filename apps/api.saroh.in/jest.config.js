@@ -181,6 +181,12 @@ module.exports = {
         "<rootDir>/src/modules/orders/order-kitchen.service.spec.ts",
         // Products v2: MRP, saving, shop switches and detail coherence — pure.
         "<rootDir>/src/modules/products/product-rules.spec.ts",
+        // GST is part of MRP (12 Oct 2026): the rule on every product and
+        // variant write, and the list the business's switch is refused
+        // with, with a jest-mocked Prisma. mrp-includes-gst.db.spec.ts
+        // needs Postgres.
+        "<rootDir>/src/modules/products/products.mrp.spec.ts",
+        "<rootDir>/src/modules/products/over-mrp.spec.ts",
         // #519 the Products list's "Needs you": pure.
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
         // The Products list's query: a page by number and its sizes, with a

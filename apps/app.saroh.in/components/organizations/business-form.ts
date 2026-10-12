@@ -129,6 +129,8 @@ export const FIELD_OF: Record<string, FormField> = {
     deliveryRate: "deliveryRate",
     deliverySac: "deliverySac",
     priceMode: "priceMode",
+    // Registering adds GST to a product already set to "GST is added".
+    gstRegistered: "gstRegistered",
     invoiceNumberParts: "numberParts",
     invoiceNumberRestart: "numberRestart",
     invoiceNumberDigits: "numberDigits",

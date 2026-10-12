@@ -306,3 +306,123 @@ describe("plainText", () => {
         ).toBe("A <b> \"c\" 'd'");
     });
 });
+
+/**
+ * GST is part of MRP (12 Oct 2026): the list price is the MRP only where
+ * it is above the amount to pay, GST and all. The API says so (`saving`),
+ * and the page strikes through the same MRP.
+ */
+describe("the list price is the MRP only above the amount to pay", () => {
+    // ₹1,000 + 18% is ₹1,180 to pay.
+    const adds = {
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+    const one: CatalogueProduct = {
+        ...base,
+        price: "1000.00",
+        variants: [],
+        stock: null,
+    };
+
+    it("GST added, MRP above what is paid: the amount to pay with the MRP as its list price", () => {
+        // 1,475 against 1,180.
+        const ld = build({
+            ...one,
+            mrp: "1475.00",
+            gst: adds,
+            saving: { mrp: "1475.00", percent: 20 },
+        });
+        expect(ld.offers).toMatchObject({
+            price: "1180.00",
+            priceSpecification: {
+                "@type": "UnitPriceSpecification",
+                priceType: "https://schema.org/ListPrice",
+                price: "1475.00",
+                priceCurrency: "INR",
+            },
+        });
+    });
+
+    it("GST added, the amount to pay is the MRP: no list price", () => {
+        const ld = build({
+            ...one,
+            mrp: "1180.00",
+            gst: adds,
+            saving: null,
+        });
+        expect(ld.offers).toMatchObject({ price: "1180.00" });
+        expect(ld.offers).not.toHaveProperty("priceSpecification");
+    });
+
+    it("GST added, already over its MRP: the amount to pay, and no list price", () => {
+        // Typed ₹1,000 under an MRP of ₹1,100; ₹1,180 is paid.
+        const ld = build({
+            ...one,
+            mrp: "1100.00",
+            gst: adds,
+            saving: null,
+        });
+        expect(ld.offers).toMatchObject({ price: "1180.00" });
+        expect(ld.offers).not.toHaveProperty("priceSpecification");
+    });
+
+    it("takes the API's word over its own comparison", () => {
+        // The API says none: none is published, whatever the MRP reads.
+        const ld = build({ ...one, mrp: "1475.00", gst: adds, saving: null });
+        expect(ld.offers).not.toHaveProperty("priceSpecification");
+    });
+
+    it("each option carries its own: the MRP it is struck through with, or none", () => {
+        const offers = build({
+            ...base,
+            price: "1000.00",
+            mrp: "1475.00",
+            gst: adds,
+            saving: { mrp: "1475.00", percent: 20 },
+            variants: [
+                // The product's price: ₹1,180 against ₹1,475.
+                {
+                    ...base.variants[0],
+                    gst: adds,
+                    saving: { mrp: "1475.00", percent: 20 },
+                },
+                // Its own price, ₹1,250 + 18% = ₹1,475: the MRP exactly.
+                {
+                    ...base.variants[1],
+                    price: "1250.00",
+                    mrp: null,
+                    gst: {
+                        ...adds,
+                        listCents: 125000,
+                        gstCents: 22500,
+                        payCents: 147500,
+                    },
+                    saving: null,
+                },
+            ],
+        }).offers as Record<string, unknown>[];
+        expect(offers[0]).toMatchObject({
+            price: "1180.00",
+            priceSpecification: { price: "1475.00" },
+        });
+        expect(offers[1]).toMatchObject({ price: "1475.00" });
+        expect(offers[1]).not.toHaveProperty("priceSpecification");
+    });
+
+    it("an option on its own price, from an API that sends no saving, is compared with the product's MRP as the page does", () => {
+        // ₹320 typed, no MRP of its own, the product's MRP is ₹300: none.
+        // Raise the product's MRP to ₹400 and it is the list price.
+        const [, , third] = build({ ...base, mrp: "400.00" }).offers as Record<
+            string,
+            unknown
+        >[];
+        expect(third).toMatchObject({
+            price: "320.00",
+            priceSpecification: { price: "400.00" },
+        });
+    });
+});
