@@ -9,6 +9,7 @@ import {
     gstNoteWords,
     gstOnPriceOf,
     gstPayWords,
+    gstPriceWords,
     startOfLine,
 } from "../lib/gst-price";
 import { formatAmount } from "../lib/money";
@@ -382,6 +383,8 @@ export default function ProductPage({
     // the MRP or more.
     const saving = productSaving(product, variant);
     const gst = productGst(product, variant);
+    // GST comes on top and an MRP is shown: lead with what is paid.
+    const leadsWithPay = saving !== null && gst?.mode === "ADDED";
     const stock = variant
         ? { word: variant.stock, left: variant.left }
         : product.stock;
@@ -467,8 +470,17 @@ export default function ProductPage({
             {/* 2 — price */}
             <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <Marker n={2} show={markers} />
-                <span className="font-site-heading text-[calc(1.75rem*var(--site-heading-scale,1))] font-semibold tabular-nums leading-none tracking-[-0.02em]">
-                    {formatAmount(price, product.currency, locale)}
+                {/* Beside a struck-through MRP the big figure is what is
+                    paid, GST and all: an MRP includes its taxes, so "7%
+                    off" next to the price before GST would read as a
+                    saving against the wrong number. */}
+                <span
+                    data-price-lead=""
+                    className="font-site-heading text-[calc(1.75rem*var(--site-heading-scale,1))] font-semibold tabular-nums leading-none tracking-[-0.02em]"
+                >
+                    {leadsWithPay
+                        ? gstPayWords(gst, product.currency, locale)
+                        : formatAmount(price, product.currency, locale)}
                 </span>
                 {saving ? (
                     <>
@@ -504,8 +516,12 @@ export default function ProductPage({
                     data-price-gst=""
                     className="text-site-body mt-2 text-sm tabular-nums"
                 >
-                    {startOfLine(gstNoteWords(gst, product.currency, locale))}
-                    {gst.mode === "ADDED" ? (
+                    {leadsWithPay
+                        ? gstPriceWords(gst, product.currency, locale)
+                        : startOfLine(
+                              gstNoteWords(gst, product.currency, locale),
+                          )}
+                    {gst.mode === "ADDED" && !leadsWithPay ? (
                         <>
                             {" · "}
                             <span className="text-site-fg whitespace-nowrap font-semibold">

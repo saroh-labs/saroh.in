@@ -1939,6 +1939,44 @@ describe("GST in the bag and on the product's button", () => {
         expect(sheet).not.toHaveTextContent("GST");
     });
 
+    it("leads with the amount to pay beside a struck-through MRP when GST comes on top", () => {
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...bread,
+                    gst: null,
+                    saving: null,
+                    variants: bread.variants.map((v) => ({
+                        ...v,
+                        mrp: "200.00",
+                        // ₹180 + 5% is ₹189 to pay: 5% off an MRP of ₹200.
+                        saving: { mrp: "200.00", percent: 5 },
+                        gst: {
+                            mode: "ADDED" as const,
+                            rate: "5",
+                            listCents: 18000,
+                            gstCents: 900,
+                            payCents: 18900,
+                        },
+                    })),
+                }}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        // The big figure is what is paid, so "5% off" is true of it.
+        expect(container.querySelector("[data-price-lead]")?.textContent).toBe(
+            "₹189",
+        );
+        expect(container.querySelector("[data-price-off]")?.textContent).toBe(
+            "5% off",
+        );
+        // And the price before GST is said in full under it.
+        expect(container.querySelector("[data-price-gst]")?.textContent).toBe(
+            "₹180 + ₹9 GST (5%)",
+        );
+    });
+
     it("names the amount to pay on Add to bag when GST comes on top of the price", () => {
         render(
             <ProductPage
