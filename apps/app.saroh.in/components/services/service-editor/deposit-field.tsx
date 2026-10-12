@@ -8,6 +8,7 @@ import type { PlanLock } from "@/lib/billing/access";
 import { depositLock } from "@/lib/billing/access";
 import type { OnlineProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
+import type { ServiceCharged } from "@/lib/services/service-editor";
 import { depositNote, depositPausedNote } from "@/lib/services/service-editor";
 import type { BookingPayment } from "@/lib/staff/types";
 
@@ -28,7 +29,9 @@ const DEPOSITS: [DepositMode, string][] = [
  * "At booking, they pay" (E8, the Service Editor design): nothing, a 25%
  * or 50% deposit, or the full price. The note works the split out from the
  * price as typed, so the merchant sees what a customer pays now and at the
- * visit; the booking page charges what the server works out. When online
+ * visit; the booking page charges what the server works out. A price with
+ * GST added on top is said from the API's own amounts once saved, and in
+ * words while it is being changed (`depositNote`). When online
  * can't take what it asks, it says what happens instead, with a link to
  * what fixes it (DEC-088, DEC-089, #821): paid at the desk where the
  * business allows the desk, or — a business that takes payment online
@@ -49,6 +52,8 @@ export function DepositField({
     paymentsLock = null,
     way = "BOTH",
     problem = null,
+    charged = null,
+    gstOnTop = false,
     onChange,
 }: {
     deposit: DepositMode;
@@ -65,6 +70,10 @@ export function DepositField({
     way?: BookingPayment;
     /** What happens when people book it online, when it isn't as chosen. */
     problem?: OnlineProblem | null;
+    /** The API's amounts for the price as saved; null once it is changed. */
+    charged?: ServiceCharged | null;
+    /** GST is added on top of the typed price (12 Oct 2026). */
+    gstOnTop?: boolean;
     onChange: (deposit: DepositMode) => void;
 }) {
     const label = useId();
@@ -73,13 +82,14 @@ export function DepositField({
     // When online can't take it, only what happens instead is said (UX-056):
     // paid at the desk — never "they pay ₹300 when booking" right above it —
     // or, when it can't be booked online at all, the problem alone.
+    const gst = { charged, gstOnTop };
     const note = paused
         ? depositPausedNote
         : problem
           ? problem.blocked
               ? null
-              : depositNote(deposit, price, currency, visits, "DESK")
-          : depositNote(deposit, price, currency, visits, way);
+              : depositNote(deposit, price, currency, visits, "DESK", gst)
+          : depositNote(deposit, price, currency, visits, way, gst);
     return (
         <>
             <Eyebrow id={label} className="mt-3">

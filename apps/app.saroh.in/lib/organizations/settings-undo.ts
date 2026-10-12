@@ -1,3 +1,4 @@
+import { businessModeOf } from "@/lib/gst/price-mode";
 import { kindOf } from "@/lib/organizations/kind";
 import { sameWeek } from "@/lib/organizations/opening-hours";
 import type { OpeningHoursDay } from "@/lib/stores/storefronts";
@@ -59,9 +60,15 @@ const TAX_READ: Record<Exclude<TaxKey, "invoiceNumber">, TaxField> = {
     invoicePrefix: "invoicePrefix",
     deliveryRate: "deliveryRate",
     deliverySac: "deliverySac",
+    priceMode: "priceMode",
 };
 type TaxField =
-    "registered" | "state" | "invoicePrefix" | "deliveryRate" | "deliverySac";
+    | "registered"
+    | "state"
+    | "invoicePrefix"
+    | "deliveryRate"
+    | "deliverySac"
+    | "priceMode";
 
 const keysOf = <T extends object>(o: T | undefined) =>
     (o ? Object.keys(o) : []) as (keyof T)[];
@@ -148,6 +155,9 @@ export function settingsUndo(
             if (key === "registered") back.registered = tax.registered;
             else if (key === "invoiceNumber") {
                 back.invoiceNumber = chosenFormat(before) ?? undefined;
+            } else if (key === "priceMode") {
+                // An older read sent none: prices included GST.
+                back.priceMode = businessModeOf(tax.priceMode);
             } else back[key] = String(tax[TAX_READ[key]] ?? "");
         }
         input.tax = back;

@@ -6,6 +6,13 @@ import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
+import {
+    ITEM_MODE_LABEL,
+    itemModeOptions,
+    rateHint,
+    SAME_AS_BUSINESS,
+} from "@/lib/gst/price-mode";
 import type { GstRateValue } from "@/lib/invoices/gst";
 import {
     GST_RATE_CHOICES,
@@ -46,6 +53,7 @@ const EMPTY: BasicsValues = {
     mrp: "",
     categoryId: "",
     gstRate: "",
+    gstPriceMode: SAME_AS_BUSINESS,
     hsnCode: "",
 };
 
@@ -56,6 +64,7 @@ const FIELDS = [
     "mrp",
     "categoryId",
     "gstRate",
+    "gstPriceMode",
     "hsnCode",
 ] as const;
 
@@ -71,7 +80,9 @@ const CURRENCY_WORD: Record<string, string> = {
  * sells for and what it is. Creating needs a name and a price and nothing
  * else; the address is made from the name and can be changed afterwards.
  * A GST-registered business's priced product also needs its GST rate,
- * asked under the price.
+ * asked under the price, and beside it "GST on this price" for the one
+ * product priced differently from the business's own way (12 Oct 2026). A
+ * business that isn't registered is never shown that.
  */
 export function BasicsSection({
     product,
@@ -79,6 +90,7 @@ export function BasicsSection({
     currency,
     gstRegistered,
     gstRateNeeded = false,
+    businessPriceMode = null,
     categories: initialCategories,
     manageCategoriesHref,
     onCategoryChange,
@@ -90,6 +102,11 @@ export function BasicsSection({
     gstRegistered: boolean;
     /** Known to be registered: a priced product needs its GST rate. */
     gstRateNeeded?: boolean;
+    /**
+     * How the business's prices carry GST, for "Same as the business (…)";
+     * null when it couldn't be told.
+     */
+    businessPriceMode?: GstPriceMode | null;
     categories: CategoryChoice[];
     manageCategoriesHref: string;
     /** Creating: the category picked, so its defaults can apply. */
@@ -353,6 +370,9 @@ export function BasicsSection({
             {gstRegistered || v.gstRate !== "" || v.hsnCode.trim() !== "" ? (
                 <div className="mt-4 flex flex-wrap gap-3.5">
                     <Field
+                        // Saroh's own words, whichever way the price
+                        // carries GST.
+                        holdsData={false}
                         label="GST rate"
                         className="flex-[1_1_150px]"
                         error={
@@ -361,7 +381,11 @@ export function BasicsSection({
                                 ? GST_RATE_NEEDED
                                 : null)
                         }
-                        hint="Included in the price. Bread and other nil-rated goods are 0%."
+                        hint={rateHint(
+                            businessPriceMode,
+                            gstRateNeeded ? v.gstPriceMode : "INCLUDED",
+                            "Included in the price. Bread and other nil-rated goods are 0%.",
+                        )}
                     >
                         <OptionSelect<GstRateValue>
                             id="pe-gst"
@@ -384,6 +408,29 @@ export function BasicsSection({
                             disabled={ro}
                         />
                     </Field>
+                    {/* Only a business known to be registered chooses how
+                        a price carries GST (12 Oct 2026); most leave it as
+                        the business's own way. */}
+                    {gstRateNeeded ? (
+                        <Field
+                            label={ITEM_MODE_LABEL}
+                            className="flex-[1_1_220px]"
+                            hint="Only if this one is priced differently from the rest."
+                        >
+                            <OptionSelect<ItemModeValue>
+                                id="pe-gst-mode"
+                                value={v.gstPriceMode}
+                                onValueChange={(mode) =>
+                                    form.setValue("gstPriceMode", mode, {
+                                        shouldDirty: true,
+                                        shouldValidate: true,
+                                    })
+                                }
+                                options={itemModeOptions(businessPriceMode)}
+                                disabled={ro}
+                            />
+                        </Field>
+                    ) : null}
                     <Field
                         label="HSN code"
                         className="flex-[1_1_150px]"

@@ -4,6 +4,12 @@ import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
+import {
+    ITEM_MODE_LABEL,
+    itemModeOptions,
+    rateHint,
+} from "@/lib/gst/price-mode";
 import type { GstRateValue } from "@/lib/invoices/gst";
 import {
     GST_RATE_CHOICES,
@@ -19,7 +25,10 @@ import type { Edit } from "./fields";
  *
  * Beside the price, for a GST-registered business (`asked`): the rate is a
  * question with no "Not set" row. The box starts on "Choose a rate", and
- * 0% is a choice like any other, for an exempt or nil-rated service.
+ * 0% is a choice like any other, for an exempt or nil-rated service. Beside
+ * it, "GST on this price" for the one service priced differently from the
+ * business's own way (12 Oct 2026); a business that isn't registered is
+ * never shown it.
  *
  * Under More settings, where the page couldn't tell whether the business
  * is registered, or one that isn't has a rate saved from before: as it
@@ -32,20 +41,32 @@ export function GstFields({
     leave,
     asked,
     canEdit,
+    businessPriceMode = null,
 }: Edit & {
     /** A registered business's: it has to be answered for a priced service. */
     asked: boolean;
     canEdit: boolean;
+    /**
+     * How the business's prices carry GST, for "Same as the business (…)";
+     * null when it couldn't be told.
+     */
+    businessPriceMode?: GstPriceMode | null;
 }) {
     return (
         <>
             <Field
+                // Saroh's own words, whichever way the price carries GST.
+                holdsData={false}
                 label="GST rate"
                 className="flex-[1_1_200px]"
                 error={problem("gstRate")}
                 hint={
                     asked
-                        ? "The rate the price includes. It isn't added on top."
+                        ? rateHint(
+                              businessPriceMode,
+                              draft.gstPriceMode,
+                              "The rate the price includes. It isn't added on top.",
+                          )
                         : "Included in the price, on a GST invoice."
                 }
             >
@@ -60,6 +81,22 @@ export function GstFields({
                     disabled={!canEdit}
                 />
             </Field>
+            {/* Only a registered business chooses how a price carries GST
+                (12 Oct 2026); most leave it as the business's own way. */}
+            {asked ? (
+                <Field
+                    label={ITEM_MODE_LABEL}
+                    className="flex-[1_1_220px]"
+                    hint="Only if this one is priced differently from the rest."
+                >
+                    <OptionSelect<ItemModeValue>
+                        value={draft.gstPriceMode}
+                        onValueChange={(gstPriceMode) => set({ gstPriceMode })}
+                        options={itemModeOptions(businessPriceMode)}
+                        disabled={!canEdit}
+                    />
+                </Field>
+            ) : null}
             <Field
                 label="SAC code"
                 optional={asked}

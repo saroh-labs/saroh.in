@@ -4,7 +4,7 @@ import { formatRecent } from "@/lib/format/datetime";
 
 import type { AuditEventRow } from "./activity";
 import { ACTIVITY_ACTIONS, activityLine, activityLines } from "./activity";
-import { FIELD_PHRASES } from "./activity-changes";
+import { FIELD_PHRASES, recordedValueText } from "./activity-changes";
 
 const sanjay = { name: "Sanjay", email: "sanjay@ryeandco.in" };
 const priya = { name: "Priya", email: "priya@ryeandco.in" };
@@ -89,6 +89,33 @@ describe("activityLine — settings saves", () => {
         );
         expect(kindChange("WORK", "BUSINESS")).toBe(
             "Sanjay changed what you're setting up to A business → Identity",
+        );
+    });
+
+    it("says how prices carry GST in the row's words (12 Oct 2026)", () => {
+        const modeChange = (before: string, after: string) =>
+            said({
+                metadata: {
+                    fields: ["gstPriceMode"],
+                    changes: [{ field: "gstPriceMode", before, after }],
+                },
+            });
+        expect(modeChange("INCLUDED", "ADDED")).toBe(
+            "Sanjay set GST to be added to prices → Tax and invoices",
+        );
+        expect(modeChange("ADDED", "INCLUDED")).toBe(
+            "Sanjay set prices to include GST → Tax and invoices",
+        );
+        // With no value kept, the field is named.
+        expect(said({ metadata: { fields: ["gstPriceMode"] } })).toBe(
+            "Sanjay updated how prices carry GST → Tax and invoices",
+        );
+        // Each recorded value reads as the Settings row does.
+        expect(recordedValueText("gstPriceMode", "INCLUDED")).toBe(
+            "Prices include GST",
+        );
+        expect(recordedValueText("gstPriceMode", "ADDED")).toBe(
+            "GST is added to prices",
         );
     });
 

@@ -119,7 +119,9 @@ export function useGstRateStep({
             description={asking ? askWhy(asking.items, asking.words.then) : ""}
             saveLabel={asking?.words.continueLabel ?? continueLabel}
             requireAll
-            note={items ? savedWhere(items) : undefined}
+            // The refusal doesn't say how the business's prices carry GST,
+            // so a service or a product isn't told either way here.
+            note={items ? savedWhere(items, null) : undefined}
             save={save}
             onDone={done}
         />

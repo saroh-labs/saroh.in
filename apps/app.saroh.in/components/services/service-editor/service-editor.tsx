@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import type { PlanLock } from "@/lib/billing/access";
 import { joinAnd } from "@/lib/editor-shell/state";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import {
     archiveService,
     createService,
@@ -24,8 +25,10 @@ import type { AvailabilityRule, Service } from "@/lib/services/service";
 import { takingLabel } from "@/lib/services/service-cards";
 import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
 import {
+    businessModeFor,
     changedParts,
     changedSections,
+    chargedAsSaved,
     draftOf,
     glance,
     gstPlace,
@@ -104,7 +107,13 @@ export function ServiceEditor({
     paymentsLock = null,
     payment = null,
     gstRegistered = null,
+    businessPriceMode = null,
 }: {
+    /**
+     * How the business's prices carry GST (12 Oct 2026), for the Price
+     * card's "Same as the business (…)". Null when it couldn't be read.
+     */
+    businessPriceMode?: GstPriceMode | null;
     /**
      * Whether the business is GST-registered: its priced services need a
      * GST rate, asked beside the price. False: no GST field, and nothing
@@ -559,6 +568,11 @@ export function ServiceEditor({
                         payment={payment}
                         withGst={gstAt === "price"}
                         canEdit={canEdit}
+                        businessPriceMode={businessModeFor(
+                            service,
+                            businessPriceMode,
+                        )}
+                        charged={chargedAsSaved(service, draft)}
                     />
                     <WhoTakesIt
                         draft={draft}

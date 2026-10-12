@@ -7,6 +7,8 @@ import {
     askWhy,
     chosenRates,
     kindWord,
+    listNote,
+    listWhy,
     missingLine,
     rateItemsOf,
     rateKey,
@@ -139,6 +141,48 @@ describe("the words", () => {
             "Each rate is saved on its item",
         );
         expect(savedWhere([LINE])).toContain("saved on this invoice");
+    });
+
+    it("says how the prices carry GST as the business chose, and nothing when that isn't known", () => {
+        expect(savedWhere([PT], "ADDED")).toBe(
+            "The rate is saved on the service, so you're asked once. GST is added to your prices. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(savedWhere([PT, SERUM], "INCLUDED")).toBe(
+            "Each rate is saved on its item, so you're asked once. Prices include GST. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(savedWhere([SERUM], null)).toBe(
+            "The rate is saved on the product, so you're asked once. Choose 0% for anything exempt or nil-rated.",
+        );
+        // A line typed on an invoice is charged as typed, whatever the
+        // business chose for its services and products.
+        expect(savedWhere([LINE], "ADDED")).toBe(
+            "The rate is saved on this invoice. Prices include GST. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(savedWhere([LINE], null)).toContain("Prices include GST.");
+    });
+
+    it("the list's sheet says the same, by the business's choice", () => {
+        expect(listNote("INCLUDED", false)).toBe(
+            "Prices include GST. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(listNote("ADDED", false)).toBe(
+            "GST is added to your prices. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(listNote(null, false)).toBe(
+            "Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(listNote("ADDED", true)).toBe(
+            "There are more than this list holds. Save these and the rest are listed next. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(listWhy("INCLUDED")).toBe(
+            "These are on sale with a price and no GST rate. Choose the rate each price includes.",
+        );
+        expect(listWhy("ADDED")).toBe(
+            "These are on sale with a price and no GST rate. Choose the rate added to each price.",
+        );
+        expect(listWhy(null)).toBe(
+            "These are on sale with a price and no GST rate. Choose each one's rate.",
+        );
     });
 
     it("names each kind", () => {

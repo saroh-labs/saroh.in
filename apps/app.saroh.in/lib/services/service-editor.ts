@@ -11,6 +11,15 @@
 
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
+import {
+    effectiveMode,
+    isGstPriceMode,
+    itemModeInput,
+    itemModeValue,
+    rateBps,
+    SAME_AS_BUSINESS,
+} from "@/lib/gst/price-mode";
 import { GST_RATE_NEEDED, rateOption } from "@/lib/invoices/gst";
 import type { BookingPayment } from "@/lib/staff/types";
 import { absentText } from "@saroh/ui/lib/absent";
@@ -59,6 +68,11 @@ export interface ServiceDraft {
     price: string;
     /** What is paid at booking (E8): nothing, a share, or all of it. */
     deposit: DepositMode;
+    /**
+     * How this price carries GST when it differs from the business's way
+     * (12 Oct 2026); "" is "same as the business".
+     */
+    gstPriceMode: ItemModeValue;
     // Who takes it
     staffIds: string[];
     // The booking page, and taking bookings
@@ -144,6 +158,7 @@ export function draftOf(
             meetingUrl: "",
             price: "",
             deposit: "NONE",
+            gstPriceMode: SAME_AS_BUSINESS,
             // The one person on the diary, when there is only one.
             staffIds: [...staffIds],
             showOnBookingPage: true,
@@ -168,6 +183,7 @@ export function draftOf(
         meetingUrl: service.meetingUrl ?? "",
         price: fromMinor(service.priceCents),
         deposit: service.depositMode,
+        gstPriceMode: itemModeValue(service.gstPriceMode),
         staffIds: [...staffIds].sort(),
         showOnBookingPage: service.showOnBookingPage,
         taking: service.status === "ACTIVE",
@@ -391,6 +407,9 @@ export function serviceInput(
         currency,
         gstRate: draft.gstRate || null,
         sacCode: sac || null,
+        // Null is "same as the business". A business that isn't registered
+        // is never shown the choice, so what was saved goes back as it was.
+        gstPriceMode: itemModeInput(draft.gstPriceMode),
         timezone: draft.timezone.trim(),
         locationType: draft.where,
         meetingUrl: online ? draft.meetingUrl.trim() : null,
@@ -418,7 +437,7 @@ export const HOURS_SECTION = "Its weekly hours";
 const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["What it is", ["name", "description", "kind"]],
     ["Time", ["minutes", "gap", "visits", "places", "where", "meetingUrl"]],
-    ["Price", ["price", "deposit"]],
+    ["Price", ["price", "deposit", "gstPriceMode"]],
     ["Who takes it", ["staffIds"]],
     ["Booking page", ["showOnBookingPage"]],
     ["Taking bookings", ["taking"]],
@@ -608,11 +627,84 @@ const DEPOSIT_PERCENT: Record<DepositMode, number> = {
 };
 
 /**
+ * What the API charges for one booking of a saved service, GST and all:
+ * the amount to pay, and the share of it taken when booking.
+ */
+export interface ServiceCharged {
+    payCents: number;
+    depositCents: number | null;
+}
+
+/**
+ * The API's own figures for the price, while nothing that decides them has
+ * been changed on the page. Null for a new service, an older API, or a
+ * draft whose price, rate, GST choice or deposit differs from what is
+ * saved: the page never works the GST out itself. Judged against the
+ * service as read, so a save shows its new amounts only once the API has
+ * answered with them.
+ */
+export function chargedAsSaved(
+    service: Service | null,
+    draft: Pick<
+        ServiceDraft,
+        "price" | "deposit" | "gstRate" | "gstPriceMode" | "kind" | "visits"
+    >,
+): ServiceCharged | null {
+    if (!service || typeof service.payCents !== "number") return null;
+    const asRead =
+        toMinor(draft.price) === service.priceCents &&
+        draft.deposit === service.depositMode &&
+        draft.gstRate === rateOption(service.gstRate) &&
+        draft.gstPriceMode === itemModeValue(service.gstPriceMode) &&
+        draftVisits(draft) ===
+            (service.capacity > 1 ? 1 : Math.max(1, service.visits));
+    if (!asRead) return null;
+    return {
+        payCents: service.payCents,
+        depositCents: service.depositCents,
+    };
+}
+
+/**
+ * The business's own way of carrying GST, for "Same as the business (…)":
+ * as its settings said, else as a saved service priced the business's way
+ * is charged (a role that can't read the settings still reads that). Null
+ * when neither tells.
+ */
+export function businessModeFor(
+    service: Pick<Service, "gstPriceMode" | "gst"> | null,
+    read: GstPriceMode | null,
+): GstPriceMode | null {
+    if (read !== null) return read;
+    if (!service || isGstPriceMode(service.gstPriceMode)) return null;
+    return service.gst?.mode ?? null;
+}
+
+/**
+ * Whether GST goes on top of the price as typed: a registered business's
+ * priced service with a rate above 0, under "GST is added". False when the
+ * business's way couldn't be told and the service follows it.
+ */
+export function gstGoesOnTop(
+    draft: Pick<ServiceDraft, "gstRate" | "gstPriceMode">,
+    business: GstPriceMode | null,
+    registered: boolean,
+): boolean {
+    if (!registered || !((rateBps(draft.gstRate) ?? 0) > 0)) return false;
+    if (business === null && !isGstPriceMode(draft.gstPriceMode)) return false;
+    return effectiveMode(business, draft.gstPriceMode) === "ADDED";
+}
+
+/**
  * The note under "At booking, they pay" (the design's): what a customer
- * pays when booking and at the visit, worked out from the price as typed,
- * rounded to the paisa as the server rounds it. A business that takes
- * payment at the desk only takes nothing when booking, a deposit or not
- * (DEC-089).
+ * pays when booking and at the visit. A business that takes payment at the
+ * desk only takes nothing when booking, a deposit or not (DEC-089).
+ *
+ * The amounts are the API's (`charged`) while the price is as saved. A
+ * price being typed that includes its GST is the amount to pay, so its
+ * split is said from it, rounded to the paisa as the server rounds it. One
+ * that has GST added on top (`gstOnTop`) is not worked out here: the note
+ * says the shares in words until it is saved.
  */
 export function depositNote(
     deposit: DepositMode,
@@ -621,24 +713,37 @@ export function depositNote(
     visits = 1,
     /** How the business takes payment when people book (DEC-088). */
     way: BookingPayment = "BOTH",
+    gst: { charged?: ServiceCharged | null; gstOnTop?: boolean } = {},
 ): string {
     const minor = toMinor(price);
-    const cents = minor === null || Number.isNaN(minor) ? 0 : minor;
+    const typed = minor === null || Number.isNaN(minor) ? 0 : minor;
+    const charged = gst.charged ?? null;
+    const cents = charged ? charged.payCents : typed;
     const money = (n: number) => formatMoney(n, currency);
+    // GST on top of a price not saved yet: said in words, never summed.
+    const inWords = !charged && gst.gstOnTop === true;
+    const all = inWords ? "the price plus GST" : money(cents);
+    const later = visits > 1 ? "over the visits" : "at the visit";
     if (deposit === "NONE") {
         // Online only: nothing at the visit, it is all paid when booking.
         return way === "ONLINE" && cents > 0
-            ? `They pay ${money(cents)} online when booking: your booking rules take payment online only.`
+            ? `They pay ${all} online when booking: your booking rules take payment online only.`
             : "No card needed to book. No-shows cost you the time.";
     }
-    if (way === "DESK" && cents > 0) {
-        return `They pay ${money(cents)} ${visits > 1 ? "over the visits" : "at the visit"}.`;
+    if (way === "DESK" && cents > 0) return `They pay ${all} ${later}.`;
+    const percent = DEPOSIT_PERCENT[deposit];
+    if (inWords) {
+        const split =
+            deposit === "FULL"
+                ? `They pay ${all} when booking.`
+                : `They pay ${percent}% of ${all} when booking, and the rest ${later}.`;
+        return `${split} Refunded if they cancel in time.`;
     }
-    const now = Math.round((cents * DEPOSIT_PERCENT[deposit]) / 100);
+    const now = charged?.depositCents ?? Math.round((cents * percent) / 100);
     const split =
         deposit === "FULL"
             ? `They pay ${money(now)} when booking.`
-            : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) ${visits > 1 ? "over the visits" : "at the visit"}.`;
+            : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) ${later}.`;
     return `${split} Refunded if they cancel in time.`;
 }
 

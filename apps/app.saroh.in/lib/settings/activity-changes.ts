@@ -7,6 +7,7 @@
  */
 
 import { plural } from "@/lib/format/plural";
+import { isGstPriceMode, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { moduleName as railName } from "@/lib/modules/turn-on";
 import { businessTypeLabel } from "@/lib/organizations/business-types";
 import { KIND_CHOICES } from "@/lib/organizations/kind";
@@ -80,6 +81,12 @@ export const FIELD_PHRASES: Partial<
     deliveryGstRate: {
         phrase: "GST on delivery",
         label: "GST on delivery",
+        tab: "tax",
+    },
+    // 12 Oct 2026: recorded as stored (INCLUDED, ADDED), said as the row.
+    gstPriceMode: {
+        phrase: "how prices carry GST",
+        label: "GST on prices",
         tab: "tax",
     },
     deliverySacCode: {
@@ -213,8 +220,9 @@ export const fieldsOf = (meta: Record<string, unknown>): string[] =>
 /**
  * A recorded value as a person reads it: a business type by its name
  * ("llp" is "LLP", and the old "company" Private limited, F10), what is
- * being set up as setup offered it ("SOLO" is "Just me", DEC-070); anything
- * else as recorded.
+ * being set up as setup offered it ("SOLO" is "Just me", DEC-070), how
+ * prices carry GST as its row says it ("ADDED" is "GST is added to
+ * prices"); anything else as recorded.
  */
 export function recordedValueText(
     field: string,
@@ -225,6 +233,9 @@ export function recordedValueText(
     }
     if (field === "kind" && typeof value === "string") {
         return KIND_CHOICES.find((c) => c.kind === value)?.label ?? value;
+    }
+    if (field === "gstPriceMode" && isGstPriceMode(value)) {
+        return PRICE_MODE_SAYS[value];
     }
     return String(value);
 }
@@ -253,6 +264,12 @@ function valueSentence(change: RecordedChange): string | null {
     if (change.field === "gstRegistered") {
         if (change.after === true) return "registered the business for GST";
         if (change.after === false) return "took the business off GST";
+        return null;
+    }
+    // "changed how prices carry GST to GST is added to prices" reads badly.
+    if (change.field === "gstPriceMode") {
+        if (change.after === "ADDED") return "set GST to be added to prices";
+        if (change.after === "INCLUDED") return "set prices to include GST";
         return null;
     }
     if (change.after === null) return `cleared ${known.phrase}`;

@@ -8,6 +8,8 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { allows, authorize } from "../organizations/organization-policy";
 import { isGstRate } from "./gst";
+import type { GstPriceMode } from "./gst-price";
+import { businessPriceMode } from "./gst-price";
 import type { RatedKind, SetGstRatesDto } from "./gst-rates.dto";
 import { loadTaxProfile } from "./order-invoicing";
 import { toCents } from "./totals";
@@ -35,7 +37,7 @@ export interface MissingRateItem {
     kind: RatedKind;
     id: string;
     name: string;
-    /** Its price in minor units, GST included. */
+    /** Its typed price in minor units. */
     priceCents: number;
     currency: string | null;
     /** Whether this person may save its rate. */
@@ -52,6 +54,12 @@ export interface MissingRates {
     items: MissingRateItem[];
     /** True when more are missing than `items` lists. */
     more: boolean;
+    /**
+     * How a registered business's prices carry GST (`gst-price.ts`), so the
+     * notice can say whether the rate chosen is inside the price or added
+     * to it. Absent for a business that isn't registered: it is never told.
+     */
+    priceMode?: GstPriceMode;
 }
 
 /** As many as one sheet lists; more than this is said, not drawn. */
@@ -78,7 +86,8 @@ export class GstRatesService {
      */
     async missing(ctx: OrganizationContext): Promise<MissingRates> {
         const organizationId = ctx.organizationId;
-        const { registered } = await loadTaxProfile(prisma, organizationId);
+        const profile = await loadTaxProfile(prisma, organizationId);
+        const { registered } = profile;
         if (!registered) return { registered, items: [], more: false };
 
         const [services, products] = await Promise.all([
@@ -142,6 +151,7 @@ export class GstRatesService {
             registered,
             items: all.slice(0, LIST_CAP),
             more: all.length > LIST_CAP,
+            priceMode: businessPriceMode(profile.priceMode),
         };
     }
 
