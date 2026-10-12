@@ -7,7 +7,7 @@
  * `react-dom/client` + `act` directly, as the editor's tests do.
  */
 import type { ReactNode } from "react";
-import { act } from "react";
+import { act, useState } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -263,5 +263,169 @@ describe("WeeklyHours — + Hours", () => {
         expect(onChange).not.toHaveBeenCalled();
         await press(plus("Tuesday"));
         expect(time("From")?.value).toBe("540");
+    });
+});
+
+/**
+ * One row a day, as the reference weeks have it: a switch takes the day off
+ * and puts it back with the hours it had (or the opening hours for a day
+ * that had none), a day off says so in words, and a range's own chip opens
+ * its From and To to change it.
+ */
+describe("WeeklyHours — a switch a day, and a range that can be changed", () => {
+    const onChange = vi.fn();
+    // Open 10:00 to 4:00 on Saturdays.
+    const SAT_OPEN: WeeklyRange[] = [
+        { dayOfWeek: 6, startMinute: 600, endMinute: 960 },
+    ];
+    function Held({ opening }: { opening: WeeklyRange[] | null }) {
+        const [hours, setHours] = useState(HOURS);
+        return (
+            <WeeklyHours
+                staffId="st_asha"
+                hours={hours}
+                opening={opening}
+                kept={[]}
+                canEdit
+                onChange={(next) => {
+                    onChange(next);
+                    setHours(next);
+                }}
+            />
+        );
+    }
+    beforeEach(() => {
+        onChange.mockReset();
+        act(() => root.render(<Held opening={SAT_OPEN} />));
+    });
+
+    const toggle = (day: string) =>
+        host.querySelector<HTMLButtonElement>(
+            `[role="switch"][aria-label="Bookable on ${day}"]`,
+        );
+    const popover = () =>
+        document.querySelector<HTMLElement>('[role="dialog"]');
+    async function press(el: HTMLElement | null | undefined) {
+        await act(async () => {
+            el?.click();
+            await new Promise((r) => setTimeout(r, 0));
+        });
+    }
+
+    it("has a switch on every day, on where the day has hours", () => {
+        expect(host.querySelectorAll('[role="switch"]')).toHaveLength(7);
+        expect(toggle("Monday")?.getAttribute("aria-checked")).toBe("true");
+        expect(toggle("Tuesday")?.getAttribute("aria-checked")).toBe("false");
+        // A day off reads as words in its row.
+        expect(row("Tuesday")?.textContent).toContain("Not bookable");
+    });
+
+    it("takes a day off, and puts back the hours it had", async () => {
+        await press(toggle("Monday"));
+        expect(onChange).toHaveBeenLastCalledWith([HOURS[1]]);
+        expect(row("Monday")?.textContent).toContain("Not bookable");
+        await press(toggle("Monday"));
+        expect(onChange).toHaveBeenLastCalledWith([HOURS[1], HOURS[0]]);
+    });
+
+    it("switches a day on with that day's opening hours", async () => {
+        await press(toggle("Saturday"));
+        expect(onChange).toHaveBeenLastCalledWith([...HOURS, ...SAT_OPEN]);
+    });
+
+    it("switches on the usual hours on a day the business is closed", async () => {
+        await press(toggle("Tuesday"));
+        expect(onChange).toHaveBeenLastCalledWith([
+            ...HOURS,
+            { dayOfWeek: 2, startMinute: 540, endMinute: 1080 },
+        ]);
+    });
+
+    it("opens a range's From and To from its chip, and changes it in place", async () => {
+        await press(
+            host.querySelector<HTMLButtonElement>(
+                '[aria-label="Change 8:00 am to 8:00 pm on Monday"]',
+            ),
+        );
+        expect(popover()?.getAttribute("aria-label")).toBe(
+            "Change hours on Monday",
+        );
+        const from = popover()?.querySelector<HTMLInputElement>(
+            '[aria-label="From"]',
+        );
+        // It opens on the range as it is, which doesn't clash with itself.
+        expect(from?.value).toBe("480");
+        expect(popover()?.querySelector('[role="alert"]')).toBeNull();
+        act(() => {
+            if (!from) return;
+            Object.getOwnPropertyDescriptor(
+                Object.getPrototypeOf(from) as object,
+                "value",
+            )?.set?.call(from, "540");
+            from.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await press(
+            Array.from(popover()?.querySelectorAll("button") ?? []).find(
+                (b) => b.textContent === "Change hours",
+            ),
+        );
+        expect(onChange).toHaveBeenLastCalledWith([
+            HOURS[1],
+            { dayOfWeek: 1, startMinute: 540, endMinute: 1200 },
+        ]);
+        expect(popover()).toBeNull();
+    });
+
+    const copyOf = (day: string) =>
+        host.querySelector<HTMLButtonElement>(
+            `button[aria-label="Copy ${day} to other days"]`,
+        );
+    const tick = (day: string) =>
+        Array.from(popover()?.querySelectorAll("label") ?? [])
+            .find((l) => l.textContent === day)
+            ?.querySelector<HTMLButtonElement>('[role="checkbox"]');
+    const copyButton = () =>
+        Array.from(popover()?.querySelectorAll("button") ?? []).find(
+            (b) => b.textContent === "Copy hours",
+        );
+
+    it("offers to copy a day only where the day has hours", () => {
+        expect(copyOf("Monday")).not.toBeNull();
+        expect(copyOf("Sunday")).not.toBeNull();
+        expect(copyOf("Tuesday")).toBeNull();
+    });
+
+    it("copies a day to the days ticked, and to no others", async () => {
+        await press(copyOf("Monday"));
+        expect(popover()?.getAttribute("aria-label")).toBe(
+            "Copy Monday to other days",
+        );
+        // Every other day is offered, none ticked, and nothing to copy yet.
+        expect(popover()?.querySelectorAll('[role="checkbox"]')).toHaveLength(
+            6,
+        );
+        expect(copyButton()?.disabled).toBe(true);
+        await press(tick("Wednesday"));
+        await press(tick("Sunday"));
+        await press(copyButton());
+        expect(onChange).toHaveBeenLastCalledWith([
+            HOURS[0],
+            { dayOfWeek: 3, startMinute: 480, endMinute: 1200 },
+            { dayOfWeek: 0, startMinute: 480, endMinute: 1200 },
+        ]);
+        expect(popover()).toBeNull();
+        expect(row("Wednesday")?.textContent).toContain("8:00 am to 8:00 pm");
+    });
+
+    it("copies nothing on Cancel", async () => {
+        await press(copyOf("Monday"));
+        await press(tick("Friday"));
+        await press(
+            Array.from(popover()?.querySelectorAll("button") ?? []).find(
+                (b) => b.textContent === "Cancel",
+            ),
+        );
+        expect(popover()).toBeNull();
+        expect(onChange).not.toHaveBeenCalled();
     });
 });

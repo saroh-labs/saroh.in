@@ -9,15 +9,38 @@ import { useId, useState } from "react";
 
 import { FormDialog } from "@/components/shared/form-dialog";
 import { runAction } from "@/lib/api/run-action";
-import { createStaff } from "@/lib/staff/actions";
+import { addPerson } from "@/lib/staff/actions";
+import { defaultWeek, weekLines } from "@/lib/staff/starting-week";
+
+/** The default week in words: "Monday to Saturday, 9:00 am to 6:00 pm". */
+const DEFAULT_WORDS = weekLines(defaultWeek())
+    .filter((line) => line.hours)
+    .map((line) => `${line.days}, ${line.hours}`)
+    .join(", and ");
+
+/**
+ * The dialog's one sentence about the week they start with, by what is
+ * known where it opens: the opening hours, the default week when the
+ * business has none, or either when the opener can't tell (the calendar).
+ */
+export function weekSentence(week?: "opening" | "default"): string {
+    const then = "Change their hours any time. They don't need a sign-in.";
+    return week === "opening"
+        ? `They start with your opening hours. ${then}`
+        : week === "default"
+          ? `They start with ${DEFAULT_WORDS}. ${then}`
+          : `They start with your opening hours, or ${DEFAULT_WORDS} if you haven't set any. ${then}`;
+}
 
 /**
  * Someone new on the diary (U3): a name and what they do. A trainer at the
- * front desk may never log in, so no login is needed, but like everyone who
- * takes bookings they use a team seat (DEC-105); a full team is refused by
- * the API and said here, and a refusal keeps the dialog open with what was
- * typed. Their hours are set on Availability once they are added, and which
- * services they take on Services.
+ * front desk may never log in, so no login is needed. Nobody starts with
+ * an empty week: they get the business's opening hours as their weekly
+ * hours, and the dialog says so. Like everyone who takes bookings with no
+ * login they use a team seat (DEC-105), which is said only where the plan
+ * counts seats (`seatNote`); a full team is refused by the API and said
+ * here, and a refusal keeps the dialog open with what was typed. Which
+ * services they take is set on Services.
  *
  * Opened from Availability and, so nobody is sent away to add a name, from
  * the calendar's "Nobody is on the diary yet". Cancel, Escape and the close
@@ -28,13 +51,19 @@ export function AddPersonDialog({
     open,
     onOpenChange,
     onAdded,
-    hoursHint = "Set their hours below.",
+    hoursHint = "Their week is below. Change it any time.",
+    week,
+    seatNote,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onAdded?: (staffId: string) => void;
-    /** Where their hours are set from here, said once they are added. */
+    /** Where their hours are changed from here, said once they are added. */
     hoursHint?: string;
+    /** Which week they will start with, when the opener knows. */
+    week?: "opening" | "default";
+    /** The seat this uses, said only when the plan counts seats. */
+    seatNote?: string | null;
 }) {
     const router = useRouter();
     const ids = { name: useId(), title: useId() };
@@ -60,7 +89,7 @@ export function AddPersonDialog({
         setError(null);
         const res = await runAction(
             () =>
-                createStaff({
+                addPerson({
                     name: name.trim(),
                     title: title.trim() || undefined,
                 }),
@@ -85,7 +114,11 @@ export function AddPersonDialog({
             open={open}
             size="sm"
             title="New person who takes bookings"
-            description="They don't need a sign-in, but they use a team seat, as everyone who takes bookings does. Their hours start empty, so nobody can book them until you add some."
+            description={
+                seatNote
+                    ? `${weekSentence(week)} ${seatNote}`
+                    : weekSentence(week)
+            }
             pending={saving}
             saveLabel="Add person"
             savingLabel="Adding…"

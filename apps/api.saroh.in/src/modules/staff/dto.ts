@@ -85,6 +85,26 @@ export class CreateStaffDto {
     hours?: StaffHoursDto[];
 }
 
+/**
+ * "It's just me": the caller puts themselves on the diary. Who they are is
+ * read from the session, never sent; the week and the services they start
+ * with are.
+ */
+export class AddSelfDto {
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(200)
+    @IsString({ each: true })
+    serviceIds?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(70)
+    @ValidateNested({ each: true })
+    @Type(() => StaffHoursDto)
+    hours?: StaffHoursDto[];
+}
+
 export class UpdateStaffDto {
     @IsOptional()
     @Transform(trim)

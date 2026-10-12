@@ -768,12 +768,13 @@ export function CalendarScreen({
             />
             {/* Adding someone is a name and what they do, so it is done
                 here; the dialog refreshes the calendar, which gives them
-                their column. Their week is Availability's job. */}
+                their column. They start with the opening hours, and
+                Availability is where their week is changed. */}
             {can.hours ? (
                 <AddPersonDialog
                     open={addingPerson}
                     onOpenChange={setAddingPerson}
-                    hoursHint="Set their hours in Availability."
+                    hoursHint="Change their hours in Availability."
                 />
             ) : null}
         </div>

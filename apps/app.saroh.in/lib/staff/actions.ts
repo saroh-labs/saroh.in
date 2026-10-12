@@ -1,7 +1,17 @@
 "use server";
 
-import type { BookingRules, OffRangeInput, WeeklyRange } from "./service";
+import type { ApiResult } from "@/lib/api/failure";
+import { listServices } from "@/lib/services/service";
+
+import type {
+    AddedSelf,
+    BookingRules,
+    OfferedRead,
+    OffRangeInput,
+    WeeklyRange,
+} from "./service";
 import * as staff from "./service";
+import { hasOpening, startingWeek } from "./starting-week";
 
 /**
  * Server Actions for staff, hours, time off and booking rules (U3). Thin
@@ -10,6 +20,51 @@ import * as staff from "./service";
 
 export async function createStaff(input: staff.CreateStaffInput) {
     return staff.createStaff(input);
+}
+
+/**
+ * Someone new on the diary, starting with the business's opening hours as
+ * their weekly hours (the default week when none are saved, or when they
+ * couldn't be read), so nobody starts with an empty week.
+ */
+export async function addPerson(input: { name: string; title?: string }) {
+    const opening = await staff.readOpeningHours();
+    return staff.createStaff({ ...input, hours: startingWeek(opening) });
+}
+
+/**
+ * "It's just me": the signed-in person on the diary in one press, with the
+ * opening hours as their week and every service that takes bookings as
+ * theirs, so customers can book them at once. Answers with which week they
+ * started with, for the toast to say.
+ */
+export async function addMyself(): Promise<ApiResult<AddedSelf>> {
+    const [opening, services] = await Promise.all([
+        staff.readOpeningHours(),
+        listServices().catch(() => []),
+    ]);
+    const res = await staff.addSelf({
+        hours: startingWeek(opening),
+        serviceIds: services
+            .filter((s) => s.status === "ACTIVE")
+            .map((s) => s.id),
+    });
+    if (!res.ok) return res;
+    return {
+        ok: true,
+        data: {
+            staff: res.data,
+            week: hasOpening(opening) ? "opening" : "default",
+        },
+    };
+}
+
+/** The times the booking page offers, for Availability's preview. */
+export async function readOffered(
+    serviceId: string,
+    staffId?: string,
+): Promise<OfferedRead> {
+    return staff.readOffered(serviceId, staffId);
 }
 
 export async function updateStaff(

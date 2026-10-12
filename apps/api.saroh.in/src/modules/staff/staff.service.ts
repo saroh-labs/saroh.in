@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
@@ -25,6 +26,7 @@ import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
 import type {
     AddExtraHoursDto,
+    AddSelfDto,
     AddTimeOffDto,
     CreateStaffDto,
     StaffHoursDto,
@@ -305,6 +307,66 @@ export class StaffService {
             }),
         );
         return this.read(ctx, created.id);
+    }
+
+    /**
+     * "It's just me": the caller on the diary as themselves, linked to
+     * their own membership, which is read from the session and never sent.
+     * A team member who can change services already uses a team seat, so
+     * taking bookings adds none and no plan limit is asked (DEC-105,
+     * `staff-seats.ts`). Someone who was on it and archived comes back as
+     * they were, given the week and services sent only where they had
+     * none; someone already on it is answered as they are.
+     */
+    async addSelf(
+        ctx: OrganizationContext,
+        dto: AddSelfDto,
+    ): Promise<StaffView> {
+        requireBookingPower(ctx, "service:write");
+        const membership = await prisma.membership.findFirst({
+            where: {
+                organizationId: ctx.organizationId,
+                userId: ctx.userId,
+            },
+            select: {
+                id: true,
+                user: { select: { name: true, email: true } },
+                staffMember: {
+                    select: {
+                        id: true,
+                        status: true,
+                        _count: { select: { hours: true, services: true } },
+                    },
+                },
+            },
+        });
+        if (!membership) {
+            throw new ForbiddenException(
+                "Only someone on this business's team can go on its diary.",
+            );
+        }
+        const mine = membership.staffMember;
+        if (!mine) {
+            // Their own name, else the front of their email.
+            const typed = membership.user.name?.trim() ?? "";
+            const local = membership.user.email.split("@")[0] ?? "";
+            const name = typed !== "" ? typed : local !== "" ? local : "Me";
+            return this.create(ctx, {
+                name: name.slice(0, 80),
+                membershipId: membership.id,
+                serviceIds: dto.serviceIds,
+                hours: dto.hours,
+            });
+        }
+        if (mine.status === "ACTIVE") return this.read(ctx, mine.id);
+        await this.update(ctx, mine.id, { status: "ACTIVE" });
+        if (mine._count.hours === 0 && dto.hours?.length) {
+            await this.replaceHours(ctx, mine.id, dto.hours);
+        }
+        if (mine._count.services === 0 && dto.serviceIds?.length) {
+            await this.setServices(ctx, mine.id, dto.serviceIds);
+        }
+        return this.read(ctx, mine.id);
     }
 
     async update(

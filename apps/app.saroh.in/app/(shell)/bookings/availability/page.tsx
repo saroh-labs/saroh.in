@@ -7,6 +7,7 @@ import { AvailabilityEditor } from "@/components/bookings/availability/availabil
 
 import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import type { KeptBooking } from "@/lib/services/availability-rules";
 import {
     addDays,
@@ -21,13 +22,16 @@ import {
     readBookingsCalendar,
     readNow,
 } from "@/lib/services/service";
+import { readServiceHours } from "@/lib/services/service-hours-read";
 import { requireSession } from "@/lib/session";
-import type { BookingRules, StaffList } from "@/lib/staff/service";
+import { seatNote } from "@/lib/staff/seat-note";
+import type { StaffList } from "@/lib/staff/service";
 import {
     getBookingRules,
     listStaff,
     readBookingPayment,
 } from "@/lib/staff/service";
+import { tidyWeek } from "@/lib/staff/starting-week";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
@@ -36,17 +40,11 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
  * (U3) and three weeks of bookings (U4) — the bookings only to say which
  * would fall outside new hours or in extra hours; time off and closures
  * ask the API what they cover (E3). Without them the editor still works
- * and says it could not check.
+ * and says it could not check. With nobody on the diary it also reads the
+ * services' own hours, as the calendar's "Service hours" column does
+ * (`readServiceHours`), to say the week customers can book today.
  */
 export const metadata = { title: "Availability" };
-
-const NO_RULES: BookingRules = {
-    bookAheadDays: null,
-    latestBookingMinutes: null,
-    freeCancelHours: null,
-    refundInTimeCancels: true,
-    bookingPayment: "BOTH",
-};
 
 async function readStaff(): Promise<StaffList | null> {
     try {
@@ -58,13 +56,14 @@ async function readStaff(): Promise<StaffList | null> {
 
 export default async function AvailabilityPage() {
     await requireSession();
-    const [organization, staffList, rules, services, payment] =
+    const [organization, staffList, rules, services, payment, plan] =
         await Promise.all([
             resolveActiveOrganization(),
             readStaff(),
             getBookingRules().catch(() => null),
             listServices(),
             readBookingPayment(),
+            billingAccessOrNull(),
         ]);
 
     if (!staffList) {
@@ -90,10 +89,14 @@ export default async function AvailabilityPage() {
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
     const timezone = staffList.timezone;
     const today = localDateOf(new Date(readNow()), timezone);
-    const calendar = await readBookingsCalendar(
-        dayBounds(today, timezone).from.toISOString(),
-        dayBounds(addDays(today, 21), timezone).to.toISOString(),
-    );
+    const [calendar, serviceHours] = await Promise.all([
+        readBookingsCalendar(
+            dayBounds(today, timezone).from.toISOString(),
+            dayBounds(addDays(today, 21), timezone).to.toISOString(),
+        ),
+        // Only read while nobody is on the diary; null otherwise.
+        readServiceHours(services, staffList),
+    ]);
 
     // The live bookings with a person: this week's for "outside these
     // hours", and a count per person per day for extra hours.
@@ -164,7 +167,16 @@ export default async function AvailabilityPage() {
                     staff={staffList.staff}
                     closures={staffList.closures}
                     openingHours={staffList.openingHours ?? null}
-                    rules={rules ?? NO_RULES}
+                    rules={rules}
+                    serviceHours={
+                        serviceHours ? tidyWeek(serviceHours.hours) : null
+                    }
+                    services={services
+                        .filter(
+                            (s) => s.status === "ACTIVE" && s.showOnBookingPage,
+                        )
+                        .map((s) => ({ id: s.id, name: s.name }))}
+                    seatNote={seatNote(plan)}
                     timezone={timezone}
                     today={today}
                     kept={kept}
