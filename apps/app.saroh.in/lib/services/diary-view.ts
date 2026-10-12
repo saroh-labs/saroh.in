@@ -107,7 +107,7 @@ export function toPayText(block: Block): string | null {
 export const MIN_BLOCK_MINUTES = 28;
 
 /** Under this a block has room for one line only: the name, then the time. */
-export const ONE_LINE_UNDER_MINUTES = 45;
+export const ONE_LINE_UNDER_MINUTES = 60;
 
 /** What a cancelled booking's thin line takes of the diary, in minutes. */
 export const CANCELLED_LINE_MINUTES = 24;
