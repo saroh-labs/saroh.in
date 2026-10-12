@@ -21,7 +21,8 @@ import {
     productFieldsFor,
     saveProductFieldValues,
 } from "../catalogue/fields.service";
-import { isGstRate } from "../invoices/gst";
+import { isGstRate, rateToBps } from "../invoices/gst";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { productTypesOf } from "../orders/fulfilment";
 import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { PRODUCT_HAS_STOCK_HISTORY } from "../stock/stock-words";
@@ -43,10 +44,15 @@ import { promisesToMove } from "./open-promises";
 import type { ProductScope } from "./product-access";
 import { ProductAccess } from "./product-access";
 import { duplicateProduct } from "./product-duplicate";
+import type { MrpJudged } from "./product-rules";
 import {
     assertDetailsCoherent,
-    assertMrpAtOrAbovePrice,
+    assertProductWithinMrp,
     cleanShopFields,
+    hasMrp,
+    moneyToCents,
+    overMrp,
+    overMrpMessage,
 } from "./product-rules";
 import type { CatalogueItemDto } from "./serialize";
 import {
@@ -182,6 +188,47 @@ function isLockConflict(error: unknown): boolean {
     if (isSerializationFailure(error)) return true;
     const text = `${JSON.stringify(meta ?? null)} ${typeof message === "string" ? message : ""}`;
     return text.includes("40P01") || text.includes("deadlock detected");
+}
+
+/**
+ * What the MRP rule reads of a stored product: its price and MRP, how its
+ * price carries GST, and each option's own price and MRP.
+ */
+const MRP_SELECT = {
+    price: true,
+    mrp: true,
+    currency: true,
+    gstRate: true,
+    gstPriceMode: true,
+    variants: {
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: { title: true, price: true, mrp: true },
+    },
+} satisfies Prisma.ProductSelect;
+
+type MrpRow = Prisma.ProductGetPayload<{ select: typeof MRP_SELECT }>;
+
+const text = (value: { toString(): string } | null): string | null =>
+    value === null ? null : value.toString();
+
+/** A stored product's options as the MRP rule reads them. */
+function optionsOf(row: Pick<MrpRow, "variants">): MrpJudged["variants"] {
+    return row.variants.map((v) => ({
+        title: v.title,
+        price: text(v.price),
+        mrp: text(v.mrp),
+    }));
+}
+
+/**
+ * Whether a status change puts a product back within reach of a sale: it
+ * is published, or brought back from the archive. Taking one off sale (to
+ * a draft, or archiving it) never is, so a product over its MRP can always
+ * be taken down.
+ */
+function goesOnSale(from: string, to: string | undefined | null): boolean {
+    if (to == null || to === from || to === "ARCHIVED") return false;
+    return to === "PUBLISHED" || from === "ARCHIVED";
 }
 
 /** Never null over the wire in a patch: a null there means "not sent". */
@@ -399,7 +446,31 @@ export class ProductsService {
         await this.assertSlugFree(organizationId, slug);
         await this.assertCategoryOf(organizationId, dto.categoryId);
         await this.assertOptionOf(organizationId, dto.optionId);
-        assertMrpAtOrAbovePrice(dto.price, dto.mrp ?? null);
+        // GST is part of MRP: the MRP is compared with the amount to pay
+        // (`product-rules.ts`). Only a product with an MRP asks.
+        if (dto.mrp != null) {
+            const over = overMrp(dto.price, dto.mrp, {
+                item: {
+                    gstRate: checkGstRate(dto.gstRate),
+                    gstPriceMode: dto.gstPriceMode,
+                },
+                terms: await loadPriceTerms(prisma, organizationId),
+            });
+            if (over) {
+                // The sums are written in the currency it will be priced in.
+                const currency =
+                    dto.currency ??
+                    (await defaultProductCurrency(prisma, {
+                        storeId,
+                        organizationId,
+                    })) ??
+                    "INR";
+                throw new BadRequestException({
+                    message: overMrpMessage(over, currency),
+                    field: "mrp",
+                });
+            }
+        }
         assertDetailsCoherent({
             madeHere: dto.madeHere ?? true,
             maker: dto.maker ?? null,
@@ -526,10 +597,32 @@ export class ProductsService {
         const { organizationId } = scope;
         const current = await prisma.product.findFirst({
             where: { id: productId, organizationId },
-            select: { slug: true, status: true, currency: true },
+            select: { slug: true, status: true, ...MRP_SELECT },
         });
         if (!current) {
             throw new NotFoundException("Product not found");
+        }
+        // A new price, or a product coming back on sale, is judged against
+        // its MRP by the amount to pay (`product-rules.ts`).
+        const judged: MrpJudged = {
+            price: dto.price,
+            mrp: text(current.mrp),
+            gstRate: current.gstRate,
+            gstPriceMode: current.gstPriceMode,
+            variants: optionsOf(current),
+        };
+        if (
+            hasMrp(judged) &&
+            (moneyToCents(dto.price) !==
+                moneyToCents(current.price.toString()) ||
+                goesOnSale(current.status, dto.status))
+        ) {
+            assertProductWithinMrp(
+                judged,
+                await loadPriceTerms(prisma, organizationId),
+                current.currency,
+                "price",
+            );
         }
         const slug = slugify(dto.slug);
         // Left out, the product keeps its currency. Changed, every
@@ -624,8 +717,7 @@ export class ProductsService {
             where: { id: productId, organizationId },
             select: {
                 slug: true,
-                price: true,
-                mrp: true,
+                ...MRP_SELECT,
                 madeHere: true,
                 maker: true,
                 returnsMode: true,
@@ -743,11 +835,44 @@ export class ProductsService {
             data.seoImageId = dto.seoImageId ?? null;
         }
 
-        const price = dto.price ?? current.price.toString();
-        const mrp = has("mrp")
-            ? (dto.mrp ?? null)
-            : (current.mrp?.toString() ?? null);
-        assertMrpAtOrAbovePrice(price, mrp, has("mrp") ? "mrp" : "price");
+        // The MRP is compared with the amount to pay for one, GST and all
+        // (`product-rules.ts`), on the product as it will stand: when this
+        // save changes the price, the MRP, the rate or how the price
+        // carries GST, or brings the product back on sale. A save that
+        // touches none of them is never refused for a sum it did not make.
+        const storedPrice = current.price.toString();
+        const storedMrp = text(current.mrp);
+        const price = dto.price ?? storedPrice;
+        const mrp = has("mrp") ? (dto.mrp ?? null) : storedMrp;
+        const judged: MrpJudged = {
+            price,
+            mrp,
+            gstRate: has("gstRate") ? (dto.gstRate ?? null) : current.gstRate,
+            gstPriceMode: has("gstPriceMode")
+                ? (dto.gstPriceMode ?? null)
+                : current.gstPriceMode,
+            variants: optionsOf(current),
+        };
+        const sumChanged =
+            moneyToCents(price) !== moneyToCents(storedPrice) ||
+            (mrp === null ? null : moneyToCents(mrp)) !==
+                (storedMrp === null ? null : moneyToCents(storedMrp)) ||
+            rateToBps(judged.gstRate) !== rateToBps(current.gstRate) ||
+            (judged.gstPriceMode ?? null) !== (current.gstPriceMode ?? null);
+        if (
+            hasMrp(judged) &&
+            (sumChanged ||
+                (has("status") && goesOnSale(current.status, dto.status)))
+        ) {
+            assertProductWithinMrp(
+                judged,
+                await loadPriceTerms(prisma, organizationId),
+                current.currency,
+                (["mrp", "price", "gstPriceMode", "gstRate"] as const).find(
+                    (key) => has(key),
+                ) ?? "price",
+            );
+        }
         assertDetailsCoherent({
             madeHere: dto.madeHere ?? current.madeHere,
             maker: has("maker") ? (dto.maker ?? null) : current.maker,

@@ -10,12 +10,21 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import type { OrgAction } from "../organizations/organization-actions";
 import { allows, authorize } from "../organizations/organization-policy";
+import type { OverMrpRead } from "../products/over-mrp";
+import { findOverMrp } from "../products/over-mrp";
+import {
+    firstOverMrp,
+    hasMrp,
+    overMrpMessage,
+} from "../products/product-rules";
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { actorFromContext } from "../subscriptions/event-actors";
 import { bpsToRate, isGstRate, rateToBps } from "./gst";
 import type { GstPriceMode } from "./gst-price";
 import { businessPriceMode, isGstPriceMode } from "./gst-price";
 import type { RatedKind, SetGstRatesDto } from "./gst-rates.dto";
 import { loadTaxProfile } from "./order-invoicing";
+import { loadPriceTerms } from "./price-terms";
 import { fromCents, toCents } from "./totals";
 
 /**
@@ -286,9 +295,36 @@ export class GstRatesService {
     }
 
     /**
+     * The products, and their options, whose amount to pay is above their
+     * MRP because GST is added to the price (`products/over-mrp.ts`): as the
+     * business stands, or as it would stand under `mode`, which is how the
+     * tax settings say what a switch to "GST is added" would do before it
+     * is saved. Nothing for a business that isn't registered, or a role
+     * that can't read products.
+     */
+    async overMrp(
+        ctx: OrganizationContext,
+        mode?: GstPriceMode,
+    ): Promise<OverMrpRead> {
+        const terms = await loadPriceTerms(prisma, ctx.organizationId);
+        const judged = { ...terms, mode: mode ?? terms.mode };
+        const none = { products: 0, options: 0, items: [], more: false };
+        return {
+            registered: judged.registered,
+            mode: judged.mode,
+            ...(allows(ctx, READ.PRODUCT)
+                ? await findOverMrp(prisma, ctx.organizationId, judged)
+                : none),
+        };
+    }
+
+    /**
      * Save a rate on each item named: all of them, or none. A rate is one
      * GST has, 0 included; clearing a rate is the item's own editor's job,
      * not this one's. An item in another business, or gone, is a 404.
+     *
+     * A product's rate is refused where it would take the amount to pay
+     * above the MRP (GST is part of MRP, `products/product-rules.ts`).
      */
     async set(
         ctx: OrganizationContext,
@@ -319,6 +355,15 @@ export class GstRatesService {
                 // It has a rate already, and changing one is its editor's.
                 authorize(ctx, WRITE[item.kind]);
             }
+            // A product's rate is in the GST words, the amount to pay and
+            // the saving against its MRP on its published page and cards.
+            await enqueuePageRevalidation(tx, {
+                cause: "product",
+                productIds: dto.items
+                    .filter((item) => item.kind === "PRODUCT")
+                    .map((item) => item.id),
+                organizationId: ctx.organizationId,
+            });
         });
         return { saved: dto.items.length };
     }
@@ -375,6 +420,7 @@ async function saveRate(
     }
     if (item.kind === "PRODUCT") {
         const owned = { id: item.id, organizationId };
+        await assertRateWithinMrp(tx, organizationId, item, fill);
         const { count } = await tx.product.updateMany({
             where: { ...owned, ...unsetOnly },
             data: { gstRate: item.rate },
@@ -449,6 +495,65 @@ async function saveRate(
         },
     });
     return "saved";
+}
+
+/**
+ * A rate on a product changes the amount to pay where GST is added to its
+ * price, so the product is judged with the new rate before it is saved:
+ * refused, by name and with the sums, when it or one of its options would
+ * be above its MRP. A product with no MRP, one that is gone, and one whose
+ * rate this save leaves alone (`fill` with a rate already chosen) pass.
+ */
+async function assertRateWithinMrp(
+    tx: Tx,
+    organizationId: string,
+    item: { id: string; rate: string },
+    fill: boolean,
+): Promise<void> {
+    const product = await tx.product.findFirst({
+        where: { id: item.id, organizationId },
+        select: {
+            name: true,
+            price: true,
+            mrp: true,
+            currency: true,
+            gstRate: true,
+            gstPriceMode: true,
+            variants: {
+                orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+                select: { title: true, price: true, mrp: true },
+            },
+        },
+    });
+    if (!product || (fill && product.gstRate !== null)) return;
+    const judged = {
+        price: product.price.toString(),
+        mrp: product.mrp?.toString() ?? null,
+        gstRate: item.rate,
+        gstPriceMode: product.gstPriceMode,
+        variants: product.variants.map((v) => ({
+            title: v.title,
+            price: v.price?.toString() ?? null,
+            mrp: v.mrp?.toString() ?? null,
+        })),
+    };
+    if (!hasMrp(judged)) return;
+    const over = firstOverMrp(judged, await loadPriceTerms(tx, organizationId));
+    // Only what the rate does: a typed price already above its MRP is the
+    // product's own editor's to fix, and choosing a rate never made it so.
+    if (!over || over.payCents <= over.listCents) return;
+    throw new BadRequestException({
+        message: overMrpMessage(
+            {
+                ...over,
+                option: over.option
+                    ? `${product.name}, ${over.option}`
+                    : product.name,
+            },
+            product.currency,
+        ),
+        details: { field: "rate", kind: "PRODUCT", id: item.id },
+    });
 }
 
 /** A stored rate as it is written: "18", "0.25"; null when not set. */

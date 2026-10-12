@@ -11,9 +11,12 @@ jest.mock("@saroh/database", () => {
         },
         product: {
             findMany: jest.fn(),
+            // What the MRP rule reads before a product's rate is saved.
+            findFirst: jest.fn(),
             updateMany: jest.fn(),
             count: jest.fn(),
         },
+        businessProfile: { findUnique: jest.fn() },
         // Plans, class packs and courses carry a rate too (12 Oct 2026).
         subscriptionPlan: {
             findMany: jest.fn(),
@@ -47,6 +50,11 @@ jest.mock("@saroh/database", () => {
 });
 jest.mock("./order-invoicing", () => ({
     loadTaxProfile: jest.fn(),
+}));
+// A product's rate tells the page cache; whether it is on is not this
+// spec's.
+jest.mock("../sites/page-cache-revalidate", () => ({
+    enqueuePageRevalidation: jest.fn().mockResolvedValue(false),
 }));
 
 import "reflect-metadata";
@@ -587,5 +595,227 @@ describe("what the API accepts", () => {
         await expect(
             problems({ items: [{ kind: "SERVICE", id: "s_1", rate: "" }] }),
         ).resolves.not.toHaveLength(0);
+    });
+});
+
+/**
+ * GST is part of MRP (12 Oct 2026). A product's rate changes the amount to
+ * pay where GST is added to its price, so the save that sets a rate is
+ * judged as the product's own editor is.
+ */
+describe("a product's rate and its MRP", () => {
+    const business = (mode: "INCLUDED" | "ADDED" | null, registered = true) =>
+        db.businessProfile!.findUnique!.mockResolvedValue({
+            gstRegistered: registered,
+            gstState: registered ? "29" : null,
+            taxId: registered ? "29AAGCR4375J1ZU" : null,
+            gstPriceMode: mode,
+        });
+    /** The product the save reads: ₹1,000, with this MRP. */
+    const product = (
+        mrp: string | null,
+        over: {
+            gstRate?: string | null;
+            gstPriceMode?: string | null;
+            variants?: {
+                title: string;
+                price: string | null;
+                mrp: string | null;
+            }[];
+        } = {},
+    ) =>
+        products.findFirst!.mockResolvedValue({
+            name: "Face cream",
+            price: decimal("1000"),
+            mrp: mrp === null ? null : decimal(mrp),
+            currency: "INR",
+            gstRate: over.gstRate == null ? null : decimal(over.gstRate),
+            gstPriceMode: over.gstPriceMode ?? null,
+            variants: (over.variants ?? []).map((v) => ({
+                title: v.title,
+                price: v.price === null ? null : decimal(v.price),
+                mrp: v.mrp === null ? null : decimal(v.mrp),
+            })),
+        });
+    const set = (rate: string) =>
+        rates.set(owner, {
+            items: [{ kind: "PRODUCT", id: "prod_cream", rate }],
+        });
+
+    beforeEach(() => business("ADDED"));
+
+    it("GST is added: refused where the rate takes it over the MRP, by name and with the sums", async () => {
+        // 1,000 + 180 = 1,180 > 1,100
+        product("1100");
+        const attempt = set("18");
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toMatchObject({
+            response: {
+                message:
+                    "Face cream: with 18% GST added this is ₹1,180 to pay, more than its MRP of ₹1,100. Lower the price, raise the MRP, or set this product's price to include GST.",
+                details: { field: "rate", kind: "PRODUCT", id: "prod_cream" },
+            },
+        });
+        expect(products.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("GST is added: saved at exactly the MRP, below it, and at 0%", async () => {
+        product("1180");
+        await expect(set("18")).resolves.toEqual({ saved: 1 });
+        product("1500");
+        await expect(set("18")).resolves.toEqual({ saved: 1 });
+        // Exempt: nothing is added, ₹1,000 against ₹1,000.
+        product("1000");
+        await expect(set("0")).resolves.toEqual({ saved: 1 });
+        expect(products.updateMany).toHaveBeenCalledTimes(3);
+    });
+
+    it("at 5, 12 and 28 percent: ₹1,050, ₹1,120 and ₹1,280 to pay", async () => {
+        for (const [rate, pay, short] of [
+            ["5", "1050", "1049.99"],
+            ["12", "1120", "1119.99"],
+            ["28", "1280", "1279.99"],
+        ] as const) {
+            product(pay);
+            await expect(set(rate)).resolves.toEqual({ saved: 1 });
+            product(short);
+            await expect(set(rate)).rejects.toBeInstanceOf(BadRequestException);
+        }
+    });
+
+    it("names the option the rate takes over its own MRP", async () => {
+        // Large: 1,200 + 216 = 1,416 > 1,300
+        product("1500", {
+            variants: [{ title: "Large", price: "1200", mrp: "1300" }],
+        });
+        await expect(set("18")).rejects.toMatchObject({
+            response: {
+                message:
+                    "Face cream, Large: with 18% GST added this is ₹1,416 to pay, more than its MRP of ₹1,300. Lower the price, raise the MRP, or set this product's price to include GST.",
+            },
+        });
+    });
+
+    it("prices include GST: unchanged, any rate is saved", async () => {
+        business("INCLUDED");
+        product("1100");
+        await expect(set("28")).resolves.toEqual({ saved: 1 });
+        product("1000");
+        await expect(set("28")).resolves.toEqual({ saved: 1 });
+    });
+
+    it("the product's own choice decides, both ways", async () => {
+        business("INCLUDED");
+        product("1100", { gstPriceMode: "ADDED" });
+        await expect(set("18")).rejects.toBeInstanceOf(BadRequestException);
+        business("ADDED");
+        product("1100", { gstPriceMode: "INCLUDED" });
+        await expect(set("18")).resolves.toEqual({ saved: 1 });
+    });
+
+    it("a business that isn't registered is untouched", async () => {
+        business("ADDED", false);
+        product("1100");
+        await expect(set("18")).resolves.toEqual({ saved: 1 });
+    });
+
+    it("a product with no MRP asks nothing of the business", async () => {
+        product(null);
+        await expect(set("18")).resolves.toEqual({ saved: 1 });
+        expect(db.businessProfile!.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("someone who may only fill in a missing rate is not judged on a rate already chosen", async () => {
+        // The desk can't change a rate: the save keeps the one it has,
+        // and is refused as it always was, for the permission.
+        product("1100", { gstRate: "5" });
+        products.updateMany!.mockResolvedValue({ count: 0 });
+        products.count!.mockResolvedValue(1);
+        await expect(
+            rates.set(roleWith("store:read", "invoice:write"), {
+                items: [{ kind: "PRODUCT", id: "prod_cream", rate: "18" }],
+            }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+});
+
+describe("what is over its MRP", () => {
+    const row = (mrp: string) => ({
+        id: "prod_cream",
+        name: "Face cream",
+        price: decimal("1000"),
+        mrp: decimal(mrp),
+        currency: "INR",
+        gstRate: decimal("18"),
+        gstPriceMode: null,
+        variants: [],
+    });
+    const business = (mode: "INCLUDED" | "ADDED", registered = true) =>
+        db.businessProfile!.findUnique!.mockResolvedValue({
+            gstRegistered: registered,
+            gstState: registered ? "29" : null,
+            taxId: registered ? "29AAGCR4375J1ZU" : null,
+            gstPriceMode: mode,
+        });
+
+    it("as it would stand under GST is added: the count, and the first few by name", async () => {
+        business("INCLUDED");
+        products.findMany!.mockResolvedValue([row("1100"), row("1180")]);
+        await expect(rates.overMrp(owner, "ADDED")).resolves.toEqual({
+            registered: true,
+            mode: "ADDED",
+            products: 1,
+            options: 0,
+            items: [
+                {
+                    productId: "prod_cream",
+                    name: "Face cream",
+                    option: null,
+                    currency: "INR",
+                    listCents: 100_000,
+                    payCents: 118_000,
+                    mrpCents: 110_000,
+                    rate: "18",
+                },
+            ],
+            more: false,
+        });
+    });
+
+    it("as it stands: nothing while the business's prices include GST", async () => {
+        business("INCLUDED");
+        products.findMany!.mockResolvedValue([row("1100")]);
+        await expect(rates.overMrp(owner)).resolves.toMatchObject({
+            mode: "INCLUDED",
+            products: 0,
+            items: [],
+        });
+    });
+
+    it("as it stands: lists what a business already on GST is added has over", async () => {
+        business("ADDED");
+        products.findMany!.mockResolvedValue([row("1100")]);
+        await expect(rates.overMrp(owner)).resolves.toMatchObject({
+            mode: "ADDED",
+            products: 1,
+        });
+    });
+
+    it("says nothing for a business that isn't registered, or a role that can't read products", async () => {
+        business("ADDED", false);
+        await expect(rates.overMrp(owner, "ADDED")).resolves.toEqual({
+            registered: false,
+            mode: "ADDED",
+            products: 0,
+            options: 0,
+            items: [],
+            more: false,
+        });
+        business("ADDED");
+        products.findMany!.mockResolvedValue([row("1100")]);
+        await expect(
+            rates.overMrp(roleWith("service:read"), "ADDED"),
+        ).resolves.toMatchObject({ registered: true, products: 0 });
+        expect(products.findMany).not.toHaveBeenCalled();
     });
 });

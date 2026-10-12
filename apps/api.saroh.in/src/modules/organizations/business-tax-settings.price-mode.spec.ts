@@ -1,7 +1,12 @@
 import { BadRequestException } from "@nestjs/common";
 
 import type { TaxCurrent } from "./business-tax-settings";
-import { taxChanges, taxView, touchesTax } from "./business-tax-settings";
+import {
+    priceTermsChange,
+    taxChanges,
+    taxView,
+    touchesTax,
+} from "./business-tax-settings";
 import { settingsChanges, settingsSnapshot } from "./settings-audit";
 
 /**
@@ -160,5 +165,84 @@ describe("the activity record", () => {
                 settingsSnapshot(row),
             ),
         ).toEqual([]);
+    });
+});
+
+/**
+ * GST is part of MRP (12 Oct 2026): a tax save that adds GST to prices
+ * that had none added can take products above their MRP, so the settings
+ * service counts them first. Which saves those are is decided here.
+ */
+describe("whether a save adds GST to the business's prices", () => {
+    const change = (
+        current: TaxCurrent | null,
+        data: Parameters<typeof priceTermsChange>[1],
+        taxId?: string,
+    ) => priceTermsChange(current, data, taxId);
+
+    it("switching to GST is added does", () => {
+        expect(change(registered, { gstPriceMode: "ADDED" })).toEqual({
+            before: { registered: true, mode: "INCLUDED" },
+            after: { registered: true, mode: "ADDED" },
+            addsGst: true,
+        });
+    });
+
+    it("switching back to includes GST never does", () => {
+        expect(
+            change(
+                { ...registered, gstPriceMode: "ADDED" },
+                { gstPriceMode: "INCLUDED" },
+            ).addsGst,
+        ).toBe(false);
+    });
+
+    it("saving the same choice again, or something else, does not", () => {
+        const added = { ...registered, gstPriceMode: "ADDED" };
+        expect(change(added, { gstPriceMode: "ADDED" }).addsGst).toBe(false);
+        expect(change(added, { invoicePrefix: "RC" }).addsGst).toBe(false);
+        expect(change(registered, { invoicePrefix: "RC" }).addsGst).toBe(false);
+    });
+
+    it("registering does: a product can already be set to GST is added, and an old choice comes back", () => {
+        expect(
+            change(
+                unregistered,
+                { gstRegistered: true, gstState: "29" },
+                "29AAGCR4375J1ZU",
+            ),
+        ).toEqual({
+            before: { registered: false, mode: "INCLUDED" },
+            after: { registered: true, mode: "INCLUDED" },
+            addsGst: true,
+        });
+        expect(
+            change(
+                { ...unregistered, gstPriceMode: "ADDED" },
+                { gstRegistered: true },
+                "29AAGCR4375J1ZU",
+            ).after,
+        ).toEqual({ registered: true, mode: "ADDED" });
+    });
+
+    it("deregistering does not, and a business with no profile is not registered", () => {
+        expect(change(registered, { gstRegistered: false }).addsGst).toBe(
+            false,
+        );
+        expect(change(null, {}).after).toEqual({
+            registered: false,
+            mode: "INCLUDED",
+        });
+    });
+
+    it("is registered only with the switch, a GSTIN and a state, as prices are", () => {
+        // The switch alone, with no GSTIN on file: no GST is charged.
+        expect(
+            change(unregistered, { gstRegistered: true }).after.registered,
+        ).toBe(false);
+        expect(
+            change({ ...registered, gstState: null }, { gstPriceMode: "ADDED" })
+                .addsGst,
+        ).toBe(false);
     });
 });
