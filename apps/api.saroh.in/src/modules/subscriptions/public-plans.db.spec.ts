@@ -136,6 +136,8 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
                 currency: "INR",
                 interval: "MONTH",
                 mostChosen: true,
+                // Not GST-registered: no GST words.
+                gst: null,
             },
             {
                 id: weekly,
@@ -145,6 +147,7 @@ describe("GET public/sites/:siteId/plans (G9, real database)", () => {
                 currency: "INR",
                 interval: "WEEK",
                 mostChosen: false,
+                gst: null,
             },
         ]);
     });

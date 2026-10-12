@@ -1,7 +1,11 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// These tests read every app's files off the disk: seconds on a busy
+// machine (a gate run beside other work, 12 Oct 2026), past the default five.
+vi.setConfig({ testTimeout: 30_000 });
 
 /**
  * Session replay is the signed-in workspace and saroh.in, and nowhere else

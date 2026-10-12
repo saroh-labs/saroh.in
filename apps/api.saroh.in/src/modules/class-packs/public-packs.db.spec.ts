@@ -168,6 +168,8 @@ describe("GET public/sites/:siteId/packs (G20, real database)", () => {
                     currency: "INR",
                     kind: "CLASSES",
                     singlePrice: "500.00",
+                    // Not GST-registered: no GST words.
+                    gst: null,
                 },
                 {
                     id: five,
@@ -179,6 +181,7 @@ describe("GET public/sites/:siteId/packs (G20, real database)", () => {
                     currency: "INR",
                     kind: "ONE_TO_ONE",
                     singlePrice: null,
+                    gst: null,
                 },
             ],
         });
