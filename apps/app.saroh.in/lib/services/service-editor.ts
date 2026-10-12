@@ -411,19 +411,22 @@ export function serviceUpdate(
     };
 }
 
-/** The hours' own section name: they save in a call of their own. */
-export const HOURS_SECTION = "Its weekly hours";
+/**
+ * The hours' own card, and what the leave dialog calls it: they save in a
+ * call of their own.
+ */
+export const HOURS_SECTION = "When it can be booked";
 
 /** The editor's sections, as the leave dialog names them. */
 const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["What it is", ["name", "description", "kind"]],
     ["Time", ["minutes", "gap", "visits", "places", "where", "meetingUrl"]],
+    [HOURS_SECTION, ["hours"]],
     ["Price", ["price", "deposit"]],
     ["Who takes it", ["staffIds"]],
     ["Booking page", ["showOnBookingPage"]],
     ["Taking bookings", ["taking"]],
     ["More settings", ["timezone", "bufferBefore", "gstRate", "sacCode"]],
-    [HOURS_SECTION, ["hours"]],
 ];
 
 function same(a: ServiceDraft, b: ServiceDraft, key: keyof ServiceDraft) {
@@ -504,9 +507,11 @@ export function stateLine({
     if (dirty) return "Unsaved changes";
     if (isNew) return "Not saved yet";
     if (comingUp === null) return "";
+    // The count is of what is still to come: with none, a service may
+    // well have been booked before, so it never says "nothing booked yet".
     return comingUp
         ? `${bookingsCount(comingUp)} still to come`
-        : "Nothing booked yet";
+        : "Nothing coming up";
 }
 
 /** The pill beside the title: new, or whether it takes bookings. */
@@ -550,11 +555,11 @@ export function savedMessage({
             return `${name} added. Customers can book it in its weekly hours.`;
         }
         if (kind === "class") {
-            return `${name} added. Set its weekly times under More settings so customers can book it.`;
+            return `${name} added. Give it weekly times so customers can book it.`;
         }
         return hasPerson
             ? `${name} added. Customers can book it in the free time of who takes it.`
-            : `${name} added. Give it hours under More settings so customers can book it.`;
+            : `${name} added. Give it weekly hours so customers can book it.`;
     }
     if (!comingUp) {
         return comingUp === 0
@@ -570,16 +575,43 @@ export function savedMessage({
 
 /**
  * The note over a service's own weekly hours. They go with the page's Save;
- * a new service that started from the opening hours says so.
+ * a new service that started from the opening hours says so, and a
+ * one-to-one someone takes says its hours only narrow theirs.
  */
 export function hoursNote(
     timezone: string,
     startedFromOpening: boolean,
+    /** Someone takes it: its own hours narrow that person's free time. */
+    narrows = false,
 ): string {
     const zone = `Weekly windows in ${timezone}, saved with the rest of the page.`;
-    return startedFromOpening
-        ? `${zone} They start from your opening hours: change them if this runs at other times.`
-        : `${zone} With people on the diary, their free time inside these windows is what customers can book.`;
+    if (startedFromOpening) {
+        return `${zone} They start from your opening hours: change them if this runs at other times.`;
+    }
+    return narrows
+        ? `${zone} Only the free time inside these windows is offered.`
+        : zone;
+}
+
+/**
+ * What gives a service its times, which is what its "When it can be
+ * booked" card shows: its own weekly hours (a class, or a one-to-one
+ * nobody takes), or the hours of the people who take it.
+ */
+export function timesComeFrom(
+    kind: ServiceKind,
+    staffCount: number,
+): "own" | "people" {
+    return kind === "one" && staffCount > 0 ? "people" : "own";
+}
+
+/** Whose hours a one-to-one books in: "Asha's", "Asha's and Ravi's". */
+export function whoseHours(names: readonly string[]): string {
+    const [first, second] = names;
+    if (!first) return "";
+    if (names.length === 1) return `${first}'s hours`;
+    if (names.length === 2 && second) return `${first}'s and ${second}'s hours`;
+    return `the hours of the ${names.length} people who take it`;
 }
 
 /** The note under Time. */
@@ -596,7 +628,7 @@ export function timeNote(
     }
     return hasStaff
         ? "Fills the free time of whoever takes it, with the gap kept free after."
-        : "Books in its own weekly hours, set under More settings, with the gap kept free after.";
+        : "The gap is kept free after each booking.";
 }
 
 /** Each deposit's share of the price, in percent — the server's too. */

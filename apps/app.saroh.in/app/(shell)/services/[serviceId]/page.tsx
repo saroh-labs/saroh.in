@@ -32,7 +32,7 @@ export async function generateMetadata({
 
 /**
  * Bookings › Services › a service (E2): the Service Editor. It opens from
- * Edit (or View) on a service's card and from the calendar's links. Its own
+ * a service's row on Bookings › Services and from the calendar's links. Its own
  * weekly hours, who takes it and how it is booked each degrade on their
  * own; a service that can't be read says so rather than "isn't here".
  */

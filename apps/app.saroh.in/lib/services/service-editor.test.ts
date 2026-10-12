@@ -28,10 +28,12 @@ import {
     stateLine,
     statePill,
     timeNote,
+    timesComeFrom,
     toMinor,
     TREATMENT_NEEDS_STOREFRONT,
     VIEW_ONLY,
     whereNote,
+    whoseHours,
 } from "./service-editor";
 
 describe("VIEW_ONLY (E26)", () => {
@@ -382,8 +384,10 @@ describe("the words around the editor", () => {
         expect(stateLine({ isNew: false, dirty: false, comingUp: 1 })).toBe(
             "1 booking still to come",
         );
+        // The count is of what is still to come: a service with none may
+        // have been booked many times before, so it never says "yet".
         expect(stateLine({ isNew: false, dirty: false, comingUp: 0 })).toBe(
-            "Nothing booked yet",
+            "Nothing coming up",
         );
         expect(stateLine({ isNew: false, dirty: false, comingUp: null })).toBe(
             "",
@@ -412,7 +416,7 @@ describe("the words around the editor", () => {
                 comingUp: 0,
             }),
         ).toBe(
-            "Check-up added. Give it hours under More settings so customers can book it.",
+            "Check-up added. Give it weekly hours so customers can book it.",
         );
         expect(
             savedMessage({
@@ -432,9 +436,7 @@ describe("the words around the editor", () => {
                 kind: "class",
                 comingUp: 0,
             }),
-        ).toBe(
-            "Yoga added. Set its weekly times under More settings so customers can book it.",
-        );
+        ).toBe("Yoga added. Give it weekly times so customers can book it.");
         expect(
             savedMessage({ isNew: false, name: "x", kind: "one", comingUp: 2 }),
         ).toBe(
@@ -457,7 +459,11 @@ describe("the words around the editor", () => {
         expect(timeNote("class", true)).toBe(
             "A class runs at set times, and people book a place.",
         );
-        expect(timeNote("one", false)).toContain("its own weekly hours");
+        // The hours have a card of their own, which says where the times
+        // come from: Time says only what the gap does.
+        expect(timeNote("one", false)).toBe(
+            "The gap is kept free after each booking.",
+        );
         expect(whereNote("EITHER")).toBe(
             "They pick when booking. Online visits join by the link below.",
         );
@@ -782,8 +788,26 @@ describe("its own weekly hours are part of the draft (one Save)", () => {
             "Weekly windows in Asia/Kolkata, saved with the rest of the page. They start from your opening hours: change them if this runs at other times.",
         );
         expect(hoursNote("Asia/Kolkata", false)).toBe(
-            "Weekly windows in Asia/Kolkata, saved with the rest of the page. With people on the diary, their free time inside these windows is what customers can book.",
+            "Weekly windows in Asia/Kolkata, saved with the rest of the page.",
         );
+        // Someone takes it: its own hours only narrow theirs.
+        expect(hoursNote("Asia/Kolkata", false, true)).toBe(
+            "Weekly windows in Asia/Kolkata, saved with the rest of the page. Only the free time inside these windows is offered.",
+        );
+    });
+
+    it("says what gives a service its times: its own hours, or the people who take it", () => {
+        expect(timesComeFrom("one", 0)).toBe("own");
+        expect(timesComeFrom("one", 2)).toBe("people");
+        // A class runs at its own times, whoever teaches it.
+        expect(timesComeFrom("class", 0)).toBe("own");
+        expect(timesComeFrom("class", 1)).toBe("own");
+        expect(whoseHours(["Asha"])).toBe("Asha's hours");
+        expect(whoseHours(["Asha", "Ravi"])).toBe("Asha's and Ravi's hours");
+        expect(whoseHours(["Asha", "Ravi", "Mo"])).toBe(
+            "the hours of the 3 people who take it",
+        );
+        expect(HOURS_SECTION).toBe("When it can be booked");
     });
 });
 
