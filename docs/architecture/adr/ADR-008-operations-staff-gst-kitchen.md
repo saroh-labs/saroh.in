@@ -211,6 +211,32 @@ pure module, built test-first from worked examples.
 > taxes" only there. The rule and its one sum are
 > `docs/patterns/backend-billing-and-classes.md` → "How a price carries GST
 > is the business's choice" and `invoices/gst-price.ts`.
+>
+> **What the paper prints as the rate (the owner's rule, the same day).**
+> "If the business says prices include GST, ₹1,000 will be the full
+> amount. If they say exclude, then ₹1,000 + GST." The first paper under
+> "GST is added" printed the amount to pay as the unit price (₹1,180) and
+> still said "Prices include GST." It now reads as the business charges:
+> the rate is the price it typed (₹1,000), the line's amount is its taxable
+> value, and the GST and the total are as frozen, so the lines add up to
+> the taxable value and the taxable value and the GST to the total. Nothing
+> stored changed: a line's unit price and amount are still the amount to
+> pay, and every total, pay link, refund and credit note works from them as
+> before. Only the reading on the paper moved, and only for a line recorded
+> as "added"; a line recorded as "includes", or from before the choice,
+> prints exactly as it did.
+>
+> Because GST is rounded on one unit and a line's tax is derived from the
+> whole line, quantity × the typed price can differ from the frozen taxable
+> value by under half a paisa a unit (7 × ₹99.99 at 18% is ₹699.93; the
+> line's taxable value is ₹699.94). The paper prints the frozen value, and
+> on such a line also what one unit comes to with GST (₹117.99), which does
+> multiply out to the line's total. "Prices include GST." prints only when
+> no line had GST added; "GST is added to these prices." when every line
+> that carries GST had; a paper with both has no sentence and each line
+> says its own. The rule is `invoices/added-line.ts` and
+> `docs/patterns/backend-billing-and-classes.md` → "A paper prints the
+> typed price as the rate of a line GST was added to".
 
 ### Staff and their hours
 
