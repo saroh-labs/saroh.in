@@ -180,10 +180,29 @@ pure module, built test-first from worked examples.
 > so a later change of the choice never rewrites a placed order, a made
 > booking or issued paper, and a credit note reverses what was charged.
 >
-> A deposit is a share of the amount to pay. A delivery charge, a line typed
-> on a hand-written invoice, and courses, class packs and plans (which carry
-> no rate) are charged as typed, with GST inside. "A registered business's
-> orders ignore the storefront's old add-on tax" stands.
+> A deposit is a share of the amount to pay. A delivery charge and a line
+> typed on a hand-written invoice are charged as typed, with GST inside. "A
+> registered business's orders ignore the storefront's old add-on tax"
+> stands.
+>
+> **Courses, class packs and membership plans (the owner's decision, the
+> same day).** They carried no rate, so a registered business's invoice for
+> one was a tax invoice with no tax on it. Each now has a GST rate, a SAC
+> code and its own way of carrying GST, by the same rules as a service: the
+> rate is asked for beside the price, the desk is asked in place when it
+> sells one with no rate, and the customer is told the GST before paying.
+> "It should be charging from the new invoices; already added ones won't be
+> edited": once a rate is set, every invoice issued from then on carries
+> it, the renewals of members who joined before it included, and an invoice
+> already issued is never changed. A member keeps the typed price they
+> joined at; under "includes GST" they pay the same and the paper shows the
+> split, and under "GST is added" their next renewal is the price plus its
+> GST (₹2,000 at 18% renews at ₹2,360). A renewal is never refused or
+> stopped for a missing rate: it goes out as before and the plan is listed
+> as needing one. Autopay is never charged above what the customer
+> authorised: a renewal above the mandate's limit goes out as an invoice
+> with a pay link. The rule is `docs/patterns/backend-billing-and-classes.md`
+> → "Plans, class packs and courses carry GST" and `invoices/sale-price.ts`.
 >
 > The customer is told before paying, in one form of words on every page:
 > "₹1,000, includes ₹152.54 GST (18%)" or "₹1,000 + ₹180 GST (18%)", with
