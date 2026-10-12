@@ -13,9 +13,11 @@ import { accountAreaOn } from "./account-area";
  * only where nothing is sent):
  *
  * - **The account thread** is written when it is live: the account area is
- *   on (`SITE_ACCOUNT_AREA`) and the business's `ACCOUNT_THREAD` rollout
- *   flag is on (both off by default). A customer with a live site account
- *   sees it there; one without sees it when they first sign in.
+ *   on (`SITE_ACCOUNT_AREA`), the business's `ACCOUNT_THREAD` rollout flag
+ *   is on (both off by default), and the business has not turned its
+ *   updates off (`BusinessProfile.accountUpdates`, on by default). The rule
+ *   is `accountThreadOn`. A customer with a live site account sees it
+ *   there; one without sees it when they first sign in.
  * - **Email** goes only to a live site account's verified email, through
  *   the business's own connected EMAIL provider (D17, default 10) — or,
  *   for a booking notice at a business with none, through Saroh when
@@ -67,7 +69,12 @@ export async function noticeEmailRoute(
     return (await emailRoute(db, organizationId, kind)).route;
 }
 
-/** Whether the account thread is live for the business. */
+/**
+ * Whether Saroh posts to the business's account threads: the one rule
+ * (`accountThreadOn`: the account area, the rollout flag and the business's
+ * own choice). The area is asked here first only to save the reads while
+ * it is off; the rule asks it again.
+ */
 export async function threadLive(organizationId: string): Promise<boolean> {
     return accountAreaOn() ? accountThreadOn(organizationId) : false;
 }

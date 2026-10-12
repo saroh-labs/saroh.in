@@ -36,7 +36,7 @@ async function renderAt(slug: string, iso: string) {
 }
 
 describe("/features/[slug]", () => {
-    it("builds the eight feature pages and nothing else", () => {
+    it("builds the nine feature pages and nothing else", () => {
         expect(generateStaticParams()).toEqual(
             FEATURE_SLUGS.map((slug) => ({ slug })),
         );
@@ -115,12 +115,15 @@ describe("/features/[slug]", () => {
 
     it("gives each page its title, description and canonical", async () => {
         const meta = await generateMetadata(params("orders"));
+        // The search title is the plain category, the brand last; the
+        // share card keeps the page's own headline.
         expect(meta.title).toBe(
-            "Orders — Every order in one list, and none slip. · Saroh",
+            "Order management software for small business · Saroh",
         );
+        expect(meta.description).toBe(features.orders.seoDescription);
         expect(meta.alternates?.canonical).toBe("/features/orders");
         expect(meta.openGraph?.title).toBe(
-            "Orders — Every order in one list, and none slip.",
+            "Orders: Every order in one list, and none slip.",
         );
     });
 });

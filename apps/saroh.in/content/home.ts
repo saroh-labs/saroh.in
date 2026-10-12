@@ -21,7 +21,16 @@ export interface HeroWord {
 }
 
 export const home = {
-    eyebrow: "For shops, studios and clinics in India",
+    /**
+     * What Home says to a search engine (`SearchWords`, `types.ts`): the
+     * plain category first, the brand last. The acronym line stays the h1;
+     * the eyebrow above it says the phrase in the first screen.
+     */
+    phrase: "small business software",
+    seoTitle: "Small business software for bookings and GST billing",
+    seoDescription:
+        "Small business software for India: your website, bookings, orders and GST invoices in one place, for shops, studios, salons and clinics.",
+    eyebrow: "Small business software for shops, studios and clinics in India",
     /** "Services, Appointments, Retail, Orders. Handled." with saffron initials. */
     headline: [
         { initial: "S", rest: "ervices, " },
@@ -41,14 +50,13 @@ export const home = {
     chips: ["UPI Autopay", "GST invoices", "Bills of supply"],
     worksFor: "Works for",
     featuresEyebrow: "Everything in Saroh",
-    featuresTitle: "Eight parts, one workspace.",
+    featuresTitle: "Nine parts, one workspace.",
     solutionsTitle: "Solutions",
     pricingTitle: "Pricing",
     pricingCompare: "Compare every plan",
     faqTitle: "Questions",
     /** The dark CTA band's title (the design's "band" closer). */
     closer: "Every morning, know what needs you.",
-    metaTitle: "Saroh — Services, Appointments, Retail, Orders. Handled.",
 } as const;
 
 /**

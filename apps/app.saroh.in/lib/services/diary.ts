@@ -388,42 +388,40 @@ export function bookedValue(
     return total;
 }
 
-/**
- * The visible hours of a day: the design's 06:00–21:00, widened to whole
- * hours around anything that falls outside it, so an early class or a late
- * booking is never cut off.
- */
-export function visibleHours(spans: readonly Span[]): Span {
-    let start = 6 * 60;
-    let end = 21 * 60;
-    for (const [a, b] of spans) {
-        if (b <= a) continue;
-        start = Math.min(start, Math.floor(Math.max(0, a) / 60) * 60);
-        end = Math.max(end, Math.ceil(Math.min(DAY_MINUTES, b) / 60) * 60);
-    }
-    return [start, end];
-}
+/** With no hours to go by, the diary shows the working day. */
+const DEFAULT_HOURS: Span = [8 * 60, 18 * 60];
+/** The least the diary shows, so a short day still reads as a day. */
+const MIN_VISIBLE_MINUTES = 6 * 60;
 
 /**
- * Side-by-side lanes for a week column: blocks that overlap another person's
- * take that person's lane, so a 06:30 session and a 07:00 class sit side by
- * side rather than on top of each other (the design's rule).
+ * The hours the diary draws: from an hour before the earliest opening to an
+ * hour after the latest close, in whole hours, widened around any booking
+ * outside them so an early class or a late booking is never cut off. With no
+ * hours at all it is the working day, 8 am to 6 pm. Never under six hours.
  */
-export function laneOf(
-    block: Block,
-    all: readonly Block[],
-    lanes: readonly string[],
-): { lane: number; of: number } | null {
-    const overlaps = all.some(
-        (o) =>
-            o !== block &&
-            o.staffId !== block.staffId &&
-            o.start < block.end &&
-            block.start < o.end,
-    );
-    if (!overlaps) return null;
-    const lane = Math.max(0, lanes.indexOf(block.staffId ?? UNASSIGNED));
-    return { lane, of: Math.max(1, lanes.length) };
+export function visibleHours(
+    open: readonly Span[],
+    booked: readonly Span[] = [],
+): Span {
+    const real = open.filter(([a, b]) => b > a);
+    let [start, end] = DEFAULT_HOURS;
+    if (real.length) {
+        start = Math.floor((Math.min(...real.map(([a]) => a)) - 60) / 60) * 60;
+        end = Math.ceil((Math.max(...real.map(([, b]) => b)) + 60) / 60) * 60;
+    }
+    for (const [a, b] of booked) {
+        if (b <= a) continue;
+        start = Math.min(start, Math.floor(a / 60) * 60);
+        end = Math.max(end, Math.ceil(b / 60) * 60);
+    }
+    start = Math.max(0, start);
+    end = Math.min(DAY_MINUTES, end);
+    // A short day grows later first, then earlier once it reaches midnight.
+    while (end - start < MIN_VISIBLE_MINUTES) {
+        if (end < DAY_MINUTES) end += 60;
+        else start -= 60;
+    }
+    return [start, end];
 }
 
 // ── Columns and words ───────────────────────────────────────────────────────
@@ -436,6 +434,11 @@ export interface Column {
     /** Their hours, time off and free gaps; null when hours are unknown. */
     day: PersonDay | null;
     blocks: Block[];
+    /**
+     * The shortest thing they can be booked for, in minutes: a booking
+     * started from a free gap leaves at least this much of the gap.
+     */
+    shortest?: number;
 }
 
 /**
@@ -458,6 +461,10 @@ export const SERVICE_HOURS_NAME = "Service hours";
  * (it failed to load), the people the bookings read names. With nobody on
  * the diary, one column draws the services' own hours and what is free in
  * them, as the booking page offers it (UX-023), with every booking in it.
+ *
+ * Cancelled bookings are left out unless `withCancelled`: they stay off the
+ * diary by default, so a column that would hold nothing else (Unassigned,
+ * someone archived) is not drawn for them.
  */
 export function dayColumns(
     calendar: BookingsCalendar,
@@ -469,8 +476,14 @@ export function dayColumns(
     minFree: (person: StaffView) => number = () => MIN_FREE_MINUTES,
     /** The services' own hours, read only while nobody is on the diary. */
     serviceHours: ServiceHours | null = null,
+    withCancelled = true,
 ): Column[] {
     const byPerson = blocksOnDay(calendar, date, timeZone);
+    if (!withCancelled) {
+        byPerson.forEach((blocks, key) => {
+            byPerson.set(key, blocks.filter(isLive));
+        });
+    }
     const columns: Column[] = [];
     const seen = new Set<string>();
     for (const person of staff ?? []) {
@@ -489,6 +502,7 @@ export function dayColumns(
                 minFree(person),
             ),
             blocks,
+            shortest: minFree(person),
         });
     }
     for (const diary of calendar.diaries) {

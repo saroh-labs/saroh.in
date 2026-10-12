@@ -11,9 +11,12 @@
 // Manifest types + content-builder helpers
 export {
     TEMPLATE_KINDS,
+    TEMPLATE_MODULE_PAGE_KINDS,
     TEMPLATE_SHAPES,
     isContentBuilder,
     resolveContent,
+    templateFooterLineFor,
+    templateModulePageKinds,
     templateStylePreset,
 } from "./manifest";
 export type {
@@ -22,6 +25,8 @@ export type {
     TemplateFooter,
     TemplateKind,
     TemplateManifest,
+    TemplateModulePage,
+    TemplateModulePageKind,
     TemplatePage,
     TemplateSection,
     TemplateShape,
@@ -102,16 +107,53 @@ export type {
     InstantiatedTemplate,
 } from "./instantiate";
 
-// The starter production template: `starterTemplate` is the latest (v3,
-// UX-070), `starterTemplateV2` and `starterTemplateV1` the versions earlier
-// sites came from.
+// The starter production template: `starterTemplate` is the latest (v4,
+// DEC-141); `starterTemplateV3`, `starterTemplateV2` and `starterTemplateV1`
+// are the versions earlier sites came from.
 export {
     HERO_PROMPT,
     STARTER_TEMPLATE_ID,
-    starterTemplate,
     starterTemplateV1,
     starterTemplateV2,
+    starterTemplateV3,
 } from "./templates/starter";
+export { STARTER_STYLES } from "./templates/starter-look";
+export {
+    STARTER_IMAGE_BRIEFS,
+    starterBooks,
+    starterLine,
+    starterPrimaryAction,
+    starterSells,
+    starterServiceIds,
+    starterTemplate,
+} from "./templates/starter-v4";
+export type { StarterAction } from "./templates/starter-v4";
+
+// One true line about a business, from what it already told Saroh.
+export {
+    BUSINESS_LINE_MAX,
+    BUSINESS_LINE_MAX_NAMES,
+    BUSINESS_LINE_NAME_MAX,
+    businessArea,
+    composeBusinessLine,
+} from "./business-line";
+export type { BusinessLineFacts } from "./business-line";
+
+// Bringing a site's pages up to what its template lays down now.
+export {
+    BOUND_SECTION_TYPES,
+    pageUntouched,
+    planTemplateUpgrade,
+    sameAsMade,
+    withBoundSections,
+} from "./upgrade";
+export type {
+    PagePlan,
+    PlannedSection,
+    StoredPage,
+    StoredSection,
+    TemplateUpgradeInput,
+} from "./upgrade";
 
 // Blog/writing (DEC-070, K13). Registered; no kind's default.
 export { WRITING_TEMPLATE_ID, writingTemplate } from "./templates/writing";
@@ -128,12 +170,14 @@ export {
     PERSONAL_TEMPLATE_ID,
     personalServiceIds,
     personalTemplate,
+    personalTemplateV1,
 } from "./templates/personal";
 
 // The Portfolio template (DEC-070, K12): the default for "A site for my work".
 export {
     PORTFOLIO_TEMPLATE_ID,
     portfolioTemplate,
+    portfolioTemplateV1,
 } from "./templates/portfolio";
 
 // Ceramics, the gallery's "Store" (industry templates plan, U5).
@@ -198,7 +242,11 @@ export { GALLERY_SAMPLES } from "./gallery-samples";
 
 // The pre-publish check's matcher for a template's placeholder words.
 export {
+    OWNER_NOTES,
     TEMPLATE_PLACEHOLDER_PATTERNS,
+    TEMPLATE_STOCK_PHRASES,
+    isOwnerNote,
     templatePlaceholderIn,
     templatePlaceholderInAny,
+    templateStockPhraseIn,
 } from "./placeholders";

@@ -1,0 +1,25 @@
+# Files Cloudflare serves without running the Worker (everything in this
+# folder, and Next's own under /_next/static) get no header from next.config
+# or proxy.ts, so they are named here. A file with no rule goes out as
+# "max-age=0, must-revalidate": a browser asks again on every page.
+# `public-headers.test.ts` reads this file.
+
+# The same four next.config sends with every page (SECURITY_HEADERS). This
+# site is public: never an X-Robots-Tag here.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'
+  X-Content-Type-Options: nosniff
+
+# Next's scripts, styles and fonts: each file's name carries a hash of what
+# is in it, so a changed file is a new address and an old one never changes.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Screenshots (the captures and their sized copies, scripts/shot-sizes.mjs).
+# A name is reused when a screen is captured again, so not "immutable": a
+# browser keeps one for a day, and may show it for a week while it asks for
+# the new one.
+/shots/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800

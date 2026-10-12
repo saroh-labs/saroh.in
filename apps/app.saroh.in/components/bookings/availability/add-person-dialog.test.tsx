@@ -148,7 +148,7 @@ describe("Add someone who takes bookings", () => {
         });
         act(() =>
             root.render(
-                <Harness hoursHint="Set their hours in Availability." />,
+                <Harness hoursHint="Change their hours in Availability." />,
             ),
         );
         await press(opener());
@@ -157,7 +157,7 @@ describe("Add someone who takes bookings", () => {
         expect(dialog()).toBeNull();
         expect(showSuccess).toHaveBeenCalledWith(
             "Asha added.",
-            "Set their hours in Availability.",
+            "Change their hours in Availability.",
         );
         expect(onAdded).toHaveBeenCalledWith("st_asha");
         expect(refresh).toHaveBeenCalled();

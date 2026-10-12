@@ -27,8 +27,10 @@ const DEFAULT_ZONE = "Asia/Kolkata";
  * clear (D17), and a thread message is kept. The sentence names the
  * invoice, its amount and when it is due.
  *
- * Only reached while the `ACCOUNT_THREAD` flag is on (off by default) and
- * the contact has a live site account (`InvoiceSendService.threadOpen`).
+ * Only reached while Saroh may post to the business's threads
+ * (`accountThreadOn`: the account area, the `ACCOUNT_THREAD` flag and the
+ * business's own choice) and the contact has a live site account
+ * (`InvoiceSendService.threadOpen`).
  */
 @Injectable()
 export class AccountThreadPosterService implements AccountThreadPoster {

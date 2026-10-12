@@ -7,7 +7,7 @@ import { parseLegal } from "@/lib/legal-markdown";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
-    title: "For customers of businesses on Saroh · Saroh",
+    title: CUSTOMERS.seoTitle,
     socialTitle: CUSTOMERS.title,
     description: CUSTOMERS.description,
     path: CUSTOMERS.href,

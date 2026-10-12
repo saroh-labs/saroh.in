@@ -10,6 +10,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CheckResult, UnlockResult } from "@/lib/link-preview";
+import { guardHistory, resetAddress, takeAddress } from "@/lib/page-address";
 
 import { LinkPreviewTool } from "./link-preview-tool";
 
@@ -33,6 +34,7 @@ beforeEach(() => {
 });
 afterEach(() => {
     cleanup();
+    resetAddress();
     vi.unstubAllGlobals();
     fetchMock.mockReset();
     writeText.mockReset();
@@ -258,6 +260,45 @@ describe("LinkPreviewTool", () => {
         render(<LinkPreviewTool initialUrl="shop.in" />);
         await screen.findByTestId("score-line");
         expect(field().value).toBe("shop.in");
+    });
+
+    it("reads a shared report's address in the browser, so the page is the same for every address", async () => {
+        fetchMock.mockReturnValue(reply(RESULT));
+        window.history.replaceState(
+            null,
+            "",
+            "/tools/link-preview?url=shop.in",
+        );
+        render(<LinkPreviewTool />);
+        await screen.findByTestId("score-line");
+        expect(field().value).toBe("shop.in");
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(JSON.parse(init.body as string)).toEqual({
+            url: "https://shop.in",
+        });
+    });
+
+    it("still opens it after the tag guard has cut the address bar (DEC-127)", async () => {
+        fetchMock.mockReturnValue(reply(RESULT));
+        window.history.replaceState(
+            null,
+            "",
+            "/tools/link-preview?url=http%3A%2F%2Fshop.in",
+        );
+        // What `lib/tags.ts` does before any tag loads.
+        takeAddress();
+        guardHistory();
+        expect(window.location.search).toBe("");
+        render(<LinkPreviewTool />);
+        await screen.findByTestId("score-line");
+        expect(field().value).toBe("shop.in");
+    });
+
+    it("checks nothing on its own when the address names no report", () => {
+        render(<LinkPreviewTool />);
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(field().value).toBe("");
     });
 
     it("refuses a bad email in the design's words, and unlocks the fixes with a good one", async () => {

@@ -108,6 +108,8 @@ import {
     checkShop,
     checkSite,
     FLAGS_AWAITING_NAVIGATION,
+    hasOwnerNote,
+    OWNER_NOTE_MESSAGE,
 } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
 import { footerAfterUpdate, parseSiteFooter } from "./site-footer";
@@ -2055,6 +2057,18 @@ export class SitesService {
 
         const publishedAt = new Date();
         const snapshot = this.buildSnapshot(site, publishedAt);
+        /*
+         * A template's note to the owner never goes live (DEC-141): the
+         * first starters put "Say what you do and where, in one line." under
+         * every headline, and customers read it. Refused in the words the
+         * pre-publish check uses, which names the block.
+         */
+        if (hasOwnerNote(snapshot.pages)) {
+            throw new ConflictException({
+                message: OWNER_NOTE_MESSAGE,
+                details: { reason: "ownerNote" },
+            });
+        }
         /*
          * Approval gates nothing, and says so (#199, #278). The epic's rule: if
          * a review was asked for and has not been answered for THIS draft,

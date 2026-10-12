@@ -5,7 +5,7 @@ import { PricingPage } from "@/components/v2/pricing/pricing-page";
 import { PRICING_COPY, PRICING_DESCRIPTION } from "@/content/pricing";
 import { readLivePricing } from "@/lib/pricing";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, pageTitle } from "@/lib/seo";
 import { softwareApplicationLd } from "@/lib/structured-data";
 
 /**
@@ -16,8 +16,8 @@ import { softwareApplicationLd } from "@/lib/structured-data";
  */
 
 export const metadata: Metadata = pageMetadata({
-    title: `Pricing — ${PRICING_COPY.title} · Saroh`,
-    socialTitle: `Pricing — ${PRICING_COPY.title}`,
+    title: pageTitle("Pricing and plans"),
+    socialTitle: `Pricing: ${PRICING_COPY.title}`,
     description: PRICING_DESCRIPTION,
     path: "/pricing",
 });

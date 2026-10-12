@@ -588,6 +588,15 @@ the Privacy Policy states both.
 - **A business with no live site still queues** on a stock change: knowing
   would cost a read in the hottest stock paths, so the handler finds no
   site and ends. The one place the "never enqueue a no-op" rule bends.
+- **A write to a draft queues nothing.** A kept page is a published page,
+  and a site's draft (its sections, its style, its footer) reaches one only
+  through `putLive`. So bringing a site up to its template
+  (`sites/template-sync.ts`: a module switched on, and the template upgrade,
+  DEC-141) writes drafts and queues no revalidation. The upgrade is a
+  command run by hand, not a job
+  (`docs/architecture/runbooks/TEMPLATE_UPGRADE.md`): each site is one
+  transaction and a site already upgraded is skipped, which is what makes it
+  safe to run again.
 
 ## Plan limit notices — **Current** (plans catalogue U13)
 

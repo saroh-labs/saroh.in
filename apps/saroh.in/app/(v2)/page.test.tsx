@@ -79,7 +79,7 @@ describe("/ (Home)", () => {
         expect(metadata.alternates?.canonical).toBe("/");
     });
 
-    it("lists the eight features, Dashboard first, and the three solutions", async () => {
+    it("lists the nine features, Dashboard first, and the four solutions", async () => {
         const { container } = render(await HomePage());
         const features = container.querySelector("#features");
         const hrefs = Array.from(features?.querySelectorAll("a") ?? []).map(
@@ -94,7 +94,7 @@ describe("/ (Home)", () => {
             ),
         ).toEqual(SOLUTION_SLUGS.map((s) => `/solutions/${s}`));
         const worksFor = screen.getByRole("navigation", { name: "Works for" });
-        expect(within(worksFor).getAllByRole("link")).toHaveLength(3);
+        expect(within(worksFor).getAllByRole("link")).toHaveLength(4);
     });
 
     it("no tour video: no 'See it in action' and no #video", async () => {

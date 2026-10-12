@@ -55,7 +55,7 @@ export interface SiteContactPlace {
  * holds to 4.5:1 on the footer.
  */
 export const FOOTER_LINK =
-    "focus-visible:ring-site-footer-fg rounded-sm underline decoration-1 underline-offset-[3px] transition-[text-decoration-color,opacity] duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-site-footer-bg active:opacity-70";
+    "focus-visible:ring-site-footer-fg rounded-sm underline decoration-1 underline-offset-[3px] transition-[text-decoration-color,opacity] duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-site-footer-bg active:opacity-70";
 
 /** A link someone taps: a full 44px target on a touch pointer. */
 const TAP_LINK = `${FOOTER_LINK} coarse:min-h-11 inline-flex items-center`;
@@ -65,7 +65,7 @@ const TAP_LINK = `${FOOTER_LINK} coarse:min-h-11 inline-flex items-center`;
  * list of pages under "Pages" needs no underline to read as links.
  */
 const MENU_LINK =
-    "focus-visible:ring-site-footer-fg coarse:min-h-11 inline-flex min-h-8 items-center rounded-sm underline decoration-transparent decoration-1 underline-offset-[3px] transition-[text-decoration-color,opacity] duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)] hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-site-footer-bg active:opacity-70 aria-[current=page]:font-bold aria-[current=page]:decoration-current";
+    "focus-visible:ring-site-footer-fg coarse:min-h-11 inline-flex min-h-8 items-center rounded-sm underline decoration-transparent decoration-1 underline-offset-[3px] transition-[text-decoration-color,opacity] duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-site-footer-bg active:opacity-70 aria-[current=page]:font-bold aria-[current=page]:decoration-current";
 
 /** A column's heading: small, wide-tracked, in the footer's own text colour. */
 const COLUMN_HEADING =

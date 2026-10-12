@@ -42,10 +42,10 @@ export const CONTACT_PAGE = {
     /** What the page is, in one line (`/llms.txt`). */
     line: "Write to the Saroh team, and the other ways to reach it.",
     seo: {
-        title: "Contact · Saroh",
+        title: "Contact us: questions, help and ideas · Saroh",
         socialTitle: "Contact Saroh",
         description:
-            "Write to the Saroh team: a question before you sign up, something not working, or an idea for what we should build next.",
+            "Contact the Saroh team with a question before you sign up, something not working or an idea, and a person replies within one working day.",
     },
 
     eyebrow: "Contact",

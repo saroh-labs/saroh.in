@@ -11,7 +11,8 @@ import { ScreenshotFrame } from "../screenshot-frame";
 /**
  * The top of a solution page: "Solutions / Gyms & studios", the headline,
  * the sub, the start button (and "See it in action" once a video is set,
- * deviation D-3), the free-plan line, then the hero shot and its note.
+ * deviation D-3), the free-plan line, then the hero shot and its note. A
+ * page with no screen of its trade captured yet has neither (`Solution.hero`).
  */
 export function SolutionHero({
     solution,
@@ -63,19 +64,23 @@ export function SolutionHero({
                     {freeLine}
                 </p>
             </Container>
-            <Container className="pt-14">
-                <ScreenshotFrame
-                    shot={solution.hero.shot}
-                    alt={solution.hero.alt}
-                    variant="hero"
-                    zoomable
-                    priority
-                    sizes="(min-width: 1280px) 1168px, 100vw"
-                />
-                <p className="m-0 mt-3.5 text-sm text-muted-foreground">
-                    {solution.heroNote}
-                </p>
-            </Container>
+            {solution.hero ? (
+                <Container className="pt-14">
+                    <ScreenshotFrame
+                        shot={solution.hero.shot}
+                        alt={solution.hero.alt}
+                        variant="hero"
+                        zoomable
+                        priority
+                        sizes="(min-width: 1280px) 1168px, 100vw"
+                    />
+                    {solution.heroNote ? (
+                        <p className="m-0 mt-3.5 text-sm text-muted-foreground">
+                            {solution.heroNote}
+                        </p>
+                    ) : null}
+                </Container>
+            ) : null}
         </>
     );
 }

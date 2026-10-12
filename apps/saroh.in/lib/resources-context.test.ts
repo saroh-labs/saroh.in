@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { parseBuiltRoutes, previewOn, templatesOn } from "./resources-context";
+import {
+    parseBuiltAt,
+    parseBuiltRoutes,
+    previewOn,
+    templatesOn,
+} from "./resources-context";
 
 describe("previewOn (RESOURCES_PREVIEW)", () => {
     it("is never on in production, whatever the flag says", () => {
@@ -50,5 +55,19 @@ describe("parseBuiltRoutes (SAROH_BUILT_ROUTES)", () => {
         expect(parseBuiltRoutes(undefined)).toBeNull();
         expect(parseBuiltRoutes("not json")).toBeNull();
         expect(parseBuiltRoutes('{"a":1}')).toBeNull();
+    });
+});
+
+describe("parseBuiltAt (SAROH_BUILT_AT)", () => {
+    it("reads the moment next.config.js stamps the build with", () => {
+        expect(parseBuiltAt("2026-10-16T18:31:00.000Z")?.toISOString()).toBe(
+            "2026-10-16T18:31:00.000Z",
+        );
+    });
+
+    it("is null, not a guess, when unset or unreadable", () => {
+        expect(parseBuiltAt(undefined)).toBeNull();
+        expect(parseBuiltAt("")).toBeNull();
+        expect(parseBuiltAt("yesterday")).toBeNull();
     });
 });

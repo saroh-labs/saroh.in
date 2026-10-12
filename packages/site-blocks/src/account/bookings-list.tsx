@@ -133,7 +133,8 @@ export function AccountBookingsTab({
 
     const book = (
         <Link href="/book" className={buttonClasses(true)}>
-            Book another
+            {/* "Another" only when there is one already. */}
+            {comingUp.length === 0 ? "Book a time" : "Book another"}
         </Link>
     );
 

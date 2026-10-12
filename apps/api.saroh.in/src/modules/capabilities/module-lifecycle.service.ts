@@ -29,6 +29,7 @@ import { ActivationEvents } from "../analytics/activation-events";
 import { auditMetadata } from "../audit/audit.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { allows, authorize } from "../organizations/organization-policy";
+import { syncSiteAfterModuleSwitch } from "../sites/template-sync";
 import type { ModuleImpactView } from "./dto";
 import type { ModuleKey } from "./module-registry";
 import { MODULE_BY_KEY, moduleRolledOut, MODULES } from "./module-registry";
@@ -189,6 +190,14 @@ export class ModuleLifecycleService {
                 { module: descriptor.label, enabled: true },
             );
             await alsoInTransaction?.(tx);
+            // The business's website follows its modules where its template
+            // does (the starter from v4, DEC-141): it gains this module's
+            // page and Home section, the ones a site made today starts
+            // with. Here, not in the setup writers, so every way a module
+            // is switched on reaches it (the Turn on sheet, a plain switch,
+            // an operator); and last, so it sees what the setup just made
+            // (a first service). Nothing is done for any other site.
+            await syncSiteAfterModuleSwitch(tx, ctx, moduleKey);
         });
 
         // After the commit, so only a module that really is enabled is counted.

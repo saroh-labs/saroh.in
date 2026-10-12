@@ -6,8 +6,9 @@ import { SITE_URL } from "@/lib/seo";
 
 /**
  * `/llms.txt` (Resources plan U7): the Resources pages shown now, for
- * language models (`lib/llms.ts`). Static: a page dated today joins it
- * through the nightly rebuild at 00:00 IST (KTD-2), as the sitemap does.
+ * language models (`lib/llms.ts`). Static: a page dated for a day joins it
+ * with the first deploy made on or after that day, as it joins the sitemap
+ * (`app/layout.tsx`). Nothing rebuilds the site on a schedule.
  */
 export const dynamic = "force-static";
 

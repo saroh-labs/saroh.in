@@ -1,8 +1,8 @@
 import { withDevAccess } from "@saroh/auth/dev-access";
 import { NextResponse } from "next/server";
 
-import { helpHostPath, helpHostTarget } from "@/lib/help-host";
-import { resourcesContext } from "@/lib/resources-context";
+import { helpHostRedirect, helpHostTarget } from "@/lib/help-host";
+import { builtContext } from "@/lib/resources-context";
 
 const site = withDevAccess(() => NextResponse.next());
 
@@ -16,10 +16,13 @@ const site = withDevAccess(() => NextResponse.next());
 export default function proxy(request: Parameters<typeof site>[0]) {
     const www = helpHostTarget(request.headers.get("host"));
     if (www) {
-        const path = helpHostPath(request.nextUrl.pathname, resourcesContext());
-        // Temporary (307): a browser keeps a permanent one, and before 17 Oct
-        // this goes to the home page, which must not stick after Help opens.
-        return NextResponse.redirect(`https://${www}${path}`, 307);
+        // 307 to the home page until this build has Help, 308 to Help from
+        // then on (`lib/help-host.ts`). Asked of the build, not the clock.
+        const { path, status } = helpHostRedirect(
+            request.nextUrl.pathname,
+            builtContext(),
+        );
+        return NextResponse.redirect(`https://${www}${path}`, status);
     }
     return site(request);
 }

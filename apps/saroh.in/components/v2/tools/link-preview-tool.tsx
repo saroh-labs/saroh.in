@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from "react";
 
 import { linkPreview as copy } from "@/content/link-preview";
 import type { CheckResult, UnlockResult } from "@/lib/link-preview";
@@ -10,8 +16,10 @@ import {
     domainOf,
     failureMessage,
     reportLink,
+    sharedAddress,
     splitScheme,
 } from "@/lib/link-preview";
+import { readAddress } from "@/lib/page-address";
 
 import { LinkInput } from "./link-input";
 import { CardsGrid, ScorePanel } from "./link-results";
@@ -35,8 +43,31 @@ const GUTTER = "px-mk-gutter";
  * loading, each error, results — is one `view`. A result has its own
  * address (`?url=`), so "Copy link to this report" and a shared link open
  * the same check again (R13).
+ *
+ * The shared address is read here, in the browser, once the page is up
+ * (`readAddress`, which also gives back what the tag guard cut from the
+ * address bar), so the page itself reads no query and is built once as a
+ * file: the served page is the empty tool for every address, and the tool
+ * with the shared address takes its place after hydration. `initialUrl` is
+ * for a caller that already has the address (tests).
  */
 export function LinkPreviewTool({ initialUrl }: { initialUrl?: string }) {
+    const fromAddress = useSyncExternalStore(
+        noSubscription,
+        readShared,
+        () => "",
+    );
+    const shared = initialUrl ?? fromAddress;
+    return <Tool key={shared} initialUrl={shared || undefined} />;
+}
+
+/** The address doesn't change under the tool: nothing to subscribe to. */
+const noSubscription = () => () => undefined;
+
+/** The shared report's address in this page's query, or "" with none. */
+const readShared = () => sharedAddress(readAddress()) ?? "";
+
+function Tool({ initialUrl }: { initialUrl?: string }) {
     const first = splitScheme(initialUrl ?? "");
     const [rest, setRest] = useState(first.rest);
     const [scheme, setScheme] = useState<"https" | "http">(

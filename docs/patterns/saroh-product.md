@@ -513,23 +513,46 @@ organizations/:org/customers`: everyone who has paid (an order through a
   why an invoice or a review invitation can't be emailed (built, #850). Consent gates every send.
 - **Adopted** — A simple WhatsApp deep link with a prefilled message is
   acceptable before any provider integration (§16). None exists yet.
-- **Adopted** (2026-09-26, ADR-011) — A message about a customer's own order,
-  booking or invoice always goes into their account on the business's site.
+- **Adopted** (2026-09-26, ADR-011; amended 12 Oct 2026) — A message about a
+  customer's own order, booking or invoice goes into their account on the
+  business's site, unless the business has turned those updates off (below).
   It goes out by email, SMS or WhatsApp only through the business's connected
   provider. Saroh's own email sends a site's sign-in codes and nothing else.
   Until those messages ship, the honest copy ("Saroh doesn't send this") stays.
   Invoices went first (D17): see Money above.
 - **Current** (round-2 A14) — A booking confirmed, moved or cancelled, and
   an order's Ready and handover, are told to the customer: in their account
-  thread while it is live (`SITE_ACCOUNT_AREA` and the `ACCOUNT_THREAD`
-  flag), and by email to a verified site account through the business's
-  own provider. Nothing by SMS or WhatsApp. **Copy names what is sent, from
+  thread while it is live (`SITE_ACCOUNT_AREA`, the `ACCOUNT_THREAD`
+  flag, and the business's own choice, below), and by email to a verified
+  site account through the business's own provider. Nothing by SMS or
+  WhatsApp. **Copy names what is sent, from
   the API's reach** (`EMAIL_AND_ACCOUNT` | `EMAIL` | `ACCOUNT` |
   `ON_SIGN_IN` | `NONE`, `lib/messages/notice-reach.ts`): "Saroh doesn't
   message ‹First›" only for `NONE`, and a read that failed claims nothing
   either way. The account's "‹Business› has been told" / "The team has been
   told" shows only when the API says it (`told`): the customer's own move or
   cancel reaches the team's inbox.
+- **Current** (owner, 12 Oct 2026) — **Updates in Messages are on for every
+  business, and each can turn them off for itself.** Saroh posts an order's
+  steps, a booking confirmed, moved or cancelled, an invoice sent or
+  reminded about and autopay turned off into the customer's Messages only
+  when three things hold: the account area is on for the instance
+  (`SITE_ACCOUNT_AREA`), the `ACCOUNT_THREAD` rollout flag is on for the
+  business, and the business has not turned its updates off
+  (`BusinessProfile.accountUpdates`, on by default). The rule is one
+  function, `accountThreadOn` in `communications/account-thread.ts`, which
+  the notice reach and the invoice send both ask: never ask a gate of your
+  own. Off, each caller does what it did before the thread was live: email
+  through the business's own provider where there is one, else nothing, and
+  the reach says `EMAIL` or `NONE`. Off stops only Saroh's own posts. A
+  customer still writes to the business in Messages, the team's Reply still
+  reaches them, and so does the note someone chooses to send when they
+  change or cancel an order ("Tell the customer"). The business chooses on
+  Settings › Providers ("Updates in Messages", `comms:manage`): a read row
+  with Edit, a sheet with the two choices and Undo. The row is drawn only
+  while the first two hold (`offered`), so nobody is offered a switch that
+  does nothing, and it says what a business with no email provider is left
+  with: no other way to tell a customer their order is ready.
 
 ## Analytics
 

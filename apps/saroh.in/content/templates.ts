@@ -457,7 +457,7 @@ const LAST_WAITLIST_DAY = "16th";
 export const templatesPage = {
     title: "Pick a site that looks like your business.",
     seo: {
-        title: "Website templates for small businesses — Saroh",
+        title: "Website templates for small businesses · Saroh",
         socialTitle: "Pick a site that looks like your business.",
         description:
             "Website templates for a bakery, a salon, a gym, a clinic, a shop, a dietician, a writer, a studio and a developer, each with its own type and colours, built on your products, bookings and posts in Saroh.",

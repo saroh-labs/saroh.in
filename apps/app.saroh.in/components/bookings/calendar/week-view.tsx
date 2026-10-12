@@ -1,124 +1,148 @@
 "use client";
 
-import { formatClock } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { Block, LocalDate, Span } from "@/lib/services/diary";
-import { blockTitle, laneOf, liveSeats } from "@/lib/services/diary";
+import { isLive } from "@/lib/services/diary";
+import type { DayHours } from "@/lib/services/diary-view";
+import {
+    closedSpans,
+    drawnLanes,
+    firstSight,
+    offSpans,
+} from "@/lib/services/diary-view";
 
-import { blockColour, blockLabel, HourRail, PX } from "./day-by-person";
+import { Hatches, HourRail } from "./day-by-person";
+import { blockLabel, DiaryBlock, lanePlace } from "./diary-block";
+import { tall } from "./geometry";
+import { FirstSight, NowLine, NowTime, useNowMinute } from "./now-line";
 
 export interface WeekDay {
     date: LocalDate;
     label: string;
     blocks: Block[];
+    /** When anybody works that day; null when hours are not known. */
+    hours: DayHours | null;
     today: boolean;
     selected: boolean;
 }
 
 /**
- * Layout 3b: the week, Monday first. Each block says its start and who;
- * where two people's blocks overlap they take a lane each. A day's heading
- * opens that day by person. Phones get the agenda instead (the design).
+ * The week, Monday first, drawn as the day is: the same blocks over the same
+ * hours, closed time hatched, free time plain, and the now line on today's
+ * column. Blocks that share a time sit side by side. A day's heading opens
+ * that day by person. Phones get the agenda instead.
  */
 export function WeekView({
     days,
     span,
-    lanes,
+    timezone,
+    sightKey,
     selected,
     onDay,
     onBlock,
 }: {
     days: WeekDay[];
     span: Span;
-    /** Column order for overlapping blocks: the people, Unassigned last. */
-    lanes: string[];
+    timezone: string;
+    /** The week shown: the diary is brought into view once for each. */
+    sightKey: string;
     selected: string | null;
     onDay: (date: LocalDate) => void;
     onBlock: (block: Block, date: LocalDate) => void;
 }) {
     const [from, to] = span;
+    const hasToday = days.some((d) => d.today);
+    const nowMinute = useNowMinute(timezone, hasToday);
+    const sight = firstSight(
+        hasToday ? nowMinute : null,
+        hasToday ? [] : days.flatMap((d) => d.blocks),
+        hasToday ? [] : days.flatMap((d) => d.hours?.windows ?? []),
+        span,
+    );
     return (
         <div className="overflow-auto rounded-[12px] border border-border bg-card">
             <div className="grid min-w-[820px] grid-cols-[52px_repeat(7,minmax(110px,1fr))]">
                 <div className="border-b border-border" />
                 {days.map((d) => {
-                    const n = d.blocks.filter(
-                        (b) => b.state !== "cancelled",
-                    ).length;
+                    const n = d.blocks.filter(isLive).length;
                     return (
                         <button
                             key={d.date}
                             type="button"
                             onClick={() => onDay(d.date)}
-                            aria-label={`${d.label}, ${count(n, "booking")}. Open the day`}
+                            aria-label={`${d.label}${d.today ? ", today" : ""}, ${count(n, "booking")}. Open the day`}
                             className={cn(
                                 "border-b border-l border-b-border border-l-border/60 px-2.5 py-2 text-left transition-colors duration-fast hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted",
                                 d.selected ? "bg-muted/60" : "bg-transparent",
+                                // Today wears the Ink rule a chosen tab does;
+                                // its column stays plain so the hatch reads.
+                                d.today &&
+                                    "shadow-[inset_0_2px_0_hsl(var(--foreground))]",
                             )}
                         >
-                            <div className="text-[12px] font-semibold">
+                            <div
+                                className={cn(
+                                    "text-[12px]",
+                                    d.today ? "font-bold" : "font-semibold",
+                                )}
+                            >
                                 {d.label}
                             </div>
                             <div className="text-[11px] text-muted-foreground">
+                                {d.today ? "Today · " : ""}
                                 {count(n, "booking")}
                             </div>
                         </button>
                     );
                 })}
-                <HourRail span={span} />
-                {days.map((d) => (
-                    <div
-                        key={d.date}
-                        className={cn(
-                            "relative border-l border-border/60",
-                            d.today && "bg-muted",
-                        )}
-                        style={{ height: `${(to - from) * PX}px` }}
-                    >
-                        {d.blocks.map((b) => {
-                            const lane = laneOf(b, d.blocks, lanes);
-                            return (
-                                <button
+                <HourRail span={span}>
+                    <NowTime minute={nowMinute} span={span} />
+                    <FirstSight
+                        sightKey={sightKey}
+                        minute={sight}
+                        span={span}
+                    />
+                </HourRail>
+                {days.map((d) => {
+                    const lanes = drawnLanes(d.blocks);
+                    return (
+                        <div
+                            key={d.date}
+                            data-diary-column={d.date}
+                            className="relative border-l border-border/60"
+                            style={{ height: tall(from, to) }}
+                        >
+                            {d.hours ? (
+                                <Hatches
+                                    closed={closedSpans(d.hours, span)}
+                                    off={offSpans(d.hours, span)}
+                                    from={from}
+                                />
+                            ) : null}
+                            {d.blocks.map((b) => (
+                                <DiaryBlock
                                     key={b.key}
-                                    type="button"
-                                    onClick={() => onBlock(b, d.date)}
-                                    aria-label={`${d.label}, ${blockLabel(b)}`}
-                                    className={cn(
-                                        "absolute z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[5px] py-0.5 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
-                                        blockColour(b),
-                                        selected === b.key &&
-                                            "ring-2 ring-foreground",
-                                        b.state === "cancelled" &&
-                                            "line-through",
+                                    block={b}
+                                    from={from}
+                                    selected={selected === b.key}
+                                    label={`${d.label}, ${blockLabel(b)}`}
+                                    onOpen={() => onBlock(b, d.date)}
+                                    place={lanePlace(
+                                        lanes.get(b.key) ?? {
+                                            lane: 0,
+                                            lanes: 1,
+                                        },
                                     )}
-                                    style={{
-                                        top: `${(b.start - from) * PX}px`,
-                                        height: `${Math.max(0, b.end - b.start) * PX}px`,
-                                        ...(lane
-                                            ? {
-                                                  left: `calc(${(lane.lane * 100) / lane.of}% + 2px)`,
-                                                  width: `calc(${100 / lane.of}% - 4px)`,
-                                              }
-                                            : { left: "3px", right: "3px" }),
-                                    }}
-                                >
-                                    <span className="block truncate text-[12px] font-bold">
-                                        {formatClock(b.start)} {blockTitle(b)}
-                                    </span>
-                                    <span className="block truncate text-[11px]">
-                                        {b.kind === "class"
-                                            ? `${liveSeats(b.session).length} of ${b.session.capacity}`
-                                            : b.state === "cancelled"
-                                              ? "Cancelled"
-                                              : b.booking.service.name}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                ))}
+                                />
+                            ))}
+                            {d.today ? (
+                                <NowLine minute={nowMinute} span={span} />
+                            ) : null}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

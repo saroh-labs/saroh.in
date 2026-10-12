@@ -5,7 +5,12 @@ import { describe, expect, it } from "vitest";
 
 import type { PublishContext } from "@/content/resources";
 
-import { helpHostPath, helpHostTarget, OLD_TO_NEW } from "./help-host";
+import {
+    helpHostPath,
+    helpHostRedirect,
+    helpHostTarget,
+    OLD_TO_NEW,
+} from "./help-host";
 
 const BEFORE = new Date("2026-10-16T18:29:59.999Z"); // 16 Oct, 23:59:59.999 IST
 const AFTER = new Date("2026-10-16T18:30:00.000Z"); // 17 Oct, 00:00 IST
@@ -71,5 +76,31 @@ describe("helpHostPath", () => {
         expect(Object.keys(OLD_TO_NEW).length).toBe(
             pairs.filter((m) => m[2]).length,
         );
+    });
+});
+
+describe("helpHostRedirect", () => {
+    it("is temporary, to the home page, until Help is shown", () => {
+        expect(helpHostRedirect("/selling", ctx(BEFORE))).toEqual({
+            path: "/",
+            status: 307,
+        });
+    });
+
+    it("is permanent, to Help or the old page's article, from then on", () => {
+        expect(helpHostRedirect("/selling", ctx(AFTER))).toEqual({
+            path: "/help/add-your-first-product",
+            status: 308,
+        });
+        expect(helpHostRedirect("/anything", ctx(AFTER))).toEqual({
+            path: "/help",
+            status: 308,
+        });
+    });
+
+    it("stays temporary when Help's route isn't in the build", () => {
+        expect(
+            helpHostRedirect("/selling", { ...ctx(AFTER), routes: ["/"] }),
+        ).toEqual({ path: "/", status: 307 });
     });
 });

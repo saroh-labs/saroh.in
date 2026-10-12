@@ -11,11 +11,13 @@
  */
 export const CUSTOMERS = {
     title: "Bought from a business that uses Saroh?",
+    /** The search title: what the page is for, the brand once, last. */
+    seoTitle: "For customers: your order, or report a business · Saroh",
     href: "/customers",
     /** The link in saroh.in's footer, beside Privacy and Terms. */
     footerLabel: "Bought from a business on Saroh?",
     description:
-        "Saroh makes the software. The business you bought from runs its own shop, takes the payment and is responsible for your order or booking. How to reach them, and how to report a business to us.",
+        "For customers of a business that uses Saroh: who is responsible for your order or booking, how to reach them, and how to report a business.",
     body: `Saroh makes software that businesses use to run their shop, bookings and website. We don't sell anything on those websites ourselves.
 
 ## The business is responsible for your order

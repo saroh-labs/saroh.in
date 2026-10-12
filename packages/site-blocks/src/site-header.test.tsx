@@ -350,7 +350,7 @@ describe("the header's states", () => {
         ]) {
             expect(el.className).toContain("duration-150");
             expect(el.className).toContain(
-                "ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+                "[transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)]",
             );
             expect(el.className).not.toContain("transition-all");
         }
