@@ -151,12 +151,13 @@ test.describe("a Member", () => {
                 }),
             ).toContainText(WHO_CAN_CHANGE);
             await expectNotOffered(page, "New service");
-            // Each service opens to read, never to edit.
+            // Each service's row opens it to read, and nothing on the
+            // row changes one: no Taking bookings switch.
             await expect(
-                page.getByRole("link", { name: /^View / }).first(),
-            ).toBeVisible();
+                page.locator('a[href^="/services/"]').first(),
+            ).toBeAttached();
             await expect(
-                page.getByRole("link", { name: /^Edit / }),
+                page.getByRole("switch", { name: /^Taking bookings/ }),
             ).toHaveCount(0);
         } finally {
             await northwind(owner.request).delete(`/contacts/${who.id}`);

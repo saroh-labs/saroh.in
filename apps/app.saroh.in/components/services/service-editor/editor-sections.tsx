@@ -4,6 +4,7 @@ import { FailedRead } from "@/components/shared/failed-read";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
+import { TextLink } from "@saroh/ui/text-link";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
@@ -11,6 +12,7 @@ import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import type { PlanLock } from "@/lib/billing/access";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
+import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
 import {
     bookingPageNote,
     draftVisits,
@@ -29,6 +31,7 @@ import { DepositField } from "./deposit-field";
 import type { Edit } from "./fields";
 import { HELP, NumberField, Section } from "./fields";
 import { GstFields } from "./gst-fields";
+import { LengthField } from "./length-field";
 import { VisitsField, VisitsStorefrontNote } from "./visits-field";
 import { WhereField } from "./where-field";
 
@@ -107,15 +110,14 @@ export function TimeSection({
 }) {
     return (
         <Section title="Time">
-            <div className="flex flex-wrap gap-3">
-                <NumberField
-                    label="Each visit (min)"
-                    value={draft.minutes}
-                    onChange={(minutes) => set({ minutes })}
-                    width="w-[120px]"
-                    error={problem("minutes")}
-                    onLeave={() => leave("minutes")}
-                />
+            {/* The usual lengths as chips, and Custom for any other. */}
+            <LengthField
+                value={draft.minutes}
+                onChange={(minutes) => set({ minutes })}
+                error={problem("minutes")}
+                onLeave={() => leave("minutes")}
+            />
+            <div className="mt-3 flex flex-wrap gap-3">
                 <NumberField
                     label="Gap after (min)"
                     value={draft.gap}
@@ -310,8 +312,10 @@ export function WhoTakesIt({
                 </>
             ) : (
                 <p className={cn(HELP, "mt-0")}>
-                    Nobody is on the diary yet, so it books in its own weekly
-                    hours, under More settings.
+                    Nobody is on the diary yet.{" "}
+                    <TextLink href={AVAILABILITY_HREF}>
+                        Add yourself or your team in Availability
+                    </TextLink>
                 </p>
             )}
         </Section>

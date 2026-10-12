@@ -435,9 +435,13 @@
     locations list, and everything `ListCard` draws (Providers,
     Notifications, Follow-ups, Website pages, posts and forms). Orders'
     grid already matched and keeps its own row. Not tables, and left as
-    they are: card grids (Services, Class packs, Collections, plan cards,
+    they are: card grids (Class packs, Collections, plan cards,
     the Pipeline board), Stock's Checks (a card per check, with its
-    actions) and a settings matrix (Your profile's alerts). Stock's
+    actions) and a settings matrix (Your profile's alerts). Services
+    left the card grids on 12 Oct 2026: it is `DataView` rows, with no
+    search or filter (a business has a handful), and a "Taking bookings"
+    `SwitchRow` as each row's action. What is true of several rows is
+    said once above the list, never on every row. Stock's
     three lists (Levels, Log, Checks) end with `ListPaging`, each with its
     own page and size in the address (`lib/stock/list-query.ts`); Levels
     pages by product, so its footer counts products, not rows. A list

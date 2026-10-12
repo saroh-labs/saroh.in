@@ -6,21 +6,20 @@ import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 
 import { TimezoneSelect } from "@/components/shared/timezone-select";
-import type { AvailabilityRule } from "@/lib/services/service";
-import { hoursNote } from "@/lib/services/service-editor";
+import { TAKING_LABEL } from "@/lib/services/service-cards";
 
-import { FailedRead } from "@/components/shared/failed-read";
 import { Field } from "@saroh/ui/field";
 import type { Edit } from "./fields";
-import { HELP, LABEL, NumberField, Section } from "./fields";
+import { HELP, NumberField, Section } from "./fields";
 import { GstFields } from "./gst-fields";
-import { HoursField } from "./hours-field";
 
 /**
  * More settings (E2, default 42): what the old service forms had that the
  * design's page leaves out, kept one click away (00-universal §15) — the
- * time zone, the buffer before, GST, the service's own weekly hours and
- * Delete. Closed until opened (UX-056: `hidden` alone lost to `grid`).
+ * time zone, the buffer before, GST and Delete. Closed until opened
+ * (UX-056: `hidden` alone lost to `grid`). The service's own weekly hours
+ * left for a card of their own, "When it can be booked" (`hours-card.tsx`,
+ * 12 Oct 2026): they decide whether anyone can book.
  *
  * GST left for the Price section where the business is GST-registered
  * (12 Oct 2026): a rate that has to be chosen is asked where the price is.
@@ -30,11 +29,8 @@ export function MoreSettings({
     set,
     problem,
     leave,
-    hoursProblem,
-    startedFromOpening,
     forceOpen,
     serviceId,
-    rules,
     canEdit,
     withGst = true,
     onDelete,
@@ -45,16 +41,10 @@ export function MoreSettings({
      * one that isn't registered and never saved one.
      */
     withGst?: boolean;
-    /** What is wrong with a row of the hours, once it should be said. */
-    hoursProblem: (index: number) => string | null;
-    /** A new service whose hours were filled in from the opening hours. */
-    startedFromOpening: boolean;
     /** Opened by the page: something in here has to be fixed. */
     forceOpen: boolean;
     /** Null while creating: Delete needs a saved service. */
     serviceId: string | null;
-    /** Null when the hours couldn't be read. */
-    rules: AvailabilityRule[] | null;
     canEdit: boolean;
     onDelete: () => void;
 }) {
@@ -65,8 +55,8 @@ export function MoreSettings({
         <Section title="More settings">
             <p className={cn(HELP, "mt-0")}>
                 {withGst
-                    ? "Time zone, buffer before, GST, its own weekly hours, and deleting it."
-                    : "Time zone, buffer before, its own weekly hours, and deleting it."}
+                    ? "Time zone, buffer before, GST, and deleting it."
+                    : "Time zone, buffer before, and deleting it."}
             </p>
             <Button
                 size="sm"
@@ -121,27 +111,6 @@ export function MoreSettings({
                         />
                     </div>
                 ) : null}
-                <div>
-                    <div className={LABEL}>Its own weekly hours</div>
-                    {rules === null ? (
-                        <FailedRead
-                            things="its weekly hours"
-                            reassurance="They can't be changed right now."
-                        />
-                    ) : (
-                        <>
-                            <p className={cn(HELP, "mb-2.5")}>
-                                {hoursNote(draft.timezone, startedFromOpening)}
-                            </p>
-                            <HoursField
-                                rows={draft.hours}
-                                onChange={(hours) => set({ hours })}
-                                problemOf={hoursProblem}
-                                disabled={!canEdit}
-                            />
-                        </>
-                    )}
-                </div>
                 {serviceId !== null && canEdit ? (
                     <div className="border-t border-border pt-3.5">
                         <Button
@@ -153,7 +122,7 @@ export function MoreSettings({
                             Delete service
                         </Button>
                         <p className={HELP}>
-                            To stop bookings for now, use Stop taking bookings
+                            To stop bookings for now, turn off {TAKING_LABEL}{" "}
                             instead. Delete can&apos;t be undone.
                         </p>
                     </div>

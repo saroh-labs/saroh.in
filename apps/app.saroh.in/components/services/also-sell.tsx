@@ -20,6 +20,11 @@ import { alsoSellToast } from "@/lib/services/also-sell";
  * modules. Ticking one opens the "Turn on" sheet (DEC-068), the same one
  * Settings › Modules uses, so the menu, `/class-packs` and Settings all
  * follow. Turning one off takes Undo; nothing it holds is deleted.
+ *
+ * A quiet row under the list since the Bookings audit (12 Oct 2026): the
+ * list starts the screen, and a switch for a module doesn't sit where it
+ * should begin. Once Courses is on, "New course" is in the header's New
+ * service menu.
  */
 export function AlsoSell({
     features,
@@ -65,9 +70,11 @@ export function AlsoSell({
             role="group"
             aria-label="Also sell"
             aria-busy={pending || undefined}
-            className="mb-3.5 flex flex-wrap items-center gap-x-[18px] gap-y-2.5 rounded-[12px] border border-border bg-card px-3.5 py-[11px]"
+            className="mt-4 flex flex-wrap items-start gap-x-[18px] gap-y-1.5 px-[14px]"
         >
-            <span className="text-[13px] font-semibold">Also sell</span>
+            <span className="text-[13px] font-medium leading-snug text-muted-foreground">
+                Also sell
+            </span>
             {features.map((f) => (
                 <CheckRow
                     key={f.key}
@@ -75,7 +82,7 @@ export function AlsoSell({
                     disabled={pending}
                     onChange={() => flip(f)}
                     boxClassName="mt-0.5"
-                    className="max-w-[300px] items-start gap-[7px] coarse:min-h-0"
+                    className="max-w-[300px] items-start gap-[7px]"
                 >
                     <span>
                         {f.label}

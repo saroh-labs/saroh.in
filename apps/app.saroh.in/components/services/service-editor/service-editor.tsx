@@ -21,7 +21,7 @@ import {
     updateService,
 } from "@/lib/services/actions";
 import type { AvailabilityRule, Service } from "@/lib/services/service";
-import { takingLabel } from "@/lib/services/service-cards";
+import { TAKING_LABEL } from "@/lib/services/service-cards";
 import type { ServiceDraft, ServiceField } from "@/lib/services/service-editor";
 import {
     changedParts,
@@ -55,6 +55,8 @@ import type {
     WeeklyRange,
 } from "@/lib/staff/types";
 
+import { useTakingBookings } from "@/components/services/use-taking-bookings";
+import { SwitchRow } from "@/components/shared/check-row";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
@@ -68,6 +70,7 @@ import {
     WhatItIs,
     WhoTakesIt,
 } from "./editor-sections";
+import { HoursCard } from "./hours-card";
 import { MoreSettings } from "./more-settings";
 
 const SERVICES_HREF = "/services";
@@ -75,16 +78,22 @@ const SERVICES_HREF = "/services";
 /**
  * The Service Editor (E2, "Saroh Service Editor"): one page for a new
  * service and a saved one, in place of the old dialog and forms. What it
- * is, its time and where, its price, who takes it, the booking page and
- * At a glance; everything else the old forms had is under More settings.
- * One Save, in the header, applies to bookings made after it. It goes in
- * up to three calls: the service, who takes it, and its own weekly hours
- * (`PUT …/rules`). When the service is saved and its hours are not, the
+ * is, its time and where, when it can be booked, its price, who takes it,
+ * the booking page and At a glance; the time zone, the buffer before and
+ * Delete are under More settings. One Save, in the header, applies to
+ * bookings made after it. It goes in up to three calls: the service, who
+ * takes it, and its own weekly hours (`PUT …/rules`). When the service is
+ * saved and its hours are not, the
  * page says exactly that, keeps the hours typed, and Try again sends only
  * the hours.
  *
  * A field says what is wrong once it has been left; Save says the rest and
  * puts the keyboard on the first one.
+ *
+ * "Taking bookings" is a switch beside Save (Bookings audit, 12 Oct
+ * 2026), not part of the draft's Save: it acts as it is flipped, with
+ * Undo, the same as on a row of Bookings › Services, and leaves whatever
+ * else is typed on the page as it is.
  *
  * "At booking, they pay" sits under Price (E8), and Visits under Time
  * (E10): more than one makes it a treatment, which needs a storefront to
@@ -171,6 +180,7 @@ export function ServiceEditor({
     );
     const [draft, setDraft] = useState(saved);
     const [saving, setSaving] = useState(false);
+    const taking = useTakingBookings();
     const [confirmDelete, setConfirmDelete] = useState(false);
     // A new service's hours follow its kind until someone changes them.
     const [hoursTouched, setHoursTouched] = useState(false);
@@ -234,8 +244,8 @@ export function ServiceEditor({
     // on it.
     const inMore = (
         gstAt === "more"
-            ? (["timezone", "bufferBefore", "sacCode", "hours"] as const)
-            : (["timezone", "bufferBefore", "hours"] as const)
+            ? (["timezone", "bufferBefore", "sacCode"] as const)
+            : (["timezone", "bufferBefore"] as const)
     )
         .map((field) => problemFor(problems, field))
         .some((message) => message !== null);
@@ -457,18 +467,38 @@ export function ServiceEditor({
                     actions={
                         canEdit ? (
                             <div className="flex flex-wrap items-center gap-2">
-                                {isNew ? null : (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-
-                                        disabled={saving}
-                                        onClick={() =>
-                                            set({ taking: !draft.taking })
+                                {serviceId === null ? null : (
+                                    // Its own save, at once, with Undo: it
+                                    // moves the saved state and the draft
+                                    // together, so it is never "unsaved".
+                                    <SwitchRow
+                                        checked={draft.taking}
+                                        disabled={
+                                            saving || taking.busy === serviceId
                                         }
+                                        onChange={(next) =>
+                                            void taking.setTaking(
+                                                {
+                                                    id: serviceId,
+                                                    name: saved.name.trim(),
+                                                },
+                                                next,
+                                                (on) => {
+                                                    setSaved((was) => ({
+                                                        ...was,
+                                                        taking: on,
+                                                    }));
+                                                    setDraft((was) => ({
+                                                        ...was,
+                                                        taking: on,
+                                                    }));
+                                                },
+                                            )
+                                        }
+                                        className="mr-1 whitespace-nowrap font-medium"
                                     >
-                                        {takingLabel(draft.taking)}
-                                    </Button>
+                                        {TAKING_LABEL}
+                                    </SwitchRow>
                                 )}
                                 {dirty ? (
                                     <Button
@@ -548,6 +578,17 @@ export function ServiceEditor({
                         hasStaff={hasStaff}
                         noStorefront={noStorefront}
                     />
+                    <HoursCard
+                        draft={draft}
+                        set={set}
+                        hoursProblem={hoursProblem}
+                        startedFromOpening={
+                            isNew && !hoursTouched && draft.hours.length > 0
+                        }
+                        rules={rules}
+                        people={people}
+                        canEdit={canEdit}
+                    />
                     <PriceSection
                         draft={draft}
                         set={set}
@@ -574,13 +615,8 @@ export function ServiceEditor({
                         set={set}
                         problem={problem}
                         leave={leave}
-                        hoursProblem={hoursProblem}
-                        startedFromOpening={
-                            isNew && !hoursTouched && draft.hours.length > 0
-                        }
-                        forceOpen={(tried && inMore) || hoursFailed !== null}
+                        forceOpen={tried && inMore}
                         serviceId={serviceId}
-                        rules={rules}
                         canEdit={canEdit}
                         withGst={gstAt === "more"}
                         onDelete={() => setConfirmDelete(true)}
@@ -616,7 +652,7 @@ export function ServiceEditor({
                     open={confirmDelete}
                     onOpenChange={setConfirmDelete}
                     title={`Delete ${service.name}?`}
-                    description="It leaves your services and can no longer be booked. Bookings already made keep it. To stop bookings for now, choose Stop taking bookings instead. This cannot be undone."
+                    description="It leaves your services and can no longer be booked. Bookings already made keep it. To stop bookings for now, turn off Taking bookings instead. This cannot be undone."
                     confirmLabel="Delete service"
                     keepLabel="Keep service"
                     onConfirm={remove}
