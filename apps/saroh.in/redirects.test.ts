@@ -53,8 +53,18 @@ describe("redirects", () => {
         expect(launched("waitlist")).toEqual([]);
         // Where "Start free" goes (`cta`, lib/links.ts), with no query of
         // its own: Next carries the visitor's over.
-        expect(launched("open")).toEqual([
+        // Given the address the build is given, as next.config.js gives it
+        // (read back from `SIGN_UP_URL`): CI sets one, so the unset default
+        // is not what the site links to there.
+        expect(launched("open", SIGN_UP_URL.replace(/\/signup$/, ""))).toEqual([
             { source: "/waitlist", destination: SIGN_UP_URL, statusCode: 301 },
+        ]);
+        expect(launched("open")).toEqual([
+            {
+                source: "/waitlist",
+                destination: "https://accounts.saroh.in/signup",
+                statusCode: 301,
+            },
         ]);
         expect(launched("open", "https://accounts.example.test")).toEqual([
             {

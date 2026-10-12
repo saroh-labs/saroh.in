@@ -4458,3 +4458,34 @@ query parameter reads it in the browser. And when a plan is dropped, grep
 the code's comments for it the same day: a comment that promises a job is
 read as the job existing.
 **Category**: performance · frontend · devops · `docs/patterns/frontend-app-structure.md` → saroh.in and search
+
+## Three unit tests passed on the laptop and failed on CI: an address, two timeouts and a pattern built from text
+
+**Date**: 2026-10-12 · **Area**: tests · CI
+**Symptom**: the batch's gate passed in full (`pnpm prepush --all`), and its
+pull request failed "Unit tests" and CodeQL. `redirects.test.ts` expected the
+waitlist to move to `http://localhost:3000/signup` and got
+`https://accounts.saroh.in/signup`. `seo-pages.test.tsx` and
+`service-editor.test.tsx` each lost their first test to the five second
+limit, and in the editor's file every test after it failed too. CodeQL
+flagged "Incomplete string escaping" in `bookings-view-switch.test.tsx`.
+**Cause**: three different things, none of which the laptop shows.
+
+- CI sets `NEXT_PUBLIC_ACCOUNTS_URL`; the laptop's unit run does not. The
+  test compared `launched("open")`, which falls back to the production
+  address, with `SIGN_UP_URL`, which reads the variable.
+- The first test in each of the two files loads a whole page. That takes
+  two to three seconds here and more than five on a shared runner. A test
+  that times out is not unmounted, so the next tests find its page.
+- A test helper made a `RegExp` from an address and escaped only `?`.
+  **Fix**: the redirect test passes the address the site was given, and checks
+  the unset default apart. The two files take `vi.setConfig({ testTimeout:
+20_000 })`, as the template picker's and the turn-on sheet's already do. The
+  helper finds the tag by plain text.
+  **Check**: the tests themselves. Nothing new in `prepush.sh`: it cannot make
+  the laptop slow, and CodeQL runs only on GitHub.
+  **Rule**: a test never compares a value that reads an environment variable
+  with one that does not. A test file whose first test renders a whole page
+  sets its own timeout. A test never builds a pattern from text: find it with
+  `includes`, or write the pattern out.
+  **Category**: tests · devops · `docs/patterns/devops-tooling-and-deploy.md`

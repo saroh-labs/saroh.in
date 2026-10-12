@@ -31,6 +31,11 @@ import type { StaffView } from "@/lib/staff/types";
 
 import { ServiceEditor } from "./service-editor";
 
+// The first test loads the whole page, which takes several seconds on a
+// loaded machine (CI, 12 Oct 2026): past the default five, a timeout there
+// fails it and leaves the page mounted for every test after.
+vi.setConfig({ testTimeout: 20_000 });
+
 const router = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() };
 vi.mock("next/navigation", () => ({
     useRouter: () => router,

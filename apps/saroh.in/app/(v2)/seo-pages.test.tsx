@@ -8,6 +8,11 @@ import { home } from "@/content/home";
 import { solutions } from "@/content/solutions";
 import { WAITLIST_PAGE } from "@/content/waitlist";
 
+// The first test loads the whole page, which takes several seconds on a
+// loaded machine (CI, 12 Oct 2026): past the default five, a timeout there
+// fails it and leaves the page mounted for every test after.
+vi.setConfig({ testTimeout: 20_000 });
+
 /**
  * The pages as a search engine meets them before launch (12 Oct 2026): the
  * two new pages in waitlist mode, Home and the waitlist with an h1 each,

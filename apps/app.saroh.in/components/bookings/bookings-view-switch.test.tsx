@@ -10,10 +10,14 @@ import { BookingsViewSwitch } from "./bookings-view-switch";
  * two switches side by side (Calendar | List, then the layout).
  */
 describe("the bookings view switch", () => {
+    // The opening tag of the link to an address, found by plain text: an
+    // address is never made into a pattern.
     const link = (html: string, href: string) =>
-        new RegExp(`<a[^>]*href="${href.replace(/[?]/g, "\\?")}"[^>]*>`).exec(
-            html,
-        )?.[0] ?? "";
+        html
+            .split("<a ")
+            .slice(1)
+            .map((rest) => `<a ${rest.slice(0, rest.indexOf(">") + 1)}`)
+            .find((tag) => tag.includes(`href="${href}"`)) ?? "";
 
     it("is one switch, with the list as its fourth view", () => {
         const html = renderToStaticMarkup(<BookingsViewSwitch current="day" />);
