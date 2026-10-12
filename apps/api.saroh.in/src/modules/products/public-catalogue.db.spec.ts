@@ -256,6 +256,8 @@ describe("public catalogue (G11)", () => {
             name: "Sourdough",
             currency: "INR",
             price: "250.00",
+            // Not GST-registered: nothing comes on top of the price.
+            gstAdded: false,
             mrp: null,
             priceFrom: true,
             image: null,
