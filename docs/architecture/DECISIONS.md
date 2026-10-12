@@ -1847,3 +1847,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Availability** is where a person's hours are set, with a preview of the week a customer would see.
 - **A service says what gives it its times** in a card of its own: the people who take it, or its own weekly hours for a class or a service nobody takes yet. It is not under "More settings".
 - A task is finished where it was opened (rows read first, edit in a sheet); no screen sends the merchant elsewhere halfway.
+
+## DEC-153 Subscriptions opens on who needs you, and plans are rows
+
+**Status: Accepted — 2026-10-12, built** · owner (agreed the audit and all four units)
+
+- Payments › Subscriptions lands on renewals that aren't paid when there are any, and the header leads with how many and what is unpaid; otherwise it lands on Active. A view someone chose (`?view=`) always wins.
+- Where a subscription stands is the shared list's one dropdown with counts, not tabs or tiles.
+- Plans are rows of the shared list with views Live, Archived, Drafts and All; the tab's badge counts live plans only. Archive and Sell again are in the row's menu.
+- "Members can pause from their account" and "When autopay charges" are read-first rows under the list, each edited in its own sheet.
+- When renewals last ran is said only when they are late.
+- An amount that recurs is written "₹900 a month" everywhere; "₹900/mo" only in a column that is narrow on a phone.
+- A plan's editor opens on its first unanswered question, and says what a price change does where the price is changed.
