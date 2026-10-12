@@ -117,7 +117,8 @@ const SCREENS: Screen[] = [
         name: "Bookings",
         org: PULSE,
         path: "/bookings",
-        ready: (page) => page.getByRole("radiogroup", { name: "Layout" }),
+        ready: (page) =>
+            page.getByRole("navigation", { name: "Bookings view" }),
     },
     {
         name: "Products",

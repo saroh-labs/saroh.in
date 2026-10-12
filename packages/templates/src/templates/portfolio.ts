@@ -1,5 +1,6 @@
 import type { TemplateContext, TemplateManifest } from "../manifest";
 import { escapeHtml } from "./html";
+import { STARTER_STYLES } from "./starter-look";
 
 /**
  * `portfolio` — a site for someone showing their work (DEC-070, K12). Three
@@ -84,7 +85,7 @@ function reachOut(ctx: TemplateContext): { label: string; href: string } {
         : { label: "Get in touch", href: "/" };
 }
 
-export const portfolioTemplate: TemplateManifest = {
+export const portfolioTemplateV1: TemplateManifest = {
     id: PORTFOLIO_TEMPLATE_ID,
     version: 1,
     name: "Portfolio",
@@ -202,4 +203,17 @@ export const portfolioTemplate: TemplateManifest = {
             ],
         },
     ],
+};
+
+/**
+ * `portfolio@2` (DEC-141): the same three pages in the starter's look, so a
+ * site made for "A site for my work" is not left in the unstyled page the
+ * starter had before v4. Only the look and the footer are new
+ * (`starter-look.ts`); the pages and their placeholder projects are v1's.
+ */
+export const portfolioTemplate: TemplateManifest = {
+    ...portfolioTemplateV1,
+    version: 2,
+    styles: STARTER_STYLES,
+    footer: { layout: "left", lineFrom: ownWords },
 };

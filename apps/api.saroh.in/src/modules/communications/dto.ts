@@ -1,5 +1,6 @@
 import { Transform } from "class-transformer";
 import {
+    IsBoolean,
     IsIn,
     IsObject,
     IsOptional,
@@ -129,4 +130,13 @@ export class SendMessageDto {
     @MinLength(1)
     @MaxLength(10_000)
     body!: string;
+}
+
+/**
+ * Turn "Updates in your customers' Messages" on or off (12 Oct 2026). A
+ * real boolean, or a 400: nothing is converted (`common/validation.ts`).
+ */
+export class SetAccountUpdatesDto {
+    @IsBoolean({ message: "Choose on or off" })
+    on!: boolean;
 }

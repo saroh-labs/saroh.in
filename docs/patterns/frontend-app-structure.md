@@ -172,6 +172,41 @@ accounts and the operator console. `pnpm run check:titles` and
   token in its address (`/invite/[token]`, `/reset-password`) keeps a fixed
   title and sets `referrer: "no-referrer"`.
 
+## saroh.in and search
+
+- **Current** (DEC-143) — **A main page of saroh.in has search words of its
+  own**, beside what a visitor reads: a plain category `phrase`, a
+  `seoTitle` that leads with it and a one-sentence `seoDescription` that
+  opens with it (`SearchWords`, `content/types.ts`). The title is
+  `pageTitle(seoTitle)`: "‹what the page is› · Saroh", 60 characters or
+  fewer, the brand once and last; the description is 150 or fewer. The
+  page's first screen says the phrase in plain words. A feature page owns
+  "‹X› software", a solution page "software for ‹trade›".
+  `content/seo.test.ts` fails a page that breaks any of it. They are claims:
+  a row in `MARKETING_CLAIMS.md` first, and no price or plan.
+- **A new feature or solution page** is a slug in `content/types.ts` and a
+  data set; the nav, the footer, Home's cards, the sitemap and `llms.txt`
+  follow from the list. Add it to `e2e/tests/marketing.spec.ts`'s lists. A
+  solution with no screen of its own trade captured has no `hero` and no
+  segment `shot`: it is drawn as words, never beside another trade's
+  screen.
+- **The site is built at deploy time and nothing deploys on a schedule.** A
+  page dated for a day (`publishOn`) appears with the first deploy made on
+  or after it. Anything that answers per request about a dated page asks
+  `builtContext()` (the build's moment), not `resourcesContext()` (now).
+- **A page that reads an optional query parameter reads it in the
+  browser**, through `readAddress` (`lib/page-address.ts`), so the page
+  stays one built file: the waitlist form, the link preview tool.
+- **A screenshot is files with a `srcset`**, never `next/image`
+  (`components/v2/shot-image.tsx`). After a capture run
+  `pnpm --filter web shots:sizes --force`.
+- **Files Cloudflare serves without the Worker take their headers from
+  `public/_headers`**: caching for `/_next/static/*` and `/shots/*`, and
+  the security headers. Never an `X-Robots-Tag` there: this site is public.
+- **Structured data carries only facts that are set** (`lib/structured-data.ts`,
+  `content/company.ts`): no price, rating, review or count, and an offer
+  only from a published catalogue once the launch switch is open.
+
 ## The other apps
 
 - **Current** — `accounts.saroh.in` is identity UI only, built client-side

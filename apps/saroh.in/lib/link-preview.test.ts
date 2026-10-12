@@ -10,6 +10,7 @@ import {
     domainOf,
     failureMessage,
     reportLink,
+    sharedAddress,
     splitScheme,
 } from "./link-preview";
 
@@ -90,6 +91,31 @@ describe("failureMessage", () => {
 
     it("names the site as typed, before any path", () => {
         expect(domainOf("https://Shop.in/menu?x=1")).toBe("shop.in");
+    });
+});
+
+describe("sharedAddress", () => {
+    it("reads the address a shared report names", () => {
+        expect(sharedAddress("?url=shop.in")).toBe("shop.in");
+        expect(sharedAddress("?src=x&url=http%3A%2F%2Fshop.in%2Fmenu")).toBe(
+            "http://shop.in/menu",
+        );
+    });
+
+    it("is nothing without one", () => {
+        expect(sharedAddress("")).toBeUndefined();
+        expect(sharedAddress("?url=")).toBeUndefined();
+        expect(sharedAddress("?url=%20")).toBeUndefined();
+        expect(sharedAddress("?plan=grow")).toBeUndefined();
+    });
+
+    it("cuts an address no site has to a sane length", () => {
+        expect(sharedAddress(`?url=${"a".repeat(5000)}`)).toHaveLength(2048);
+    });
+
+    it("opens the report its own link names", () => {
+        const link = reportLink("https://www.saroh.in", "https://shop.in/");
+        expect(sharedAddress(new URL(link).search)).toBe("shop.in");
     });
 });
 

@@ -28,6 +28,10 @@ jest.mock("@saroh/database", () => {
         },
         page: {
             create: jest.fn(async () => ({ id: "page_1" })),
+            // A module page is added only where the site has none of its
+            // kind and nothing at its address (DEC-141): a new site has
+            // neither.
+            findFirst: jest.fn(async () => null),
         },
         // Addresses held after a change (DEC-069, L1): none here.
         addressReservation: {
@@ -42,9 +46,11 @@ jest.mock("@saroh/database", () => {
         // What the template context reads (K15): no module on, no service.
         organizationModule: { findMany: jest.fn(async () => []) },
         service: { findMany: jest.fn(async () => []) },
-        // A template's enquiry sections get their Form (K15): the starter
-        // has none.
-        form: { create: jest.fn() },
+        // What the business sells, for its line (DEC-141): nothing here.
+        category: { findMany: jest.fn(async () => []) },
+        // A template's enquiry sections get their Form (K15), and so does
+        // the Contact page the starter starts with (DEC-141).
+        form: { create: jest.fn(async () => ({ id: "form_1" })) },
         // The logo that stands in for a site's icon (DEC-124): none here.
         businessProfile: { findUnique: jest.fn(async () => null) },
         // The shop's rollout flag, never configured here: off.
@@ -342,10 +348,11 @@ describe("SitesService.createFromTemplate", () => {
             templateId: "personal",
         });
 
+        // Its newest version, in the first of its colourways (DEC-141).
         expect(siteCreate.mock.calls[0][0].data).toMatchObject({
             templateId: "personal",
-            templateVersion: 1,
-            templateStyleId: null,
+            templateVersion: 2,
+            templateStyleId: "stone",
         });
     });
 
@@ -367,16 +374,25 @@ describe("SitesService.createFromTemplate", () => {
                 slug: "acme",
                 // Never without an address (L5): the business's own.
                 subdomain: "acme",
-                // The template it came from (KTD-7): the kind's default.
+                // The template it came from (KTD-7): the kind's default, in
+                // the first of its colourways (DEC-141).
                 templateId: STARTER_TEMPLATE_ID,
-                templateVersion: 3,
-                templateStyleId: null,
+                templateVersion: 4,
+                templateStyleId: "stone",
                 storefrontId: null,
+                style: expect.objectContaining({
+                    fontPair: "source-serif-inter",
+                    palette: expect.objectContaining({ bg: "#F6F3EC" }),
+                }),
+                // No line: nothing is known of what this business does.
+                footer: { format: "markdown", value: "", layout: "left" },
             },
             select: { id: true, slug: true },
         });
 
-        // The real starter template lays down exactly two pages (Home + About).
+        // A business with nothing switched on and nothing said about it
+        // gets Home and a Contact page (DEC-141): no About, which has
+        // nothing true to say yet.
         expect(pageCreate).toHaveBeenCalledTimes(2);
 
         const pagesByPath = new Map<string, Record<string, unknown>>(
@@ -407,17 +423,22 @@ describe("SitesService.createFromTemplate", () => {
                 };
             };
         };
-        const about = pagesByPath.get("/about") as typeof home;
+        const contact = pagesByPath.get("/contact") as typeof home & {
+            kind: string;
+        };
+        expect(pagesByPath.has("/about")).toBe(false);
 
         // Home is the home page and hangs off the created Site.
         expect(home.siteId).toBe("site_1");
         expect(home.organizationId).toBe("org_1");
         expect(home.isHome).toBe(true);
-        expect(about.isHome).toBe(false);
+        expect(contact.isHome).toBe(false);
+        // Made as adding a Contact page by hand makes it.
+        expect(contact.kind).toBe("CONTACT");
 
         // Each page gets exactly one DRAFT version authored by the ctx user, and
         // every version + section carries the denormalized ctx org id.
-        for (const page of [home, about]) {
+        for (const page of [home, contact]) {
             const version = page.versions.create;
             expect(version.status).toBe("DRAFT");
             expect(version.organizationId).toBe("org_1");
@@ -427,18 +448,23 @@ describe("SitesService.createFromTemplate", () => {
             }
         }
 
-        // The real starter template's section shape flows through: Home has 3
-        // ordered sections without a contact email (one About button, UX-070),
-        // starting with a validated hero.
+        // The real starter template's section shape flows through: with
+        // nothing switched on, Home is a validated hero and the message
+        // form, which is the page's one action.
         const homeSections = home.versions.create.sections.create;
-        expect(homeSections).toHaveLength(3);
-        expect(homeSections.map((s) => s.order)).toEqual([0, 1, 2]);
-        expect(homeSections[0].type).toBe("hero");
-        // Content is the CONTRACT-NORMALIZED output seeded with the org name.
-        expect(homeSections[0].content).toMatchObject({ heading: "Acme" });
-        expect(about.versions.create.sections.create).toHaveLength(2);
+        expect(homeSections.map((s) => s.type)).toEqual(["hero", "enquiry"]);
+        expect(homeSections.map((s) => s.order)).toEqual([0, 1]);
+        // Content is the CONTRACT-NORMALIZED output seeded with the org name,
+        // and no line where nothing true can be said: never a prompt.
+        expect(homeSections[0].content).toMatchObject({
+            heading: "Acme",
+            cta: { label: "Get in touch", href: "/contact" },
+        });
+        expect(homeSections[0].content).not.toHaveProperty("subheading");
+        // The form takes messages from the first publish.
+        expect(homeSections[1].content).toMatchObject({ formId: "form_1" });
 
-        // A real menu from the first draft (UX-070): Home, then About.
+        // A real menu from the first draft (UX-070): Home, then Contact.
         expect(prisma.site.update).toHaveBeenCalledWith({
             where: { id: "site_1" },
             data: {
@@ -458,7 +484,13 @@ describe("SitesService.createFromTemplate", () => {
             },
         });
 
-        await service.createFromTemplate(ctx(), { name: "Acme" });
+        // The version that weaves the legal name into About (v4 writes no
+        // story it cannot know to be true).
+        await service.createFromTemplate(ctx(), {
+            name: "Acme",
+            templateId: STARTER_TEMPLATE_ID,
+            templateVersion: 3,
+        });
 
         const about = pageCreate.mock.calls
             .map(([arg]) => arg.data)

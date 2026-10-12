@@ -153,7 +153,8 @@ export function dayStartsAt(day: IsoDay): Date {
 /**
  * Whether a page dated `publishOn` is live at `now`: from midnight in India
  * on that day (KTD-2). One rule for every Resources page, entry and legal
- * page, so they all appear at the same moment, without a deploy.
+ * page, so they all appear together: with the first deploy made on or after
+ * the day, since the site is built at deploy time (`app/layout.tsx`).
  */
 export function isPublished(publishOn: IsoDay, now: Date): boolean {
     return now.getTime() >= dayStartsAt(publishOn).getTime();

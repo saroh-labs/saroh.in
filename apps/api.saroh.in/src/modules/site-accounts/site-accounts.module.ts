@@ -7,6 +7,7 @@ import { InvoicePdfModule } from "../invoices/invoice-pdf.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { AccountAreaGuard } from "./account-area";
+import { AccountDetailsController } from "./account-details.controller";
 import {
     AccountHomeService,
     CUSTOMER_NOTES_OPEN,
@@ -54,7 +55,11 @@ import { ThreadsService } from "./threads.service";
  * workspace answers through the exported `ThreadsService`. A14 tells
  * customers about their own bookings and orders (`customer.notify`, and
  * `CustomerNotifyService`, which `booking.notify` delegates to), in the
- * thread and through the business's own email provider.
+ * thread and through the business's own email provider. DEC-142 adds the
+ * rest of what a customer may see (`AccountDetailsController`: a class's
+ * line, courses, email choices; Home's "since you were last here"); their
+ * open invoices are served by `SubscriptionsModule`, which holds the
+ * invoices service (`AccountInvoicesController`).
  */
 @Module({
     // The notices' job is registered at boot.
@@ -69,6 +74,8 @@ import { ThreadsService } from "./threads.service";
         AccountController,
         AccountOrdersController,
         AccountMessagesController,
+        // A class's line, courses and email choices (DEC-142).
+        AccountDetailsController,
     ],
     providers: [
         AccountOrdersService,

@@ -487,6 +487,15 @@ model BusinessProfile {
   // Staff pause either way. No profile yet reads as on.
   membersCanPause Boolean @default(true)
 
+  // "Updates in your customers' Messages" (12 Oct 2026): the business's own
+  // choice to have Saroh post order, booking and invoice updates into a
+  // customer's account thread. On by default, and no profile yet reads as
+  // on. It is the third gate, after the instance's SITE_ACCOUNT_AREA and
+  // the ACCOUNT_THREAD rollout flag (`communications/account-thread.ts`).
+  // Off stops only Saroh's own posts: the team's replies and what the
+  // customer writes are untouched.
+  accountUpdates Boolean @default(true)
+
   // When autopay debits a renewal (round-2 D13B, DEC-065): ON_RENEWAL_DATE
   // (the invoice and bank notice go out early so the debit lands on the
   // renewal date), DAY_AFTER_RENEWAL (D13: invoice on the renewal date,
@@ -6622,6 +6631,14 @@ model CustomerAccount {
 
   linkedAt       DateTime  @default(now())
   lastSignedInAt DateTime?
+
+  // When the customer last opened their account's Home, and the visit
+  // before that one (DEC-142): Home says what changed since
+  // `previousVisitAt` for as long as the visit that began after it lasts.
+  // Only the Home read moves them (`site-accounts/account-visit.ts`). Null
+  // until a first, then a second, visit.
+  lastVisitAt     DateTime?
+  previousVisitAt DateTime?
 
   sessions CustomerSession[]
 

@@ -11,6 +11,10 @@ import { ScreenshotFrame } from "../screenshot-frame";
  * One "What changes" problem: the area's label, the pain quote with its left
  * rule, the title, the body, "See {feature} →" on the first segment of each
  * area only, and the shot. Every second segment puts the shot on the left.
+ *
+ * A segment with no shot (a trade with no screen captured yet) is its words
+ * alone, at a width that reads: no empty frame, and never another trade's
+ * screen in its place.
  */
 export function SolutionSegment({
     segment,
@@ -23,10 +27,15 @@ export function SolutionSegment({
         <div
             className={cn(
                 "flex flex-wrap items-center gap-12",
-                reverse ? "flex-row-reverse" : "flex-row",
+                segment.shot && reverse ? "flex-row-reverse" : "flex-row",
             )}
         >
-            <div className="grid flex-[1_1_320px] content-center gap-3.5">
+            <div
+                className={cn(
+                    "grid content-center gap-3.5",
+                    segment.shot ? "flex-[1_1_320px]" : "max-w-[68ch]",
+                )}
+            >
                 <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                     {segment.label}
                 </span>
@@ -49,12 +58,14 @@ export function SolutionSegment({
                     </Link>
                 ) : null}
             </div>
-            <ScreenshotFrame
-                shot={segment.shot}
-                alt={segment.alt}
-                zoomable
-                className="flex-[1.4_1_420px]"
-            />
+            {segment.shot ? (
+                <ScreenshotFrame
+                    shot={segment.shot}
+                    alt={segment.alt}
+                    zoomable
+                    className="flex-[1.4_1_420px]"
+                />
+            ) : null}
         </div>
     );
 }

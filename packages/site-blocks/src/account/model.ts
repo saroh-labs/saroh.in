@@ -5,6 +5,12 @@ import type {
 } from "../autopay/api";
 import { timeWords } from "../lib/clock";
 import { siteMoney } from "../lib/money";
+import type {
+    AccountChange,
+    AccountCourse,
+    AccountInvoiceDue,
+    AccountWaitlistPlace,
+} from "./details-types";
 
 /**
  * The customer account area's data, as the site's server hands it to the
@@ -210,6 +216,24 @@ export interface AccountHome {
     classes: Block<AccountClasses | null>;
     orders: Block<AccountOrder[]> | null;
     plan: Block<AccountPlan | null>;
+    // What DEC-142 added. Each is absent from an API before it, and Home
+    // then draws nothing for it: never an empty card, never a failed one.
+    /** What changed since they were last here, newest first. */
+    changes?: Block<AccountChange[]>;
+    /** The visit the changes count from; null on a first visit. */
+    since?: string | null;
+    /** Their open invoices, the one due soonest first. */
+    invoicesDue?: Block<AccountInvoiceDue[]>;
+    /** Their places in a class's line; null when the business takes no bookings. */
+    waitlist?: Block<AccountWaitlistPlace[]> | null;
+    /** The courses they hold a seat on. */
+    courses?: Block<AccountCourse[]>;
+    /**
+     * The account is on a record of its own until the business links it to
+     * the one it already had (DEC-049): earlier orders and bookings may be
+     * waiting for that.
+     */
+    linkPending?: boolean;
 }
 
 export interface AccountReceipt {
@@ -408,8 +432,15 @@ const VISIT_STATE: Record<AccountOrderVisit["state"], string> = {
     "to-book": "To book",
 };
 
-/** "Visit 2 · Mon 5 Oct, 10:00 am" and its word. */
-export function visitLine(visit: AccountOrderVisit): {
+/**
+ * "Visit 2 · Mon 5 Oct, 10:00 am" and its word. A visit whose time has
+ * passed with nothing recorded says its date alone: never "Booked", and
+ * never a guess at "Done" (DEC-142).
+ */
+export function visitLine(
+    visit: AccountOrderVisit,
+    now: Date = new Date(),
+): {
     title: string;
     state: string;
 } {
@@ -417,9 +448,13 @@ export function visitLine(visit: AccountOrderVisit): {
         visit.startAt && visit.timezone
             ? ` · ${bookingWhen(visit.startAt, visit.timezone)}`
             : "";
+    const passed =
+        visit.state === "booked" &&
+        visit.startAt !== null &&
+        new Date(visit.startAt).getTime() < now.getTime();
     return {
         title: `Visit ${visit.number}${when}`,
-        state: VISIT_STATE[visit.state],
+        state: passed ? "" : VISIT_STATE[visit.state],
     };
 }
 

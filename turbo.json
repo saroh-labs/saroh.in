@@ -117,6 +117,8 @@
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.
         "SAROH_BUILT_ROUTES",
+        // saroh.in: the moment of the build, written the same way.
+        "SAROH_BUILT_AT",
         // The customer account area's release switch, in the api and saroh.app
         // (round-2 A5): off until A6-A8 and A13 ship.
         "SITE_ACCOUNT_AREA",

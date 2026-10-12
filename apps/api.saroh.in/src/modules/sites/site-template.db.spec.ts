@@ -2,8 +2,9 @@
  * DEC-070 K15 against a real Postgres: a new site starts from its kind's
  * template, and its enquiry forms take enquiries from the first publish.
  *
- * - With no template asked for: a business gets `starter@2`, "Just me"
- *   `personal@1`, "A site for my work" `portfolio@1`. An explicit choice in
+ * - With no template asked for: a business gets the starter (`starter@4`,
+ *   DEC-141: Home and a Contact page until it has more to show), "Just me"
+ *   Personal, "A site for my work" Portfolio. An explicit choice in
  *   `/sites/new` wins.
  * - Every enquiry section a template lays down gets its Form with the site
  *   (a template can lay down content only, so it has no `formId` of its
@@ -87,8 +88,10 @@ beforeAll(async () => {
 
 describe("a new site starts from the kind's template (K15)", () => {
     it.each([
-        ["a business", "BUSINESS", ["/", "/about"]],
-        ["a business from before the kind", undefined, ["/", "/about"]],
+        // Nothing switched on and nothing said about it yet: no About,
+        // which would have nothing true on it (DEC-141).
+        ["a business", "BUSINESS", ["/", "/contact"]],
+        ["a business from before the kind", undefined, ["/", "/contact"]],
         ["Just me", "SOLO", ["/", "/about", "/contact"]],
         ["A site for my work", "WORK", ["/", "/about", "/work"]],
     ] as [string, Kind | undefined, string[]][])(
@@ -126,7 +129,7 @@ describe("a new site starts from the kind's template (K15)", () => {
         });
         expect((await draft(siteId)).map((p) => p.path)).toEqual([
             "/",
-            "/about",
+            "/contact",
         ]);
 
         const writer = await business("Ink Notes", "SOLO");
@@ -190,12 +193,24 @@ describe("a template's enquiry form works from the first publish (K15)", () => {
         },
     );
 
-    it("the starter lays down no enquiry, so no Form is made", async () => {
+    it("the starter's two forms each get their own: Home's message form and the Contact page's", async () => {
         const ctx = await business("Northwind Salon", "BUSINESS");
         const { siteId } = await sites.createFromTemplate(ctx, {
             name: "Northwind Salon",
         });
-        expect(await prisma.form.count({ where: { siteId } })).toBe(0);
+        const enquiries = (await draft(siteId)).flatMap((p) =>
+            p.sections
+                .filter((s) => s.type === "enquiry")
+                .map((s) => ({
+                    path: p.path,
+                    formId: (s.content as { formId?: string }).formId,
+                })),
+        );
+        expect(enquiries.map((e) => e.path)).toEqual(["/", "/contact"]);
+        const ids = enquiries.map((e) => e.formId);
+        expect(ids.every((id) => typeof id === "string")).toBe(true);
+        expect(new Set(ids).size).toBe(2);
+        expect(await prisma.form.count({ where: { siteId } })).toBe(2);
     });
 
     it("a refused site makes no Form either", async () => {

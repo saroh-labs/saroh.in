@@ -50,9 +50,13 @@ const FEATURES = [
     "bookings",
     "subscriptions",
     "billing",
+    // The Website page (12 Oct 2026): /website and /modules/website land here.
+    "website",
     "insights",
 ];
-const SOLUTIONS = ["shops", "gyms", "clinics"];
+// Salons (12 Oct 2026) has no screenshot yet: every check runs on it as on
+// the others.
+const SOLUTIONS = ["shops", "salons", "gyms", "clinics"];
 
 /** The pages a search engine should find, in the launch mode the stack runs (waitlist). */
 /**
@@ -67,7 +71,9 @@ const INDEXED = [
     ...(OPEN ? ["/pricing"] : []),
     ...FEATURES.map((s) => `/features/${s}`),
     ...SOLUTIONS.map((s) => `/solutions/${s}`),
-    "/waitlist",
+    // Once the launch switch is open the waitlist's address moves to
+    // sign-up for good (`launched` in redirects.js) and leaves the sitemap.
+    ...(OPEN ? [] : ["/waitlist"]),
     // Who makes Saroh and how to write to it (DEC-137): always listed,
     // whatever the launch mode.
     "/about",
@@ -638,6 +644,13 @@ test.describe("links, redirects and the sitemap", () => {
                 `Disallow: ${path}`,
             );
         expect(robots).toMatch(/Sitemap: \S+\/sitemap\.xml/);
+        // No non-standard Host line; and /welcome stays readable, so its
+        // own noindex is seen (a blocked page can still be listed bare).
+        expect(robots).not.toMatch(/^Host:/m);
+        expect(robots).not.toContain("Disallow: /welcome");
+        // No guessed changefreq or priority in the sitemap.
+        const xml = await (await request.get(`${WEB}/sitemap.xml`)).text();
+        expect(xml).not.toMatch(/<changefreq>|<priority>/);
 
         // The draft and its link say noindex themselves too.
         const draft = await head(request, `${WEB}/pricing/draft`);

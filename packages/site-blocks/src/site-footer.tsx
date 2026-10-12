@@ -227,9 +227,11 @@ export function SiteFooter({
     return (
         <footer
             data-site-footer=""
-            className={`border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t px-5 pb-7 sm:px-[var(--site-page-margin)] ${facts ? "pt-[var(--site-section-padding)]" : "pt-5"}`}
+            className={`border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t pb-7 ${facts ? "pt-[var(--site-section-padding)]" : "pt-5"}`}
         >
-            <div className="max-w-site-content mx-auto">
+            {/* The margins inside the column, as in the left layout below,
+                so the footer lines up with the header and the page. */}
+            <div className="max-w-site-content mx-auto px-5 sm:px-[var(--site-page-margin)]">
                 {facts ? (
                     <div className="pb-9">
                         <p

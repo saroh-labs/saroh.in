@@ -1110,3 +1110,176 @@ export const TEMPLATE_FIXTURES: Readonly<
     salon,
     clinic,
 };
+
+// ---------------------------------------------------------------------------
+// The starter (DEC-141): three businesses, one template
+// ---------------------------------------------------------------------------
+
+/**
+ * A business the starter is drawn for. The starter is not a gallery
+ * template (it has no one sample: it is every business's first site), so
+ * its renders are named for the business instead: `starter` is one with
+ * nothing switched on, `starter-shop` one that sells, `starter-salon` one
+ * that takes bookings.
+ *
+ *     /template-renders/starter/stone
+ *     /template-renders/starter-shop/harbour
+ *     /template-renders/starter-salon/clay/about
+ *
+ * The context is what the API would build for such a business
+ * (`buildTemplateContext`): its modules, its services, and the line
+ * composed from its own names. Nothing here is the owner's writing, because
+ * the point of the starter is what a site looks like before there is any.
+ * Not in `/template-renders`' index: the capture script shoots the gallery.
+ */
+export interface StarterSample {
+    name: string;
+    context: Omit<TemplateContext, "organizationName">;
+    fixture: TemplateFixture;
+}
+
+const STARTER_SALON_HOURS = week({
+    TUE: ["10:00", "20:00"],
+    WED: ["10:00", "20:00"],
+    THU: ["10:00", "20:00"],
+    FRI: ["10:00", "20:00"],
+    SAT: ["09:00", "21:00"],
+    SUN: ["10:00", "18:00"],
+});
+
+/** A business that has only just signed up: a name, and nothing else. */
+const starterPlain: StarterSample = {
+    name: "Verma & Rao",
+    context: { modules: ["WEBSITE"], serviceIds: [], sells: false },
+    fixture: {},
+};
+
+/** A shop that delivers: Commerce on, products in three categories. */
+const starterShop: StarterSample = {
+    name: "Hill Road Pantry",
+    context: {
+        description: "Pickles, Preserves and Spice blends in Pune",
+        contactEmail: "hillroadpantry@example.com",
+        modules: ["WEBSITE", "COMMERCE"],
+        serviceIds: [],
+        sells: true,
+        area: "Pune",
+    },
+    fixture: {
+        products: [
+            {
+                slug: "mango-pickle",
+                name: "Raw mango pickle",
+                price: "280.00",
+                blurb: "Cold-pressed mustard oil, sun-cured for three weeks.",
+                brief: "A glass jar of mango pickle, lid off, on a steel plate",
+            },
+            {
+                slug: "lime-pickle",
+                name: "Sweet lime pickle",
+                price: "260.00",
+                blurb: "Jaggery and whole spices. No oil.",
+                brief: "A spoon lifting dark lime pickle from an open jar",
+            },
+            {
+                slug: "strawberry-preserve",
+                name: "Strawberry preserve",
+                price: "340.00",
+                blurb: "Mahabaleshwar berries, half the usual sugar.",
+                brief: "A jar of red preserve beside a cut strawberry",
+            },
+            {
+                slug: "orange-marmalade",
+                name: "Orange marmalade",
+                price: "320.00",
+                blurb: "Nagpur oranges, thick cut.",
+                brief: "Marmalade on buttered toast, the jar behind it",
+            },
+            {
+                slug: "garam-masala",
+                name: "Garam masala",
+                price: "180.00",
+                blurb: "Ground in small lots, every fortnight.",
+                brief: "A steel bowl of dark ground spice, whole spices around it",
+            },
+            {
+                slug: "sambar-powder",
+                name: "Sambar powder",
+                price: "160.00",
+                blurb: null,
+                brief: "A paper pouch of red-brown powder, folded top",
+                soldOut: true,
+            },
+        ],
+    },
+};
+
+/** A salon: Bookings on, three services, a place with a week of hours. */
+const starterSalon: StarterSample = {
+    name: "Meher Hair Studio",
+    context: {
+        description: "Haircut, Colour and Bridal styling in Bengaluru",
+        contactEmail: "meherhairstudio@example.com",
+        modules: ["WEBSITE", "CRM", "APPOINTMENTS"],
+        serviceIds: ["starter-cut", "starter-colour", "starter-bridal"],
+        sells: false,
+        area: "Bengaluru",
+        hasPlace: true,
+        hasHours: true,
+    },
+    fixture: {
+        services: [
+            {
+                id: "starter-cut",
+                name: "Haircut",
+                description: "Wash, cut and blow-dry.",
+                durationMinutes: 45,
+                priceCents: 80000,
+                currency: "INR",
+            },
+            {
+                id: "starter-colour",
+                name: "Colour",
+                description: "Root touch-up or full colour, priced on the day.",
+                durationMinutes: 120,
+                priceCents: 350000,
+                currency: "INR",
+            },
+            {
+                id: "starter-bridal",
+                name: "Bridal styling",
+                description: null,
+                durationMinutes: 180,
+                priceCents: null,
+                currency: null,
+            },
+        ],
+        today: {
+            timezone: FIXTURE_TIME_ZONE,
+            date: SAMPLE_DAY,
+            appointments: true,
+            classes: false,
+            items: [
+                freeAt("starter-cut", "Haircut", 45, "11:15", "Meher"),
+                freeAt("starter-colour", "Colour", 120, "13:00", "Meher"),
+                freeAt("starter-cut", "Haircut", 45, "17:30", "Rohit"),
+            ],
+            hours: STARTER_SALON_HOURS,
+            closedDates: [],
+        },
+        visit: {
+            address: "2nd Cross, Indiranagar\nBengaluru 560038",
+            phone: null,
+            hours: STARTER_SALON_HOURS,
+            closedDates: [],
+        },
+    },
+};
+
+/** By render id. See {@link StarterSample}. */
+export const STARTER_SAMPLES: Readonly<Partial<Record<string, StarterSample>>> =
+    {
+        starter: starterPlain,
+        "starter-shop": starterShop,
+        "starter-salon": starterSalon,
+    };

@@ -5,10 +5,7 @@ import { formatClock, formatDay } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
-import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showInfo, showUndo } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
@@ -25,7 +22,6 @@ import type {
     BookingsCalendar,
     DiaryBooking,
 } from "@/lib/services/booking-calendar";
-import { runsClasses } from "@/lib/services/booking-calendar";
 import type { BookingPeople } from "@/lib/services/booking-pay";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
@@ -45,11 +41,17 @@ import {
     isLive,
     localDateOf,
     localMinuteOf,
-    UNASSIGNED,
     visibleHours,
     weekStartOf,
     whoFor,
 } from "@/lib/services/diary";
+import {
+    CANCELLED_LINE_MINUTES,
+    closedSpans,
+    hoursAcross,
+    legendOf,
+    offSpans,
+} from "@/lib/services/diary-view";
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 import { Users } from "lucide-react";
@@ -58,9 +60,9 @@ import { useHold } from "@/components/shared/use-hold";
 import { Segmented } from "@saroh/ui/segmented";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
-import { BookingsViewSwitch } from "../bookings-view-switch";
 import { AgendaList, AgendaMonth } from "./agenda-month";
 import { BookingQuickLook } from "./booking-quick-look";
+import { CalendarToolbar, Legend, ServiceHoursHint } from "./calendar-toolbar";
 import { DayByPerson } from "./day-by-person";
 import type { GapTarget } from "./new-booking-from-gap";
 import { NewBookingFromGap } from "./new-booking-from-gap";
@@ -105,12 +107,21 @@ function withOverrides(
     };
 }
 
+/** A block's place on the diary's hours: a cancelled one is a thin line. */
+const drawnSpan = (b: Block): Span =>
+    isLive(b) ? [b.start, b.end] : [b.start, b.start + CANCELLED_LINE_MINUTES];
+
 /**
  * Bookings › Calendar (U15, the "Saroh Bookings" design): the day by person
  * (default), the week, or the agenda with the month. Everything is read from
  * the bookings read (U4) and the staff read (U3); free gaps are what is left
  * of each person's hours. A booking opens a quick look; a free gap books;
  * closed time opens hours. Changes the desk makes are held for their Undo.
+ *
+ * Bookings are the only solid colour: free time is the plain page, closed
+ * time and time off are hatched, and cancelled bookings stay off the diary
+ * until the count's switch asks for them (kept in the address, so a reload
+ * remembers). The hours drawn are trimmed to the day's own.
  */
 export function CalendarScreen({
     layout,
@@ -128,6 +139,7 @@ export function CalendarScreen({
     notices = null,
     limitNotice = null,
     serviceHours = null,
+    showCancelled = false,
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -164,9 +176,19 @@ export function CalendarScreen({
      * one column with its free time, as the booking page offers it.
      */
     serviceHours?: ServiceHours | null;
+    /** The address asks for cancelled bookings to be drawn (`cancelled=1`). */
+    showCancelled?: boolean;
 }) {
     const router = useRouter();
     const { hold, undo, pending } = useHold();
+    // Flipped here and written to the address without a round trip; a
+    // navigation that changes what the address says wins.
+    const [cancelledShown, setCancelledShown] = useState(showCancelled);
+    const [asked, setAsked] = useState(showCancelled);
+    if (asked !== showCancelled) {
+        setAsked(showCancelled);
+        setCancelledShown(showCancelled);
+    }
     const [overrides, setOverrides] = useState<Record<string, Override>>({});
     const [peek, setPeek] = useState<string | null>(null);
     const [gap, setGap] = useState<GapTarget | null>(null);
@@ -212,38 +234,95 @@ export function CalendarScreen({
                 gapAfter,
                 minFree,
                 serviceHours,
+                cancelledShown,
             ),
-        [calendar, staff, date, timezone, gapAfter, minFree, serviceHours],
+        [
+            calendar,
+            staff,
+            date,
+            timezone,
+            gapAfter,
+            minFree,
+            serviceHours,
+            cancelledShown,
+        ],
     );
+    // What the day draws, and everything on it (cancelled too) for the
+    // count and for a quick look that stays open over a cancel.
     const dayBlocks = columns
         .flatMap((c) => c.blocks)
         .sort((a, b) => a.start - b.start || a.key.localeCompare(b.key));
+    const everyDayBlock = useMemo(
+        () => Array.from(blocksOnDay(calendar, date, timezone).values()).flat(),
+        [calendar, date, timezone],
+    );
     const weekStart = weekStartOf(date);
     const week = useMemo(() => {
         const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
         return days.map((d) => {
-            const byPerson = blocksOnDay(calendar, d, timezone);
+            // The same columns the day draws, so the week agrees with it
+            // about what is open, closed and off.
+            const cols = dayColumns(
+                calendar,
+                staff,
+                d,
+                timezone,
+                gapAfter,
+                minFree,
+                serviceHours,
+                cancelledShown,
+            );
             return {
                 date: d,
                 label: formatDay(d, { weekday: "short", year: "never" }),
-                blocks: Array.from(byPerson.values())
-                    .flat()
+                blocks: cols
+                    .flatMap((c) => c.blocks)
                     .sort((a, b) => a.start - b.start),
+                every: Array.from(
+                    blocksOnDay(calendar, d, timezone).values(),
+                ).flat(),
+                hours: hoursAcross(cols),
                 today: d === today,
                 selected: d === date,
             };
         });
-    }, [calendar, timezone, weekStart, today, date]);
-
-    const shownBlocks =
-        layout === "week" ? week.flatMap((d) => d.blocks) : dayBlocks;
-    const span: Span = visibleHours([
-        ...shownBlocks.map((b): Span => [b.start, b.end]),
-        ...columns.flatMap((c) => c.day?.windows ?? []),
+    }, [
+        calendar,
+        staff,
+        timezone,
+        gapAfter,
+        minFree,
+        serviceHours,
+        cancelledShown,
+        weekStart,
+        today,
+        date,
     ]);
-    const live = shownBlocks.filter(isLive);
-    const value = bookedValue(shownBlocks, money);
-    const first = shownBlocks.at(0);
+
+    const inWeek = layout === "week";
+    const shownBlocks = inWeek ? week.flatMap((d) => d.blocks) : dayBlocks;
+    const everyBlock = inWeek ? week.flatMap((d) => d.every) : everyDayBlock;
+    const openHours = inWeek
+        ? week.flatMap((d) => d.hours?.windows ?? [])
+        : columns.flatMap((c) => c.day?.windows ?? []);
+    const span: Span = visibleHours(openHours, shownBlocks.map(drawnSpan));
+    const hatched = inWeek
+        ? week.flatMap((d) => (d.hours ? [d.hours] : []))
+        : columns.flatMap((c) => (c.day ? [c.day] : []));
+    // The agenda is a list: it has no hours to hatch.
+    const legend = legendOf({
+        blocks: shownBlocks,
+        closed:
+            layout !== "agenda" &&
+            hatched.some((h) => closedSpans(h, span).length > 0),
+        off:
+            layout !== "agenda" &&
+            hatched.some((h) => offSpans(h, span).length > 0),
+    });
+    const live = everyBlock.filter(isLive);
+    const cancelledCount = everyBlock.length - live.length;
+    const value = bookedValue(everyBlock, money);
+    const first = everyBlock.at(0);
     const currencyCode = first
         ? ((first.kind === "one"
               ? first.booking.service.currency
@@ -259,15 +338,12 @@ export function CalendarScreen({
             : ""
     }`;
 
-    // The legend follows the business (runsClasses).
-    const hasClasses = runsClasses(services, calendar);
-
+    // From everything on the view, drawn or not: a booking cancelled from
+    // its quick look leaves the diary, and the quick look keeps its Undo.
     const peekBlock = peek
-        ? ((layout === "week" ? week.flatMap((d) => d.blocks) : dayBlocks).find(
-              (b) => b.key === peek,
-          ) ??
+        ? (everyBlock.find((b) => b.key === peek) ??
           // A block opened from the week that is not on the day.
-          week.flatMap((d) => d.blocks).find((b) => b.key === peek) ??
+          week.flatMap((d) => d.every).find((b) => b.key === peek) ??
           null)
         : null;
 
@@ -466,12 +542,19 @@ export function CalendarScreen({
     }
 
     const go = (l: CalendarLayout, d: LocalDate) =>
-        router.push(calendarHref(l, d), { scroll: false });
-    const step = layout === "week" ? 7 : 1;
-    const heading =
-        layout === "week"
-            ? `Week of ${formatDay(weekStart, { year: "never" })}`
-            : `${formatDay(date, { weekday: "short", year: "never" })}${date === today ? " · today" : ""}`;
+        router.push(calendarHref(l, d, { cancelled: cancelledShown }), {
+            scroll: false,
+        });
+    // Nothing is read again for it, so the address is written in place
+    // (Next keeps `history.replaceState` in step with its router).
+    const showCancelledBookings = (on: boolean) => {
+        setCancelledShown(on);
+        window.history.replaceState(
+            null,
+            "",
+            calendarHref(layout, date, { cancelled: on }),
+        );
+    };
 
     const freeRows =
         staff === null
@@ -505,9 +588,12 @@ export function CalendarScreen({
         return days;
     }, [calendar, timezone]);
 
-    const nowMinute =
-        date === today ? localMinuteOf(new Date(now), timezone) : null;
-    const lanes = [...(staff ?? []).map((p) => p.id), UNASSIGNED];
+    const nobodyYet =
+        staff !== null &&
+        !staff.some((p) => p.status === "ACTIVE") &&
+        columns.length > 0;
+    const ownHours = serviceHours !== null && serviceHours.hours.length > 0;
+    const addPerson = can.hours ? () => setAddingPerson(true) : undefined;
     const peekFromDay = (b: Block) => setPeek(b.key);
 
     const agendaList = (
@@ -525,104 +611,40 @@ export function CalendarScreen({
 
     return (
         <div>
-            {/* The date is the page's title; the two view switches sit
-                before New booking. */}
-            <PageHeader
-                holdsData={false}
-                className="mb-3"
-                breadcrumb={["Bookings", "Calendar"]}
-                title={heading}
-                actions={newBooking}
-                meta={
-                    <>
-                        <BookingsViewSwitch current="calendar" />
-                        <Segmented
-                            label="Layout"
-                            className="ml-auto"
-                            value={layout}
-                            onValueChange={(id) => go(id, date)}
-                            options={(
-                                [
-                                    ["day", "Day by person", "Day"],
-                                    ["week", "Week", "Week"],
-                                    ["agenda", "Agenda", "Agenda"],
-                                ] as const
-                            ).map(([id, label, short]) => ({
-                                value: id,
-                                label: (
-                                    <>
-                                        <span className="max-[759px]:hidden">
-                                            {label}
-                                        </span>
-                                        <span className="min-[760px]:hidden">
-                                            {short}
-                                        </span>
-                                    </>
-                                ),
-                                // A phone has no week grid.
-                                className:
-                                    id === "week"
-                                        ? "max-[759px]:hidden"
-                                        : undefined,
-                            }))}
-                        />
-                    </>
-                }
+            <CalendarToolbar
+                layout={layout}
+                date={date}
+                today={today}
+                summary={summary}
+                cancelled={{
+                    count: cancelledCount,
+                    shown: cancelledShown,
+                    onChange: showCancelledBookings,
+                }}
+                newBooking={newBooking}
             />
             <div>
                 {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
-                <div className="mb-3 flex flex-wrap items-center gap-3">
-                    <div className="flex gap-1">
-                        <NavLink
-                            href={calendarHref(layout, addDays(date, -step))}
-                            label={
-                                layout === "week"
-                                    ? "Previous week"
-                                    : "Previous day"
-                            }
-                        >
-                            ‹
-                        </NavLink>
-                        <Link
-                            href={calendarHref(layout, today)}
-                            scroll={false}
-                            className="flex h-8 items-center rounded-[8px] border border-border bg-card px-[11px] text-[12.5px] font-semibold hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11"
-                        >
-                            Today
-                        </Link>
-                        <NavLink
-                            href={calendarHref(layout, addDays(date, step))}
-                            label={layout === "week" ? "Next week" : "Next day"}
-                        >
-                            ›
-                        </NavLink>
-                    </div>
-                    <span
-                        role="status"
-                        className="ml-auto text-[12.5px] text-muted-foreground max-[759px]:ml-0"
-                    >
-                        {summary}
-                    </span>
-                </div>
-                <Legend classes={hasClasses} />
+                <Legend keys={legend} />
                 {staff === null ? (
                     <PartialRead
                         className="mb-3"
                         things="hours and time off"
-                        so="Free times aren't shown. The bookings below are complete."
+                        so="Open and closed times aren't shown. The bookings below are complete."
                     />
                 ) : null}
 
-                {staff !== null &&
-                !staff.some((p) => p.status === "ACTIVE") &&
-                columns.length ? (
+                {nobodyYet && ownHours ? (
+                    // How the one column works, said once; the action stays
+                    // at the head of the column.
+                    <ServiceHoursHint onAdd={addPerson} />
+                ) : nobodyYet ? (
                     <p className="mb-3 text-[12.5px] text-muted-foreground">
-                        {serviceHours && serviceHours.hours.length > 0
-                            ? "Customers book each service in its own hours, shown here as free time. Add the people who take bookings to give each their own column."
-                            : "Nobody is on the diary and no service has hours of its own yet, so customers have no free times to book."}{" "}
-                        {can.hours ? (
+                        Nobody is on the diary and no service has hours of its
+                        own yet, so customers have no free times to book.{" "}
+                        {addPerson ? (
                             <TextLink
-                                onClick={() => setAddingPerson(true)}
+                                onClick={addPerson}
                                 className="coarse:min-h-11"
                             >
                                 Add who takes bookings
@@ -650,7 +672,9 @@ export function CalendarScreen({
                             <DayByPerson
                                 columns={columns}
                                 span={span}
-                                nowMinute={nowMinute}
+                                today={date === today}
+                                timezone={timezone}
+                                sightKey={`day:${date}`}
                                 phoneKey={phoneKey}
                                 selected={peek}
                                 canBook={can.book}
@@ -662,6 +686,7 @@ export function CalendarScreen({
                                 onBlock={peekFromDay}
                                 onFree={bookGap}
                                 onClosed={openClosed}
+                                onAddPerson={addPerson}
                             />
                         ) : (
                             <NoOneYet
@@ -678,7 +703,8 @@ export function CalendarScreen({
                             <WeekView
                                 days={week}
                                 span={span}
-                                lanes={lanes}
+                                timezone={timezone}
+                                sightKey={`week:${weekStart}`}
                                 selected={peek}
                                 onDay={(d) => go("day", d)}
                                 onBlock={(b) => setPeek(b.key)}
@@ -699,8 +725,6 @@ export function CalendarScreen({
                         {agendaList}
                     </AgendaMonth>
                 ) : null}
-
-                <RulesNote rules={rules} />
             </div>
 
             <BookingQuickLook
@@ -753,111 +777,6 @@ export function CalendarScreen({
                 />
             ) : null}
         </div>
-    );
-}
-
-function NavLink({
-    href,
-    label,
-    children,
-}: {
-    href: string;
-    label: string;
-    children: ReactNode;
-}) {
-    return (
-        <Link
-            href={href}
-            scroll={false}
-            aria-label={label}
-            className="flex size-8 items-center justify-center rounded-[8px] border border-border bg-card text-[15px] hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:size-11"
-        >
-            {children}
-        </Link>
-    );
-}
-
-function Legend({ classes }: { classes: boolean }) {
-    const sw = "inline-block h-2.5 w-3.5 rounded-[3px]";
-    return (
-        <ul className="mb-3 flex flex-wrap gap-x-3.5 gap-y-1.5 text-[11.5px] text-muted-foreground">
-            <li className="inline-flex items-center gap-1.5">
-                <span aria-hidden className={cn(sw, "bg-diary-one")} />
-                {classes ? "One-to-one" : "Booking"}
-            </li>
-            {classes ? (
-                <li className="inline-flex items-center gap-1.5">
-                    <span aria-hidden className={cn(sw, "bg-diary-class")} />
-                    Class
-                </li>
-            ) : null}
-            <li className="inline-flex items-center gap-1.5">
-                <span
-                    aria-hidden
-                    className={cn(
-                        sw,
-                        "border border-dashed border-success-subtle-foreground bg-success-subtle",
-                    )}
-                />
-                Free
-            </li>
-            <li className="inline-flex items-center gap-1.5">
-                <span
-                    aria-hidden
-                    className={cn(
-                        sw,
-                        "bg-[repeating-linear-gradient(135deg,transparent_0_3px,hsl(var(--border-strong))_3px_4px)]",
-                    )}
-                />
-                Closed
-            </li>
-            <li className="inline-flex items-center gap-1.5">
-                <span
-                    aria-hidden
-                    className={cn(
-                        sw,
-                        "bg-[repeating-linear-gradient(135deg,hsl(var(--destructive))_0_2px,transparent_2px_5px)]",
-                    )}
-                />
-                Time off
-            </li>
-        </ul>
-    );
-}
-
-/** "Customers can book up to 3 weeks ahead, until 2 hours before, …" */
-export function rulesSentence(rules: BookingRules | null): string {
-    const parts: string[] = [];
-    if (rules?.bookAheadDays) {
-        const d = rules.bookAheadDays;
-        parts.push(
-            `up to ${d % 7 === 0 ? `${d / 7} ${d === 7 ? "week" : "weeks"}` : count(d, "day")} ahead`,
-        );
-    }
-    if (rules?.latestBookingMinutes) {
-        const m = rules.latestBookingMinutes;
-        parts.push(
-            `until ${m % 1440 === 0 ? `${m / 1440} ${m === 1440 ? "day" : "days"}` : m % 60 === 0 ? `${m / 60} ${m === 60 ? "hour" : "hours"}` : `${m} minutes`} before`,
-        );
-    }
-    const book = parts.length
-        ? `Customers can book ${parts.join(", ")}`
-        : "Customers can book any free time";
-    const cancel =
-        rules?.freeCancelHours !== null && rules?.freeCancelHours !== undefined
-            ? `, and cancel for free until ${count(rules.freeCancelHours, "hour")} before`
-            : "";
-    return `${book}${cancel}. Free times are worked out from availability, minus bookings and the gap after each.`;
-}
-
-// The rules as they stand. Changing them is Availability, in the rail; the
-// calendar links there only where hours are what is missing ("Add who takes
-// bookings", "Add someone"). The list is the header's Calendar | List switch.
-function RulesNote({ rules }: { rules: BookingRules | null }) {
-    return (
-        <p className="mt-3 text-[11.5px] text-muted-foreground">
-            {rulesSentence(rules)}
-        </p>
     );
 }
 

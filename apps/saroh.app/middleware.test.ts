@@ -2,6 +2,11 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 
 import { TENANT_HOST_HEADER } from "./lib/pay-host";
+import {
+    PRIVATE_PATH_PREFIXES,
+    PRIVATE_ROBOTS_TAG,
+    privatePathHeaders,
+} from "./lib/private-paths";
 import { REQUEST_PATH_HEADER } from "./lib/request-path";
 import {
     TEST_GATE_HEADER,
@@ -320,5 +325,66 @@ describe("middleware: a site's icon (DEC-124)", () => {
         expect(
             rewrittenTo(middleware(request("https://saroh.app/favicon.ico"))),
         ).toBeNull();
+    });
+});
+
+describe("middleware: a private page says so on its response (DEC-142)", () => {
+    const robots = (url: string) =>
+        middleware(request(url)).headers.get("x-robots-tag");
+
+    it.each(PRIVATE_PATH_PREFIXES.map((prefix) => [prefix]))(
+        "%s, and everything under it, is never indexed",
+        (prefix) => {
+            // `/account` answers a plain 404 while the area is switched
+            // off, and that says "noindex" too.
+            expect(robots(`https://rye.saroh.app${prefix}`)).toContain(
+                "noindex",
+            );
+            expect(robots(`https://rye.saroh.app${prefix}/abc/def`)).toContain(
+                "noindex",
+            );
+            expect(robots(`https://shop.rye.in${prefix}/abc?x=1`)).toContain(
+                "noindex",
+            );
+        },
+    );
+
+    it("says nofollow too wherever the page is served", () => {
+        for (const path of [
+            "/checkout/ord_1",
+            "/shop/order/ord_1",
+            "/q/ab12",
+            "/pay/abc",
+        ]) {
+            expect(robots(`https://rye.saroh.app${path}`)).toBe(
+                PRIVATE_ROBOTS_TAG,
+            );
+        }
+        expect(PRIVATE_ROBOTS_TAG).toBe("noindex, nofollow");
+    });
+
+    it("leaves a public page alone, even one whose address starts the same", () => {
+        for (const path of [
+            "/",
+            "/shop",
+            "/shop/sourdough",
+            "/book",
+            "/about",
+            // Not `/account`, `/pay` or `/q`: a merchant's own pages.
+            "/accounting",
+            "/payments",
+            "/quotes",
+        ]) {
+            expect(robots(`https://rye.saroh.app${path}`)).toBeNull();
+        }
+    });
+
+    it("one list decides: the header's paths are robots.txt's", () => {
+        for (const prefix of PRIVATE_PATH_PREFIXES) {
+            expect(privatePathHeaders(`${prefix}/x`)).toEqual({
+                "X-Robots-Tag": PRIVATE_ROBOTS_TAG,
+            });
+        }
+        expect(privatePathHeaders("/shop")).toEqual({});
     });
 });

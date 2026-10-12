@@ -6,11 +6,17 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { TemplateManifest } from "@saroh/templates";
+import type {
+    TemplateContext,
+    TemplateManifest,
+    TemplateModulePageKind,
+} from "@saroh/templates";
 import {
     getTemplate,
     instantiateTemplate,
+    templateFooterLineFor,
     TemplateInstantiationError,
+    templateModulePageKinds,
     templateStylePreset,
 } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
@@ -25,6 +31,7 @@ import {
 } from "../organizations/business-limits";
 import { organizationKind } from "../organizations/organization-kind";
 import { authorize } from "../organizations/organization-policy";
+import { addModulePageIfMissing } from "./module-page-create";
 import { automaticStorefront } from "./sells-from";
 import {
     addressProblem,
@@ -88,6 +95,14 @@ export interface SitePlan {
      * sets none — the site ends in its name, as every site did.
      */
     footer?: SiteFooter;
+    /**
+     * The module pages the template starts this business's site with
+     * (`TemplateManifest.modulePages`, starter v4): each is made through
+     * the one path that adds a module page (`addModulePageIfMissing`), so
+     * it is the page the business would get by switching the module on
+     * later. Absent or empty: none.
+     */
+    modulePages?: readonly TemplateModulePageKind[];
 }
 
 /** What a caller asks for: the `/sites/new` body's fields. */
@@ -143,13 +158,21 @@ export function planTemplateStyle(
  */
 export function planTemplateFooter(
     template: Pick<TemplateManifest, "id" | "version" | "footer">,
+    /**
+     * The business, for a template whose line is worked out from it
+     * (`footer.lineFrom`, starter v4). Absent: only a fixed `line` is used.
+     */
+    context?: TemplateContext,
 ): SiteFooter | undefined {
     if (!template.footer) return undefined;
     try {
         return (
             parseSiteFooter({
                 format: "markdown",
-                value: template.footer.line ?? "",
+                value:
+                    (context
+                        ? templateFooterLineFor(template, context)
+                        : template.footer.line) ?? "",
                 layout: template.footer.layout ?? "centre",
             }) ?? undefined
         );
@@ -243,7 +266,6 @@ export async function planSiteFromTemplate(
 
     // Before any read: a colourway the template lacks is the caller's error.
     const style = planTemplateStyle(template, dto.styleId);
-    const footer = planTemplateFooter(template);
 
     const slug = slugify(dto.slug ?? dto.name);
     if (!slug) {
@@ -253,6 +275,10 @@ export async function planSiteFromTemplate(
     }
 
     const context = await buildTemplateContext(ctx.organizationId);
+    // After the context: a template's footer line may be the business's
+    // own (`footer.lineFrom`).
+    const footer = planTemplateFooter(template, context);
+    const modulePages = templateModulePageKinds(template, context);
 
     try {
         return {
@@ -267,6 +293,7 @@ export async function planSiteFromTemplate(
             },
             ...(style ? { style } : {}),
             ...(footer ? { footer } : {}),
+            ...(modulePages.length > 0 ? { modulePages } : {}),
         };
     } catch (error) {
         if (error instanceof TemplateInstantiationError) {
@@ -475,7 +502,7 @@ export async function writeSiteFromTemplate(
     // Trainers page would otherwise be unreachable from the header; and
     // Settings › Menu, the pre-publish check and the live header name the
     // same one from the first draft.
-    const menuPageIds: string[] = [];
+    const menu: { id: string; isHome: boolean }[] = [];
     for (const page of pages) {
         const created = await tx.page.create({
             select: { id: true },
@@ -507,8 +534,42 @@ export async function writeSiteFromTemplate(
                 },
             },
         });
-        if (page.inMenu ?? !page.isHome) menuPageIds.push(created.id);
+        if (page.inMenu ?? !page.isHome) {
+            menu.push({ id: created.id, isHome: page.isHome });
+        }
     }
+
+    // The template's module pages (starter v4, DEC-141), each made as
+    // switching its module on later would make it. The plan already asked
+    // whether the business has the module (`TemplateModulePage.when`), on
+    // the same facts the page's own gate reads, so the gate is not asked
+    // again here: inside a module switch's transaction it would read the
+    // switch as it was before.
+    const modulePageIds = new Map<TemplateModulePageKind, string>();
+    for (const kind of plan.modulePages ?? []) {
+        const added = await addModulePageIfMissing(
+            tx,
+            ctx,
+            { id: site.id, name: plan.name },
+            kind,
+            { known: true },
+        );
+        if (added) modulePageIds.set(kind, added.id);
+    }
+    // In the menu where a visitor looks for them: what the business offers
+    // straight after Home, Contact last. (Left to themselves they would all
+    // follow the template's pages: "Home · About · Shop".)
+    const offered = (["SHOP", "BOOK", "PRICES"] as const).flatMap((kind) => {
+        const id = modulePageIds.get(kind);
+        return id ? [id] : [];
+    });
+    const contact = modulePageIds.get("CONTACT");
+    const menuPageIds = [
+        ...menu.filter((m) => m.isHome).map((m) => m.id),
+        ...offered,
+        ...menu.filter((m) => !m.isHome).map((m) => m.id),
+        ...(contact ? [contact] : []),
+    ];
     if (menuPageIds.length > 0) {
         const navigation: SiteNavigation = {
             items: menuPageIds

@@ -33,6 +33,8 @@ import type {
 import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
 import type { NoticeVars } from "../site-accounts/notify-templates";
 import { renderNotice } from "../site-accounts/notify-templates";
+import type { AccountUpdatesView } from "./account-updates";
+import { readAccountUpdates, writeAccountUpdates } from "./account-updates";
 import type { EmailSetup } from "./email-setup";
 import { readEmailSetup } from "./email-setup";
 import type { MessageSendPayload } from "./message-send.handler";
@@ -998,6 +1000,33 @@ export class CommunicationsService {
               )
             : null;
         return { ...channels, reach };
+    }
+
+    /**
+     * "Updates in your customers' Messages" (12 Oct 2026), for Settings ›
+     * Providers: the business's choice, whether it can have an effect yet,
+     * and whether it emails its customers itself. `comms:manage`, as the
+     * rest of that screen.
+     */
+    async accountUpdates(
+        ctx: OrganizationContext,
+    ): Promise<AccountUpdatesView> {
+        authorize(ctx, "comms:manage");
+        return readAccountUpdates(ctx.organizationId);
+    }
+
+    /**
+     * Turn Saroh's own posts into customers' Messages on or off for the
+     * business. `comms:manage`. It is saved whether or not it can have an
+     * effect yet, so a choice made early holds when the thread goes live.
+     * The posts read it through `accountThreadOn`, from the next one on.
+     */
+    async setAccountUpdates(
+        ctx: OrganizationContext,
+        on: boolean,
+    ): Promise<AccountUpdatesView> {
+        authorize(ctx, "comms:manage");
+        return writeAccountUpdates(ctx.organizationId, on);
     }
 
     // ---- Reads (auditable lifecycle) --------------------------------------

@@ -51,6 +51,10 @@ export const faqs = {
         q: "Who can read a patient's medical notes?",
         a: "Only people whose role allows sensitive notes, such as the owner and anyone you allow. Allergies and access needs show on a patient's bookings and today's list, so the desk still knows to take care.",
     },
+    "salons-choose-stylist": {
+        q: "Can a client choose their stylist?",
+        a: "Yes. When more than one person takes a service, your booking page offers Anyone or a named person, and shows only the times that person is free. You choose who takes each service.",
+    },
 } satisfies Record<FaqId, FaqItem>;
 
 export type { FaqId };

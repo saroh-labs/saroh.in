@@ -1,6 +1,7 @@
 import { featureHref, features } from "@/content/features";
 import { solutionHref, solutions } from "@/content/solutions";
 import type { Feature } from "@/content/types";
+import type { LaunchMode } from "@/lib/links";
 
 import { CardLink } from "../card-link";
 import { Container } from "../container";
@@ -10,9 +11,16 @@ import { SectionHeading } from "../section-heading";
 
 /**
  * "What it does": the page's points, each under a hairline, as many columns
- * as fit at 280px.
+ * as fit at 280px. A point's `openNote` (what a plan has to do with it) is
+ * added only once the launch switch is open (DEC-136).
  */
-export function FeaturePoints({ feature }: { feature: Feature }) {
+export function FeaturePoints({
+    feature,
+    mode,
+}: {
+    feature: Feature;
+    mode: LaunchMode;
+}) {
     return (
         <Container
             as="section"
@@ -31,6 +39,9 @@ export function FeaturePoints({ feature }: { feature: Feature }) {
                         </span>
                         <span className="text-mk-card-body text-mk-copy [text-wrap:pretty]">
                             {point.body}
+                            {mode === "open" && point.openNote
+                                ? ` ${point.openNote}`
+                                : null}
                         </span>
                     </li>
                 ))}

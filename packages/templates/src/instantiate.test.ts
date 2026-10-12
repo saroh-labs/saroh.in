@@ -7,10 +7,11 @@ import { getTemplate, listTemplates } from "./registry";
 import {
     HERO_PROMPT,
     STARTER_TEMPLATE_ID,
-    starterTemplate,
     starterTemplateV1,
     starterTemplateV2,
+    starterTemplateV3,
 } from "./templates/starter";
+import { starterTemplate } from "./templates/starter-v4";
 
 const sampleProfile: TemplateContext = {
     organizationName: "Acme Roasters",
@@ -48,9 +49,10 @@ function everySection(template: TemplateManifest, ctx: TemplateContext) {
 
 describe("registry", () => {
     it("resolves the starter template by id (latest) and by exact version", () => {
-        expect(starterTemplate.version).toBe(3);
+        expect(starterTemplate.version).toBe(4);
         expect(getTemplate(STARTER_TEMPLATE_ID)).toBe(starterTemplate);
-        expect(getTemplate(STARTER_TEMPLATE_ID, 3)).toBe(starterTemplate);
+        expect(getTemplate(STARTER_TEMPLATE_ID, 4)).toBe(starterTemplate);
+        expect(getTemplate(STARTER_TEMPLATE_ID, 3)).toBe(starterTemplateV3);
         expect(getTemplate(STARTER_TEMPLATE_ID, 2)).toBe(starterTemplateV2);
         // Sites built from v1 keep resolving it (KTD-12).
         expect(getTemplate(STARTER_TEMPLATE_ID, 1)).toBe(starterTemplateV1);
@@ -71,7 +73,7 @@ describe("registry", () => {
             listTemplates()
                 .map((t) => `${t.id}@${t.version}`)
                 .slice(0, 4),
-        ).toEqual(["starter@3", "personal@1", "portfolio@1", "writing@1"]);
+        ).toEqual(["starter@4", "personal@2", "portfolio@2", "writing@1"]);
         for (const id of ["personal", "portfolio", "writing"]) {
             expect(getTemplate(id)?.id).toBe(id);
             expect(getTemplate(id, 1)?.version).toBe(1);
@@ -208,7 +210,7 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
 
 describe("starter@3 — a real menu, a prompting hero, one About button (UX-070)", () => {
     it("puts Home and About in the menu, in page order", () => {
-        const { pages } = instantiateTemplate(starterTemplate, {
+        const { pages } = instantiateTemplate(starterTemplateV3, {
             organizationName: "Asha Rao",
         });
         expect(pages.filter((p) => p.inMenu).map((p) => p.path)).toEqual([
@@ -218,7 +220,7 @@ describe("starter@3 — a real menu, a prompting hero, one About button (UX-070)
     });
 
     it("prompts the owner rather than speaking for them", () => {
-        const [home] = instantiateTemplate(starterTemplate, {
+        const [home] = instantiateTemplate(starterTemplateV3, {
             organizationName: "Asha Rao",
         }).pages;
         expect(home.sections[0]?.content).toMatchObject({
@@ -226,8 +228,8 @@ describe("starter@3 — a real menu, a prompting hero, one About button (UX-070)
             subheading: HERO_PROMPT,
         });
         // Their own words, once they have said any.
-        const own = instantiateTemplate(starterTemplate, sampleProfile).pages[0]
-            ?.sections[0]?.content;
+        const own = instantiateTemplate(starterTemplateV3, sampleProfile)
+            .pages[0]?.sections[0]?.content;
         expect(own).toMatchObject({
             subheading: "Small-batch coffee, roasted with care.",
         });
@@ -236,7 +238,7 @@ describe("starter@3 — a real menu, a prompting hero, one About button (UX-070)
     it("has one About button without an email, and a closing Get in touch with one", () => {
         const hrefs = (ctx: TemplateContext) =>
             instantiateTemplate(
-                starterTemplate,
+                starterTemplateV3,
                 ctx,
             ).pages[0]?.sections.flatMap((s) => {
                 const c = s.content as {

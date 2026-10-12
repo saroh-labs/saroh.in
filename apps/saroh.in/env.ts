@@ -75,7 +75,9 @@ import { z } from "zod";
  *
  * `SAROH_BUILT_ROUTES` is not set by anyone: `next.config.js` writes the
  * build's page routes into it (`routes.config.js`), so the Resources list links
- * only pages this build has.
+ * only pages this build has. `SAROH_BUILT_AT` is written the same way: the
+ * moment of the build, for what runs per request but must agree with pages
+ * drawn at build time (`builtContext`).
  */
 export const env = createEnv({
     client: {
@@ -137,6 +139,7 @@ export const env = createEnv({
         VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
         RESOURCES_PREVIEW: z.string().optional(),
         SAROH_BUILT_ROUTES: z.string().optional(),
+        SAROH_BUILT_AT: z.string().optional(),
     },
     shared: {
         NODE_ENV: z.enum(["development", "test", "production"]).optional(),
@@ -149,6 +152,7 @@ export const env = createEnv({
         VERCEL_ENV: process.env.VERCEL_ENV,
         RESOURCES_PREVIEW: process.env.RESOURCES_PREVIEW,
         SAROH_BUILT_ROUTES: process.env.SAROH_BUILT_ROUTES,
+        SAROH_BUILT_AT: process.env.SAROH_BUILT_AT,
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,

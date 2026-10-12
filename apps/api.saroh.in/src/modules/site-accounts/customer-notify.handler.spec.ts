@@ -203,6 +203,19 @@ describe("customer.notify — what it writes", () => {
         });
     });
 
+    // `accountThreadOn` is one answer for the rollout flag and the
+    // business's own choice (`account-thread.spec.ts`): turned off by the
+    // business, the notice goes exactly as it did with the flag off.
+    it("a business that turned its updates off and has no email: nothing is written or sent", async () => {
+        threadFlag.mockResolvedValue(false);
+        const tx = makeTx();
+        tx.communicationProvider.findUnique.mockResolvedValue(null);
+        const out = await service.notify(asTx(tx), ORG, READY, NOW);
+        expect(append).not.toHaveBeenCalled();
+        expect(queueTransactional).not.toHaveBeenCalled();
+        expect(out).toMatchObject({ threadMessageId: null, messageId: null });
+    });
+
     it("the account area off: the thread stays dark whatever the flag says", async () => {
         areaOn.mockReturnValue(false);
         const tx = makeTx();

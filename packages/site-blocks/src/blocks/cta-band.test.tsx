@@ -280,7 +280,9 @@ describe("the states every shared button carries", () => {
     it("moves on one short curve, never everything at once", () => {
         const classes = ctaClasses("primary");
         expect(classes).toContain("duration-150");
-        expect(classes).toContain("ease-[cubic-bezier(0.2,0.8,0.2,1)]");
+        expect(classes).toContain(
+            "[transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)]",
+        );
         expect(classes).not.toContain("transition-all");
     });
 

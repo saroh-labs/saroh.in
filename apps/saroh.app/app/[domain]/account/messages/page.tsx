@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { AccountMessages } from "@saroh/site-blocks";
 
 import { getAccount, getThread } from "@/lib/account-area";
+import { accountTitle } from "@/lib/account-site";
+import { ACCOUNT_PAGE_TITLES } from "@/lib/account-title";
 
 import { sendMessage } from "./actions";
 
@@ -12,7 +14,9 @@ import { sendMessage } from "./actions";
  * so the tab's dot clears. The layout has already checked the switch and
  * the session.
  */
-export const metadata: Metadata = { title: "Messages" };
+export function generateMetadata(): Promise<Metadata> {
+    return accountTitle(ACCOUNT_PAGE_TITLES.messages);
+}
 
 export default async function AccountMessagesPage() {
     const [lookup, thread] = await Promise.all([getAccount(), getThread()]);

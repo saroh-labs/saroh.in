@@ -27,6 +27,8 @@ import {
     isTestReleaseRefusal,
 } from "@saroh/site-blocks";
 
+import { homeDetails } from "./account-details-shape";
+
 /**
  * The account area's answers, checked before a page sees them (round-2 plan
  * A, A5). The API's allow-list (`site-accounts/customer-view.ts`) decides
@@ -197,6 +199,8 @@ export function homeResult(v: unknown): AccountHomeData | null {
         classes: block(v.classes, orNull(isClasses)),
         orders: v.orders === null ? null : block(v.orders, isOrders),
         plan: block(v.plan, orNull(isPlan)),
+        // What changed, invoices to pay, a class's line, courses (DEC-142).
+        ...homeDetails(v),
     };
 }
 

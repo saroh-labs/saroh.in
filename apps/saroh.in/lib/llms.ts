@@ -2,6 +2,7 @@ import { ABOUT } from "@/content/about";
 import type { ChangelogEntry } from "@/content/changelog";
 import { changelogHref, liveEntries } from "@/content/changelog";
 import { CONTACT_PAGE } from "@/content/contact-page";
+import { featureHref, featureList } from "@/content/features";
 import type { HelpFrontmatter } from "@/content/help";
 import { helpHref, liveArticles } from "@/content/help";
 import { integrationHref, liveIntegrations } from "@/content/integrations";
@@ -13,12 +14,14 @@ import {
     shownResources,
     shownTools,
 } from "@/content/resources";
+import { solutionHref, solutionList } from "@/content/solutions";
 import type { GalleryTemplate } from "@/content/templates";
 import { galleryTemplates, templateHref } from "@/content/templates";
 
 /**
  * `/llms.txt` (Resources plan U7, llmstxt.org): the site's name, one line
- * on what Saroh is, About and Contact (DEC-137), then the Resources and
+ * on what Saroh is, About and Contact (DEC-137), the feature pages and the
+ * solution pages (each with the one sentence it gives a search engine), then the Resources and
  * legal pages shown now, each with a one-line description, Help's articles, the changelog's entries and
  * the gallery's templates under their page. It follows the same publish rule as the nav, the footer
  * and the sitemap (KTD-2): an unpublished page, or one whose route this
@@ -60,6 +63,29 @@ export function llmsText(
         out.push("", "## Saroh", "");
         for (const page of company) {
             out.push(line(base, page.href, page.name, page.line));
+        }
+    }
+
+    // What Saroh does and who it is for: every feature and solution page,
+    // with the sentence it gives a search engine (`SearchWords`).
+    const featurePages = featureList.filter((f) =>
+        routeExists(featureHref(f.slug), ctx.routes),
+    );
+    if (featurePages.length > 0) {
+        out.push("", "## Features", "");
+        for (const f of featurePages) {
+            out.push(line(base, featureHref(f.slug), f.name, f.seoDescription));
+        }
+    }
+    const solutionPages = solutionList.filter((s) =>
+        routeExists(solutionHref(s.slug), ctx.routes),
+    );
+    if (solutionPages.length > 0) {
+        out.push("", "## Solutions", "");
+        for (const s of solutionPages) {
+            out.push(
+                line(base, solutionHref(s.slug), s.longName, s.seoDescription),
+            );
         }
     }
 
