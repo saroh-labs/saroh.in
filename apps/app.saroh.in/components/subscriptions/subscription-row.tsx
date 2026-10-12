@@ -12,6 +12,7 @@ import {
     olderPrice,
     rowWhen,
     shortPrice,
+    subscriptionPay,
     TAB_LABEL,
     TAB_TONE,
 } from "@/lib/subscriptions/view";
@@ -20,7 +21,7 @@ import {
 /**
  * The list's row and its columns, shared with the head band over it so the
  * two line up: initials, who and which plan, where it stands, what comes
- * next, and the price. From `md` they are one fixed grid, so a longer
+ * next, and what they pay. From `md` they are one fixed grid, so a longer
  * price in one row can't move the columns of the next. They wrap on a
  * phone, where the head is left out.
  */
@@ -105,7 +106,8 @@ export function SubscriptionRow({
                     "font-display text-[14px] font-semibold text-foreground",
                 )}
             >
-                {shortPrice(sub.price, sub.currency, sub.interval)}
+                {/* What they pay a period, GST and all. */}
+                {shortPrice(subscriptionPay(sub), sub.currency, sub.interval)}
             </span>
         </button>
     );

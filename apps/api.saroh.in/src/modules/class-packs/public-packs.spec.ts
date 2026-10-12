@@ -1,4 +1,9 @@
-import { publicPackView, singlePriceOf } from "./public-packs.service";
+import {
+    payEachOf,
+    publicPackView,
+    singlePayOf,
+    singlePriceOf,
+} from "./public-packs.service";
 
 /**
  * G20 — a pack as the site shows it, and the one class's price it is
@@ -7,7 +12,13 @@ import { publicPackView, singlePriceOf } from "./public-packs.service";
 
 function covered(
     priceCents: number | null,
-    over: { currency?: string | null; status?: string; deleted?: boolean } = {},
+    over: {
+        currency?: string | null;
+        status?: string;
+        deleted?: boolean;
+        gstRate?: string | null;
+        gstPriceMode?: string | null;
+    } = {},
 ) {
     return {
         service: {
@@ -15,6 +26,8 @@ function covered(
             currency: over.currency === undefined ? "INR" : over.currency,
             status: over.status ?? "ACTIVE",
             deletedAt: over.deleted ? new Date() : null,
+            gstRate: over.gstRate ?? null,
+            gstPriceMode: over.gstPriceMode ?? null,
         },
     };
 }
@@ -73,8 +86,93 @@ describe("a pack as the site shows it", () => {
             currency: "INR",
             kind: "CLASSES",
             singlePrice: "500.00",
+            // The two sides of "₹450 a class instead of ₹500", as what is
+            // paid: with no GST on top they are the typed figures.
+            payEach: "450.00",
+            singlePay: "500.00",
             // No rate on the pack: nothing is said about GST.
             gst: null,
+        });
+    });
+
+    // 12 Oct 2026: two figures compared are the same kind, both amounts
+    // to pay. A 10-class pack at ₹4,500 against a ₹600 class, both 18%.
+    describe("a class in the pack against a class alone", () => {
+        const pack = {
+            ...row,
+            gstRate: "18",
+            services: [covered(60_000, { gstRate: "18" })],
+        };
+
+        it("GST is added: ₹531 a class instead of ₹708", () => {
+            const view = publicPackView(pack, {
+                registered: true,
+                mode: "ADDED",
+            });
+            // ₹4,500 + ₹810 is ₹5,310 for 10; ₹600 + ₹108 is ₹708.
+            expect(view.payEach).toBe("531.00");
+            expect(view.singlePay).toBe("708.00");
+            // The typed figures stay as they were, for an older site.
+            expect(view.price).toBe("4500.00");
+            expect(view.singlePrice).toBe("600.00");
+        });
+
+        it("prices include GST: ₹450 a class instead of ₹600, to the paisa as before", () => {
+            const view = publicPackView(pack, {
+                registered: true,
+                mode: "INCLUDED",
+            });
+            expect(view.payEach).toBe("450.00");
+            expect(view.singlePay).toBe("600.00");
+        });
+
+        it("not registered: ₹450 a class instead of ₹600, whatever the rates", () => {
+            const view = publicPackView(pack);
+            expect(view.payEach).toBe("450.00");
+            expect(view.singlePay).toBe("600.00");
+        });
+
+        it("a class priced its own way is compared by what it costs to pay", () => {
+            // The business adds GST, but this class's price includes it.
+            const view = publicPackView(
+                {
+                    ...pack,
+                    services: [
+                        covered(60_000, {
+                            gstRate: "18",
+                            gstPriceMode: "INCLUDED",
+                        }),
+                    ],
+                },
+                { registered: true, mode: "ADDED" },
+            );
+            expect(view.payEach).toBe("531.00");
+            expect(view.singlePay).toBe("600.00");
+        });
+
+        it("the cheapest class is the cheapest to pay, not the cheapest typed", () => {
+            // ₹560 with 18% added is ₹660.80; ₹600 with GST inside is ₹600.
+            expect(
+                singlePayOf(
+                    "INR",
+                    [
+                        covered(56_000, { gstRate: "18" }),
+                        covered(60_000, {
+                            gstRate: "18",
+                            gstPriceMode: "INCLUDED",
+                        }),
+                    ],
+                    { registered: true, mode: "ADDED" },
+                ),
+            ).toBe("600.00");
+        });
+
+        it("rounds a class's share to the whole rupee, half up", () => {
+            expect(payEachOf(531_000, 10)).toBe("531.00");
+            // ₹1,000 for 3 is ₹333.33; ₹1,001.50 for 2 is ₹500.75.
+            expect(payEachOf(100_000, 3)).toBe("333.00");
+            expect(payEachOf(100_150, 2)).toBe("501.00");
+            expect(payEachOf(100_000, 0)).toBeNull();
         });
     });
 

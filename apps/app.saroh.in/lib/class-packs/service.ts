@@ -5,6 +5,7 @@ import { toFailure } from "@/lib/api/failure";
 import { readGstAsk } from "@/lib/gst-rates/service";
 import type { GstAsk, GstValues } from "@/lib/gst/item-words";
 import { NOT_ASKED } from "@/lib/gst/item-words";
+import type { GstOnPrice } from "@/lib/gst/on-price";
 
 import type { PackStanding } from "./balance";
 
@@ -37,6 +38,14 @@ export interface ClassPack {
     gstRate?: GstValues["gstRate"];
     sacCode?: GstValues["sacCode"];
     gstPriceMode?: GstValues["gstPriceMode"];
+    /**
+     * The GST on its price as it is sold today, and the amount to pay;
+     * null when nothing is said about GST. `price` is the price the
+     * business set, while a purchase's price and every "taken" figure are
+     * amounts paid: compare those with `payOf(price, gst)`. Absent from an
+     * API before it.
+     */
+    gst?: GstOnPrice | null;
 }
 
 export interface PackPurchase {

@@ -2,9 +2,14 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { toMoneyString } from "../../common/money";
-import type { GstPriceMode } from "../invoices/gst-price";
+import { toMinor, toMoneyString } from "../../common/money";
+import type {
+    GstOnPrice,
+    GstPriceMode,
+    PriceTerms,
+} from "../invoices/gst-price";
 import { isGstPriceMode } from "../invoices/gst-price";
+import { priceTermsFor, saleCharge } from "../invoices/sale-price";
 import type { AutopayChargeTiming } from "./autopay-timing";
 import { isAutopayChargeTiming } from "./autopay-timing";
 import type { Interval } from "./periods";
@@ -49,6 +54,14 @@ export interface PlanView extends PlanFigures {
     gstRate: string | null;
     sacCode: string | null;
     gstPriceMode: GstPriceMode | null;
+    /**
+     * The GST on its price as it is charged today: the typed price, the
+     * GST in or on it and the amount to pay for one period. Null when
+     * nothing is said about GST (not registered, no rate, exempt): the
+     * price is the amount to pay. The app says "+ GST" beside the price
+     * from it and never works one out.
+     */
+    gst: GstOnPrice | null;
 }
 
 const PLAN_SELECT = {
@@ -110,7 +123,9 @@ export async function planViews(
         });
         byPlan.set(g.planId, list);
     }
-    return rows.map((r) => planView(r, byPlan.get(r.id) ?? []));
+    // How the business's prices carry GST; read only when a plan has a rate.
+    const terms = await priceTermsFor(prisma, organizationId, rows);
+    return rows.map((r) => planView(r, byPlan.get(r.id) ?? [], terms));
 }
 
 /** One plan with its figures; another business's is a 404. */
@@ -123,7 +138,14 @@ export async function readPlan(
     return views[0];
 }
 
-function planView(row: PlanRow, groups: readonly PriceGroup[]): PlanView {
+function planView(
+    row: PlanRow,
+    groups: readonly PriceGroup[],
+    terms: PriceTerms,
+): PlanView {
+    // One period of a typed price as this plan's GST bills it today: the
+    // sum every renewal uses (`invoicePeriod`, `sale-price.ts`).
+    const charge = (minor: number) => saleCharge(minor, row, terms);
     return {
         id: row.id,
         name: row.name,
@@ -143,7 +165,8 @@ function planView(row: PlanRow, groups: readonly PriceGroup[]): PlanView {
         gstPriceMode: isGstPriceMode(row.gstPriceMode)
             ? row.gstPriceMode
             : null,
-        ...planFigures(row, groups),
+        gst: charge(toMinor(row.price)).gst,
+        ...planFigures(row, groups, (minor) => charge(minor).payCents),
     };
 }
 

@@ -2,6 +2,7 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
+import type { GstOnPrice } from "@/lib/gst/on-price";
 import type { CappedList } from "@/lib/lists/capped";
 import { withLive } from "@/lib/lists/capped";
 
@@ -57,11 +58,24 @@ export interface Plan {
     gstRate?: string | null;
     sacCode?: string | null;
     gstPriceMode?: "INCLUDED" | "ADDED" | null;
+    /**
+     * The GST on its price as it is charged today, and the amount to pay
+     * for a period; null when nothing is said about GST. `price` is the
+     * price the business set, so a price list says "+ GST" from this.
+     * Absent from an API before it.
+     */
+    gst?: GstOnPrice | null;
 }
 
 /** One price people on a plan pay, and how many pay it. */
 export interface PlanPriceRow {
+    /** The typed price they joined at. */
     price: string;
+    /**
+     * What a period comes to for them, GST and all. Absent from an API
+     * before it, where the price is read instead.
+     */
+    pay?: string;
     currency: string;
     interval: Interval;
     /** Active or paused, on these terms. */
@@ -105,7 +119,16 @@ export interface Subscription {
     contact: { id: string; name: string; email: string };
     /** Autopay (D12); absent from the list and from an API older than D12. */
     autopay?: SubscriptionAutopay | null;
+    /** The typed price they joined at: a price the business set. */
     price: string;
+    /**
+     * What one period comes to for them, GST and all: what their next
+     * invoice is written for, by the plan's GST as it stands. Read through
+     * `subscriptionPay`; absent from an API before it.
+     */
+    pay?: string;
+    /** The GST in or on `price` as it is charged today; null for none. */
+    gst?: GstOnPrice | null;
     currency: string;
     interval: Interval;
     timezone: string;
@@ -159,6 +182,9 @@ export interface Subscription {
         id: string;
         name: string;
         price: string;
+        /** What a period on the new plan comes to, GST and all. */
+        pay?: string;
+        gst?: GstOnPrice | null;
         currency: string;
         interval: Interval;
         from: string;

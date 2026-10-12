@@ -14,6 +14,7 @@ import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { runAction } from "@/lib/api/run-action";
+import { addedSum, setPriceWords } from "@/lib/gst/on-price";
 import { subscribe } from "@/lib/subscriptions/actions";
 import { renewalWords } from "@/lib/subscriptions/autopay";
 import { explainStart, intervalWords } from "@/lib/subscriptions/renewal";
@@ -76,6 +77,8 @@ export function SubscribeDialog({
 
     const plan = active.find((p) => p.id === planId);
     const person = contacts.find((c) => c.id === contactId);
+    // "₹2,000 + ₹360 GST (18%) = ₹2,360 to pay", the API's own sum.
+    const toPay = plan ? addedSum(plan.gst, plan.currency) : null;
     const startsLater = start ? ymd(start) > ymd(new Date()) : false;
     const help =
         plan && start
@@ -156,9 +159,16 @@ export function SubscribeDialog({
                                 onValueChange={setPlanId}
                                 options={active.map((p) => ({
                                     value: p.id,
-                                    label: `${p.name} · ${formatMoneyMajor(p.price, p.currency, { decimals: "always" })} ${intervalWords(p.interval).per}`,
+                                    // The plan's own price, saying so where
+                                    // GST comes on top; the sum is below.
+                                    label: `${p.name} · ${setPriceWords(formatMoneyMajor(p.price, p.currency, { decimals: "always" }), p.gst)} ${intervalWords(p.interval).per}`,
                                 }))}
                             />
+                            {toPay ? (
+                                <p className="text-[12.5px] font-medium tabular-nums text-foreground">
+                                    {toPay}
+                                </p>
+                            ) : null}
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor={ids.start}>Starting</Label>

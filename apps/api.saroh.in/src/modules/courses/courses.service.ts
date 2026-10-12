@@ -14,7 +14,11 @@ import { BookingEventType } from "../bookings/booking-event-type";
 import { BookingsService } from "../bookings/bookings.service";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
-import type { GstPriceMode } from "../invoices/gst-price";
+import type {
+    GstOnPrice,
+    GstPriceMode,
+    PriceTerms,
+} from "../invoices/gst-price";
 import { isGstPriceMode } from "../invoices/gst-price";
 import { assertSaleRated } from "../invoices/gst-rate-required";
 import type { InvoiceStanding } from "../invoices/invoice-state";
@@ -22,7 +26,12 @@ import { invoiceStanding } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
 import { loadPriceTerms } from "../invoices/price-terms";
-import { hasRate, saleChargeInTx } from "../invoices/sale-price";
+import {
+    hasRate,
+    priceTermsFor,
+    saleCharge,
+    saleChargeInTx,
+} from "../invoices/sale-price";
 import { contactName } from "../invoices/serialize";
 import { toCents } from "../invoices/totals";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -90,6 +99,13 @@ export interface CourseView {
     gstRate: string | null;
     sacCode: string | null;
     gstPriceMode: GstPriceMode | null;
+    /**
+     * The GST on its price as an enrolment is charged today: the typed
+     * price, the GST in or on it and the amount to pay. Null when nothing
+     * is said about GST (not registered, no rate, exempt): the price is
+     * the amount to pay. An enrolment's `price` is the amount paid.
+     */
+    gst: GstOnPrice | null;
     seats: number;
     /** People on it now. */
     enrolled: number;
@@ -219,8 +235,11 @@ export class CoursesService {
             take: LIST_LIMIT,
             select: COURSE_SELECT,
         });
+        // How the business's prices carry GST; read only when a course has
+        // a rate.
+        const terms = await priceTermsFor(prisma, ctx.organizationId, rows);
         const now = new Date();
-        return rows.map((r) => courseView(r, now));
+        return rows.map((r) => courseView(r, now, terms));
     }
 
     async get(ctx: OrganizationContext, id: string): Promise<CourseDetail> {
@@ -231,7 +250,7 @@ export class CoursesService {
             orderBy: [{ status: "asc" }, { createdAt: "asc" }],
             select: ENROLLMENT_SELECT,
         });
-        const [upcoming, booked, invoicesOnEnrol] = await Promise.all([
+        const [upcoming, booked, invoicesOnEnrol, terms] = await Promise.all([
             this.upcomingByEnrollment(enrollments.map((e) => e.id)),
             // A course's bookings share its session's start.
             prisma.booking.groupBy({
@@ -243,12 +262,13 @@ export class CoursesService {
                 _count: { _all: true },
             }),
             paymentsOn(prisma, ctx.organizationId),
+            priceTermsFor(prisma, ctx.organizationId, [row]),
         ]);
         const bookedAt = new Map(
             booked.map((b) => [b.startAt.getTime(), b._count._all]),
         );
         const now = new Date();
-        const view = courseView(row, now);
+        const view = courseView(row, now, terms);
         return {
             ...view,
             sessions: row.sessions.map((s) => ({
@@ -1025,7 +1045,7 @@ async function assertCourseRated(
     });
 }
 
-function courseView(row: CourseRow, now: Date): CourseView {
+function courseView(row: CourseRow, now: Date, terms: PriceTerms): CourseView {
     const upcoming = row.sessions.filter((s) => s.startAt > now);
     const enrolled = row._count.enrollments;
     return {
@@ -1040,6 +1060,8 @@ function courseView(row: CourseRow, now: Date): CourseView {
         gstPriceMode: isGstPriceMode(row.gstPriceMode)
             ? row.gstPriceMode
             : null,
+        // The sum an enrolment uses (`enrol`, `sale-price.ts`).
+        gst: saleCharge(toCents(toMoneyString(row.price)), row, terms).gst,
         seats: row.seats,
         enrolled,
         seatsLeft: Math.max(0, row.seats - enrolled),

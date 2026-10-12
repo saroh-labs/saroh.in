@@ -24,6 +24,11 @@ import {
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
 } from "../invoices/invoice-state";
+import {
+    priceTermsFor,
+    RATED_SALE_SELECT,
+    saleCharge,
+} from "../invoices/sale-price";
 import type { FulfilmentType } from "../orders/fulfilment";
 import { shipsToAddress, typeOf } from "../orders/fulfilment";
 import { realOrderWhere } from "../orders/open-orders";
@@ -212,7 +217,13 @@ export interface DetailSubscription {
     plan: { id: string; name: string };
     status: string;
     interval: string;
+    /** The typed price they joined at. */
     price: string;
+    /**
+     * What one period comes to for them, GST and all, by the plan's GST as
+     * it stands today (`sale-price.ts`): the figure the tab shows.
+     */
+    pay: string;
     currency: string;
     currentPeriodStart: string;
     currentPeriodEnd: string;
@@ -1143,15 +1154,25 @@ export class CustomerDetailService {
                 cancelAtPeriodEnd: true,
                 pausedAt: true,
                 cancelledAt: true,
-                plan: { select: { id: true, name: true } },
+                plan: {
+                    select: { id: true, name: true, ...RATED_SALE_SELECT },
+                },
             },
         });
+        // How the business's prices carry GST; read only when a plan here
+        // has a rate.
+        const terms = await priceTermsFor(
+            this.db,
+            organizationId,
+            rows.map((s) => s.plan),
+        );
         return rows.map((s) => ({
             id: s.id,
-            plan: s.plan,
+            plan: { id: s.plan.id, name: s.plan.name },
             status: s.status,
             interval: s.interval,
             price: toMoneyString(s.price),
+            pay: saleCharge(toMinor(s.price), s.plan, terms).pay,
             currency: s.currency,
             currentPeriodStart: s.currentPeriodStart.toISOString(),
             currentPeriodEnd: s.currentPeriodEnd.toISOString(),

@@ -7,6 +7,8 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import type { GstAsk, GstForm } from "@/lib/gst/item-words";
 import {
+    addedGst,
+    addedGstWords,
     gstChangeLines,
     SAC_SHAPE_PROBLEM,
     sacOk,
@@ -28,7 +30,7 @@ import type { AutopayLimit, PlanEditorRecord, PlanValues } from "./plan-drafts";
 import type { RenewalChange } from "./renewal-change";
 import { renewalAmountChanges } from "./renewal-change";
 import type { Interval, Plan } from "./service";
-import { classesText } from "./view";
+import { classesText, subscriptionPay } from "./view";
 
 /*
  * The Plan Editor's rules (plan 2026-09-26-004, D7), after "Saroh Plan
@@ -454,22 +456,44 @@ export type PlanFigures = Pick<
     "subscriberCount" | "monthlyFromMembers" | "byPrice" | "currency"
 >;
 
-/** At a glance, in the design's order. */
+/**
+ * "₹2,000 + ₹360 GST (18%) = ₹2,360 to pay", under the price while GST is
+ * added to it: the price typed is the business's own, and this is what a
+ * member pays for a period. Null whenever the typed price is the amount to
+ * pay. A preview by the mirror in `lib/gst/price-mode.ts`; the invoice the
+ * API writes is the truth.
+ */
+export function priceToPay(
+    form: PlanForm,
+    currency: string,
+    gst: GstAsk | null | undefined,
+): string | null {
+    const added = addedGst(parsePrice(form.price), form, gst);
+    return added ? addedGstWords(added, form.currency || currency) : null;
+}
+
+/**
+ * At a glance, in the design's order. "Per month" is the price being set,
+ * so it says "+ GST" where GST is added to it (`gst`, the business's
+ * standing); "Coming in a month" is what the members pay, GST and all.
+ */
 export function glance(
     form: PlanForm,
     figures: PlanFigures | null,
+    gst: GstAsk | null = null,
 ): { label: string; value: string }[] {
     const price = priceOf(form);
     const cur = form.currency || (figures?.currency ?? "INR");
     const coming = figures ? Math.round(Number(figures.monthlyFromMembers)) : 0;
+    const onTop = addedGst(parsePrice(form.price), form, gst) !== null;
     return [
         {
             label: "Per month",
             value: price
-                ? formatMoneyMajor(
+                ? `${formatMoneyMajor(
                       Math.round(price * PER_MONTH[form.interval]),
                       cur,
-                  )
+                  )}${onTop ? " + GST" : ""}`
                 : absentText(),
         },
         { label: "On it now", value: String(figures?.subscriberCount ?? 0) },
@@ -483,13 +507,17 @@ export function glance(
     ];
 }
 
-/** Who pays what: "12 people" at today's price, "3 people · older price". */
+/**
+ * Who pays what: "12 people" at today's price, "3 people · older price".
+ * The figure is what each pays a period, GST and all, as the plan's
+ * published GST bills it.
+ */
 export function whoPays(
     figures: PlanFigures | null,
 ): { label: string; value: string }[] {
     return (figures?.byPrice ?? []).map((b) => ({
         label: `${count(b.count, "person", "people")}${b.current ? "" : " · older price"}`,
-        value: formatMoneyMajor(b.price, b.currency),
+        value: formatMoneyMajor(subscriptionPay(b), b.currency),
     }));
 }
 

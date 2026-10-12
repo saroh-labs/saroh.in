@@ -47,7 +47,7 @@ import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
 import { formatDate, formatTimeRange } from "@/lib/format/datetime";
 import type { GstAsk } from "@/lib/gst/item-words";
-import { NOT_ASKED } from "@/lib/gst/item-words";
+import { addedGst, addedGstWords, NOT_ASKED } from "@/lib/gst/item-words";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -146,6 +146,17 @@ export function CourseForm({
                   currency: course.currency,
               }
             : undefined);
+
+    // "₹6,000 + ₹1,080 GST (18%) = ₹7,080 to pay" while GST is added to the
+    // price typed: a preview by the mirror, the invoice is the truth.
+    const toPay = addedGst(
+        form.watch("price").trim(),
+        {
+            gstRate: form.watch("gstRate"),
+            gstPriceMode: form.watch("gstPriceMode"),
+        },
+        gst,
+    );
 
     // New courses gather their sessions here.
     const [sessions, setSessions] = useState<string[]>([]);
@@ -388,6 +399,13 @@ export function CourseForm({
                             businessPriceMode={gst.priceMode}
                         />
                     </div>
+                ) : null}
+                {/* The price above is the business's own; where GST is
+                    added to it, what someone enrolling pays is said here. */}
+                {toPay ? (
+                    <p className="text-[12.5px] tabular-nums leading-[1.5] text-muted-foreground">
+                        {addedGstWords(toPay, form.watch("currency"))}
+                    </p>
                 ) : null}
 
                 {course ? null : (

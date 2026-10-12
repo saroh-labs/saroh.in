@@ -1,6 +1,7 @@
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
+import { payOf, setPriceWords } from "@/lib/gst/on-price";
 import { absentText } from "@saroh/ui/lib/absent";
 
 import type {
@@ -70,7 +71,7 @@ const PER: Record<Interval, { short: string; long: string }> = {
     YEAR: { short: "yr", long: "year" },
 };
 
-/** "₹1,200/mo" — a row's price. */
+/** "₹1,200/mo" — what a row's member pays a period. */
 export function shortPrice(
     price: string,
     currency: string,
@@ -89,14 +90,25 @@ export function longPrice(
 }
 
 /**
- * About what the running subscriptions bring in a month, in the currency
- * most of them are in. An estimate by design ("about"): a yearly plan counts
- * a twelfth, a weekly one 52 twelfths.
+ * What one period comes to for someone, GST and all: the API's `pay`, the
+ * amount their next invoice is written for. Every figure that is money
+ * expected or charged reads this, never `price` (the price the business
+ * set, before GST where GST is added). An API before `pay` has only the
+ * price, which was the amount then.
+ */
+export function subscriptionPay(sub: { price: string; pay?: string }): string {
+    return sub.pay ?? sub.price;
+}
+
+/**
+ * About what the running subscriptions bring in a month, GST and all, in
+ * the currency most of them are in. An estimate by design ("about"): a
+ * yearly plan counts a twelfth, a weekly one 52 twelfths.
  */
 export function monthlyTotal(
     subs: readonly Pick<
         Subscription,
-        "status" | "paymentFailed" | "price" | "currency" | "interval"
+        "status" | "paymentFailed" | "price" | "pay" | "currency" | "interval"
     >[],
 ): { amount: number; currency: string } | null {
     const running = subs.filter((s) => listTab(s) === "active");
@@ -114,7 +126,10 @@ export function monthlyTotal(
     };
     const amount = running
         .filter((s) => s.currency === currency)
-        .reduce((n, s) => n + Number(s.price) * factor[s.interval], 0);
+        .reduce(
+            (n, s) => n + Number(subscriptionPay(s)) * factor[s.interval],
+            0,
+        );
     return { amount: Math.round(amount), currency };
 }
 
@@ -326,25 +341,30 @@ function people(n: number): string {
 
 /**
  * Who pays what, as Plan Detail says it: "12 people · current price" and
- * "₹1,500 / month", then each older price the API lists.
+ * "₹1,500 / month", then each older price the API lists. The amount is
+ * what each pays a period, GST and all (₹2,360 for a ₹2,000 price with
+ * 18% added), since it is money coming in.
  */
 export function payRows(
     plan: Pick<Plan, "byPrice">,
 ): { label: string; amount: string; older: boolean }[] {
     return plan.byPrice.map((b) => ({
         label: `${people(b.count)} · ${b.current ? "current price" : "older price"}`,
-        amount: longPrice(b.price, b.currency, b.interval),
+        amount: longPrice(subscriptionPay(b), b.currency, b.interval),
         older: !b.current,
     }));
 }
 
-/** A plan card's notes: "3 still on ₹1,200 — they keep it". */
-export function olderPriceNotes(plan: Pick<Plan, "byPrice">): string[] {
+/**
+ * A plan card's notes: "3 still on ₹1,200, and they keep it". The price is
+ * the one the business set, so it says "+ GST" where GST is added to it.
+ */
+export function olderPriceNotes(plan: Pick<Plan, "byPrice" | "gst">): string[] {
     return plan.byPrice
         .filter((b) => !b.current)
         .map(
             (b) =>
-                `${b.count} still on ${formatMoneyMajor(b.price, b.currency)}, and they keep it`,
+                `${b.count} still on ${setPriceWords(formatMoneyMajor(b.price, b.currency), plan.gst)}, and they keep it`,
         );
 }
 
@@ -355,13 +375,29 @@ export function olderPriceNotes(plan: Pick<Plan, "byPrice">): string[] {
  */
 export function olderPrice(
     sub: Pick<Subscription, "price" | "currency" | "plan">,
-    plans: readonly Pick<Plan, "id" | "price" | "currency">[],
-): { listPrice: string } | null {
+    plans: readonly Pick<Plan, "id" | "price" | "currency" | "gst">[],
+): { listPrice: string; listPay: string } | null {
     const plan = plans.find((p) => p.id === sub.plan.id);
     if (plan?.currency !== sub.currency) return null;
+    // Two prices the business set, compared as typed.
     return Number(plan.price) !== Number(sub.price)
-        ? { listPrice: plan.price }
+        ? {
+              listPrice: plan.price,
+              // What a new sign-up pays a period, GST and all.
+              listPay: payOf(plan.price, plan.gst),
+          }
         : null;
+}
+
+/**
+ * "Keeps ₹2,360. The plan is ₹2,950 for new sign-ups": what they pay
+ * beside what a new sign-up pays, both GST and all, so the two compare.
+ */
+export function keepsLine(
+    sub: Pick<Subscription, "price" | "pay" | "currency">,
+    older: { listPay: string },
+): string {
+    return `Keeps ${formatMoneyMajor(subscriptionPay(sub), sub.currency)}. The plan is ${formatMoneyMajor(older.listPay, sub.currency)} for new sign-ups`;
 }
 
 /**
@@ -386,14 +422,16 @@ export function headline(
     const pill = ending
         ? { tone: "accent" as const, label: `Ends ${d(ending)}` }
         : { tone: TAB_TONE[tab], label: TAB_LABEL[tab] };
+    // The next charge is money expected: what it comes to, GST and all.
     const next = sub.pendingPlan ?? sub;
+    const nextPay = formatMoneyMajor(subscriptionPay(next), next.currency);
     const charging = chargingText(sub, now);
     if (tab === "failed") {
         const due = sub.failedCharge?.dueAt;
         return {
             pill,
             big: formatMoneyMajor(
-                sub.failedCharge?.total ?? sub.price,
+                sub.failedCharge?.total ?? subscriptionPay(sub),
                 sub.currency,
             ),
             when: due ? `failed ${d(due)}` : "failed",
@@ -429,7 +467,7 @@ export function headline(
     if (sub.startsAt) {
         return {
             pill,
-            big: formatMoneyMajor(sub.price, sub.currency),
+            big: formatMoneyMajor(subscriptionPay(sub), sub.currency),
             when: `starts ${d(sub.startsAt)}`,
             line: `Starts ${d(sub.startsAt)}. Nothing is charged before then.`,
         };
@@ -445,11 +483,11 @@ export function headline(
     const on = d(sub.nextRenewalAt);
     return {
         pill,
-        big: formatMoneyMajor(next.price, next.currency),
+        big: nextPay,
         when: on,
         line: charging
-            ? `${charging} for this period. Next: ${formatMoneyMajor(next.price, next.currency)} on ${on}`
-            : `${formatMoneyMajor(next.price, next.currency)} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
+            ? `${charging} for this period. Next: ${nextPay} on ${on}`
+            : `${nextPay} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
     };
 }
 

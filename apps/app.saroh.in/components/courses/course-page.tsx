@@ -34,6 +34,7 @@ import {
     formatWeekday,
     zoneParts,
 } from "@/lib/format/datetime";
+import { addedSum } from "@/lib/gst/on-price";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -186,9 +187,12 @@ export function CoursePage({
                         : STATUS_LABEL[course.status]}
                 </Badge>
                 {course.service.name} ·{" "}
-                {formatMoneyMajor(course.price, course.currency, {
-                    decimals: "always",
-                })}{" "}
+                {/* The price the business set, with the whole sum where
+                    GST comes on top of it. */}
+                {addedSum(course.gst, course.currency) ??
+                    formatMoneyMajor(course.price, course.currency, {
+                        decimals: "always",
+                    })}{" "}
                 · {count(course.seats, "seat")}
                 {course.description ? ` · ${course.description}` : ""}
             </div>

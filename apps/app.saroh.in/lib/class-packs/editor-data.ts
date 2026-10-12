@@ -34,7 +34,8 @@ function toOption(s: Service): PackServiceOption {
         id: s.id,
         name: s.name,
         capacity: s.capacity,
-        priceCents: s.priceCents,
+        // What one visit costs to pay, GST and all, as the API charges it.
+        priceCents: s.payCents ?? s.priceCents,
         currency: s.currency,
         active: s.status === "ACTIVE",
     };

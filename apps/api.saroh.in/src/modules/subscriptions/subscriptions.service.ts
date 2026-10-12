@@ -15,6 +15,7 @@ import { billingMayChargeFor } from "../billing/business-closing";
 import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { assertBusinessDetails } from "../invoices/business-details";
+import type { GstOnPrice, PriceTerms } from "../invoices/gst-price";
 import { assertSaleRated } from "../invoices/gst-rate-required";
 import { isPastDue } from "../invoices/invoice-state";
 import { InvoicesService } from "../invoices/invoices.service";
@@ -23,7 +24,9 @@ import { loadPriceTerms } from "../invoices/price-terms";
 import type { RatedSale } from "../invoices/sale-price";
 import {
     hasRate,
+    priceTermsFor,
     RATED_SALE_SELECT,
+    saleCharge,
     saleChargeInTx,
 } from "../invoices/sale-price";
 import { contactName } from "../invoices/serialize";
@@ -179,7 +182,20 @@ export interface SubscriptionView {
     status: string;
     plan: { id: string; name: string };
     contact: { id: string; name: string; email: string };
+    /** The typed price they joined at: a price the business set. */
     price: string;
+    /**
+     * What one period comes to for them, GST and all: the amount their
+     * next invoice is written for, by the plan's GST as it stands today
+     * (`invoicePeriod`). The same as `price` where GST is in the price or
+     * none is charged. Every figure that is money expected reads this.
+     */
+    pay: string;
+    /**
+     * The GST in or on `price` as it is charged today, or null when
+     * nothing is said about GST.
+     */
+    gst: GstOnPrice | null;
     currency: string;
     interval: Interval;
     timezone: string;
@@ -238,7 +254,11 @@ export interface SubscriptionView {
     pendingPlan: {
         id: string;
         name: string;
+        /** The new plan's typed price. */
         price: string;
+        /** What a period on it comes to, GST and all, as it stands today. */
+        pay: string;
+        gst: GstOnPrice | null;
         currency: string;
         interval: Interval;
         /** When it takes effect: the next renewal, or a resume after the paid period. */
@@ -603,16 +623,23 @@ export class SubscriptionsService {
             select: SUBSCRIPTION_SELECT,
         });
         const ids = rows.map((r) => r.id);
-        const [invoices, skips, badges] = await Promise.all([
+        const [invoices, skips, badges, terms] = await Promise.all([
             this.invoicesFor(ctx.organizationId, ids),
             this.skipsFor(ctx.organizationId, ids),
             // "UPI Autopay · …" on the row (D14).
             autopayBadges(ctx.organizationId, ids),
+            viewTerms(ctx.organizationId, rows),
         ]);
         const now = new Date();
         return rows.map((r) =>
             forViewer(ctx, {
-                ...this.view(r, invoices.get(r.id), skips.get(r.id), now),
+                ...this.view(
+                    r,
+                    invoices.get(r.id),
+                    skips.get(r.id),
+                    now,
+                    terms,
+                ),
                 autopayOn: badges.get(r.id) ?? null,
             }),
         );
@@ -2479,13 +2506,14 @@ export class SubscriptionsService {
             select: SUBSCRIPTION_SELECT,
         });
         if (!row) notFound("Subscription");
-        const [invoices, skips] = await Promise.all([
+        const [invoices, skips, terms] = await Promise.all([
             this.invoicesFor(organizationId, [id]),
             this.skipsFor(organizationId, [id]),
+            viewTerms(organizationId, [row]),
         ]);
         return forViewer(
             ctx,
-            this.view(row, invoices.get(id), skips.get(id), new Date()),
+            this.view(row, invoices.get(id), skips.get(id), new Date(), terms),
         );
     }
 
@@ -2551,7 +2579,22 @@ export class SubscriptionsService {
         invoices: SubscriptionInvoices | undefined,
         skips: ReadonlySet<string> | undefined,
         now: Date,
+        terms: PriceTerms,
     ): SubscriptionView {
+        // What a period comes to: the sum `invoicePeriod` bills, from the
+        // typed price they keep and the plan's GST as it stands today.
+        const charge = saleCharge(
+            toCents(toMoneyString(row.price)),
+            row.plan,
+            terms,
+        );
+        const next = row.pendingPlan
+            ? saleCharge(
+                  toCents(toMoneyString(row.pendingPlan.price)),
+                  row.pendingPlan,
+                  terms,
+              )
+            : null;
         const failed = failedCharge(row, invoices, now);
         const unpaid = invoices?.unpaid ?? [];
         const latest = invoices?.latest ?? null;
@@ -2568,6 +2611,8 @@ export class SubscriptionsService {
                 email: row.contact.email,
             },
             price: toMoneyString(row.price),
+            pay: charge.pay,
+            gst: charge.gst,
             currency: row.currency,
             interval: row.interval as Interval,
             timezone: row.timezone,
@@ -2624,11 +2669,13 @@ export class SubscriptionsService {
                 : null,
             collection: this.collectionView(row, skips, now),
             pendingPlan:
-                row.pendingPlan && row.status !== "CANCELLED"
+                row.pendingPlan && next && row.status !== "CANCELLED"
                     ? {
                           id: row.pendingPlan.id,
                           name: row.pendingPlan.name,
                           price: toMoneyString(row.pendingPlan.price),
+                          pay: next.pay,
+                          gst: next.gst,
                           currency: row.pendingPlan.currency,
                           interval: row.pendingPlan.interval as Interval,
                           from: row.currentPeriodEnd.toISOString(),
@@ -2698,6 +2745,23 @@ function failedCharge(
         latest.issuedAt !== null &&
         failedAt >= latest.issuedAt;
     return autopayFailed ? latest : null;
+}
+
+/**
+ * The business's GST terms for a read of these subscriptions, read only
+ * when a plan among them (or one booked to switch to) has a rate.
+ */
+function viewTerms(
+    organizationId: string,
+    rows: readonly Pick<SubscriptionRow, "plan" | "pendingPlan">[],
+): Promise<PriceTerms> {
+    return priceTermsFor(
+        prisma,
+        organizationId,
+        rows.flatMap((r) =>
+            r.pendingPlan ? [r.plan, r.pendingPlan] : [r.plan],
+        ),
+    );
 }
 
 /** A plan as an event names it, money as the wire says it. */

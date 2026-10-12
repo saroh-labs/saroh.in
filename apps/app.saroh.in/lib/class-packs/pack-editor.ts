@@ -50,6 +50,10 @@ export interface PackServiceOption {
     name: string;
     /** More than one person at a time is a class (E13's `packKindFor`). */
     capacity: number;
+    /**
+     * What one visit costs to pay alone, GST and all (the service's
+     * `payCents`): the drop-in the pack's "a class" figure is compared with.
+     */
     priceCents: number | null;
     currency: string | null;
     /** Taking bookings; a paused one is offered only if the pack names it. */

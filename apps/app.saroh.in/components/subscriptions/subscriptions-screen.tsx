@@ -393,7 +393,7 @@ export function SubscriptionsScreen({
                                         Next
                                     </span>
                                     <span className={SUBSCRIPTION_COLS.price}>
-                                        Price
+                                        Pays
                                     </span>
                                 </ListTableHead>
                                 <ul aria-label="Subscriptions">

@@ -74,6 +74,16 @@ export function packToPay(pack: SellPack, gst?: GstAsk | null): string {
 }
 
 /**
+ * The pack's own price where the dialog lists it (the picker, the terms
+ * under the title): the price the business set, with "+ GST" after it
+ * where GST comes on top, so it never reads as the amount to take.
+ */
+export function packSetPrice(pack: SellPack, gst?: GstAsk | null): string {
+    const price = formatMoneyMajor(pack.price, pack.currency);
+    return addedGst(pack.price, pack, gst) ? `${price} + GST` : price;
+}
+
+/**
  * "₹1,500 + ₹270 GST (18%) = ₹1,770 to pay", under the dialog's fields
  * where GST is added to the pack's price. Null otherwise: the price is the
  * amount to pay and nothing more is said.
@@ -98,10 +108,14 @@ export function lastDayFor(validityDays: number, now: number): string {
 }
 
 /** Under the title: "₹1,500 · 10 classes · use by 12 January 2027". */
-export function sellTerms(pack: SellPack, now: number): string {
+export function sellTerms(
+    pack: SellPack,
+    now: number,
+    gst?: GstAsk | null,
+): string {
     const kind = packKind(pack);
     return [
-        formatMoneyMajor(pack.price, pack.currency),
+        packSetPrice(pack, gst),
         `${pack.credits} ${unitWord(kind, pack.credits)}`,
         `use by ${lastDayFor(pack.validityDays, now)}`,
     ].join(" · ");

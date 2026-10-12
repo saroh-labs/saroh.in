@@ -1,5 +1,6 @@
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
+import { setPriceWords } from "@/lib/gst/on-price";
 import type { Plan } from "./service";
 import { classesText, longPrice, olderPriceNotes } from "./view";
 
@@ -12,7 +13,7 @@ export interface PlanCardView {
     id: string;
     name: string;
     description: string | null;
-    /** "₹1,500 / month". */
+    /** "₹1,500 / month"; "₹1,500 / month + GST" where GST is added. */
     price: string;
     /** "8 classes a month included"; null where classes aren't sold. */
     classes: string | null;
@@ -51,7 +52,12 @@ export function planCard(plan: Plan, withClasses: boolean): PlanCardView {
         id: plan.id,
         name: plan.name,
         description: plan.description,
-        price: longPrice(plan.price, plan.currency, plan.interval),
+        // The business's own price list: the price it set, saying so where
+        // GST comes on top ("₹2,000 / month + GST").
+        price: setPriceWords(
+            longPrice(plan.price, plan.currency, plan.interval),
+            plan.gst,
+        ),
         classes: withClasses
             ? plan.classesPerMonth
                 ? `${classesText(plan.classesPerMonth)} included`

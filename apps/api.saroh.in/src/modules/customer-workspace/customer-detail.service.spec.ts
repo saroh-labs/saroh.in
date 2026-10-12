@@ -859,6 +859,59 @@ describe("CustomerDetailService", () => {
         expect(detail).not.toHaveProperty("invoices");
     });
 
+    // 12 Oct 2026: the Subscriptions tab shows what they pay a period, GST
+    // and all, beside the price they joined at.
+    describe("what a subscription comes to", () => {
+        const row = async (
+            profile: Record<string, unknown>,
+            plan: Record<string, unknown>,
+        ) => {
+            const { svc, db } = make();
+            db.customerSubscription.findMany.mockResolvedValue([
+                {
+                    ...SUBSCRIPTION,
+                    price: "2000",
+                    plan: { ...SUBSCRIPTION.plan, ...plan },
+                },
+            ]);
+            db.businessProfile.findUnique.mockResolvedValue({
+                timezone: "Asia/Kolkata",
+                ...profile,
+            });
+            const detail = await svc.detail(OWNER, "c1");
+            return detail.subscriptions?.rows[0];
+        };
+        const registered = (gstPriceMode: string) => ({
+            gstRegistered: true,
+            taxId: "29ABCDE1234F1Z5",
+            gstState: "29",
+            gstPriceMode,
+        });
+
+        it("GST is added: a ₹2,000 member pays ₹2,360", async () => {
+            const sub = await row(registered("ADDED"), { gstRate: "18.00" });
+            expect(sub).toMatchObject({ price: "2000.00", pay: "2360.00" });
+            // Its plan stays an id and a name on the wire.
+            expect(sub?.plan).toEqual({
+                id: "plan_1",
+                name: "Sourdough weekly",
+            });
+        });
+
+        it("prices include GST, not registered, or no rate: ₹2,000, as before", async () => {
+            expect(
+                await row(registered("INCLUDED"), { gstRate: "18.00" }),
+            ).toMatchObject({ price: "2000.00", pay: "2000.00" });
+            expect(
+                await row({ gstRegistered: false }, { gstRate: "18.00" }),
+            ).toMatchObject({ price: "2000.00", pay: "2000.00" });
+            expect(await row(registered("ADDED"), {})).toMatchObject({
+                price: "2000.00",
+                pay: "2000.00",
+            });
+        });
+    });
+
     it("returns the rest when the packs read throws, naming packs", async () => {
         const { svc, db } = make();
         db.packPurchase.findMany.mockRejectedValue(new Error("timeout"));

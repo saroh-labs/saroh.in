@@ -316,6 +316,52 @@
 - **A customer's sum is the API's.** A public read that shows a price about
   to be paid serves the GST in or on it and the amount to pay
   (`GstOnPrice`); the site formats and never adds, multiplies or rounds.
+- **One figure, one kind** (12 Oct 2026). Every money figure a business
+  reads is one of two kinds, and says which. It matters only where GST is
+  added to a price: where it is included, or the business is not
+  registered, the two are the same to the paisa and nothing reads
+  differently.
+    - **Money taken, owed or expected is the amount the customer pays, GST
+      and all:** what a member pays a period, "a month from members",
+      takings, a total, due, paid, a renewal still to come, a to-pay amount.
+      Never sum or show a typed column (`CustomerSubscription.price`, a
+      plan's, pack's, course's or service's price) as money. A sum over a
+      stretch of time is the sum of what was actually charged
+      (`PackPurchase.price`, `CourseEnrollment.price`, `Invoice.total`,
+      `Order.total`, a booking's snapshot): never re-derive an old amount
+      from today's setting.
+    - **A price the business set is the typed price, and says so where GST
+      comes on top:** "₹2,000 + GST" in its own price list
+      (`setPriceWords`), or the whole sum where there is room, "₹2,000 +
+      ₹360 GST (18%) = ₹2,360 to pay" (`addedSum`, the desk dialogs' words).
+      An editor says the sum under the price as it is typed.
+    - **Two figures compared are the same kind, both amounts to pay:** a
+      class in a pack against a class alone, plans in a picker, "keeps
+      ₹1,770, the plan is ₹2,360", a purchase against the pack's price
+      today (`paidAtPrice`: what was paid matches a price when it is that
+      price or that price with its GST on top, so a sale is never "an older
+      price" only because GST is added).
+    - **The API serves both, one place each.** A merchant read of a plan, a
+      pack, a course or a service carries `gst` (`GstOnPrice`, from
+      `saleCharge` or `serviceCharge`: the typed price, the GST and the
+      amount to pay as it is charged today). A subscription carries `pay`
+      beside `price`, by the sum its next invoice uses, and a plan's
+      `byPrice[].pay` and `monthlyFromMembers` are worked from it
+      (`plan-figures.ts`). The calendar's renewal to come and the customer
+      page's Subscriptions tab read the same sum. The diary's price of a
+      booking is its snapshot's. The public packs read serves both sides of
+      "a class instead of" as amounts to pay (`payEach`, `singlePay`).
+    - **The app formats and never works one out**
+      (`apps/app.saroh.in/lib/gst/on-price.ts`: `payOf`, `setPriceWords`,
+      `addedSum`, `paidAtPrice`). The preview mirror
+      (`lib/gst/price-mode.ts`) is only for a price being typed in an
+      editor or a desk dialog, before the API has answered.
+    - **A new money figure picks its kind before it is drawn,** and a new
+      read of something priced serves `gst` with the price.
+    - **Left as typed, on purpose:** a history line ("subscribed at
+      ₹2,000", a price change) records the price that was set, and no mode
+      was recorded with it. The "Download your data" files keep the stored
+      columns, and their README says which price each file holds.
 
 ## Modelling
 
