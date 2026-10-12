@@ -7,7 +7,12 @@ import { cn } from "../lib/utils";
 import type { PayInvoice } from "./details-api";
 import { DETAILS_OFFLINE } from "./details-api";
 import type { AccountInvoiceDue } from "./details-model";
-import { invoiceLine, invoiceTag, invoiceTitle } from "./details-model";
+import {
+    invoiceGstLine,
+    invoiceLine,
+    invoiceTag,
+    invoiceTitle,
+} from "./details-model";
 import type { Block } from "./model";
 import {
     AccountCard,
@@ -24,6 +29,35 @@ import {
  * one — and goes to the business's own pay page. An invoice the business
  * can't take online says to pay it directly; one autopay is charging says
  * so, and offers no second way to pay it (D13).
+ *
+ * The amount in a row's title is the amount to pay. Where the API says the
+ * GST in it (a renewal, a pack, a course), the row says it under its line,
+ * before "Pay now".
+ */
+
+/** A row's line, and under it the GST in its amount where the API said. */
+function rowSub(
+    invoice: AccountInvoiceDue,
+    businessName: string,
+): React.ReactNode {
+    const line = invoiceLine(invoice, businessName);
+    const gst = invoiceGstLine(invoice);
+    if (!gst) return line || undefined;
+    return (
+        <>
+            {line}
+            <span
+                data-price-gst=""
+                className={cn("block tabular-nums", line && "mt-0.5")}
+            >
+                {gst}
+            </span>
+        </>
+    );
+}
+
+/**
+ * The card: "To pay", one row an invoice.
  */
 export function InvoicesDue({
     invoices,
@@ -89,7 +123,7 @@ export function InvoicesDue({
                 <AccountRow
                     key={invoice.ref}
                     title={invoiceTitle(invoice)}
-                    sub={invoiceLine(invoice, businessName) || undefined}
+                    sub={rowSub(invoice, businessName)}
                     tag={
                         <Tag tone={invoice.overdue ? "accent" : "quiet"}>
                             {invoiceTag(invoice)}

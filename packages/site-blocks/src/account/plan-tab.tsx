@@ -14,6 +14,7 @@ import {
     accountMoney,
     packLine,
     planClassesLine,
+    planGstLine,
     planLine,
     planPrice,
 } from "./model";
@@ -346,6 +347,8 @@ function PlanCard({
         ? `${accountMoney(overdue.total, overdue.currency)} is overdue${overdue.dueAt ? ` since ${accountDate(overdue.dueAt, plan.timezone)}` : ""}`
         : planLine(plan);
     const classes = planClassesLine(plan);
+    // The GST in or on what each renewal costs to pay, where the API said.
+    const gstLine = planGstLine(plan);
     const autopay = autopayStateLine(plan.autopay);
     // When autopay next takes money (D13B): a charge queued for a later
     // day, or the next renewal's by the business's timing.
@@ -430,6 +433,14 @@ function PlanCard({
                 sub={
                     <>
                         {sub}
+                        {gstLine ? (
+                            <span
+                                data-price-gst=""
+                                className="mt-0.5 block tabular-nums"
+                            >
+                                {gstLine}
+                            </span>
+                        ) : null}
                         {classes ? (
                             <span className="mt-0.5 block">{classes}</span>
                         ) : null}

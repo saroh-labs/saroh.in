@@ -1,5 +1,6 @@
 import { dateIn } from "../booking-flow/model";
 import { timeWords } from "../lib/clock";
+import { gstUnderWords } from "../lib/gst-price";
 import type {
     AccountChange,
     AccountCourse,
@@ -86,6 +87,15 @@ export function invoiceLine(
     ]
         .filter(Boolean)
         .join(" · ");
+}
+
+/**
+ * The GST in the amount the row names, on a line of its own, so it is said
+ * before "Pay now": "Includes ₹305.08 GST (18%)", or "₹2,000 + ₹360 GST
+ * (18%)" where it was added. The API's numbers; null when it said none.
+ */
+export function invoiceGstLine(invoice: AccountInvoiceDue): string | null {
+    return gstUnderWords(invoice.gst, invoice.currency);
 }
 
 /** "Overdue" or "To pay": the row's tag. */

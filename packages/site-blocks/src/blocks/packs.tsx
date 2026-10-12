@@ -5,14 +5,20 @@ import { useCallback, useEffect, useState } from "react";
 import type { RenderedPacks } from "@saroh/block-contract";
 
 import { BuyPackSheet } from "../account/buy-pack-sheet";
-import { accountMoney } from "../account/model";
 import type { AccountPackOnSale } from "../account/packs-api";
 import { DEFAULT_API_URL } from "../api-url";
+import { gstUnderWords } from "../lib/gst-price";
 import { cn } from "../lib/utils";
 import type { PricesActions } from "../prices/api";
 import { PricesDone, useSignInFirst } from "../prices/flow";
 import type { PublicPack } from "../prices/pack-words";
-import { packEyebrow, packPerClass, packsOf } from "../prices/pack-words";
+import {
+    packBrowsePrice,
+    packEyebrow,
+    packPayPrice,
+    packPerClass,
+    packsOf,
+} from "../prices/pack-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
 
@@ -39,6 +45,14 @@ import { NotTakingOrders } from "../shop/not-taking-orders";
  * "Ask about this pack" instead, opening the enquiry form with the pack
  * named; with no enquiry form, no button. Nothing names a way to pay
  * (DEC-059).
+ *
+ * **GST is said before Buy.** Where the read carries a pack's `gst`, the
+ * amount beside Buy is the amount to pay, with the GST in or on it under
+ * it: "₹5,310" over "₹4,500 + ₹810 GST (18%)", or "₹4,500" over "Includes
+ * ₹686.44 GST (18%)". A card that is only browsed (no Buy) keeps the typed
+ * price, with "+ GST" after it when GST comes on top. The line that
+ * compares a class with a single visit is left as it was: both of its
+ * prices are the ones the business typed.
  *
  * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
  */
@@ -83,6 +97,8 @@ function onSale(pack: PublicPack): AccountPackOnSale {
         price: pack.price,
         currency: pack.currency,
         kind: pack.kind,
+        // The GST the card said, so the sheet says the same before paying.
+        ...(pack.gst === undefined ? {} : { gst: pack.gst }),
     };
 }
 
@@ -325,7 +341,7 @@ function PackCards({
         setDone(null);
         flow.signedIn(
             () => setBuying(pack),
-            `the customer signs in here and pays ${accountMoney(pack.price, pack.currency)} for ${pack.name}`,
+            `the customer signs in here and pays ${packPayPrice(pack)} for ${pack.name}`,
         );
     }
 
@@ -340,6 +356,11 @@ function PackCards({
                     const perClass = packPerClass(pack);
                     const description = showDescriptions
                         ? said(pack.description)
+                        : null;
+                    // Beside Buy the price is the amount to pay, with its
+                    // GST under it.
+                    const gstLine = buyWords
+                        ? gstUnderWords(pack.gst, pack.currency)
                         : null;
                     return (
                         <li
@@ -364,7 +385,17 @@ function PackCards({
                             ) : null}
                             <span className="mt-1.5 flex items-center gap-2.5">
                                 <span className="flex-1 text-base font-bold">
-                                    {accountMoney(pack.price, pack.currency)}
+                                    {buyWords
+                                        ? packPayPrice(pack)
+                                        : packBrowsePrice(pack)}
+                                    {gstLine ? (
+                                        <span
+                                            data-price-gst=""
+                                            className="text-site-muted block text-xs font-normal tabular-nums"
+                                        >
+                                            {gstLine}
+                                        </span>
+                                    ) : null}
                                 </span>
                                 {canvas ? (
                                     <span className={buyButton}>{label}</span>

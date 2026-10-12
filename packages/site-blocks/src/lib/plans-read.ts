@@ -1,5 +1,6 @@
 import type { AutopayMethod } from "../autopay/api";
 import { autopayMethodsOf } from "../autopay/api";
+import type { GstOnPrice } from "./gst-price";
 
 /**
  * Reading the public plans answer (G9, G20), in a module with no "use
@@ -21,6 +22,12 @@ export interface PublicPlan {
     interval: string;
     /** The one plan more current members are on than any other. */
     mostChosen: boolean;
+    /**
+     * The GST in or on the price, and the amount to pay each period; null
+     * for none. Absent from an older API. Narrowed where it is read
+     * (`gstOnPriceOf`): anything strange is none said.
+     */
+    gst?: GstOnPrice | null;
 }
 
 export function isPublicPlan(value: unknown): value is PublicPlan {

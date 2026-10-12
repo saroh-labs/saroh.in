@@ -4,6 +4,8 @@ import type {
     AutopayState,
 } from "../autopay/api";
 import { timeWords } from "../lib/clock";
+import type { GstOnPrice } from "../lib/gst-price";
+import { gstUnderWords, payPriceWords } from "../lib/gst-price";
 import { siteMoney } from "../lib/money";
 import type {
     AccountChange,
@@ -130,8 +132,15 @@ export interface AccountOrderDetail {
 export interface AccountPlan {
     ref: string;
     name: string;
+    /** The price they are on, as the business typed it. */
     price: string;
     currency: string;
+    /**
+     * The GST on the next renewal as it will be charged, and the amount to
+     * pay; null for none. Absent from an older API. Narrowed where it is
+     * read (`gstOnPriceOf`): anything strange is none said.
+     */
+    gst?: GstOnPrice | null;
     interval: string;
     status: "ACTIVE" | "PAUSED";
     renewsAt: string | null;
@@ -343,10 +352,26 @@ const EVERY: Record<string, string> = {
     YEAR: "year",
 };
 
-/** "₹2,500 / month". */
+/**
+ * "₹2,500 / month": what each renewal costs to pay, so where GST is added
+ * it is the API's amount to pay ("₹2,360 / month" on a ₹2,000 plan at 18%).
+ */
 export function planPrice(plan: AccountPlan): string {
     const every = EVERY[plan.interval] ?? plan.interval.toLowerCase();
-    return `${accountMoney(plan.price, plan.currency)} / ${every}`;
+    const money = payPriceWords(
+        accountMoney(plan.price, plan.currency),
+        plan.gst,
+        plan.currency,
+    );
+    return `${money} / ${every}`;
+}
+
+/**
+ * The GST in or on that amount, on a line of its own: "Includes ₹305.08
+ * GST (18%)" or "₹2,000 + ₹360 GST (18%)". Null when nothing is said.
+ */
+export function planGstLine(plan: AccountPlan): string | null {
+    return gstUnderWords(plan.gst, plan.currency);
 }
 
 /** The line under a plan: when it renews, pauses or ends. */

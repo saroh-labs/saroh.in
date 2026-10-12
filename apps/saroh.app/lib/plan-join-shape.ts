@@ -3,7 +3,11 @@ import type {
     PlanJoinAttempt,
     PlanJoinStarted,
 } from "@saroh/site-blocks";
-import { autopayStartOf, isTestReleaseRefusal } from "@saroh/site-blocks";
+import {
+    autopayStartOf,
+    gstOnPriceOf,
+    isTestReleaseRefusal,
+} from "@saroh/site-blocks";
 
 /**
  * Joining a plan from the site (round-2 G20): the API's answers narrowed,
@@ -72,6 +76,9 @@ export function joinStartAnswer(
                       plan: body.plan,
                       total: body.total,
                       currency: body.currency,
+                      // The GST in or on `total`, said before the window
+                      // opens; none from an older API, or anything strange.
+                      gst: gstOnPriceOf((body as { gst?: unknown }).gst),
                       payment: {
                           provider: body.payment.provider,
                           amountCents: body.payment.amountCents,
