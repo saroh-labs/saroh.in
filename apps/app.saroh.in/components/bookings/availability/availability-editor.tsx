@@ -594,7 +594,9 @@ export function AvailabilityEditor({
                 />
                 <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3">
                     <BookablePreview
-                        key={me.id}
+                        // Its own key: the card below is keyed by the person
+                        // too, and siblings may not share one.
+                        key={`preview-${me.id}`}
                         person={me}
                         services={services.filter((x) =>
                             me.serviceIds.includes(x.id),
@@ -611,7 +613,7 @@ export function AvailabilityEditor({
                         dirty={dirty}
                     />
                     <TimeOffCard
-                        key={me.id}
+                        key={`off-${me.id}`}
                         me={me}
                         closures={closures}
                         timezone={timezone}
