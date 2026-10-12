@@ -11,6 +11,8 @@ import type { GstAsk } from "@/lib/gst/item-words";
 
 import type { ChosenRate, MissingRates } from "./missing";
 import { gstAskOf } from "./missing";
+import type { OverMrpRead } from "./over-mrp";
+import { overMrpOf } from "./over-mrp";
 
 /**
  * The GST rates a business still has to choose (`missing.ts`), read from
@@ -82,6 +84,26 @@ async function readBusinessPriceMode(
         return body?.tax?.registered === true
             ? businessModeOf(body.tax.priceMode)
             : null;
+    } catch (error) {
+        unstable_rethrow(error);
+        return null;
+    }
+}
+
+/**
+ * The products (and options) that would cost more than their MRP with GST
+ * added to the business's prices (`over-mrp.ts`): what the tax settings
+ * say before a switch to "GST is added" is saved. Null when it couldn't be
+ * told; the sheet then says nothing, and the API's own check on the save
+ * still stands. A bare fetch, so a 403 is "couldn't tell".
+ */
+export async function readOverMrpIfAdded(): Promise<OverMrpRead | null> {
+    try {
+        const base = await orgBase();
+        if (!base) return null;
+        const res = await apiFetch(`${base}/gst-rates/over-mrp?mode=ADDED`);
+        if (!res.ok) return null;
+        return overMrpOf(await res.json());
     } catch (error) {
         unstable_rethrow(error);
         return null;

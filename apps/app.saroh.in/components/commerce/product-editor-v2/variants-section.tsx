@@ -7,6 +7,9 @@ import { Plus } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { formatMoneyMajor } from "@/lib/format/money";
+import type { MrpPricing } from "@/lib/gst/mrp";
+import { optionOverMrpNote } from "@/lib/gst/mrp";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { isMoney, LIMITS, trimMoney } from "@/lib/products/editor-sections";
 import type { ProductListingView } from "@/lib/products/listing-changes";
 import { newVariantStores, soldAtFrom } from "@/lib/products/listing-changes";
@@ -43,6 +46,8 @@ export function VariantsSection({
     sku,
     stores,
     listings,
+    gstRegistered = false,
+    businessPriceMode = null,
 }: {
     product: ProductDetail;
     storeId: string;
@@ -54,6 +59,10 @@ export function VariantsSection({
     stores: { id: string; name: string }[];
     /** Where it is sold; null with one storefront or when unread. */
     listings: ProductListingView[] | null;
+    /** Known to be GST-registered: GST may be added to a price. */
+    gstRegistered?: boolean;
+    /** How the business's prices carry GST; null when it couldn't be told. */
+    businessPriceMode?: GstPriceMode | null;
 }) {
     const { canWrite, saving } = useEditor();
     // While its save runs, the list is what is being sent: typing into it
@@ -112,21 +121,27 @@ export function VariantsSection({
     // placeholder keeps the plain figure it would type.
     const shown = (m: string) => formatMoneyMajor(m, product.currency);
     const shownPrice = productPrice ? shown(productPrice) : "";
-    const cents = (m: string) => Math.round(Number(m) * 100);
-    // The API refuses a price over the MRP customers see struck through;
-    // said here first, beside the price, rather than after a Save.
-    const mrpNote = (mrp: string | null) =>
-        `Above the MRP of ${shown(trimMoney(mrp ?? product.mrp ?? ""))}. Lower it, or raise the MRP in Basics.`;
-    const overMrp = (price: string, mrp: string | null) => {
-        const cap = mrp ?? product.mrp;
-        return (
-            !!price.trim() &&
-            isMoney(price) &&
-            !!cap &&
-            isMoney(cap) &&
-            cents(price) > cents(cap)
-        );
+    // The API refuses an amount to pay over the MRP customers see struck
+    // through; said here first, beside the price, rather than after a
+    // Save. GST is part of MRP (`lib/gst/mrp.ts`): where GST is added to
+    // the product's prices, the amount to pay is the price with its GST.
+    const pricing: MrpPricing = {
+        registered: gstRegistered,
+        businessMode: businessPriceMode,
+        itemMode: product.gstPriceMode ?? "",
+        rate: product.gstRate ?? "",
     };
+    // Why a variant's own price is over its MRP (its own, else the
+    // product's), or "" when it isn't. A blank price is the product's.
+    const mrpNote = (price: string, mrp: string | null) =>
+        optionOverMrpNote(
+            price,
+            mrp ?? product.mrp,
+            pricing,
+            product.currency,
+        ) ?? "";
+    const overMrp = (price: string, mrp: string | null) =>
+        mrpNote(price, mrp) !== "";
     // A variant shows a photo of its own, never a video.
     const photos = product.images.filter((i) => i.kind !== "video");
     const skuKey = (r: VariantRow) => r.sku.trim().toLowerCase();
@@ -134,7 +149,7 @@ export function VariantsSection({
         variantProblem(r, rows, {
             opt,
             title: titleOf,
-            overMrp: (x) => (overMrp(x.price, x.mrp) ? mrpNote(x.mrp) : ""),
+            overMrp: (x) => mrpNote(x.price, x.mrp),
         });
     const bad = rows.some((r) => errOf(r));
     const dirty = optionId !== savedOptionId || !sameRows(rows, base);
@@ -389,7 +404,7 @@ export function VariantsSection({
                                   : dupSku
                                     ? "That SKU is already on this product."
                                     : newOverMrp
-                                      ? mrpNote(null)
+                                      ? mrpNote(newPrice, null)
                                       : newPriceBad
                                         ? "A number with at most two decimal places."
                                         : `Blank price uses the product's ${shownPrice}. Save variants to keep it.`
