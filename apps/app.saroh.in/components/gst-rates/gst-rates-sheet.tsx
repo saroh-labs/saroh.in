@@ -109,6 +109,8 @@ function RatesDraft({
     onDone: (saved: number | null) => void;
 }) {
     const [choices, setChoices] = useState<RateChoices>({});
+    // The one rate last given to every row; "" once a row is changed after.
+    const [forAll, setForAll] = useState<GstRateValue>("");
     const [saving, setSaving] = useState(false);
     const [refusal, setRefusal] = useState<string | null>(null);
     // What is still to choose is said once Save is pressed.
@@ -117,6 +119,7 @@ function RatesDraft({
     const chosen = chosenRates(rows, choices);
     const left = unchosen(rows, choices);
     const locked = rows.filter((row) => row.canSet === false);
+    const open = rows.filter((row) => row.canSet !== false);
     useFormSheetDirty(chosen.length > 0);
 
     async function submit(event: FormEvent<HTMLFormElement>) {
@@ -152,6 +155,38 @@ function RatesDraft({
                         {WHO_CAN_CHANGE}
                     </Notice>
                 ) : null}
+                {/* Most businesses charge one rate on everything: with
+                    several rows, one choice fills them all, and any row can
+                    still be changed after (owner, 12 Oct 2026). */}
+                {open.length > 1 ? (
+                    <div className="grid gap-4 border-b border-border pb-4">
+                        <Field
+                            label={`One rate for all ${open.length}`}
+                            hint="Fills every row below. Change any that differ."
+                        >
+                            <OptionSelect<GstRateValue>
+                                value={forAll}
+                                onValueChange={(rate) => {
+                                    setForAll(rate);
+                                    if (rate === "") return;
+                                    setChoices(
+                                        Object.fromEntries(
+                                            open.map((row) => [
+                                                rateKey(row),
+                                                rate,
+                                            ]),
+                                        ),
+                                    );
+                                    setRefusal(null);
+                                }}
+                                options={GST_RATE_CHOICES}
+                                placeholder={GST_RATE_PLACEHOLDER}
+                                disabled={saving}
+                                aria-label="GST rate for all of these"
+                            />
+                        </Field>
+                    </div>
+                ) : null}
                 {rows.map((row) => {
                     const key = rateKey(row);
                     const value = choices[key] ?? "";
@@ -185,6 +220,8 @@ function RatesDraft({
                                         ...had,
                                         [key]: rate,
                                     }));
+                                    // No longer one rate for all of them.
+                                    if (rate !== forAll) setForAll("");
                                     setRefusal(null);
                                 }}
                                 options={GST_RATE_CHOICES}

@@ -197,6 +197,19 @@ describe("the missing GST rates notice", () => {
         expect(sheet()).toBeNull();
     });
 
+    it("one rate for all fills every row, and a row can still differ", async () => {
+        show(MISSING);
+        await press("Choose rates");
+        choose("all of these", "18");
+        choose("Vitamin C serum", "5");
+        await press("Save");
+
+        expect(saveGstRates).toHaveBeenCalledWith([
+            { kind: "SERVICE", id: "svc_pt", rate: "18" },
+            { kind: "PRODUCT", id: "prod_1", rate: "5" },
+        ]);
+    });
+
     it("Save with nothing chosen just closes: there is nothing to save", async () => {
         show(MISSING);
         await press("Choose rates");
