@@ -419,11 +419,50 @@ describe("a pack's price words", () => {
         expect(packBrowsePrice(TEN)).toBe("₹4,500");
     });
 
-    it("the line against a single class is left as it was, whatever the GST", () => {
+    it("an API before the two amounts to pay: the line against a single class is as it was", () => {
         const line = "₹450 a class instead of ₹600";
         expect(packPerClass(TEN)).toBe(line);
         expect(packPerClass({ ...TEN, gst: PACK_ADDED })).toBe(line);
         expect(packPerClass({ ...TEN, gst: PACK_INCLUDED })).toBe(line);
+    });
+
+    // 12 Oct 2026: two figures compared are the same kind. The API serves
+    // both sides as amounts to pay, and the card only writes them.
+    it("GST added: a class in the pack and a class alone are both what is paid", () => {
+        // ₹4,500 + ₹810 is ₹5,310 for 10; ₹600 + ₹108 is ₹708.
+        expect(
+            packPerClass({
+                ...TEN,
+                gst: PACK_ADDED,
+                payEach: "531.00",
+                singlePay: "708.00",
+            }),
+        ).toBe("₹531 a class instead of ₹708");
+    });
+
+    it("GST included, or none said: the line is the one it always was", () => {
+        const line = "₹450 a class instead of ₹600";
+        const same = { payEach: "450.00", singlePay: "600.00" };
+        expect(packPerClass({ ...TEN, ...same, gst: PACK_INCLUDED })).toBe(
+            line,
+        );
+        expect(packPerClass({ ...TEN, ...same, gst: null })).toBe(line);
+        expect(packPerClass({ ...TEN, ...same })).toBe(line);
+    });
+
+    it("says no comparison when a class alone costs no more to pay", () => {
+        // The pack adds GST and the class includes it: ₹531 against ₹500.
+        expect(
+            packPerClass({
+                ...TEN,
+                gst: PACK_ADDED,
+                payEach: "531.00",
+                singlePay: "500.00",
+            }),
+        ).toBe("₹531 a class");
+        expect(
+            packPerClass({ ...TEN, payEach: "450.00", singlePay: null }),
+        ).toBe("₹450 a class");
     });
 });
 
