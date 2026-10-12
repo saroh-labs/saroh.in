@@ -142,6 +142,21 @@ export interface InvoiceLine {
         sgst: string;
         igst: string;
     } | null;
+    /**
+     * How the paper prints a line GST was added to (the API's
+     * `invoices/added-line.ts`): its rate before GST, its taxable value as
+     * the amount, its GST, its discount before GST, and, only where the
+     * units do not multiply out to the amount, what one comes to with GST.
+     * Null or absent for every other line, which prints `unitPrice` and
+     * `amount` as they are.
+     */
+    addedGst?: {
+        unitPrice: string;
+        amount: string;
+        gst: string;
+        discount: string;
+        unitPay: string | null;
+    } | null;
     orderItemId?: string | null;
 }
 
