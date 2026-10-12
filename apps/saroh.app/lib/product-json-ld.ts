@@ -1,5 +1,5 @@
 import type { StockWord } from "@saroh/site-blocks";
-import { gstOnPriceOf } from "@saroh/site-blocks";
+import { gstOnPriceOf, shownSaving } from "@saroh/site-blocks";
 
 import type { CatalogueProduct } from "./catalogue-shape";
 
@@ -65,14 +65,23 @@ function payPrice(typed: string, gst: unknown): string {
 
 /**
  * The MRP as a list price, only where it is above the price the offer
- * publishes.
+ * publishes: the amount to pay, GST and all, since an MRP includes its
+ * taxes. `saving` is the API's own answer to that (the one the page
+ * strikes through); with none sent, the MRP is compared with the offer's
+ * price here. An offer at its MRP, or above it, publishes no list price.
  */
-function listPrice(price: string, mrp: string | null, currency: string) {
-    if (mrp === null || !(Number(mrp) > Number(price))) return undefined;
+function listPrice(
+    price: string,
+    mrp: string | null,
+    currency: string,
+    saving: unknown,
+) {
+    const shown = shownSaving(saving, price, mrp);
+    if (!shown) return undefined;
     return {
         "@type": "UnitPriceSpecification",
         priceType: `${SCHEMA}/ListPrice`,
-        price: mrp,
+        price: shown.mrp,
         priceCurrency: currency,
     };
 }
@@ -96,11 +105,12 @@ export function productJsonLd({
         typed: string,
         gst: unknown,
         mrp: string | null,
+        saving: unknown,
         stock: StockWord | null,
         name?: string,
     ) => {
         const price = payPrice(typed, gst);
-        const spec = listPrice(price, mrp, product.currency);
+        const spec = listPrice(price, mrp, product.currency, saving);
         return {
             "@type": "Offer",
             ...(name ? { name } : {}),
@@ -126,7 +136,9 @@ export function productJsonLd({
                           : v.price === null
                             ? product.gst
                             : null,
-                      v.price === null ? product.mrp : v.mrp,
+                      // Its own MRP, else the product's: the page's rule.
+                      v.mrp ?? product.mrp,
+                      v.saving,
                       v.stock,
                       `${product.name} – ${v.title}`,
                   ),
@@ -136,6 +148,7 @@ export function productJsonLd({
                       product.price,
                       product.gst,
                       product.mrp,
+                      product.saving,
                       product.stock?.word ?? null,
                   ),
               ];

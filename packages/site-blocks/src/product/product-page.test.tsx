@@ -527,3 +527,176 @@ describe("choosing an option", () => {
         expect(small.className).toContain("line-through");
     });
 });
+
+/**
+ * GST is part of MRP (12 Oct 2026): the saving is the MRP against the
+ * amount to pay, GST and all. The API works it out (`saving`); the page
+ * only draws it.
+ */
+describe("the saving against the MRP is true", () => {
+    const one: ProductPageData = {
+        ...dress,
+        price: "1000.00",
+        mrp: "1475.00",
+        variants: [],
+    };
+    // ₹1,000 + 18% is ₹1,180 to pay.
+    const adds = {
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+    const includes = {
+        mode: "INCLUDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 15254,
+        payCents: 100000,
+    };
+    const struck = (c: HTMLElement) => c.querySelector("[data-price-mrp]");
+    const badge = (c: HTMLElement) => c.querySelector("[data-price-off]");
+
+    it("prices include GST: the MRP against the price, as the API says it", () => {
+        // 1,475 - 1,000 = 475 off; 475 / 1,475 is 32.2%, said as 32.
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...one,
+                    gst: includes,
+                    saving: { mrp: "1475.00", percent: 32 },
+                }}
+            />,
+        );
+        expect(struck(container)).toHaveTextContent("MRP ₹1,475");
+        expect(badge(container)).toHaveTextContent("32% off");
+    });
+
+    it("GST is added: the saving is against ₹1,180 to pay, not the ₹1,000 typed", () => {
+        // 1,475 - 1,180 = 295 off; 295 / 1,475 is exactly 20%. Against the
+        // typed ₹1,000 it would have claimed 32%.
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...one,
+                    gst: adds,
+                    saving: { mrp: "1475.00", percent: 20 },
+                }}
+            />,
+        );
+        expect(struck(container)).toHaveTextContent("MRP ₹1,475");
+        expect(badge(container)).toHaveTextContent("20% off");
+        expect(container).not.toHaveTextContent("32% off");
+    });
+
+    it("the amount to pay is the MRP: no saving and nothing struck through", () => {
+        // Typed ₹1,000 under an MRP of ₹1,180; ₹1,180 is paid.
+        const { container } = render(
+            <ProductPage
+                product={{ ...one, mrp: "1180.00", gst: adds, saving: null }}
+            />,
+        );
+        expect(struck(container)).toBeNull();
+        expect(badge(container)).toBeNull();
+        expect(container).not.toHaveTextContent("% off");
+        // The price and what is paid are still said.
+        expect(container.querySelector("[data-price-gst]")).toHaveTextContent(
+            "+ ₹180 GST (18%) · ₹1,180 to pay",
+        );
+    });
+
+    it("a product already over its MRP shows no saving and still sells", () => {
+        // Typed ₹1,000 under an MRP of ₹1,100; ₹1,180 is paid.
+        const { container } = render(
+            <ProductPage
+                product={{ ...one, mrp: "1100.00", gst: adds, saving: null }}
+            />,
+        );
+        expect(struck(container)).toBeNull();
+        expect(container).not.toHaveTextContent("% off");
+        expect(
+            screen.getByRole("button", { name: "Add to bag" }),
+        ).toBeEnabled();
+    });
+
+    it("follows the option picked, each with the API's own saving", () => {
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...dress,
+                    price: "1000.00",
+                    mrp: "1475.00",
+                    gst: adds,
+                    saving: { mrp: "1475.00", percent: 20 },
+                    variants: dress.variants.map((v) =>
+                        v.id === "l"
+                            ? {
+                                  ...v,
+                                  // ₹1,250 + 18% is ₹1,475 to pay: the MRP.
+                                  price: "1250.00",
+                                  gst: {
+                                      ...adds,
+                                      listCents: 125000,
+                                      gstCents: 22500,
+                                      payCents: 147500,
+                                  },
+                                  saving: null,
+                              }
+                            : {
+                                  ...v,
+                                  gst: adds,
+                                  saving: { mrp: "1475.00", percent: 20 },
+                              },
+                    ),
+                }}
+            />,
+        );
+        expect(badge(container)).toHaveTextContent("20% off");
+        fireEvent.click(screen.getByRole("button", { name: "L" }));
+        expect(struck(container)).toBeNull();
+        expect(badge(container)).toBeNull();
+    });
+
+    it("under one whole percent the MRP is struck through with no number said", () => {
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...one,
+                    mrp: "1001.00",
+                    saving: { mrp: "1001.00", percent: 0 },
+                }}
+            />,
+        );
+        expect(struck(container)).toHaveTextContent("MRP ₹1,001");
+        expect(badge(container)).toBeNull();
+    });
+
+    it("with no saving from the API, compares the MRP with the amount to pay it holds", () => {
+        // An older API, GST added: 1,475 against ₹1,180, never ₹1,000.
+        const older = render(<ProductPage product={{ ...one, gst: adds }} />);
+        expect(badge(older.container)).toHaveTextContent("20% off");
+        older.unmount();
+        // The same at the MRP: none.
+        const equal = render(
+            <ProductPage product={{ ...one, mrp: "1180.00", gst: adds }} />,
+        );
+        expect(struck(equal.container)).toBeNull();
+        equal.unmount();
+        // The workspace's preview sends no GST at all: the typed price.
+        const preview = render(<ProductPage product={one} />);
+        expect(badge(preview.container)).toHaveTextContent("32% off");
+    });
+
+    it("an answer that isn't a saving is none", () => {
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...one,
+                    saving: { percent: "lots" } as never,
+                }}
+            />,
+        );
+        expect(struck(container)).toBeNull();
+    });
+});

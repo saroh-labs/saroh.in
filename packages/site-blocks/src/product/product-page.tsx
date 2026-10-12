@@ -12,6 +12,8 @@ import {
     startOfLine,
 } from "../lib/gst-price";
 import { formatAmount } from "../lib/money";
+import type { MrpSaving } from "../lib/mrp-saving";
+import { percentOff, shownSaving } from "../lib/mrp-saving";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { plateTint } from "./name-plate";
@@ -82,6 +84,12 @@ export interface ProductPageVariant {
      */
     gst?: GstOnPrice | null;
     mrp: string | null;
+    /**
+     * The saving against the MRP at what is paid for this option, worked
+     * out by the API; null for none. Absent from an older API, and from a
+     * preview: `shownSaving` then compares with what the page holds.
+     */
+    saving?: MrpSaving | null;
     /** The photo shown when picked; null = the cover. */
     imageId: string | null;
     stock: StockWord;
@@ -110,6 +118,11 @@ export interface ProductPageData {
      */
     gst?: GstOnPrice | null;
     mrp: string | null;
+    /**
+     * The saving against the MRP at what is paid for it, GST and all,
+     * worked out by the API; null for none. Absent from an older API.
+     */
+    saving?: MrpSaving | null;
     categoryName: string | null;
     /** Sanitised HTML — the API's allowlist runs on every save. */
     description: string | null;
@@ -134,15 +147,31 @@ export interface ProductPageData {
 
 // Lives in `lib/money` (no directive) so a server page can call it too: an
 // export of this "use client" module is only a client reference there.
-export { formatAmount };
+export { formatAmount, percentOff };
 
-/** Whole percent off, rounded down, or null when nothing is off. */
-export function percentOff(price: string, mrp: string | null): number | null {
-    if (mrp === null) return null;
-    const p = Math.round(Number(price) * 100);
-    const m = Math.round(Number(mrp) * 100);
-    if (!(m > p) || m === 0) return null;
-    return Math.floor(((m - p) * 100) / m);
+/**
+ * The saving the page shows for what is picked: the API's, which compares
+ * the MRP with the amount to pay, GST and all (`lib/mrp-saving.ts`). Where
+ * the API sent none of its own (an older one, or the workspace's preview),
+ * the MRP is the option's own, else the product's, beside the amount to
+ * pay the page already holds: the typed price, or the API's `payCents`
+ * where GST is added. Null: nothing is struck through, no "% off".
+ */
+export function productSaving(
+    product: Pick<ProductPageData, "price" | "mrp" | "gst" | "saving">,
+    variant: Pick<
+        ProductPageVariant,
+        "price" | "mrp" | "gst" | "saving"
+    > | null,
+): MrpSaving | null {
+    const gst = productGst(product, variant);
+    return shownSaving(
+        variant ? variant.saving : product.saving,
+        gst?.mode === "ADDED"
+            ? (gst.payCents / 100).toFixed(2)
+            : (variant?.price ?? product.price),
+        variant?.mrp ?? product.mrp,
+    );
 }
 
 export function stockLabel(
@@ -349,8 +378,9 @@ export default function ProductPage({
 
     const variant = product.variants.find((v) => v.id === variantId) ?? null;
     const price = variant?.price ?? product.price;
-    const mrp = variant?.mrp ?? product.mrp;
-    const off = percentOff(price, mrp);
+    // The MRP beside the amount to pay, GST and all: none when that is
+    // the MRP or more.
+    const saving = productSaving(product, variant);
     const gst = productGst(product, variant);
     const stock = variant
         ? { word: variant.stock, left: variant.left }
@@ -440,20 +470,28 @@ export default function ProductPage({
                 <span className="font-site-heading text-[calc(1.75rem*var(--site-heading-scale,1))] font-semibold tabular-nums leading-none tracking-[-0.02em]">
                     {formatAmount(price, product.currency, locale)}
                 </span>
-                {off !== null && mrp ? (
+                {saving ? (
                     <>
-                        <span className="text-site-muted text-[15px] tabular-nums line-through">
-                            <span className="sr-only">MRP </span>
-                            {formatAmount(mrp, product.currency, locale)}
-                        </span>
                         <span
-                            className={cn(
-                                "text-site-fg rounded-full px-2 py-0.5 text-[12.5px] font-semibold",
-                                plateTint,
-                            )}
+                            data-price-mrp=""
+                            className="text-site-muted text-[15px] tabular-nums line-through"
                         >
-                            {off}% off
+                            <span className="sr-only">MRP </span>
+                            {formatAmount(saving.mrp, product.currency, locale)}
                         </span>
+                        {/* Under one whole percent there is no number to
+                            say: the MRP alone shows the saving. */}
+                        {saving.percent > 0 ? (
+                            <span
+                                data-price-off=""
+                                className={cn(
+                                    "text-site-fg rounded-full px-2 py-0.5 text-[12.5px] font-semibold",
+                                    plateTint,
+                                )}
+                            >
+                                {saving.percent}% off
+                            </span>
+                        ) : null}
                     </>
                 ) : null}
             </div>

@@ -168,6 +168,8 @@ export {
     startOfLine,
 } from "./lib/gst-price";
 export type { GstOnPrice } from "./lib/gst-price";
+export { isMrpSaving, shownSaving } from "./lib/mrp-saving";
+export type { MrpSaving } from "./lib/mrp-saving";
 // A business's public phone as a visitor reads it (DEC-053).
 export { phoneText } from "./lib/phone";
 export { shopFactsLine, shopLeadLine } from "./lib/shop-facts";
@@ -184,6 +186,7 @@ export type { BusinessReach } from "./reach-links";
 export {
     default as ProductPage,
     percentOff,
+    productSaving,
     stockLabel,
     useProductSelection,
 } from "./product/product-page";
