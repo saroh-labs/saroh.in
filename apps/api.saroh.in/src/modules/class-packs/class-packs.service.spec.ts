@@ -1118,3 +1118,113 @@ describe("GST on a pack sold at the desk", () => {
         expect(line()).toMatchObject({ gstRate: "0", priceMode: null });
     });
 });
+
+// — What the merchant reads of a pack's price (12 Oct 2026) ——————————
+//
+// One figure, one kind: `price` is the price the business set; `gst` says
+// the GST in or on it and what a sale comes to, by the sum `sell` uses. A
+// purchase's `price` and `takings` are what was paid, so the app compares
+// them with `gst.payCents`, never with `price`.
+describe("a pack's price as the merchant reads it", () => {
+    const registered = (gstPriceMode: "INCLUDED" | "ADDED") => ({
+        gstRegistered: true,
+        taxId: "29ABCDE1234F1Z5",
+        gstState: "29",
+        gstPriceMode,
+    });
+    const listed = async (
+        profile: Record<string, unknown> | null,
+        gst: Record<string, unknown>,
+    ) => {
+        db.businessProfile!.findUnique!.mockResolvedValue(profile);
+        db.classPack!.findMany!.mockResolvedValue([
+            { ...PACK, gstRate: null, sacCode: null, ...gst },
+        ]);
+        const [view] = await service.listPacks(owner, {});
+        return view!;
+    };
+
+    it("GST is added: a 10-class pack at ₹4,500 is ₹5,310 to pay", async () => {
+        const pack = await listed(registered("ADDED"), {
+            gstRate: decimal("18.00"),
+        });
+        expect(pack.price).toBe("4500.00");
+        expect(pack.gst).toEqual({
+            mode: "ADDED",
+            rate: "18",
+            listCents: 450_000,
+            gstCents: 81_000,
+            payCents: 531_000,
+        });
+    });
+
+    it("the amount to pay is what a sale keeps on the purchase", async () => {
+        const profile = registered("ADDED");
+        const pack = await listed(profile, { gstRate: decimal("18.00") });
+        tx.businessProfile!.findUnique!.mockResolvedValue(profile);
+        const row = { ...PACK, gstRate: decimal("18.00"), sacCode: null };
+        db.classPack!.findFirst!.mockResolvedValue(row);
+        tx.classPack!.findFirst!.mockResolvedValue(row);
+        await service.sell(owner, "pack_1", { contactId: "c_1" });
+        expect(tx.packPurchase!.create!.mock.calls[0]![0].data.price).toBe(
+            "5310.00",
+        );
+        expect(pack.gst?.payCents).toBe(531_000);
+    });
+
+    it("takings are the sum of what was paid, whatever the choice is today", async () => {
+        // Two sold before GST was added (₹4,500 each), one after (₹5,310).
+        db.packPurchase!.findMany!.mockResolvedValue(
+            ["4500", "4500", "5310"].map((price) => ({
+                packId: "pack_1",
+                contactId: "c_1",
+                price,
+                currency: "INR",
+                credits: 10,
+                expiresAt: new Date("2099-01-01T00:00:00Z"),
+                _count: { redemptions: 0 },
+            })),
+        );
+        const added = await listed(registered("ADDED"), {
+            gstRate: decimal("18.00"),
+        });
+        expect(added.takings).toEqual([
+            { currency: "INR", amount: "14310.00" },
+        ]);
+        // Changed back: the same money was taken.
+        const included = await listed(registered("INCLUDED"), {
+            gstRate: decimal("18.00"),
+        });
+        expect(included.takings).toEqual([
+            { currency: "INR", amount: "14310.00" },
+        ]);
+    });
+
+    it("prices include GST: ₹4,500 is both, with the GST inside it", async () => {
+        const pack = await listed(registered("INCLUDED"), {
+            gstRate: decimal("18.00"),
+        });
+        expect(pack.price).toBe("4500.00");
+        expect(pack.gst).toEqual({
+            mode: "INCLUDED",
+            rate: "18",
+            listCents: 450_000,
+            gstCents: 68_644,
+            payCents: 450_000,
+        });
+    });
+
+    it("not registered, or no rate: nothing is said about GST", async () => {
+        const plain = await listed(
+            { gstRegistered: false },
+            { gstRate: decimal("18.00") },
+        );
+        expect(plain.gst).toBeNull();
+        db.businessProfile!.findUnique!.mockClear();
+        const unrated = await listed(registered("ADDED"), {});
+        expect(unrated.gst).toBeNull();
+        expect(unrated.price).toBe("4500.00");
+        // With no rate there is nothing to work out, and nothing is read.
+        expect(db.businessProfile!.findUnique).not.toHaveBeenCalled();
+    });
+});

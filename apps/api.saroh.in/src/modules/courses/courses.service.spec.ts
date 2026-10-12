@@ -51,6 +51,8 @@ jest.mock("@saroh/database", () => {
             contact: { findFirst: jest.fn() },
             service: { findFirst: jest.fn() },
             organizationModule: { findFirst: jest.fn() },
+            // How the business's prices carry GST, for a read's amount to pay.
+            businessProfile: { findUnique: jest.fn() },
             $transaction: jest.fn(
                 (fn: (t: typeof tx) => unknown, _opts?: unknown) => fn(tx),
             ),
@@ -782,5 +784,83 @@ describe("GST on a course enrolment", () => {
         await enrol();
         // ₹8,000 + 12% = ₹8,960.
         expect(enrolled().price).toBe("8960.00");
+    });
+});
+
+// — What the merchant reads of a course's price (12 Oct 2026) ————————
+//
+// One figure, one kind: `price` is the price the business set; `gst` says
+// the GST in or on it and what an enrolment comes to, by the sum `enrol`
+// uses. An enrolment's own `price` is what was charged.
+describe("a course's price as the merchant reads it", () => {
+    const registered = (gstPriceMode: "INCLUDED" | "ADDED") => ({
+        gstRegistered: true,
+        taxId: "29ABCDE1234F1Z5",
+        gstState: "29",
+        gstPriceMode,
+    });
+    const read = async (
+        profile: Record<string, unknown> | null,
+        gst: Record<string, unknown>,
+    ) => {
+        db.businessProfile!.findUnique!.mockResolvedValue(profile);
+        db.course!.findFirst!.mockResolvedValue({ ...COURSE_ROW, ...gst });
+        db.courseEnrollment!.findMany!.mockResolvedValue([]);
+        db.booking!.groupBy!.mockResolvedValue([]);
+        return service.get(owner, "course_1");
+    };
+
+    it("GST is added: ₹8,000 is the price, ₹9,440 the amount to pay", async () => {
+        const course = await read(registered("ADDED"), {
+            gstRate: decimal("18.00"),
+        });
+        expect(course.price).toBe("8000.00");
+        expect(course.gst).toEqual({
+            mode: "ADDED",
+            rate: "18",
+            listCents: 800_000,
+            gstCents: 144_000,
+            payCents: 944_000,
+        });
+    });
+
+    it("prices include GST: ₹8,000 is both, with the GST inside it", async () => {
+        const course = await read(registered("INCLUDED"), {
+            gstRate: decimal("18.00"),
+        });
+        expect(course.price).toBe("8000.00");
+        expect(course.gst).toEqual({
+            mode: "INCLUDED",
+            rate: "18",
+            listCents: 800_000,
+            gstCents: 122_034,
+            payCents: 800_000,
+        });
+    });
+
+    it("not registered, or no rate: nothing is said about GST", async () => {
+        expect(
+            (
+                await read(
+                    { gstRegistered: false },
+                    { gstRate: decimal("18.00") },
+                )
+            ).gst,
+        ).toBeNull();
+        db.businessProfile!.findUnique!.mockClear();
+        const unrated = await read(registered("ADDED"), { gstRate: null });
+        expect(unrated.gst).toBeNull();
+        expect(unrated.price).toBe("8000.00");
+        // With no rate there is nothing to work out, and nothing is read.
+        expect(db.businessProfile!.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("the list says the same of each course", async () => {
+        db.businessProfile!.findUnique!.mockResolvedValue(registered("ADDED"));
+        db.course!.findMany!.mockResolvedValue([
+            { ...COURSE_ROW, gstRate: decimal("18.00") },
+        ]);
+        const [course] = await service.list(owner, {});
+        expect(course!.gst?.payCents).toBe(944_000);
     });
 });

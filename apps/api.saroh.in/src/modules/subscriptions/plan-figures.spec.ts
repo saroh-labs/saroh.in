@@ -59,6 +59,8 @@ describe("a plan's figures", () => {
         expect(f.byPrice).toEqual([
             {
                 price: "1500.00",
+                // No GST on top: what they pay is the price.
+                pay: "1500.00",
                 currency: "INR",
                 interval: "MONTH",
                 count: 12,
@@ -66,6 +68,7 @@ describe("a plan's figures", () => {
             },
             {
                 price: "1200.00",
+                pay: "1200.00",
                 currency: "INR",
                 interval: "MONTH",
                 count: 3,
@@ -102,6 +105,86 @@ describe("a plan's figures", () => {
         expect(f.byPrice).toHaveLength(1);
         expect(f.byPrice[0]!.current).toBe(false);
         expect(f.monthlyFromMembers).toBe("0.00");
+    });
+
+    // 12 Oct 2026: a figure that is money expected is what the member
+    // pays, GST and all; a price the business set stays as typed.
+    describe("where GST is added to the plan's price", () => {
+        const GYM = {
+            price: money("2000"),
+            currency: "INR",
+            interval: "MONTH",
+        };
+        /** 18% on top, rounded to the paisa, as `unitPayCents` does. */
+        const added18 = (minor: number) =>
+            minor + Math.round((minor * 1800) / 10_000);
+
+        it("says what each member pays beside the price they joined at", () => {
+            const f = planFigures(
+                GYM,
+                [
+                    group({ price: money("2000"), count: 4 }),
+                    group({ price: money("1500"), count: 1 }),
+                ],
+                added18,
+            );
+            expect(f.byPrice).toEqual([
+                {
+                    // ₹2,000 + ₹360 is ₹2,360 a month.
+                    price: "2000.00",
+                    pay: "2360.00",
+                    currency: "INR",
+                    interval: "MONTH",
+                    count: 4,
+                    current: true,
+                },
+                {
+                    // ₹1,500 + ₹270 is ₹1,770.
+                    price: "1500.00",
+                    pay: "1770.00",
+                    currency: "INR",
+                    interval: "MONTH",
+                    count: 1,
+                    current: false,
+                },
+            ]);
+        });
+
+        it("sums a month from members from what they pay, not what was typed", () => {
+            const f = planFigures(
+                GYM,
+                [
+                    group({ price: money("2000"), count: 4 }),
+                    group({ price: money("1500"), count: 1 }),
+                    group({ price: money("2000"), status: "PAUSED", count: 2 }),
+                ],
+                added18,
+            );
+            // 4 × 2,360 + 1 × 1,770; the paused two bring nothing in.
+            expect(f.monthlyFromMembers).toBe("11210.00");
+            // The plan's own price as a month's worth stays as typed.
+            expect(f.monthly).toBe("2000.00");
+        });
+
+        it("takes a month's worth of what a yearly member pays", () => {
+            const f = planFigures(
+                { price: money("12000"), currency: "INR", interval: "YEAR" },
+                [group({ price: money("12000"), interval: "YEAR", count: 1 })],
+                added18,
+            );
+            // ₹12,000 + ₹2,160 is ₹14,160 a year: ₹1,180 a month.
+            expect(f.byPrice[0]!.pay).toBe("14160.00");
+            expect(f.monthlyFromMembers).toBe("1180.00");
+        });
+
+        it("still matches the current price on what was typed", () => {
+            const f = planFigures(
+                GYM,
+                [group({ price: money("2000"), count: 1 })],
+                added18,
+            );
+            expect(f.byPrice[0]!.current).toBe(true);
+        });
     });
 
     it("is empty for a plan nobody is on", () => {

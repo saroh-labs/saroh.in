@@ -91,7 +91,13 @@ export interface DiaryService {
     timezone: string;
     capacity: number;
     durationMinutes: number;
-    /** Money only — absent for a viewer who reads no money. */
+    /**
+     * What this booking was made at, GST and all: the amount its snapshot
+     * froze (`snapshot.service.priceCents`), which is what the desk takes
+     * and the day's booked money adds up. Only a booking from before
+     * snapshots falls back to the service's price as typed. Money only —
+     * absent for a viewer who reads no money.
+     */
     priceCents?: number | null;
     currency?: string | null;
 }
@@ -184,13 +190,23 @@ export function isClass(service: { capacity: number }): boolean {
 
 function serviceView(row: DiaryRow, money: boolean): DiaryService {
     const s = row.service;
+    // The price the booking was made at is money expected, so it is the
+    // amount to pay its snapshot froze (12 Oct 2026): never the service's
+    // price as typed today, which leaves the GST out where GST is added
+    // and moves when the price is edited.
+    const made = bookingPrice(row.snapshot);
     return {
         id: s.id,
         name: s.name,
         timezone: s.timezone,
         capacity: s.capacity,
         durationMinutes: s.durationMinutes,
-        ...(money ? { priceCents: s.priceCents, currency: s.currency } : {}),
+        ...(money
+            ? {
+                  priceCents: made.priceCents ?? s.priceCents,
+                  currency: made.currency ?? s.currency,
+              }
+            : {}),
     };
 }
 

@@ -17,13 +17,22 @@ import {
 } from "../bookings/booking-access";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { assertBusinessDetails } from "../invoices/business-details";
-import type { GstPriceMode } from "../invoices/gst-price";
+import type {
+    GstOnPrice,
+    GstPriceMode,
+    PriceTerms,
+} from "../invoices/gst-price";
 import { isGstPriceMode } from "../invoices/gst-price";
 import { assertSaleRated } from "../invoices/gst-rate-required";
 import { InvoicesService } from "../invoices/invoices.service";
 import { paymentsOn } from "../invoices/payments-on";
 import { loadPriceTerms } from "../invoices/price-terms";
-import { hasRate, saleChargeInTx } from "../invoices/sale-price";
+import {
+    hasRate,
+    priceTermsFor,
+    saleCharge,
+    saleChargeInTx,
+} from "../invoices/sale-price";
 import { contactName } from "../invoices/serialize";
 import { fromCents, toCents } from "../invoices/totals";
 import { allows } from "../organizations/organization-policy";
@@ -173,6 +182,14 @@ export interface PackView {
     gstRate: string | null;
     sacCode: string | null;
     gstPriceMode: GstPriceMode | null;
+    /**
+     * The GST on its price as it is sold today: the typed price, the GST in
+     * or on it and the amount to pay. Null when nothing is said about GST
+     * (not registered, no rate, exempt): the price is the amount to pay.
+     * `takings` and every purchase's `price` are amounts paid, so the app
+     * compares them with this amount to pay, never with the typed price.
+     */
+    gst: GstOnPrice | null;
 }
 
 /** One pack with Pack Detail's Overview figures (E13). */
@@ -271,11 +288,16 @@ export class ClassPacksService {
             orderBy: [{ status: "asc" }, { createdAt: "asc" }],
             include: PACK_INCLUDE,
         });
-        const holders = await packCounts(
-            ctx.organizationId,
-            rows.map((r) => r.id),
-        );
-        return rows.map((r) => this.packView(r, holders.get(r.id)));
+        const [holders, terms] = await Promise.all([
+            packCounts(
+                ctx.organizationId,
+                rows.map((r) => r.id),
+            ),
+            // How the business's prices carry GST; read only when a pack
+            // has a rate.
+            priceTermsFor(prisma, ctx.organizationId, rows),
+        ]);
+        return rows.map((r) => this.packView(r, holders.get(r.id), terms));
     }
 
     /**
@@ -994,8 +1016,11 @@ export class ClassPacksService {
             include: PACK_INCLUDE,
         });
         if (!row) notFound("Class pack");
-        const holders = await packCounts(organizationId, [id]);
-        return this.packView(row, holders.get(id));
+        const [holders, terms] = await Promise.all([
+            packCounts(organizationId, [id]),
+            priceTermsFor(prisma, organizationId, [row]),
+        ]);
+        return this.packView(row, holders.get(id), terms);
     }
 
     /** The pack is this business's, or it is a 404. */
@@ -1043,6 +1068,7 @@ export class ClassPacksService {
             gstPriceMode?: string | null;
         },
         holders: PackCounts | undefined,
+        terms: PriceTerms,
     ): PackView {
         const pending =
             row.status !== PACK_DRAFT &&
@@ -1075,6 +1101,8 @@ export class ClassPacksService {
             gstPriceMode: isGstPriceMode(row.gstPriceMode)
                 ? row.gstPriceMode
                 : null,
+            // The sum a sale uses (`sell`, `sale-price.ts`).
+            gst: saleCharge(toCents(toMoneyString(row.price)), row, terms).gst,
         };
     }
 

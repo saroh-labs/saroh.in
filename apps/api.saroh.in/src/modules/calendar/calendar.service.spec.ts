@@ -1167,6 +1167,59 @@ describe("CalendarService.month — money in, out and due (E19)", () => {
         ]);
     });
 
+    // 12 Oct 2026: a renewal to come is money expected, so it is what its
+    // invoice will be written for, GST and all, like every other "due".
+    describe("a renewal still to come, on a plan with a GST rate", () => {
+        const dueOn = async (
+            profile: Record<string, unknown>,
+            plan: Record<string, unknown>,
+        ) => {
+            const { service, db } = build(["PAYMENTS"], {
+                subs: [
+                    {
+                        ...SUBSCRIBER,
+                        price: "2000",
+                        plan: { name: "Gym monthly", ...plan },
+                        currentPeriodEnd: new Date("2026-09-25T18:30:00Z"),
+                    },
+                ],
+            });
+            db.businessProfile.findUnique.mockResolvedValue({
+                timezone: IST,
+                ...profile,
+            });
+            const res = await service.read(OWNER, monthRange("2026-09"), NOW);
+            return dayOfMonth(res, "2026-09-26").money;
+        };
+        const registered = (gstPriceMode: string) => ({
+            gstRegistered: true,
+            taxId: "29ABCDE1234F1Z5",
+            gstState: "29",
+            gstPriceMode,
+        });
+
+        it("GST is added: ₹2,000 + ₹360 is ₹2,360 due", async () => {
+            expect(
+                await dueOn(registered("ADDED"), { gstRate: "18.00" }),
+            ).toEqual([expect.objectContaining({ due: 236000 })]);
+        });
+
+        it("prices include GST: ₹2,000 due, as before", async () => {
+            expect(
+                await dueOn(registered("INCLUDED"), { gstRate: "18.00" }),
+            ).toEqual([expect.objectContaining({ due: 200000 })]);
+        });
+
+        it("not registered, or no rate on the plan: ₹2,000 due, as before", async () => {
+            expect(
+                await dueOn({ gstRegistered: false }, { gstRate: "18.00" }),
+            ).toEqual([expect.objectContaining({ due: 200000 })]);
+            expect(await dueOn(registered("ADDED"), {})).toEqual([
+                expect.objectContaining({ due: 200000 }),
+            ]);
+        });
+    });
+
     it("a booking already past, one with a pay link open, and a live hold have no Due", async () => {
         const base = {
             status: "CONFIRMED",

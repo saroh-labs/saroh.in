@@ -66,6 +66,16 @@ const README = (businessName: string, made: Date) =>
         "Dates and times are in UTC. Amounts are in the currency named on the same row:",
         "a column ending in Cents is in the smallest unit (paise), the others in rupees.",
         "Credit notes are in invoices-and-credit-notes.csv, with kind CREDIT_NOTE.",
+        // Which price a "price" column is (12 Oct 2026): the headers are
+        // the same word in every file, so the file says which it holds.
+        "",
+        "A price in services.csv, membership-plans.csv, class-packs.csv and courses.csv is",
+        "the price you set, as you typed it. So is the price in memberships.csv: the price",
+        "that member joined at. If GST is added to your prices, what a customer pays is that",
+        "price plus GST (gstRate and gstPriceMode are on the same row, where one is set).",
+        "A price in order-lines.csv, class-pack-purchases.csv and course-enrolments.csv, and",
+        "every total in orders.csv, invoices-and-credit-notes.csv and payments.csv, is what",
+        "the customer was charged, GST and all.",
         "Text that a spreadsheet would read as a formula starts with ' so it stays text.",
         "",
         "media/ holds the photos and videos you uploaded. media.csv lists every one,",

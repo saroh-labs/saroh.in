@@ -1749,6 +1749,9 @@ describe("changing plan from the next renewal", () => {
             id: "plan_2",
             name: "Weekly box",
             price: "300.00",
+            // No rate on the plan: what a period comes to is the price.
+            pay: "300.00",
+            gst: null,
             currency: "INR",
             interval: "MONTH",
             from: "2026-10-01T00:00:00.000Z",
@@ -2853,6 +2856,187 @@ describe("GST on a plan", () => {
     const renewing = (gst: Record<string, unknown> = {}) =>
         tx.customerSubscription!.findUnique!.mockResolvedValue(member(gst));
     const line = () => issueInTx.mock.calls[0]![2].lines[0];
+
+    // One figure, one kind: `price` is the price the business set, `pay`
+    // what a period comes to, GST and all, by the sum a renewal uses.
+    describe("what the merchant reads", () => {
+        const reading = (gst: Record<string, unknown> = {}) =>
+            db.customerSubscription!.findFirst!.mockResolvedValue(member(gst));
+
+        it("GST is added: a ₹2,000 member pays ₹2,360, and the read says both", async () => {
+            business(registered("ADDED"));
+            reading({ gstRate: decimal("18.00") });
+            const view = await service.get(owner, "sub_1");
+            expect(view.price).toBe("2000.00");
+            expect(view.pay).toBe("2360.00");
+            expect(view.gst).toEqual({
+                mode: "ADDED",
+                rate: "18",
+                listCents: 200_000,
+                gstCents: 36_000,
+                payCents: 236_000,
+            });
+        });
+
+        it("the amount is the one the renewal's invoice is written for", async () => {
+            business(registered("ADDED"));
+            reading({ gstRate: decimal("18.00") });
+            renewing({ gstRate: decimal("18.00") });
+            const view = await service.get(owner, "sub_1");
+            await service.renewOne("sub_1", now);
+            expect(line().unitPrice).toBe(view.pay);
+        });
+
+        it("prices include GST: they pay the ₹2,000 they always did", async () => {
+            business(registered("INCLUDED"));
+            reading({ gstRate: decimal("18.00") });
+            const view = await service.get(owner, "sub_1");
+            expect(view.price).toBe("2000.00");
+            expect(view.pay).toBe("2000.00");
+            expect(view.gst).toEqual({
+                mode: "INCLUDED",
+                rate: "18",
+                listCents: 200_000,
+                gstCents: 30_508,
+                payCents: 200_000,
+            });
+        });
+
+        it("the plan's own way wins over the business's", async () => {
+            business(registered("INCLUDED"));
+            reading({ gstRate: decimal("18.00"), gstPriceMode: "ADDED" });
+            expect((await service.get(owner, "sub_1")).pay).toBe("2360.00");
+        });
+
+        it("not registered: ₹2,000, whatever the plan's rate, and nothing about GST", async () => {
+            business({ timezone: "UTC", gstRegistered: false });
+            reading({ gstRate: decimal("18.00"), gstPriceMode: "ADDED" });
+            const view = await service.get(owner, "sub_1");
+            expect(view.pay).toBe("2000.00");
+            expect(view.gst).toBeNull();
+        });
+
+        it("no rate on the plan: ₹2,000, and the business's terms are not read", async () => {
+            business(registered("ADDED"));
+            reading();
+            db.businessProfile!.findUnique!.mockClear();
+            const view = await service.get(owner, "sub_1");
+            expect(view.pay).toBe("2000.00");
+            expect(view.gst).toBeNull();
+            expect(db.businessProfile!.findUnique).not.toHaveBeenCalled();
+        });
+
+        it("a booked plan change says what the new plan comes to", async () => {
+            business(registered("ADDED"));
+            db.customerSubscription!.findFirst!.mockResolvedValue({
+                ...member({ gstRate: decimal("18.00") }),
+                pendingPlanId: "plan_2",
+                pendingPlan: {
+                    id: "plan_2",
+                    name: "Gym yearly",
+                    price: decimal("20000"),
+                    currency: "INR",
+                    interval: "YEAR",
+                    classesPerMonth: null,
+                    gstRate: decimal("18.00"),
+                    sacCode: null,
+                    gstPriceMode: null,
+                },
+            });
+            const view = await service.get(owner, "sub_1");
+            // ₹20,000 + ₹3,600.
+            expect(view.pendingPlan).toMatchObject({
+                price: "20000.00",
+                pay: "23600.00",
+            });
+        });
+
+        it("a plan's figures are what its members pay, and its price says its GST", async () => {
+            business(registered("ADDED"));
+            db.subscriptionPlan!.findMany!.mockResolvedValue([
+                {
+                    ...PLAN,
+                    price: decimal("2000"),
+                    classesPerMonth: null,
+                    gstRate: decimal("18.00"),
+                    sacCode: null,
+                    gstPriceMode: null,
+                },
+            ]);
+            db.customerSubscription!.groupBy!.mockResolvedValue([
+                {
+                    planId: "plan_1",
+                    price: decimal("2000"),
+                    currency: "INR",
+                    interval: "MONTH",
+                    status: "ACTIVE",
+                    _count: { _all: 3 },
+                },
+                {
+                    planId: "plan_1",
+                    price: decimal("1500"),
+                    currency: "INR",
+                    interval: "MONTH",
+                    status: "ACTIVE",
+                    _count: { _all: 1 },
+                },
+            ]);
+            const plan = await service.getPlan(owner, "plan_1");
+            expect(plan.price).toBe("2000.00");
+            expect(plan.monthly).toBe("2000.00");
+            expect(plan.gst).toEqual({
+                mode: "ADDED",
+                rate: "18",
+                listCents: 200_000,
+                gstCents: 36_000,
+                payCents: 236_000,
+            });
+            expect(plan.byPrice).toEqual([
+                expect.objectContaining({ price: "2000.00", pay: "2360.00" }),
+                expect.objectContaining({ price: "1500.00", pay: "1770.00" }),
+            ]);
+            // 3 × 2,360 + 1 × 1,770.
+            expect(plan.monthlyFromMembers).toBe("8850.00");
+        });
+
+        it("a plan's figures under includes GST, and unregistered, are the typed sums", async () => {
+            const rows = () => {
+                db.subscriptionPlan!.findMany!.mockResolvedValue([
+                    {
+                        ...PLAN,
+                        price: decimal("2000"),
+                        classesPerMonth: null,
+                        gstRate: decimal("18.00"),
+                        sacCode: null,
+                        gstPriceMode: null,
+                    },
+                ]);
+                db.customerSubscription!.groupBy!.mockResolvedValue([
+                    {
+                        planId: "plan_1",
+                        price: decimal("2000"),
+                        currency: "INR",
+                        interval: "MONTH",
+                        status: "ACTIVE",
+                        _count: { _all: 3 },
+                    },
+                ]);
+            };
+            business(registered("INCLUDED"));
+            rows();
+            const included = await service.getPlan(owner, "plan_1");
+            expect(included.byPrice[0]).toMatchObject({ pay: "2000.00" });
+            expect(included.monthlyFromMembers).toBe("6000.00");
+            expect(included.gst?.mode).toBe("INCLUDED");
+
+            business({ timezone: "UTC", gstRegistered: false });
+            rows();
+            const plain = await service.getPlan(owner, "plan_1");
+            expect(plain.byPrice[0]).toMatchObject({ pay: "2000.00" });
+            expect(plain.monthlyFromMembers).toBe("6000.00");
+            expect(plain.gst).toBeNull();
+        });
+    });
 
     describe("a renewal", () => {
         it("with no rate on the plan is written exactly as before, to the paisa, and reads nothing more", async () => {

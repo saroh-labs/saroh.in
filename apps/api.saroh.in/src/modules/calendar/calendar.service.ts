@@ -18,6 +18,11 @@ import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { isPastDue } from "../invoices/invoice-state";
+import {
+    priceTermsFor,
+    RATED_SALE_SELECT,
+    saleCharge,
+} from "../invoices/sale-price";
 import { realOrderWhere } from "../orders/open-orders";
 import { orderLocationWhere } from "../orders/order-location";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -908,7 +913,8 @@ export class CalendarService {
                     id: true,
                     price: true,
                     currency: true,
-                    plan: { select: { name: true } },
+                    // Its GST as it stands, for what a renewal comes to.
+                    plan: { select: { name: true, ...RATED_SALE_SELECT } },
                     contact: {
                         select: {
                             firstName: true,
@@ -1034,10 +1040,20 @@ export class CalendarService {
             }
         }
 
+        // A renewal still to come is money expected, so it is the amount
+        // its invoice will be written for, GST and all: the typed price
+        // they keep and the plan's GST as it stands today (`sale-price.ts`).
+        // Read only when a plan here has a rate.
+        const terms = await priceTermsFor(
+            this.db,
+            organizationId,
+            subs.map((s) => s.plan),
+        );
         for (const s of subs) {
             const who = personName(s.contact) ?? "Customer";
+            const charge = saleCharge(toMinor(s.price), s.plan, terms);
             const price = {
-                amount: toMoneyString(s.price),
+                amount: charge.pay,
                 currency: s.currency,
             };
             for (const at of upcomingRenewals(s, window.start, window.end)) {
@@ -1059,7 +1075,7 @@ export class CalendarService {
                     owes: {
                         kind: "renewal_due",
                         currency: s.currency,
-                        cents: toMinor(s.price),
+                        cents: charge.payCents,
                     },
                 });
             }
