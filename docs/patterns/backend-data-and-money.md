@@ -283,6 +283,16 @@
   `gstPriceMode`), null when no GST was charged. Never recompute a sold
   line's price from the product, and never read the business's choice to
   explain a line already sold.
+- **An MRP includes its taxes** (12 Oct 2026: "GST is part of MRP").
+  `Product.mrp` and `ProductVariant.mrp` (null: the product's) are compared
+  with the amount to pay for one, GST and all, never with the typed
+  `price`: under "GST is added" a ₹1,000 price at 18% needs an MRP of
+  ₹1,180 or more. The comparison is `products/product-rules.ts` and nowhere
+  else; every write of a price, an MRP, a rate or a price mode on a product
+  or a variant goes through it, and so does the business's own switch
+  (`backend-billing-and-classes.md` → GST is part of MRP). A saving is the
+  MRP less the amount to pay, served by the API (`saving`) and null when
+  there is none.
 - **Plans, class packs and courses** (12 Oct 2026). `SubscriptionPlan.price`,
   `ClassPack.price` and `Course.price` are what the business typed, each
   with its own `gstRate`, `sacCode` and `gstPriceMode`. A
