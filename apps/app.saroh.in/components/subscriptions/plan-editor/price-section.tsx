@@ -4,6 +4,7 @@ import { Field, FieldError } from "@saroh/ui/field";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { useId, useState } from "react";
 
 import type { EditorFields } from "@/components/editor-shell/editor-shell";
@@ -36,8 +37,18 @@ import {
 export const CHIP = "";
 
 /**
+ * Under the price of a plan that has been published (UX audit, 12 Oct
+ * 2026): it stood above the Plans list, and belongs where a price is
+ * changed. What a GST change does to the members on the plan is the notice
+ * under the GST fields, so it is not said here.
+ */
+export const PRICE_KEPT =
+    "A new price is for people who join next. Everyone already on the plan keeps the price they joined at.";
+
+/**
  * Price and billing (D7): the price, then how often — month and year
- * first, week and quarter behind More (default 29) — and how it is paid,
+ * first, week and quarter behind "Another interval" (default 29) — and how
+ * it is paid,
  * which never promises autopay the business can't take (DEC-038): it says
  * so only when the business offers it (D14). A price above what the
  * autopay of members switching to the plan covers warns that they will need
@@ -70,7 +81,10 @@ export function PriceSection({
     /** What switchers' autopay covers (D13), from the plan's read. */
     autopayLimits?: readonly AutopayLimit[];
 }) {
-    const { values, set, errors, disabled } = fields;
+    const { values, set, errors, notes, leave, record, disabled } = fields;
+    // Said where a price is changed, of a plan people may already be on: a
+    // draft has nobody on it yet.
+    const priceHint = record?.published ? PRICE_KEPT : undefined;
     const ids = {
         price: useId(),
         priceErr: useId(),
@@ -96,12 +110,24 @@ export function PriceSection({
           })
         : [];
     const describedBy =
-        [errors.price ? ids.priceErr : "", limitWarning ? ids.limit : ""]
+        [
+            // `Field` names its help line after the control it was handed.
+            priceHint ? `${ids.price}-note` : "",
+            errors.price ? ids.priceErr : "",
+            limitWarning ? ids.limit : "",
+        ]
             .filter(Boolean)
             .join(" ") || undefined;
     return (
         <Section title="Price and billing">
-            <Field label="Price" htmlFor={ids.price} className="space-y-[5px]">
+            <Field
+                // The help line is Saroh's own words, never a record's.
+                holdsData={false}
+                label="Price"
+                htmlFor={ids.price}
+                hint={priceHint}
+                className="space-y-[5px]"
+            >
                 <div className="w-[140px] max-w-full">
                     <MoneyInput
                         id={ids.price}
@@ -130,8 +156,12 @@ export function PriceSection({
                     <GstFields
                         draft={values}
                         set={set}
-                        // The shell says a problem as soon as it is there.
+                        // The shell says a problem as soon as it is there,
+                        // but for one the plan was opened with: that is a
+                        // note until the field is left or Publish pressed.
                         problem={(field) => errors[field] ?? null}
+                        note={(field) => notes[field]}
+                        leave={leave}
                         asked
                         canEdit={!disabled}
                         businessPriceMode={gst.priceMode}
@@ -165,33 +195,35 @@ export function PriceSection({
             <p id={ids.every} className={cn(LABEL, "mt-3.5")}>
                 Charged
             </p>
-            <div
-                role="radiogroup"
-                aria-labelledby={ids.every}
-                className="mt-1.5 flex flex-wrap gap-1.5"
-            >
-                {shown.map((k) => (
-                    <Chip
-                        key={k}
-                        on={values.interval === k}
-                        className={CHIP}
-                        onClick={() => set({ interval: k })}
-                    >
-                        {INTERVAL_LABEL[k]}
-                    </Chip>
-                ))}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <div
+                    role="radiogroup"
+                    aria-labelledby={ids.every}
+                    className="flex flex-wrap gap-1.5"
+                >
+                    {shown.map((k) => (
+                        <Chip
+                            key={k}
+                            on={values.interval === k}
+                            className={CHIP}
+                            onClick={() => set({ interval: k })}
+                        >
+                            {INTERVAL_LABEL[k]}
+                        </Chip>
+                    ))}
+                </div>
+                {/* Not one of the choices: it shows two more of them (week
+                    and quarter), so it is a link beside the group and not a
+                    chip in it. A dashed, grey chip read as a choice that
+                    was off. */}
                 {moreOpen ? null : (
-                    <button
-                        type="button"
+                    <TextLink
                         aria-expanded={false}
                         onClick={() => setMore(true)}
-                        className={cn(
-                            CHIP,
-                            "rounded-full border border-dashed border-border bg-card font-medium text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-muted disabled:cursor-not-allowed coarse:h-11",
-                        )}
+                        className="text-[13px] coarse:inline-flex coarse:min-h-11 coarse:items-center"
                     >
-                        More…
-                    </button>
+                        Another interval
+                    </TextLink>
                 )}
             </div>
             {note ? <p className={HELP}>{note}</p> : null}

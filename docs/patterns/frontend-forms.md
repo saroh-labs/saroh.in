@@ -77,6 +77,18 @@ Editor's rules (problems, the save blocker, "When you publish" lines) are pure
 in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
 typed form into the API's values and back.
 
+**Current** — **An editor never opens in an error state over a rule newer
+than the record** (UX audit, 12 Oct). A plan or pack published before a GST
+rate was asked for opens with a plain note beside the field ("This plan has
+no GST rate yet. Choose one before you publish again."): no red field, no
+alert, no count beside Publish. It becomes the error it always was once the
+field is left or Publish is pressed, with the keyboard on the field, and
+Publish stays refused throughout. A rule gives its problem a `note`
+(`EditorProblem` in `lib/editor-shell/types.ts`); the shell holds back only
+what a published record was opened with (`heldAtOpen`, `sayProblems` in
+`state.ts`) and hands the sections `notes` and `leave`. A draft's problems
+and a new record's are said as before. Give any new publish rule a `note`.
+
 **Current** — **One sheet, one dialog, one confirm** (UX audit, 10 Oct).
 Every overlay in `app.saroh.in` is one of three components, by the size of
 the task. Never write a `SheetContent`, a `DialogContent` or an

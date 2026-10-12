@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { RecordFacts, SaveEvent, SaveState } from "./state";
 import {
+    heldAtOpen,
     initialSave,
     isSettled,
     joinAnd,
     leaveCopy,
     publishState,
     saveReducer,
+    sayProblems,
     shellActions,
     statePill,
     statusLine,
@@ -416,6 +418,88 @@ describe("the header's actions", () => {
 
     it("turns Publish off while another action is out", () => {
         expect(act(saved, DRAFT, [], true).publishOn).toBe(false);
+    });
+});
+
+describe("a problem the record was opened with", () => {
+    const rate = {
+        field: "gstRate",
+        message: "Choose a GST rate",
+        note: "This plan has no GST rate yet. Choose one before you publish again.",
+    };
+    const price = { field: "price", message: "Add the price" };
+    const none: ReadonlySet<string> = new Set();
+
+    it("holds only what a published record opened with, and only what has a note", () => {
+        expect(heldAtOpen({ published: {} }, [price, rate])).toEqual([
+            "gstRate",
+        ]);
+        // A draft's problems are its to-do list, and a new page has none.
+        expect(heldAtOpen({ published: null }, [price, rate])).toEqual([]);
+        expect(heldAtOpen(null, [rate])).toEqual([]);
+    });
+
+    it("says a held one as a note, and the rest as problems", () => {
+        const said = sayProblems({
+            problems: [price, rate],
+            held: ["gstRate"],
+            left: none,
+            tried: false,
+        });
+        expect(said.shown).toEqual([price]);
+        expect(said.notes).toEqual({ gstRate: rate.note });
+    });
+
+    it("says it as a problem once its field has been left", () => {
+        const said = sayProblems({
+            problems: [rate],
+            held: ["gstRate"],
+            left: new Set(["gstRate"]),
+            tried: false,
+        });
+        expect(said.shown).toEqual([rate]);
+        expect(said.notes).toEqual({});
+    });
+
+    it("says it as a problem once Publish has been pressed", () => {
+        const said = sayProblems({
+            problems: [rate],
+            held: ["gstRate"],
+            left: none,
+            tried: true,
+        });
+        expect(said.shown).toEqual([rate]);
+        expect(said.notes).toEqual({});
+    });
+
+    it("never holds one that arrived after the page opened", () => {
+        // A free plan given a price in this visit: the rate is asked now.
+        const said = sayProblems({
+            problems: [rate],
+            held: [],
+            left: none,
+            tried: false,
+        });
+        expect(said.shown).toEqual([rate]);
+        expect(said.notes).toEqual({});
+    });
+
+    it("keeps Publish on and gives no count while the only problem is held", () => {
+        const { shown } = sayProblems({
+            problems: [rate],
+            held: ["gstRate"],
+            left: none,
+            tried: false,
+        });
+        const save = saveReducer(initialSave(4), { type: "edit" });
+        const actions = shellActions({
+            save,
+            record: { ...LIVE, hasPendingChanges: true },
+            problems: shown,
+            busy: false,
+        });
+        expect(actions.publishOn).toBe(true);
+        expect(actions.publishWhy).toBeNull();
     });
 });
 

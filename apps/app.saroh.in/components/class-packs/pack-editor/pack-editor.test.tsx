@@ -89,6 +89,9 @@ vi.mock("@saroh/ui/option-select", () => ({
 
 import { PackEditor } from "@/components/class-packs/pack-editor/pack-editor";
 
+// The first test draws the whole editor, and its imports with it.
+vi.setConfig({ testTimeout: 20_000 });
+
 const SERVICES: PackServiceOption[] = [
     {
         id: "hatha",
@@ -192,6 +195,13 @@ function render(
 }
 
 const text = () => host.textContent;
+
+/** The keyboard leaves a field, as Tab does. */
+function leave(el: HTMLElement) {
+    act(() => {
+        el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+}
 
 function input(label: string): HTMLInputElement {
     const el = Array.from(host.querySelectorAll("label")).find((l) =>
@@ -471,14 +481,93 @@ describe("a pack's GST (12 Oct 2026)", () => {
         expect(text()).toContain("The rate added on top of the price.");
     });
 
-    it("stops Publish for a priced pack with no rate, beside the field, until one is chosen", async () => {
+    const NO_RATE_NOTE =
+        "This pack has no GST rate yet. Choose one before you publish again.";
+    const RATE_COUNT =
+        "1 thing to fix before publishing: choose a GST rate. Pick 0% if it's exempt or nil-rated.";
+    /** A pack on sale with an edit waiting, so Publish changes can be pressed. */
+    const WAITING = rec({
+        status: "ACTIVE",
+        revision: 4,
+        hasPendingChanges: true,
+        published: TEN,
+        canDelete: false,
+        values: { ...TEN, price: "5000" },
+    });
+
+    it("opens a pack on sale that nobody has touched with a plain note, not an error", () => {
         render(LIVE, 0, undefined, ASKED);
+        // The rule is newer than the pack: said beside the field, in ink.
+        const note = Array.from(host.querySelectorAll("p")).find(
+            (p) => p.textContent === NO_RATE_NOTE,
+        );
+        expect(note?.getAttribute("data-slot")).toBe("field-hint");
+        expect(
+            select("GST rate").getAttribute("aria-describedby")?.split(" "),
+        ).toContain(note?.id);
+        // No red field, no alert and no count beside Publish.
+        expect(select("GST rate").getAttribute("aria-invalid")).not.toBe(
+            "true",
+        );
+        expect(host.querySelector("[data-invalid]")).toBeNull();
+        expect(host.querySelector("[role=alert]")).toBeNull();
+        expect(text()).not.toContain("to fix before publishing");
+        expect(text()).not.toContain("Choose a GST rate");
+        expect(text()).toContain(
+            "Nothing to publish yet. Edits appear here as a draft first.",
+        );
+        expect(button("Publish changes").disabled).toBe(true);
+    });
+
+    it("says it as an error once the rate box is left with nothing chosen", () => {
+        render(LIVE, 0, undefined, ASKED);
+        leave(select("GST rate"));
+        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(host.querySelector("[role=alert]")?.textContent).toBe(
+            "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
+        );
+        expect(text()).toContain(RATE_COUNT);
+        expect(text()).not.toContain(NO_RATE_NOTE);
+    });
+
+    it("says a draft's missing rate at once when it is opened: it was never published", () => {
+        render(rec(), 0, undefined, ASKED);
+        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(text()).toContain(RATE_COUNT);
+        expect(text()).not.toContain("has no GST rate yet");
+        expect(button("Publish").disabled).toBe(true);
+    });
+
+    it("says a new pack's missing rate at once, as before", () => {
+        actions.createPackDraft.mockResolvedValue(ok(rec()));
+        render(null, 0, undefined, ASKED);
+        // Nothing typed: nothing is wrong yet, and there is no note.
+        expect(host.querySelector("[role=alert]")).toBeNull();
+        expect(text()).not.toContain("has no GST rate yet");
+
+        type(input("Name"), "Ten classes");
+        type(input("Price"), "4500");
+        expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
+        expect(text()).not.toContain("has no GST rate yet");
+    });
+
+    it("says the missing rate as an error once Publish is pressed, and goes to it, until one is chosen", async () => {
+        render(WAITING, 0, undefined, ASKED);
+        // Before anything is pressed: the note, and a Publish to press.
+        expect(text()).toContain(NO_RATE_NOTE);
+        expect(text()).not.toContain("to fix before publishing");
+        expect(button("Publish changes").disabled).toBe(false);
+
+        click(button("Publish changes"));
+        await wait(20);
+        // Nothing is sent: the pack can't be published without a rate.
+        expect(actions.publishPack).not.toHaveBeenCalled();
         expect(select("GST rate").getAttribute("aria-invalid")).toBe("true");
         expect(button("Publish changes").disabled).toBe(true);
-        expect(text()).toContain(
-            "1 thing to fix before publishing: choose a GST rate. Pick 0% if it's exempt or nil-rated.",
-        );
+        expect(text()).toContain(RATE_COUNT);
         expect(text()).not.toContain("nil-rated..");
+        expect(text()).not.toContain(NO_RATE_NOTE);
+        expect(document.activeElement).toBe(select("GST rate"));
 
         actions.savePackDraft.mockResolvedValue(
             ok(
@@ -488,7 +577,7 @@ describe("a pack's GST (12 Oct 2026)", () => {
                     hasPendingChanges: true,
                     published: TEN,
                     canDelete: false,
-                    values: { ...TEN, gstRate: "18" },
+                    values: { ...TEN, price: "5000", gstRate: "18" },
                 }),
             ),
         );

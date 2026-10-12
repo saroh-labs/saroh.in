@@ -59,6 +59,16 @@ export function shellProblem(message: string): string {
     return message.replace(/\.$/, "");
 }
 
+/**
+ * The missing rate of something already published, said plainly beside the
+ * field when its editor opens: the rule (12 Oct 2026) is newer than the
+ * plan or pack, so it is not an error until the person has acted
+ * (`EditorProblem.note`).
+ */
+export function rateMissingNote(noun: "plan" | "pack"): string {
+    return `This ${noun} has no GST rate yet. Choose one before you publish again.`;
+}
+
 /** A typed SAC code with its spaces gone. */
 export function tidySac(typed: string | null | undefined): string {
     return (typed ?? "").replace(/\s+/g, "");

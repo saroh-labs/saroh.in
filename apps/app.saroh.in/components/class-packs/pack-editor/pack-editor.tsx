@@ -140,7 +140,7 @@ export function PackEditor({
                 </>
             )}
         >
-            {({ values, set, errors, record, disabled }) => {
+            {({ values, set, errors, notes, leave, record, disabled }) => {
                 const live = record !== null && record.status !== "DRAFT";
                 return (
                     <>
@@ -160,6 +160,8 @@ export function PackEditor({
                             services={services}
                             gst={gst}
                             disabled={disabled}
+                            notes={notes}
+                            leave={leave}
                         />
                         <ServicesPicker
                             kind={values.kind}

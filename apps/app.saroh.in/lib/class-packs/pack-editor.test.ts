@@ -376,6 +376,9 @@ describe("a pack's GST (12 Oct 2026)", () => {
             field: "gstRate",
             // The shell ends the sentence itself, as it does "Add the price".
             message: "Choose a GST rate. Pick 0% if it's exempt or nil-rated",
+            // What a published pack opened without one says instead, until
+            // the field is left or Publish is pressed.
+            note: "This pack has no GST rate yet. Choose one before you publish again.",
         });
         expect(fields({ ...TEN, gstRate: "0" }, asked)).toEqual([]);
         expect(fields({ ...TEN, gstRate: "18" }, asked)).toEqual([]);
