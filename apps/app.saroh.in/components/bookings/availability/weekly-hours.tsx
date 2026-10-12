@@ -1,16 +1,18 @@
 "use client";
 
+import { CheckRow } from "@/components/shared/check-row";
 import { formatClock, formatClockRange } from "@/lib/format/datetime";
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { Switch } from "@saroh/ui/switch";
-import { X } from "lucide-react";
+import { Copy, X } from "lucide-react";
 import { useState } from "react";
 
 import type { KeptBooking } from "@/lib/services/availability-rules";
 import {
+    copyDay,
     dayRanges,
     outsideHours,
     rangeRefusal,
@@ -34,9 +36,10 @@ const sameRange = (
  * as a chip that opens its From and To in a small popover over the row.
  * "+ Hours" adds a second range in the same popover, so no other day moves
  * (an end before the start, or an overlap, is refused there and keeps it
- * open). Monday copies to the weekdays, a day off says so in words, and
- * under any day are the bookings the new hours would leave outside. They
- * stay booked. With opening hours set, hours outside them are drawn as not
+ * open). A day with hours copies to the other days ticked in its own
+ * popover, and Monday still copies to the weekdays in one press. A day off
+ * says so in words, and under any day are the bookings the new hours would
+ * leave outside. They stay booked. With opening hours set, hours outside them are drawn as not
  * bookable in person, and the day says why (DEC-087).
  */
 export function WeeklyHours({
@@ -62,6 +65,11 @@ export function WeeklyHours({
         to: number;
         /** The range being changed; absent for one being added. */
         was?: Pick<WeeklyRange, "startMinute" | "endMinute">;
+    } | null>(null);
+    // The day being copied, and the days ticked to take its hours.
+    const [copying, setCopying] = useState<{
+        day: number;
+        to: number[];
     } | null>(null);
     // A day switched off keeps its hours here, so switching it back on
     // puts them back rather than starting the day again.
@@ -153,6 +161,7 @@ export function WeeklyHours({
                                             [day]: ranges,
                                         }));
                                         setAdding(null);
+                                        setCopying(null);
                                         onChange(rest);
                                     }}
                                 />
@@ -240,6 +249,7 @@ export function WeeklyHours({
                                         open={Boolean(open)}
                                         onOpenChange={(o) => {
                                             if (!o) return setAdding(null);
+                                            setCopying(null);
                                             const last = ranges.at(-1);
                                             const from = last
                                                 ? Math.min(
@@ -356,6 +366,120 @@ export function WeeklyHours({
                                                             variant="ghost"
                                                             onClick={() =>
                                                                 setAdding(null)
+                                                            }
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </div>
+                                                </form>
+                                            </PopoverContent>
+                                        ) : null}
+                                    </Popover>
+                                ) : null}
+                                {canEdit && ranges.length ? (
+                                    <Popover
+                                        open={copying?.day === day}
+                                        onOpenChange={(o) => {
+                                            if (!o) return setCopying(null);
+                                            setAdding(null);
+                                            setCopying({ day, to: [] });
+                                        }}
+                                    >
+                                        <PopoverTrigger asChild>
+                                            <button
+                                                type="button"
+                                                aria-label={`Copy ${name} to other days`}
+                                                className="grid size-[30px] place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:size-11"
+                                            >
+                                                <Copy
+                                                    aria-hidden
+                                                    className="size-3.5"
+                                                />
+                                            </button>
+                                        </PopoverTrigger>
+                                        {copying?.day === day ? (
+                                            <PopoverContent
+                                                align="end"
+                                                collisionPadding={12}
+                                                aria-label={`Copy ${name} to other days`}
+                                                className="w-auto min-w-[13rem] max-w-[calc(100vw-1.5rem)] rounded-[12px] p-3"
+                                            >
+                                                <form
+                                                    onKeyDown={submitOnModEnter}
+                                                    className="grid gap-2"
+                                                    onSubmit={(e) => {
+                                                        e.preventDefault();
+                                                        if (!copying.to.length)
+                                                            return;
+                                                        onChange(
+                                                            copyDay(
+                                                                hours,
+                                                                day,
+                                                                copying.to,
+                                                            ),
+                                                        );
+                                                        setCopying(null);
+                                                    }}
+                                                >
+                                                    <p className="text-[12.5px] font-semibold">
+                                                        Copy {name}&apos;s hours
+                                                        to
+                                                    </p>
+                                                    <div className="grid gap-1.5 coarse:gap-0">
+                                                        {WEEK.filter(
+                                                            (w) =>
+                                                                w.day !== day,
+                                                        ).map((w) => (
+                                                            <CheckRow
+                                                                key={w.day}
+                                                                checked={copying.to.includes(
+                                                                    w.day,
+                                                                )}
+                                                                onChange={(
+                                                                    on,
+                                                                ) =>
+                                                                    setCopying({
+                                                                        day,
+                                                                        to: on
+                                                                            ? [
+                                                                                  ...copying.to,
+                                                                                  w.day,
+                                                                              ]
+                                                                            : copying.to.filter(
+                                                                                  (
+                                                                                      x,
+                                                                                  ) =>
+                                                                                      x !==
+                                                                                      w.day,
+                                                                              ),
+                                                                    })
+                                                                }
+                                                            >
+                                                                {w.name}
+                                                            </CheckRow>
+                                                        ))}
+                                                    </div>
+                                                    <p className="max-w-[15rem] text-pretty text-[12px] text-muted-foreground">
+                                                        This replaces the hours
+                                                        those days have.
+                                                    </p>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            type="submit"
+                                                            disabled={
+                                                                !copying.to
+                                                                    .length
+                                                            }
+                                                        >
+                                                            Copy hours
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            type="button"
+                                                            variant="ghost"
+                                                            onClick={() =>
+                                                                setCopying(null)
                                                             }
                                                         >
                                                             Cancel

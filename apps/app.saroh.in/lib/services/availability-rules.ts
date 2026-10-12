@@ -75,6 +75,23 @@ export function copyMondayToWeekdays(
     ];
 }
 
+/**
+ * One day's hours given to other days, replacing what those days had. A
+ * day off copies as a day off; the day itself is left alone.
+ */
+export function copyDay(
+    hours: readonly WeeklyRange[],
+    from: number,
+    to: readonly number[],
+): WeeklyRange[] {
+    const days = to.filter((day) => day !== from);
+    const source = dayRanges(hours, from);
+    return [
+        ...hours.filter((h) => !days.includes(h.dayOfWeek)),
+        ...days.flatMap((day) => source.map((r) => ({ ...r, dayOfWeek: day }))),
+    ];
+}
+
 /** Hours a week, e.g. 44 or 27.5. */
 export function weeklyHours(hours: readonly WeeklyRange[]): number {
     return hours.reduce((n, h) => n + (h.endMinute - h.startMinute), 0) / 60;

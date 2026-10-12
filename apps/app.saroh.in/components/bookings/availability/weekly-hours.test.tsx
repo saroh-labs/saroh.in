@@ -375,4 +375,57 @@ describe("WeeklyHours — a switch a day, and a range that can be changed", () =
         ]);
         expect(popover()).toBeNull();
     });
+
+    const copyOf = (day: string) =>
+        host.querySelector<HTMLButtonElement>(
+            `button[aria-label="Copy ${day} to other days"]`,
+        );
+    const tick = (day: string) =>
+        Array.from(popover()?.querySelectorAll("label") ?? [])
+            .find((l) => l.textContent === day)
+            ?.querySelector<HTMLButtonElement>('[role="checkbox"]');
+    const copyButton = () =>
+        Array.from(popover()?.querySelectorAll("button") ?? []).find(
+            (b) => b.textContent === "Copy hours",
+        );
+
+    it("offers to copy a day only where the day has hours", () => {
+        expect(copyOf("Monday")).not.toBeNull();
+        expect(copyOf("Sunday")).not.toBeNull();
+        expect(copyOf("Tuesday")).toBeNull();
+    });
+
+    it("copies a day to the days ticked, and to no others", async () => {
+        await press(copyOf("Monday"));
+        expect(popover()?.getAttribute("aria-label")).toBe(
+            "Copy Monday to other days",
+        );
+        // Every other day is offered, none ticked, and nothing to copy yet.
+        expect(popover()?.querySelectorAll('[role="checkbox"]')).toHaveLength(
+            6,
+        );
+        expect(copyButton()?.disabled).toBe(true);
+        await press(tick("Wednesday"));
+        await press(tick("Sunday"));
+        await press(copyButton());
+        expect(onChange).toHaveBeenLastCalledWith([
+            HOURS[0],
+            { dayOfWeek: 3, startMinute: 480, endMinute: 1200 },
+            { dayOfWeek: 0, startMinute: 480, endMinute: 1200 },
+        ]);
+        expect(popover()).toBeNull();
+        expect(row("Wednesday")?.textContent).toContain("8:00 am to 8:00 pm");
+    });
+
+    it("copies nothing on Cancel", async () => {
+        await press(copyOf("Monday"));
+        await press(tick("Friday"));
+        await press(
+            Array.from(popover()?.querySelectorAll("button") ?? []).find(
+                (b) => b.textContent === "Cancel",
+            ),
+        );
+        expect(popover()).toBeNull();
+        expect(onChange).not.toHaveBeenCalled();
+    });
 });

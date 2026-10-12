@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { StaffView } from "@/lib/staff/types";
+import type { StaffView, WeeklyRange } from "@/lib/staff/types";
 
 import {
+    copyDay,
     copyMondayToWeekdays,
+    dayRanges,
     draftFrom,
     outsideHours,
     payWayBlocked,
@@ -67,6 +69,32 @@ describe("rangeRefusal", () => {
         expect(
             rangeRefusal([MON], { startMinute: 600, endMinute: 660 }),
         ).toBeNull();
+    });
+});
+
+describe("copyDay", () => {
+    const week: WeeklyRange[] = [
+        { dayOfWeek: 1, startMinute: 540, endMinute: 780 },
+        { dayOfWeek: 1, startMinute: 840, endMinute: 1080 },
+        { dayOfWeek: 3, startMinute: 600, endMinute: 660 },
+        { dayOfWeek: 6, startMinute: 600, endMinute: 960 },
+    ];
+
+    it("gives the chosen days the day's hours, replacing what they had", () => {
+        const copied = copyDay(week, 1, [3, 0]);
+        expect(dayRanges(copied, 3)).toEqual([
+            { dayOfWeek: 3, startMinute: 540, endMinute: 780 },
+            { dayOfWeek: 3, startMinute: 840, endMinute: 1080 },
+        ]);
+        expect(dayRanges(copied, 0)).toHaveLength(2);
+        // The day itself and the days not chosen are as they were.
+        expect(dayRanges(copied, 1)).toEqual(dayRanges(week, 1));
+        expect(dayRanges(copied, 6)).toEqual(dayRanges(week, 6));
+    });
+
+    it("copies a day off as a day off, and never onto itself", () => {
+        expect(dayRanges(copyDay(week, 2, [6]), 6)).toEqual([]);
+        expect(copyDay(week, 1, [1])).toEqual(week);
     });
 });
 
