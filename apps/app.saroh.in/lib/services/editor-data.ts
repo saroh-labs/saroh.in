@@ -1,5 +1,6 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
 import { readMissingRates } from "@/lib/gst-rates/service";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listSites } from "@/lib/sites/service";
 import type { BookingPaymentView, StaffList } from "@/lib/staff/service";
@@ -87,6 +88,12 @@ export interface EditorContext {
      * for nothing.
      */
     gstRegistered: boolean | null;
+    /**
+     * How a registered business's prices carry GST (12 Oct 2026), for the
+     * editor's "Same as the business (…)". Null when the business isn't
+     * registered, or it couldn't be read (a role without the settings).
+     */
+    businessPriceMode: GstPriceMode | null;
     canEdit: boolean;
     /** The business's zone: the diary's, else its services', else India. */
     timezone: string;
@@ -119,6 +126,7 @@ export async function loadEditorContext(): Promise<
             hasStorefront,
             payment,
             gstRegistered: rates?.registered ?? null,
+            businessPriceMode: rates?.priceMode ?? null,
             canEdit,
             timezone:
                 staff?.timezone ??

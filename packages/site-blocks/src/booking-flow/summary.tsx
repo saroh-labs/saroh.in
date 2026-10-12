@@ -10,6 +10,12 @@ export interface ConfirmSummary {
      */
     dueLabel: string;
     due: string;
+    /**
+     * The price with its GST, under the amount: "₹1,000, includes ₹152.54
+     * GST (18%)". Null or absent says nothing. The aside draws it; the
+     * phone's bar has no room, and the pay step above it says the same.
+     */
+    gstText?: string | null;
     /** Why it cannot go yet, or "" when it can. */
     block: string;
     /**
@@ -34,6 +40,7 @@ export function SummaryAside({
     rules,
     dueLabel,
     due,
+    gstText = null,
     block,
     quiet = false,
     submitError,
@@ -81,6 +88,17 @@ export function SummaryAside({
                         {due}
                     </span>
                 </div>
+            ) : null}
+            {dueLabel && gstText ? (
+                <p
+                    data-booking-gst=""
+                    className={cn(
+                        "mt-1 text-right text-[13px] tabular-nums",
+                        onDarkMuted,
+                    )}
+                >
+                    {gstText}
+                </p>
             ) : null}
             {(block && hasService) || submitError ? (
                 <p

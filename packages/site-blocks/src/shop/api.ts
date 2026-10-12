@@ -1,4 +1,5 @@
 import type { PaymentHandoff } from "../booking-flow/api";
+import type { GstOnPrice } from "../lib/gst-price";
 import type { BagItem } from "./bag-store";
 
 /**
@@ -15,7 +16,10 @@ export type ShopWay = "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING";
 
 export type QuoteLineState = "ok" | "short" | "sold-out" | "gone";
 
-/** One bag line as the server priced it. */
+/**
+ * One bag line as the server priced it: `unitPrice` and `amount` are what
+ * is paid, GST and all.
+ */
 export interface QuoteLine {
     listingId: string;
     variantId: string | null;
@@ -28,6 +32,11 @@ export interface QuoteLine {
     amount: string;
     state: QuoteLineState;
     available: number | null;
+    /**
+     * The GST in or on ONE of this line, for the words under its price;
+     * null when there is none to say. Absent from an older API.
+     */
+    gst?: GstOnPrice | null;
     /**
      * The returns rule the product's page shows, repeated above the bag's
      * button; null for none. Absent from an older API.
@@ -77,6 +86,11 @@ export interface CheckoutQuote {
      */
     freeDelivery?: QuoteFreeDelivery | null;
     total: string;
+    /**
+     * The GST inside `total`, "369.00", for the line under it; null when
+     * there is none. Absent from an older API.
+     */
+    gst?: string | null;
     ready: boolean;
     /**
      * How an order leaving the chosen way can be paid, online first. Empty

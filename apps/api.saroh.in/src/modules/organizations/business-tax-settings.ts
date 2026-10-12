@@ -2,6 +2,8 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { bpsToRate, isGstRate, rateToBps } from "../invoices/gst";
+import type { GstPriceMode } from "../invoices/gst-price";
+import { businessPriceMode } from "../invoices/gst-price";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import type {
     NumberFormat,
@@ -33,6 +35,11 @@ export interface TaxSettingsView {
     /** The GST rate on delivery, in percent ("18"). */
     deliveryRate: string;
     deliverySac: string | null;
+    /**
+     * How its prices carry GST (`invoices/gst-price.ts`): INCLUDED until
+     * the business says GST is added. Read only while it is registered.
+     */
+    priceMode: GstPriceMode;
     /** How invoice numbers are built, and where their counters stand. */
     invoiceNumber: InvoiceNumberView;
 }
@@ -74,6 +81,7 @@ export type TaxData = Partial<{
     invoiceNumberFormat: Prisma.InputJsonObject;
     deliveryGstRate: string;
     deliverySacCode: string | null;
+    gstPriceMode: GstPriceMode;
 }>;
 
 /** The stored profile, as far as the tax and address read it. */
@@ -85,6 +93,8 @@ export interface TaxProfileColumns {
     invoiceNumberFormat?: unknown;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
+    /** As stored; absent on a profile read without it: INCLUDED. */
+    gstPriceMode?: string | null;
     addressLine1: string | null;
     addressLine2: string | null;
     city: string | null;
@@ -138,6 +148,7 @@ export function taxView(
         invoicePrefix: p?.invoicePrefix ?? null,
         deliveryRate: bpsToRate(bps),
         deliverySac: p?.deliverySacCode ?? null,
+        priceMode: businessPriceMode(p?.gstPriceMode),
         invoiceNumber: {
             ...format,
             custom: readNumberFormat(p?.invoiceNumberFormat) !== null,
@@ -354,6 +365,18 @@ export function taxChanges(current: TaxCurrent | null, sent: TaxSent): TaxData {
     }
     if (tax?.deliverySac !== undefined) {
         data.deliverySacCode = tax.deliverySac === "" ? null : tax.deliverySac;
+    }
+    // How prices carry GST is a registered business's choice: one that
+    // charges no GST is never asked, and a stray request is refused rather
+    // than stored for the day it registers.
+    if (tax?.priceMode !== undefined) {
+        if (!registered) {
+            taxError(
+                "Only a GST-registered business chooses how its prices carry GST.",
+                "priceMode",
+            );
+        }
+        data.gstPriceMode = tax.priceMode;
     }
     return data;
 }

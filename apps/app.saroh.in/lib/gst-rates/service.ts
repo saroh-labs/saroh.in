@@ -3,6 +3,9 @@ import { unstable_rethrow } from "next/navigation";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, mutate, orgBase } from "@/lib/api/http";
 
+import type { GstPriceMode } from "@/lib/gst/price-mode";
+import { businessModeOf, isGstPriceMode } from "@/lib/gst/price-mode";
+
 import type { ChosenRate, MissingRates } from "./missing";
 
 /**
@@ -30,7 +33,37 @@ export async function readMissingRates(): Promise<MissingRates | null> {
             registered: body.registered,
             items: Array.isArray(body.items) ? body.items : [],
             more: body.more === true,
+            // The read's own when it says, else the business's settings.
+            priceMode: !body.registered
+                ? null
+                : isGstPriceMode(body.priceMode)
+                  ? body.priceMode
+                  : await readBusinessPriceMode(base),
         };
+    } catch (error) {
+        unstable_rethrow(error);
+        return null;
+    }
+}
+
+/**
+ * How a registered business's prices carry GST (12 Oct 2026), from its
+ * settings. Null when it isn't registered or the settings couldn't be read
+ * (the API down, a role without them): a screen then says neither way. A
+ * bare fetch, so a 403 is "couldn't tell", never the page's own forbidden.
+ */
+async function readBusinessPriceMode(
+    base: string,
+): Promise<GstPriceMode | null> {
+    try {
+        const res = await apiFetch(`${base}/settings`);
+        if (!res.ok) return null;
+        const body = (await res.json()) as {
+            tax?: { registered?: unknown; priceMode?: unknown };
+        } | null;
+        return body?.tax?.registered === true
+            ? businessModeOf(body.tax.priceMode)
+            : null;
     } catch (error) {
         unstable_rethrow(error);
         return null;

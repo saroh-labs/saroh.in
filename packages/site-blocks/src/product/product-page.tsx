@@ -4,6 +4,13 @@ import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
 import { focusRing } from "../booking-flow/styles";
+import type { GstOnPrice } from "../lib/gst-price";
+import {
+    gstNoteWords,
+    gstOnPriceOf,
+    gstPayWords,
+    startOfLine,
+} from "../lib/gst-price";
 import { formatAmount } from "../lib/money";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
@@ -69,6 +76,11 @@ export interface ProductPageVariant {
     title: string;
     /** Null = the product's price. */
     price: string | null;
+    /**
+     * The GST in or on the price this option sells at (its own, else the
+     * product's); null for none. Absent from an older API.
+     */
+    gst?: GstOnPrice | null;
     mrp: string | null;
     /** The photo shown when picked; null = the cover. */
     imageId: string | null;
@@ -91,6 +103,12 @@ export interface ProductPageData {
     name: string;
     currency: string;
     price: string;
+    /**
+     * The GST in or on that price, worked out by the API; null when there
+     * is none to say (not registered, exempt, no rate). Absent from an
+     * older API: none.
+     */
+    gst?: GstOnPrice | null;
     mrp: string | null;
     categoryName: string | null;
     /** Sanitised HTML — the API's allowlist runs on every save. */
@@ -138,6 +156,20 @@ export function stockLabel(
     return null;
 }
 
+/**
+ * The GST words under the price, following the option picked: its own
+ * where the API sent one, else the product's when the option sells at the
+ * product's price. Null: nothing is said about GST.
+ */
+export function productGst(
+    product: Pick<ProductPageData, "gst">,
+    variant: Pick<ProductPageVariant, "gst" | "price"> | null,
+): GstOnPrice | null {
+    if (!variant) return gstOnPriceOf(product.gst);
+    if (variant.gst !== undefined) return gstOnPriceOf(variant.gst);
+    return variant.price === null ? gstOnPriceOf(product.gst) : null;
+}
+
 /** What the visitor has chosen, for whatever fills the action slot. */
 export interface ProductSelection {
     /** The variant picked; null for a product without variants. */
@@ -148,6 +180,8 @@ export interface ProductSelection {
     name: string;
     /** The price shown for it. */
     price: string;
+    /** GST comes on top of that price: the action says "+ GST" after it. */
+    gstAdded?: boolean;
     /** The currency that price is in. */
     currency?: string;
     /** Nothing of it can be sold now: the action is off. */
@@ -312,6 +346,7 @@ export default function ProductPage({
     const price = variant?.price ?? product.price;
     const mrp = variant?.mrp ?? product.mrp;
     const off = percentOff(price, mrp);
+    const gst = productGst(product, variant);
     const stock = variant
         ? { word: variant.stock, left: variant.left }
         : product.stock;
@@ -417,11 +452,31 @@ export default function ProductPage({
                     </>
                 ) : null}
             </div>
-            {/* Every price includes its taxes (ADR-008), MRP or not,
-                so it is said under every price. */}
-            <p className="text-site-body mt-2 text-sm">
-                Inclusive of all taxes
-            </p>
+            {/* What the price carries in tax, under every price, MRP or
+                not: the GST the API worked out, in the words the bag and
+                checkout use, with the amount to pay when it is added on
+                top. With no GST to say, the price includes its taxes. */}
+            {gst ? (
+                <p
+                    data-price-gst=""
+                    className="text-site-body mt-2 text-sm tabular-nums"
+                >
+                    {startOfLine(gstNoteWords(gst, product.currency, locale))}
+                    {gst.mode === "ADDED" ? (
+                        <>
+                            {" · "}
+                            <span className="text-site-fg whitespace-nowrap font-semibold">
+                                {gstPayWords(gst, product.currency, locale)} to
+                                pay
+                            </span>
+                        </>
+                    ) : null}
+                </p>
+            ) : (
+                <p className="text-site-body mt-2 text-sm">
+                    Inclusive of all taxes
+                </p>
+            )}
             {facts ? (
                 <p className="text-site-body mt-1 text-sm [overflow-wrap:anywhere]">
                     {facts}
@@ -528,6 +583,7 @@ export default function ProductPage({
                         variantTitle: variant?.title ?? null,
                         name: product.name,
                         price,
+                        gstAdded: gst?.mode === "ADDED",
                         currency: product.currency,
                         soldOut,
                         left:

@@ -69,9 +69,11 @@ import {
     formatMoney,
     laterSkip,
     laterWords,
+    payCentsOf,
     payChoices,
     restAfterDeposit,
     rulesText,
+    serviceGstWords,
     unpayableText,
     visitsOf,
     whereText,
@@ -471,9 +473,13 @@ export default function BookingFlow({
             : "join";
     const waiting = waitMode === "join" || waitMode === "waiting";
 
+    // What one booking costs to pay, GST and all: the API's amount, on the
+    // button, the summary and the confirmation. The words about the GST in
+    // or on it go beside it; null when the API said none.
     const price = service
-        ? formatMoney(service.priceCents, service.currency)
+        ? formatMoney(payCentsOf(service), service.currency)
         : null;
+    const gstWords = serviceGstWords(service);
     // A class credit of their own (A10), once signed in with a time chosen:
     // the API says which, and it is offered first.
     const {
@@ -1218,6 +1224,8 @@ export default function BookingFlow({
     const summary = {
         dueLabel,
         due,
+        // Beside an amount of money only: not a credit, nor the waitlist.
+        gstText: waiting || pay === "CREDIT" ? null : gstWords,
         block,
         // A name not typed yet is a next step until they try to book.
         quiet: !touched && block === NAME_LEFT,
@@ -1354,6 +1362,7 @@ export default function BookingFlow({
                             }
                             rules={page.rules}
                             visits={visitsOf(service)}
+                            gst={gstWords}
                             onAgain={bookAnother}
                         />
                     ) : phase.kind === "waitlisted" ? (
@@ -1369,6 +1378,7 @@ export default function BookingFlow({
                             zone={zone}
                             headingRef={headingRef}
                             serviceName={service?.name ?? ""}
+                            gst={gstWords}
                             business={page.businessName}
                             booker={{
                                 name: bookerName,
@@ -1497,6 +1507,11 @@ export default function BookingFlow({
                                 <PayStep
                                     choices={choices}
                                     pay={pay}
+                                    gst={
+                                        choices.some((c) => c.pay !== "CREDIT")
+                                            ? gstWords
+                                            : null
+                                    }
                                     onPick={pickPay}
                                 />
                             ) : null}

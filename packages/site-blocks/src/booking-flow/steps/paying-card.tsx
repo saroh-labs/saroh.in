@@ -31,6 +31,7 @@ export function PayingCard({
     zone,
     headingRef,
     serviceName,
+    gst = null,
     business,
     booker,
     busy,
@@ -44,6 +45,8 @@ export function PayingCard({
     zone: string;
     headingRef: React.RefObject<HTMLHeadingElement | null>;
     serviceName: string;
+    /** The price with its GST, under what is being paid for; null: none. */
+    gst?: string | null;
     business: string;
     booker: CheckoutRequest["booker"];
     /** Letting the hold go, or booking it at the desk, is under way. */
@@ -96,6 +99,14 @@ export function PayingCard({
             <p className="text-site-fg mt-1.5 text-[15px] leading-[1.55] opacity-90">
                 {serviceName} · {phase.when}
             </p>
+            {gst ? (
+                <p
+                    data-booking-gst=""
+                    className="text-site-body mt-1 text-[13.5px] tabular-nums leading-[1.55]"
+                >
+                    {gst}
+                </p>
+            ) : null}
             {until ? (
                 <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
                     It&apos;s held for you until {timeWords(until, zone)}

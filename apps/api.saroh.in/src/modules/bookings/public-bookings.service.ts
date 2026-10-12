@@ -15,6 +15,7 @@ import { ActivationEvents } from "../analytics/activation-events";
 import { notTakingOrders } from "../billing/paused-errors";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { hashPayToken } from "../invoices/pay-token";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { takingNewActivity } from "../orders/checkout-paused";
 import { qrSourceFor } from "../sites/qr-source";
 import { isValidSlotStart } from "./availability";
@@ -83,6 +84,11 @@ import {
     reserve,
 } from "./reservation";
 import { depositCents } from "./service-fields";
+import {
+    bookedPriceMode,
+    heldAmountCents,
+    serviceCharge,
+} from "./service-price";
 import { serviceStaff } from "./staff-availability";
 import {
     isTreatment,
@@ -602,11 +608,16 @@ export class PublicBookingsService {
                             input.pay === "DEPOSIT"
                                 ? `Deposit for ${service.name}`
                                 : service.name,
-                        priceCents: price.cents,
+                        // What the booking itself froze, in this same
+                        // transaction: the amount to pay, or its deposit.
+                        priceCents:
+                            heldAmountCents(booking.snapshot, input.pay) ??
+                            price.cents,
                         currency: price.currency,
                         timezone: service.timezone,
                         gstRate: service.gstRate,
                         sacCode: service.sacCode,
+                        priceMode: bookedPriceMode(booking.snapshot),
                     },
                     startAt,
                     // A treatment's pay-now invoice is its order's (E9).
@@ -852,7 +863,14 @@ export class PublicBookingsService {
                 field: "pay",
             });
         }
-        const deposit = depositCents(service.priceCents, service.depositMode);
+        // The amount to pay as the business charges it (`service-price.ts`):
+        // a deposit is its share of that, GST and all.
+        const payCents =
+            serviceCharge(
+                service,
+                await loadPriceTerms(prisma, service.organizationId),
+            ).payCents ?? service.priceCents;
+        const deposit = depositCents(payCents, service.depositMode);
         if ((await onlinePaymentBlocker(service.organizationId)) !== null) {
             throw new ConflictException({
                 message: onlineUnavailableMessage(deposit !== null, rules),
@@ -860,10 +878,7 @@ export class PublicBookingsService {
             });
         }
         return {
-            cents:
-                pay === "DEPOSIT" && deposit !== null
-                    ? deposit
-                    : service.priceCents,
+            cents: pay === "DEPOSIT" && deposit !== null ? deposit : payCents,
             currency: service.currency,
         };
     }

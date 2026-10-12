@@ -12,6 +12,7 @@ import {
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
 import { holdLineDescription, lockBookingInTx } from "./booking-hold";
+import { bookedPriceMode } from "./service-price";
 
 /**
  * "Send a pay link" for a booking made by staff (E4, ADR-007's link path).
@@ -185,6 +186,7 @@ export async function bookingPayLinkInTx(
                 unitCents: terms.priceCents,
                 rateBps: rateToBps(booking.service.gstRate?.toString() ?? null),
                 code: booking.service.sacCode,
+                priceMode: bookedPriceMode(booking.snapshot),
             },
         ],
         profile,

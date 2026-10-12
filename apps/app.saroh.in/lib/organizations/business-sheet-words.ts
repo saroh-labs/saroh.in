@@ -1,3 +1,6 @@
+import type { GstPriceMode } from "@/lib/gst/price-mode";
+import { PRICE_MODE_ROW, PRICE_MODE_SAVED } from "@/lib/gst/price-mode";
+
 import type { BusinessSheet } from "./business-rows";
 import { kindOf, kindWords } from "./kind";
 
@@ -103,6 +106,12 @@ export function sheetWords(sheet: BusinessSheet, page: Page): SheetWords {
                 title: "GST on delivery",
                 description: "The rate and SAC code delivery is charged under.",
             };
+        case "priceMode":
+            return {
+                title: PRICE_MODE_ROW,
+                description:
+                    "Whether the prices you type include GST, or GST is added to them.",
+            };
         case "pay":
             return {
                 title: "How to pay us",
@@ -142,7 +151,13 @@ export const PREVIEWED: readonly BusinessSheet[] = [
 ];
 
 /** What a save says: "Legal name saved. Invoices from now on use it." */
-export function savedWords(sheet: BusinessSheet, page: Page): string {
+export function savedWords(
+    sheet: BusinessSheet,
+    page: Page,
+    /** How prices carry GST once saved: its own sentence says which. */
+    priceMode?: GstPriceMode,
+): string {
+    if (sheet === "priceMode" && priceMode) return PRICE_MODE_SAVED[priceMode];
     const { title } = sheetWords(sheet, page);
     return PRINTED.includes(sheet)
         ? `${title} saved. Invoices from now on use it.`

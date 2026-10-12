@@ -10,6 +10,7 @@ import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { normaliseEmail } from "../customer-workspace/duplicates";
 import { rateToBps } from "../invoices/gst";
+import { priceTermsOf } from "../invoices/gst-price";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
 import { fromCents } from "../orders/order-pricing";
@@ -26,6 +27,7 @@ import type { BookingLocationType } from "./dto";
 import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type { BookInput, SignedInBooker } from "./reservation";
 import { loadBookableService, reserveInTx } from "./reservation";
+import { serviceCharge } from "./service-price";
 
 /*
  * Visits (E9, DEC-050, default 40): a service of more than one visit is a
@@ -235,9 +237,10 @@ async function treatmentCustomerInTx(
 /**
  * Sell a treatment on the booking's transaction: one order at the
  * storefront, one service line for the whole treatment (quantity 1, the
- * service's price, no stock), and the booking made its visit 1. The price
- * includes GST at the service's rate for a registered business, as a
- * product's does (ADR-008). Nothing is invoiced here: the booking's pay-now
+ * service's amount to pay, no stock), and the booking made its visit 1.
+ * For a registered business that amount carries GST at the service's rate,
+ * inside the typed price or added to it as the business chose, as a
+ * product's does (ADR-008, `invoices/gst-price.ts`). Nothing is invoiced here: the booking's pay-now
  * invoice (or the order's, when it is paid) bills it.
  */
 export async function startTreatmentInTx(
@@ -253,10 +256,13 @@ export async function startTreatmentInTx(
         email,
         booking,
     });
-    const priceCents = service.priceCents ?? 0;
     const currency =
         service.currency ?? (await storefrontCurrency(tx, storeId)) ?? "INR";
     const profile = await loadTaxProfile(tx, organizationId);
+    // The amount to pay for the whole treatment, as the business charges
+    // it (`service-price.ts`): the same sum visit 1's booking froze.
+    const charge = serviceCharge(service, priceTermsOf(profile));
+    const priceCents = charge.payCents ?? 0;
     const taxCents = profile.registered
         ? gstInsideOrder(
               [
@@ -294,6 +300,12 @@ export async function startTreatmentInTx(
                     serviceId: service.id,
                     quantity: 1,
                     price: fromCents(priceCents),
+                    ...(charge.mode
+                        ? {
+                              gstPriceMode: charge.mode,
+                              listPrice: fromCents(charge.listCents ?? 0),
+                          }
+                        : {}),
                     // A service line holds no stock, for life.
                     stockRow: "NONE",
                 },

@@ -24,6 +24,7 @@ export function DoneCard({
     where,
     rules,
     visits = 1,
+    gst = null,
     soldBy = null,
     email = null,
     onAgain,
@@ -39,6 +40,11 @@ export function DoneCard({
     rules: BookingPageData["rules"];
     /** More than one: visit 1 of a treatment was booked (E10). */
     visits?: number;
+    /**
+     * The price with its GST, as the page said it before booking: "₹1,000
+     * + ₹180 GST (18%)". Null says nothing.
+     */
+    gst?: string | null;
     /** "Run by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
     /** The signed-in customer's address, for "We've emailed ‹address›". */
@@ -124,6 +130,16 @@ export function DoneCard({
             <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
                 {payText}
             </p>
+            {/* The same GST words the page showed before booking; none
+                for a class a credit paid for, or with nothing to pay. */}
+            {gst && phase.price && !phase.creditText ? (
+                <p
+                    data-booking-gst=""
+                    className="text-site-body mt-1 text-[13.5px] tabular-nums leading-[1.55]"
+                >
+                    {gst}
+                </p>
+            ) : null}
             {payAhead ? (
                 <PayInstructionsCard
                     instructions={payAhead}

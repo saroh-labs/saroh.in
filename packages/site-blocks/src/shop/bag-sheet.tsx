@@ -530,6 +530,16 @@ export function BagSheet({
                     </span>
                 </div>
             ) : null}
+            {/* The GST inside the total, as the API summed it. One short
+                line, so the button below barely moves. */}
+            {quote?.gst ? (
+                <p
+                    data-total-gst=""
+                    className="text-site-body text-right text-sm tabular-nums"
+                >
+                    Includes {formatAmount(quote.gst, quote.currency)} GST
+                </p>
+            ) : null}
             <button
                 type="button"
                 onClick={place}

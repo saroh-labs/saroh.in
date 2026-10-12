@@ -18,6 +18,7 @@ import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
 import { recordRedemptionInTx } from "../discounts/redemption";
 import { assertBusinessDetails } from "../invoices/business-details";
+import { NO_GST_TERMS, priceTermsOf, soldColumns } from "../invoices/gst-price";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
     ensureOrderInvoice,
@@ -222,7 +223,16 @@ export class OrdersService {
             });
         }
 
-        const lines = await priceOrderLines(storeId, dto.items);
+        // The business's GST standing, read once: it prices the lines
+        // (`invoices/gst-price.ts`) and, below, says what `tax` records.
+        const profile = organizationId
+            ? await loadTaxProfile(prisma, organizationId)
+            : null;
+        const lines = await priceOrderLines(
+            storeId,
+            dto.items,
+            profile ? priceTermsOf(profile) : NO_GST_TERMS,
+        );
         // A product that lists how it may leave refuses any other way (B12).
         assertItemsAllow(lines, type);
 
@@ -261,12 +271,9 @@ export class OrdersService {
             (sum, l) => sum + l.priceCents * l.quantity,
             0,
         );
-        // A GST-registered business's prices include GST: the storefront's
-        // add-on tax is ignored, and `tax` records the GST inside the total
-        // instead of adding to it (ADR-008).
-        const profile = organizationId
-            ? await loadTaxProfile(prisma, organizationId)
-            : null;
+        // A GST-registered business's lines are already the amount to pay,
+        // GST and all: the storefront's add-on tax is ignored, and `tax`
+        // records the GST inside the total instead of adding to it (ADR-008).
         const registered = profile?.registered ?? false;
         let taxCents = registered ? 0 : toCents(dto.tax ?? "0");
         const shippingCents = toCents(dto.shipping ?? "0");
@@ -373,6 +380,10 @@ export class OrdersService {
                     variantId: l.variantId ?? null,
                     quantity: l.quantity,
                     price: fromCents(l.priceCents),
+                    ...soldColumns({
+                        listCents: l.listCents,
+                        mode: l.gstPriceMode,
+                    }),
                 })),
             },
         };

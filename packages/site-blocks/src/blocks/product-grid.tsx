@@ -9,6 +9,7 @@ import {
 } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import { browsePriceWords } from "../lib/gst-price";
 import {
     isShopListingCard,
     productCardsOf,
@@ -543,7 +544,10 @@ function CardWords({
 }) {
     const line = show.line ? cardLine(p.blurb) : null;
     const eyebrow = optionSummary(p.variantTitles, p.optionName);
-    const amount = formatAmount(p.price, p.currency);
+    const amount = browsePriceWords(
+        formatAmount(p.price, p.currency),
+        p.gstAdded === true,
+    );
     return (
         <>
             {eyebrow || p.soldOut ? (
@@ -624,7 +628,10 @@ function BareGrid({
         >
             {products.map((p) => {
                 const line = show.line ? cardLine(p.blurb) : null;
-                const amount = formatAmount(p.price, p.currency);
+                const amount = browsePriceWords(
+                    formatAmount(p.price, p.currency),
+                    p.gstAdded === true,
+                );
                 const soldOut = p.soldOut ? (
                     <span className="bg-site-fg text-site-bg px-2 py-1 text-[11.5px] font-semibold uppercase tracking-[0.06em]">
                         Sold out

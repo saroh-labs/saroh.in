@@ -5,6 +5,7 @@ import {
     payChargingOf,
     payContactOf,
     payDate,
+    payLineGstWords,
     payMoney,
     payOffer,
     payOnlineOf,
@@ -142,5 +143,44 @@ describe("payContactOf (UX-007)", () => {
         });
         expect(payContactOf(null)).toBeNull();
         expect(payContactOf("x")).toBeNull();
+    });
+});
+
+describe("the GST on a line (the business's price mode)", () => {
+    const adds = {
+        mode: "ADDED",
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+
+    it("reads an invoice whose lines say it, say none, or say nothing", () => {
+        for (const gst of [adds, null, undefined, "18"]) {
+            expect(
+                isPayInvoice({
+                    ...INVOICE,
+                    lines: [{ ...INVOICE.lines[0], gst }],
+                }),
+            ).toBe(true);
+        }
+    });
+
+    it("writes the API's numbers out, and nothing for anything else", () => {
+        expect(payLineGstWords(adds, "INR")).toBe("₹1,000 + ₹180 GST (18%)");
+        expect(
+            payLineGstWords(
+                {
+                    ...adds,
+                    mode: "INCLUDED",
+                    gstCents: 15254,
+                    payCents: 100000,
+                },
+                "INR",
+            ),
+        ).toBe("includes ₹152.54 GST (18%)");
+        expect(payLineGstWords(null, "INR")).toBeNull();
+        expect(payLineGstWords(undefined, "INR")).toBeNull();
+        expect(payLineGstWords({ mode: "ADDED" }, "INR")).toBeNull();
     });
 });

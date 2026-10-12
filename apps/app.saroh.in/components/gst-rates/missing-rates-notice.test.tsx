@@ -182,6 +182,37 @@ describe("the missing GST rates notice", () => {
         expect(text).toContain("Product · ₹549");
     });
 
+    it("says how the prices carry GST as the business chose, and neither way when that wasn't read", async () => {
+        show({ ...MISSING, priceMode: "ADDED" });
+        await press("Choose rates");
+        expect(sheet()?.textContent).toContain(
+            "GST is added to your prices. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(sheet()?.textContent).toContain(
+            "Choose the rate added to each price.",
+        );
+        expect(sheet()?.textContent).not.toContain("Prices include GST");
+        await press("Cancel");
+
+        show({ ...MISSING, priceMode: "INCLUDED" });
+        await press("Choose rates");
+        expect(sheet()?.textContent).toContain(
+            "Prices include GST. Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(sheet()?.textContent).toContain(
+            "Choose the rate each price includes.",
+        );
+        await press("Cancel");
+
+        show(MISSING);
+        await press("Choose rates");
+        expect(sheet()?.textContent).toContain(
+            "Choose 0% for anything exempt or nil-rated.",
+        );
+        expect(sheet()?.textContent).not.toContain("Prices include GST");
+        expect(sheet()?.textContent).not.toContain("GST is added");
+    });
+
     it("saves the rows that were answered, says so, and reads the page again", async () => {
         show(MISSING);
         await press("Choose rates");

@@ -273,6 +273,19 @@
 - **The API computes.** Order totals are summed in integer cents server-side
   (`orders.service.ts`), and a payment's amount derives from the Order, never
   from the client. Client arithmetic is for previews and sort keys only.
+- **A stored price says which price it is.** `Product.price` and
+  `Service.priceCents` are what the business typed. `OrderItem.price` and a
+  booking's `snapshot.service.priceCents` are the amount to pay for one,
+  fixed at the sale: the typed price, or with GST added where the business
+  chose that (`invoices/gst-price.ts`, the only place the two are turned
+  into each other; `backend-billing-and-classes.md` → How a price carries
+  GST). The line keeps what was typed and the mode (`listPrice`,
+  `gstPriceMode`), null when no GST was charged. Never recompute a sold
+  line's price from the product, and never read the business's choice to
+  explain a line already sold.
+- **A customer's sum is the API's.** A public read that shows a price about
+  to be paid serves the GST in or on it and the amount to pay
+  (`GstOnPrice`); the site formats and never adds, multiplies or rounds.
 
 ## Modelling
 

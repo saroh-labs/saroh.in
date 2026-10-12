@@ -110,6 +110,8 @@ describe("what is missing", () => {
         await expect(rates.missing(owner)).resolves.toEqual({
             registered: true,
             more: false,
+            // Never chosen: its prices include GST.
+            priceMode: "INCLUDED",
             items: [
                 {
                     kind: "SERVICE",

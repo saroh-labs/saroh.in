@@ -154,6 +154,18 @@ export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 
 // A price as the site shows it; no directive, so server pages can call it.
 export { formatAmount } from "./lib/money";
+// The GST words beside a price, one way on every page; the API's numbers.
+export {
+    browsePriceWords,
+    gstLineWords,
+    gstNoteWords,
+    gstOnPriceOf,
+    gstPayWords,
+    gstPriceWords,
+    isGstOnPrice,
+    startOfLine,
+} from "./lib/gst-price";
+export type { GstOnPrice } from "./lib/gst-price";
 // A business's public phone as a visitor reads it (DEC-053).
 export { phoneText } from "./lib/phone";
 export { shopFactsLine, shopLeadLine } from "./lib/shop-facts";

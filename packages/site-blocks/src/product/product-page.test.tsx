@@ -285,6 +285,125 @@ describe("the facts under the price", () => {
         expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
     });
 
+    const plain: ProductPageData = {
+        ...dress,
+        price: "1000.00",
+        mrp: null,
+        variants: [],
+    };
+    const includes = {
+        mode: "INCLUDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 15254,
+        payCents: 100000,
+    };
+    const adds = {
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+
+    it("keeps that line when the API says nothing about GST", () => {
+        render(<ProductPage product={{ ...plain, gst: null }} />);
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+        expect(screen.queryByText(/GST/)).toBeNull();
+    });
+
+    it("says the GST a price includes, in place of that line", () => {
+        const { container } = render(
+            <ProductPage product={{ ...plain, gst: includes }} />,
+        );
+        expect(container.querySelector("[data-price-gst]")).toHaveTextContent(
+            /^Includes ₹152\.54 GST \(18%\)$/,
+        );
+        expect(screen.queryByText("Inclusive of all taxes")).toBeNull();
+    });
+
+    it("says the GST added on top, and what there is to pay", () => {
+        const { container } = render(
+            <ProductPage product={{ ...plain, gst: adds }} />,
+        );
+        expect(container.querySelector("[data-price-gst]")).toHaveTextContent(
+            /^\+ ₹180 GST \(18%\) · ₹1,180 to pay$/,
+        );
+        // The price itself stays the one the business typed.
+        expect(screen.getByText("₹1,000")).toBeVisible();
+        expect(screen.queryByText("Inclusive of all taxes")).toBeNull();
+    });
+
+    it("follows the option picked: its own GST, else nothing made up", () => {
+        const large = {
+            mode: "ADDED" as const,
+            rate: "18",
+            listCents: 269900,
+            gstCents: 48582,
+            payCents: 318482,
+        };
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...dress,
+                    price: "1000.00",
+                    mrp: null,
+                    gst: adds,
+                    variants: dress.variants.map((v) => ({
+                        ...v,
+                        gst: v.id === "l" ? large : adds,
+                    })),
+                }}
+            />,
+        );
+        const line = () => container.querySelector("[data-price-gst]");
+        expect(line()).toHaveTextContent("+ ₹180 GST (18%) · ₹1,180 to pay");
+        fireEvent.click(screen.getByRole("button", { name: "L" }));
+        expect(line()).toHaveTextContent(
+            "+ ₹485.82 GST (18%) · ₹3,184.82 to pay",
+        );
+    });
+
+    it("reads an older API's options: the product's GST at the product's price only", () => {
+        const { container } = render(
+            <ProductPage
+                product={{ ...dress, price: "1000.00", mrp: null, gst: adds }}
+            />,
+        );
+        // M sells at the product's price: the product's words.
+        expect(container.querySelector("[data-price-gst]")).toHaveTextContent(
+            "+ ₹180 GST (18%)",
+        );
+        // L has a price of its own and no GST from the API: none is said.
+        fireEvent.click(screen.getByRole("button", { name: "L" }));
+        expect(container.querySelector("[data-price-gst]")).toBeNull();
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+    });
+
+    it("tells the action when GST comes on top", () => {
+        function Probe() {
+            const s = useProductSelection();
+            return <p data-testid="gst-probe">{String(s?.gstAdded)}</p>;
+        }
+        const { unmount } = render(
+            <ProductPage
+                product={{ ...plain, gst: adds }}
+                preview={false}
+                action={<Probe />}
+            />,
+        );
+        expect(screen.getByTestId("gst-probe")).toHaveTextContent("true");
+        unmount();
+        render(
+            <ProductPage
+                product={{ ...plain, gst: includes }}
+                preview={false}
+                action={<Probe />}
+            />,
+        );
+        expect(screen.getByTestId("gst-probe")).toHaveTextContent("false");
+    });
+
     it("says what it costs to receive, in the body colour, when the shop takes orders", () => {
         render(
             <ProductPage

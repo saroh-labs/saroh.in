@@ -1,4 +1,6 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
+import { businessModeOf } from "@/lib/gst/price-mode";
 import { printedAddress } from "@/lib/organizations/registered-address";
 import type { RegisteredAddress } from "@/lib/organizations/settings-service";
 import type { ProviderConnection } from "@/lib/payments/providers";
@@ -16,6 +18,11 @@ export interface InvoiceBusiness {
     legalName: string | null;
     email: string | null;
     registered: boolean;
+    /**
+     * How a registered business's prices carry GST (12 Oct 2026). Absent
+     * reads as included, as an older API's business is.
+     */
+    priceMode?: GstPriceMode;
     gstin: string | null;
     state: { code: string; name: string | null } | null;
     /**
@@ -47,6 +54,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
             registered: boolean;
             state: string | null;
             stateName: string | null;
+            priceMode?: unknown;
         };
         registeredAddress?: RegisteredAddress;
         logo?: { url: string } | null;
@@ -57,6 +65,7 @@ export async function getInvoiceBusiness(): Promise<InvoiceBusiness | null> {
         legalName: s.profile?.legalName ?? null,
         email: s.profile?.contactEmail ?? null,
         registered,
+        priceMode: businessModeOf(s.tax?.priceMode),
         gstin: registered ? (s.profile?.taxId ?? null) : null,
         state: s.tax?.state
             ? { code: s.tax.state, name: s.tax.stateName }

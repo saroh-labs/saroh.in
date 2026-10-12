@@ -3,7 +3,10 @@ import { stateCode } from "./gst-states";
 /**
  * GST on invoice lines (ADR-008) — pure, in integer paise, no I/O.
  *
- * Prices include GST. From a line's inclusive amount and its rate this
+ * A line's amount is what is paid for it, GST included: the price the
+ * business typed where its prices include GST, or that price plus its GST
+ * where GST is added on top (`gst-price.ts` turns one into the other when
+ * the line is sold). From that amount and the line's rate this
  * derives the taxable value and CGST + SGST (same state as the business) or
  * IGST (another state), rounded to the paisa per line, and the parts always
  * add back to the line. An order's discount is spread across its lines in
@@ -150,7 +153,11 @@ export function taxTypeFor(
 export interface GstLineInput {
     description: string;
     quantity: number;
-    /** GST-inclusive, per unit. */
+    /**
+     * The amount to pay per unit, GST and all: the typed price where prices
+     * include GST, the typed price plus its GST where GST is added
+     * (`gst-price.ts`).
+     */
     unitCents: number;
     rateBps: number | null;
     /** HSN or SAC. */
@@ -158,6 +165,12 @@ export interface GstLineInput {
     /** False for delivery: an order discount comes off the items first. */
     discountable?: boolean;
     orderItemId?: string | null;
+    /**
+     * How the price behind the line carried GST when it was charged
+     * (`gst-price.ts`): recorded on the line, never read by the maths here.
+     * `unitCents` is the amount to pay either way.
+     */
+    priceMode?: "INCLUDED" | "ADDED" | null;
 }
 
 export interface GstLine extends GstLineInput {

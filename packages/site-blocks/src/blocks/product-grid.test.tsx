@@ -418,3 +418,41 @@ describe("a product with no photo, in the Product grid (starter audit)", () => {
         expect(container.querySelector("[data-name-plate]")).toBeNull();
     });
 });
+
+describe("a grid card's price when GST comes on top", () => {
+    const products = [
+        card({ slug: "focaccia", name: "Focaccia", gstAdded: true }),
+        card({
+            slug: "sourdough",
+            name: "Sourdough",
+            price: "250.00",
+            priceFrom: true,
+            gstAdded: true,
+        }),
+        card({ slug: "rye-loaf", name: "Rye loaf", gstAdded: false }),
+        card({ slug: "baguette", name: "Baguette" }),
+    ];
+
+    it("says + GST after the price on every layout, and nothing otherwise", () => {
+        const looks: Partial<RenderedProductGrid>[] = [
+            {},
+            { layout: "list" },
+            { variant: "lead" },
+            { variant: "plates" },
+        ];
+        for (const look of looks) {
+            const { container, unmount } = render(
+                <ProductGridSection
+                    content={{ ...content, ...look }}
+                    feed={{ products, basePath: "/shop" }}
+                />,
+            );
+            const text = container.textContent;
+            expect(text).toContain("₹120 + GST");
+            expect(text).toContain("From ₹250 + GST");
+            // Two of the four say it; the others show the price alone.
+            expect(text.match(/\+ GST/g)).toHaveLength(2);
+            unmount();
+        }
+    });
+});

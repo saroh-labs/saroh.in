@@ -18,6 +18,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { GstPriceMode } from "../invoices/gst-price";
+import { GST_PRICE_MODES } from "../invoices/gst-price";
 import type { ProductFulfilmentType } from "../orders/fulfilment";
 import { PRODUCT_FULFILMENT_TYPES } from "../orders/fulfilment";
 
@@ -174,6 +176,18 @@ class ProductSectionFields {
     @ValidateIf((_o, v) => v !== null)
     @Matches(/^\d{1,2}(\.\d{1,2})?$/, { message: "A GST rate like 5 or 18" })
     gstRate?: string | null;
+
+    /**
+     * How this product's price carries GST when it differs from the
+     * business's way (`invoices/gst-price.ts`): INCLUDED or ADDED. null is
+     * "same as the business".
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsIn(GST_PRICE_MODES, {
+        message: "Choose whether this price includes GST or GST is added.",
+    })
+    gstPriceMode?: GstPriceMode | null;
 
     /** HSN code: four to eight digits, spaces allowed as typed on paper. */
     @IsOptional()

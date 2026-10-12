@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 
 import { startPayment } from "@/app/pay/o/[token]/actions";
-import { payMoney } from "@/lib/invoice-pay-shape";
+import { payLineGstWords, payMoney } from "@/lib/invoice-pay-shape";
 import type { PayOrder } from "@/lib/order-pay";
 import { orderPayOffer } from "@/lib/order-pay-shape";
 
@@ -106,6 +106,10 @@ export function OrderPay({
                                             {money(l.unitPrice)} each
                                         </span>
                                     ) : null}
+                                    <LineGst
+                                        gst={l.gst}
+                                        currency={order.currency}
+                                    />
                                 </td>
                                 <td className="px-4 py-3 text-right tabular-nums">
                                     {l.quantity}
@@ -275,4 +279,20 @@ function StatusBadge({ status }: { status: PayOrder["status"] }) {
             {s.label}
         </span>
     );
+}
+
+/**
+ * The GST in or on a line's amount, under its name, in the words the bag
+ * and checkout use. Nothing when the API said none.
+ */
+function LineGst({ gst, currency }: { gst: unknown; currency: string }) {
+    const words = payLineGstWords(gst, currency);
+    return words ? (
+        <span
+            data-line-gst=""
+            className="block text-xs tabular-nums text-site-muted"
+        >
+            {words}
+        </span>
+    ) : null;
 }

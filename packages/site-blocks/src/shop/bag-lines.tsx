@@ -1,6 +1,7 @@
 "use client";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
+import { gstLineWords, gstOnPriceOf } from "../lib/gst-price";
 import { formatAmount } from "../lib/money";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
@@ -35,6 +36,16 @@ export function lineNote(line: QuoteLine): string | null {
     return null;
 }
 
+/**
+ * The GST in or on one of a line, under its price: "includes ₹152.54 GST
+ * (18%)", or "₹1,000 + ₹180 GST (18%)" where it was added. Null when the
+ * API said none, and for a line no longer sold.
+ */
+export function lineGstWords(line: QuoteLine, currency: string): string | null {
+    const gst = gstOnPriceOf(line.gst);
+    return gst && line.state !== "gone" ? gstLineWords(gst, currency) : null;
+}
+
 /** A line taken out of the bag, kept so it can be put back. */
 export interface RemovedLine {
     listingId: string;
@@ -67,6 +78,7 @@ export function BagLines({
         <ul className="m-0 list-none p-0">
             {quote.lines.map((line) => {
                 const note = lineNote(line);
+                const gst = lineGstWords(line, quote.currency);
                 const name = lineName(line);
                 const at = {
                     listingId: line.listingId,
@@ -115,6 +127,14 @@ export function BagLines({
                                     each
                                 </span>
                             )}
+                            {gst ? (
+                                <span
+                                    data-line-gst=""
+                                    className="text-site-body block tabular-nums"
+                                >
+                                    {gst}
+                                </span>
+                            ) : null}
                             {note ? (
                                 <span className="text-site-fg block font-semibold">
                                     {note}

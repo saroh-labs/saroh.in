@@ -1886,3 +1886,82 @@ describe("parseBagDraft", () => {
         ).toBe("");
     });
 });
+
+describe("GST in the bag and on the product's button", () => {
+    it("says the GST inside the total under it, as the API summed it", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    lines: [
+                        {
+                            ...quoteOf().lines[0],
+                            unitPrice: "1180.00",
+                            amount: "2360.00",
+                            gst: {
+                                mode: "ADDED",
+                                rate: "18",
+                                listCents: 100000,
+                                gstCents: 18000,
+                                payCents: 118000,
+                            },
+                        },
+                    ],
+                    subtotal: "2360.00",
+                    total: "2360.00",
+                    gst: "360.00",
+                }),
+            },
+        });
+        await openTheBag();
+        const sheet = screen.getByRole("dialog", { name: "Your bag" });
+        expect(sheet.querySelector("[data-total-gst]")).toHaveTextContent(
+            /^Includes ₹360 GST$/,
+        );
+        expect(sheet.querySelector("[data-line-gst]")).toHaveTextContent(
+            "₹1,000 + ₹180 GST (18%)",
+        );
+        // The button pays the API's total, never a sum made here.
+        expect(
+            screen.getByRole("button", { name: "Place order · ₹2,360" }),
+        ).toBeEnabled();
+    });
+
+    it("says nothing about GST in a bag that has none", async () => {
+        setup({
+            signedIn: true,
+            quote: { ok: true, data: quoteOf({ gst: null }) },
+        });
+        await openTheBag();
+        const sheet = screen.getByRole("dialog", { name: "Your bag" });
+        expect(sheet.querySelector("[data-total-gst]")).toBeNull();
+        expect(sheet).not.toHaveTextContent("GST");
+    });
+
+    it("says + GST on Add to bag when GST comes on top of the price", () => {
+        render(
+            <ProductPage
+                product={{
+                    ...bread,
+                    gst: null,
+                    variants: bread.variants.map((v) => ({
+                        ...v,
+                        gst: {
+                            mode: "ADDED" as const,
+                            rate: "5",
+                            listCents: 18000,
+                            gstCents: 900,
+                            payCents: 18900,
+                        },
+                    })),
+                }}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        expect(
+            screen.getByRole("button", { name: "Add to bag · ₹180 + GST" }),
+        ).toBeInTheDocument();
+    });
+});

@@ -11,6 +11,10 @@
 - by DEC-045: the kitchen's collect-or-delivery (six fulfilment types);
 - by DEC-038: in §3, "Not card-on-file, auto-debit" (autopay now runs on the business's own provider).
 
+**Amended (2026-10-12):** in "GST", "Prices include GST" is no longer a rule
+for every business. How a price carries GST is the business's own choice;
+the note under that decision says what changed.
+
 Notes in each section say what changed.
 
 ---
@@ -155,6 +159,39 @@ pure module, built test-first from worked examples.
 
 **What it is not.** Not GST returns or filing exports, not e-invoicing
 (IRN/QR), not TCS.
+
+> **Amended 2026-10-12 (the owner's decision).** "Prices include GST" was
+> Saroh's condition on every registered business. It is now the business's
+> own choice: "My prices include GST" or "GST is added to my prices", set
+> once in its tax settings and changeable on a single service or product
+> that it prices the other way. Every business and item that existed keeps
+> prices that include GST until the business changes it, so no total moved.
+> A business that is not registered is never asked.
+>
+> What stands from the decision above: tax is still derived per line from
+> the amount paid, rounded to the paisa per line and frozen; a discount is
+> still spread before tax; delivery is still a taxed line; the invoice still
+> totals what the order does. What changed is the step before it. Under
+> "GST is added" the amount to pay for one unit is the typed price plus its
+> GST, rounded to the paisa, half up (₹1,000 at 18% is ₹1,180), and that
+> amount is what the order line and the booking record. The paper is then
+> derived from it exactly as before, so ₹1,180 prints as ₹1,000 taxable and
+> ₹180 GST. The line records which way it was charged and what was typed,
+> so a later change of the choice never rewrites a placed order, a made
+> booking or issued paper, and a credit note reverses what was charged.
+>
+> A deposit is a share of the amount to pay. A delivery charge, a line typed
+> on a hand-written invoice, and courses, class packs and plans (which carry
+> no rate) are charged as typed, with GST inside. "A registered business's
+> orders ignore the storefront's old add-on tax" stands.
+>
+> The customer is told before paying, in one form of words on every page:
+> "₹1,000, includes ₹152.54 GST (18%)" or "₹1,000 + ₹180 GST (18%)", with
+> ₹1,180 as the amount to pay. Where no GST is charged (not registered, or
+> exempt) nothing is said, and the product page keeps "Inclusive of all
+> taxes" only there. The rule and its one sum are
+> `docs/patterns/backend-billing-and-classes.md` → "How a price carries GST
+> is the business's choice" and `invoices/gst-price.ts`.
 
 ### Staff and their hours
 

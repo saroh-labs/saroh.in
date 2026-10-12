@@ -1,4 +1,6 @@
 import { count, plural } from "@/lib/format/plural";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
+import { pricesCarryGst } from "@/lib/gst/price-mode";
 import type { GstRateValue } from "@/lib/invoices/gst";
 
 /**
@@ -46,6 +48,12 @@ export interface MissingRates {
     items: (RateRow & { kind: "SERVICE" | "PRODUCT" })[];
     /** More are missing than `items` lists. */
     more: boolean;
+    /**
+     * How a registered business's prices carry GST (12 Oct 2026), where it
+     * could be told: the read's own, else the business's settings. Null or
+     * absent when it couldn't, and nothing is then said of it.
+     */
+    priceMode?: GstPriceMode | null;
 }
 
 /**
@@ -129,8 +137,16 @@ export function askWhy(items: readonly RateItem[], then: string): string {
     return `${count(items.length, "item")} have no GST rate. Choose one for each to ${then}.`;
 }
 
-/** Where the choice is kept, said under the rows. */
-export function savedWhere(items: readonly RateItem[]): string {
+/**
+ * Where the choice is kept, said under the rows, with how the prices carry
+ * GST. A line typed on an invoice is always charged as typed, GST included.
+ * A service or a product follows the business's choice (`mode`), and where
+ * that couldn't be told (`null`) nothing is said of it.
+ */
+export function savedWhere(
+    items: readonly RateItem[],
+    mode: GstPriceMode | null = "INCLUDED",
+): string {
     const lines = items.every((i) => i.kind === "LINE");
     const kept = lines
         ? "The rate is saved on this invoice."
@@ -139,7 +155,13 @@ export function savedWhere(items: readonly RateItem[]): string {
           : items.length === 1 && items[0]?.kind === "PRODUCT"
             ? "The rate is saved on the product, so you're asked once."
             : "Each rate is saved on its item, so you're asked once.";
-    return `${kept} Prices include GST. Choose 0% for anything exempt or nil-rated.`;
+    return [
+        kept,
+        pricesCarryGst(lines ? "INCLUDED" : mode),
+        "Choose 0% for anything exempt or nil-rated.",
+    ]
+        .filter((sentence) => sentence !== "")
+        .join(" ");
 }
 
 /**
@@ -159,6 +181,27 @@ export function missingLine(missing: MissingRates | null): string | null {
         ? `More than ${parts.join(" and ")}`
         : parts.join(" and ");
     return `${what} ${plural(total, "has", "have")} no GST rate. Until you choose one, ${plural(total, "its", "their")} tax invoices show no GST.`;
+}
+
+/** The list's sheet: the line under its title, by how prices carry GST. */
+export function listWhy(mode: GstPriceMode | null): string {
+    const choose =
+        mode === null
+            ? "Choose each one's rate."
+            : mode === "ADDED"
+              ? "Choose the rate added to each price."
+              : "Choose the rate each price includes.";
+    return `These are on sale with a price and no GST rate. ${choose}`;
+}
+
+/** The list's sheet: the line under its rows. */
+export function listNote(mode: GstPriceMode | null, more: boolean): string {
+    if (more) {
+        return "There are more than this list holds. Save these and the rest are listed next. Choose 0% for anything exempt or nil-rated.";
+    }
+    return [pricesCarryGst(mode), "Choose 0% for anything exempt or nil-rated."]
+        .filter((sentence) => sentence !== "")
+        .join(" ");
 }
 
 /** What the list's sheet says once it has saved. */

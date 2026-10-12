@@ -1,5 +1,6 @@
 "use client";
 
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { planLabel } from "@saroh/ui/lib/state-copy";
@@ -61,6 +62,11 @@ export interface ProductEditorProps {
      * GST rate. Absent or false asks for nothing.
      */
     gstRateNeeded?: boolean;
+    /**
+     * How the business's prices carry GST, for Basics' "Same as the
+     * business (…)"; null when it couldn't be told.
+     */
+    businessPriceMode?: GstPriceMode | null;
     categories: CategoryChoice[];
     categoriesHref: string;
     options: ProductOptionView[];
@@ -128,6 +134,7 @@ function EditorBody({
     currency,
     gstRegistered,
     gstRateNeeded = false,
+    businessPriceMode = null,
     categories,
     categoriesHref,
     options,
@@ -380,6 +387,7 @@ function EditorBody({
                         currency={currency}
                         gstRegistered={gstRegistered}
                         gstRateNeeded={gstRateNeeded}
+                        businessPriceMode={businessPriceMode}
                         categories={categories}
                         manageCategoriesHref={categoriesHref}
                         onCategoryChange={(id) => void categoryChanged(id)}

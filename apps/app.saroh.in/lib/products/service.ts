@@ -1,6 +1,7 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, getList, orgBase } from "@/lib/api/http";
 import type { PlanRefusal } from "@/lib/billing/refusal";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 
 import type { SoldOutPlace } from "./tracking";
 
@@ -76,6 +77,13 @@ export interface ProductImage {
  * SKU it is known by, and its stock against its own low-stock threshold.
  */
 export interface ProductListItem extends Product {
+    /**
+     * The price's GST rate in percent and its own way of carrying GST, as
+     * the row is read; the counter's preview prices by them. Absent from
+     * an older API.
+     */
+    gstRate?: string | null;
+    gstPriceMode?: GstPriceMode | null;
     storeId: string;
     updatedAt: string;
     variantCount: number;
@@ -195,6 +203,12 @@ export interface ProductDetail extends Product {
     /** GST the price includes, in percent ("18"), ADR-008; null when unset. */
     gstRate?: string | null;
     hsnCode?: string | null;
+    /**
+     * How this price carries GST when it differs from the business's way
+     * (12 Oct 2026); null is "same as the business". Absent from an older
+     * API.
+     */
+    gstPriceMode?: GstPriceMode | null;
     warranty: string | null;
     returnsMode: "STOREFRONT" | "OWN";
     returnsText: string | null;
@@ -653,6 +667,8 @@ export interface ProductPatch {
     supplierCode?: string | null;
     gstRate?: string | null;
     hsnCode?: string | null;
+    /** Null goes back to "same as the business". */
+    gstPriceMode?: GstPriceMode | null;
     warranty?: string | null;
     returnsMode?: "STOREFRONT" | "OWN";
     returnsText?: string | null;

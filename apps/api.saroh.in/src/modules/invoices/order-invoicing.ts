@@ -4,6 +4,7 @@ import { ensureContactForPaidOrder } from "../customer-workspace/ensure-contact"
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { bpsToRate, rateToBps } from "./gst";
+import { businessPriceMode } from "./gst-price";
 import type { RatedLine } from "./gst-rate-required";
 import { assertRatesSet } from "./gst-rate-required";
 import { stateName } from "./gst-states";
@@ -22,6 +23,7 @@ import {
     buildOrderInvoice,
     buildPaymentSupplementary,
     formatSellerAddress,
+    modeOf,
     orderBillTo,
 } from "./order-invoice";
 import { fromCents, toCents } from "./totals";
@@ -63,6 +65,7 @@ export async function loadTaxProfile(
             timezone: true,
             deliveryGstRate: true,
             deliverySacCode: true,
+            gstPriceMode: true,
             addressLine1: true,
             addressLine2: true,
             city: true,
@@ -85,6 +88,7 @@ export async function loadTaxProfile(
         numberFormat: p?.invoiceNumberFormat ?? null,
         deliveryRateBps: rateToBps(p?.deliveryGstRate ?? "18") ?? 1800,
         deliverySac: p?.deliverySacCode ?? null,
+        priceMode: businessPriceMode(p?.gstPriceMode),
         address: p
             ? formatSellerAddress({ ...p, stateName: stateName(p.gstState) })
             : null,
@@ -172,6 +176,8 @@ export async function writeDocumentLines(
             cgst: fromCents(l.cgstCents),
             sgst: fromCents(l.sgstCents),
             igst: fromCents(l.igstCents),
+            // Frozen with the rate: only a taxed line was charged under one.
+            gstPriceMode: receipt || !l.rateBps ? null : (l.priceMode ?? null),
             orderItemId: l.orderItemId ?? null,
         })),
     });
@@ -265,6 +271,7 @@ export async function ensureOrderInvoice(
                     id: true,
                     quantity: true,
                     price: true,
+                    gstPriceMode: true,
                     product: {
                         select: {
                             id: true,
@@ -375,6 +382,7 @@ const ORIGINAL_SELECT = {
             gstRate: true,
             hsnSac: true,
             orderItemId: true,
+            gstPriceMode: true,
         },
     },
 } as const satisfies Prisma.InvoiceSelect;
@@ -546,6 +554,7 @@ async function ensureTreatmentBalanceInvoice(
                 where: { serviceId: { not: null } },
                 select: {
                     id: true,
+                    gstPriceMode: true,
                     service: {
                         select: {
                             id: true,
@@ -590,6 +599,7 @@ async function ensureTreatmentBalanceInvoice(
             rateBps: rateToBps(line.service.gstRate?.toString() ?? null),
             code: line.service.sacCode,
             orderItemId: line.id,
+            priceMode: modeOf(line.gstPriceMode),
         },
     ]);
     await writeCorrection(tx, original, "SUPPLEMENTARY", doc, {
@@ -1000,6 +1010,11 @@ export async function correctOrderInvoiceForEdit(
             /** The line's rate and code when it has no product. */
             rateBps?: number | null;
             code?: string | null;
+            /**
+             * What the units were charged under, for a line removed by
+             * this edit (its row is gone); otherwise read from the line.
+             */
+            priceMode?: string | null;
         }[];
         note: string | null;
         createdByUserId: string | null;
@@ -1031,6 +1046,19 @@ export async function correctOrderInvoiceForEdit(
         select: { id: true, name: true, gstRate: true, hsnCode: true },
     });
     const byProduct = new Map(products.map((p) => [p.id, p]));
+    // What each line was charged under, as it was sold: the correction's
+    // lines say the same.
+    const itemIds = input.changes.flatMap((c) =>
+        c.orderItemId ? [c.orderItemId] : [],
+    );
+    const sold =
+        itemIds.length > 0
+            ? await tx.orderItem.findMany({
+                  where: { id: { in: itemIds } },
+                  select: { id: true, gstPriceMode: true },
+              })
+            : [];
+    const modeByItem = new Map(sold.map((i) => [i.id, i.gstPriceMode]));
     // An edit is made by someone at the business: units added to a tax
     // invoice's order never go out on a supplementary invoice with a rate
     // nobody chose (`gst-rate-required.ts`). The edit is refused, the app
@@ -1051,6 +1079,10 @@ export async function correctOrderInvoiceForEdit(
                 : (c.rateBps ?? null),
             code: c.productId ? (product?.hsnCode ?? null) : (c.code ?? null),
             orderItemId: c.orderItemId,
+            priceMode: modeOf(
+                c.priceMode ??
+                    (c.orderItemId ? modeByItem.get(c.orderItemId) : null),
+            ),
         };
     };
     const up = input.changes

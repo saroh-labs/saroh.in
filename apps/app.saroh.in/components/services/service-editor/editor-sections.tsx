@@ -10,12 +10,15 @@ import { useId } from "react";
 
 import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import type { PlanLock } from "@/lib/billing/access";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
 import { AVAILABILITY_HREF } from "@/lib/services/service-cards";
+import type { ServiceCharged } from "@/lib/services/service-editor";
 import {
     bookingPageNote,
     draftVisits,
+    gstGoesOnTop,
     staffNote,
     timeNote,
     toMinor,
@@ -183,10 +186,16 @@ export function PriceSection({
     payment,
     withGst = false,
     canEdit = true,
+    businessPriceMode = null,
+    charged = null,
 }: Edit & {
     currency: string;
     /** A GST-registered business: the GST rate and SAC code sit here. */
     withGst?: boolean;
+    /** How the business's prices carry GST; null when it couldn't be told. */
+    businessPriceMode?: GstPriceMode | null;
+    /** The API's amounts for the price as saved; null once it is changed. */
+    charged?: ServiceCharged | null;
     canEdit?: boolean;
     /** The deposit the service has saved. */
     savedDeposit?: DepositMode;
@@ -233,6 +242,7 @@ export function PriceSection({
                         leave={leave}
                         asked
                         canEdit={canEdit}
+                        businessPriceMode={businessPriceMode}
                     />
                 ) : null}
             </div>
@@ -245,6 +255,8 @@ export function PriceSection({
                 paymentsLock={paymentsLock}
                 way={payment?.bookingPayment}
                 problem={problem}
+                charged={charged}
+                gstOnTop={gstGoesOnTop(draft, businessPriceMode, withGst)}
                 onChange={(deposit) => set({ deposit })}
             />
         </Section>

@@ -876,6 +876,8 @@ describe("OrganizationSettingsService", () => {
                     invoicePrefix: "RC",
                     deliveryRate: "18",
                     deliverySac: "996813",
+                    // Never chosen: prices include GST, as they always did.
+                    priceMode: "INCLUDED",
                     // Never chosen: the numbers it always had.
                     invoiceNumber: {
                         parts: ["PREFIX", "FY"],
