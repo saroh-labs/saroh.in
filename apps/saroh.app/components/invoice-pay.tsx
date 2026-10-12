@@ -23,7 +23,13 @@ import { InvoiceAutopay } from "@/components/invoice-autopay";
 import { PrintButton } from "@/components/print-button";
 import type { PayInvoice } from "@/lib/invoice-pay";
 import type { PayContact } from "@/lib/invoice-pay-shape";
-import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
+import {
+    payDate,
+    payLineGstWords,
+    payMoney,
+    payOffer,
+    payTitle,
+} from "@/lib/invoice-pay-shape";
 import { hasCustomerPdf } from "@/lib/invoice-pdf";
 
 /**
@@ -145,6 +151,10 @@ export function InvoicePay({
                                             {money(l.unitPrice)} each
                                         </span>
                                     ) : null}
+                                    <LineGst
+                                        gst={l.gst}
+                                        currency={invoice.currency}
+                                    />
                                 </td>
                                 <td className="px-4 py-3 text-right tabular-nums">
                                     {l.quantity}
@@ -431,4 +441,20 @@ export function ContactToPay({
             </ul>
         </div>
     );
+}
+
+/**
+ * The GST in or on a line's amount, under its name, in the words the bag
+ * and checkout use. Nothing when the API said none.
+ */
+function LineGst({ gst, currency }: { gst: unknown; currency: string }) {
+    const words = payLineGstWords(gst, currency);
+    return words ? (
+        <span
+            data-line-gst=""
+            className="block text-xs tabular-nums text-site-muted"
+        >
+            {words}
+        </span>
+    ) : null;
 }

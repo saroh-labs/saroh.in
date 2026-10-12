@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
+import { browsePriceWords } from "../lib/gst-price";
 import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
 import { useProductSelection } from "../product/product-page";
@@ -135,8 +136,12 @@ export function AddToBag({
     }
 
     // What one more costs, on the button itself.
+    // "₹1,000 + GST" where GST comes on top: the bag shows the sum.
     const price = selection.currency
-        ? formatAmount(selection.price, selection.currency)
+        ? browsePriceWords(
+              formatAmount(selection.price, selection.currency),
+              selection.gstAdded === true,
+          )
         : "";
     const forPrice = price ? ` · ${price}` : "";
 

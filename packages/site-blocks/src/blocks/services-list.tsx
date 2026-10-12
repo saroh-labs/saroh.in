@@ -8,6 +8,8 @@ import { resolveVariant } from "@saroh/block-contract";
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
 import { quietFill } from "../booking-flow/styles";
+import type { GstOnPrice } from "../lib/gst-price";
+import { browsePriceWords, gstOnPriceOf } from "../lib/gst-price";
 import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
 import { useQrSource, withQrSource } from "../qr-source";
@@ -43,6 +45,12 @@ export interface PublicService {
     durationMinutes: number;
     priceCents: number | null;
     currency: string | null;
+    /**
+     * The GST in or on the price; null for none. Absent from an older API.
+     * The list only browses, so it reads the mode alone: "+ GST" after a
+     * price GST is added to.
+     */
+    gst?: GstOnPrice | null;
 }
 
 type LoadState =
@@ -61,6 +69,20 @@ function isPublicService(value: unknown): value is PublicService {
         (v.priceCents === null || typeof v.priceCents === "number") &&
         (v.currency === null || typeof v.currency === "string")
     );
+}
+
+/**
+ * A service's price as the list shows it: the price the business typed,
+ * with "+ GST" after it when GST comes on top. Null for none to show.
+ */
+export function servicePriceWords(
+    service: Pick<PublicService, "priceCents" | "currency" | "gst">,
+    locale?: string,
+): string | null {
+    const price = formatPrice(service.priceCents, service.currency, locale);
+    return price === null
+        ? null
+        : browsePriceWords(price, gstOnPriceOf(service.gst)?.mode === "ADDED");
 }
 
 /** "30 min", "1 hr", "1 hr 30 min". */
@@ -265,10 +287,7 @@ export default function ServicesListSection({
                     <ul className="border-site-border mt-8 border-t">
                         {state.services.map((service) => {
                             const price = showPrices
-                                ? formatPrice(
-                                      service.priceCents,
-                                      service.currency,
-                                  )
+                                ? servicePriceWords(service)
                                 : null;
                             return (
                                 <li
@@ -395,9 +414,7 @@ function ServiceCards({
     return (
         <ul className="mt-8 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]">
             {services.map((service) => {
-                const price = showPrices
-                    ? formatPrice(service.priceCents, service.currency)
-                    : null;
+                const price = showPrices ? servicePriceWords(service) : null;
                 return (
                     <li
                         key={service.id}
@@ -563,9 +580,7 @@ function PriceCard({
 }) {
     const source = useQrSource();
     const price =
-        content.showPrices !== false
-            ? formatPrice(service.priceCents, service.currency)
-            : null;
+        content.showPrices !== false ? servicePriceWords(service) : null;
     const duration = formatDuration(service.durationMinutes);
     const mode = said(content.modeLine);
     const followUp = said(content.followUpLine);

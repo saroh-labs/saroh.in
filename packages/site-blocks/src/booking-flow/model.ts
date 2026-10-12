@@ -5,6 +5,12 @@
  */
 
 import { clockParts, clockValue } from "../lib/clock";
+import type { GstOnPrice } from "../lib/gst-price";
+import {
+    browsePriceWords,
+    gstOnPriceOf,
+    gstPriceWords,
+} from "../lib/gst-price";
 import { siteMoney } from "../lib/money";
 import type { NoticeReach } from "../lib/told";
 import type { PayInstructions } from "../pay-instructions/model";
@@ -23,12 +29,25 @@ export interface BookingService {
     durationMinutes: number;
     kind: "one" | "class";
     capacity: number;
+    /** The price the business typed, × 100. */
     priceCents: number | null;
     currency: string | null;
     /**
+     * What one booking costs to pay, GST and all, worked out by the
+     * server: more than `priceCents` when GST is added on top. Null with
+     * no price; absent from an API older than the page, where the price
+     * is what is paid.
+     */
+    payCents?: number | null;
+    /**
+     * The GST in or on the price, for the words beside it; null when
+     * there is none to say. Absent from an older API.
+     */
+    gst?: GstOnPrice | null;
+    /**
      * What paying the deposit takes at booking (E8), worked out by the
-     * server, or null when the service takes none. Absent from an API
-     * older than the page: no deposit.
+     * server as a share of the amount to pay, or null when the service
+     * takes none. Absent from an API older than the page: no deposit.
      */
     depositCents?: number | null;
     /**
@@ -223,6 +242,9 @@ function isService(v: unknown): v is BookingService {
         isNum(v.capacity) &&
         numOrNull(v.priceCents) &&
         strOrNull(v.currency) &&
+        // `gst` is narrowed where it is read (`gstOnPriceOf`): anything
+        // strange there is no GST said, never a page that won't open.
+        (v.payCents === undefined || numOrNull(v.payCents)) &&
         (v.depositCents === undefined || numOrNull(v.depositCents)) &&
         (v.visits === undefined || isNum(v.visits)) &&
         typeof v.online === "boolean" &&
@@ -489,8 +511,10 @@ export function payChoices(
     business: string,
     way: BookingPayment = "BOTH",
 ): PayChoice[] {
-    const price = formatMoney(service.priceCents, service.currency);
-    if (!price || !service.priceCents || service.priceCents <= 0) return [];
+    // Every amount here is what is paid, GST and all: the API's sum.
+    const toPay = payCentsOf(service);
+    const price = formatMoney(toPay, service.currency);
+    if (!price || !toPay || toPay <= 0) return [];
     const online = payOnline && way !== "DESK";
     const atDesk = way !== "ONLINE";
     const isClass = service.kind === "class";
@@ -517,7 +541,7 @@ export function payChoices(
         // Online can't take it: the desk, where the business allows it
         // (DEC-089); under online only it can't be booked here.
         if (!online) return atDesk ? [desk] : [];
-        if (deposit >= service.priceCents) return [payNow];
+        if (deposit >= toPay) return [payNow];
         const part = formatMoney(deposit, service.currency) ?? "";
         const rest = restAfterDeposit(service) ?? "";
         return [
@@ -613,9 +637,44 @@ export function unpayableText(
  */
 export function restAfterDeposit(service: BookingService): string | null {
     const deposit = service.depositCents ?? null;
-    if (deposit === null || !service.priceCents) return null;
-    if (deposit >= service.priceCents) return null;
-    return formatMoney(service.priceCents - deposit, service.currency);
+    const toPay = payCentsOf(service);
+    if (deposit === null || !toPay) return null;
+    if (deposit >= toPay) return null;
+    // Two amounts the API worked out: what is paid, less the deposit.
+    return formatMoney(toPay - deposit, service.currency);
+}
+
+// ── GST on the price ─────────────────────────────────────────────────────
+
+/**
+ * What one booking of the service costs to pay: the API's amount, GST and
+ * all, or the price itself from an API that sends none.
+ */
+export function payCentsOf(service: BookingService): number | null {
+    return service.payCents ?? service.priceCents;
+}
+
+/**
+ * The price with its GST, before paying and on the confirmation: "₹1,000,
+ * includes ₹152.54 GST (18%)" or "₹1,000 + ₹180 GST (18%)". Null when the
+ * API said none: nothing is said about GST.
+ */
+export function serviceGstWords(service: BookingService | null): string | null {
+    const gst = gstOnPriceOf(service?.gst);
+    return gst && service?.currency
+        ? gstPriceWords(gst, service.currency)
+        : null;
+}
+
+/**
+ * A service's price where it is only being picked: the price the business
+ * typed, with "+ GST" after it when GST comes on top.
+ */
+export function servicePickPrice(service: BookingService): string | null {
+    const price = formatMoney(service.priceCents, service.currency);
+    return price === null
+        ? null
+        : browsePriceWords(price, gstOnPriceOf(service.gst)?.mode === "ADDED");
 }
 
 // ── Words and numbers ────────────────────────────────────────────────────

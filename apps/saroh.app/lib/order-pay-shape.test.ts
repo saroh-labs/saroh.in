@@ -68,3 +68,21 @@ describe("orderPayOffer (R33)", () => {
         expect(isPayOrder({ ...ORDER, payOnline: false })).toBe(true);
     });
 });
+
+describe("the GST on an order's line", () => {
+    const adds = {
+        mode: "ADDED",
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+
+    it("reads an order whose lines say it, say none, or say nothing", () => {
+        for (const gst of [adds, null, undefined, "18"]) {
+            expect(
+                isPayOrder({ ...ORDER, lines: [{ ...ORDER.lines[0], gst }] }),
+            ).toBe(true);
+        }
+    });
+});

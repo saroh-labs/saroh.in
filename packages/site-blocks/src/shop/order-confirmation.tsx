@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { focusRing } from "../booking-flow/styles";
+import type { GstOnPrice } from "../lib/gst-price";
+import { gstLineWords, gstOnPriceOf } from "../lib/gst-price";
 import { formatAmount } from "../lib/money";
 import type { NoticeReach } from "../lib/told";
 import { toldText } from "../lib/told";
@@ -33,6 +35,11 @@ export interface OrderConfirmationLine {
     variant: string | null;
     quantity: number;
     amount: string;
+    /**
+     * The GST in or on the line's whole amount; null for none. Absent from
+     * an older API.
+     */
+    gst?: GstOnPrice | null;
 }
 
 /** What the API sends for a placed order (`checkout-confirmation.ts`). */
@@ -118,25 +125,38 @@ function Summary({ order }: { order: OrderConfirmationData }) {
                 Your order
             </h2>
             <ul className="divide-site-border mt-2 divide-y">
-                {order.lines.map((line, i) => (
-                    <li
-                        key={`${line.name}-${line.variant ?? ""}-${i}`}
-                        className="flex items-start justify-between gap-3 py-3"
-                    >
-                        <span className="min-w-0">
-                            <span className="text-site-fg block break-words font-medium">
-                                {line.name}
+                {order.lines.map((line, i) => {
+                    const gst = gstOnPriceOf(line.gst);
+                    return (
+                        <li
+                            key={`${line.name}-${line.variant ?? ""}-${i}`}
+                            className="flex items-start justify-between gap-3 py-3"
+                        >
+                            <span className="min-w-0">
+                                <span className="text-site-fg block break-words font-medium">
+                                    {line.name}
+                                </span>
+                                <span className="text-site-body block text-sm">
+                                    {line.variant ? `${line.variant} · ` : ""}
+                                    Qty {line.quantity}
+                                </span>
+                                {/* The GST in or on what was paid for
+                                    the line, in the bag's words. */}
+                                {gst ? (
+                                    <span
+                                        data-line-gst=""
+                                        className="text-site-body block text-sm tabular-nums"
+                                    >
+                                        {gstLineWords(gst, order.currency)}
+                                    </span>
+                                ) : null}
                             </span>
-                            <span className="text-site-body block text-sm">
-                                {line.variant ? `${line.variant} · ` : ""}
-                                Qty {line.quantity}
+                            <span className="text-site-fg shrink-0 tabular-nums">
+                                {money(line.amount)}
                             </span>
-                        </span>
-                        <span className="text-site-fg shrink-0 tabular-nums">
-                            {money(line.amount)}
-                        </span>
-                    </li>
-                ))}
+                        </li>
+                    );
+                })}
             </ul>
             <dl className="border-site-border mt-1 space-y-2 border-t pt-3.5 text-sm">
                 <div className="flex justify-between gap-3">

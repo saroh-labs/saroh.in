@@ -599,3 +599,45 @@ describe("a discount code in the bag (DEC-104)", () => {
         });
     });
 });
+
+describe("GST on the quote (the business's price mode)", () => {
+    const adds = {
+        mode: "ADDED",
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+    const line = {
+        listingId: "l1",
+        variantId: null,
+        slug: "sourdough",
+        name: "Sourdough",
+        variantTitle: null,
+        image: null,
+        unitPrice: "1180.00",
+        quantity: 1,
+        amount: "1180.00",
+        state: "ok",
+        available: null,
+    };
+    const quote = (lineGst: unknown, gst: unknown) => ({
+        currency: "INR",
+        lines: [
+            { ...line, ...(lineGst === undefined ? {} : { gst: lineGst }) },
+        ],
+        ways: [],
+        fulfilment: null,
+        subtotal: "1180.00",
+        delivery: "0.00",
+        total: "1180.00",
+        ready: true,
+        ...(gst === undefined ? {} : { gst }),
+    });
+
+    it("reads a quote with it, with none, and from an API that sends nothing", () => {
+        expect(isQuote(quote(adds, "180.00"))).toBe(true);
+        expect(isQuote(quote(null, null))).toBe(true);
+        expect(isQuote(quote(undefined, undefined))).toBe(true);
+    });
+});

@@ -105,3 +105,51 @@ describe("what is left to do before booking (UX-083)", () => {
         ).toBeInTheDocument();
     });
 });
+
+describe("the GST beside what is due", () => {
+    const aside = (gstText: string | null) =>
+        render(
+            <SummaryAside
+                {...BASE}
+                due="₹1,180"
+                block=""
+                gstText={gstText}
+                serviceName="Consultation"
+                whenText="Thu 8 Oct at 11:00 am"
+                name="Asha"
+                hasService
+                confirmLabel="Book and pay at the desk"
+                rules=""
+            />,
+        );
+
+    it("says the price with its GST under the amount to pay", () => {
+        const { container } = aside("₹1,000 + ₹180 GST (18%)");
+        expect(container.querySelector("[data-booking-gst]")).toHaveTextContent(
+            /^₹1,000 \+ ₹180 GST \(18%\)$/,
+        );
+        expect(screen.getByText("₹1,180")).toBeInTheDocument();
+    });
+
+    it("says nothing when there is none", () => {
+        const { container } = aside(null);
+        expect(container.querySelector("[data-booking-gst]")).toBeNull();
+        expect(container.textContent).not.toContain("GST");
+    });
+
+    it("keeps the phone's bar to the amount and the button", () => {
+        const { container } = render(
+            <PhoneBar
+                {...BASE}
+                due="₹1,180"
+                block=""
+                gstText="₹1,000 + ₹180 GST (18%)"
+                hasService
+                whenText="Thu 8 Oct at 11:00 am"
+                barLabel="Book"
+            />,
+        );
+        expect(container.textContent).toContain("₹1,180");
+        expect(container.textContent).not.toContain("GST");
+    });
+});

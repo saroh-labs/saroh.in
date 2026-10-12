@@ -505,3 +505,42 @@ describe("a shop with nothing to show", () => {
         expect(screen.queryByRole("button")).toBeNull();
     });
 });
+
+describe("a card's price when GST comes on top", () => {
+    it("says + GST after the price, and nothing otherwise", () => {
+        render(
+            <ShopListing
+                products={[
+                    { ...sourdough, gstAdded: true },
+                    {
+                        ...sourdough,
+                        slug: "rye",
+                        name: "Rye loaf",
+                        price: "180.00",
+                        priceFrom: false,
+                        variantTitles: [],
+                        gstAdded: false,
+                    },
+                    {
+                        ...sourdough,
+                        slug: "bun",
+                        name: "Milk bun",
+                        price: "40.00",
+                        priceFrom: false,
+                        variantTitles: [],
+                    },
+                ]}
+            />,
+        );
+        expect(
+            screen.getByRole("link", { name: /Sourdough/ }),
+        ).toHaveTextContent("From ₹250 + GST");
+        const rye = screen.getByRole("link", { name: /Rye loaf/ });
+        expect(rye).toHaveTextContent("₹180");
+        expect(rye).not.toHaveTextContent("GST");
+        // An older API sends no word about it: no GST words.
+        expect(
+            screen.getByRole("link", { name: /Milk bun/ }),
+        ).not.toHaveTextContent("GST");
+    });
+});

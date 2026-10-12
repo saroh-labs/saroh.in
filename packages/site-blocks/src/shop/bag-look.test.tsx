@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { CheckoutQuote, QuoteLine } from "./api";
-import { BagLines } from "./bag-lines";
+import { BagLines, lineGstWords } from "./bag-lines";
 import type { OrderConfirmationData } from "./order-confirmation";
 import { OrderConfirmation } from "./order-confirmation";
 import { SheetFrame } from "./sheet-frame";
@@ -192,4 +192,85 @@ describe("the order page as a moment", () => {
             expect(screen.queryByRole("alert")).toBeNull();
         },
     );
+});
+
+describe("the GST under a bag line's price", () => {
+    const adds = {
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+    const includes = {
+        mode: "INCLUDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 15254,
+        payCents: 100000,
+    };
+    const priced = (over: Partial<QuoteLine>): QuoteLine => ({
+        ...line("Crate"),
+        unitPrice: "1180.00",
+        quantity: 2,
+        amount: "2360.00",
+        ...over,
+    });
+
+    it("says the sum where GST was added, and what is in a price that includes it", () => {
+        const { container } = render(
+            <BagLines
+                site="site-1"
+                quote={quoteOf([
+                    priced({ gst: adds }),
+                    priced({
+                        name: "Pallet",
+                        listingId: "listing-Pallet",
+                        unitPrice: "1000.00",
+                        amount: "2000.00",
+                        gst: includes,
+                    }),
+                ])}
+                caps={{}}
+                onRemoved={() => undefined}
+            />,
+        );
+        // The line's own amounts are the API's amounts to pay.
+        expect(screen.getByText("₹1,180 each")).toBeVisible();
+        expect(screen.getByText("₹2,360")).toBeVisible();
+        const notes = Array.from(
+            container.querySelectorAll("[data-line-gst]"),
+        ).map((n) => n.textContent);
+        expect(notes).toEqual([
+            "₹1,000 + ₹180 GST (18%)",
+            "includes ₹152.54 GST (18%)",
+        ]);
+    });
+
+    it("says nothing when the API said none, or sent nothing", () => {
+        const { container } = render(
+            <BagLines
+                site="site-1"
+                quote={quoteOf([priced({ gst: null }), line("Pallet")])}
+                caps={{}}
+                onRemoved={() => undefined}
+            />,
+        );
+        expect(container.querySelector("[data-line-gst]")).toBeNull();
+        expect(container.textContent).not.toContain("GST");
+    });
+
+    it("says nothing on a line no longer sold, or for a strange answer", () => {
+        expect(
+            lineGstWords(priced({ gst: adds, state: "gone" }), "INR"),
+        ).toBeNull();
+        expect(
+            lineGstWords(
+                priced({
+                    gst: { mode: "ADDED" } as unknown as QuoteLine["gst"],
+                }),
+                "INR",
+            ),
+        ).toBeNull();
+    });
 });

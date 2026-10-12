@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
+import { browsePriceWords } from "../lib/gst-price";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { BusinessReach } from "../reach-links";
@@ -54,6 +55,11 @@ export interface ShopListingCard {
     mrp: string | null;
     /** The price is the lowest of several: "From ₹250". */
     priceFrom: boolean;
+    /**
+     * GST comes on top of the price: the card says "+ GST" after it, so
+     * the amount to pay is no surprise. Absent from an older API: no.
+     */
+    gstAdded?: boolean;
     image: { url: string; alt: string } | null;
     variantTitles: string[];
     /**
@@ -267,10 +273,9 @@ export default function ShopListing({
                     )}
                 >
                     {shown.map((p, index) => {
-                        const amount = formatAmount(
-                            p.price,
-                            p.currency,
-                            locale,
+                        const amount = browsePriceWords(
+                            formatAmount(p.price, p.currency, locale),
+                            p.gstAdded === true,
                         );
                         const canAdd = Boolean(bagSite && p.listingId);
                         const href = `${basePath}/${encodeURIComponent(p.slug)}`;

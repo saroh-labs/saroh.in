@@ -7,6 +7,7 @@ import type { PublicService } from "./services-list";
 import ServicesListSection, {
     formatDuration,
     formatPrice,
+    servicePriceWords,
 } from "./services-list";
 
 const content = BLOCK_META.servicesList.fixtures
@@ -169,5 +170,65 @@ describe("the services list's states (starter audit)", () => {
         const book = screen.getByRole("link", { name: /Cut and finish/ });
         expect(book.className).toContain("coarse:h-11");
         expect(book.className).toContain("bg-site-accent");
+    });
+});
+
+describe("a service's price when GST comes on top", () => {
+    const realFetch = globalThis.fetch;
+    afterEach(() => {
+        globalThis.fetch = realFetch;
+    });
+    const priced = { ...cut, priceCents: 100000, currency: "INR" };
+    const adds = {
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+    const includes = {
+        mode: "INCLUDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 15254,
+        payCents: 100000,
+    };
+
+    it("says + GST after the price only when it is added", () => {
+        expect(servicePriceWords({ ...priced, gst: adds }, "en-IN")).toBe(
+            "₹1,000 + GST",
+        );
+        expect(servicePriceWords({ ...priced, gst: includes }, "en-IN")).toBe(
+            "₹1,000",
+        );
+        expect(servicePriceWords({ ...priced, gst: null }, "en-IN")).toBe(
+            "₹1,000",
+        );
+        // An older API sends none; a service with no price shows none.
+        expect(servicePriceWords(priced, "en-IN")).toBe("₹1,000");
+        expect(servicePriceWords({ ...consult, gst: adds })).toBeNull();
+    });
+
+    it("draws it in the list, and still reads a service the API sent no GST for", async () => {
+        globalThis.fetch = vi.fn(() =>
+            Promise.resolve(
+                new Response(
+                    JSON.stringify([
+                        { ...priced, gst: adds },
+                        { ...priced, id: "fixture-colour", name: "Colour" },
+                    ]),
+                ),
+            ),
+        );
+        const { container } = render(<ServicesListSection content={content} />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(
+            screen
+                .getAllByRole("heading", { level: 3 })
+                .map((h) => h.textContent),
+        ).toEqual(["Cut and finish", "Colour"]);
+        expect(container.textContent.match(/\+ GST/g)).toHaveLength(1);
     });
 });
