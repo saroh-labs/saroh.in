@@ -600,7 +600,17 @@ test.describe("availability and services", () => {
     }) => {
         await signIn(page);
         await page.goto("/services");
-        await page.getByRole("link", { name: "New service" }).click();
+        // New service is one link, and a menu with New course beside it
+        // once Courses is on.
+        const newLink = page.getByRole("link", { name: "New service" });
+        const newMenu = page.getByRole("button", { name: "New service" });
+        await expect(newLink.or(newMenu).first()).toBeVisible();
+        if (await newMenu.isVisible()) {
+            await newMenu.click();
+            await page.getByRole("menuitem", { name: "New service" }).click();
+        } else {
+            await newLink.first().click();
+        }
         await expect(
             page.getByRole("heading", { level: 1, name: "New service" }),
         ).toBeVisible();
@@ -664,7 +674,7 @@ test.describe("the Service Editor on Northwind (E2)", () => {
     const nwApi = (path: string) =>
         `${urls.API_URL}/organizations/${NORTHWIND}${path}`;
 
-    test("an Either service with a price is added, and its card says so", async ({
+    test("an Either service with a price is added, and its row says so", async ({
         page,
     }) => {
         await signIn(page);
@@ -709,11 +719,17 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             ).toBeVisible();
 
             await page.goto("/services");
-            const card = page.getByRole("listitem").filter({ hasText: name });
-            await expect(card).toContainText("In person or online");
+            // A row of the list: a table row at the desk, a list item
+            // on a phone. Taking bookings is a switch on it, on for a
+            // service just added.
+            const row = page
+                .locator("tr, li")
+                .filter({ hasText: name })
+                .filter({ visible: true });
+            await expect(row).toContainText("In person or online");
             await expect(
-                card.getByRole("button", { name: "Stop taking bookings" }),
-            ).toBeVisible();
+                row.getByRole("switch", { name: `Taking bookings, ${name}` }),
+            ).toBeChecked();
         } finally {
             await page.request.delete(nwApi(`/services/${id}`), {
                 headers: { "x-organization-id": NORTHWIND },

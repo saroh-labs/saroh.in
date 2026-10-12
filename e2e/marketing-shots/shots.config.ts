@@ -395,9 +395,9 @@ const HELP_SHOTS_B: Shot[] = [
         role: "owner",
         route: "/services",
         viewport: { width: 1024, height: 760 },
-        mark: 'a[aria-label="Edit Root canal treatment"]',
-        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button",
-        caption: "Services at Kavi Dental, with Edit on the root canal",
+        mark: `a[href="${KAVI_ROOT_CANAL}"]`,
+        alt: "Services at Kavi Dental (demo clinic): a row each, with its length, price and who takes it, and the root canal's row marked",
+        caption: "Services at Kavi Dental, with the root canal's row",
     },
     {
         key: "help-take-deposit-2",

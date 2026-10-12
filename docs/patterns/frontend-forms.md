@@ -28,13 +28,21 @@ as its design draws. The page holds one draft; its rules, the problems
 strip, what Save sends and the leave dialog's section names are pure
 functions in `lib/services/service-editor.ts`, tested with vitest. It
 replaced the service dialog and the two react-hook-form service forms.
+What takes effect as it is flipped is not part of that Save: "Taking
+bookings" is a switch beside it (`use-taking-bookings.ts`, 12 Oct 2026)
+that saves at once with Undo and moves the saved state and the draft
+together, so the page is never "unsaved" because of it. A length people
+mostly pick from a few values is chips with Custom (`length-field.tsx`),
+over the same string the number field held.
 
 **Current** — **One Save may be several calls, and says so when one
 fails** (10 Oct). The Service Editor's Save sends the service, then who
 takes it, then its own weekly hours (`PUT …/rules`, which replaces the
 set). The hours are rows of the same draft
 (`lib/services/service-hours-draft.ts`, `hours-field.tsx`): there is no
-"Save availability". A new service starts from the business's opening
+"Save availability". They sit in a card of their own, "When it can be
+booked" (`hours-card.tsx`), which says whose hours a one-to-one someone
+takes books in, with the way to Availability. A new service starts from the business's opening
 hours where its own hours are what gives it times (nobody on the diary
 takes it, or it is a class); a one-to-one someone takes starts with none,
 because its own hours only narrow that person's. When the service is saved
