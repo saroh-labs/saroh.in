@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { CRAWL_DISALLOWED, SERVED_PATHS, indexedPaths } from "./lib/site-pages";
+import { SIGN_UP_URL } from "./lib/links";
+import { CRAWL_DISALLOWED, indexedPaths, SERVED_PATHS } from "./lib/site-pages";
 import nextConfig from "./next.config.js";
-import { REDIRECTS, temporary } from "./redirects.js";
+import { launched, REDIRECTS, temporary } from "./redirects.js";
 
 /** The URLs the V1 sitemap listed, and the addresses before it (plan U26). */
 const OLD_URLS = [
@@ -47,6 +48,40 @@ describe("redirects", () => {
         ]);
     });
 
+    it("keeps the waitlist a page until the launch switch opens, then moves it to sign-up for good", () => {
+        expect(launched(undefined)).toEqual([]);
+        expect(launched("waitlist")).toEqual([]);
+        // Where "Start free" goes (`cta`, lib/links.ts), with no query of
+        // its own: Next carries the visitor's over.
+        // Given the address the build is given, as next.config.js gives it
+        // (read back from `SIGN_UP_URL`): CI sets one, so the unset default
+        // is not what the site links to there.
+        expect(launched("open", SIGN_UP_URL.replace(/\/signup$/, ""))).toEqual([
+            { source: "/waitlist", destination: SIGN_UP_URL, statusCode: 301 },
+        ]);
+        expect(launched("open")).toEqual([
+            {
+                source: "/waitlist",
+                destination: "https://accounts.saroh.in/signup",
+                statusCode: 301,
+            },
+        ]);
+        expect(launched("open", "https://accounts.example.test")).toEqual([
+            {
+                source: "/waitlist",
+                destination: "https://accounts.example.test/signup",
+                statusCode: 301,
+            },
+        ]);
+        // Open, nothing sends anyone to the waitlist any more: no chain.
+        expect(temporary("open")).toEqual([]);
+    });
+
+    it("sends the old Website addresses to the Website page", () => {
+        expect(resolve("/website")).toBe("/features/website");
+        expect(resolve("/modules/website")).toBe("/features/website");
+    });
+
     it("sends Pricing to the waitlist until the launch switch opens", () => {
         expect(temporary(undefined)).toEqual([
             { source: "/pricing", destination: "/waitlist", statusCode: 302 },
@@ -86,9 +121,12 @@ describe("redirects", () => {
 });
 
 describe("indexed pages", () => {
-    it("lists Home, 8 features, 3 solutions, About, Contact, /customers and the waitlist while it is the ask; Pricing once it opens", () => {
+    it("lists Home, 9 features, 4 solutions, About, Contact, /customers and the waitlist while it is the ask; Pricing once it opens", () => {
         const waitlist = indexedPaths("waitlist");
-        expect(waitlist).toHaveLength(16);
+        expect(waitlist).toHaveLength(18);
+        expect(waitlist).toEqual(
+            expect.arrayContaining(["/features/website", "/solutions/salons"]),
+        );
         expect(waitlist).toContain("/waitlist");
         expect(waitlist).toContain("/customers");
         // About and Contact are pages in either mode (DEC-137).
@@ -102,11 +140,11 @@ describe("indexed pages", () => {
         expect(waitlist).not.toContain("/pricing");
         expect(indexedPaths("open")).toContain("/pricing");
         expect(waitlist.filter((p) => p.startsWith("/features/"))).toHaveLength(
-            8,
+            9,
         );
         expect(
             waitlist.filter((p) => p.startsWith("/solutions/")),
-        ).toHaveLength(3);
+        ).toHaveLength(4);
         expect(indexedPaths("open")).not.toContain("/waitlist");
     });
 
@@ -117,5 +155,9 @@ describe("indexed pages", () => {
         expect(CRAWL_DISALLOWED).toEqual(
             expect.arrayContaining(["/pricing/draft", "/pricing/preview"]),
         );
+    });
+
+    it("leaves /welcome open to crawlers, so its noindex can be read", () => {
+        expect(CRAWL_DISALLOWED).not.toContain("/welcome");
     });
 });

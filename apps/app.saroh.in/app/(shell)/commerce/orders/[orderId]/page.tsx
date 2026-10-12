@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
@@ -22,6 +23,7 @@ import { arrivalOf } from "@/lib/orders/row-menu";
 import { sellablesOf } from "@/lib/orders/sellables";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { recordTitle } from "@/lib/page-title";
 import { refundsOnlineOrUnknown } from "@/lib/payments/refunds-online";
 import { getOrderPayments } from "@/lib/payments/service";
 import { invitationState } from "@/lib/product-reviews/service";
@@ -29,7 +31,22 @@ import { listProducts } from "@/lib/products/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Order" };
+// One read for the tab's title and the page.
+const readOrder = cache((orderId: string) => getOrderRead(orderId));
+
+/** "Order #1042" in the tab: its number, never who it is for or its total. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ orderId: string }>;
+}) {
+    const { orderId } = await params;
+    return recordTitle(
+        () => readOrder(orderId),
+        (order) => `Order #${order.orderId}`,
+        "Order",
+    );
+}
 
 /**
  * Sell → Orders → one order, after the "Saroh Order Detail" design, layout
@@ -68,7 +85,7 @@ export default async function OrderPage({
     if (organization && !ordersAccess(organization).open) {
         return <OrderLocked text={orderLockedText(organization)} />;
     }
-    const order = await getOrderRead(orderId);
+    const order = await readOrder(orderId);
     if (!order) notFound();
 
     const may = permitsFor(organization);

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { BookingDetailView } from "@/components/bookings/booking-detail";
 import { takesOnlinePayment } from "@/lib/billing/access";
@@ -10,6 +11,7 @@ import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { recordTitle } from "@/lib/page-title";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import {
     canReadOrders,
@@ -32,14 +34,21 @@ import { requireSession } from "@/lib/session";
  *
  * The page fetches; the view decides how to render, matching the list.
  */
+// One read for the tab's title and the page (it was read twice).
+const readBooking = cache((bookingId: string) => getBooking(bookingId));
+
+/** What was booked, in the tab: the service, never who booked it or when. */
 export async function generateMetadata({
     params,
 }: {
     params: Promise<{ bookingId: string }>;
 }) {
     const { bookingId } = await params;
-    const booking = await getBooking(bookingId);
-    return { title: booking ? `${booking.service.name} booking` : "Booking" };
+    return recordTitle(
+        () => readBooking(bookingId),
+        (booking) => `${booking.service.name} booking`,
+        "Booking",
+    );
 }
 
 export default async function BookingPage({
@@ -52,7 +61,7 @@ export default async function BookingPage({
 
     // Null covers missing, another org's, and not permitted alike — the api
     // answers 404 for all three so a caller cannot probe what exists.
-    const booking = await getBooking(bookingId);
+    const booking = await readBooking(bookingId);
     if (!booking) notFound();
 
     // Read through the data layer, which is where this codebase keeps clock

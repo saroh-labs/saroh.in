@@ -32,6 +32,10 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/booking-quick-look.tsx": ["button"],
     // button: a cell covered by its button, a row or card that is one button
     "components/bookings/calendar/day-by-person.tsx": ["button"],
+    // button: a booking on the diary, a block that is one button
+    "components/bookings/calendar/diary-block.tsx": ["button"],
+    // button: free time on the diary, a cell covered by its button
+    "components/bookings/calendar/free-gap.tsx": ["button"],
     // button: a row or card that is one button
     "components/bookings/calendar/week-view.tsx": ["button"],
     // button: a choice in a list

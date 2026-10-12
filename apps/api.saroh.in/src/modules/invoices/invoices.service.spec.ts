@@ -998,6 +998,90 @@ describe("GST (ADR-008)", () => {
         expect(data.cgst).toBe("9.00");
     });
 
+    /** A draft under its lock, with these lines. */
+    const draftWith = (lines: Record<string, unknown>[]) =>
+        tx.invoice!.findFirst!.mockResolvedValue({
+            status: "DRAFT",
+            contactId: "c_1",
+            dueAt: null,
+            tax: decimal("0"),
+            billToGstin: null,
+            billToState: null,
+            billToAddress: null,
+            lines,
+        });
+    const line = (description: string, gstRate: string | null) => ({
+        description,
+        quantity: 1,
+        unitPrice: decimal("118"),
+        gstRate: gstRate === null ? null : decimal(gstRate),
+        hsnSac: null,
+    });
+
+    it("refuses to issue a tax invoice with a line whose rate nobody chose, naming the lines by their place", async () => {
+        registered();
+        draftWith([
+            line("Almond croissant", "18"),
+            line("Catering, Saturday", null),
+            line("Delivery", null),
+        ]);
+        const attempt = service.issue(owner, "inv_1");
+        await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+        await expect(attempt).rejects.toMatchObject({
+            response: {
+                message:
+                    "Catering, Saturday and Delivery have no GST rate. Choose one for each to issue this invoice.",
+                details: {
+                    reason: "GST_RATE_MISSING",
+                    items: [
+                        { kind: "LINE", id: "1", name: "Catering, Saturday" },
+                        { kind: "LINE", id: "2", name: "Delivery" },
+                    ],
+                },
+            },
+        });
+        // Before its number: nothing is numbered or written.
+        expect(tx.invoiceSequence!.upsert).not.toHaveBeenCalled();
+        expect(tx.invoice!.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("issues a line at 0%: exempt is a rate somebody chose", async () => {
+        registered();
+        draftWith([line("Bread loaf", "0")]);
+        await service.issue(owner, "inv_1");
+        const data = tx.invoice!.updateMany!.mock.calls[0]![0].data;
+        expect(data.status).toBe("ISSUED");
+        expect(data.tax).toBe("0.00");
+    });
+
+    it("never asks an unregistered business for a rate", async () => {
+        draftWith([line("Towel hire", null)]);
+        await service.issue(owner, "inv_1");
+        expect(tx.invoice!.updateMany!.mock.calls[0]![0].data.status).toBe(
+            "ISSUED",
+        );
+    });
+
+    it("another module's invoice (a renewal, a pack, a course) is issued with no rate, as before", async () => {
+        registered();
+        const issued = await service.issueInTx(tx as never, "org_1", {
+            contactId: "c_1",
+            currency: "INR",
+            lines: [
+                {
+                    description: "Monthly membership",
+                    quantity: 1,
+                    unitPrice: "1200",
+                },
+            ],
+            source: "SUBSCRIPTION",
+        });
+        expect(issued.number).toMatch(/^RC\//);
+        expect(tx.invoiceLine!.createMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({ gstRate: null })],
+        });
+    });
+
     it("an issued invoice reads the address it was issued with, never today's", () => {
         // The read is the frozen column alone: it never consults the
         // business profile, so a move after issue cannot reach the paper.

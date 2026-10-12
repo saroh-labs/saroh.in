@@ -7,30 +7,46 @@ import type {
 } from "@saroh/site-blocks";
 import { Me } from "@saroh/site-blocks";
 
-import { getAccount, getNotes, getReceipts } from "@/lib/account-area";
+import {
+    getAccount,
+    getInvoicesDue,
+    getNotes,
+    getNotices,
+    getReceipts,
+} from "@/lib/account-area";
+import { accountTitle } from "@/lib/account-site";
+import { ACCOUNT_PAGE_TITLES } from "@/lib/account-title";
 import { getSignInOptions } from "@/lib/sign-in";
 
 import { signOut, signOutEverywhere } from "../actions";
 import {
     addHealthNote,
     confirmEmailChange,
+    payInvoiceNow,
     requestEmailChangeCode,
+    saveEmailChoice,
     updateAccountDetails,
 } from "./actions";
 
 /**
- * Me, in the customer's account (round-2 plan A, A5): details, a health
- * note for the team (once C12 lets staff act on it), receipts, and signing
- * out. The layout has already checked the switch and the session.
+ * Your details, in the customer's account (round-2 plan A, A5; the tab was
+ * "Me" until DEC-142): their name and contact, what is still to pay, their
+ * receipts, a health note for the team (once C12 lets staff act on it),
+ * whether the business may email them, and signing out. The layout has
+ * already checked the switch and the session.
  */
-export const metadata: Metadata = { title: "Me" };
+export function generateMetadata(): Promise<Metadata> {
+    return accountTitle(ACCOUNT_PAGE_TITLES.me);
+}
 
 export default async function MePage() {
     const lookup = await getAccount();
     if (!lookup.ok) return null; // The layout drew the signed-out state.
     const { account } = lookup;
-    const [receipts, notes, options] = await Promise.all([
+    const [receipts, invoices, notices, notes, options] = await Promise.all([
         getReceipts(),
+        getInvoicesDue(),
+        getNotices(),
         account.healthNotes
             ? getNotes()
             : Promise.resolve<AccountBlock<AccountNote[]> | null>(null),
@@ -40,6 +56,8 @@ export default async function MePage() {
         <Me
             account={account}
             receipts={receipts}
+            invoices={invoices}
+            notices={notices}
             notes={notes}
             options={
                 options ?? {
@@ -57,6 +75,8 @@ export default async function MePage() {
                 addNote: addHealthNote,
                 signOut,
                 signOutEverywhere,
+                payInvoice: payInvoiceNow,
+                saveNotices: saveEmailChoice,
             }}
         />
     );

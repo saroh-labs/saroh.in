@@ -72,6 +72,39 @@
   intro as one large heading-face line; `productGrid.columns` (3–5) fixes
   the bare cards' count across at the desk.
 
+- **Current** — **The craft layer and the site's chrome** (starter site
+  work, 12 Oct). `SiteTheme` writes, after the tokens, the rules every site
+  shares (`site-craft.ts`): headings in the heading face, balanced, with
+  tracking and leading by level; a text block's column held to a 62ch
+  measure when the site sets none; its lists, quotes and links from the
+  site's tokens; the rhythm between sections (a banded section takes 1.2×
+  the merchant's Section padding, two plain sections in a row sit half a
+  padding apart); a focus outline in the ground's own text colour for any
+  link or button without a designed ring; the accent as the selection
+  colour; and a section's entrance on scroll (`animation-timeline: view()`
+  behind `@supports`, screens and no-preference only, never on a scoped
+  theme). Base rules are `:where(<scope>) h2`, so **a block's utility class
+  always wins**; a new base rule is written the same way. The scope is the
+  marks `data-site-section`, `data-site-header`, `data-site-footer` and
+  `data-site-page`; a block that paints its own full-width ground (hero,
+  closing band) marks its root `data-site-ground`, and its colour runs edge
+  to edge with the column and margins on an inner element.
+  **One primary action a site** (`sitePrimaryAction` in
+  `site-primary-action.ts`: Book, else Order, else Contact us): the header
+  shows it once and its menu leaves that page out
+  (`withoutPrimaryAction`); a template's hero and closing band follow the
+  same function. The footer (`site-footer.tsx`) lists the facts in columns
+  (each place with its address, directions and its week by day, how to get
+  in touch, the site's pages) over the closing line, and draws no column or
+  heading for what isn't set; today is marked in the browser, on the
+  business's clock. Footer text is the footer's own colour at full
+  strength; only hairlines are tinted. A closing band always has a heading
+  and a line: its own (`heading`, `text`) or composed by `ctaBandWords`
+  from what its button does and the site's name, never a promise. Only a
+  page's first hero is its `h1` (`heroLevels`, `HeroHeading`). Shared
+  buttons (`ctaClasses`) take a surface (`page`, `hero`, `band`, `photo`)
+  and carry hover, focus-visible, pressed and disabled states on each.
+
 ## Saroh tokens — Ink & Saffron
 
 - **Current** — **The brand is the "Saroh Brand System" page in the Claude
@@ -402,9 +435,13 @@
     locations list, and everything `ListCard` draws (Providers,
     Notifications, Follow-ups, Website pages, posts and forms). Orders'
     grid already matched and keeps its own row. Not tables, and left as
-    they are: card grids (Services, Class packs, Collections, plan cards,
+    they are: card grids (Class packs, Collections, plan cards,
     the Pipeline board), Stock's Checks (a card per check, with its
-    actions) and a settings matrix (Your profile's alerts). Stock's
+    actions) and a settings matrix (Your profile's alerts). Services
+    left the card grids on 12 Oct 2026: it is `DataView` rows, with no
+    search or filter (a business has a handful), and a "Taking bookings"
+    `SwitchRow` as each row's action. What is true of several rows is
+    said once above the list, never on every row. Stock's
     three lists (Levels, Log, Checks) end with `ListPaging`, each with its
     own page and size in the address (`lib/stock/list-query.ts`); Levels
     pages by product, so its footer counts products, not rows. A list
@@ -617,6 +654,25 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   the first section's hero fetched first. Give the `<img>` its width and
   height, or a box with an aspect ratio. No `srcset`: storage keeps one
   file per photo and nothing resizes on request.
+- **Current** (12 Oct 2026) — **A product with no photo never leaves an
+  empty frame on a merchant's site**, and "No photo yet" never reaches a
+  customer (it is a note for the owner, said in the workspace). Where
+  nothing shown has a photo (the shop, a Product grid section, the bag) the
+  cards are cards of words and no photo box is drawn. Where some have one,
+  the others take `NamePlate` (`site-blocks/src/product/name-plate.tsx`):
+  a quiet panel in the accent with the product's name, in the photo's own
+  box, so the row lines up. A product page with no photo leads with the
+  name. A new list of products follows the same two cases.
+- **Current** (12 Oct 2026) — **A whole page with nothing to show has one
+  look and stays out of search.** A failed read or an empty page on a
+  merchant's site is `SitePageState` (`site-blocks/src/shop/page-state.tsx`):
+  what happened as the heading, one sentence, "Try again" on the page's own
+  address for a failed read, and the business's phone and WhatsApp when the
+  site shows them. Its route adds `NOT_FOR_SEARCH` to its metadata
+  (`apps/saroh.app/lib/module-pages.ts`, `routeHasNothing`) and nothing
+  else: the page answers 200, and "not available" is not a page to rank.
+  A button that can't be pressed goes quiet (`quietFill`, body-colour
+  words), never the accent at half opacity.
 - **Current** (10 Oct 2026) — **The customer's words**: Pick-up (never
   collect or pickup), bag (never basket), booking (never appointment, save
   where a merchant typed it), the payment window (never the provider's

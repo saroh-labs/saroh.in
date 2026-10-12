@@ -206,6 +206,8 @@ describe("PublicInvoicesService.read", () => {
                     quantity: 1,
                     unitPrice: "1200.00",
                     amount: "1200.00",
+                    // A line with no rate says nothing about GST.
+                    gst: null,
                 },
             ],
             tax: "200.00",

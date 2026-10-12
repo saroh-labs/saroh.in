@@ -34,7 +34,8 @@ const ROUTES = ["/", "/bookings", "/commerce", "/contacts"] as const;
  */
 const LANDMARK: Record<(typeof ROUTES)[number], (page: Page) => Locator> = {
     "/": (page) => page.getByRole("region", { name: "Needs you" }),
-    "/bookings": (page) => page.getByRole("radiogroup", { name: "Layout" }),
+    "/bookings": (page) =>
+        page.getByRole("navigation", { name: "Bookings view" }),
     // Sell lands on its location, titled with its own name; its first card
     // is the same whatever it is called.
     "/commerce": (page) => page.getByRole("region", { name: "The place" }),
@@ -290,7 +291,7 @@ test.describe("touch targets", () => {
         // The calendar itself, not its failed or locked state: measuring a
         // page without the layout switch passes vacuously.
         await expect(
-            page.getByRole("radiogroup", { name: "Layout" }),
+            page.getByRole("navigation", { name: "Bookings view" }),
         ).toBeVisible();
 
         // Guard the guard: if `pointer: coarse` does not match, every
@@ -307,6 +308,10 @@ test.describe("touch targets", () => {
                     "button, [role=button], input",
                 ),
             ]
+                // A switch keeps its track's size: an unseen area around it
+                // and its words take the tap (`SwitchRow`, pinned in
+                // `controls.test.tsx`). The day's "1 cancelled" is one.
+                .filter((el) => el.getAttribute("role") !== "switch")
                 .map((el) => {
                     const text = el.textContent.trim();
                     const label =

@@ -1,5 +1,5 @@
 import type { BookingService } from "../model";
-import { formatMoney, serviceLine } from "../model";
+import { serviceLine, servicePickPrice } from "../model";
 import { card, optionClasses } from "../styles";
 import { StepHead } from "./step-head";
 
@@ -23,7 +23,7 @@ export function ServiceStep({
             >
                 {services.map((s) => {
                     const on = s.id === serviceId;
-                    const p = formatMoney(s.priceCents, s.currency);
+                    const p = servicePickPrice(s);
                     return (
                         <button
                             key={s.id}
@@ -49,7 +49,7 @@ export function ServiceStep({
                                 ) : null}
                             </span>
                             {p ? (
-                                <span className="text-[15px] font-semibold tabular-nums">
+                                <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums">
                                     {p}
                                 </span>
                             ) : null}

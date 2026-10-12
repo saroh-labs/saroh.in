@@ -1,5 +1,7 @@
 import { unstable_rethrow } from "next/navigation";
 
+import { readMissingRates } from "@/lib/gst-rates/service";
+import { businessModeOf } from "@/lib/gst/price-mode";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { readOrganizationSettings } from "@/lib/organizations/settings-service";
 import { canStockProducts, canWriteProducts } from "@/lib/products/access";
@@ -46,6 +48,7 @@ export async function loadEditorContext(
         business,
         listings,
         businessSettings,
+        rates,
     ] = await Promise.all([
         getStorefront(store.id).catch(() => null),
         listCategories(),
@@ -74,6 +77,10 @@ export async function loadEditorContext(
         // rate and an HSN code only then. Unknown reads as registered, so
         // a failed read never hides a field someone needs.
         readOrganizationSettings().catch(() => null),
+        // Whether a priced product has to choose its rate: only where the
+        // business is known to be registered. Unknown asks for nothing, so
+        // a read that failed never blocks a save.
+        readMissingRates(),
     ]);
     return {
         storeId: store.id,
@@ -91,6 +98,14 @@ export async function loadEditorContext(
         gstRegistered: businessSettings?.ok
             ? (businessSettings.data.tax?.registered ?? false)
             : true,
+        gstRateNeeded: rates?.registered === true,
+        // How a registered business's prices carry GST (12 Oct 2026), for
+        // Basics' "Same as the business (…)". Null when the business isn't
+        // registered or its settings couldn't be read.
+        businessPriceMode:
+            businessSettings?.ok && businessSettings.data.tax?.registered
+                ? businessModeOf(businessSettings.data.tax.priceMode)
+                : (rates?.priceMode ?? null),
         sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },
         allergens: (allergens ?? []).map((a) => ({ id: a.id, name: a.name })),
         defaults,

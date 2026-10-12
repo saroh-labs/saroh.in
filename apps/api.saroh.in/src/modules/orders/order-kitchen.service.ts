@@ -11,12 +11,14 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { businessTimezone } from "../bookings/staff-availability";
+import { soldColumns } from "../invoices/gst-price";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
     correctOrderInvoiceForEdit,
     loadTaxProfile,
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
     DIFFERENCE_KEY_PREFIX,
@@ -505,6 +507,8 @@ export class OrderKitchenService {
                 description: string;
                 deltaQuantity: number;
                 unitCents: number;
+                /** What a removed line was charged under: its row goes. */
+                priceMode?: string | null;
             }[] = [];
             let subtotalCents = toCents(order.subtotal.toString());
 
@@ -547,6 +551,7 @@ export class OrderKitchenService {
                     description: product.name,
                     deltaQuantity: delta,
                     unitCents: unit,
+                    priceMode: item.gstPriceMode,
                 });
                 if (change.quantity === 0) {
                     await applyInventoryTransition(
@@ -579,6 +584,10 @@ export class OrderKitchenService {
                             variantId: line.variantId,
                             quantity: line.quantity,
                             price: fromCents(line.priceCents),
+                            ...soldColumns({
+                                listCents: line.listCents,
+                                mode: line.gstPriceMode,
+                            }),
                         },
                         select: {
                             id: true,
@@ -1236,5 +1245,9 @@ async function priceOrderLinesFor(
         select: { storeId: true },
     });
     if (!order) throw new NotFoundException("Order not found");
-    return priceOrderLines(order.storeId, items);
+    return priceOrderLines(
+        order.storeId,
+        items,
+        await loadPriceTerms(prisma, ctx.organizationId),
+    );
 }

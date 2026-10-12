@@ -1,17 +1,22 @@
 import { withDevAccess } from "@saroh/auth/dev-access";
 import { createAuthMiddleware } from "@saroh/auth/middleware";
+import { withPrivateApp } from "@saroh/auth/private-app";
 
 import { accountsLoginUrl, inviteLandingFor } from "@/lib/accounts";
 
 // Auth-only gate: every app route requires an accounts session. (The old
 // host-based tenant rewriting is gone — the public renderer is saroh.app.)
 // The dev environment admits only browsers holding its key (withDevAccess).
-export default withDevAccess(
-    createAuthMiddleware({
-        loginUrl: accountsLoginUrl,
-        // An invitation link opens the invitation, not the login (UX-029).
-        signedOutUrl: inviteLandingFor,
-    }),
+// Outermost, withPrivateApp: every answer given here, the redirect to sign-in
+// among them, says "noindex, nofollow" and carries the security headers.
+export default withPrivateApp(
+    withDevAccess(
+        createAuthMiddleware({
+            loginUrl: accountsLoginUrl,
+            // An invitation link opens the invitation, not the login (UX-029).
+            signedOutUrl: inviteLandingFor,
+        }),
+    ),
 );
 
 export const config = {

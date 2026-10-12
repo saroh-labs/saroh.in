@@ -18,6 +18,7 @@ import {
     mediaFileProblem,
     mediaLimitNote,
     mergeDraft,
+    needsGstRate,
     partitionSections,
     photosFrom,
     photosInput,
@@ -50,6 +51,7 @@ describe("product editor sections", () => {
             mrp: "999",
             categoryId: "",
             gstRate: "",
+            gstPriceMode: "" as const,
             hsnCode: "",
         };
         expect(basicsSchema.safeParse(ok).success).toBe(true);
@@ -159,6 +161,7 @@ describe("the editor's header and Save all", () => {
             mrp: "",
             categoryId: "",
             gstRate: "",
+            gstPriceMode: "" as const,
             hsnCode: "",
         };
         expect(basicsProblem(ok, false)).toBe("");
@@ -175,6 +178,36 @@ describe("the editor's header and Save all", () => {
         );
         expect(basicsProblem({ ...ok, mrp: "500" }, false)).toBe(
             "MRP can't be lower than the price it sells for.",
+        );
+    });
+
+    it("asks a GST-registered business's priced product for its GST rate, and nobody else", () => {
+        const ok = {
+            name: "Serum",
+            slug: "serum",
+            price: "799",
+            mrp: "",
+            categoryId: "",
+            gstRate: "",
+            gstPriceMode: "" as const,
+            hsnCode: "",
+        };
+        // Creating and editing alike.
+        expect(basicsProblem(ok, false, true)).toBe("Choose a GST rate first.");
+        expect(basicsProblem(ok, true, true)).toBe("Choose a GST rate first.");
+        // 0% is an answer: nil-rated or exempt, never "not set".
+        expect(basicsProblem({ ...ok, gstRate: "0" }, false, true)).toBe("");
+        expect(basicsProblem({ ...ok, gstRate: "18" }, false, true)).toBe("");
+        // Not registered, or not known to be: never asked.
+        expect(basicsProblem(ok, false, false)).toBe("");
+        expect(basicsProblem(ok, false)).toBe("");
+        // A free product has no price to include a rate in.
+        expect(needsGstRate({ price: "0", gstRate: "" }, true)).toBe(false);
+        expect(needsGstRate({ price: "", gstRate: "" }, true)).toBe(false);
+        expect(needsGstRate({ price: "799", gstRate: "" }, true)).toBe(true);
+        // The price comes first: one thing at a time.
+        expect(basicsProblem({ ...ok, price: "" }, false, true)).toBe(
+            "Add a price first.",
         );
     });
 });
@@ -233,6 +266,7 @@ describe("each section's values and patch", () => {
             mrp: "999.50",
             categoryId: "c1",
             gstRate: "",
+            gstPriceMode: "" as const,
             hsnCode: "",
         });
         expect(
@@ -249,6 +283,7 @@ describe("each section's values and patch", () => {
             mrp: null,
             categoryId: null,
             gstRate: null,
+            gstPriceMode: null,
             hsnCode: null,
         });
         // GST (ADR-008): the rate as saved, the HSN as printed.
@@ -260,6 +295,24 @@ describe("each section's values and patch", () => {
         ).toMatchObject({ gstRate: "5", hsnCode: "21011120" });
         expect(
             basicsSchema.safeParse({ ...values, hsnCode: "12" }).success,
+        ).toBe(false);
+        // How the price carries GST (12 Oct 2026): its own way as saved,
+        // and "same as the business" sent as none.
+        expect(basicsFrom(product({ gstPriceMode: "ADDED" }))).toMatchObject({
+            gstPriceMode: "ADDED",
+        });
+        expect(basicsFrom(product({ gstPriceMode: null }))).toMatchObject({
+            gstPriceMode: "",
+        });
+        expect(basicsPatch({ ...values, gstPriceMode: "ADDED" })).toMatchObject(
+            { gstPriceMode: "ADDED" },
+        );
+        expect(
+            basicsPatch({ ...values, gstPriceMode: "INCLUDED" }),
+        ).toMatchObject({ gstPriceMode: "INCLUDED" });
+        expect(
+            basicsSchema.safeParse({ ...values, gstPriceMode: "SOMETIMES" })
+                .success,
         ).toBe(false);
         expect(
             basicsFrom(product({ mrp: null, categoryId: null })),

@@ -1,5 +1,6 @@
 import { Transform } from "class-transformer";
 import {
+    IsBoolean,
     IsEmail,
     IsIn,
     IsISO8601,
@@ -184,6 +185,15 @@ export class UpdateDetailsDto {
         message: "Enter a phone number, like +91 98765 43210",
     })
     phone?: string;
+}
+
+/**
+ * Whether the business may email the customer (DEC-142): their own EMAIL
+ * consent, and nothing else. A real boolean, never a string.
+ */
+export class UpdateNoticesDto {
+    @IsBoolean({ message: "Choose whether we may email you" })
+    email!: boolean;
 }
 
 /** Ask for a code at a new sign-in email. */

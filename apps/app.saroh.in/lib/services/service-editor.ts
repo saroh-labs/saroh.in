@@ -11,7 +11,16 @@
 
 import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
-import { rateOption } from "@/lib/invoices/gst";
+import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
+import {
+    effectiveMode,
+    isGstPriceMode,
+    itemModeInput,
+    itemModeValue,
+    rateBps,
+    SAME_AS_BUSINESS,
+} from "@/lib/gst/price-mode";
+import { GST_RATE_NEEDED, rateOption } from "@/lib/invoices/gst";
 import type { BookingPayment } from "@/lib/staff/types";
 import { absentText } from "@saroh/ui/lib/absent";
 
@@ -59,6 +68,11 @@ export interface ServiceDraft {
     price: string;
     /** What is paid at booking (E8): nothing, a share, or all of it. */
     deposit: DepositMode;
+    /**
+     * How this price carries GST when it differs from the business's way
+     * (12 Oct 2026); "" is "same as the business".
+     */
+    gstPriceMode: ItemModeValue;
     // Who takes it
     staffIds: string[];
     // The booking page, and taking bookings
@@ -144,6 +158,7 @@ export function draftOf(
             meetingUrl: "",
             price: "",
             deposit: "NONE",
+            gstPriceMode: SAME_AS_BUSINESS,
             // The one person on the diary, when there is only one.
             staffIds: [...staffIds],
             showOnBookingPage: true,
@@ -168,6 +183,7 @@ export function draftOf(
         meetingUrl: service.meetingUrl ?? "",
         price: fromMinor(service.priceCents),
         deposit: service.depositMode,
+        gstPriceMode: itemModeValue(service.gstPriceMode),
         staffIds: [...staffIds].sort(),
         showOnBookingPage: service.showOnBookingPage,
         taking: service.status === "ACTIVE",
@@ -187,6 +203,40 @@ function isHttps(link: string): boolean {
     }
 }
 
+/**
+ * Whether the draft still has to choose its GST rate: a GST-registered
+ * business's service with a price above nothing and no rate. 0% is a rate
+ * ("exempt or nil-rated"); a free service is never asked, and neither is a
+ * business that isn't registered.
+ */
+export function needsGstRate(
+    draft: Pick<ServiceDraft, "price" | "gstRate">,
+    gstRegistered: boolean,
+): boolean {
+    if (!gstRegistered || draft.gstRate !== "") return false;
+    const price = toMinor(draft.price);
+    return price !== null && !Number.isNaN(price) && price > 0;
+}
+
+/**
+ * Where the GST rate and the SAC code sit. Beside the price for a
+ * registered business, which has to answer it. For a business that isn't
+ * registered they aren't drawn at all, unless one was saved before: that
+ * stays in view under More settings (00-universal §15). When the page
+ * couldn't tell (`null`), they stay under More settings as they were, and
+ * nothing is asked.
+ */
+export function gstPlace(
+    gstRegistered: boolean | null,
+    saved: Pick<ServiceDraft, "gstRate" | "sacCode">,
+): "price" | "more" | "none" {
+    if (gstRegistered === true) return "price";
+    if (gstRegistered === null) return "more";
+    return saved.gstRate !== "" || saved.sacCode.trim() !== ""
+        ? "more"
+        : "none";
+}
+
 /** The field a problem is about: where its sentence is shown. */
 export type ServiceField =
     | "name"
@@ -196,6 +246,7 @@ export type ServiceField =
     | "places"
     | "meetingUrl"
     | "price"
+    | "gstRate"
     | "staffIds"
     | "bufferBefore"
     | "timezone"
@@ -221,6 +272,11 @@ export function serviceFieldProblems(
     noStorefront = false,
     /** Exactly one person is on the diary. */
     onePerson = false,
+    /**
+     * The business is GST-registered: a priced service needs the rate its
+     * price includes, or its tax invoice shows no GST (12 Oct 2026).
+     */
+    gstRegistered = false,
 ): ServiceProblem[] {
     const problems: ServiceProblem[] = [];
     const say = (field: ServiceField, message: string) =>
@@ -266,6 +322,7 @@ export function serviceFieldProblems(
             "A deposit is part of the price. Set a price first, or take nothing at booking.",
         );
     }
+    if (needsGstRate(draft, gstRegistered)) say("gstRate", GST_RATE_NEEDED);
     if (hasStaff && !onePerson && draft.staffIds.length === 0) {
         say("staffIds", "Pick who takes it.");
     }
@@ -297,10 +354,16 @@ export function serviceProblems(
     noStorefront = false,
     /** Exactly one person is on the diary. */
     onePerson = false,
+    /** The business is GST-registered. */
+    gstRegistered = false,
 ): string[] {
-    return serviceFieldProblems(draft, hasStaff, noStorefront, onePerson).map(
-        (p) => p.message,
-    );
+    return serviceFieldProblems(
+        draft,
+        hasStaff,
+        noStorefront,
+        onePerson,
+        gstRegistered,
+    ).map((p) => p.message);
 }
 
 /** The first problem for a field (or a row of the hours), if it has one. */
@@ -344,6 +407,9 @@ export function serviceInput(
         currency,
         gstRate: draft.gstRate || null,
         sacCode: sac || null,
+        // Null is "same as the business". A business that isn't registered
+        // is never shown the choice, so what was saved goes back as it was.
+        gstPriceMode: itemModeInput(draft.gstPriceMode),
         timezone: draft.timezone.trim(),
         locationType: draft.where,
         meetingUrl: online ? draft.meetingUrl.trim() : null,
@@ -364,19 +430,22 @@ export function serviceUpdate(
     };
 }
 
-/** The hours' own section name: they save in a call of their own. */
-export const HOURS_SECTION = "Its weekly hours";
+/**
+ * The hours' own card, and what the leave dialog calls it: they save in a
+ * call of their own.
+ */
+export const HOURS_SECTION = "When it can be booked";
 
 /** The editor's sections, as the leave dialog names them. */
 const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["What it is", ["name", "description", "kind"]],
     ["Time", ["minutes", "gap", "visits", "places", "where", "meetingUrl"]],
-    ["Price", ["price", "deposit"]],
+    [HOURS_SECTION, ["hours"]],
+    ["Price", ["price", "deposit", "gstPriceMode"]],
     ["Who takes it", ["staffIds"]],
     ["Booking page", ["showOnBookingPage"]],
     ["Taking bookings", ["taking"]],
     ["More settings", ["timezone", "bufferBefore", "gstRate", "sacCode"]],
-    [HOURS_SECTION, ["hours"]],
 ];
 
 function same(a: ServiceDraft, b: ServiceDraft, key: keyof ServiceDraft) {
@@ -409,14 +478,26 @@ export function changedParts(
     };
 }
 
-/** The sections whose fields differ from the saved draft, in page order. */
+/** The GST fields: under More settings, or beside the price (`gstPlace`). */
+const GST_KEYS: (keyof ServiceDraft)[] = ["gstRate", "sacCode"];
+
+/**
+ * The sections whose fields differ from the saved draft, in page order.
+ * `gstWithPrice`: the GST rate and SAC code are drawn under Price (a
+ * GST-registered business), so a change to them is named there.
+ */
 export function changedSections(
     saved: ServiceDraft,
     draft: ServiceDraft,
+    gstWithPrice = false,
 ): string[] {
-    return SECTIONS.filter(([, keys]) =>
-        keys.some((k) => !same(saved, draft, k)),
-    ).map(([name]) => name);
+    return SECTIONS.map(([name, keys]): [string, (keyof ServiceDraft)[]] => {
+        if (!gstWithPrice) return [name, keys];
+        if (name === "Price") return [name, [...keys, ...GST_KEYS]];
+        return [name, keys.filter((k) => !GST_KEYS.includes(k))];
+    })
+        .filter(([, keys]) => keys.some((k) => !same(saved, draft, k)))
+        .map(([name]) => name);
 }
 
 function bookingsCount(n: number): string {
@@ -445,9 +526,11 @@ export function stateLine({
     if (dirty) return "Unsaved changes";
     if (isNew) return "Not saved yet";
     if (comingUp === null) return "";
+    // The count is of what is still to come: with none, a service may
+    // well have been booked before, so it never says "nothing booked yet".
     return comingUp
         ? `${bookingsCount(comingUp)} still to come`
-        : "Nothing booked yet";
+        : "Nothing coming up";
 }
 
 /** The pill beside the title: new, or whether it takes bookings. */
@@ -491,11 +574,11 @@ export function savedMessage({
             return `${name} added. Customers can book it in its weekly hours.`;
         }
         if (kind === "class") {
-            return `${name} added. Set its weekly times under More settings so customers can book it.`;
+            return `${name} added. Give it weekly times so customers can book it.`;
         }
         return hasPerson
             ? `${name} added. Customers can book it in the free time of who takes it.`
-            : `${name} added. Give it hours under More settings so customers can book it.`;
+            : `${name} added. Give it weekly hours so customers can book it.`;
     }
     if (!comingUp) {
         return comingUp === 0
@@ -511,16 +594,43 @@ export function savedMessage({
 
 /**
  * The note over a service's own weekly hours. They go with the page's Save;
- * a new service that started from the opening hours says so.
+ * a new service that started from the opening hours says so, and a
+ * one-to-one someone takes says its hours only narrow theirs.
  */
 export function hoursNote(
     timezone: string,
     startedFromOpening: boolean,
+    /** Someone takes it: its own hours narrow that person's free time. */
+    narrows = false,
 ): string {
     const zone = `Weekly windows in ${timezone}, saved with the rest of the page.`;
-    return startedFromOpening
-        ? `${zone} They start from your opening hours: change them if this runs at other times.`
-        : `${zone} With people on the diary, their free time inside these windows is what customers can book.`;
+    if (startedFromOpening) {
+        return `${zone} They start from your opening hours: change them if this runs at other times.`;
+    }
+    return narrows
+        ? `${zone} Only the free time inside these windows is offered.`
+        : zone;
+}
+
+/**
+ * What gives a service its times, which is what its "When it can be
+ * booked" card shows: its own weekly hours (a class, or a one-to-one
+ * nobody takes), or the hours of the people who take it.
+ */
+export function timesComeFrom(
+    kind: ServiceKind,
+    staffCount: number,
+): "own" | "people" {
+    return kind === "one" && staffCount > 0 ? "people" : "own";
+}
+
+/** Whose hours a one-to-one books in: "Asha's", "Asha's and Ravi's". */
+export function whoseHours(names: readonly string[]): string {
+    const [first, second] = names;
+    if (!first) return "";
+    if (names.length === 1) return `${first}'s hours`;
+    if (names.length === 2 && second) return `${first}'s and ${second}'s hours`;
+    return `the hours of the ${names.length} people who take it`;
 }
 
 /** The note under Time. */
@@ -537,7 +647,7 @@ export function timeNote(
     }
     return hasStaff
         ? "Fills the free time of whoever takes it, with the gap kept free after."
-        : "Books in its own weekly hours, set under More settings, with the gap kept free after.";
+        : "The gap is kept free after each booking.";
 }
 
 /** Each deposit's share of the price, in percent — the server's too. */
@@ -549,11 +659,84 @@ const DEPOSIT_PERCENT: Record<DepositMode, number> = {
 };
 
 /**
+ * What the API charges for one booking of a saved service, GST and all:
+ * the amount to pay, and the share of it taken when booking.
+ */
+export interface ServiceCharged {
+    payCents: number;
+    depositCents: number | null;
+}
+
+/**
+ * The API's own figures for the price, while nothing that decides them has
+ * been changed on the page. Null for a new service, an older API, or a
+ * draft whose price, rate, GST choice or deposit differs from what is
+ * saved: the page never works the GST out itself. Judged against the
+ * service as read, so a save shows its new amounts only once the API has
+ * answered with them.
+ */
+export function chargedAsSaved(
+    service: Service | null,
+    draft: Pick<
+        ServiceDraft,
+        "price" | "deposit" | "gstRate" | "gstPriceMode" | "kind" | "visits"
+    >,
+): ServiceCharged | null {
+    if (!service || typeof service.payCents !== "number") return null;
+    const asRead =
+        toMinor(draft.price) === service.priceCents &&
+        draft.deposit === service.depositMode &&
+        draft.gstRate === rateOption(service.gstRate) &&
+        draft.gstPriceMode === itemModeValue(service.gstPriceMode) &&
+        draftVisits(draft) ===
+            (service.capacity > 1 ? 1 : Math.max(1, service.visits));
+    if (!asRead) return null;
+    return {
+        payCents: service.payCents,
+        depositCents: service.depositCents,
+    };
+}
+
+/**
+ * The business's own way of carrying GST, for "Same as the business (…)":
+ * as its settings said, else as a saved service priced the business's way
+ * is charged (a role that can't read the settings still reads that). Null
+ * when neither tells.
+ */
+export function businessModeFor(
+    service: Pick<Service, "gstPriceMode" | "gst"> | null,
+    read: GstPriceMode | null,
+): GstPriceMode | null {
+    if (read !== null) return read;
+    if (!service || isGstPriceMode(service.gstPriceMode)) return null;
+    return service.gst?.mode ?? null;
+}
+
+/**
+ * Whether GST goes on top of the price as typed: a registered business's
+ * priced service with a rate above 0, under "GST is added". False when the
+ * business's way couldn't be told and the service follows it.
+ */
+export function gstGoesOnTop(
+    draft: Pick<ServiceDraft, "gstRate" | "gstPriceMode">,
+    business: GstPriceMode | null,
+    registered: boolean,
+): boolean {
+    if (!registered || !((rateBps(draft.gstRate) ?? 0) > 0)) return false;
+    if (business === null && !isGstPriceMode(draft.gstPriceMode)) return false;
+    return effectiveMode(business, draft.gstPriceMode) === "ADDED";
+}
+
+/**
  * The note under "At booking, they pay" (the design's): what a customer
- * pays when booking and at the visit, worked out from the price as typed,
- * rounded to the paisa as the server rounds it. A business that takes
- * payment at the desk only takes nothing when booking, a deposit or not
- * (DEC-089).
+ * pays when booking and at the visit. A business that takes payment at the
+ * desk only takes nothing when booking, a deposit or not (DEC-089).
+ *
+ * The amounts are the API's (`charged`) while the price is as saved. A
+ * price being typed that includes its GST is the amount to pay, so its
+ * split is said from it, rounded to the paisa as the server rounds it. One
+ * that has GST added on top (`gstOnTop`) is not worked out here: the note
+ * says the shares in words until it is saved.
  */
 export function depositNote(
     deposit: DepositMode,
@@ -562,24 +745,37 @@ export function depositNote(
     visits = 1,
     /** How the business takes payment when people book (DEC-088). */
     way: BookingPayment = "BOTH",
+    gst: { charged?: ServiceCharged | null; gstOnTop?: boolean } = {},
 ): string {
     const minor = toMinor(price);
-    const cents = minor === null || Number.isNaN(minor) ? 0 : minor;
+    const typed = minor === null || Number.isNaN(minor) ? 0 : minor;
+    const charged = gst.charged ?? null;
+    const cents = charged ? charged.payCents : typed;
     const money = (n: number) => formatMoney(n, currency);
+    // GST on top of a price not saved yet: said in words, never summed.
+    const inWords = !charged && gst.gstOnTop === true;
+    const all = inWords ? "the price plus GST" : money(cents);
+    const later = visits > 1 ? "over the visits" : "at the visit";
     if (deposit === "NONE") {
         // Online only: nothing at the visit, it is all paid when booking.
         return way === "ONLINE" && cents > 0
-            ? `They pay ${money(cents)} online when booking: your booking rules take payment online only.`
+            ? `They pay ${all} online when booking: your booking rules take payment online only.`
             : "No card needed to book. No-shows cost you the time.";
     }
-    if (way === "DESK" && cents > 0) {
-        return `They pay ${money(cents)} ${visits > 1 ? "over the visits" : "at the visit"}.`;
+    if (way === "DESK" && cents > 0) return `They pay ${all} ${later}.`;
+    const percent = DEPOSIT_PERCENT[deposit];
+    if (inWords) {
+        const split =
+            deposit === "FULL"
+                ? `They pay ${all} when booking.`
+                : `They pay ${percent}% of ${all} when booking, and the rest ${later}.`;
+        return `${split} Refunded if they cancel in time.`;
     }
-    const now = Math.round((cents * DEPOSIT_PERCENT[deposit]) / 100);
+    const now = charged?.depositCents ?? Math.round((cents * percent) / 100);
     const split =
         deposit === "FULL"
             ? `They pay ${money(now)} when booking.`
-            : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) ${visits > 1 ? "over the visits" : "at the visit"}.`;
+            : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) ${later}.`;
     return `${split} Refunded if they cancel in time.`;
 }
 

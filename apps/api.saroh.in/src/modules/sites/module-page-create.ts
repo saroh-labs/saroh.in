@@ -13,6 +13,16 @@ import { assertPathIsFree } from "./site-access";
 
 type Tx = Prisma.TransactionClient;
 
+/**
+ * Who a page is made for: the business, and the person making it. No
+ * person when Saroh makes it (a site brought up to its template by the
+ * upgrade, DEC-141): the draft then records no author.
+ */
+export interface PageActor {
+    organizationId: string;
+    userId: string | null;
+}
+
 /** A page as the page endpoints return it. */
 export interface CreatedPage {
     id: string;
@@ -160,7 +170,7 @@ export async function createModulePage(
 /** The page, its DRAFT version and its default sections, on `tx`. */
 async function insertModulePage(
     tx: Tx,
-    ctx: OrganizationContext,
+    ctx: PageActor,
     site: { id: string; name: string },
     page: {
         kind: ModulePageKind;
@@ -225,15 +235,24 @@ async function insertModulePage(
  *
  * It goes in at its default address and title, in the menu, as a draft: the
  * merchant publishes it with the site.
+ *
+ * `known`: the caller has already established, on this transaction, that
+ * the kind's module is on and rolled out for the business (a template's
+ * `modulePages`, DEC-141). The gate is then not asked again. It must not
+ * be: the Book and Prices gates read through the shared client, which
+ * inside a module switch's own transaction still sees the module off.
  */
 export async function addModulePageIfMissing(
     tx: Tx,
-    ctx: OrganizationContext,
+    ctx: PageActor,
     site: { id: string; name: string },
     kind: ModulePageKind,
+    options: { known?: boolean } = {},
 ): Promise<CreatedPage | null> {
-    const gate = await modulePageState(kind, ctx.organizationId, tx);
-    if (gate.state !== "on") return null;
+    if (!options.known) {
+        const gate = await modulePageState(kind, ctx.organizationId, tx);
+        if (gate.state !== "on") return null;
+    }
 
     const defaults = MODULE_PAGE_DEFAULTS[kind];
     // One query at a time: a transaction runs on one connection.

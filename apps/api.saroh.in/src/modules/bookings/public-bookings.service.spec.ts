@@ -718,13 +718,18 @@ describe("PublicBookingsService.publicServices — the website's services list (
                 },
             },
         });
-        // Nothing internal leaves: no org, site, capacity or buffers.
+        // No site, capacity or buffers are read. The business, the rate and
+        // the price mode are read only to work out the GST words
+        // (`service-price.ts`), and never leave: see the next test.
         expect(Object.keys(select).sort()).toEqual([
             "currency",
             "description",
             "durationMinutes",
+            "gstPriceMode",
+            "gstRate",
             "id",
             "name",
+            "organizationId",
             "priceCents",
         ]);
     });

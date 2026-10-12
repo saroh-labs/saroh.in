@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import type { StaffView } from "@/lib/staff/types";
+import type { StaffView, WeeklyRange } from "@/lib/staff/types";
 
 import {
+    copyDay,
     copyMondayToWeekdays,
+    dayRanges,
     draftFrom,
     outsideHours,
+    payWayBlocked,
     payWayHint,
     payWayOf,
     rangeRefusal,
     refundsInTime,
+    ruleBefore,
     ruleChoices,
+    rulePatch,
+    ruleRows,
     saveOps,
     weeklyHours,
 } from "./availability-rules";
@@ -63,6 +69,32 @@ describe("rangeRefusal", () => {
         expect(
             rangeRefusal([MON], { startMinute: 600, endMinute: 660 }),
         ).toBeNull();
+    });
+});
+
+describe("copyDay", () => {
+    const week: WeeklyRange[] = [
+        { dayOfWeek: 1, startMinute: 540, endMinute: 780 },
+        { dayOfWeek: 1, startMinute: 840, endMinute: 1080 },
+        { dayOfWeek: 3, startMinute: 600, endMinute: 660 },
+        { dayOfWeek: 6, startMinute: 600, endMinute: 960 },
+    ];
+
+    it("gives the chosen days the day's hours, replacing what they had", () => {
+        const copied = copyDay(week, 1, [3, 0]);
+        expect(dayRanges(copied, 3)).toEqual([
+            { dayOfWeek: 3, startMinute: 540, endMinute: 780 },
+            { dayOfWeek: 3, startMinute: 840, endMinute: 1080 },
+        ]);
+        expect(dayRanges(copied, 0)).toHaveLength(2);
+        // The day itself and the days not chosen are as they were.
+        expect(dayRanges(copied, 1)).toEqual(dayRanges(week, 1));
+        expect(dayRanges(copied, 6)).toEqual(dayRanges(week, 6));
+    });
+
+    it("copies a day off as a day off, and never onto itself", () => {
+        expect(dayRanges(copyDay(week, 2, [6]), 6)).toEqual([]);
+        expect(copyDay(week, 1, [1])).toEqual(week);
     });
 });
 
@@ -124,12 +156,12 @@ describe("outsideHours", () => {
 describe("saveOps", () => {
     it("is nothing for an untouched draft", () => {
         const staff = [person()];
-        expect(saveOps(staff, RULES, draftFrom(staff, RULES))).toEqual([]);
+        expect(saveOps(staff, draftFrom(staff))).toEqual([]);
     });
 
     it("turns a draft into the writes, each with what Undo puts back", () => {
         const staff = [person()];
-        const draft = draftFrom(staff, RULES);
+        const draft = draftFrom(staff);
         draft.hours.st_vikram = copyMondayToWeekdays(draft.hours.st_vikram);
         draft.offRemoved.push("t1");
         draft.extraRemoved.push("x1");
@@ -142,14 +174,13 @@ describe("saveOps", () => {
             endMinute: null,
             reason: "Physio",
         });
-        draft.rules.freeCancelHours = 24;
-        const ops = saveOps(staff, RULES, draft);
+        const ops = saveOps(staff, draft);
+        // Never a rule: each saves in its own sheet.
         expect(ops.map((o) => o.kind)).toEqual([
             "hours",
             "removeOff",
             "removeExtra",
             "addOff",
-            "rules",
         ]);
         const hours = ops.at(0);
         expect(hours?.kind === "hours" && hours.before).toEqual([
@@ -181,7 +212,7 @@ describe("saveOps", () => {
                 reason: "Diwali",
             },
         ];
-        const draft = draftFrom(staff, RULES);
+        const draft = draftFrom(staff);
         draft.offRemoved.push("p0", "p1", "p2", "c1");
         draft.offAdded.push({
             key: "n2",
@@ -192,7 +223,7 @@ describe("saveOps", () => {
             endMinute: null,
             reason: "Closed",
         });
-        const ops = saveOps(staff, RULES, draft, closures, "Asia/Kolkata");
+        const ops = saveOps(staff, draft, closures, "Asia/Kolkata");
         expect(ops.map((o) => o.kind)).toEqual([
             "removeClosure",
             "removeOff",
@@ -217,26 +248,31 @@ describe("the refund policy (E30, DEC-058)", () => {
         );
     });
 
-    it("turning it off is a rules write, with the old policy for Undo", () => {
-        const staff = [person()];
+    it("turning it off is that one field, with the old policy for Undo", () => {
         const before = { ...RULES, refundInTimeCancels: true };
-        const draft = draftFrom(staff, before);
-        expect(saveOps(staff, before, draft)).toEqual([]);
-        draft.rules.refundInTimeCancels = false;
-        expect(saveOps(staff, before, draft)).toEqual([
-            {
-                kind: "rules",
-                rules: { ...before, refundInTimeCancels: false },
-                before,
-            },
-        ]);
+        expect(rulePatch("refundInTimeCancels", "keep")).toEqual({
+            refundInTimeCancels: false,
+        });
+        expect(ruleBefore("refundInTimeCancels", before)).toEqual({
+            refundInTimeCancels: true,
+        });
+        // Left out by an older API: put back as on, which is what it was.
+        expect(ruleBefore("refundInTimeCancels", RULES)).toEqual({
+            refundInTimeCancels: true,
+        });
     });
+});
 
-    it("on, set or left out, is no change", () => {
-        const staff = [person()];
-        const draft = draftFrom(staff, RULES);
-        draft.rules.refundInTimeCancels = true;
-        expect(saveOps(staff, RULES, draft)).toEqual([]);
+describe("the page's draft no longer holds the rules", () => {
+    it("has hours, time off and extra hours, and no rules", () => {
+        const draft = draftFrom([person()]);
+        expect(Object.keys(draft).sort()).toEqual([
+            "extraRemoved",
+            "hours",
+            "offAdded",
+            "offRemoved",
+        ]);
+        expect(saveOps([person()], draft)).toEqual([]);
     });
 });
 
@@ -267,25 +303,14 @@ describe("how people pay when they book (DEC-088)", () => {
         expect(payWayOf({ ...RULES, bookingPayment: "DESK" })).toBe("DESK");
     });
 
-    it("changing it is a rules write, with the old way for Undo", () => {
-        const staff = [person()];
-        const draft = draftFrom(staff, RULES);
-        expect(saveOps(staff, RULES, draft)).toEqual([]);
-        draft.rules.bookingPayment = "ONLINE";
-        expect(saveOps(staff, RULES, draft)).toEqual([
-            {
-                kind: "rules",
-                rules: { ...RULES, bookingPayment: "ONLINE" },
-                before: RULES,
-            },
-        ]);
-    });
-
-    it("Both, set or left out, is no change", () => {
-        const staff = [person()];
-        const draft = draftFrom(staff, RULES);
-        draft.rules.bookingPayment = "BOTH";
-        expect(saveOps(staff, RULES, draft)).toEqual([]);
+    it("changing it is that one field, with the old way for Undo", () => {
+        expect(rulePatch("bookingPayment", "ONLINE")).toEqual({
+            bookingPayment: "ONLINE",
+        });
+        // Left out by an older API: Both goes back, which is what it was.
+        expect(ruleBefore("bookingPayment", RULES)).toEqual({
+            bookingPayment: "BOTH",
+        });
     });
 
     it("says what each way means, and why online can't be taken when it matters", () => {
@@ -305,5 +330,93 @@ describe("how people pay when they book (DEC-088)", () => {
         expect(payWayHint("ONLINE", undefined)).toBe(
             "Everyone pays on the booking page when they book. Free services book with nothing to pay.",
         );
+    });
+});
+
+describe("ruleRows: each rule as a sentence in a row", () => {
+    const said = (rules: Parameters<typeof ruleRows>[0]) =>
+        ruleRows(rules).map((r) => r.sentence);
+
+    it("says every rule whole, with no label needed to read it", () => {
+        expect(
+            said({
+                bookAheadDays: 60,
+                latestBookingMinutes: 120,
+                freeCancelHours: 12,
+                refundInTimeCancels: true,
+                bookingPayment: "BOTH",
+            }),
+        ).toEqual([
+            "Book up to 60 days ahead",
+            "Book up to 2 hours before the start",
+            "Free to cancel up to 12 hours before",
+            "Pay online or at the desk",
+            "Cancelled in time: refund what they paid online",
+        ]);
+    });
+
+    it("says no rule in words too, never a bare 'Any time before'", () => {
+        expect(
+            said({
+                bookAheadDays: null,
+                latestBookingMinutes: null,
+                freeCancelHours: null,
+                refundInTimeCancels: false,
+                bookingPayment: "DESK",
+            }),
+        ).toEqual([
+            "No limit on how far ahead",
+            "Book up to the start time",
+            "Free to cancel any time before",
+            "Pay at the desk",
+            "Cancelled in time: don't refund automatically",
+        ]);
+        expect(said({ ...RULES, bookAheadDays: 56 })[0]).toBe(
+            "Book up to 8 weeks ahead",
+        );
+    });
+
+    it("offers the same choices as before, with the help they had", () => {
+        const rows = ruleRows(
+            { ...RULES, bookAheadDays: 21, bookingPayment: "ONLINE" },
+            "NO_PROVIDER",
+        );
+        expect(rows.map((r) => r.key)).toEqual([
+            "bookAheadDays",
+            "latestBookingMinutes",
+            "freeCancelHours",
+            "bookingPayment",
+            "refundInTimeCancels",
+        ]);
+        // The saved value is one of the choices, off the list or not.
+        for (const row of rows) {
+            expect(row.options.map((o) => o.value)).toContain(row.value);
+        }
+        const pay = rows.at(3);
+        expect(pay?.options.map((o) => o.label)).toEqual([
+            "Both",
+            "Online",
+            "At the desk",
+        ]);
+        expect(pay?.options[1]?.note).toBe(payWayHint("ONLINE", "NO_PROVIDER"));
+        expect(rows[4]?.hint).toMatch(/A late cancel is never refunded/);
+    });
+
+    it("turns a choice into the one field it changes, null for no limit", () => {
+        expect(rulePatch("bookAheadDays", "28")).toEqual({ bookAheadDays: 28 });
+        expect(rulePatch("freeCancelHours", "")).toEqual({
+            freeCancelHours: null,
+        });
+        expect(ruleBefore("latestBookingMinutes", RULES)).toEqual({
+            latestBookingMinutes: RULES.latestBookingMinutes,
+        });
+    });
+
+    it("says why online can't be taken apart from what the way means", () => {
+        expect(payWayBlocked("BOTH", "PAYMENTS_OFF")).toBe(
+            "Right now Payments is switched off, so everything is paid at the desk.",
+        );
+        expect(payWayBlocked("DESK", "NO_PROVIDER")).toBeNull();
+        expect(payWayBlocked("ONLINE", null)).toBeNull();
     });
 });

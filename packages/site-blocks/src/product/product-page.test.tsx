@@ -162,9 +162,19 @@ describe("ProductPage", () => {
                 }}
             />,
         );
-        expect(screen.getByText("No photo yet")).toBeInTheDocument();
+        // No empty frame, and no owner's note where a customer reads.
+        expect(screen.queryByText("No photo yet")).toBeNull();
         expect(screen.getByText(/No reviews yet/)).toBeInTheDocument();
         expect(screen.getByText("₹2,499")).toBeInTheDocument();
+    });
+
+    it("keeps the words No photo yet for the workspace's staff notes only", () => {
+        const bare = { ...dress, images: [] };
+        const { rerender } = render(<ProductPage product={bare} markers />);
+        expect(screen.getByText("No photo yet")).toBeInTheDocument();
+        expect(screen.getByLabelText("Note 1")).toBeInTheDocument();
+        rerender(<ProductPage product={bare} preview={false} markers />);
+        expect(screen.queryByText("No photo yet")).toBeNull();
     });
 
     it("shows a video with its length, and its poster with Open video when it can't play", () => {
@@ -275,6 +285,125 @@ describe("the facts under the price", () => {
         expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
     });
 
+    const plain: ProductPageData = {
+        ...dress,
+        price: "1000.00",
+        mrp: null,
+        variants: [],
+    };
+    const includes = {
+        mode: "INCLUDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 15254,
+        payCents: 100000,
+    };
+    const adds = {
+        mode: "ADDED" as const,
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+
+    it("keeps that line when the API says nothing about GST", () => {
+        render(<ProductPage product={{ ...plain, gst: null }} />);
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+        expect(screen.queryByText(/GST/)).toBeNull();
+    });
+
+    it("says the GST a price includes, in place of that line", () => {
+        const { container } = render(
+            <ProductPage product={{ ...plain, gst: includes }} />,
+        );
+        expect(container.querySelector("[data-price-gst]")).toHaveTextContent(
+            /^Includes ₹152\.54 GST \(18%\)$/,
+        );
+        expect(screen.queryByText("Inclusive of all taxes")).toBeNull();
+    });
+
+    it("says the GST added on top, and what there is to pay", () => {
+        const { container } = render(
+            <ProductPage product={{ ...plain, gst: adds }} />,
+        );
+        expect(container.querySelector("[data-price-gst]")).toHaveTextContent(
+            /^\+ ₹180 GST \(18%\) · ₹1,180 to pay$/,
+        );
+        // The price itself stays the one the business typed.
+        expect(screen.getByText("₹1,000")).toBeVisible();
+        expect(screen.queryByText("Inclusive of all taxes")).toBeNull();
+    });
+
+    it("follows the option picked: its own GST, else nothing made up", () => {
+        const large = {
+            mode: "ADDED" as const,
+            rate: "18",
+            listCents: 269900,
+            gstCents: 48582,
+            payCents: 318482,
+        };
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...dress,
+                    price: "1000.00",
+                    mrp: null,
+                    gst: adds,
+                    variants: dress.variants.map((v) => ({
+                        ...v,
+                        gst: v.id === "l" ? large : adds,
+                    })),
+                }}
+            />,
+        );
+        const line = () => container.querySelector("[data-price-gst]");
+        expect(line()).toHaveTextContent("+ ₹180 GST (18%) · ₹1,180 to pay");
+        fireEvent.click(screen.getByRole("button", { name: "L" }));
+        expect(line()).toHaveTextContent(
+            "+ ₹485.82 GST (18%) · ₹3,184.82 to pay",
+        );
+    });
+
+    it("reads an older API's options: the product's GST at the product's price only", () => {
+        const { container } = render(
+            <ProductPage
+                product={{ ...dress, price: "1000.00", mrp: null, gst: adds }}
+            />,
+        );
+        // M sells at the product's price: the product's words.
+        expect(container.querySelector("[data-price-gst]")).toHaveTextContent(
+            "+ ₹180 GST (18%)",
+        );
+        // L has a price of its own and no GST from the API: none is said.
+        fireEvent.click(screen.getByRole("button", { name: "L" }));
+        expect(container.querySelector("[data-price-gst]")).toBeNull();
+        expect(screen.getByText("Inclusive of all taxes")).toBeVisible();
+    });
+
+    it("tells the action when GST comes on top", () => {
+        function Probe() {
+            const s = useProductSelection();
+            return <p data-testid="gst-probe">{String(s?.gstAdded)}</p>;
+        }
+        const { unmount } = render(
+            <ProductPage
+                product={{ ...plain, gst: adds }}
+                preview={false}
+                action={<Probe />}
+            />,
+        );
+        expect(screen.getByTestId("gst-probe")).toHaveTextContent("true");
+        unmount();
+        render(
+            <ProductPage
+                product={{ ...plain, gst: includes }}
+                preview={false}
+                action={<Probe />}
+            />,
+        );
+        expect(screen.getByTestId("gst-probe")).toHaveTextContent("false");
+    });
+
     it("says what it costs to receive, in the body colour, when the shop takes orders", () => {
         render(
             <ProductPage
@@ -294,5 +423,107 @@ describe("the facts under the price", () => {
     it("says nothing about delivery when the page was given nothing", () => {
         render(<ProductPage product={dress} preview={false} />);
         expect(screen.queryByText(/Pick-up|delivery/i)).toBeNull();
+    });
+});
+
+describe("a product with no photo, on the live page", () => {
+    const bare: ProductPageData = { ...dress, images: [] };
+
+    it("draws no frame: the name leads, and the words take the second column", () => {
+        const { container } = render(
+            <ProductPage product={bare} preview={false} />,
+        );
+        expect(container.querySelector("img")).toBeNull();
+        expect(container.querySelector(".aspect-\\[4\\/5\\]")).toBeNull();
+        expect(container).not.toHaveTextContent("No photo yet");
+        const layout = container.querySelector("[data-product-layout]");
+        expect(layout).toHaveAttribute("data-product-layout", "words");
+        expect(layout?.className).toContain("md:grid-cols-");
+        // Everything a shopper needs is still there.
+        expect(
+            screen.getByRole("heading", { level: 1, name: "Linen Wrap Dress" }),
+        ).toBeInTheDocument();
+        expect(screen.getByText("About this product")).toBeInTheDocument();
+        expect(screen.getByText("Details")).toBeInTheDocument();
+        expect(screen.getByText("Only 2 left")).toBeInTheDocument();
+    });
+
+    it("is one column when there is nothing more to say about it", () => {
+        const { container } = render(
+            <ProductPage
+                product={{
+                    ...bare,
+                    description: null,
+                    keyPoints: [],
+                    materials: null,
+                    maker: null,
+                    returns: null,
+                }}
+                preview={false}
+            />,
+        );
+        const layout = container.querySelector("[data-product-layout]");
+        expect(layout?.className).not.toContain("md:grid-cols-");
+        expect(screen.queryByText("About this product")).toBeNull();
+        expect(screen.queryByText("Details")).toBeNull();
+    });
+
+    it("keeps the photos' layout for a product that has them", () => {
+        const { container } = render(
+            <ProductPage product={dress} preview={false} />,
+        );
+        expect(
+            container.querySelector("[data-product-layout]"),
+        ).toHaveAttribute("data-product-layout", "photos");
+        const cover = screen.getByAltText("Sage wrap dress, front");
+        // Room kept for it before it arrives.
+        expect(cover).toHaveAttribute("width");
+        expect(cover).toHaveAttribute("height");
+    });
+});
+
+describe("the way back to the shop", () => {
+    it("links the live product page to the shop, by the shop's own name", () => {
+        render(
+            <ProductPage
+                product={dress}
+                preview={false}
+                back={{ href: "/shop", label: "Our counter" }}
+            />,
+        );
+        const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+        const link = screen.getByRole("link", { name: "Our counter" });
+        expect(nav).toContainElement(link);
+        expect(link).toHaveAttribute("href", "/shop");
+        // Reachable by a thumb.
+        expect(link.className).toContain("coarse:min-h-11");
+    });
+
+    it("draws none in the workspace's preview, or when the page was given none", () => {
+        const { rerender } = render(
+            <ProductPage
+                product={dress}
+                back={{ href: "/shop", label: "Shop" }}
+            />,
+        );
+        expect(screen.queryByRole("navigation")).toBeNull();
+        rerender(<ProductPage product={dress} preview={false} />);
+        expect(screen.queryByRole("navigation")).toBeNull();
+    });
+});
+
+describe("choosing an option", () => {
+    it("keeps a sold-out option readable when it is the one picked", () => {
+        render(<ProductPage product={dress} preview={false} />);
+        const small = screen.getByRole("button", { name: "S (sold out)" });
+        // Not picked: quiet, struck through and dashed.
+        expect(small.className).toContain("line-through");
+        expect(small.className).toContain("border-dashed");
+        fireEvent.click(small);
+        // Picked: the picked colours, never quiet words on the ink.
+        expect(small).toHaveAttribute("aria-pressed", "true");
+        expect(small.className).toContain("text-site-bg");
+        expect(small.className).not.toContain("text-site-muted");
+        expect(small.className).toContain("line-through");
     });
 });

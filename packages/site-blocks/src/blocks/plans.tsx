@@ -282,9 +282,12 @@ const textButton = cn(
     focusRing,
 );
 
-/* The design's card button: the merchant's accent, the site's radius. */
+/*
+ * The design's card button: the merchant's accent, the site's radius.
+ * 38px under a mouse, 44px under a finger.
+ */
 const joinButton =
-    "inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] bg-site-accent px-3.5 text-[13.5px] font-bold text-site-accent-fg";
+    "coarse:h-11 inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] bg-site-accent px-3.5 text-[13.5px] font-bold text-site-accent-fg";
 
 function PlansFrame({
     title,

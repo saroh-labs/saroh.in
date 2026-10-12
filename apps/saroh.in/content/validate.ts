@@ -71,8 +71,10 @@ export function contentErrors({
         if (!s.headline.trim()) errors.push(`solution ${slug}: no headline`);
         if (!s.sub.trim()) errors.push(`solution ${slug}: no sub`);
         if (!s.segments.length) errors.push(`solution ${slug}: no segments`);
+        // A hero or a segment may have no shot (a trade not captured yet);
+        // one that names a shot must name a real one.
         for (const ref of [s.hero, ...s.segments]) {
-            if (!hasShot(ref.shot)) {
+            if (ref?.shot && !hasShot(ref.shot)) {
                 errors.push(
                     `solution ${slug}: shot ${ref.shot} not in shots.ts`,
                 );

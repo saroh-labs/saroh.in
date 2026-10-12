@@ -9,11 +9,10 @@ import type { FaqItem } from "./types";
 export const linkPreview = {
     path: "/tools/link-preview",
     title: "Link preview checker",
-    metaTitle:
-        "Link preview checker: see your link on WhatsApp, Facebook and Google · Saroh",
+    metaTitle: "Link preview checker for WhatsApp and Facebook · Saroh",
     socialTitle: "How does your link look when it's shared?",
     metaDescription:
-        "Free link preview checker. Paste an address and see the card WhatsApp, Facebook, LinkedIn, X, Slack and Google draw for it, with what to fix.",
+        "Free link preview checker: paste an address and see the card WhatsApp, Facebook, LinkedIn, X, Slack and Google draw for it, and what to fix.",
     apps: "WhatsApp · Facebook · LinkedIn · X · Slack · Google. Free.",
     /** The definition search engines and answer engines quote (plan U7). */
     definition:

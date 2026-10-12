@@ -3,6 +3,8 @@ import { resolveVariant } from "@saroh/block-contract";
 
 import type { PublicVisit } from "../lib/public-visit";
 import FullBleedHero from "./hero-full-bleed";
+import { HeroHeading } from "./hero-heading";
+import type { HeroLevel } from "./hero-level";
 import PlainHero from "./hero-plain";
 import type { PublicToday } from "./on-today";
 import OnTodayHero from "./on-today";
@@ -21,11 +23,15 @@ import OnTodayHero from "./on-today";
  *   (`hero-full-bleed.tsx`); `onToday` there is the open line alone.
  * - `none` — no band at all: the page's heading and its line, small, in the
  *   page column, for pages that go straight to a list (a blog, a portfolio).
- *   The heading stays an `h1`, so the page still has one for a screen
- *   reader and a search engine. Its button and photo are not drawn. With
+ *   The heading stays the page's `h1`, so the page still has one for a
+ *   screen reader and a search engine. Its button and photo are not drawn. With
  *   `titleVisible: false` the h1 is for those readers only — the header
  *   already shows the business's name, and a page opening on it twice reads
  *   as a mistake — and with no line under it the section takes no room.
+ *
+ * ONE H1 A PAGE. Only the page's first hero draws its headline as the `h1`;
+ * a later one is an `h2` (`level`, from `hero-level.ts`), whichever look it
+ * wears.
  */
 export default function HeroSection({
     content,
@@ -36,8 +42,15 @@ export default function HeroSection({
     today,
     now,
     priority = false,
+    level = 1,
 }: {
     content: RenderedHero;
+    /**
+     * `1`: this is the page's first hero, and its headline is the page's
+     * `h1`. `2`: a later hero, whose headline is an `h2` (`hero-level.ts`).
+     * A hero drawn on its own (the catalog, the editor's canvas) is `1`.
+     */
+    level?: HeroLevel;
     /**
      * The page opens on this hero (it is the first section): its photo is
      * fetched ahead of everything else. Any other hero's waits its turn.
@@ -66,14 +79,18 @@ export default function HeroSection({
                 visit={visit}
                 now={now}
                 priority={priority}
+                level={level}
             />
         );
     }
-    if (look === "none") return <CompactHeading content={content} />;
+    if (look === "none") {
+        return <CompactHeading content={content} level={level} />;
+    }
     if (content.onToday) {
         return (
             <OnTodayHero
                 content={content}
+                level={level}
                 siteId={siteId}
                 apiUrl={apiUrl}
                 bookHref={bookHref}
@@ -82,19 +99,30 @@ export default function HeroSection({
             />
         );
     }
-    return <PlainHero content={content} priority={priority} />;
+    return <PlainHero content={content} priority={priority} level={level} />;
 }
 
 /** The `none` look: a page title, not a hero. */
-function CompactHeading({ content }: { content: RenderedHero }) {
+function CompactHeading({
+    content,
+    level,
+}: {
+    content: RenderedHero;
+    level: HeroLevel;
+}) {
     const visible = content.titleVisible !== false;
     if (!visible && !content.subheading) {
-        // Only the page's h1, for screen readers and search engines.
-        return <h1 className="sr-only">{content.heading}</h1>;
+        // Only the page's heading, for screen readers and search engines.
+        return (
+            <HeroHeading level={level} className="sr-only">
+                {content.heading}
+            </HeroHeading>
+        );
     }
     return (
         <section className="text-site-fg mx-auto w-full max-w-screen-xl px-5 pb-2 pt-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-            <h1
+            <HeroHeading
+                level={level}
                 className={
                     visible
                         ? "font-site-heading text-balance text-[calc(2rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.025em]"
@@ -102,7 +130,7 @@ function CompactHeading({ content }: { content: RenderedHero }) {
                 }
             >
                 {content.heading}
-            </h1>
+            </HeroHeading>
             {content.subheading ? (
                 <p
                     className={`text-site-body max-w-[60ch] text-pretty text-base leading-relaxed ${visible ? "mt-2" : ""}`}

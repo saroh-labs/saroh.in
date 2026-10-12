@@ -1,17 +1,38 @@
+import { cache } from "react";
+
 import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
 import { ServiceEditor } from "@/components/services/service-editor/service-editor";
 import { rowLock } from "@/lib/billing/access";
+import { recordTitle } from "@/lib/page-title";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { loadEditorContext } from "@/lib/services/editor-data";
 import { listRules, readService } from "@/lib/services/service";
 import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Service" };
+// One read for the tab's title and the page.
+const readOne = cache((serviceId: string) => readService(serviceId));
+
+/** The service's own name in the tab; "Service" when it can't be read. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ serviceId: string }>;
+}) {
+    const { serviceId } = await params;
+    return recordTitle(
+        async () => {
+            const read = await readOne(serviceId);
+            return read.ok ? read.service : null;
+        },
+        (service) => service.name,
+        "Service",
+    );
+}
 
 /**
  * Bookings › Services › a service (E2): the Service Editor. It opens from
- * Edit (or View) on a service's card and from the calendar's links. Its own
+ * a service's row on Bookings › Services and from the calendar's links. Its own
  * weekly hours, who takes it and how it is booked each degrade on their
  * own; a service that can't be read says so rather than "isn't here".
  */
@@ -24,7 +45,7 @@ export default async function ServiceEditorPage({
     await requireSession();
 
     const [read, context, rules, access] = await Promise.all([
-        readService(serviceId),
+        readOne(serviceId),
         loadEditorContext(),
         listRules(serviceId),
         // Deposits are taken online: locked on a plan without it.
@@ -52,6 +73,8 @@ export default async function ServiceEditorPage({
         hasPage,
         hasStorefront,
         payment,
+        gstRegistered,
+        businessPriceMode,
         canEdit,
         timezone,
         currency,
@@ -74,6 +97,8 @@ export default async function ServiceEditorPage({
             hasStorefront={hasStorefront}
             paymentsLock={rowLock(access, "payments")}
             payment={payment}
+            gstRegistered={gstRegistered}
+            businessPriceMode={businessPriceMode}
         />
     );
 }

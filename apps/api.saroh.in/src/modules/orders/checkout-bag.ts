@@ -8,6 +8,8 @@ import type {
 } from "../discounts/discounts.service";
 import type { OrderView } from "../discounts/redeem";
 import { customerRefusalMessage } from "../discounts/redeem";
+import { priceTermsOf } from "../invoices/gst-price";
+import { loadTaxProfile } from "../invoices/order-invoicing";
 import { onTheShop } from "../products/public-catalogue.serialize";
 import { businessTracksStock } from "../stock/tracking";
 import type { PickupPlace } from "../stores/pickup-place";
@@ -119,6 +121,9 @@ export async function priceBag(
     applied: AppliedDiscount | null;
 }> {
     const ids = [...new Set(bag.map((l) => l.listingId))];
+    // How the business's prices carry GST, for each line's amount to pay
+    // and the GST inside the total (`invoices/gst-price.ts`).
+    const profile = await loadTaxProfile(prisma, scope.organizationId);
     const [rows, settings, businessTracks] = await Promise.all([
         ids.length === 0
             ? Promise.resolve([])
@@ -140,6 +145,8 @@ export async function priceBag(
                               name: true,
                               status: true,
                               price: true,
+                              gstRate: true,
+                              gstPriceMode: true,
                               categoryId: true,
                               stockTracked: true,
                               fulfilmentTypes: true,
@@ -218,6 +225,7 @@ export async function priceBag(
         }),
         shelves,
         businessTracks,
+        priceTermsOf(profile),
     );
     const discount = code
         ? judgeCode(
@@ -235,6 +243,7 @@ export async function priceBag(
         fees: settings.fees,
         asked,
         discount,
+        tax: profile,
     });
     return {
         quote,

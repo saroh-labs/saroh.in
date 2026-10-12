@@ -17,14 +17,14 @@ import { isLive, linkShown } from "@/content/resources";
 import { launchOfferLines } from "@/content/waitlist";
 import { readLaunchOffer } from "@/lib/launch-offer";
 import { resourcesContext } from "@/lib/resources-context";
-import { pageMetadata } from "@/lib/seo";
-import { articleLd } from "@/lib/structured-data";
+import { pageMetadata, pageTitle } from "@/lib/seo";
+import { articleLd, breadcrumbLd } from "@/lib/structured-data";
 
 /**
  * One changelog entry (plan U4, design "Saroh is open"). Every entry is
  * built at build time, but one whose `publishOn` day hasn't begun in India
- * is a 404 and is linked nowhere (KTD-2); the root layout's five-minute
- * revalidate brings it in on its day. Any other slug is a 404.
+ * is a 404 and is linked nowhere (KTD-2); the first deploy on or after its
+ * day brings it in (`app/layout.tsx`). Any other slug is a 404.
  */
 export const dynamicParams = false;
 
@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const entry = liveEntry(slug, resourcesContext());
     if (!entry) return {};
     const meta = pageMetadata({
-        title: `${entry.title} · Saroh changelog`,
+        title: pageTitle(`${entry.title} · Changelog`),
         socialTitle: entry.title,
         description: entry.description,
         path: changelogHref(slug),
@@ -73,12 +73,19 @@ export default async function ChangelogEntryPage({ params }: Props) {
     return (
         <article className="mx-auto grid w-full max-w-[720px] gap-6 px-6 pt-[72px]">
             <JsonLd
-                data={articleLd({
-                    headline: entry.title,
-                    description: entry.description,
-                    path,
-                    publishOn: entry.publishOn,
-                })}
+                data={[
+                    articleLd({
+                        headline: entry.title,
+                        description: entry.description,
+                        path,
+                        publishOn: entry.publishOn,
+                    }),
+                    // The trail drawn below, ending on this entry.
+                    breadcrumbLd([
+                        { name: "Changelog", path: "/changelog" },
+                        { name: entry.title, path },
+                    ]),
+                ]}
             />
             <Breadcrumbs
                 mono

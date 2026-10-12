@@ -16,6 +16,11 @@
  * A shot with a `mark` also records where that control sits in the image,
  * for the Help article's Saffron ring.
  *
+ * Afterwards run `pnpm --filter web shots:sizes --force`: the pages serve
+ * each marketing shot from smaller copies of it
+ * (`apps/saroh.in/scripts/shot-sizes.mjs`), and a test there fails on a
+ * missing one.
+ *
  * Read-only: it only navigates, sets page-local UI state and types into
  * forms it never submits. It never saves.
  * The seed moves with the calendar, so re-seed before a run for "today" to

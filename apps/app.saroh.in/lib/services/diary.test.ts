@@ -7,6 +7,7 @@ import {
     blocksOnDay,
     bookedValue,
     busySpans,
+    dayColumns,
     firstStartIn,
     localDateOf,
     localMinuteOf,
@@ -272,17 +273,93 @@ describe("blocksOnDay", () => {
         expect(bookedValue(mine, true)).toBe(120_000 + 2 * 40_000);
         expect(bookedValue(mine, false)).toBeNull();
     });
+
+    it("draws Unassigned only on a day that has an unassigned booking", () => {
+        const names = (date: string) =>
+            dayColumns(calendar, null, date, IST, () => 0).map((c) => c.name);
+        expect(names("2026-09-21")).toEqual(["Vikram"]);
+        expect(names("2026-09-22")).toEqual(["Vikram", "Unassigned"]);
+    });
+
+    it("leaves cancelled bookings off the columns unless asked", () => {
+        const keys = (withCancelled: boolean) =>
+            dayColumns(
+                calendar,
+                null,
+                "2026-09-21",
+                IST,
+                () => 0,
+                undefined,
+                null,
+                withCancelled,
+            ).flatMap((c) => c.blocks.map((b) => b.key));
+        expect(keys(true)).toContain("b2");
+        expect(keys(false)).not.toContain("b2");
+        expect(keys(false)).toContain("b1");
+    });
+
+    it("does not draw Unassigned for a cancelled booking alone", () => {
+        const only: BookingsCalendar = {
+            ...calendar,
+            diaries: [
+                {
+                    person: null,
+                    bookings: [
+                        booking("u2", "2026-09-21T04:30:00.000Z", 60, {
+                            status: "CANCELLED",
+                        }),
+                    ],
+                    classes: [],
+                },
+            ],
+        };
+        const cols = (withCancelled: boolean) =>
+            dayColumns(
+                only,
+                [],
+                "2026-09-21",
+                IST,
+                () => 0,
+                undefined,
+                null,
+                withCancelled,
+            ).map((c) => c.name);
+        expect(cols(false)).toEqual([]);
+        expect(cols(true)).toEqual(["Unassigned"]);
+    });
 });
 
 describe("visibleHours", () => {
-    it("keeps 06:00–21:00 and widens it for anything outside", () => {
-        expect(visibleHours([[420, 480]])).toEqual([360, 1260]);
+    it("runs from an hour before opening to an hour after closing", () => {
+        // A 9 to 5 day: 8 am to 6 pm, not 6 am to 9 pm.
+        expect(visibleHours([[540, 1020]])).toEqual([480, 1080]);
+        // Split hours: the earliest opening and the latest close.
         expect(
             visibleHours([
-                [330, 400],
-                [1250, 1300],
+                [360, 600],
+                [1020, 1260],
             ]),
         ).toEqual([300, 1320]);
+        // Hours off the hour still land on whole hours.
+        expect(visibleHours([[570, 990]])).toEqual([480, 1080]);
+    });
+
+    it("widens to whole hours around a booking outside the hours", () => {
+        expect(visibleHours([[540, 1020]], [[390, 450]])).toEqual([360, 1080]);
+        expect(visibleHours([[540, 1020]], [[1230, 1290]])).toEqual([
+            480, 1320,
+        ]);
+        // A booking inside the hours changes nothing.
+        expect(visibleHours([[540, 1020]], [[600, 660]])).toEqual([480, 1080]);
+    });
+
+    it("is the working day with no hours, and never under six hours", () => {
+        expect(visibleHours([])).toEqual([480, 1080]);
+        expect(visibleHours([], [[420, 450]])).toEqual([420, 1080]);
+        // Two open hours still draw six.
+        expect(visibleHours([[600, 720]])).toEqual([540, 900]);
+        // A late short day grows earlier once it reaches midnight.
+        expect(visibleHours([[1320, 1440]])).toEqual([1080, 1440]);
     });
 });
 

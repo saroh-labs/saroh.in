@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
+import type { GstOnPrice } from "../invoices/gst-price";
+import { orderLineGst } from "../invoices/line-gst-words";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 import type { NoticeReach } from "../site-accounts/notice-reach";
 import { contactReach } from "../site-accounts/notice-reach";
@@ -40,8 +42,13 @@ export interface ConfirmationLine {
     /** "Large", or null for a product with no options. */
     variant: string | null;
     quantity: number;
-    /** The line's amount, "500.00". */
+    /** The line's amount, "500.00": what was paid for it, GST and all. */
     amount: string;
+    /**
+     * How that amount carries GST, as the bag said before it was paid
+     * (`invoices/line-gst-words.ts`); null when nothing is said about GST.
+     */
+    gst: GstOnPrice | null;
 }
 
 export interface CheckoutConfirmation {
@@ -122,8 +129,15 @@ export interface ConfirmationRow {
     items: {
         quantity: number;
         price: { toString(): string };
-        product: { name: string } | null;
-        service: { name: string } | null;
+        gstPriceMode?: string | null;
+        product: {
+            name: string;
+            gstRate?: { toString(): string } | null;
+        } | null;
+        service: {
+            name: string;
+            gstRate?: { toString(): string } | null;
+        } | null;
         variant: { title: string } | null;
     }[];
 }
@@ -164,6 +178,17 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
             variant: clean(item.variant?.title),
             quantity: item.quantity,
             amount: fromMinor(toMinor(item.price) * item.quantity),
+            gst: orderLineGst({
+                quantity: item.quantity,
+                price: item.price,
+                gstPriceMode: item.gstPriceMode,
+                product: item.product
+                    ? { gstRate: item.product.gstRate ?? null }
+                    : null,
+                service: item.service
+                    ? { gstRate: item.service.gstRate ?? null }
+                    : null,
+            }),
         })),
         subtotal: toMoneyString(row.subtotal),
         delivery: unlessZero(row.shipping),
@@ -261,8 +286,9 @@ export class CheckoutConfirmationService {
                         select: {
                             quantity: true,
                             price: true,
-                            product: { select: { name: true } },
-                            service: { select: { name: true } },
+                            gstPriceMode: true,
+                            product: { select: { name: true, gstRate: true } },
+                            service: { select: { name: true, gstRate: true } },
                             variant: { select: { title: true } },
                         },
                     },

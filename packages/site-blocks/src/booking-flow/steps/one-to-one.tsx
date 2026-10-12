@@ -78,11 +78,11 @@ export function OneToOne({
     const asked = people.find((p) => p.id === person) ?? null;
     const whoChip = (on: boolean) =>
         cn(
-            "coarse:min-h-11 min-h-9 cursor-pointer rounded-full border px-3.5 text-sm font-semibold transition-colors duration-100 ease-out",
+            "coarse:min-h-11 min-h-9 cursor-pointer rounded-full border px-3.5 text-sm font-semibold transition-[color,background-color,border-color,transform] duration-100 ease-out active:scale-[0.97]",
             focusRing,
             on
                 ? "border-site-fg bg-site-fg text-site-bg"
-                : "border-site-border bg-site-surface text-site-fg",
+                : "border-site-border bg-site-surface text-site-fg hover:border-site-fg",
         );
     return (
         <>
@@ -154,7 +154,7 @@ export function OneToOne({
                             disabled={!free}
                             onClick={() => onDay(d.date)}
                             className={cn(
-                                "coarse:min-h-11 min-w-0 border text-center transition-colors duration-100 ease-out",
+                                "coarse:min-h-11 min-w-0 border text-center transition-[color,background-color,border-color,transform] duration-100 ease-out",
                                 focusRing,
                                 compact
                                     ? "rounded-[calc(var(--site-radius)+10px)] py-2"
@@ -162,9 +162,12 @@ export function OneToOne({
                                 on
                                     ? "border-site-fg bg-site-fg text-site-bg cursor-pointer"
                                     : free
-                                      ? "border-site-border bg-site-surface text-site-fg cursor-pointer"
+                                      ? "border-site-border bg-site-surface text-site-fg hover:border-site-fg cursor-pointer active:scale-[0.96]"
                                       : cn(
-                                            "border-site-border text-site-muted cursor-not-allowed",
+                                            // Nothing free: quiet and dashed,
+                                            // told from a free day by its
+                                            // shape as well as its colour.
+                                            "border-site-border text-site-muted cursor-not-allowed border-dashed",
                                             quietFill,
                                         ),
                             )}
@@ -225,7 +228,7 @@ export function OneToOne({
                                 aria-label={g.label}
                                 className="flex flex-wrap items-baseline gap-x-2.5 gap-y-2"
                             >
-                                <span className="text-site-muted flex-[0_0_84px] text-[12.5px] font-semibold">
+                                <span className="text-site-body flex-[0_0_84px] text-[13px] font-semibold max-[699px]:flex-[1_0_100%]">
                                     {g.label}
                                 </span>
                                 <div className="grid min-w-0 flex-[1_1_240px] grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
@@ -246,11 +249,11 @@ export function OneToOne({
                                                 }
                                                 onClick={() => onStart(s)}
                                                 className={cn(
-                                                    "h-[45px] cursor-pointer whitespace-nowrap rounded-[calc(var(--site-radius)+7px)] border text-[15px] font-semibold tabular-nums transition-colors duration-100 ease-out",
+                                                    "h-[45px] cursor-pointer whitespace-nowrap rounded-[calc(var(--site-radius)+7px)] border text-[15px] font-semibold tabular-nums transition-[color,background-color,border-color,transform] duration-100 ease-out active:scale-[0.97]",
                                                     focusRing,
                                                     on
                                                         ? "border-site-fg bg-site-fg text-site-bg"
-                                                        : "border-site-border bg-site-surface text-site-fg",
+                                                        : "border-site-border bg-site-surface text-site-fg hover:border-site-fg",
                                                 )}
                                             >
                                                 {t}

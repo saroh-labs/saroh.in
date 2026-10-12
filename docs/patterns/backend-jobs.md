@@ -578,7 +578,9 @@ the Privacy Policy states both.
   location's name, address, map link, hours or kind: the footer reads them live, DEC-128; cause
   `contact`, `enqueueBusinessSitesRevalidation`), the business's own domain
   pausing or coming back with its plan (every page then names another
-  address as its own, DEC-139; cause `domain`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
+  address as its own, DEC-139; cause `domain`), how the business's prices carry GST (its
+  choice, its registration, its GSTIN or state: every price's GST words are
+  read live; cause `prices`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
   stock row or how a product counts takes `lockStockLevels`, `lockProduct`
   or `lockProducts` (`products/stock-levels.ts`, the lock order), and those
   queue on the same transaction, once per row or product per transaction.
@@ -588,6 +590,15 @@ the Privacy Policy states both.
 - **A business with no live site still queues** on a stock change: knowing
   would cost a read in the hottest stock paths, so the handler finds no
   site and ends. The one place the "never enqueue a no-op" rule bends.
+- **A write to a draft queues nothing.** A kept page is a published page,
+  and a site's draft (its sections, its style, its footer) reaches one only
+  through `putLive`. So bringing a site up to its template
+  (`sites/template-sync.ts`: a module switched on, and the template upgrade,
+  DEC-141) writes drafts and queues no revalidation. The upgrade is a
+  command run by hand, not a job
+  (`docs/architecture/runbooks/TEMPLATE_UPGRADE.md`): each site is one
+  transaction and a site already upgraded is skipped, which is what makes it
+  safe to run again.
 
 ## Plan limit notices — **Current** (plans catalogue U13)
 

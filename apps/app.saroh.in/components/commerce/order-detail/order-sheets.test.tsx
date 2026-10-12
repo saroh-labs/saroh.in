@@ -48,6 +48,10 @@ vi.mock("@/lib/orders/actions", () => ({
         actions.changeFulfilment(...a) as unknown,
     cancelOrder: (...a: unknown[]) => actions.cancelOrder(...a) as unknown,
 }));
+const saveGstRates = vi.fn();
+vi.mock("@/lib/gst-rates/actions", () => ({
+    saveGstRates: (...a: unknown[]) => saveGstRates(...a) as unknown,
+}));
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }),
@@ -526,6 +530,31 @@ describe("a refusal", () => {
         expect(toast.showError).toHaveBeenCalledWith("Preparing has started.");
         expect(dialogName()).toBe("Edit #1063");
         expect(quantity(0)).toBe("3");
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("asks for a product's GST rate in place when the edit's invoice needs it, and changes nothing until it is chosen", async () => {
+        actions.editBeforePreparing.mockResolvedValue({
+            ok: false,
+            error: "Seeded loaf has no GST rate. Choose one to issue this invoice.",
+            rates: [{ kind: "PRODUCT", id: "p1", name: "Seeded loaf" }],
+        });
+        render();
+        await press(button("Edit items or address"));
+        await press(button("One more Seeded loaf", dialog()));
+        await press(button("Save (₹120 more due)", dialog()));
+
+        // Asked where the edit was saved: no toast, no other page.
+        const ask = Array.from(
+            document.querySelectorAll<HTMLElement>('[role="dialog"]'),
+        ).find((d) => d.textContent.includes("Choose a GST rate"));
+        expect(ask?.textContent).toContain(
+            "Seeded loaf has no GST rate. Choose one to save this change.",
+        );
+        expect(ask?.textContent).toContain("Save and update order");
+        expect(toast.showError).not.toHaveBeenCalled();
+        expect(saveGstRates).not.toHaveBeenCalled();
+        expect(actions.editBeforePreparing).toHaveBeenCalledTimes(1);
         expect(refresh).not.toHaveBeenCalled();
     });
 

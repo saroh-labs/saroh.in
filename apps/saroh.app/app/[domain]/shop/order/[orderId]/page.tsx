@@ -64,6 +64,8 @@ export default async function ShopOrderPage({
             businessName={businessName}
             soldBy={soldByFor(facts, businessName, true)}
             ordersHref={ordersHref}
+            // Where a read that failed is asked for again.
+            retryHref={`/shop/order/${encodeURIComponent(orderId)}`}
             signIn={
                 !lookup.ok && lookup.reason === "signed-out" ? (
                     <AccountEntry

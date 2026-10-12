@@ -25,7 +25,7 @@ import {
 } from "@/lib/sites/template-picker";
 import { templateChoiceOn } from "@/lib/sites/templates-switch";
 
-export const metadata = { title: "New site" };
+export const metadata = { title: "New website" };
 
 /**
  * New-site page (S2-004). Mirrors the create-store page: a back link, a

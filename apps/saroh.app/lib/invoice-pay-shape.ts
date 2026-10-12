@@ -1,11 +1,14 @@
 import type {
     AutopayChecks,
     AutopayMethod,
+    GstOnPrice,
     PayInstructions,
 } from "@saroh/site-blocks";
 import {
     autopayChecksOf,
     autopayMethodsOf,
+    gstLineWords,
+    gstOnPriceOf,
     isAutopayMethod,
 } from "@saroh/site-blocks";
 
@@ -23,6 +26,12 @@ export interface PayInvoiceLine {
     quantity: number;
     unitPrice: string;
     amount: string;
+    /**
+     * The GST in or on the line's whole amount, from the invoice's frozen
+     * sums; null for none. Absent from an older API. Narrowed where it is
+     * drawn (`gstOnPriceOf`): anything strange is none said.
+     */
+    gst?: GstOnPrice | null;
 }
 
 /** Exactly what the API's allow-list sends; nothing else is read. */
@@ -238,6 +247,16 @@ export function payMoney(amount: string, currency: string): string {
     } catch {
         return `${currency} ${amount}`;
     }
+}
+
+/**
+ * The GST in or on a line's amount, under its name on a pay page:
+ * "includes ₹152.54 GST (18%)", or "₹1,000 + ₹180 GST (18%)" where it was
+ * added. The API's numbers, only written out; null when it said none.
+ */
+export function payLineGstWords(gst: unknown, currency: string): string | null {
+    const on = gstOnPriceOf(gst);
+    return on ? gstLineWords(on, currency) : null;
 }
 
 /** "22 September 2026", in the zone the date was written in (UTC). */

@@ -33,7 +33,10 @@ const BOOKING: BookResult = {
     },
 };
 
-function done(over: Partial<Extract<Phase, { kind: "done" }>> = {}) {
+function done(
+    over: Partial<Extract<Phase, { kind: "done" }>> = {},
+    gst: string | null = null,
+) {
     const phase: Extract<Phase, { kind: "done" }> = {
         kind: "done",
         booking: BOOKING,
@@ -49,6 +52,7 @@ function done(over: Partial<Extract<Phase, { kind: "done" }>> = {}) {
             headingRef={createRef()}
             business="Rye"
             where={null}
+            gst={gst}
             rules={{
                 bookAheadDays: null,
                 latestBookingMinutes: null,
@@ -196,5 +200,33 @@ describe("the booked card says whether a message is coming", () => {
             expect(screen.queryByText(/We've emailed/)).toBeNull();
             unmount();
         }
+    });
+});
+
+describe("the booked card repeats the GST it showed before booking", () => {
+    const words = "₹1,000 + ₹180 GST (18%)";
+
+    it("says the same sentence under what there is to pay", () => {
+        const { container } = done({ price: "₹1,180" }, words);
+        expect(
+            screen.getByText("Pay ₹1,180 at the front desk when you arrive."),
+        ).toBeInTheDocument();
+        expect(container.querySelector("[data-booking-gst]")).toHaveTextContent(
+            words,
+        );
+    });
+
+    it("says nothing with none, for a credit, or with nothing to pay", () => {
+        const none = done({ price: "₹1,180" });
+        expect(none.container.textContent).not.toContain("GST");
+        none.unmount();
+        const credit = done(
+            { creditText: "Used 1 credit from your pack." },
+            words,
+        );
+        expect(credit.container.textContent).not.toContain("GST");
+        credit.unmount();
+        const free = done({ price: null }, words);
+        expect(free.container.textContent).not.toContain("GST");
     });
 });

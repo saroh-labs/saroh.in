@@ -1,6 +1,7 @@
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch } from "@/lib/api/http";
+import { businessModeOf } from "@/lib/gst/price-mode";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import type {
     LineAllergens,
@@ -34,7 +35,7 @@ export interface NewOrderCatalogue {
     /**
      * The storefront's add-on tax, in basis points, when it charges one and
      * the business isn't GST-registered (a registered business's prices
-     * include GST, ADR-008). Zero otherwise.
+     * carry their GST already, ADR-008). Zero otherwise.
      */
     taxBps: number;
     gstRegistered: boolean;
@@ -66,7 +67,12 @@ export async function loadNewOrderCatalogue(
         products: counterProducts(products).map((p) => ({
             id: p.id,
             name: p.name,
-            sellables: sellablesOfProduct(p, storeId),
+            // Priced as the API will charge it: GST on top where the
+            // business, or the product, has "GST is added".
+            sellables: sellablesOfProduct(p, storeId, {
+                registered: gstRegistered,
+                mode: businessModeOf(business?.priceMode),
+            }),
         })),
     };
 }

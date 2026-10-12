@@ -12,10 +12,12 @@ import type {
 } from "@/lib/staff/types";
 
 /**
- * The Availability editor's rules (U16, the design's `?view=avail`): hours are
- * a draft until "Save hours", ranges refuse overlap and an end before the
- * start, Monday copies to the weekdays, and a draft turns into the writes the
- * API takes. Pure, so the editor and its tests agree.
+ * The Availability editor's rules (U16, the design's `?view=avail`): hours,
+ * time off and extra hours are a draft until "Save", ranges refuse overlap
+ * and an end before the start, Monday copies to the weekdays, and a draft
+ * turns into the writes the API takes. The business's booking rules are not
+ * part of that draft: each is a sentence in a row, changed in its own sheet
+ * (`ruleRows`). Pure, so the editor and its tests agree.
  */
 
 /** Monday first, as the design lists the week; values are 0 = Sunday. */
@@ -70,6 +72,23 @@ export function copyMondayToWeekdays(
         ...[2, 3, 4, 5].flatMap((day) =>
             monday.map((r) => ({ ...r, dayOfWeek: day })),
         ),
+    ];
+}
+
+/**
+ * One day's hours given to other days, replacing what those days had. A
+ * day off copies as a day off; the day itself is left alone.
+ */
+export function copyDay(
+    hours: readonly WeeklyRange[],
+    from: number,
+    to: readonly number[],
+): WeeklyRange[] {
+    const days = to.filter((day) => day !== from);
+    const source = dayRanges(hours, from);
+    return [
+        ...hours.filter((h) => !days.includes(h.dayOfWeek)),
+        ...days.flatMap((day) => source.map((r) => ({ ...r, dayOfWeek: day }))),
     ];
 }
 
@@ -140,20 +159,16 @@ export interface NewOff {
     reason: string;
 }
 
-/** Everything the editor can change, held until "Save hours". */
+/** Everything the page's draft holds until "Save". */
 export interface AvailabilityDraft {
     hours: Record<string, WeeklyRange[]>;
     offAdded: NewOff[];
     /** Rows of time off or closure taken away — a line's rows together. */
     offRemoved: string[];
     extraRemoved: string[];
-    rules: BookingRules;
 }
 
-export function draftFrom(
-    staff: readonly StaffView[],
-    rules: BookingRules,
-): AvailabilityDraft {
+export function draftFrom(staff: readonly StaffView[]): AvailabilityDraft {
     return {
         hours: Object.fromEntries(
             staff.map((p) => [
@@ -168,7 +183,6 @@ export function draftFrom(
         offAdded: [],
         offRemoved: [],
         extraRemoved: [],
-        rules: { ...rules },
     };
 }
 
@@ -183,18 +197,7 @@ export type SaveOp =
     | { kind: "addOff"; off: NewOff }
     | { kind: "removeOff"; staffId: string; before: OffLine }
     | { kind: "removeClosure"; before: OffLine }
-    | { kind: "removeExtra"; staffId: string; before: ExtraHours }
-    | { kind: "rules"; rules: BookingRules; before: BookingRules };
-
-function sameRules(a: BookingRules, b: BookingRules): boolean {
-    return (
-        a.bookAheadDays === b.bookAheadDays &&
-        a.latestBookingMinutes === b.latestBookingMinutes &&
-        a.freeCancelHours === b.freeCancelHours &&
-        refundsInTime(a) === refundsInTime(b) &&
-        payWayOf(a) === payWayOf(b)
-    );
-}
+    | { kind: "removeExtra"; staffId: string; before: ExtraHours };
 
 /** How people pay when they book; both unless it was set (DEC-088). */
 export function payWayOf(rules: BookingRules): BookingPayment {
@@ -230,7 +233,19 @@ export function payWayHint(
             : way === "ONLINE"
               ? "Everyone pays on the booking page when they book. Free services book with nothing to pay."
               : "People pay online when they book, or at the desk. A deposit is paid online, or at the desk when you can't take payment online.";
-    if (way === "DESK" || !blocker) return base;
+    const blocked = payWayBlocked(way, blocker);
+    return blocked ? `${base} ${blocked}` : base;
+}
+
+/**
+ * Why the chosen way can't take money online right now, and what that
+ * leaves, or null when it can or the way doesn't need it.
+ */
+export function payWayBlocked(
+    way: BookingPayment,
+    blocker: OnlineBlocker | null | undefined,
+): string | null {
+    if (way === "DESK" || !blocker) return null;
     const why =
         blocker === "PAYMENTS_OFF"
             ? "Payments is switched off"
@@ -239,7 +254,7 @@ export function payWayHint(
         way === "ONLINE"
             ? "nobody can book a service with a price online"
             : "everything is paid at the desk";
-    return `${base} Right now ${why}, so ${then}.`;
+    return `Right now ${why}, so ${then}.`;
 }
 
 /** The business's refund policy, on unless it was turned off (DEC-058). */
@@ -266,7 +281,6 @@ export const REFUND_POLICY = {
  */
 export function saveOps(
     staff: readonly StaffView[],
-    rules: BookingRules,
     draft: AvailabilityDraft,
     closures: readonly Closure[] = [],
     timeZone = "UTC",
@@ -299,9 +313,6 @@ export function saveOps(
         }
     }
     for (const off of draft.offAdded) ops.push({ kind: "addOff", off });
-    if (!sameRules(rules, draft.rules)) {
-        ops.push({ kind: "rules", rules: draft.rules, before: rules });
-    }
     return ops;
 }
 
@@ -392,4 +403,139 @@ export function ruleChoices(rules: BookingRules) {
             ),
         },
     ];
+}
+
+/** One of the business's five booking rules. */
+export type RuleKey =
+    | "bookAheadDays"
+    | "latestBookingMinutes"
+    | "freeCancelHours"
+    | "bookingPayment"
+    | "refundInTimeCancels";
+
+/** A choice in a rule's sheet, with the line under it when it has one. */
+export interface RuleChoice extends RuleOption {
+    note?: string;
+}
+
+/**
+ * A booking rule as Availability shows it: a sentence in a row with Edit,
+ * and the choices its sheet offers.
+ */
+export interface RuleRow {
+    key: RuleKey;
+    /** The row's few words: what the rule is about. */
+    label: string;
+    /** The sheet's title, and what Edit says it edits. */
+    title: string;
+    /** The saved rule, said whole. */
+    sentence: string;
+    /** The saved rule as one of `options`. */
+    value: string;
+    options: RuleChoice[];
+    /** Said under the choices. */
+    hint?: string;
+}
+
+const PAY_SENTENCE: Record<BookingPayment, string> = {
+    BOTH: "Pay online or at the desk",
+    ONLINE: "Pay online when they book",
+    DESK: "Pay at the desk",
+};
+
+const lowerFirst = (words: string) =>
+    words.charAt(0).toLowerCase() + words.slice(1);
+
+/**
+ * The five rules as sentences, in the order they are read: how far ahead,
+ * how late, cancelling, paying, refunds. `blocker` is why online payment
+ * can't be taken now, for the paying choices' own lines.
+ */
+export function ruleRows(
+    rules: BookingRules,
+    blocker?: OnlineBlocker | null,
+): RuleRow[] {
+    const [ahead, latest, cancel] = ruleChoices(rules);
+    const way = payWayOf(rules);
+    const refund = refundsInTime(rules) ? "refund" : "keep";
+    const refundWords =
+        REFUND_POLICY.options.find((o) => o.value === refund)?.label ?? "";
+    return [
+        {
+            key: "bookAheadDays",
+            label: "Booking ahead",
+            title: ahead.label,
+            sentence:
+                rules.bookAheadDays === null
+                    ? "No limit on how far ahead"
+                    : `Book up to ${aheadLabel(rules.bookAheadDays)} ahead`,
+            value: String(rules.bookAheadDays ?? ""),
+            options: ahead.options,
+        },
+        {
+            key: "latestBookingMinutes",
+            label: "Booking late",
+            title: latest.label,
+            sentence:
+                rules.latestBookingMinutes === null
+                    ? "Book up to the start time"
+                    : `Book up to ${latestLabel(rules.latestBookingMinutes)} the start`,
+            value: String(rules.latestBookingMinutes ?? ""),
+            options: latest.options,
+        },
+        {
+            key: "freeCancelHours",
+            label: "Cancelling",
+            title: cancel.label,
+            sentence:
+                rules.freeCancelHours === null
+                    ? "Free to cancel any time before"
+                    : `Free to cancel up to ${cancelLabel(rules.freeCancelHours)}`,
+            value: String(rules.freeCancelHours ?? ""),
+            options: cancel.options,
+        },
+        {
+            key: "bookingPayment",
+            label: "Paying",
+            title: PAY_WAY.label,
+            sentence: PAY_SENTENCE[way],
+            value: way,
+            options: PAY_WAY.options.map((o) => ({
+                ...o,
+                note: payWayHint(o.value, blocker),
+            })),
+        },
+        {
+            key: "refundInTimeCancels",
+            label: "Refunds",
+            title: REFUND_POLICY.label,
+            sentence: `${REFUND_POLICY.label}: ${lowerFirst(refundWords)}`,
+            value: refund,
+            options: [...REFUND_POLICY.options],
+            hint: REFUND_POLICY.hint,
+        },
+    ];
+}
+
+/** A sheet's choice as the one field of the rules it changes. */
+export function rulePatch(key: RuleKey, value: string): Partial<BookingRules> {
+    if (key === "bookingPayment") {
+        return { bookingPayment: value as BookingPayment };
+    }
+    if (key === "refundInTimeCancels") {
+        return { refundInTimeCancels: value === "refund" };
+    }
+    return { [key]: value === "" ? null : Number(value) };
+}
+
+/** The one field as it stands, to put back on Undo. */
+export function ruleBefore(
+    key: RuleKey,
+    rules: BookingRules,
+): Partial<BookingRules> {
+    if (key === "bookingPayment") return { bookingPayment: payWayOf(rules) };
+    if (key === "refundInTimeCancels") {
+        return { refundInTimeCancels: refundsInTime(rules) };
+    }
+    return { [key]: rules[key] };
 }

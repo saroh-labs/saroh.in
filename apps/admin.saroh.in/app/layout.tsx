@@ -40,6 +40,10 @@ export const metadata: Metadata = {
         template: "%s · Saroh console",
     },
     description: "The operator console for a Saroh instance.",
+    // The console is never for a search engine. The same is said in a
+    // header on every answer, the redirect to sign-in among them
+    // (`withPrivateApp` in middleware.ts, next.config, public/_headers).
+    robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

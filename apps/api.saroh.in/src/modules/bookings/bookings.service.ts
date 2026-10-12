@@ -16,6 +16,7 @@ import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { isGstRate } from "../invoices/gst";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { allows } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
 import { OPENS_CHECKOUT } from "../payments/public-key";
@@ -302,6 +303,8 @@ export class BookingsService {
                 currency: dto.currency ?? null,
                 gstRate: serviceGstRate(dto.gstRate),
                 sacCode: dto.sacCode ?? null,
+                // Null: priced the business's way (`service-price.ts`).
+                gstPriceMode: dto.gstPriceMode ?? null,
                 timezone: dto.timezone,
                 ...location,
                 status: "ACTIVE",
@@ -316,7 +319,10 @@ export class BookingsService {
             ctx.organizationId,
             created.id,
         );
-        return toServiceView(created);
+        return toServiceView(
+            created,
+            await loadPriceTerms(prisma, ctx.organizationId),
+        );
     }
 
     /** List the org's services, newest first (excludes soft-deleted). `service:read`. */
@@ -326,7 +332,8 @@ export class BookingsService {
             where: { organizationId: ctx.organizationId, deletedAt: null },
             orderBy: { createdAt: "desc" },
         });
-        return services.map(toServiceView);
+        const terms = await loadPriceTerms(prisma, ctx.organizationId);
+        return services.map((service) => toServiceView(service, terms));
     }
 
     /** Get one owned service. `service:read`; cross-tenant/missing → 404. */
@@ -335,7 +342,10 @@ export class BookingsService {
         serviceId: string,
     ): Promise<ServiceView> {
         requireBookingPower(ctx, "service:read");
-        return toServiceView(await this.requireOwnedService(ctx, serviceId));
+        return toServiceView(
+            await this.requireOwnedService(ctx, serviceId),
+            await loadPriceTerms(prisma, ctx.organizationId),
+        );
     }
 
     /**
@@ -392,6 +402,9 @@ export class BookingsService {
         if (dto.gstRate !== undefined)
             data.gstRate = serviceGstRate(dto.gstRate);
         if (dto.sacCode !== undefined) data.sacCode = dto.sacCode;
+        if (dto.gstPriceMode !== undefined) {
+            data.gstPriceMode = dto.gstPriceMode;
+        }
         if (dto.timezone !== undefined) data.timezone = dto.timezone;
         if (dto.status !== undefined) data.status = dto.status;
         if (dto.locationType !== undefined || dto.meetingUrl !== undefined) {
@@ -441,6 +454,7 @@ export class BookingsService {
 
         return toServiceView(
             await prisma.service.update({ where: { id: service.id }, data }),
+            await loadPriceTerms(prisma, ctx.organizationId),
         );
     }
 

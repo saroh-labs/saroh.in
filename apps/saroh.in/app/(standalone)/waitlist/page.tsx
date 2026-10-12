@@ -15,6 +15,7 @@ import {
     WAITLIST,
     WAITLIST_FOOTER,
     WAITLIST_MONEY,
+    WAITLIST_PAGE,
 } from "@/content/waitlist";
 import { readLaunchOffer } from "@/lib/launch-offer";
 import { resourcesContext } from "@/lib/resources-context";
@@ -37,19 +38,19 @@ const devanagari = localFont({
     preload: false,
 });
 
-const DESCRIPTION =
-    "Join the Saroh waitlist: sell, take bookings and run your website from one place. We'll email you once, with your invite, when we open.";
-
 export const metadata: Metadata = pageMetadata({
-    title: "Join the waitlist — Saroh",
-    description: DESCRIPTION,
+    title: WAITLIST_PAGE.seoTitle,
+    description: WAITLIST_PAGE.seoDescription,
     path: "/waitlist",
 });
 
 const GUTTER = "px-mk-gutter";
 const FRAME = "mx-auto box-border w-full max-w-[1180px]";
 
-/** "Services, Appointments, Retail, Orders. Handled." — the name's letters in Saffron. */
+/**
+ * "Services, Appointments, Retail, Orders. Handled.", the name's letters in
+ * Saffron: the design's display line. Not this page's h1 (it is Home's).
+ */
 const HERO: [string, string][] = [
     ["S", "ervices, "],
     ["A", "ppointments, "],
@@ -111,7 +112,10 @@ export default async function WaitlistPage() {
                 className={`${FRAME} ${GUTTER} grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-[clamp(28px,5vw,64px)] py-[clamp(24px,5vw,64px)]`}
             >
                 <div className="flex flex-col gap-[22px] pt-2">
-                    <h1 className="m-0 font-display text-[clamp(40px,6vw,68px)] font-semibold leading-[1.06] tracking-[-0.04em] [text-wrap:balance]">
+                    <h1 className="m-0 text-[11px] font-semibold uppercase leading-[1.5] tracking-[0.1em] text-muted-foreground">
+                        {WAITLIST_PAGE.h1}
+                    </h1>
+                    <p className="m-0 font-display text-[clamp(40px,6vw,68px)] font-semibold leading-[1.06] tracking-[-0.04em] [text-wrap:balance]">
                         {HERO.map(([initial, rest]) => (
                             <span key={initial}>
                                 <span className="text-brand-500">
@@ -120,7 +124,7 @@ export default async function WaitlistPage() {
                                 {rest}
                             </span>
                         ))}
-                    </h1>
+                    </p>
                     <p className="m-0 max-w-[46ch] text-[18px] leading-[1.55] text-neutral-600 [text-wrap:pretty]">
                         Sell, take bookings and run your website from one place.
                         Made in India, priced in rupees.

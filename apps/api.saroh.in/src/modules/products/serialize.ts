@@ -8,6 +8,7 @@
 
 import { toMoneyString } from "../../common/money";
 import { bpsToRate, rateToBps } from "../invoices/gst";
+import { isGstPriceMode } from "../invoices/gst-price";
 import type { ProductFulfilmentType } from "../orders/fulfilment";
 import { productTypesOf } from "../orders/fulfilment";
 import { sanitizeRichHtml } from "../sites/sanitize";
@@ -85,9 +86,14 @@ export interface ProductDto {
     maker: string | null;
     madeIn: string | null;
     supplierCode: string | null;
-    /** GST the price includes, in percent ("18"); null when not set. */
+    /** The price's GST rate, in percent ("18"); null when not set. */
     gstRate: string | null;
     hsnCode: string | null;
+    /**
+     * Its own price mode (INCLUDED or ADDED) when it differs from the
+     * business's; null is "same as the business".
+     */
+    gstPriceMode: string | null;
     warranty: string | null;
     returnsMode: string;
     returnsText: string | null;
@@ -239,6 +245,7 @@ interface RawProduct {
     supplierCode: string | null;
     gstRate?: DecimalLike | null;
     hsnCode?: string | null;
+    gstPriceMode?: string | null;
     warranty: string | null;
     returnsMode: string;
     returnsText: string | null;
@@ -365,6 +372,9 @@ export function serializeProduct(
                 ? bpsToRate(rateToBps(product.gstRate) ?? 0)
                 : null,
         hsnCode: product.hsnCode ?? null,
+        gstPriceMode: isGstPriceMode(product.gstPriceMode)
+            ? product.gstPriceMode
+            : null,
         warranty: product.warranty,
         returnsMode: product.returnsMode,
         returnsText: product.returnsText,

@@ -235,17 +235,30 @@ describe("productGrid: what is left, a note and bare cards", () => {
     });
 
     it("draws bare cards: tall photos, sold out on the corner, the count and the note", () => {
+        // One product with a photo: the others take a name panel in the
+        // photo's own tall box, so the row lines up.
+        const products = SAMPLE_PRODUCTS.map((p, i) =>
+            i === 0
+                ? { ...p, image: { url: "https://cdn.test/a.jpg", alt: "A" } }
+                : p,
+        );
         const { container } = render(
             <ProductGridSection
                 content={BLOCK_META.productGrid.cases.bare}
-                feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
+                feed={{ products, basePath: "/shop" }}
             />,
         );
         const shown = SAMPLE_PRODUCTS.slice(0, 4);
         expect(
             container.querySelector("[data-availability]")?.textContent,
         ).toBe(availabilityLine(shown));
-        expect(container.querySelector(".aspect-\\[4\\/5\\]")).not.toBeNull();
+        expect(container.querySelectorAll(".aspect-\\[4\\/5\\]")).toHaveLength(
+            shown.length,
+        );
+        expect(container.querySelectorAll("img")).toHaveLength(1);
+        expect(container.querySelectorAll("[data-name-plate]")).toHaveLength(
+            shown.length - 1,
+        );
         // No bordered card around a product.
         expect(container.querySelector("li a")?.className).not.toContain(
             "border",

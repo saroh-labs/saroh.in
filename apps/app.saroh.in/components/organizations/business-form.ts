@@ -5,6 +5,7 @@ import {
     ADDRESS_KEYS,
     registeredAddressShape,
 } from "@/components/organizations/registered-address-shape";
+import { businessModeOf, GST_PRICE_MODES } from "@/lib/gst/price-mode";
 import {
     GST_STATES,
     isHsnSac,
@@ -81,6 +82,8 @@ export const formSchema = z
                 (v) => v === "" || isHsnSac(v),
                 "A SAC code is 4 to 8 digits.",
             ),
+        // How prices carry GST (12 Oct 2026): a registered business's.
+        priceMode: z.enum(GST_PRICE_MODES),
         // How invoice numbers are built (`invoice-number.ts`): the parts
         // list as one value, "PREFIX,FY,!YEAR,!MONTH", and the rest.
         numberParts: z.string(),
@@ -125,6 +128,7 @@ export const FIELD_OF: Record<string, FormField> = {
     invoicePrefix: "invoicePrefix",
     deliveryRate: "deliveryRate",
     deliverySac: "deliverySac",
+    priceMode: "priceMode",
     invoiceNumberParts: "numberParts",
     invoiceNumberRestart: "numberRestart",
     invoiceNumberDigits: "numberDigits",
@@ -165,6 +169,7 @@ const SHEET_FIELDS: Partial<Record<BusinessSheet, readonly FormField[]>> = {
     taxId: ["taxId"],
     numbers: ["invoicePrefix", ...NUMBER_FIELDS],
     delivery: ["deliveryRate", "deliverySac"],
+    priceMode: ["priceMode"],
     address: ADDRESS_FIELDS,
 };
 
@@ -211,6 +216,8 @@ export function valuesOf(settings: OrganizationSettings): FormValues {
         invoicePrefix: settings.tax?.invoicePrefix ?? "",
         deliveryRate: settings.tax?.deliveryRate ?? "18",
         deliverySac: settings.tax?.deliverySac ?? "",
+        // An older API sends none: prices include GST, as they always did.
+        priceMode: businessModeOf(settings.tax?.priceMode),
         ...formatFields(numberFormatOf(settings)),
         addressLine1: settings.registeredAddress?.line1 ?? "",
         addressLine2: settings.registeredAddress?.line2 ?? "",
@@ -280,6 +287,7 @@ export function settingsPatch(
         ...(dirty.deliverySac
             ? { deliverySac: values.deliverySac.trim() }
             : {}),
+        ...(dirty.priceMode ? { priceMode: values.priceMode } : {}),
         // The format goes whole, and only when it was touched: one never
         // chosen keeps following the registration (the API's default).
         ...(NUMBER_FIELDS.some((key) => dirty[key])

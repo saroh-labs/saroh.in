@@ -162,6 +162,18 @@ const SITE_CONTACT_COLUMNS: ReadonlySet<string> = new Set([
     "postalCode",
 ]);
 
+/**
+ * The columns whose change alters the GST words beside every price a
+ * published page shows (`invoices/gst-price.ts`): the choice itself, and
+ * whatever decides that the business is registered at all.
+ */
+const PRICE_WORDS_COLUMNS: ReadonlySet<string> = new Set([
+    "gstPriceMode",
+    "gstRegistered",
+    "gstState",
+    "taxId",
+]);
+
 /** The checklist's facts ({@link OrganizationSettings.setup}). */
 export interface SetupFacts {
     /** Products not archived: drafts count, as "Add your first product". */
@@ -204,6 +216,7 @@ const PROFILE_SELECT = {
     invoiceNumberFormat: true,
     deliveryGstRate: true,
     deliverySacCode: true,
+    gstPriceMode: true,
     logoMediaId: true,
     logoUrl: true,
     addressLine1: true,
@@ -232,6 +245,7 @@ interface ProfileRow {
     invoiceNumberFormat: unknown;
     deliveryGstRate: { toString(): string };
     deliverySacCode: string | null;
+    gstPriceMode?: string | null;
     logoMediaId: string | null;
     logoUrl: string | null;
     addressLine1: string | null;
@@ -272,6 +286,7 @@ function splitProfile(
         invoiceNumberFormat: _n,
         deliveryGstRate: _d,
         deliverySacCode: _c,
+        gstPriceMode: _m,
         logoMediaId,
         logoUrl,
         addressLine1: _a1,
@@ -562,6 +577,12 @@ export class OrganizationSettingsService {
         if (changed.some((column) => SITE_CONTACT_COLUMNS.has(column))) {
             await this.contactChangedOnSites(ctx.organizationId);
         }
+        // Every price the site shows says how it carries GST, read live
+        // (`invoices/gst-price.ts`): registering, deregistering or changing
+        // the choice changes those words on pages already kept.
+        if (changed.some((column) => PRICE_WORDS_COLUMNS.has(column))) {
+            await this.pricesChangedOnSites(ctx.organizationId);
+        }
 
         return {
             id: settings.id,
@@ -660,6 +681,28 @@ export class OrganizationSettingsService {
         });
         await enqueuePageRevalidation(prisma, {
             cause: "icon",
+            siteIds: sites.map((s) => s.id),
+        });
+    }
+
+    /**
+     * How the business's prices carry GST is read live by every public
+     * price (the product page, the bag, the booking page), so the pages the
+     * merchant sites keep (#863) say the old words until told. Queued after
+     * the write, for the business's published sites.
+     */
+    private async pricesChangedOnSites(organizationId: string): Promise<void> {
+        if (!pageCacheRevalidationOn()) return;
+        const sites = await prisma.site.findMany({
+            where: {
+                organizationId,
+                deletedAt: null,
+                currentPublicationId: { not: null },
+            },
+            select: { id: true },
+        });
+        await enqueuePageRevalidation(prisma, {
+            cause: "prices",
             siteIds: sites.map((s) => s.id),
         });
     }

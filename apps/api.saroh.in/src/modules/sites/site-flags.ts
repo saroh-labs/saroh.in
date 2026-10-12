@@ -10,9 +10,12 @@
  *
  * So this module NEVER throws and never refuses anything. It reports.
  *
- * One flag is not advisory: a site with no web address (DEC-069, L5).
- * Published, it would be live at no address at all, so that flag is
- * `blocking` and `publishSite` refuses until the site has one.
+ * Two flags are not advisory, and `publishSite` refuses while either
+ * stands (`blocking`):
+ * - a site with no web address (DEC-069, L5): published, it would be live
+ *   at no address at all;
+ * - a hero whose line is still a template's note to the owner (DEC-141):
+ *   published, customers read an instruction meant for somebody else.
  *
  * It lives on the server and is the single source of truth. The editor could
  * have run the same rules in the browser to update a dot per keystroke, but two
@@ -28,7 +31,7 @@
 
 import type { PageKind } from "@saroh/database";
 import { BLOCK_META, exampleTextIn, resolveVariant } from "@saroh/database";
-import { templatePlaceholderInAny } from "@saroh/templates";
+import { isOwnerNote, templatePlaceholderInAny } from "@saroh/templates";
 
 import { trimTrailingSlashes } from "../../common/paths";
 import {
@@ -176,6 +179,10 @@ function stringsOf(value: unknown, out: string[] = []): string[] {
  * photo brief is a note to the owner by design (KTD-5) and never drawn.
  */
 const TEMPLATE_TEXT_FIELDS: Record<string, string[]> = {
+    // The line under the headline (DEC-141): the first starters put a
+    // stock greeting there. Its note to the owner is refused, not flagged
+    // (`ownerNoteFlags`).
+    hero: ["subheading"],
     person: [
         "name",
         "role",
@@ -231,6 +238,39 @@ function obj(v: unknown): Record<string, unknown> {
  * everything below the fold.
  */
 const HERO_HEADING_PHONE_LIMIT = 60;
+
+/**
+ * What the owner reads when a hero's line is still a template's note to
+ * them (DEC-141); `publishSite`'s refusal says the same.
+ */
+export const OWNER_NOTE_MESSAGE =
+    'The line under your headline still says "Say what you do and where, in one line." That is a note for you, not for your customers. Write your own line there, or clear it, before going live.';
+
+/**
+ * Whether anything a publish would put live is a template's note to the
+ * owner (`isOwnerNote`, `@saroh/templates`): a hero's line, on a page and
+ * in a section that are both shown. `publishSite` refuses while one is, so
+ * an unedited `starter@3` line can no longer reach a visitor. The flag
+ * above tells the owner first; this is the lock.
+ */
+export function hasOwnerNote(pages: readonly unknown[]): boolean {
+    // Read loosely: a snapshot's pages are stored JSON, typed as unknown.
+    return pages.some((page) => {
+        const p = obj(page);
+        const sections = Array.isArray(p.sections) ? p.sections : [];
+        return (
+            p.hidden !== true &&
+            sections.some((section) => {
+                const s = obj(section);
+                return (
+                    s.hidden !== true &&
+                    s.type === "hero" &&
+                    isOwnerNote(obj(s.content).subheading)
+                );
+            })
+        );
+    });
+}
 
 /** Checks for one section. Returns every flag it raises. */
 function checkSection(
@@ -299,7 +339,8 @@ function checkSection(
         const textBlockSaysSo =
             section.type === "richText" &&
             looksLikePlaceholder(textOf(str(c.value)));
-        if (found !== null && !textBlockSaysSo) {
+        // A note to the owner is the blocking flag's to raise, once.
+        if (found !== null && !textBlockSaysSo && !isOwnerNote(found)) {
             const label =
                 section.type in BLOCK_META
                     ? BLOCK_META[
@@ -340,7 +381,16 @@ function checkSection(
             }
 
             const sub = str(c.subheading);
-            if (sub !== "" && looksLikePlaceholder(sub)) {
+            if (isOwnerNote(sub)) {
+                flags.push({
+                    type: "placeholderText",
+                    message: OWNER_NOTE_MESSAGE,
+                    pageId: page.id,
+                    sectionIndex: index,
+                    field: "subheading",
+                    blocking: true,
+                });
+            } else if (sub !== "" && looksLikePlaceholder(sub)) {
                 at(
                     "placeholderText",
                     "The hero subheading still has placeholder text in it.",

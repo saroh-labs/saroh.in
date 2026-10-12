@@ -4,14 +4,18 @@ import type {
     CodeRequestResult,
     DetailsResult,
     NoteResult,
+    NoticesResult,
+    PayNowResult,
     VerifyResult,
 } from "@saroh/site-blocks";
 
 import { accountAreaOn } from "@/lib/account-area";
+import { noticesResult } from "@/lib/account-details-shape";
 import {
     emailChangeAnswer,
     isAccountView,
     isNote,
+    payNowAnswer,
     refusalMessage,
 } from "@/lib/account-shape";
 import { accountFetch } from "@/lib/customer-session";
@@ -23,7 +27,8 @@ import { TEST_RELEASE_REFUSAL } from "@saroh/site-blocks";
 /**
  * What a signed-in customer changes in Me (round-2 plan A, A5): their name
  * and phone, their sign-in email (a code to the new address), and a health
- * note for the team. Each runs on this server with the session cookie and
+ * note for the team; and, since DEC-142, "Pay now" on an open invoice and
+ * whether the business may email them. Each runs on this server with the session cookie and
  * the signed relay, and checks `Origin` first (`lib/origin.test.ts` fails
  * when one doesn't). The API's own words reach the customer only where they
  * were written for them (a field's message, `refusalMessage`).
@@ -143,4 +148,65 @@ export async function addHealthNote(text: string): Promise<NoteResult> {
         ok: false,
         message: refusalMessage(call.res.status, body, OFFLINE),
     };
+}
+
+/** An invoice's ref is an opaque id: letters, digits, `_` and `-`. */
+const REF = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * "Pay now" on one of the customer's open invoices (DEC-142): the API makes
+ * a pay link that moment, for an invoice it finds by its ref **and** the
+ * signed-in customer, and this answers only ever with a pay page's address
+ * (`payNowAnswer`). An invoice that is paid, gone or someone else's is a
+ * 404 there, said here as its own sentence.
+ */
+export async function payInvoiceNow(ref: string): Promise<PayNowResult> {
+    if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
+    if (!accountAreaOn()) return { ok: false, message: OFFLINE };
+    if (typeof ref !== "string" || !REF.test(ref)) {
+        return { ok: false, message: OFFLINE };
+    }
+    const call = await accountFetch(`me/invoices/${ref}/pay`, {
+        method: "POST",
+        body: {},
+    });
+    if (!call?.ok) return { ok: false, message: OFFLINE };
+    if (call.res.status === 404) {
+        return {
+            ok: false,
+            message:
+                "That invoice isn't waiting to be paid any more. Refresh the page.",
+        };
+    }
+    return payNowAnswer(
+        call.res.status,
+        await call.res.json().catch(() => null),
+        OFFLINE,
+    );
+}
+
+/**
+ * Whether the business may email the customer (DEC-142): their own yes or
+ * no, and nothing else. A real boolean only: anything else is refused here,
+ * and the API takes no other field.
+ */
+export async function saveEmailChoice(email: boolean): Promise<NoticesResult> {
+    if (!(await siteOrigin())) return { ok: false, message: OFFLINE };
+    if (await testMode()) return TEST_RELEASE_REFUSAL;
+    if (!accountAreaOn()) return { ok: false, message: OFFLINE };
+    if (typeof email !== "boolean") return { ok: false, message: OFFLINE };
+    const call = await accountFetch("me/notifications", {
+        method: "PATCH",
+        body: { email },
+    });
+    if (!call?.ok) return { ok: false, message: OFFLINE };
+    const body: unknown = await call.res.json().catch(() => null);
+    const notices = call.res.ok ? noticesResult(body) : null;
+    return notices
+        ? { ok: true, notices }
+        : {
+              ok: false,
+              message: refusalMessage(call.res.status, body, OFFLINE),
+          };
 }

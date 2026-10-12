@@ -2583,3 +2583,135 @@ describe("the booking page on a test release (DEC-071, T6)", () => {
         expect(book).toHaveBeenCalledTimes(1);
     });
 });
+
+describe("GST on the booking page", () => {
+    const pageWith = (over: Partial<BookingPageData["services"][number]>) => ({
+        ...PAGE,
+        services: [
+            { ...PAGE.services[0], priceCents: 100_000, ...over },
+            PAGE.services[1],
+        ],
+    });
+    const ADDED = pageWith({
+        payCents: 118_000,
+        gst: {
+            mode: "ADDED",
+            rate: "18",
+            listCents: 100_000,
+            gstCents: 18_000,
+            payCents: 118_000,
+        },
+    });
+    const INCLUDED = pageWith({
+        payCents: 100_000,
+        gst: {
+            mode: "INCLUDED",
+            rate: "18",
+            listCents: 100_000,
+            gstCents: 15_254,
+            payCents: 100_000,
+        },
+    });
+    const gstLines = () =>
+        Array.from(document.querySelectorAll("[data-booking-gst]")).map(
+            (n) => n.textContent,
+        );
+
+    it("adds GST on top: + GST where it is picked, the sum before paying, and the amount to pay on the button", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(<BookingFlow page={ADDED} apiUrl={API} account={account()} />);
+        // Browsing: the price the business typed, and that GST comes on top.
+        expect(
+            screen.getByRole("radio", { name: /Personal training/ }),
+        ).toHaveTextContent("₹1,000 + GST");
+        // A service the API sent no GST for says nothing.
+        expect(
+            screen.getByRole("radio", { name: /HIIT class/ }),
+        ).not.toHaveTextContent("GST");
+        await chooseOneToOne();
+
+        // Before paying: the sentence under the ways to pay and in the
+        // summary, and the amount to pay wherever money is named.
+        expect(gstLines()).toEqual([
+            "₹1,000 + ₹180 GST (18%)",
+            "₹1,000 + ₹180 GST (18%)",
+        ]);
+        expect(
+            screen.getByRole("radio", { name: /Pay ₹1,180 now/ }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Pay ₹1,180 and book" }),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
+        );
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
+        expect(
+            screen.getByText("Pay ₹1,180 at the front desk when you arrive."),
+        ).toBeInTheDocument();
+        // The confirmation says the same sentence.
+        expect(gstLines()).toEqual(["₹1,000 + ₹180 GST (18%)"]);
+    });
+
+    it("includes GST: the typed price is what is paid, with the GST in it said", async () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow page={INCLUDED} apiUrl={API} account={account()} />,
+        );
+        expect(
+            screen.getByRole("radio", { name: /Personal training/ }),
+        ).not.toHaveTextContent("GST");
+        await chooseOneToOne();
+        expect(gstLines()).toEqual([
+            "₹1,000, includes ₹152.54 GST (18%)",
+            "₹1,000, includes ₹152.54 GST (18%)",
+        ]);
+        expect(
+            screen.getByRole("button", { name: "Pay ₹1,000 and book" }),
+        ).toBeInTheDocument();
+    });
+
+    it("takes the deposit and the rest from the amount to pay", async () => {
+        serve(() => json(ONE_DAYS));
+        const page = {
+            ...ADDED,
+            services: [
+                { ...ADDED.services[0], depositCents: 29_500 },
+                ADDED.services[1],
+            ],
+        };
+        render(<BookingFlow page={page} apiUrl={API} account={account()} />);
+        await chooseOneToOne();
+        const deposit = screen.getByRole("radio", {
+            name: /Pay ₹295 deposit now/,
+        });
+        expect(deposit).toHaveTextContent("The rest (₹885) at Pulse Fitness.");
+        expect(
+            screen.getByRole("radio", { name: /Pay the full ₹1,180 now/ }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Pay ₹295 deposit and book" }),
+        ).toBeInTheDocument();
+    });
+
+    it("says nothing about GST when the API said none", async () => {
+        serve(() => json(ONE_DAYS));
+        render(
+            <BookingFlow
+                page={pageWith({ payCents: 100_000, gst: null })}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        expect(gstLines()).toEqual([]);
+        expect(document.body.textContent).not.toContain("GST");
+        expect(
+            screen.getByRole("button", { name: "Pay ₹1,000 and book" }),
+        ).toBeInTheDocument();
+    });
+});

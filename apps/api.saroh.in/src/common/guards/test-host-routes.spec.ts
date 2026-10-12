@@ -48,6 +48,11 @@ const REFUSED = [
     "POST public/site-accounts/me/email/code",
     "POST public/site-accounts/me/messages",
     "POST public/site-accounts/me/notes",
+    // Whether the business may email them, and "Pay now" on an open
+    // invoice (DEC-142): a test release changes no consent and makes no
+    // pay link.
+    "PATCH public/site-accounts/me/notifications",
+    "POST public/site-accounts/me/invoices/:ref/pay",
     // Enquiries.
     "POST public/forms/:formId/submit",
     // Orders and payments.

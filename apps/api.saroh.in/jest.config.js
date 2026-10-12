@@ -294,6 +294,14 @@ module.exports = {
         // invoice builder — pure.
         "<rootDir>/src/modules/invoices/gst.spec.ts",
         "<rootDir>/src/modules/invoices/gst-states.spec.ts",
+        // How a price carries GST (12 Oct 2026): the one sum, pure.
+        "<rootDir>/src/modules/invoices/gst-price.spec.ts",
+        // The paper, the bag and a staff order's lines under each mode,
+        // and a credit note after the business changes its mind: pure, or
+        // a jest-mocked Prisma. gst-price-mode.db.spec.ts needs Postgres.
+        "<rootDir>/src/modules/invoices/order-invoice-price-mode.spec.ts",
+        "<rootDir>/src/modules/orders/checkout-quote-gst.spec.ts",
+        "<rootDir>/src/modules/orders/order-pricing-gst.spec.ts",
         "<rootDir>/src/modules/invoices/order-invoice.spec.ts",
         // Which refunds make no credit note — a jest-mocked transaction.
         "<rootDir>/src/modules/invoices/order-invoicing.spec.ts",
@@ -309,6 +317,10 @@ module.exports = {
         // DEC-068: which business details are missing — pure (the refusals
         // and the flag after money are in business-details.db.spec.ts).
         "<rootDir>/src/modules/invoices/business-details.spec.ts",
+        // A tax invoice's unset GST rate: the refusal (pure), and the
+        // missing-rates read and save with a jest-mocked Prisma.
+        "<rootDir>/src/modules/invoices/gst-rate-required.spec.ts",
+        "<rootDir>/src/modules/invoices/gst-rates.service.spec.ts",
         // ADR-007 subscriptions: the period calendar, the service and the
         // renewal job with a jest-mocked Prisma. subscriptions.db.spec.ts needs
         // Postgres and runs in integration.

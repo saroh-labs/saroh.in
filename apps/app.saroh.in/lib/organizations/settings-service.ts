@@ -2,6 +2,7 @@ import type { SocialLinks, SocialNetwork } from "@saroh/block-contract";
 
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, orgBase } from "@/lib/api/http";
+import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type {
     NumberFormat,
     NumberRestart,
@@ -54,6 +55,12 @@ export interface TaxSettings {
     /** Percent, e.g. "18". */
     deliveryRate: string;
     deliverySac: string | null;
+    /**
+     * How the business's prices carry GST (12 Oct 2026): included in them,
+     * or added to them. Only a registered business chooses. Absent from an
+     * older API, and read as included.
+     */
+    priceMode?: GstPriceMode;
     /** How invoice numbers are built; absent from an older API: the default. */
     invoiceNumber?: InvoiceNumberSettings;
 }
@@ -198,6 +205,8 @@ export interface TaxSettingsInput {
     invoicePrefix?: string;
     deliveryRate?: string;
     deliverySac?: string;
+    /** Refused for a business that isn't GST-registered. */
+    priceMode?: GstPriceMode;
     /** Sent whole when changed. */
     invoiceNumber?: NumberFormat;
 }

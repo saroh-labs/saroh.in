@@ -14,8 +14,11 @@ import { faqPageLd, toolLd } from "@/lib/structured-data";
  * stranger finds through search. The page itself is static words; the tool
  * is a client component that asks `/api/link-preview`, which asks the API.
  *
- * `?url=` opens a shared report already checked (R13); the canonical is
- * the page without it, so every report is one page to a search engine.
+ * `?url=` opens a shared report already checked (R13). The tool reads it in
+ * the browser, as the waitlist form reads its own query, so this page takes
+ * no `searchParams` and is built once as a file like every other content
+ * page (it was the one page rendered on each request). The canonical is the
+ * page without the query, so every report is one page to a search engine.
  */
 export const metadata: Metadata = pageMetadata({
     title: copy.metaTitle,
@@ -24,14 +27,7 @@ export const metadata: Metadata = pageMetadata({
     path: copy.path,
 });
 
-interface Props {
-    searchParams: Promise<{ url?: string | string[] }>;
-}
-
-export default async function LinkPreviewPage({ searchParams }: Props) {
-    const { url } = await searchParams;
-    const initialUrl = (Array.isArray(url) ? url[0] : url)?.slice(0, 2048);
-
+export default function LinkPreviewPage() {
     return (
         <>
             <JsonLd
@@ -58,7 +54,7 @@ export default async function LinkPreviewPage({ searchParams }: Props) {
                 </p>
             </div>
 
-            <LinkPreviewTool initialUrl={initialUrl} />
+            <LinkPreviewTool />
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-8 px-mk-gutter pt-16">
                 {copy.notes.map((note) => (

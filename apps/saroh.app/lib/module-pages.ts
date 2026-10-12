@@ -130,3 +130,28 @@ export function isBookingDeepLink(params: {
         (v) => v !== undefined,
     );
 }
+
+/**
+ * A page that answers 200 with nothing to show, for its metadata: out of
+ * search, its links still followed. An SEO audit found "not available"
+ * pages indexable; a 404 says it for a page that isn't there, and this says
+ * it for one that is there with nothing on it.
+ */
+export const NOT_FOR_SEARCH = {
+    robots: { index: false, follow: true },
+} as const;
+
+/**
+ * Whether a module's own route (`/shop`, `/book`) has nothing to show now:
+ * its page is taken off while the module is off, or the built-in listing
+ * has nothing (`builtinEmpty`: its read failed, or came back empty or
+ * closed). A published module page is the merchant's own writing and is
+ * never empty on this account, whatever the built-in read says.
+ */
+export function routeHasNothing(
+    route: { draw: "unavailable" | "page" | "builtin" },
+    builtinEmpty: boolean,
+): boolean {
+    if (route.draw === "unavailable") return true;
+    return route.draw === "builtin" && builtinEmpty;
+}

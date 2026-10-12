@@ -50,6 +50,7 @@ describe("confirmationView (P4)", () => {
                     variant: "Large",
                     quantity: 2,
                     amount: "500.00",
+                    gst: null,
                 },
             ],
             subtotal: "500.00",
@@ -240,8 +241,15 @@ describe("confirmationView (P4)", () => {
                 variant: null,
                 quantity: 1,
                 amount: "99.50",
+                gst: null,
             },
-            { name: "Item", variant: null, quantity: 3, amount: "30.00" },
+            {
+                name: "Item",
+                variant: null,
+                quantity: 3,
+                amount: "30.00",
+                gst: null,
+            },
         ]);
     });
 });

@@ -13,6 +13,7 @@ import {
     Saved,
 } from "@/components/organizations/business-row-parts";
 import { Row } from "@/components/sites/settings-rows";
+import { PRICE_MODE_ROW, PRICE_MODE_SAYS } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
 import { formatOf, RESTART_LABEL } from "@/lib/invoices/invoice-number";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
@@ -29,7 +30,9 @@ export const TAX_TAB = {
 /**
  * Tax and invoices, read first: whether the business is GST-registered,
  * its GSTIN (or another tax ID), how its invoices are numbered and, for a
- * registered business, the GST delivery is charged. The state and the
+ * registered business, the GST delivery is charged and whether its prices
+ * include GST or have it added (12 Oct 2026; a business that isn't
+ * registered has no such row). The state and the
  * financial year are facts nobody sets here, and say where they come from.
  */
 export function BusinessTaxRows({
@@ -145,6 +148,25 @@ export function BusinessTaxRows({
                         ) : (
                             "No delivery SAC yet"
                         )}
+                    </Follows>
+                </Row>
+            ) : null}
+            {registered ? (
+                <Row
+                    id={BUSINESS_ROW_ID.priceMode}
+                    label={PRICE_MODE_ROW}
+                    action={edit(
+                        "priceMode",
+                        "Edit",
+                        "Edit GST on your prices",
+                    )}
+                >
+                    <span className="block">
+                        {PRICE_MODE_SAYS[saved.priceMode]}
+                    </span>
+                    <Follows>
+                        For your services and products. One of them can be set
+                        differently where you edit it.
                     </Follows>
                 </Row>
             ) : null}

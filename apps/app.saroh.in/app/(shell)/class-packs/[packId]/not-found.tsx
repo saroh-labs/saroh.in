@@ -4,6 +4,8 @@ import { PageHeader } from "@saroh/ui/page-header";
 
 import { PageContainer } from "@/components/shared/page-container";
 
+export const metadata = { title: "Class pack not found" };
+
 /** The design's not-found: said plainly, with the way back to the packs. */
 export default function NotFoundPage() {
     return (

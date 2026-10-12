@@ -7,9 +7,17 @@ import { helpLive } from "@/lib/help-live";
  * request to it is sent here. The app's help links (`apps/app.saroh.in/lib/
  * help/links.ts`) and old bookmarks use it.
  *
- * - Once Help is shown (17 Oct, or a preview): to `/help`, or to the article
- *   an old page maps to.
- * - Before that: to the home page, since `/help` isn't published yet.
+ * - Once Help is shown (a build made on or after 17 Oct, or a preview): to
+ *   `/help`, or to the article an old page maps to, for good (308). Each old
+ *   address has one new home from then on, and a search engine should move
+ *   what it knows about the old one there.
+ * - Before that: to the home page, since `/help` isn't published yet, and
+ *   only for now (307): a browser keeps a permanent redirect, and this one
+ *   must not stick after Help opens.
+ *
+ * "Shown" is asked of the build (`builtContext`), not of the clock: the
+ * pages are drawn at build time, so until the site is deployed on or after
+ * the day, `/help` is still a 404 and this still sends people home.
  *
  * The host keeps its environment: help.saroh.in goes to www.saroh.in and
  * help.saroh.io to www.saroh.io, so dev never sends anyone to production.
@@ -45,4 +53,18 @@ function normalise(pathname: string): string {
 export function helpHostPath(pathname: string, ctx: PublishContext): string {
     if (!helpLive(ctx)) return "/";
     return OLD_TO_NEW[normalise(pathname)] ?? "/help";
+}
+
+/**
+ * Where a request to a `help.` host goes, and how firmly: 308 to Help once
+ * it is shown, 307 to the home page before.
+ */
+export function helpHostRedirect(
+    pathname: string,
+    ctx: PublishContext,
+): { path: string; status: 307 | 308 } {
+    return {
+        path: helpHostPath(pathname, ctx),
+        status: helpLive(ctx) ? 308 : 307,
+    };
 }

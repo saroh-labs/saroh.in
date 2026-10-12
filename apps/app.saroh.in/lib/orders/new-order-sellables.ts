@@ -1,3 +1,9 @@
+import type { PriceTerms } from "@/lib/gst/price-mode";
+import {
+    effectiveMode,
+    NO_GST_TERMS,
+    unitPayCents,
+} from "@/lib/gst/price-mode";
 import type { NewOrderSellable } from "@/lib/orders/new-order";
 import type {
     CatalogueProduct,
@@ -13,6 +19,12 @@ import type {
  * A product counted per variant is read per variant (UX-026): the row's
  * own `inventory` is then the variants' sum, so "5 left" would show on a
  * sold-out size. Each variant's shelf comes from the storefront's listing.
+ *
+ * A price here is the amount to pay (12 Oct 2026): the API charges an order
+ * line the typed price, plus its GST where the business or the product has
+ * "GST is added". The sum is a preview by the API's own rule
+ * (`lib/gst/price-mode.ts`); the order the API makes is the truth, and only
+ * product ids and quantities are ever sent.
  */
 
 const toCents = (money: string | null | undefined) =>
@@ -29,8 +41,14 @@ type Row = ProductListItem & Partial<Pick<CatalogueProduct, "listings">>;
 export function sellablesOfProduct(
     p: Row,
     storeId?: string,
+    /** The business's GST standing; none charges the typed price. */
+    terms: PriceTerms = NO_GST_TERMS,
 ): NewOrderSellable[] {
     const left = leftOf(p.inventory);
+    // A variant is priced under its product's rate and way.
+    const mode = effectiveMode(terms.mode, p.gstPriceMode);
+    const toPay = (money: string | null | undefined) =>
+        unitPayCents(toCents(money), p.gstRate, mode, terms.registered);
     const markedOut = p.soldOut === true;
     if (p.variants.length === 0) {
         return [
@@ -40,7 +58,7 @@ export function sellablesOfProduct(
                 variantId: null,
                 name: p.name,
                 variantTitle: null,
-                priceCents: toCents(p.price),
+                priceCents: toPay(p.price),
                 left,
                 soldOut: markedOut || left === 0,
             },
@@ -63,7 +81,7 @@ export function sellablesOfProduct(
             variantId: v.id,
             name: p.name,
             variantTitle: v.title,
-            priceCents: toCents(v.price ?? p.price),
+            priceCents: toPay(v.price ?? p.price),
             left: own,
             soldOut: markedOut || own === 0,
         };

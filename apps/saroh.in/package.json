@@ -10,6 +10,7 @@
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
+        "shots:sizes": "node scripts/shot-sizes.mjs",
         "cf:build": "opennextjs-cloudflare build",
         "cf:preview": "opennextjs-cloudflare preview",
         "cf:deploy": "opennextjs-cloudflare deploy"

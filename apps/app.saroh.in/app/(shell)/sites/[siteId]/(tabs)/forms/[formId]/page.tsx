@@ -4,14 +4,35 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { ArrowLeft, Inbox } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { personHref } from "@/lib/contacts/person-href";
 import type { FormField, Submission } from "@/lib/forms/service";
 import { getForm, listSubmissions } from "@/lib/forms/service";
+import { recordTitle } from "@/lib/page-title";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Form entries · Website" };
+// One read for the tab's title and the page.
+const readForm = cache((formId: string) => getForm(formId));
+
+/**
+ * The form's own name in the tab, then "Website"; "Form entries" when it
+ * can't be read or belongs to another site. Never who sent an entry.
+ */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ siteId: string; formId: string }>;
+}) {
+    const { siteId, formId } = await params;
+    return recordTitle(
+        () => readForm(formId),
+        (form) => (form.siteId === siteId ? form.name : null),
+        "Form entries",
+        "Website",
+    );
+}
 
 /** What a value reads as: a string as typed, anything else as JSON. */
 function show(value: unknown): string {
@@ -61,7 +82,7 @@ export default async function FormEntriesPage({
     const { siteId, formId } = await params;
     await requireSession();
     const [form, page] = await Promise.all([
-        getForm(formId),
+        readForm(formId),
         listSubmissions(formId),
     ]);
     if (form?.siteId !== siteId || !page) notFound();

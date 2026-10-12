@@ -13,6 +13,7 @@ import type { Control } from "react-hook-form";
 
 import type { FormValues } from "@/components/organizations/business-form";
 import { BusinessKindField } from "@/components/organizations/business-kind-field";
+import { BusinessPriceModeField } from "@/components/organizations/business-price-mode-field";
 import { BusinessTaxFields } from "@/components/organizations/business-tax-fields";
 import { fieldWidth } from "@/components/organizations/registered-address-fields";
 import { TimeZoneSelect } from "@/components/organizations/time-zone-select";
@@ -240,6 +241,8 @@ export function BusinessSheetFields({
                     )}
                 />
             );
+        case "priceMode":
+            return <BusinessPriceModeField control={control} at={at} />;
         case "gst":
         case "taxId":
         case "numbers":

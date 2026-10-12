@@ -1,6 +1,8 @@
 import { NotFound } from "@saroh/ui/not-found";
 import { Wordmark } from "@saroh/ui/wordmark";
 
+export const metadata = { title: "Page not found" };
+
 /**
  * App-root 404, outside the workspace shell: an unmatched address, or a
  * `notFound()` from a route with no 404 of its own (first run, the editor).

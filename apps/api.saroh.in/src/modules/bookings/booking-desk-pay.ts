@@ -6,6 +6,8 @@ import {
 import type { Prisma } from "@saroh/database";
 
 import { rateToBps } from "../invoices/gst";
+import type { GstPriceMode } from "../invoices/gst-price";
+import { assertRatesSet } from "../invoices/gst-rate-required";
 import { buildCorrection, buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -28,6 +30,7 @@ import {
     paidAtDesk,
     paidOnlineOf,
 } from "./desk-take";
+import { bookedPriceMode } from "./service-price";
 
 /*
  * "Take ₹X" at the desk for a booking (round-2 P2): cash, UPI at the
@@ -152,6 +155,7 @@ export async function takeDeskPaymentInTx(
             snapshot: true,
             service: {
                 select: {
+                    id: true,
                     name: true,
                     currency: true,
                     gstRate: true,
@@ -211,6 +215,17 @@ export async function takeDeskPaymentInTx(
     } as const;
     let written: { id: string; number: string | null; currency: string };
 
+    // Someone is at the desk, so a tax invoice written here never goes
+    // out with a rate nobody chose (`gst-rate-required.ts`): the take is
+    // refused, the app asks for the rate, saves it to the service and
+    // takes the payment again. An invoice already out (a pay link's) is
+    // paper already issued: it is marked paid as it is.
+    const billed = {
+        kind: "SERVICE",
+        id: booking.service.id,
+        name: booking.service.name,
+        rate: booking.service.gstRate,
+    } as const;
     const issued = paper.find(
         (p) => p.kind === "INVOICE" && p.status === "ISSUED",
     );
@@ -233,6 +248,9 @@ export async function takeDeskPaymentInTx(
             currency: issued.currency,
         };
     } else if (deposit) {
+        // The balance is written on the deposit's paper: a tax invoice
+        // when the deposit's was.
+        assertRatesSet(deposit.sellerGstin !== null, [billed]);
         written = await balanceInvoice(tx, deposit, {
             organizationId,
             bookingId,
@@ -240,12 +258,14 @@ export async function takeDeskPaymentInTx(
             cents: take.cents,
             rateBps: rateToBps(booking.service.gstRate?.toString() ?? null),
             code: booking.service.sacCode,
+            priceMode: bookedPriceMode(booking.snapshot),
             actorUserId: input.actorUserId,
             payment: paid,
             now,
         });
     } else {
         const profile = await loadTaxProfile(tx, organizationId);
+        assertRatesSet(profile.registered, [billed]);
         const doc = buildManualInvoice(
             [
                 {
@@ -260,6 +280,7 @@ export async function takeDeskPaymentInTx(
                         booking.service.gstRate?.toString() ?? null,
                     ),
                     code: booking.service.sacCode,
+                    priceMode: bookedPriceMode(booking.snapshot),
                 },
             ],
             profile,
@@ -366,6 +387,7 @@ async function balanceInvoice(
         cents: number;
         rateBps: number | null;
         code: string | null;
+        priceMode: GstPriceMode | null;
         actorUserId: string | null;
         payment: {
             status: "PAID";
@@ -384,6 +406,7 @@ async function balanceInvoice(
             rateBps: input.rateBps,
             code: input.code,
             orderItemId: null,
+            priceMode: input.priceMode,
         },
     ]);
     const profile = await loadTaxProfile(tx, input.organizationId);

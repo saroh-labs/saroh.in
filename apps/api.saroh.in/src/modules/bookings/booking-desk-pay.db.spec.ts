@@ -345,19 +345,48 @@ describe("taking payment at the desk (P2, real database)", () => {
             taxType: "INTRA",
         };
         const { booking, invoice: deposit } = await depositPaid(frozen);
-        const paid = await take(owner, booking.id, {
-            method: "UPI",
-            amountCents: 40_000,
+        // The deposit's paper is a tax invoice, so its balance is one too,
+        // and a tax invoice the desk writes needs the service's rate
+        // (`gst-rate-required.ts`). Exempt here: this test is about the
+        // seller's frozen details, not the tax.
+        await prisma.service.update({
+            where: { id: serviceId },
+            data: { gstRate: 0 },
         });
-        const balance = await prisma.invoice.findUniqueOrThrow({
-            where: { id: paid.invoiceId },
+        try {
+            const paid = await take(owner, booking.id, {
+                method: "UPI",
+                amountCents: 40_000,
+            });
+            const balance = await prisma.invoice.findUniqueOrThrow({
+                where: { id: paid.invoiceId },
+            });
+            expect(balance).toMatchObject({
+                kind: "SUPPLEMENTARY",
+                relatedInvoiceId: deposit.id,
+                ...frozen,
+            });
+            expect(balance.igst.toString()).toBe("0");
+        } finally {
+            await prisma.service.update({
+                where: { id: serviceId },
+                data: { gstRate: null },
+            });
+        }
+    });
+
+    it("the balance on a tax invoice's deposit is refused while the service has no GST rate", async () => {
+        const { booking } = await depositPaid({
+            sellerGstin: "29AAGCR4375J1ZU",
+            sellerState: "29",
+            placeOfSupply: "29",
+            taxType: "INTRA",
         });
-        expect(balance).toMatchObject({
-            kind: "SUPPLEMENTARY",
-            relatedInvoiceId: deposit.id,
-            ...frozen,
+        await expect(
+            take(owner, booking.id, { method: "UPI", amountCents: 40_000 }),
+        ).rejects.toMatchObject({
+            response: { details: { reason: "GST_RATE_MISSING" } },
         });
-        expect(balance.igst.toString()).toBe("0");
     });
 
     it("a pay link already out: its invoice is paid at the desk instead, and the link stops", async () => {

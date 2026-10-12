@@ -214,6 +214,11 @@ jobs:
       - name: Tag stripping
         run: pnpm run check:tag-strip
 
+      # Every page of the signed-in apps names its tab, and none of the
+      # three can be indexed.
+      - name: Page titles and noindex
+        run: pnpm run check:titles
+
       # One word each (UX-078): no "Reschedule", "Shut" or "reservation" in
       # what merchants and customers read.
       - name: One word each

@@ -340,3 +340,119 @@ describe("the Product grid's read", () => {
         expect(cardLine(null)).toBeNull();
     });
 });
+
+describe("a product with no photo, in the Product grid (starter audit)", () => {
+    const NO_PHOTOS = BREADS.map((p) => ({ ...p, image: null }));
+    const looks: RenderedProductGrid[] = [
+        { ...content },
+        { ...content, cardStyle: "bare" },
+        { ...content, variant: "lead" },
+        { ...content, layout: "list" },
+    ];
+
+    it.each(looks)(
+        "draws cards of words, with no empty box, when no product shown has one (%o)",
+        (look) => {
+            const { container } = render(
+                <ProductGridSection
+                    content={look}
+                    feed={{ products: NO_PHOTOS, basePath: "/shop" }}
+                />,
+            );
+            expect(container.querySelector("img")).toBeNull();
+            expect(container.querySelector("[data-name-plate]")).toBeNull();
+            expect(container.querySelector(".h-\\[130px\\]")).toBeNull();
+            expect(container.querySelector(".aspect-\\[4\\/5\\]")).toBeNull();
+            // Every product is still there, by name, with its price.
+            expect(screen.getAllByRole("listitem")).toHaveLength(4);
+            expect(
+                screen.getByRole("link", { name: /Sourdough/ }),
+            ).toHaveTextContent("From ₹250");
+            expect(container).not.toHaveTextContent("No photo yet");
+        },
+    );
+
+    it("says Sold out beside the name when there is no photo to carry it", () => {
+        render(
+            <ProductGridSection
+                content={{ ...content, cardStyle: "bare" }}
+                feed={{ products: NO_PHOTOS, basePath: "/shop" }}
+            />,
+        );
+        expect(screen.getByRole("link", { name: /Brioche/ })).toHaveTextContent(
+            "Sold out",
+        );
+    });
+
+    it.each(looks.slice(0, 3))(
+        "gives it a name panel in the photo's own box where its neighbours have photos (%o)",
+        (look) => {
+            const { container } = render(
+                <ProductGridSection
+                    content={look}
+                    feed={{ products: BREADS, basePath: "/shop" }}
+                />,
+            );
+            // Focaccia has a photo; the three others shown take a panel.
+            expect(container.querySelectorAll("img")).toHaveLength(1);
+            const plates = container.querySelectorAll("[data-name-plate]");
+            expect(plates).toHaveLength(3);
+            for (const plate of Array.from(plates)) {
+                // Decoration: the card's own words name the product.
+                expect(plate).toHaveAttribute("aria-hidden", "true");
+            }
+            expect(
+                screen.getByRole("link", { name: /Rye loaf/ }),
+            ).toBeVisible();
+        },
+    );
+
+    it("keeps the merchant's own switch: photos off draws none, whatever the products have", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={{ ...content, showPhotos: false }}
+                feed={{ products: BREADS, basePath: "/shop" }}
+            />,
+        );
+        expect(container.querySelector("img")).toBeNull();
+        expect(container.querySelector("[data-name-plate]")).toBeNull();
+    });
+});
+
+describe("a grid card's price when GST comes on top", () => {
+    const products = [
+        card({ slug: "focaccia", name: "Focaccia", gstAdded: true }),
+        card({
+            slug: "sourdough",
+            name: "Sourdough",
+            price: "250.00",
+            priceFrom: true,
+            gstAdded: true,
+        }),
+        card({ slug: "rye-loaf", name: "Rye loaf", gstAdded: false }),
+        card({ slug: "baguette", name: "Baguette" }),
+    ];
+
+    it("says + GST after the price on every layout, and nothing otherwise", () => {
+        const looks: Partial<RenderedProductGrid>[] = [
+            {},
+            { layout: "list" },
+            { variant: "lead" },
+            { variant: "plates" },
+        ];
+        for (const look of looks) {
+            const { container, unmount } = render(
+                <ProductGridSection
+                    content={{ ...content, ...look }}
+                    feed={{ products, basePath: "/shop" }}
+                />,
+            );
+            const text = container.textContent;
+            expect(text).toContain("₹120 + GST");
+            expect(text).toContain("From ₹250 + GST");
+            // Two of the four say it; the others show the price alone.
+            expect(text.match(/\+ GST/g)).toHaveLength(2);
+            unmount();
+        }
+    });
+});

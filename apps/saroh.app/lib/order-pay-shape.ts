@@ -1,4 +1,4 @@
-import type { PayInstructions } from "@saroh/site-blocks";
+import type { GstOnPrice, PayInstructions } from "@saroh/site-blocks";
 
 import type { PayContact } from "./invoice-pay-shape";
 
@@ -16,6 +16,11 @@ export interface PayOrderLine {
     quantity: number;
     unitPrice: string;
     amount: string;
+    /**
+     * The GST in or on the line's whole amount; null for none. Absent from
+     * an older API. Narrowed where it is drawn (`gstOnPriceOf`).
+     */
+    gst?: GstOnPrice | null;
 }
 
 /** Exactly what the API's allow-list sends; nothing else is read. */

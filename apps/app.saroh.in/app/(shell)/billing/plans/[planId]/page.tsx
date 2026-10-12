@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
@@ -8,6 +9,7 @@ import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permitsFor } from "@/lib/organizations/permits";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { recordTitle } from "@/lib/page-title";
 import { requireSession } from "@/lib/session";
 import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
 import { detailTabFromQuery } from "@/lib/subscriptions/plan-detail";
@@ -18,7 +20,22 @@ import {
     listPlanSubscriptions,
 } from "@/lib/subscriptions/service";
 
-export const metadata = { title: "Plan" };
+// One read for the tab's title and the page.
+const readPlan = cache((planId: string) => getPlan(planId));
+
+/** The plan's own name in the tab; "Plan" when it can't be read. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ planId: string }>;
+}) {
+    const { planId } = await params;
+    return recordTitle(
+        () => readPlan(planId),
+        (plan) => plan.name,
+        "Plan",
+    );
+}
 
 const FALLBACK_ZONE = "Asia/Kolkata";
 
@@ -60,7 +77,7 @@ export default async function PlanPage({
         );
     }
 
-    const plan = await getPlan(planId);
+    const plan = await readPlan(planId);
     if (!plan) notFound();
 
     const [subscriptions, events, modules, settings] = await Promise.all([

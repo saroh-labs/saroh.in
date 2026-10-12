@@ -3,7 +3,7 @@ import type {
     OrderConfirmationLine,
     OrderConfirmationLookup,
 } from "@saroh/site-blocks";
-import { reachOrNull } from "@saroh/site-blocks";
+import { gstOnPriceOf, reachOrNull } from "@saroh/site-blocks";
 
 /**
  * The order confirmation page's answer (round-2 P4), checked and rebuilt
@@ -31,7 +31,26 @@ function lineOf(v: unknown): OrderConfirmationLine | null {
     ) {
         return null;
     }
-    return { name: v.name, variant, quantity: v.quantity, amount: v.amount };
+    // The GST in or on the line, rebuilt field by field like the rest;
+    // anything strange (or an older API's nothing) is none said.
+    const gst = gstOnPriceOf(v.gst);
+    return {
+        name: v.name,
+        variant,
+        quantity: v.quantity,
+        amount: v.amount,
+        ...(gst
+            ? {
+                  gst: {
+                      mode: gst.mode,
+                      rate: gst.rate,
+                      listCents: gst.listCents,
+                      gstCents: gst.gstCents,
+                      payCents: gst.payCents,
+                  },
+              }
+            : {}),
+    };
 }
 
 function fulfilmentOf(v: unknown): OrderConfirmationData["fulfilment"] | null {

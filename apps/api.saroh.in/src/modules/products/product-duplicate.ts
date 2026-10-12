@@ -127,6 +127,7 @@ export async function duplicateProduct(
             shopFields: readShopFields(source.shopFields),
             gstRate: source.gstRate,
             hsnCode: source.hsnCode,
+            gstPriceMode: source.gstPriceMode,
             seoTitle: source.seoTitle,
             seoDescription: source.seoDescription,
             optionId: source.optionId,

@@ -12,6 +12,9 @@ import { planMeter } from "../billing/metering.service";
 import { bookingsPaused } from "../billing/plan-limit-errors";
 import { phoneToFill } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import type { PriceTerms } from "../invoices/gst-price";
+import { NO_GST_TERMS } from "../invoices/gst-price";
+import { loadPriceTerms } from "../invoices/price-terms";
 import { publicSiteOnlineFor } from "../organizations/organization-lifecycle.gate";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
@@ -23,6 +26,7 @@ import { freeCancelDeadline, loadBookingRules } from "./booking-rules";
 import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
 import { seatsHeld } from "./held-seats";
 import { depositCents } from "./service-fields";
+import { bookedPriceOf, serviceCharge } from "./service-price";
 import { acceptWaitlistInTx } from "./waitlist-queue";
 
 /*
@@ -423,7 +427,16 @@ export async function reserveInTx(
     const serviceId = service.id;
     const organizationId = service.organizationId;
     const email = input.bookerEmail.trim().toLowerCase();
-    const snapshot = buildSnapshot(service, input, startAt, endAt);
+    // The price is fixed here, as the business charges it today
+    // (`service-price.ts`): the amount to pay, the typed price and the
+    // mode, read in the booking's own transaction.
+    const snapshot = buildSnapshot(
+        service,
+        input,
+        startAt,
+        endAt,
+        await loadPriceTerms(tx, organizationId),
+    );
     // The plan's monthly bookings cap (U13), before anything is written.
     // It counts and refuses only bookings customers make themselves
     // (DEC-095): one the team makes in the workspace is never capped. A
@@ -697,13 +710,21 @@ export async function assertPersonFreeInTx(
     }
 }
 
-/** The immutable snapshot of Service terms + booker frozen onto a Booking. */
+/**
+ * The immutable snapshot of Service terms + booker frozen onto a Booking.
+ * `priceCents` is the amount to pay for it: the typed price, or under "GST
+ * is added" the typed price plus its GST (`service-price.ts`), with what
+ * was typed and the mode kept beside it. Without `terms` the business
+ * charges no GST and the price is the typed one.
+ */
 export function buildSnapshot(
     service: Service,
     input: BookInput,
     startAt: Date,
     endAt: Date,
+    terms: PriceTerms = NO_GST_TERMS,
 ): Record<string, unknown> {
+    const price = bookedPriceOf(serviceCharge(service, terms));
     return {
         service: {
             id: service.id,
@@ -713,7 +734,15 @@ export function buildSnapshot(
             bufferAfterMinutes: service.bufferAfterMinutes,
             capacity: service.capacity,
             timezone: service.timezone,
-            priceCents: service.priceCents,
+            priceCents: price.priceCents,
+            // Only when GST is charged on it: what was typed, and whether
+            // the price included GST or had it added.
+            ...(price.gstPriceMode
+                ? {
+                      listPriceCents: price.listPriceCents,
+                      gstPriceMode: price.gstPriceMode,
+                  }
+                : {}),
             currency: service.currency,
             // Frozen like the rest: a link changed later reaches new
             // bookings, never the ones already made (ADR-007).
@@ -723,11 +752,12 @@ export function buildSnapshot(
         },
         // What was asked for at booking when only the deposit is paid online
         // (E8): the rest is due at the visit. Absent for every other way.
+        // A share of the amount to pay, GST and all.
         ...(input.pay === "DEPOSIT"
             ? {
                   deposit: {
                       cents: depositCents(
-                          service.priceCents,
+                          price.priceCents,
                           service.depositMode,
                       ),
                   },

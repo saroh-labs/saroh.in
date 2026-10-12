@@ -1,3 +1,4 @@
+import { browsePriceWords } from "../lib/gst-price";
 import { formatAmount } from "../lib/money";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
@@ -94,7 +95,10 @@ function Plate({
     lead: boolean;
     line: string | null;
 }) {
-    const amount = formatAmount(p.price, p.currency);
+    const amount = browsePriceWords(
+        formatAmount(p.price, p.currency),
+        p.gstAdded === true,
+    );
     return (
         <>
             {show.photo && p.image ? (

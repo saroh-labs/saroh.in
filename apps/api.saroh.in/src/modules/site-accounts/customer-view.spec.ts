@@ -2,10 +2,19 @@ import { accountTabs } from "./account-tabs";
 import {
     accountPackView,
     accountView,
+    bookingChangeView,
     bookingView,
+    CHANGE_ROWS,
+    courseView,
+    invoiceChangeView,
+    invoiceDueView,
+    latestChanges,
+    messagesChangeView,
     messageView,
     notesKindOf,
     noteView,
+    noticesView,
+    orderChangeView,
     orderDetailView,
     orderView,
     packView,
@@ -13,6 +22,7 @@ import {
     planView,
     receiptView,
     subscriptionView,
+    waitlistPlaceView,
 } from "./customer-view";
 
 /**
@@ -85,7 +95,7 @@ describe("the account's allow-list", () => {
                 { key: "home", label: "Home" },
                 { key: "bookings", label: "Bookings" },
                 { key: "messages", label: "Messages" },
-                { key: "me", label: "Me" },
+                { key: "me", label: "Your details" },
             ],
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
@@ -822,5 +832,346 @@ describe("the notes card's words follow what the business is (UX-040)", () => {
         // Unknown (a site from before templates were recorded): never health.
         expect(notesKindOf(null)).toBe("general");
         expect(notesKindOf("not-a-template")).toBe("general");
+    });
+});
+
+describe("the rest of their details (DEC-142)", () => {
+    const now = new Date("2026-10-12T06:00:00Z");
+
+    it("an open invoice is its number, what it bills, when it is due and how it can be paid", () => {
+        const row = {
+            id: "inv_1",
+            number: "INV-0042",
+            status: "ISSUED",
+            issuedAt: new Date("2026-10-01T05:00:00Z"),
+            dueAt: new Date("2026-10-08T05:00:00Z"),
+            total: "2500.00",
+            currency: "INR",
+            kind: "INVOICE",
+            sellerGstin: null,
+            lines: [
+                { description: " Unlimited · October ", gstRate: null },
+                { description: "Second line", gstRate: null },
+            ],
+            // What an invoice row also carries, and a customer never sees.
+            payTokenHash: "pay_ref_123",
+            paymentReference: "pay_ref_123",
+            paymentNote: "STAFF NOTE: owes money",
+            ...noisy,
+        };
+        const view = invoiceDueView(row as never, "online", now);
+        expect(view).toEqual({
+            ref: "inv_1",
+            number: "INV-0042",
+            what: "Unlimited · October",
+            issuedAt: "2026-10-01T05:00:00.000Z",
+            dueAt: "2026-10-08T05:00:00.000Z",
+            overdue: true,
+            total: "2500.00",
+            currency: "INR",
+            billOfSupply: false,
+            pay: "online",
+        });
+        expect(leaks(view)).toEqual([]);
+    });
+
+    it("an invoice not yet due isn't overdue, and one with no lines says nothing about what it bills", () => {
+        const view = invoiceDueView(
+            {
+                id: "inv_2",
+                number: null,
+                status: "ISSUED",
+                issuedAt: null,
+                dueAt: new Date("2026-10-20T05:00:00Z"),
+                total: "10",
+                currency: "INR",
+                kind: "INVOICE",
+                sellerGstin: null,
+                lines: [],
+            },
+            "direct",
+            now,
+        );
+        expect(view).toMatchObject({
+            number: "",
+            what: null,
+            issuedAt: null,
+            overdue: false,
+            total: "10.00",
+            pay: "direct",
+        });
+        expect(
+            invoiceDueView(
+                {
+                    id: "inv_3",
+                    number: "INV-1",
+                    status: "ISSUED",
+                    issuedAt: null,
+                    dueAt: null,
+                    total: "10",
+                    currency: "INR",
+                    kind: "INVOICE",
+                    sellerGstin: null,
+                    lines: [],
+                },
+                "charging",
+                now,
+            ),
+        ).toMatchObject({ dueAt: null, overdue: false, pay: "charging" });
+    });
+
+    it("a place in line is the class, when, and where they stand — never who else waits", () => {
+        const row = {
+            startAt: new Date("2026-10-14T03:30:00Z"),
+            status: "WAITING",
+            offeredUntil: null,
+            service: { id: "svc_1", name: "Morning flow", ...noisy },
+            position: 7,
+            customerAccountId: "contact_secret_id",
+            ...noisy,
+        };
+        const view = waitlistPlaceView(row as never, 2, "Asia/Kolkata", now);
+        expect(view).toEqual({
+            service: "Morning flow",
+            serviceRef: "svc_1",
+            startAt: "2026-10-14T03:30:00.000Z",
+            timezone: "Asia/Kolkata",
+            status: "WAITING",
+            placeInLine: 3,
+            offeredUntil: null,
+        });
+        expect(leaks(view)).toEqual([]);
+    });
+
+    it("a place held for them says until when; one whose hold ran out is back in line", () => {
+        const held = {
+            startAt: new Date("2026-10-14T03:30:00Z"),
+            status: "OFFERED",
+            offeredUntil: new Date("2026-10-12T07:00:00Z"),
+            service: { id: "svc_1", name: "Morning flow" },
+        };
+        expect(waitlistPlaceView(held, 0, "Asia/Kolkata", now)).toMatchObject({
+            status: "OFFERED",
+            placeInLine: null,
+            offeredUntil: "2026-10-12T07:00:00.000Z",
+        });
+        expect(
+            waitlistPlaceView(
+                { ...held, offeredUntil: new Date("2026-10-12T05:00:00Z") },
+                0,
+                "Asia/Kolkata",
+                now,
+            ),
+        ).toMatchObject({
+            status: "WAITING",
+            placeInLine: 1,
+            offeredUntil: null,
+        });
+    });
+
+    it("a course is its name, its dates and their own sessions: attended, missed and left", () => {
+        const row = {
+            id: "enr_1",
+            price: "4000.00",
+            createdByUserId: "user_staff_id",
+            course: {
+                name: "Pottery, six weeks",
+                seats: 12,
+                sessions: [
+                    { startAt: new Date("2026-10-19T04:30:00Z") },
+                    { startAt: new Date("2026-10-05T04:30:00Z") },
+                    { startAt: new Date("2026-10-12T04:30:00Z") },
+                    { startAt: new Date("2026-10-26T04:30:00Z") },
+                ],
+                ...noisy,
+            },
+            bookings: [
+                {
+                    startAt: new Date("2026-10-05T04:30:00Z"),
+                    status: "CONFIRMED",
+                    outcome: "ATTENDED",
+                    ...noisy,
+                },
+                {
+                    startAt: new Date("2026-10-12T04:30:00Z"),
+                    status: "CONFIRMED",
+                    outcome: "NO_SHOW",
+                },
+                {
+                    startAt: new Date("2026-10-19T04:30:00Z"),
+                    status: "CONFIRMED",
+                    outcome: null,
+                },
+                {
+                    startAt: new Date("2026-10-26T04:30:00Z"),
+                    status: "CONFIRMED",
+                    outcome: null,
+                },
+                // A session cancelled for them is not one of theirs.
+                {
+                    startAt: new Date("2026-11-02T04:30:00Z"),
+                    status: "CANCELLED",
+                    outcome: null,
+                },
+            ],
+            ...noisy,
+        };
+        // 12 Oct, 11:30 am in Kolkata: the second session has started.
+        const view = courseView(row as never, "Asia/Kolkata", now);
+        expect(view).toEqual({
+            ref: "enr_1",
+            name: "Pottery, six weeks",
+            firstAt: "2026-10-05T04:30:00.000Z",
+            lastAt: "2026-10-26T04:30:00.000Z",
+            timezone: "Asia/Kolkata",
+            sessions: 4,
+            attended: 1,
+            missed: 1,
+            left: 2,
+            nextAt: "2026-10-19T04:30:00.000Z",
+        });
+        expect(leaks(view)).toEqual([]);
+    });
+
+    it("a course with no sessions has no dates and nothing left", () => {
+        expect(
+            courseView(
+                {
+                    id: "enr_2",
+                    course: { name: "Empty", sessions: [] },
+                    bookings: [],
+                },
+                "Asia/Kolkata",
+                now,
+            ),
+        ).toMatchObject({
+            firstAt: null,
+            lastAt: null,
+            sessions: 0,
+            left: 0,
+            nextAt: null,
+        });
+    });
+
+    it("email is allowed until they say no: no row, or a granted one, is yes", () => {
+        expect(noticesView(null)).toEqual({ email: true });
+        expect(noticesView({ status: "GRANTED" })).toEqual({ email: true });
+        const off = noticesView({
+            status: "REVOKED",
+            source: "STAFF NOTE: owes money",
+            ...noisy,
+        } as never);
+        expect(off).toEqual({ email: false });
+        expect(leaks(off)).toEqual([]);
+    });
+
+    it("a change says what happened, never who on the team did it or why", () => {
+        const order = orderChangeView({
+            orderRef: "ord_1",
+            number: "1019",
+            status: "Ready",
+            at: new Date("2026-10-11T09:00:00Z"),
+            actorUserId: "user_staff_id",
+            note: "STAFF NOTE: owes money",
+        } as never);
+        expect(order).toEqual({
+            kind: "order",
+            ref: "ord_1",
+            number: "1019",
+            status: "Ready",
+            at: "2026-10-11T09:00:00.000Z",
+        });
+
+        const booking = {
+            id: "bk_1",
+            startAt: new Date("2026-10-15T05:00:00Z"),
+            timezone: "Asia/Kolkata",
+            service: { name: "Check-up", ...noisy },
+            ...noisy,
+        };
+        const moved = bookingChangeView({
+            type: "RESCHEDULED",
+            at: new Date("2026-10-11T10:00:00Z"),
+            fromStartAt: new Date("2026-10-14T05:00:00Z"),
+            booking,
+            actorUserId: "user_staff_id",
+        } as never);
+        // Moved: where it is now.
+        expect(moved).toEqual({
+            kind: "booking-moved",
+            ref: "bk_1",
+            service: "Check-up",
+            startAt: "2026-10-15T05:00:00.000Z",
+            timezone: "Asia/Kolkata",
+            at: "2026-10-11T10:00:00.000Z",
+        });
+        const cancelled = bookingChangeView({
+            type: "CANCELLED",
+            at: new Date("2026-10-11T11:00:00Z"),
+            fromStartAt: new Date("2026-10-14T05:00:00Z"),
+            booking,
+        } as never);
+        // Cancelled: where it was.
+        expect(cancelled).toMatchObject({
+            kind: "booking-cancelled",
+            startAt: "2026-10-14T05:00:00.000Z",
+        });
+
+        const messages = messagesChangeView(
+            2,
+            new Date("2026-10-11T12:00:00Z"),
+        );
+        // A count and a time: never the words, which the thread shows.
+        expect(messages).toEqual({
+            kind: "messages",
+            count: 2,
+            at: "2026-10-11T12:00:00.000Z",
+        });
+
+        const invoice = invoiceChangeView({
+            id: "inv_1",
+            number: "INV-0042",
+            total: "2500",
+            currency: "INR",
+            issuedAt: new Date("2026-10-11T13:00:00Z"),
+            createdAt: new Date("2026-10-10T13:00:00Z"),
+            payTokenHash: "pay_ref_123",
+            ...noisy,
+        } as never);
+        expect(invoice).toEqual({
+            kind: "invoice",
+            ref: "inv_1",
+            number: "INV-0042",
+            total: "2500.00",
+            currency: "INR",
+            at: "2026-10-11T13:00:00.000Z",
+        });
+
+        for (const view of [order, moved, cancelled, messages, invoice]) {
+            expect(leaks(view)).toEqual([]);
+        }
+    });
+
+    it("lists the newest changes first, and only as many as Home shows", () => {
+        const at = (day: number) =>
+            orderChangeView({
+                orderRef: `o${day}`,
+                number: String(day),
+                status: "Ready",
+                at: new Date(Date.UTC(2026, 9, day)),
+            });
+        const many = [3, 9, 1, 7, 5, 2, 8, 4, 6].map(at);
+        const shown = latestChanges(many);
+        expect(shown).toHaveLength(CHANGE_ROWS);
+        expect(shown.map((c) => (c.kind === "order" ? c.number : ""))).toEqual([
+            "9",
+            "8",
+            "7",
+            "6",
+            "5",
+            "4",
+        ]);
+        // The list handed in is left as it was.
+        expect(many[0]).toMatchObject({ number: "3" });
     });
 });

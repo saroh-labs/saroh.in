@@ -185,3 +185,30 @@ describe("what happens next", () => {
         expect(confirmationOf({ ...BODY, email: 7 })?.email).toBeNull();
     });
 });
+
+describe("the GST on a confirmation's lines", () => {
+    const gst = {
+        mode: "ADDED",
+        rate: "18",
+        listCents: 100000,
+        gstCents: 18000,
+        payCents: 118000,
+    };
+    const withGst = (value: unknown) =>
+        confirmationOf({
+            ...BODY,
+            lines: [{ ...BODY.lines[0], gst: value }],
+        })?.lines[0];
+
+    it("carries what the API worked out, and nothing beside it", () => {
+        expect(withGst({ ...gst, hsn: "9983" })?.gst).toEqual(gst);
+    });
+
+    it("reads none, nothing, or something strange as no GST said", () => {
+        for (const value of [null, undefined, "18", { mode: "ADDED" }]) {
+            const line = withGst(value);
+            expect(line).toBeDefined();
+            expect(line).not.toHaveProperty("gst");
+        }
+    });
+});
