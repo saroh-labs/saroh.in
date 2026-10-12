@@ -58,6 +58,23 @@ function noIndex(response: Response): Response {
     return response;
 }
 
+const ISO_INSTANT =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * `LAUNCH_AT` as milliseconds, or null when it is unset or isn't a full ISO
+ * instant with its offset ("2026-10-17T16:00:00+05:30", or ending in "Z").
+ * Strict on purpose: a date with no time or no offset is a different moment
+ * on every machine, and a value that can't be read must leave the gate shut.
+ * The same rule as `launchInstant` in scripts/cf-env.mjs; keep them alike.
+ */
+export function launchInstant(value: string | undefined): number | null {
+    const text = value?.trim();
+    if (!text || !ISO_INSTANT.test(text)) return null;
+    const ms = Date.parse(text);
+    return Number.isFinite(ms) ? ms : null;
+}
+
 /**
  * Keeps the dev environment to people who have its key.
  *
@@ -72,11 +89,24 @@ function noIndex(response: Response): Response {
  * has no twin (accounts' `/login` on the marketing site); a form post is
  * refused instead, so it is never replayed there. The cookie holds the key's digest, so changing the key
  * shuts out every browser let in with the old one.
+ *
+ * Production's accounts opens by the clock: once `LAUNCH_AT` (an ISO instant
+ * in its production vars) has passed, the gate steps aside for everyone, with
+ * no deploy and nobody awake. Read on the server on every request, never sent
+ * to the browser. A `LAUNCH_AT` that can't be read keeps the gate shut. The
+ * dev environment sets none (`pnpm run check:deploy-env` refuses one there),
+ * so its key gate never opens this way. `now` is for the tests.
  */
-export function withDevAccess(next: Middleware): Middleware {
+export function withDevAccess(
+    next: Middleware,
+    now: () => number = Date.now,
+): Middleware {
     return async function devAccess(request) {
         const key = process.env.DEV_ACCESS_KEY?.trim();
         if (!key) return next(request);
+
+        const opensAt = launchInstant(process.env.LAUNCH_AT);
+        if (opensAt !== null && now() >= opensAt) return next(request);
 
         const expected = await sha256Hex(key);
         const url = new URL(publicUrl(request));
