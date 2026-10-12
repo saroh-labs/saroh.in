@@ -92,8 +92,14 @@ test("the article draws its five real screens, ringed where a step names a contr
     const ld = await page
         .locator('script[type="application/ld+json"]')
         .allTextContents();
+    // One block may hold several things (the HowTo beside the article and
+    // its breadcrumb), so each block is read as a list.
+    type Thing = { "@type"?: string; step?: unknown[] };
     const howTo = ld
-        .map((t) => JSON.parse(t) as { "@type"?: string; step?: unknown[] })
+        .flatMap((t) => {
+            const parsed = JSON.parse(t) as Thing | Thing[];
+            return Array.isArray(parsed) ? parsed : [parsed];
+        })
         .find((d) => d["@type"] === "HowTo");
     expect(howTo?.step).toHaveLength(5);
 });

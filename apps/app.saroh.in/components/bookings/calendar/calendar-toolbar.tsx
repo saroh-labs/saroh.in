@@ -5,7 +5,6 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { PageHeader } from "@saroh/ui/page-header";
-import { TextLink } from "@saroh/ui/text-link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -243,9 +242,11 @@ export function ServiceHoursHint({ onAdd }: { onAdd?: () => void }) {
             Customers book each service in its own hours. Hatched time is
             closed, and the rest is open to book.{" "}
             {onAdd ? (
+                // Words, not a second control: the action is at the head of
+                // the column just below, at a size a thumb can press.
                 <>
-                    To give each person a column of their own,{" "}
-                    <TextLink onClick={onAdd}>add who takes bookings</TextLink>.
+                    To give each person a column of their own, press “Add who
+                    takes bookings” under Service hours.
                 </>
             ) : null}
         </Notice>
