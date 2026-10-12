@@ -1,7 +1,12 @@
 // creditNoteForRefund's early answers, without a database: which refunds
 // make no credit note on their order's invoice.
 import { nextInvoiceNumber } from "./numbering";
-import { creditNoteForRefund, ensureOrderInvoice } from "./order-invoicing";
+import {
+    addedProductLines,
+    correctOrderInvoiceForEdit,
+    creditNoteForRefund,
+    ensureOrderInvoice,
+} from "./order-invoicing";
 
 jest.mock("./numbering", () => ({
     ...jest.requireActual<typeof import("./numbering")>("./numbering"),
@@ -296,5 +301,342 @@ describe("a treatment's balance invoice", () => {
                 stem: expect.not.stringContaining("/"),
             }),
         );
+    });
+
+    it("recorded by the team: the balance of a tax invoice is refused while the service has no rate", async () => {
+        const tx = balanceTx(deposit());
+        tx.order.findUnique = jest
+            .fn()
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({
+                total: money("2360"),
+                items: [
+                    {
+                        id: "item_1",
+                        service: {
+                            id: "svc_root",
+                            name: "Root canal treatment",
+                            gstRate: null,
+                            sacCode: "999312",
+                        },
+                    },
+                ],
+            });
+        await expect(
+            ensureOrderInvoice(tx as never, "order_1", {
+                method: "CASH",
+                refuseUnsetRate: true,
+            }),
+        ).rejects.toMatchObject({
+            response: {
+                details: {
+                    reason: "GST_RATE_MISSING",
+                    items: [
+                        {
+                            kind: "SERVICE",
+                            id: "svc_root",
+                            name: "Root canal treatment",
+                        },
+                    ],
+                },
+            },
+        });
+        expect(tx.invoice.create).not.toHaveBeenCalled();
+    });
+});
+
+// An order's invoice and an item with no GST rate chosen
+// (`gst-rate-required.ts`): refused only where someone at the business is
+// taking the payment; a customer's own payment writes the paper as before.
+describe("an order's invoice and an item with no GST rate", () => {
+    const money = (v: string) => ({ toString: () => v });
+
+    const PROFILE = {
+        gstRegistered: true,
+        gstState: "29",
+        taxId: "29AAGCR4375J1ZU",
+        invoicePrefix: "RC",
+        invoiceNumberFormat: null,
+        timezone: "Asia/Kolkata",
+        deliveryGstRate: "18",
+        deliverySacCode: null,
+        addressLine1: "14 Hill Road",
+        addressLine2: null,
+        city: "Bengaluru",
+        postalCode: "560038",
+        legalName: null,
+        contactEmail: null,
+    };
+
+    const item = (
+        id: string,
+        product: Record<string, unknown> | null,
+        service: Record<string, unknown> | null = null,
+    ) => ({
+        id,
+        quantity: 1,
+        price: money("590"),
+        product,
+        service,
+        variant: null,
+    });
+
+    function orderTx(
+        items: ReturnType<typeof item>[],
+        profile: Record<string, unknown> | null = PROFILE,
+    ) {
+        const total = money(String(590 * items.length));
+        return {
+            $queryRaw: jest.fn(),
+            order: {
+                findUnique: jest
+                    .fn()
+                    // Whoever paid: nobody to link here.
+                    .mockResolvedValueOnce(null)
+                    .mockResolvedValueOnce({
+                        organizationId: "org_1",
+                        orderId: "ORD-014",
+                        currency: "INR",
+                        subtotal: total,
+                        tax: money("0"),
+                        shipping: money("0"),
+                        discount: money("0"),
+                        total,
+                        fulfilment: "PICKUP",
+                        deliveryName: null,
+                        deliveryLine1: null,
+                        deliveryLine2: null,
+                        deliveryCity: null,
+                        deliveryState: null,
+                        deliveryPostalCode: null,
+                        customer: {
+                            firstName: "Asha",
+                            lastName: "Rao",
+                            email: "asha.rao@example.com",
+                        },
+                        walkInName: null,
+                        items,
+                    }),
+            },
+            invoice: {
+                findFirst: jest.fn().mockResolvedValue(null),
+                create: jest.fn().mockResolvedValue({ id: "inv_new" }),
+            },
+            invoiceLine: { createMany: jest.fn() },
+            businessProfile: {
+                findUnique: jest.fn().mockResolvedValue(profile),
+            },
+            organization: {
+                findUnique: jest.fn().mockResolvedValue({ name: "Rye & Co." }),
+            },
+        };
+    }
+
+    const SERUM = {
+        id: "prod_serum",
+        name: "Vitamin C serum",
+        gstRate: null,
+        hsnCode: null,
+    };
+    const BREAD = {
+        id: "prod_bread",
+        name: "Sourdough loaf",
+        gstRate: money("0"),
+        hsnCode: "1905",
+    };
+    const FACIAL = {
+        id: "svc_facial",
+        name: "Facial, 3 visits",
+        gstRate: null,
+        sacCode: null,
+    };
+
+    it("refuses a payment taken by the team, naming each item once", async () => {
+        const tx = orderTx([
+            item("i_1", SERUM),
+            item("i_2", BREAD),
+            item("i_3", SERUM),
+            item("i_4", null, FACIAL),
+        ]);
+        await expect(
+            ensureOrderInvoice(tx as never, "order_1", {
+                method: "CASH",
+                refuseUnsetRate: true,
+            }),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "Vitamin C serum and Facial, 3 visits have no GST rate. Choose one for each to issue this invoice.",
+                details: {
+                    reason: "GST_RATE_MISSING",
+                    items: [
+                        {
+                            kind: "PRODUCT",
+                            id: "prod_serum",
+                            name: "Vitamin C serum",
+                        },
+                        {
+                            kind: "SERVICE",
+                            id: "svc_facial",
+                            name: "Facial, 3 visits",
+                        },
+                    ],
+                },
+            },
+        });
+        expect(tx.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it("takes it when every item has a rate, 0% included", async () => {
+        const tx = orderTx([
+            item("i_1", { ...SERUM, gstRate: money("18") }),
+            item("i_2", BREAD),
+        ]);
+        await expect(
+            ensureOrderInvoice(tx as never, "order_1", {
+                method: "CASH",
+                refuseUnsetRate: true,
+            }),
+        ).resolves.toMatchObject({ id: "inv_new", created: true });
+    });
+
+    it("never asks a business that isn't registered", async () => {
+        const tx = orderTx([item("i_1", SERUM)], {
+            ...PROFILE,
+            gstRegistered: false,
+            taxId: null,
+        });
+        await expect(
+            ensureOrderInvoice(tx as never, "order_1", {
+                method: "CASH",
+                refuseUnsetRate: true,
+            }),
+        ).resolves.toMatchObject({ created: true });
+    });
+
+    it("a customer's own payment is never refused: its invoice is written with the rate unset, as before", async () => {
+        const tx = orderTx([item("i_1", SERUM)]);
+        // The webhook's call: no `refuseUnsetRate`.
+        await expect(
+            ensureOrderInvoice(tx as never, "order_1", {
+                method: "ONLINE",
+                reference: "pay_123",
+            }),
+        ).resolves.toMatchObject({ id: "inv_new", created: true });
+        const data = (
+            tx.invoice.create.mock.calls[0][0] as {
+                data: Record<string, unknown>;
+            }
+        ).data;
+        expect(data).toMatchObject({
+            sellerGstin: "29AAGCR4375J1ZU",
+            total: "590.00",
+            tax: "0.00",
+        });
+        const lines = (
+            tx.invoiceLine.createMany.mock.calls[0][0] as {
+                data: Record<string, unknown>[];
+            }
+        ).data;
+        expect(lines[0]).toMatchObject({ gstRate: null });
+    });
+});
+
+// An edit to an order whose tax invoice is out (`gst-rate-required.ts`):
+// units added go on a supplementary invoice, written by someone at the
+// business, so a product with no GST rate is asked for there.
+describe("an edit's supplementary invoice and a product with no GST rate", () => {
+    const unrated = {
+        id: "prod_cake",
+        name: "Walnut cake",
+        gstRate: null,
+        hsnCode: null,
+    };
+    const change = (productId: string | null, deltaQuantity: number) => ({
+        orderItemId: null,
+        productId,
+        description: "Walnut cake",
+        deltaQuantity,
+        unitCents: 59000,
+    });
+
+    function editTx(sellerGstin: string | null) {
+        return {
+            $queryRaw: jest.fn(),
+            invoice: {
+                findFirst: jest.fn().mockResolvedValue({ id: "inv_1" }),
+                findUnique: jest.fn().mockResolvedValue({
+                    id: "inv_1",
+                    organizationId: "org_1",
+                    sellerGstin,
+                    lines: [],
+                }),
+                create: jest.fn(),
+            },
+            product: { findMany: jest.fn().mockResolvedValue([unrated]) },
+        };
+    }
+
+    it("refuses the edit, naming the product once, before anything is written", async () => {
+        const tx = editTx("29AAGCR4375J1ZU");
+        await expect(
+            correctOrderInvoiceForEdit(tx as never, {
+                orderId: "order_1",
+                changes: [change("prod_cake", 1), change("prod_cake", 2)],
+                note: null,
+                createdByUserId: "user_1",
+                settled: false,
+            }),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "Walnut cake has no GST rate. Choose one to issue this invoice.",
+                details: {
+                    reason: "GST_RATE_MISSING",
+                    items: [
+                        {
+                            kind: "PRODUCT",
+                            id: "prod_cake",
+                            name: "Walnut cake",
+                        },
+                    ],
+                },
+            },
+        });
+        expect(tx.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it("asks only about units added: never units taken off, delivery, or a product that is gone", () => {
+        const products = new Map([[unrated.id, unrated]]);
+        expect(addedProductLines([change("prod_cake", 2)], products)).toEqual([
+            {
+                kind: "PRODUCT",
+                id: "prod_cake",
+                name: "Walnut cake",
+                rate: null,
+            },
+        ]);
+        expect(addedProductLines([change("prod_cake", -1)], products)).toEqual(
+            [],
+        );
+        expect(addedProductLines([change(null, 1)], products)).toEqual([]);
+        expect(addedProductLines([change("prod_gone", 1)], products)).toEqual(
+            [],
+        );
+    });
+
+    it("an order with no invoice yet is edited as before", async () => {
+        const tx = editTx("29AAGCR4375J1ZU");
+        tx.invoice.findFirst.mockResolvedValue(null);
+        await expect(
+            correctOrderInvoiceForEdit(tx as never, {
+                orderId: "order_1",
+                changes: [change("prod_cake", 1)],
+                note: null,
+                createdByUserId: "user_1",
+                settled: false,
+            }),
+        ).resolves.toEqual({ supplementary: null, creditNote: null });
+        expect(tx.product.findMany).not.toHaveBeenCalled();
     });
 });

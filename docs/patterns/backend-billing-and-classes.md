@@ -277,6 +277,39 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
       PDF) and in the app's `lib/invoices/paper-title.ts` (Invoice Detail's
       paper). Change both together. Stored rates are never rewritten to
       match.
+- **A tax invoice someone at the business starts never goes out with a rate
+  nobody chose** (12 Oct 2026). Null is "not set" and 0 is a rate ("Exempt
+  or nil-rated"), so only null is asked about, and only of a registered
+  business.
+    - **The rule is one file**, `invoices/gst-rate-required.ts`:
+      `assertRatesSet(registered, lines)` throws a 409 `{ reason:
+"GST_RATE_MISSING", items: [{ kind, id, name }] }` before anything is
+      numbered or written. `kind` is `SERVICE` or `PRODUCT` (the rate is
+      saved on the item) or `LINE` (a line typed on an invoice, named by its
+      place).
+    - **The app asks in place and carries on.** `toFailure` and `mutate`
+      read `rates` off the failure; `useGstRateStep` opens a sheet with one
+      row per item, saves each rate (`PUT …/gst-rates`, or the draft's lines)
+      and runs the same action again. Nobody is sent to another page.
+    - **Refused:** issuing a draft; a booking's desk payment and its pay
+      link; a new order paid at the counter; an order recorded as paid; a
+      treatment's balance recorded by the team; units added to an order whose
+      invoice is out (`correctOrderInvoiceForEdit`).
+    - **Never refused:** anything a customer's payment or a job writes (the
+      webhook's `ensureOrderInvoice`, a booking's hold, a pack or plan
+      bought online, a renewal). Nobody is there to choose, and a payment is
+      never failed for it. `ensureOrderInvoice` asks only when its caller
+      passes `refuseUnsetRate`.
+    - **Paper already out is left alone:** a pay link already issued is
+      marked paid as it is, and a credit note mirrors what it credits.
+    - **Finding them first:** `GET …/gst-rates/missing` lists the priced
+      things on sale with no rate (`gst-rates.service.ts`), drawn as one
+      notice with a count on Services and Invoices, and the editors ask for
+      the rate beside the price. A course, a class pack and a plan have no
+      rate column, so their invoices carry none and they are not listed.
+    - **A new path that writes a tax invoice picks a side**, as for the
+      business's details above: started by the team, call `assertRatesSet`;
+      started by a payment, a job or a customer, never.
 - **Numbering:** `InvoiceSequence` per business **and series**; never renumber
   an existing invoice. The financial year is April–March for everyone (GST
   sets it; not a setting), and a number's financial year and month are dated

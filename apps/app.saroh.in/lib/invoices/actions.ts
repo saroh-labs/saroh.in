@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { linesWithRates } from "./line-rates";
 import type { InvoiceInput, PaymentInput } from "./service";
 import * as api from "./service";
 
@@ -30,6 +31,35 @@ export async function deleteInvoice(id: string) {
     const res = await api.deleteInvoice(id);
     if (res.ok) refresh();
     return res;
+}
+
+/**
+ * Fill in the GST rates chosen for a draft's lines, by their place, and
+ * leave every other line as it was: asked where Issue was refused for a
+ * line with no rate (`use-gst-rate-step.tsx`). The draft is read again
+ * here, so an edit made since the page was drawn is what the rates join.
+ */
+export async function setInvoiceLineRates(
+    id: string,
+    rates: Record<number, string>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    const failed = {
+        ok: false as const,
+        error: "Couldn't save the GST rate. Try again.",
+    };
+    let invoice;
+    try {
+        invoice = await api.getInvoice(id);
+    } catch {
+        return failed;
+    }
+    if (!invoice?.lines?.length) return failed;
+    const res = await api.updateInvoice(id, {
+        lines: linesWithRates(invoice.lines, rates),
+    });
+    if (!res.ok) return { ok: false, error: res.error };
+    refresh(id);
+    return { ok: true };
 }
 
 export async function issueInvoice(id: string) {

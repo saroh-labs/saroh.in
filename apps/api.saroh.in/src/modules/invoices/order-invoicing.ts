@@ -4,6 +4,8 @@ import { ensureContactForPaidOrder } from "../customer-workspace/ensure-contact"
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { SUPERSEDED_INTENT } from "../payments/intent-state";
 import { bpsToRate, rateToBps } from "./gst";
+import type { RatedLine } from "./gst-rate-required";
+import { assertRatesSet } from "./gst-rate-required";
 import { stateName } from "./gst-states";
 import { CAPTURED_NEEDS_REFUND, ONLINE_PAYMENT_METHOD } from "./invoice-state";
 import type { InvoiceKind } from "./numbering";
@@ -184,6 +186,21 @@ function billToColumns(billTo: BillTo) {
     };
 }
 
+/** How an order's invoice is being written, and who started it. */
+export interface OrderInvoiceOptions {
+    at?: Date;
+    method?: string | null;
+    reference?: string | null;
+    /**
+     * Someone at the business is taking this payment (the counter, or an
+     * order recorded as paid): a tax invoice with an item whose GST rate
+     * was never chosen is refused, naming the items, so the app can ask
+     * for the rate there (`gst-rate-required.ts`). Never set on a path a
+     * customer's payment or a job starts: that paper is written as before.
+     */
+    refuseUnsetRate?: boolean;
+}
+
 /**
  * The order's invoice, made once. Returns the one already there when there
  * is one — a replayed webhook, a second payment on an edited order, or a
@@ -198,7 +215,7 @@ function billToColumns(billTo: BillTo) {
 export async function ensureOrderInvoice(
     tx: Tx,
     orderId: string,
-    opts: { at?: Date; method?: string | null; reference?: string | null } = {},
+    opts: OrderInvoiceOptions = {},
 ): Promise<{ id: string; number: string | null; created: boolean } | null> {
     await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
     // Whoever paid gets a contact, in this transaction (DEC-041, C2), under
@@ -249,11 +266,21 @@ export async function ensureOrderInvoice(
                     quantity: true,
                     price: true,
                     product: {
-                        select: { name: true, gstRate: true, hsnCode: true },
+                        select: {
+                            id: true,
+                            name: true,
+                            gstRate: true,
+                            hsnCode: true,
+                        },
                     },
                     // A treatment's line bills a service (E9, DEC-050).
                     service: {
-                        select: { name: true, gstRate: true, sacCode: true },
+                        select: {
+                            id: true,
+                            name: true,
+                            gstRate: true,
+                            sacCode: true,
+                        },
                     },
                     variant: { select: { title: true } },
                 },
@@ -264,6 +291,9 @@ export async function ensureOrderInvoice(
     const organizationId = order.organizationId;
 
     const profile = await loadTaxProfile(tx, organizationId);
+    if (opts.refuseUnsetRate) {
+        assertRatesSet(profile.registered, order.items.flatMap(ratedItem));
+    }
     const doc = buildOrderInvoice(order, profile);
     const at = opts.at ?? new Date();
     const number = await numberFor(tx, organizationId, profile, "INVOICE", at);
@@ -290,6 +320,27 @@ export async function ensureOrderInvoice(
     });
     await writeDocumentLines(tx, organizationId, created.id, doc);
     return { id: created.id, number, created: true };
+}
+
+/** An order line as the rate check reads it: the product or service it bills. */
+function ratedItem(item: {
+    product: { id: string; name: string; gstRate: RatedLine["rate"] } | null;
+    service?: { id: string; name: string; gstRate: RatedLine["rate"] } | null;
+}): RatedLine[] {
+    const billed = item.product
+        ? { kind: "PRODUCT" as const, ...item.product }
+        : item.service
+          ? { kind: "SERVICE" as const, ...item.service }
+          : null;
+    if (!billed) return [];
+    return [
+        {
+            kind: billed.kind,
+            id: billed.id,
+            name: billed.name,
+            rate: billed.gstRate,
+        },
+    ];
 }
 
 const ORIGINAL_SELECT = {
@@ -472,7 +523,7 @@ async function ensureTreatmentBalanceInvoice(
     tx: Tx,
     orderId: string,
     invoiceId: string,
-    opts: { at?: Date; method?: string | null; reference?: string | null },
+    opts: OrderInvoiceOptions,
 ): Promise<void> {
     const which = await tx.invoice.findUnique({
         where: { id: invoiceId },
@@ -496,7 +547,12 @@ async function ensureTreatmentBalanceInvoice(
                 select: {
                     id: true,
                     service: {
-                        select: { name: true, gstRate: true, sacCode: true },
+                        select: {
+                            id: true,
+                            name: true,
+                            gstRate: true,
+                            sacCode: true,
+                        },
                     },
                 },
             },
@@ -513,6 +569,14 @@ async function ensureTreatmentBalanceInvoice(
         toCents(original.total.toString()) -
         toCents((invoiced._sum.total ?? 0).toString());
     if (balanceCents <= 0) return;
+    // Recorded by someone at the business: the balance of a tax invoice
+    // never goes out with a rate nobody chose (`gst-rate-required.ts`).
+    if (opts.refuseUnsetRate) {
+        assertRatesSet(
+            original.sellerGstin !== null,
+            ratedItem({ product: null, service: line.service }),
+        );
+    }
     // A supplementary invoice against the deposit's, built as every other
     // is (ADR-008): the deposit's frozen seller — GSTIN, state, address,
     // name, legal name, email — and its place of supply and tax split. A
@@ -886,6 +950,32 @@ export async function invoiceSupersededPayment(
 }
 
 /**
+ * The products an edit adds units of, as the rate check reads them. Units
+ * taken off, a delivery charge (its rate is the business's own) and a
+ * product no longer there are left out.
+ */
+export function addedProductLines(
+    changes: readonly { productId: string | null; deltaQuantity: number }[],
+    products: ReadonlyMap<
+        string,
+        { id: string; name: string; gstRate: RatedLine["rate"] }
+    >,
+): RatedLine[] {
+    return changes.flatMap((c): RatedLine[] => {
+        const product = c.productId ? products.get(c.productId) : undefined;
+        if (!product || c.deltaQuantity <= 0) return [];
+        return [
+            {
+                kind: "PRODUCT",
+                id: product.id,
+                name: product.name,
+                rate: product.gstRate,
+            },
+        ];
+    });
+}
+
+/**
  * What an edit before preparing changed on a paid order's invoice: added
  * units make a supplementary invoice, removed ones a credit note — each at
  * the price and rate the line was bought at, referencing the order's
@@ -938,9 +1028,18 @@ export async function correctOrderInvoiceForEdit(
     );
     const products = await tx.product.findMany({
         where: { id: { in: productIds } },
-        select: { id: true, gstRate: true, hsnCode: true },
+        select: { id: true, name: true, gstRate: true, hsnCode: true },
     });
     const byProduct = new Map(products.map((p) => [p.id, p]));
+    // An edit is made by someone at the business: units added to a tax
+    // invoice's order never go out on a supplementary invoice with a rate
+    // nobody chose (`gst-rate-required.ts`). The edit is refused, the app
+    // asks for the rate, saves it to the product and saves the edit again.
+    // Units taken off are a credit note of paper already out: never asked.
+    assertRatesSet(
+        original.sellerGstin !== null,
+        addedProductLines(input.changes, byProduct),
+    );
     const line = (c: (typeof input.changes)[number], quantity: number) => {
         const product = c.productId ? byProduct.get(c.productId) : undefined;
         return {

@@ -10,6 +10,7 @@ import { FileCheck2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -22,6 +23,7 @@ import {
     issueInvoice,
     recordPayment,
     reissueInvoice,
+    setInvoiceLineRates,
     voidInvoice,
 } from "@/lib/invoices/actions";
 import { sendLabel } from "@/lib/invoices/send";
@@ -70,9 +72,19 @@ export function IssueDialog({
         continueLabel: "Save and issue",
     });
 
+    // A line with no GST rate on a tax invoice: each is chosen here and
+    // saved to the draft, then it issues.
+    const rates = useGstRateStep({
+        then: "issue this invoice",
+        continueLabel: "Save and issue",
+        saveLines: (chosen) => setInvoiceLineRates(invoice.id, chosen),
+    });
+
     async function issue(): Promise<ConfirmResult> {
-        const res = await details.run(() => issueInvoice(invoice.id));
-        // The details sheet was closed without saving: still a draft.
+        const res = await rates.run(() =>
+            details.run(() => issueInvoice(invoice.id)),
+        );
+        // A sheet was closed without saving: still a draft.
         if (!res) return true;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess(`${res.data.number ?? "Invoice"} issued.`);
@@ -100,6 +112,7 @@ export function IssueDialog({
                 onConfirm={issue}
             />
             {details.step}
+            {rates.step}
         </>
     );
 }

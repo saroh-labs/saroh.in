@@ -11,9 +11,11 @@ import {
     draftVisits,
     fromMinor,
     glance,
+    gstPlace,
     hasBookableHours,
     HOURS_SECTION,
     hoursNote,
+    needsGstRate,
     needsMeetingLink,
     problemFor,
     savedMessage,
@@ -226,6 +228,73 @@ describe("serviceProblems", () => {
             "Pick a time zone.",
             "A SAC code is 4 to 8 digits.",
         ]);
+    });
+});
+
+describe("the GST rate of a GST-registered business's service", () => {
+    const NEEDED = "Choose a GST rate. Pick 0% if it's exempt or nil-rated.";
+    const problems = (over: Partial<ServiceDraft>, registered: boolean) =>
+        serviceProblems(draft(over), true, false, false, registered);
+
+    it("has to be chosen before a priced service is saved", () => {
+        expect(problems({ gstRate: "" }, true)).toEqual([NEEDED]);
+        expect(
+            problemFor(
+                serviceFieldProblems(
+                    draft({ gstRate: "" }),
+                    true,
+                    false,
+                    false,
+                    true,
+                ),
+                "gstRate",
+            ),
+        ).toBe(NEEDED);
+    });
+
+    it("takes 0% as an answer: exempt is a choice, never the same as none", () => {
+        expect(problems({ gstRate: "0" }, true)).toEqual([]);
+        expect(problems({ gstRate: "18" }, true)).toEqual([]);
+        expect(needsGstRate({ price: "1200", gstRate: "0" }, true)).toBe(false);
+    });
+
+    it("is never asked of a free service, or one with no price typed yet", () => {
+        expect(
+            problems({ gstRate: "", price: "0", deposit: "NONE" }, true),
+        ).toEqual([]);
+        expect(needsGstRate({ price: "", gstRate: "" }, true)).toBe(false);
+        expect(needsGstRate({ price: "twelve", gstRate: "" }, true)).toBe(
+            false,
+        );
+    });
+
+    it("is never asked of a business that isn't registered", () => {
+        expect(problems({ gstRate: "" }, false)).toEqual([]);
+        expect(needsGstRate({ price: "1200", gstRate: "" }, false)).toBe(false);
+    });
+
+    it("sits beside the price for a registered business, and nowhere for one that isn't", () => {
+        const none = { gstRate: "", sacCode: "" };
+        expect(gstPlace(true, none)).toBe("price");
+        expect(gstPlace(false, none)).toBe("none");
+        // One saved before stays in view (00-universal §15).
+        expect(gstPlace(false, { gstRate: "18", sacCode: "" })).toBe("more");
+        expect(gstPlace(false, { gstRate: "", sacCode: "999723" })).toBe(
+            "more",
+        );
+        // Couldn't tell: where it always was, and nothing is asked.
+        expect(gstPlace(null, none)).toBe("more");
+    });
+
+    it("names a change to it under Price when that is where it is drawn", () => {
+        const saved = draft();
+        const changed = { ...saved, gstRate: "5", sacCode: "9997" };
+        expect(changedSections(saved, changed)).toEqual(["More settings"]);
+        expect(changedSections(saved, changed, true)).toEqual(["Price"]);
+        // The rest of More settings is still More settings.
+        expect(
+            changedSections(saved, { ...changed, bufferBefore: "20" }, true),
+        ).toEqual(["Price", "More settings"]);
     });
 });
 

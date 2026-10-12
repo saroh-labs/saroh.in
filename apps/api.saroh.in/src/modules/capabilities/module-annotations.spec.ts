@@ -125,6 +125,10 @@ const NEVER: Record<string, string> = {
     "provider-health/provider-health.controller.ts":
         "diagnosing an unhealthy provider must work when the module is off",
     "search/search.controller.ts": "spans modules; it should degrade, not 403",
+    // The GST rates still to choose: a service's and a product's alike,
+    // each read and saved with its own permission.
+    "invoices/gst-rates.controller.ts":
+        "spans Bookings' services and Sell's products; invoicing needs no module (DEC-070)",
     "saved-views/saved-views.controller.ts": "spans modules",
     "calendar/calendar.controller.ts":
         "spans every dated module, and drops a layer whose module is off itself",

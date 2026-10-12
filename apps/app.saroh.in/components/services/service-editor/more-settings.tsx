@@ -1,22 +1,19 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 
 import { TimezoneSelect } from "@/components/shared/timezone-select";
-import type { GstRateValue } from "@/lib/invoices/gst";
-import { GST_RATE_OPTIONS } from "@/lib/invoices/gst";
 import type { AvailabilityRule } from "@/lib/services/service";
 import { hoursNote } from "@/lib/services/service-editor";
-import { OptionSelect } from "@saroh/ui/option-select";
 
 import { FailedRead } from "@/components/shared/failed-read";
 import { Field } from "@saroh/ui/field";
 import type { Edit } from "./fields";
 import { HELP, LABEL, NumberField, Section } from "./fields";
+import { GstFields } from "./gst-fields";
 import { HoursField } from "./hours-field";
 
 /**
@@ -24,6 +21,9 @@ import { HoursField } from "./hours-field";
  * design's page leaves out, kept one click away (00-universal §15) — the
  * time zone, the buffer before, GST, the service's own weekly hours and
  * Delete. Closed until opened (UX-056: `hidden` alone lost to `grid`).
+ *
+ * GST left for the Price section where the business is GST-registered
+ * (12 Oct 2026): a rate that has to be chosen is asked where the price is.
  */
 export function MoreSettings({
     draft,
@@ -36,8 +36,15 @@ export function MoreSettings({
     serviceId,
     rules,
     canEdit,
+    withGst = true,
     onDelete,
 }: Edit & {
+    /**
+     * The GST rate and SAC code are drawn here (`gstPlace`): not for a
+     * registered business, whose rate is asked beside the price, nor for
+     * one that isn't registered and never saved one.
+     */
+    withGst?: boolean;
     /** What is wrong with a row of the hours, once it should be said. */
     hoursProblem: (index: number) => string | null;
     /** A new service whose hours were filled in from the opening hours. */
@@ -57,8 +64,9 @@ export function MoreSettings({
     return (
         <Section title="More settings">
             <p className={cn(HELP, "mt-0")}>
-                Time zone, buffer before, GST, its own weekly hours, and
-                deleting it.
+                {withGst
+                    ? "Time zone, buffer before, GST, its own weekly hours, and deleting it."
+                    : "Time zone, buffer before, its own weekly hours, and deleting it."}
             </p>
             <Button
                 size="sm"
@@ -101,36 +109,18 @@ export function MoreSettings({
                         onLeave={() => leave("bufferBefore")}
                     />
                 </div>
-                <div className="flex flex-wrap gap-3">
-                    <Field
-                        label="GST rate"
-                        className="flex-[1_1_200px]"
-                        hint="Included in the price, on a GST invoice."
-                    >
-                        <OptionSelect
-                            value={draft.gstRate as GstRateValue}
-                            onValueChange={(gstRate) => set({ gstRate })}
-                            options={GST_RATE_OPTIONS}
-                            disabled={!canEdit}
+                {withGst ? (
+                    <div className="flex flex-wrap gap-3">
+                        <GstFields
+                            draft={draft}
+                            set={set}
+                            problem={problem}
+                            leave={leave}
+                            asked={false}
+                            canEdit={canEdit}
                         />
-                    </Field>
-                    <Field
-                        label="SAC code"
-                        className="flex-[1_1_160px]"
-                        error={problem("sacCode")}
-                        onBlur={() => leave("sacCode")}
-                        hint="The service code printed on tax invoices."
-                    >
-                        <Input
-                            inputMode="numeric"
-                            maxLength={10}
-                            placeholder="999723"
-                            value={draft.sacCode}
-                            onChange={(e) => set({ sacCode: e.target.value })}
-                            className="font-mono"
-                        />
-                    </Field>
-                </div>
+                    </div>
+                ) : null}
                 <div>
                     <div className={LABEL}>Its own weekly hours</div>
                     {rules === null ? (

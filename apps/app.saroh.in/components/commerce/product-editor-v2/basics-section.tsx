@@ -7,7 +7,13 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import type { GstRateValue } from "@/lib/invoices/gst";
-import { GST_RATE_OPTIONS, isHsnSac } from "@/lib/invoices/gst";
+import {
+    GST_RATE_CHOICES,
+    GST_RATE_NEEDED,
+    GST_RATE_OPTIONS,
+    GST_RATE_PLACEHOLDER,
+    isHsnSac,
+} from "@/lib/invoices/gst";
 import { patchProduct } from "@/lib/products/actions";
 import type { BasicsValues } from "@/lib/products/editor-sections";
 import {
@@ -18,6 +24,7 @@ import {
     isMoney,
     joinAnd,
     LIMITS,
+    needsGstRate,
     paise,
     slugify,
 } from "@/lib/products/editor-sections";
@@ -63,12 +70,15 @@ const CURRENCY_WORD: Record<string, string> = {
  * Basics: what the product is called, where it lives on the shop, what it
  * sells for and what it is. Creating needs a name and a price and nothing
  * else; the address is made from the name and can be changed afterwards.
+ * A GST-registered business's priced product also needs its GST rate,
+ * asked under the price.
  */
 export function BasicsSection({
     product,
     storeId,
     currency,
     gstRegistered,
+    gstRateNeeded = false,
     categories: initialCategories,
     manageCategoriesHref,
     onCategoryChange,
@@ -78,6 +88,8 @@ export function BasicsSection({
     currency: string;
     /** Only a GST-registered business sets a rate and an HSN code. */
     gstRegistered: boolean;
+    /** Known to be registered: a priced product needs its GST rate. */
+    gstRateNeeded?: boolean;
     categories: CategoryChoice[];
     manageCategoriesHref: string;
     /** Creating: the category picked, so its defaults can apply. */
@@ -101,7 +113,11 @@ export function BasicsSection({
     const priceBox = form.register("price");
     const mrpBox = form.register("mrp");
     const v = form.watch();
-    const problem = basicsProblem(v, creating);
+    const problem = basicsProblem(v, creating, gstRateNeeded);
+    // A new product says its rate is missing once the price is in and the
+    // box has been opened or left; a saved one says so at once.
+    const rateMissing = needsGstRate(v, gstRateNeeded);
+    const [rateAsked, setRateAsked] = useState(false);
     const ro = !canWrite;
 
     // Once customers could reach it, a new address breaks the old links.
@@ -121,6 +137,7 @@ export function BasicsSection({
                       [
                           v.name.trim() ? null : "a name",
                           v.price.trim() ? null : "a price",
+                          rateMissing ? "a GST rate" : null,
                       ].filter((x): x is string => x !== null),
                   )
                 : undefined,
@@ -327,53 +344,43 @@ export function BasicsSection({
                 </Field>
             </div>
 
-            <Field
-                label="Category"
-                className="mt-4"
-                hint={
-                    v.categoryId === ""
-                        ? "Uncategorized is a real choice. It clears the category rather than leaving it alone."
-                        : "A product sits in one category. Choosing Uncategorized clears it."
-                }
-            >
-                <CategoryPicker
-                    id="pe-category"
-                    value={v.categoryId}
-                    onChange={(id) => {
-                        form.setValue("categoryId", id, {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                        });
-                        onCategoryChange?.(id);
-                    }}
-                    categories={categories}
-                    onCreated={(c) => setCategories((list) => [...list, c])}
-                    manageHref={manageCategoriesHref}
-                    disabled={ro}
-                />
-            </Field>
-
             {/* GST (ADR-008): printed on a registered business's tax invoice,
                 so only a registered business is asked. A rate or a code
-                already saved stays in view either way. */}
+                already saved stays in view either way. It sits with the
+                price it is part of, and a registered business's priced
+                product can't be saved without one (12 Oct 2026): 0% is a
+                choice, and the box's placeholder is the only "not set". */}
             {gstRegistered || v.gstRate !== "" || v.hsnCode.trim() !== "" ? (
                 <div className="mt-4 flex flex-wrap gap-3.5">
                     <Field
                         label="GST rate"
                         className="flex-[1_1_150px]"
-                        error={errors.gstRate?.message}
+                        error={
+                            errors.gstRate?.message ??
+                            (rateMissing && (rateAsked || !creating)
+                                ? GST_RATE_NEEDED
+                                : null)
+                        }
                         hint="Included in the price. Bread and other nil-rated goods are 0%."
                     >
-                        <OptionSelect
+                        <OptionSelect<GstRateValue>
                             id="pe-gst"
                             value={v.gstRate as GstRateValue}
-                            onValueChange={(rate) =>
+                            onValueChange={(rate) => {
+                                setRateAsked(true);
                                 form.setValue("gstRate", rate, {
                                     shouldDirty: true,
                                     shouldValidate: true,
-                                })
+                                });
+                            }}
+                            options={
+                                gstRateNeeded
+                                    ? GST_RATE_CHOICES
+                                    : GST_RATE_OPTIONS
                             }
-                            options={GST_RATE_OPTIONS}
+                            placeholder={
+                                gstRateNeeded ? GST_RATE_PLACEHOLDER : undefined
+                            }
                             disabled={ro}
                         />
                     </Field>
@@ -400,6 +407,32 @@ export function BasicsSection({
                     </Field>
                 </div>
             ) : null}
+
+            <Field
+                label="Category"
+                className="mt-4"
+                hint={
+                    v.categoryId === ""
+                        ? "Uncategorized is a real choice. It clears the category rather than leaving it alone."
+                        : "A product sits in one category. Choosing Uncategorized clears it."
+                }
+            >
+                <CategoryPicker
+                    id="pe-category"
+                    value={v.categoryId}
+                    onChange={(id) => {
+                        form.setValue("categoryId", id, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                        });
+                        onCategoryChange?.(id);
+                    }}
+                    categories={categories}
+                    onCreated={(c) => setCategories((list) => [...list, c])}
+                    manageHref={manageCategoriesHref}
+                    disabled={ro}
+                />
+            </Field>
         </SectionCard>
     );
 }

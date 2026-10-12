@@ -686,7 +686,15 @@ export const SECTION_JUMPS: Record<SectionKey, string> = {
  * What Basics must fix before it can save, in the words its bar uses — one
  * line, the first thing wrong. Empty when it can save.
  */
-export function basicsProblem(v: BasicsValues, creating: boolean): string {
+export function basicsProblem(
+    v: BasicsValues,
+    creating: boolean,
+    /**
+     * A GST-registered business: a priced product needs the rate its price
+     * includes, or its tax invoice shows no GST (12 Oct 2026).
+     */
+    gstRateNeeded = false,
+): string {
     const name = v.name.trim();
     if (!name) return "Add a name first.";
     if (v.name.length > LIMITS.name) return "The name is over 150 characters.";
@@ -701,7 +709,26 @@ export function basicsProblem(v: BasicsValues, creating: boolean): string {
         return "MRP: a number with at most two decimals.";
     if (v.mrp.trim() && paise(v.mrp) < paise(v.price))
         return "MRP can't be lower than the price it sells for.";
+    if (needsGstRate(v, gstRateNeeded)) return "Choose a GST rate first.";
     return "";
+}
+
+/**
+ * Whether Basics still has to choose its GST rate: a GST-registered
+ * business's product with a price above nothing and no rate. 0% is a rate
+ * ("nil-rated or exempt"); a free product is never asked, and neither is a
+ * business that isn't registered.
+ */
+export function needsGstRate(
+    v: Pick<BasicsValues, "price" | "gstRate">,
+    gstRateNeeded: boolean,
+): boolean {
+    return (
+        gstRateNeeded &&
+        v.gstRate === "" &&
+        isMoney(v.price) &&
+        paise(v.price) > 0
+    );
 }
 
 /** The first message a zod schema has for these values, or "". */
