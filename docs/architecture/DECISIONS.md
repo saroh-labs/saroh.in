@@ -1787,3 +1787,63 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **A test key belongs to the test business and a live key to the live one.** A key never crosses.
 - **When:** after early access opens, planned together with API keys. Nothing is built by this entry.
 - **Open.** One test business per live business or several; which roles see the switch; what "copy my live setup" does when the live business changes later; whether a provider's test-mode webhooks need their own endpoint or secret.
+
+## DEC-146 A GST-registered business gives every priced item a GST rate, and decides whether its prices include GST
+
+**Status: Accepted — 2026-10-12, built** · owner ("the business add their prices, and decides the GST is inclusive or exclusive… they should have freedom to decide") · amends ADR-008
+
+- Context: a tax invoice went out with no tax on it, because the service had no GST rate. A missing rate was read as "no GST".
+- **No rate is "not set", never 0%.** For a GST-registered business the rate sits beside the price and is required with it. An item priced before this keeps working until someone bills it: a staff-raised invoice or pay link for an unrated item is refused (`GST_RATE_MISSING`) and the rate is asked for in place, in the screen that was open. A notice lists what is still unrated, and one sheet sets them, with "One rate for all".
+- **The business chooses how it prices.** One setting for the business, "My prices include GST" (the default) or "GST is added to my prices", and each item can say otherwise. Included: ₹1,000 typed is ₹1,000 paid. Added: ₹1,000 typed is ₹1,000 plus GST paid. Saroh does not choose for the business.
+- **The customer sees the GST before paying.** Under "added", the booking page, product page, bag and checkout show the price, the GST and the amount to pay.
+- **One sum.** The API works out the charge in one place (`invoices/gst-price.ts`); the sites and the app only format what it returns.
+- **Who can set a rate:** whoever can set the item's price. A rate is part of a price.
+
+## DEC-147 Memberships, class packs and courses charge GST from the next invoice
+
+**Status: Accepted — 2026-10-12, built** · owner ("it should be charging from the new invoices, already added ones wont be edited")
+
+- Plans, class packs and courses carry a GST rate and a price mode, as services and products do (DEC-146).
+- **New invoices only.** An invoice already issued is never edited. A renewal raised after the rate is set carries it, so a member's renewal amount can change under "added"; the plan editor says how many members that reaches.
+- Not built: telling the member beforehand that the renewal amount changes.
+
+## DEC-148 GST is part of the MRP
+
+**Status: Accepted — 2026-10-12, built** · owner ("the GST is part of MRP")
+
+- An MRP includes all taxes. The amount a customer pays for one, GST and all, is never more than the product's MRP.
+- The product editor and the import refuse a price that goes over once GST is added. Switching the whole business to "GST is added" is refused while any product would go over; the sheet names the first few and says how to put each right.
+
+## DEC-149 One figure, one kind; the invoice prints the price as typed
+
+**Status: Accepted — 2026-10-12, built** · owner (confirmed the typed price as the rate on paper; agreed the figures should be consistent)
+
+- **Money taken or expected is the amount to pay.** Sales totals, order totals, what a customer owes: all with GST.
+- **A price being set is the typed price**, with "+ GST" beside it when GST is added. Two figures compared on one screen are the same kind.
+- **On paper under "added", the rate column is the price the business typed**, GST is its own line, and the total is the amount to pay, with "GST is added to these prices."
+- Open, for the accountant: rounding GST per unit or per line, and whether a discount comes off before or after GST.
+
+## DEC-150 Prices keep a history
+
+**Status: Accepted — 2026-10-12, built** · owner ("prices for products should have history… this way merchant can see the rate changes")
+
+- Every change to a price, an MRP, a GST rate or a price mode on a product (and its options), a service or a course is recorded in the transaction that makes it: what it was, what it is, who, when. The item's first entry is what it was created at.
+- The item's own page shows it as "Price history", newest first; nothing is drawn for an item with no history yet. Settings › Activity lists the changes with every other change to the business.
+- History starts from this release. Earlier changes were not recorded and are not invented.
+- The audit action `gst-rate.set` is no longer written; `price.changed` covers it. Rows already written still read.
+
+## DEC-151 A site on its own domain answers there only
+
+**Status: Accepted — 2026-10-12, not built** · owner (chose the redirect over serving both addresses)
+
+- Once a business's own domain is connected and live, its `saroh.app` address redirects to it, path for path, with a temporary redirect (307) so a domain that is later removed leaves nothing cached.
+- Not redirected: test hosts, pay links and previews.
+
+## DEC-152 Bookings: the diary, hours and services each answer one question
+
+**Status: Accepted — 2026-10-12, built** · owner (agreed the audit and a combination of its references)
+
+- **Calendar** shows who is booked when; a short booking keeps to one line and an empty filter offers "Show all".
+- **Availability** is where a person's hours are set, with a preview of the week a customer would see.
+- **A service says what gives it its times** in a card of its own: the people who take it, or its own weekly hours for a class or a service nobody takes yet. It is not under "More settings".
+- A task is finished where it was opened (rows read first, edit in a sheet); no screen sends the merchant elsewhere halfway.
