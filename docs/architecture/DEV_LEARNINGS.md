@@ -4490,7 +4490,7 @@ flagged "Incomplete string escaping" in `bookings-view-switch.test.tsx`.
   `includes`, or write the pattern out.
   **Category**: tests · devops · `docs/patterns/devops-tooling-and-deploy.md`
 
-### 2026-10-12 — A browser test that types in a list's search, then clicks a row at once, loses the click
+## A browser test that types in a list's search, then clicks a row at once, loses the click
 
 **Symptom**: the gate failed `subscriptions.spec.ts` on desk and phone, on
 both tries: the row was clicked and the quick look never opened. By hand the
