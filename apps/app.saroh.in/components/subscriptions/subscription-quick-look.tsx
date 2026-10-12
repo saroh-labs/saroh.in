@@ -26,9 +26,9 @@ import {
     initials,
     keepsLine,
     listTab,
-    longPrice,
     olderPrice,
     pausedText,
+    recurringPrice,
     sortCharges,
     subscriptionPay,
     TAB_LABEL,
@@ -90,7 +90,11 @@ export function SubscriptionQuickLook({
         );
     }
     // What they pay a period, GST and all.
-    const price = longPrice(subscriptionPay(sub), sub.currency, sub.interval);
+    const price = recurringPrice(
+        subscriptionPay(sub),
+        sub.currency,
+        sub.interval,
+    );
     return (
         <QuickLook
             open

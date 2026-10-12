@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GstAsk } from "@/lib/gst/item-words";
 import type { GstOnPrice } from "@/lib/gst/on-price";
 
-import { planCard } from "./plan-cards";
+import { planRow } from "./plan-cards";
 import { glanceRows, planHeader, subscriberRows } from "./plan-detail";
 import type { PlanForm } from "./plan-editor";
 import { glance, priceToPay, whoPays } from "./plan-editor";
@@ -15,7 +15,7 @@ import {
     olderPrice,
     olderPriceNotes,
     payRows,
-    shortPrice,
+    recurringPrice,
     subscriptionPay,
 } from "./view";
 
@@ -136,17 +136,17 @@ describe("what a member pays a period", () => {
     it("GST is added: the row says ₹2,360, not the ₹2,000 that was typed", () => {
         const s = sub("added");
         expect(subscriptionPay(s)).toBe("2360.00");
-        expect(shortPrice(subscriptionPay(s), s.currency, s.interval)).toBe(
-            "₹2,360/mo",
+        expect(recurringPrice(subscriptionPay(s), s.currency, s.interval)).toBe(
+            "₹2,360 a month",
         );
     });
 
     it("prices include GST, and not registered: ₹2,000, as before", () => {
         for (const way of ["included", "unregistered"] as const) {
             const s = sub(way);
-            expect(shortPrice(subscriptionPay(s), s.currency, s.interval)).toBe(
-                "₹2,000/mo",
-            );
+            expect(
+                recurringPrice(subscriptionPay(s), s.currency, s.interval),
+            ).toBe("₹2,000 a month");
         }
     });
 
@@ -280,25 +280,23 @@ describe("keeping an older price", () => {
     });
 });
 
-describe("a plan's card on the Plans tab", () => {
+describe("a plan's row on the Plans tab", () => {
     it("GST is added: the price says + GST, and what it brings in is what members pay", () => {
-        const card = planCard(plan("added"), false);
-        expect(card.price).toBe("₹2,000 / month + GST");
-        expect(card.subscribers).toBe(
-            "5 subscribers · brings in ₹11,210 a month",
-        );
+        const card = planRow(plan("added"), false);
+        expect(card.price).toBe("₹2,000 a month + GST");
+        expect(card.subscribers).toBe(5);
+        expect(card.monthly).toBe("₹11,210");
         expect(card.olderPrices).toEqual([
             "1 still on ₹1,500 + GST, and they keep it",
         ]);
     });
 
-    it("prices include GST, and not registered: the card as before", () => {
+    it("prices include GST, and not registered: the row as before", () => {
         for (const way of ["included", "unregistered"] as const) {
-            const card = planCard(plan(way), false);
-            expect(card.price).toBe("₹2,000 / month");
-            expect(card.subscribers).toBe(
-                "5 subscribers · brings in ₹9,500 a month",
-            );
+            const card = planRow(plan(way), false);
+            expect(card.price).toBe("₹2,000 a month");
+            expect(card.subscribers).toBe(5);
+            expect(card.monthly).toBe("₹9,500");
             expect(card.olderPrices).toEqual([
                 "1 still on ₹1,500, and they keep it",
             ]);
@@ -318,12 +316,12 @@ describe("Plan Detail", () => {
         expect(payRows(plan("added"))).toEqual([
             {
                 label: "4 people · current price",
-                amount: "₹2,360 / month",
+                amount: "₹2,360 a month",
                 older: false,
             },
             {
                 label: "1 person · older price",
-                amount: "₹1,770 / month",
+                amount: "₹1,770 a month",
                 older: true,
             },
         ]);
@@ -335,7 +333,7 @@ describe("Plan Detail", () => {
 
     it("GST is added: each subscriber's row says what they pay", () => {
         const [row] = subscriberRows([sub("added")], plan("added"), NOW);
-        expect(row.price).toBe("₹2,360 / month");
+        expect(row.price).toBe("₹2,360 a month");
         expect(row.olderPrice).toBe(false);
     });
 
@@ -345,12 +343,12 @@ describe("Plan Detail", () => {
                 "₹2,000 every month · 5 people on it",
             );
             expect(payRows(plan(way)).map((r) => r.amount)).toEqual([
-                "₹2,000 / month",
-                "₹1,500 / month",
+                "₹2,000 a month",
+                "₹1,500 a month",
             ]);
             expect(glanceRows(plan(way), null)[1]?.value).toBe("₹9,500");
             const [row] = subscriberRows([sub(way)], plan(way), NOW);
-            expect(row.price).toBe("₹2,000 / month");
+            expect(row.price).toBe("₹2,000 a month");
         }
     });
 });

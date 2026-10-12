@@ -9,21 +9,28 @@ import {
     chargingText,
     classesText,
     collectionRows,
+    defaultView,
     failWhy,
     gstNote,
     headline,
+    inView,
+    listSummary,
     listTab,
+    listViews,
     monthlyTotal,
+    needYou,
     olderPrice,
     olderPriceNotes,
     pausedText,
     payRows,
     paysBy,
     ranLine,
+    recurringPrice,
     retryOffer,
     rowWhen,
     screenTabFromQuery,
-    tabFromQuery,
+    VIEW_LABEL,
+    viewFromQuery,
 } from "./view";
 
 const NOW = new Date("2026-09-18T06:30:00Z");
@@ -96,19 +103,145 @@ describe("listTab", () => {
         );
     });
 
-    it("reads the design's ?tab= and the old ?view=overdue", () => {
-        expect(tabFromQuery("overdue")).toBe("failed");
-        expect(tabFromQuery("paused")).toBe("paused");
-        expect(tabFromQuery("plans")).toBe("active");
-        expect(tabFromQuery(undefined)).toBe("active");
+    it("opens Plans from ?tab=plans, and the subscribers otherwise (D3)", () => {
+        expect(screenTabFromQuery("plans")).toBe("plans");
+        expect(screenTabFromQuery("failed")).toBe("subscribers");
+        expect(screenTabFromQuery("Plans")).toBe("subscribers");
+        expect(screenTabFromQuery(undefined)).toBe("subscribers");
+    });
+});
+
+describe("the list's views", () => {
+    const chase = [sub({ paymentFailed: true }), sub(), sub()];
+    const calm = [sub(), sub({ status: "PAUSED" })];
+
+    it("reads a view someone chose, an older ?tab= and the old ?view=overdue", () => {
+        expect(viewFromQuery("failed")).toBe("failed");
+        expect(viewFromQuery("overdue")).toBe("failed");
+        expect(viewFromQuery("active")).toBe("active");
+        expect(viewFromQuery("paused")).toBe("paused");
+        expect(viewFromQuery("cancelled")).toBe("cancelled");
+        expect(viewFromQuery("all")).toBe("all");
     });
 
-    it("opens Plans from ?tab=plans, and a list tab otherwise (D3)", () => {
-        expect(screenTabFromQuery("plans")).toBe("plans");
-        expect(screenTabFromQuery("failed")).toBe("failed");
-        expect(screenTabFromQuery("overdue")).toBe("failed");
-        expect(screenTabFromQuery("Plans")).toBe("active");
-        expect(screenTabFromQuery(undefined)).toBe("active");
+    it("chooses nothing for an address that says none, so the default opens", () => {
+        expect(viewFromQuery(undefined)).toBeNull();
+        expect(viewFromQuery("plans")).toBeNull();
+        expect(viewFromQuery("archived")).toBeNull();
+    });
+
+    it("opens on who needs the owner when anyone does, else on Active", () => {
+        expect(defaultView(chase)).toBe("failed");
+        expect(defaultView(calm)).toBe("active");
+        expect(defaultView([])).toBe("active");
+    });
+
+    it("lists the views with the one it opens on first", () => {
+        expect(listViews(chase)).toEqual([
+            "failed",
+            "active",
+            "paused",
+            "cancelled",
+            "all",
+        ]);
+        expect(listViews(calm)).toEqual([
+            "active",
+            "failed",
+            "paused",
+            "cancelled",
+            "all",
+        ]);
+    });
+
+    it("names each view, and Need you is the payment failed set", () => {
+        expect(listViews(chase).map((v) => VIEW_LABEL[v])).toEqual([
+            "Need you",
+            "Active",
+            "Paused",
+            "Cancelled",
+            "All subscriptions",
+        ]);
+        const failed = sub({ status: "PAUSED", paymentFailed: true });
+        expect(inView(failed, "failed")).toBe(true);
+        expect(inView(failed, "paused")).toBe(false);
+        expect(inView(failed, "all")).toBe(true);
+        expect(inView(sub(), "active")).toBe(true);
+    });
+});
+
+describe("the header's summary", () => {
+    const unpaid = (total: string, over: Partial<Subscription> = {}) =>
+        sub({ paymentFailed: true, unpaidTotal: total, ...over });
+
+    it("leads with who needs the owner and the invoices unpaid", () => {
+        const subs = [unpaid("900.00"), unpaid("1800.50"), sub(), sub()];
+        expect(needYou(subs)).toEqual({
+            count: 2,
+            unpaid: { amount: 2700.5, currency: "INR" },
+        });
+        expect(listSummary(subs)).toEqual({
+            lead: "2 need you · ₹2,700.50 unpaid",
+            rest: "2 active · about ₹2,400 a month",
+        });
+    });
+
+    it("says one needs you, not one need you", () => {
+        expect(listSummary([unpaid("900.00")]).lead).toBe(
+            "1 needs you · ₹900 unpaid",
+        );
+    });
+
+    it("sums only the unpaid invoices of those who need the owner", () => {
+        // An active one with an invoice not yet due is not chased.
+        const subs = [unpaid("900.00"), sub({ unpaidTotal: "1200.00" })];
+        expect(needYou(subs).unpaid).toEqual({ amount: 900, currency: "INR" });
+    });
+
+    it("invents no amount where the read gives none", () => {
+        expect(listSummary([unpaid("0.00"), sub()]).lead).toBe("1 needs you");
+    });
+
+    it("says the amount in the currency most of them are in", () => {
+        const subs = [
+            unpaid("900.00"),
+            unpaid("900.00"),
+            unpaid("50.00", { currency: "USD" }),
+        ];
+        expect(needYou(subs)).toEqual({
+            count: 3,
+            unpaid: { amount: 1800, currency: "INR" },
+        });
+    });
+
+    it("reads as before when nobody needs the owner", () => {
+        expect(listSummary([sub(), sub({ status: "PAUSED" })])).toEqual({
+            lead: null,
+            rest: "1 active · about ₹1,200 a month",
+        });
+        expect(listSummary([sub({ status: "PAUSED" })])).toEqual({
+            lead: null,
+            rest: "0 active",
+        });
+    });
+});
+
+describe("recurringPrice", () => {
+    it("says an amount that recurs in one form, for every interval", () => {
+        expect(recurringPrice("900.00", "INR", "MONTH")).toBe("₹900 a month");
+        expect(recurringPrice("250.00", "INR", "WEEK")).toBe("₹250 a week");
+        expect(recurringPrice("2700.00", "INR", "QUARTER")).toBe(
+            "₹2,700 a quarter",
+        );
+        expect(recurringPrice("12000.00", "INR", "YEAR")).toBe(
+            "₹12,000 a year",
+        );
+    });
+
+    it("keeps the short form for a narrow column", () => {
+        expect(recurringPrice("900.00", "INR", "MONTH", true)).toBe("₹900/mo");
+        expect(recurringPrice("12000.00", "INR", "YEAR", true)).toBe(
+            "₹12,000/yr",
+        );
     });
 });
 
@@ -203,12 +336,12 @@ describe("a plan's words (D1)", () => {
         expect(payRows({ byPrice })).toEqual([
             {
                 label: "12 people · current price",
-                amount: "₹1,500 / month",
+                amount: "₹1,500 a month",
                 older: false,
             },
             {
                 label: "1 person · older price",
-                amount: "₹1,200 / month",
+                amount: "₹1,200 a month",
                 older: true,
             },
         ]);

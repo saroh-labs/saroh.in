@@ -28,13 +28,19 @@ import {
  *
  * The page's read is the list: saving refreshes it, so the count goes down
  * and the notice leaves by itself once the last rate is chosen.
+ *
+ * `also` is one more sentence after the line, for a screen that can say
+ * which things the count means (the Plans tab: how many of the plans are
+ * archived ones people are still on). Left out, the words are as they were.
  */
 export function MissingRatesNotice({
     missing,
     className,
+    also,
 }: {
     missing: MissingRates | null;
     className?: string;
+    also?: string | null;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -65,6 +71,7 @@ export function MissingRatesNotice({
                 }
             >
                 {line}
+                {also ? ` ${also}` : null}
             </Notice>
             <GstRatesSheet
                 rows={open ? missing.items : null}

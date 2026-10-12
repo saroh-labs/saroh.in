@@ -435,13 +435,20 @@
     locations list, and everything `ListCard` draws (Providers,
     Notifications, Follow-ups, Website pages, posts and forms). Orders'
     grid already matched and keeps its own row. Not tables, and left as
-    they are: card grids (Class packs, Collections, plan cards,
+    they are: card grids (Class packs, Collections,
     the Pipeline board), Stock's Checks (a card per check, with its
     actions) and a settings matrix (Your profile's alerts). Services
     left the card grids on 12 Oct 2026: it is `DataView` rows, with no
     search or filter (a business has a handful), and a "Taking bookings"
     `SwitchRow` as each row's action. What is true of several rows is
-    said once above the list, never on every row. Stock's
+    said once above the list, never on every row. Subscriptions followed
+    the same day: Subscribers and Plans are both `DataView` rows, each
+    with its views as the one dropdown (`?view=`) and a search. Subscribers
+    opens on who needs the owner when anyone does (`listViews` in
+    `lib/subscriptions/view.ts` puts that view first, and the header
+    leads with it), and a plan's Archive and Sell again are in its row's
+    menu. What is set once for every plan is a group of read-first rows
+    under the list (`components/subscriptions/plan-settings.tsx`). Stock's
     three lists (Levels, Log, Checks) end with `ListPaging`, each with its
     own page and size in the address (`lib/stock/list-query.ts`); Levels
     pages by product, so its footer counts products, not rows. A list
@@ -820,6 +827,12 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
       `formatNumber(1204)` is "1,204". The sign and the decimal places are
       `moneySign` and `moneyDecimals` from `@saroh/ui/lib/money`, the same
       ones `MoneyInput` shows and keeps.
+    - **An amount that recurs** (12 Oct 2026) is said one way in running
+      text and cells: "₹900 a month", "₹12,000 a year"
+      (`recurringPrice` in `lib/subscriptions/view.ts`). Never "₹900 /
+      month" or "per month" beside it. The short "₹900/mo" is its
+      `narrow` form, only for a column that is narrow on a phone (a
+      customer's Plan tab).
     - **A day** (`datetime.ts`): `formatDate(at, zone)` is "12 Oct" this
       year and "12 Oct 2025" otherwise. Options add the weekday ("Mon 12
       Oct"), the long month, `relative` ("Today", "Tomorrow", "Yesterday";

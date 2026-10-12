@@ -171,6 +171,36 @@ describe("the missing GST rates notice", () => {
         expect(sheet()).toBeNull();
     });
 
+    it("adds a screen's own sentence after the line, and keeps its words without one", () => {
+        act(() =>
+            root.render(
+                <MissingRatesNotice
+                    missing={MISSING}
+                    also="1 of the plans is archived, with members still on it."
+                />,
+            ),
+        );
+        expect(host.querySelector('[role="note"]')?.textContent).toBe(
+            "1 service and 1 product have no GST rate. Until you choose one, their tax invoices show no GST. 1 of the plans is archived, with members still on it.Choose rates",
+        );
+        act(() =>
+            root.render(<MissingRatesNotice missing={MISSING} also={null} />),
+        );
+        expect(host.querySelector('[role="note"]')?.textContent).toBe(
+            "1 service and 1 product have no GST rate. Until you choose one, their tax invoices show no GST.Choose rates",
+        );
+        // Nothing missing: the sentence alone is never drawn.
+        act(() =>
+            root.render(
+                <MissingRatesNotice
+                    missing={{ registered: true, items: [], more: false }}
+                    also="1 of the plans is archived, with members still on it."
+                />,
+            ),
+        );
+        expect(host.textContent).toBe("");
+    });
+
     it("opens a sheet with a row each, read first: its kind and its price", async () => {
         show(MISSING);
         await press("Choose rates");

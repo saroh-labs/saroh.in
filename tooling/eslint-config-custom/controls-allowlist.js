@@ -161,8 +161,6 @@ export const RAW_ALLOWED = {
     "components/sites/style-panel.tsx": ["input"],
     // input: a file picker
     "components/stores/csv-import.tsx": ["input"],
-    // button: a row or card that is one button
-    "components/subscriptions/subscription-row.tsx": ["button"],
     // input: a native radio inside its card; label: a radio card with a timeline in it
     "components/subscriptions/timing-card.tsx": ["input", "label"],
 };
