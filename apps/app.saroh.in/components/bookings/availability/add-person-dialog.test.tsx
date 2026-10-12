@@ -11,11 +11,12 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AddPersonDialog } from "./add-person-dialog";
+import { AddPersonDialog, weekSentence } from "./add-person-dialog";
 
+// The action that adds them with the opening hours as their week.
 const createStaff = vi.fn();
 vi.mock("@/lib/staff/actions", () => ({
-    createStaff: (...a: unknown[]) => createStaff(...a) as unknown,
+    addPerson: (...a: unknown[]) => createStaff(...a) as unknown,
 }));
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -30,7 +31,15 @@ let host: HTMLDivElement;
 let root: Root;
 const onAdded = vi.fn();
 
-function Harness({ hoursHint }: { hoursHint?: string }) {
+function Harness({
+    hoursHint,
+    week,
+    seatNote,
+}: {
+    hoursHint?: string;
+    week?: "opening" | "default";
+    seatNote?: string | null;
+}) {
     const [open, setOpen] = useState(false);
     return (
         <>
@@ -42,6 +51,8 @@ function Harness({ hoursHint }: { hoursHint?: string }) {
                 onOpenChange={setOpen}
                 onAdded={onAdded}
                 hoursHint={hoursHint}
+                week={week}
+                seatNote={seatNote}
             />
         </>
     );
@@ -71,6 +82,10 @@ const button = (name: string) =>
     Array.from(
         dialog()?.querySelectorAll<HTMLButtonElement>("button") ?? [],
     ).find((b) => b.textContent === name);
+const dialogSays = () => {
+    const id = dialog()?.getAttribute("aria-describedby");
+    return id ? document.getElementById(id)?.textContent : undefined;
+};
 const fields = () =>
     Array.from(dialog()?.querySelectorAll<HTMLInputElement>("input") ?? []);
 
@@ -146,6 +161,44 @@ describe("Add someone who takes bookings", () => {
         );
         expect(onAdded).toHaveBeenCalledWith("st_asha");
         expect(refresh).toHaveBeenCalled();
+    });
+
+    it("says they start with the opening hours, and nothing about seats", async () => {
+        act(() => root.render(<Harness week="opening" />));
+        await press(opener());
+        expect(dialogSays()).toBe(
+            "They start with your opening hours. Change their hours any time. They don't need a sign-in.",
+        );
+        expect(dialogSays()).not.toMatch(/seat|empty/);
+    });
+
+    it("says the default week when the business has no opening hours", async () => {
+        act(() => root.render(<Harness week="default" />));
+        await press(opener());
+        expect(dialogSays()).toBe(
+            "They start with Monday to Saturday, 9:00 am to 6:00 pm. Change their hours any time. They don't need a sign-in.",
+        );
+    });
+
+    it("says both when the opener can't tell which (the calendar)", () => {
+        expect(weekSentence()).toBe(
+            "They start with your opening hours, or Monday to Saturday, 9:00 am to 6:00 pm if you haven't set any. Change their hours any time. They don't need a sign-in.",
+        );
+    });
+
+    it("mentions the seat only when the plan counts seats", async () => {
+        act(() =>
+            root.render(
+                <Harness
+                    week="opening"
+                    seatNote="They use a team seat: 2 of 3 are taken."
+                />,
+            ),
+        );
+        await press(opener());
+        expect(dialogSays()).toMatch(
+            /They use a team seat: 2 of 3 are taken\.$/,
+        );
     });
 
     it("drops what was typed on Cancel, and goes back to the button", async () => {

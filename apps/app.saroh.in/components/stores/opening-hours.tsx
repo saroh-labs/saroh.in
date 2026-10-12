@@ -30,12 +30,7 @@ const DAYS: { key: Weekday; label: string }[] = [
 ];
 
 /** A week to start from when a shop has never saved one. */
-export const DEFAULT_WEEK: OpeningHoursDay[] = DAYS.map(({ key }) => ({
-    day: key,
-    open: "09:00",
-    close: "18:00",
-    closed: key === "SUN",
-}));
+export { DEFAULT_WEEK } from "@/lib/stores/default-week";
 
 const PRESETS: { label: string; days: Weekday[] }[] = [
     { label: "Mon to Fri", days: ["MON", "TUE", "WED", "THU", "FRI"] },
