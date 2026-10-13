@@ -11,10 +11,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PlansData } from "@/components/plans/plans-context";
 import type { AdminPricing } from "@/lib/pricing-types";
-import { ASHA, fakeDraft, fakePricing, RAVI } from "@/test/pricing-fixture";
+import {
+    ASHA,
+    fakeCatalog,
+    fakeDraft,
+    fakePricing,
+    fakeVersion,
+    RAVI,
+} from "@/test/pricing-fixture";
 
 import { AUTOSAVE_MS, useDraft } from "./draft-store";
 import { PlansShell } from "./plans-shell";
+import { RETURN_REFRESH_MS, WAITING_REFRESH_MS } from "./use-page-return";
 
 const actions = vi.hoisted(() => ({
     savePricingDraftAction: vi.fn(),
@@ -25,9 +33,12 @@ const actions = vi.hoisted(() => ({
 vi.mock("@/lib/pricing-actions", () => actions);
 
 const refresh = vi.fn();
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh, replace: vi.fn(), push: vi.fn() }),
-}));
+// One router for every render, as Next's is.
+const router = { refresh, replace: vi.fn(), push: vi.fn() };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
+const reloadPage = vi.hoisted(() => vi.fn());
+vi.mock("./reload-page", () => ({ reloadPage }));
 
 // The Plans tab is U7's; here it is one button that edits the draft the way
 // a field would, so the shell's own behaviour can be driven.
@@ -111,6 +122,8 @@ describe("the status bar", () => {
         expect(actions.savePricingDraftAction.mock.calls[0]?.[0]).toMatchObject(
             {
                 revision: 0,
+                // The version it copied, so the API can refuse a stale one.
+                baseVersion: 1,
             },
         );
         expect(screen.getByText("Saved")).toBeTruthy();
@@ -333,9 +346,11 @@ describe("an instance with no pricing yet", () => {
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
         const sent = actions.savePricingDraftAction.mock.calls[0]?.[0] as {
             revision: number;
+            baseVersion: number | null;
             catalog: { plans: { pricePaise: number }[] };
         };
         expect(sent.revision).toBe(0);
+        expect(sent.baseVersion).toBeNull();
         expect(sent.catalog.plans.length).toBeGreaterThan(1);
         expect(sent.catalog.plans.every((p) => p.pricePaise === 0)).toBe(true);
     });
@@ -383,5 +398,442 @@ describe("an instance with no pricing yet", () => {
         expect(
             screen.queryByRole("button", { name: "Start blank" }),
         ).toBeNull();
+    });
+});
+
+/** Version 2 is published over version 1, with Plan B's price changed. */
+function withVersion2(status: "live" | "waiting" = "live"): AdminPricing {
+    const catalog = fakeCatalog();
+    catalog.plans = catalog.plans.map((p) =>
+        p.id === "b" ? { ...p, pricePaise: 33_300 } : p,
+    );
+    return fakePricing({
+        now: "2026-10-04T00:00:00.000Z",
+        liveVersion: status === "live" ? 2 : 1,
+        versions: [
+            fakeVersion({ version: 2, status, catalog }),
+            fakeVersion({
+                version: 1,
+                status: status === "live" ? "earlier" : "live",
+            }),
+        ],
+    });
+}
+
+const saved = (revision: number, baseVersion: number | null = 1) => ({
+    ok: true,
+    data: {
+        revision,
+        baseVersion,
+        createdAt: "2026-10-03T10:00:00.000Z",
+        updatedAt: "2026-10-03T10:00:00.000Z",
+        valid: true,
+        errors: [],
+        changes: [],
+    },
+});
+
+describe("a version published while the page sat open", () => {
+    it("edits from a version waiting for billing, not the live one under it", async () => {
+        actions.savePricingDraftAction.mockResolvedValue(saved(1, 2));
+        render(
+            <PlansShell
+                data={data({}, withVersion2("waiting"))}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        // Version 1 is live, and the editor shows and copies version 2.
+        expect(screen.getByText("Version 1")).toBeTruthy();
+        expect(
+            screen.getByText("What you see and edit below is version 2."),
+        ).toBeTruthy();
+        expect(screen.getByText("Price of Plan B: 33300")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        const sent = actions.savePricingDraftAction.mock.calls[0]?.[0] as {
+            baseVersion: number;
+            catalog: { plans: { id: string; pricePaise: number }[] };
+        };
+        expect(sent.baseVersion).toBe(2);
+        expect(sent.catalog.plans[1]?.pricePaise).toBe(33_300 + 11_100);
+    });
+
+    it("keeps a refused start on screen, says which version is newer and what was changed", async () => {
+        actions.savePricingDraftAction.mockResolvedValue({
+            ok: false,
+            status: 409,
+            error: "Version 2 has been published since this page was opened.",
+            details: {
+                revision: null,
+                updatedBy: null,
+                updatedAt: null,
+                newestVersion: 2,
+                baseVersion: 1,
+            },
+        });
+        // This page was read while version 1 was the newest.
+        const view = render(
+            <PlansShell data={data()} impact={null} tab="plans" />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+
+        expect(actions.savePricingDraftAction.mock.calls[0]?.[0]).toMatchObject(
+            { revision: 0, baseVersion: 1 },
+        );
+        expect(
+            screen.getByText(
+                "Version 2 was published since you opened this page, so your changes weren't saved. Reload to start from version 2.",
+            ),
+        ).toBeTruthy();
+        // The edit is still on screen, and the page is read again.
+        expect(screen.getByText("Price of Plan B: 22200")).toBeTruthy();
+        expect(refresh).toHaveBeenCalledTimes(1);
+
+        // That read arrives: the edit stays, with what it had changed.
+        view.rerender(
+            <PlansShell
+                data={data({}, withVersion2())}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        expect(screen.getByText("Price of Plan B: 22200")).toBeTruthy();
+        const notice = screen.getByRole("alert");
+        expect(notice.textContent).toContain(
+            "Version 2 was published after you started these changes from version 1, so they weren't saved.",
+        );
+        expect(
+            within(
+                screen.getByRole("list", { name: "Your changes" }),
+            ).getAllByRole("listitem"),
+        ).toHaveLength(1);
+
+        // Nothing more is saved over version 2.
+        fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS * 2));
+        expect(actions.savePricingDraftAction).toHaveBeenCalledTimes(1);
+
+        // Start again: the next edit copies version 2.
+        fireEvent.click(
+            screen.getByRole("button", { name: "Start again from version 2" }),
+        );
+        expect(refresh).toHaveBeenCalledTimes(2);
+        view.rerender(
+            <PlansShell
+                data={data(
+                    {},
+                    {
+                        ...withVersion2(),
+                        now: "2026-10-04T00:01:00.000Z",
+                    },
+                )}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(screen.getByText("Price of Plan B: 33300")).toBeTruthy();
+        actions.savePricingDraftAction.mockResolvedValue(saved(1, 2));
+        fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        expect(
+            actions.savePricingDraftAction.mock.calls.at(-1)?.[0],
+        ).toMatchObject({ revision: 0, baseVersion: 2 });
+    });
+
+    it("says a saved draft was overtaken, and why it can't be published", () => {
+        render(
+            <PlansShell
+                data={data(
+                    {},
+                    { ...withVersion2(), draft: fakeDraft({ baseVersion: 1 }) },
+                )}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        expect(screen.getByRole("alert").textContent).toContain(
+            "Version 2 was published after this draft was started from version 1. Publishing the draft would undo that, so it can't be published.",
+        );
+        // A saved draft is thrown away with Discard, not from the notice.
+        expect(
+            screen.queryByRole("button", { name: /^Start again/ }),
+        ).toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Discard draft" }),
+        ).toBeTruthy();
+    });
+});
+
+describe("coming back to the page", () => {
+    const back = (event: Event, target: EventTarget = window) =>
+        act(() => {
+            target.dispatchEvent(event);
+        });
+
+    it("reads the page again on focus, and takes a newer version when nothing is unsaved", () => {
+        const view = render(
+            <PlansShell data={data()} impact={null} tab="plans" />,
+        );
+        vi.advanceTimersByTime(RETURN_REFRESH_MS);
+        back(new Event("focus"));
+        expect(refresh).toHaveBeenCalledTimes(1);
+        // Focus and visibility arrive together: one read answers both.
+        back(new Event("visibilitychange"), document);
+        expect(refresh).toHaveBeenCalledTimes(1);
+
+        view.rerender(
+            <PlansShell
+                data={data({}, withVersion2())}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        expect(screen.getByText("Version 2")).toBeTruthy();
+        expect(screen.getByText("Price of Plan B: 33300")).toBeTruthy();
+    });
+
+    it("warns instead of taking the read when an edit isn't saved", async () => {
+        actions.savePricingDraftAction.mockResolvedValue({
+            ok: false,
+            status: 500,
+            error: "The draft could not be saved.",
+        });
+        const view = render(
+            <PlansShell data={data()} impact={null} tab="plans" />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        vi.advanceTimersByTime(RETURN_REFRESH_MS);
+        back(new Event("focus"));
+        expect(refresh).toHaveBeenCalledTimes(1);
+
+        view.rerender(
+            <PlansShell
+                data={data({}, withVersion2())}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        // The unsaved edit is still what is on screen.
+        expect(screen.getByText("Price of Plan B: 22200")).toBeTruthy();
+        expect(
+            screen.getByText(
+                /^Version 2 was published after you started these changes from version 1/,
+            ),
+        ).toBeTruthy();
+    });
+
+    it("doesn't read while a save is about to go", () => {
+        actions.savePricingDraftAction.mockResolvedValue(saved(1));
+        render(<PlansShell data={data()} impact={null} tab="plans" />);
+        vi.advanceTimersByTime(RETURN_REFRESH_MS);
+        fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
+        back(new Event("focus"));
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("loads the page again when the browser's Back restores it", () => {
+        render(<PlansShell data={data()} impact={null} tab="plans" />);
+        const shown = new Event("pageshow");
+        Object.defineProperty(shown, "persisted", { value: true });
+        back(shown);
+        expect(reloadPage).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps looking while a version waits for billing", () => {
+        render(
+            <PlansShell
+                data={data({}, withVersion2("waiting"))}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        act(() => {
+            vi.advanceTimersByTime(WAITING_REFRESH_MS);
+        });
+        expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("doesn't take a read that left before the last save landed", async () => {
+        actions.savePricingDraftAction.mockResolvedValue(saved(1));
+        const view = render(
+            <PlansShell data={data()} impact={null} tab="plans" />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Change Plan B" }));
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        expect(screen.getByText(/^Draft ·/)).toBeTruthy();
+
+        // Read at 00:00 on the 3rd, before the save at 10:00: no draft yet.
+        view.rerender(
+            <PlansShell
+                data={data({}, { ...fakePricing() })}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        expect(screen.getByText(/^Draft ·/)).toBeTruthy();
+        expect(screen.getByText("Price of Plan B: 22200")).toBeTruthy();
+    });
+});
+
+describe("Save draft", () => {
+    const button = (name: string) => screen.getByRole("button", { name });
+
+    it("isn't there with no draft and nothing edited", () => {
+        render(<PlansShell data={data()} impact={null} tab="plans" />);
+        expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Saved" })).toBeNull();
+    });
+
+    it("saves now, says Saving… on the way, then Saved and when", async () => {
+        let land: (value: unknown) => void = () => undefined;
+        actions.savePricingDraftAction.mockReturnValue(
+            new Promise((resolve) => {
+                land = resolve;
+            }),
+        );
+        render(<PlansShell data={data()} impact={null} tab="plans" />);
+        fireEvent.click(button("Change Plan B"));
+        expect(screen.getByText("Not saved yet")).toBeTruthy();
+
+        // Pressed before the autosave's pause is over.
+        await act(async () => {
+            fireEvent.click(button("Save draft"));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(actions.savePricingDraftAction).toHaveBeenCalledTimes(1);
+        expect(button("Saving…").hasAttribute("disabled")).toBe(true);
+
+        await act(async () => {
+            land(saved(1));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(button("Saved").hasAttribute("disabled")).toBe(true);
+        expect(screen.getByText(/^Saved 3 Oct, /)).toBeTruthy();
+        // The pause's own save has nothing left to send.
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS * 2));
+        expect(actions.savePricingDraftAction).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a failed save to Not saved and Try again, and can be pressed again", async () => {
+        actions.savePricingDraftAction
+            .mockResolvedValueOnce({
+                ok: false,
+                status: 500,
+                error: "The draft could not be saved.",
+            })
+            .mockResolvedValueOnce(saved(1));
+        render(<PlansShell data={data()} impact={null} tab="plans" />);
+        fireEvent.click(button("Change Plan B"));
+        await act(async () => {
+            fireEvent.click(button("Save draft"));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        // One error, in the place it always was.
+        expect(screen.getAllByRole("alert")).toHaveLength(1);
+        expect(screen.getByText(/The draft could not be saved\./)).toBeTruthy();
+        expect(button("Try again")).toBeTruthy();
+
+        await act(async () => {
+            fireEvent.click(button("Save draft"));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(actions.savePricingDraftAction).toHaveBeenCalledTimes(2);
+        expect(button("Saved")).toBeTruthy();
+    });
+
+    it("can't be pressed over someone else's save", async () => {
+        actions.savePricingDraftAction.mockResolvedValue({
+            ok: false,
+            status: 409,
+            error: "Ravi saved the draft since.",
+            details: { revision: 5, updatedBy: RAVI, updatedAt: null },
+        });
+        render(
+            <PlansShell
+                data={data({}, fakePricing({ draft: fakeDraft() }))}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        fireEvent.click(button("Change Plan B"));
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        expect(button("Reload draft")).toBeTruthy();
+        expect(
+            screen
+                .getAllByRole("button")
+                .filter((b) =>
+                    /^(Save draft|Saved|Saving…)$/.test(b.textContent),
+                )
+                .every((b) => b.hasAttribute("disabled")),
+        ).toBe(true);
+    });
+
+    it("isn't offered without pricing:edit", () => {
+        render(
+            <PlansShell
+                data={data(
+                    {
+                        access: {
+                            canEdit: false,
+                            canPublish: false,
+                            canManageCoupons: false,
+                        },
+                    },
+                    fakePricing({ draft: fakeDraft() }),
+                )}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        expect(screen.queryByRole("button", { name: "Saved" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
+    });
+
+    it("is what the editor opens on next time: the server's draft, as saved", async () => {
+        actions.savePricingDraftAction.mockResolvedValue(saved(1));
+        const first = render(
+            <PlansShell data={data()} impact={null} tab="plans" />,
+        );
+        fireEvent.click(button("Change Plan B"));
+        await act(async () => {
+            fireEvent.click(button("Save draft"));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        const sent = actions.savePricingDraftAction.mock.calls[0]?.[0] as {
+            catalog: unknown;
+        };
+        first.unmount();
+
+        // The page is opened again (a reload, another tab, a return): it
+        // reads the draft the API was sent.
+        render(
+            <PlansShell
+                data={data(
+                    {},
+                    fakePricing({
+                        now: "2026-10-03T11:00:00.000Z",
+                        draft: fakeDraft({
+                            catalog: sent.catalog,
+                            revision: 1,
+                            baseVersion: 1,
+                            updatedAt: "2026-10-03T10:00:00.000Z",
+                            updatedBy: ASHA,
+                            editors: [ASHA],
+                        }),
+                    }),
+                )}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        expect(screen.getByText("Price of Plan B: 22200")).toBeTruthy();
+        expect(screen.getByText(/^Draft ·/)).toBeTruthy();
+        expect(button("Saved").hasAttribute("disabled")).toBe(true);
+        expect(screen.getByText(/^Saved 3 Oct, /)).toBeTruthy();
     });
 });

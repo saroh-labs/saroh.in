@@ -34,12 +34,15 @@ const PATH = "/plans";
 
 /**
  * Save the whole draft. `revision` is the one the editor started from; 0
- * starts a draft. Not revalidated: the editor already holds what it sent,
- * and a re-render mid-typing would fight the field under the cursor.
+ * starts a draft, and then `baseVersion` is the version the editor copied
+ * (null with nothing published). Not revalidated: the editor already holds
+ * what it sent, and a re-render mid-typing would fight the field under the
+ * cursor.
  */
 export async function savePricingDraftAction(input: {
     catalog: unknown;
     revision: number;
+    baseVersion?: number | null;
     idempotencyKey: string;
 }): Promise<ControlPlaneResult<DraftSaved>> {
     return adminWrite<DraftSaved>(

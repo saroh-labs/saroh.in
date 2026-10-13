@@ -242,11 +242,15 @@ export function PublishPanel({
                         idempotencyKey,
                     });
                     if (!r.ok) {
+                        // Refused for what changed elsewhere (a newer
+                        // version, another save): show the page as it is.
+                        if (r.status === 409) draft.refresh();
                         return {
                             ok: false,
                             error: refusalText(r.error, r.details),
                         };
                     }
+                    draft.published();
                     setNote("");
                     setPolicy(null);
                     setWhen("now");
