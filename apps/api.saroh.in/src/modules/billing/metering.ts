@@ -64,6 +64,14 @@ export const METERED_LIMIT_KEYS = [
 ] as const;
 export type MeteredLimitKey = (typeof METERED_LIMIT_KEYS)[number];
 
+/**
+ * The limit keys capped inside one thing, in `MODULE_MAP`'s words (DEC-158).
+ * Never metered: no count across the business exists for them. Their rule
+ * is `item-limits.ts`.
+ */
+export const ITEM_LIMIT_KEYS = ["variantsPerProduct"] as const;
+export type ItemLimitKey = (typeof ITEM_LIMIT_KEYS)[number];
+
 const METERED: ReadonlySet<string> = new Set(METERED_LIMIT_KEYS);
 
 export function isMeteredLimitKey(key: unknown): key is MeteredLimitKey {

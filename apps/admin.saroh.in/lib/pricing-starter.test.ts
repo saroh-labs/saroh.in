@@ -69,10 +69,10 @@ describe("rows the product knows by id (DEC-158)", () => {
             pricing: "hidden",
         });
         // A cell for every plan of THIS catalogue, each with no limit.
-        expect(Object.keys(row?.cells ?? {}).sort()).toEqual(
+        expect(Object.keys(row.cells).sort()).toEqual(
             c.plans.map((p) => p.id).sort(),
         );
-        for (const cell of Object.values(row?.cells ?? {})) {
+        for (const cell of Object.values(row.cells)) {
             expect(cell).toMatchObject({ inc: true, limit: null });
         }
         expect(validateCatalog(c).ok).toBe(true);

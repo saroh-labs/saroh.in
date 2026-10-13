@@ -22,14 +22,19 @@
  * The row is a limit and never a lock: a cell that leaves it out, like a
  * version with no such row, caps nothing.
  */
+import { ForbiddenException } from "@nestjs/common";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
-import { limitWithin, MODULE_MAP } from "@saroh/pricing-catalog";
+import {
+    itemLimitNotice,
+    LIMIT_WORDS,
+    limitWithin,
+    MODULE_MAP,
+} from "@saroh/pricing-catalog";
 
-import { itemLimitReached } from "./plan-limit-errors";
-
-/** The limit keys capped inside one thing, in `MODULE_MAP`'s words. */
-export const ITEM_LIMIT_KEYS = ["variantsPerProduct"] as const;
-export type ItemLimitKey = (typeof ITEM_LIMIT_KEYS)[number];
+import type { ItemLimitKey } from "./metering";
+import { ITEM_LIMIT_KEYS } from "./metering";
+import type { PlanLimitDetails } from "./plan-limit-errors";
+import { PLAN_LIMIT_REACHED, upgradeOf } from "./plan-limit-errors";
 
 const ITEM: ReadonlySet<string> = new Set(ITEM_LIMIT_KEYS);
 
@@ -74,4 +79,43 @@ export function assertItemRoom(
     if (!cap || adding <= 0) return;
     if (has + adding <= cap.limit) return;
     throw itemLimitReached(cap, has, stopped);
+}
+
+/**
+ * 403: the write would take one thing past the plan's cap on what it
+ * holds. The same `PLAN_LIMIT_REACHED` shape as a count across the
+ * business (`plan-limit-errors.ts`), so the app shows its usual notice;
+ * the words are the per-item ones (`itemLimitNotice`), which never speak
+ * of a total.
+ */
+export function itemLimitReached(
+    cap: ItemCap,
+    has: number,
+    stopped?: string,
+): ForbiddenException {
+    const { row, key, limit } = cap;
+    const words = LIMIT_WORDS[key];
+    const notice = itemLimitNotice(
+        { ...row, limit },
+        has,
+        words.what,
+        words.paused,
+        stopped,
+    ) ?? {
+        title: `You've reached your ${words.what} limit on ${row.plan}`,
+        body: stopped ?? words.paused,
+        cta: "See your plan",
+    };
+    const details: PlanLimitDetails = {
+        code: PLAN_LIMIT_REACHED,
+        moduleId: row.moduleId,
+        limitKey: key,
+        limit,
+        used: has,
+        per: row.per,
+        plan: { id: row.planId, name: row.plan },
+        upgradeTo: upgradeOf(row),
+        notice,
+    };
+    return new ForbiddenException({ message: notice.title, details });
 }

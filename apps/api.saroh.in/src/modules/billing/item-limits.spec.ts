@@ -24,14 +24,15 @@ import type { FeatureFlagService } from "../feature-flags/feature-flags.service"
 import { moduleAccessViews } from "./catalogue-access";
 import type { CatalogueAccessService } from "./catalogue-access.service";
 import type { ItemCap } from "./item-limits";
-import {
-    assertItemRoom,
-    ITEM_LIMIT_KEYS,
-    itemCapOf,
-    itemKeyOf,
-} from "./item-limits";
+import { assertItemRoom, itemCapOf, itemKeyOf } from "./item-limits";
 import type { MeterDb } from "./metering";
-import { meteredKeyOf, meteredModules, usageByModule } from "./metering";
+import {
+    ITEM_LIMIT_KEYS,
+    isMeteredLimitKey,
+    meteredKeyOf,
+    meteredModules,
+    usageByModule,
+} from "./metering";
 import { MeteringService, rowGate } from "./metering.service";
 
 const now = new Date("2026-10-13T06:00:00Z");
@@ -91,6 +92,9 @@ describe("which rows cap inside one thing", () => {
 
     it("is never a meter: no count, no usage, no gate of its own", async () => {
         expect(meteredKeyOf("variants")).toBeNull();
+        for (const key of ITEM_LIMIT_KEYS) {
+            expect(isMeteredLimitKey(key)).toBe(false);
+        }
         expect([...meteredModules().keys()]).not.toContain("variants");
         // Nothing is read for it, so the access view's `usage` is null:
         // no "used X of Y", no 80% notice, nothing to be over in total.
