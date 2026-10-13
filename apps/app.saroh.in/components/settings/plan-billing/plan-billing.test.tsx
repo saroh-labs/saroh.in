@@ -72,6 +72,29 @@ describe("PlanChooser", () => {
         expect(html).toContain("Keep Plan B");
         expect(html).not.toContain("trial");
     });
+
+    it("says nothing of yearly when the catalogue has no yearly billing", () => {
+        const draw = (
+            yearly: { on: false } | { on: true; freeMonths: number },
+        ) =>
+            renderToStaticMarkup(
+                <PlanChooser
+                    rows={{ month: rows, year: rows }}
+                    yearly={yearly}
+                    initialCycle="month"
+                    canChange
+                    addons={null}
+                    currentPlan="Plan B"
+                />,
+            );
+        expect(draw({ on: false })).toContain(
+            "Plans are paid monthly by autopay, for 12 months.",
+        );
+        expect(draw({ on: false })).not.toMatch(/yearly/i);
+        expect(draw({ on: true, freeMonths: 2 })).toContain(
+            "yearly is one payment",
+        );
+    });
 });
 
 describe("CheckoutPending", () => {
