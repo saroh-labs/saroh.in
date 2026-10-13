@@ -1870,3 +1870,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **One exception to "no scheduled deploys" (DEC-107), once.** Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026 only: the first starts early, waits for the instant and deploys every app; the second deploys only what is still unopened. Both do nothing in another year and are deleted after launch. The rule stands for everything else.
 - Plans show in the workspace at launch, which DEC-136 left open.
 - Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.
+
+## DEC-157 An add-on is priced and capped for the plans it names
+
+**Status: Accepted — 2026-10-13, built** · owner (packs and extra seats cost differently on each plan, and each plan has its own ceiling on how many can be held)
+
+- An add-on in the catalogue may name the plans it is offered on (`plans`) and the most of it one business may hold (`max`). Naming no plan means every plan, and no maximum means the ceiling for any add-on (`MAX_ADDON_QUANTITY`), so a catalogue published before this reads as it always did.
+- "The same thing at another price on another plan" is two add-ons of one kind, each naming its plans, with its own price and maximum. The operator sets all of it in Admin › Plans › Offers; nothing is released.
+- A plan has one price for a thing. A catalogue does not validate when two add-ons of the same kind (and the same module, for a module on its own) are offered on the same plan, when an add-on names a plan that isn't there, or when a maximum is below 1 or above the ceiling.
+- A business sees and buys only the add-ons offered on its plan. More than the maximum is refused in words; the pricing page shows a plan-specific add-on under the plans it names, and not at all when none of them can be chosen.
+- **A maximum never takes anything away.** A business that holds more than a maximum set since keeps all of it, is charged for all of it and has all of it in its limit; it can hold fewer, and cannot buy more.
+- **A change of plan ends the add-ons the new plan isn't offered.** They end with the old plan (an upgrade, a move at the period's end, a move from a publish), and the new plan's own add-on is never bought for the business: it chooses that in Settings › Plan. What a period already owed is still charged, as when an add-on is removed by hand. An add-on held on a plan it isn't offered on counts for nothing and is charged nothing, whatever path left it there.
+- Rules: `packages/pricing-catalog/src/schema.ts` (`addonOfferedOn`, `addonMaxQuantity`), `apps/api.saroh.in/src/modules/billing/offers.ts` (`addonProblem`), `addon-charges.ts` (`endAddonsNotOfferedInTx`). `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".

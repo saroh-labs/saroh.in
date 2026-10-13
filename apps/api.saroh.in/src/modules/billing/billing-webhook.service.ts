@@ -17,6 +17,7 @@ import {
 } from "../audit/audit.service";
 import {
     clearAddonsInTx,
+    endAddonsNotOfferedInTx,
     rehomeAddonChargesInTx,
     rollAddonChargesInTx,
 } from "./addon-charges";
@@ -549,14 +550,19 @@ export class BillingWebhookService {
         // takes what was owed on the old one's next charge (U16).
         if (checkout.kind === "NEW" || (trial && !continuing)) {
             await clearAddonsInTx(tx, saved.id);
-        } else if (oldProvider) {
-            await rehomeAddonChargesInTx(tx, {
-                organizationId: org,
-                subscriptionId: saved.id,
-                fromProviderSubscriptionId: oldProvider.providerSubscriptionId,
-                provider: checkout.provider,
-                toProviderSubscriptionId: checkout.providerSubscriptionId,
-            });
+        } else {
+            if (oldProvider) {
+                await rehomeAddonChargesInTx(tx, {
+                    organizationId: org,
+                    subscriptionId: saved.id,
+                    fromProviderSubscriptionId:
+                        oldProvider.providerSubscriptionId,
+                    provider: checkout.provider,
+                    toProviderSubscriptionId: checkout.providerSubscriptionId,
+                });
+            }
+            // The add-ons kept are the ones this plan is offered (DEC-157).
+            await endAddonsNotOfferedInTx(tx, saved.id);
         }
         if (trial) {
             // No plan charge yet: no plan invoice and no redemption until

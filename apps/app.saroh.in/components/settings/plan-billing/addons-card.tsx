@@ -22,13 +22,12 @@ import { card } from "./styles";
 export function AddonsCard({
     rows,
     sum,
-    max,
     canChange,
 }: {
+    /** Only the plan's own add-ons, each with its maximum (DEC-157). */
     rows: AddonRow[];
     /** "₹500 a month in add-ons", or "" with none. */
     sum: string;
-    max: number;
     canChange: boolean;
 }) {
     const router = useRouter();
@@ -125,7 +124,7 @@ export function AddonsCard({
                                     disabled={
                                         off ||
                                         !row.available ||
-                                        row.quantity >= max
+                                        row.quantity >= row.max
                                     }
                                     onClick={() => set(row, row.quantity + 1)}
                                 />

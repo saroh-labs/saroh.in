@@ -33,6 +33,56 @@ describe("publicCatalog", () => {
         expect(out.groups.map((g) => g.id)).toEqual(["sell", "team"]);
     });
 
+    it("names only plans a visitor sees on an add-on, and drops one left with none", () => {
+        const c = fakeCatalog((x) => {
+            x.plans[2]!.retired = true;
+            x.addons.push(
+                {
+                    id: "person-b",
+                    kind: "members",
+                    name: "One more person",
+                    pricePaise: 222,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["free", "b"],
+                },
+                {
+                    id: "person-c",
+                    kind: "members",
+                    name: "One more person on C",
+                    pricePaise: 111,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["c"],
+                },
+            );
+        });
+        const out = publicCatalog(c);
+        expect(out.addons.map((a) => a.id)).not.toContain("person-c");
+        expect(out.addons.find((a) => a.id === "person-b")?.plans).toEqual([
+            "free",
+            "b",
+        ]);
+        const retiredB = publicCatalog(
+            fakeCatalog((x) => {
+                x.plans[1]!.retired = true;
+                x.addons.push({
+                    id: "person",
+                    kind: "members",
+                    name: "One more person",
+                    pricePaise: 222,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["b", "c"],
+                });
+            }),
+        );
+        expect(retiredB.addons.find((a) => a.id === "person")?.plans).toEqual([
+            "c",
+        ]);
+        expect(() => parseCatalog(retiredB)).not.toThrow();
+    });
+
     it("keeps coming-soon modules", () => {
         const out = publicCatalog(fakeCatalog());
         expect(out.modules.find((m) => m.id === "themes")?.pricing).toBe(

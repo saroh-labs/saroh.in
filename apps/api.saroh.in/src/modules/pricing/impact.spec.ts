@@ -227,6 +227,33 @@ describe("catalogueImpact", () => {
         });
     });
 
+    it("counts only businesses on a plan the new add-on is offered on", () => {
+        const next = fakeCatalog((c) => {
+            c.addons.push({
+                id: "people-c",
+                kind: "members",
+                name: "More people on C",
+                pricePaise: 111,
+                mode: "unit",
+                qty: 1,
+                plans: ["c"],
+            });
+        });
+        const r = catalogueImpact({
+            live,
+            next,
+            businesses: [
+                biz("full-b", "b", { members: 3 }),
+                biz("full-c", "c", { members: 9 }),
+            ],
+            measured: MEASURED,
+        });
+        expect(r.items[0]).toMatchObject({
+            title: "New add-on: More people on C",
+            detail: "1 business is at 80% or more of their limit and could buy it.",
+        });
+    });
+
     it("reports nothing for an unchanged catalogue", () => {
         const r = catalogueImpact({
             live,

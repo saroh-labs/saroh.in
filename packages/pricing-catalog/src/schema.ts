@@ -41,6 +41,9 @@ export type AddonKind = (typeof ADDON_KINDS)[number];
 export const ADDON_MODES = ["pack", "unit"] as const;
 export type AddonMode = (typeof ADDON_MODES)[number];
 
+/** The most of one add-on a business can hold, whatever the catalogue says. */
+export const MAX_ADDON_QUANTITY = 99;
+
 /** Trial length a catalogue may offer. A longer launch offer is a plan override (OQ-1). */
 export const TRIAL_DAYS_MIN = 1;
 export const TRIAL_DAYS_MAX = 60;
@@ -134,6 +137,14 @@ export const addonSchema = z.object({
     mode: z.enum(ADDON_MODES),
     /** How much one pack adds (packs only; a unit adds one). */
     qty: z.number().int().positive(),
+    /**
+     * The plans it is offered on (DEC-157). Absent or empty: every plan. A
+     * price that differs by plan is two add-ons of one kind, each naming its
+     * plans.
+     */
+    plans: z.array(id).optional(),
+    /** The most of it one business may hold; absent: `MAX_ADDON_QUANTITY`. */
+    max: z.number().int().optional(),
 });
 
 const catalogShape = z.object({
@@ -244,6 +255,34 @@ export const catalogSchema = catalogShape.superRefine((c, ctx) => {
                 "kind",
             ]);
         }
+        for (const planId of a.plans ?? []) {
+            if (!planIds.has(planId)) {
+                issue(`${a.name} is offered on an unknown plan: ${planId}`, [
+                    "addons",
+                    i,
+                    "plans",
+                ]);
+            }
+        }
+        if (a.max !== undefined && (a.max < 1 || a.max > MAX_ADDON_QUANTITY)) {
+            issue(
+                `${a.name}'s maximum must be from 1 to ${MAX_ADDON_QUANTITY}`,
+                ["addons", i, "max"],
+            );
+        }
+        // One price a plan: two add-ons for the same thing never share one.
+        for (const b of c.addons.slice(0, i)) {
+            if (b.kind !== a.kind || b.module !== a.module) continue;
+            const shared = c.plans.find(
+                (p) => addonOfferedOn(a, p.id) && addonOfferedOn(b, p.id),
+            );
+            if (shared) {
+                issue(
+                    `${b.name} and ${a.name} are both offered on ${shared.name}; a plan takes one of them`,
+                    ["addons", i, "plans"],
+                );
+            }
+        }
     });
 });
 
@@ -269,6 +308,35 @@ export const MISSING_CELL: ExcludedCell = { inc: false, off: "locked" };
  */
 export function trialFirstPaise(plan: Pick<Plan, "trial">): number {
     return plan.trial?.on ? (plan.trial.firstPaise ?? 0) : 0;
+}
+
+/** Whether an add-on is offered on a plan: every plan unless it names some. */
+export function addonOfferedOn(
+    addon: { plans?: readonly string[] },
+    planId: string,
+): boolean {
+    return !addon.plans?.length || addon.plans.includes(planId);
+}
+
+/** The most of an add-on one business may hold. */
+export function addonMaxQuantity(addon: { max?: number }): number {
+    return addon.max ?? MAX_ADDON_QUANTITY;
+}
+
+/**
+ * "Plan B and Plan C" for an add-on that names its plans, in catalogue
+ * order; empty when it is offered on every plan.
+ */
+export function addonPlanNames(
+    catalog: Pick<Catalog, "plans">,
+    addon: { plans?: readonly string[] },
+): string {
+    const names = catalog.plans
+        .filter((p) => addon.plans?.includes(p.id))
+        .map((p) => p.name);
+    const last = names.pop();
+    if (!last) return "";
+    return names.length ? `${names.join(", ")} and ${last}` : last;
 }
 
 export function cellOf(module: CatalogModule, planId: string): Cell {

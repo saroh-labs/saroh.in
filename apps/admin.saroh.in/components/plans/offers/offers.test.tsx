@@ -10,7 +10,9 @@ import {
 } from "./coupons";
 import { paiseToRupees, rupeesToPaise } from "./money";
 import {
+    addonClash,
     addonProspects,
+    addonReach,
     addonSummary,
     canAddKind,
     gstExample,
@@ -18,6 +20,7 @@ import {
     newAddon,
     newAddonId,
     paidPlans,
+    toggleAddonPlan,
     yearlyLines,
 } from "./offers";
 
@@ -134,6 +137,104 @@ describe("offers", () => {
         expect(addonProspects(a, c, pricing)).toBe(
             "3 businesses near their limit could use it",
         );
+    });
+
+    describe("per plan (DEC-157)", () => {
+        const pack = (id: string, plans?: string[], max?: number) => ({
+            id,
+            kind: "products" as const,
+            name: id,
+            pricePaise: 1,
+            mode: "pack" as const,
+            qty: 1,
+            ...(plans ? { plans } : {}),
+            ...(max ? { max } : {}),
+        });
+
+        it("starts a second add-on for the same thing on the plans left", () => {
+            const c = fakeCatalog();
+            expect(newAddon(c, "products", "a1")).not.toHaveProperty("plans");
+            c.addons = [pack("first", ["b"])];
+            expect(newAddon(c, "products", "a2")?.plans).toEqual(["a", "c"]);
+            // Nothing left: it names none, and the row says what clashes.
+            c.addons = [pack("first")];
+            const second = newAddon(c, "products", "a2");
+            expect(second).not.toHaveProperty("plans");
+            if (!second) throw new Error("expected an add-on");
+            c.addons.push(second);
+            expect(addonClash(second, c)).toBe(
+                "Plan A already has first. A plan takes one of them.",
+            );
+        });
+
+        it("ticks and unticks a plan, in catalogue order; none left is every plan", () => {
+            const c = fakeCatalog();
+            expect(toggleAddonPlan(pack("x"), c, "c")).toEqual(["c"]);
+            expect(toggleAddonPlan(pack("x", ["c"]), c, "a")).toEqual([
+                "a",
+                "c",
+            ]);
+            expect(toggleAddonPlan(pack("x", ["a", "c"]), c, "a")).toEqual([
+                "c",
+            ]);
+            expect(toggleAddonPlan(pack("x", ["c"]), c, "c")).toBeUndefined();
+        });
+
+        it("says where it is offered and how many a business can hold", () => {
+            const c = fakeCatalog();
+            expect(addonReach(pack("x"), c)).toBe(
+                "On every plan, up to 99 a business",
+            );
+            expect(addonReach(pack("x", ["b", "c"], 4), c)).toBe(
+                "On Plan B and Plan C, up to 4 a business",
+            );
+            expect(
+                addonReach(
+                    { ...pack("x", ["b"]), kind: "module", module: "products" },
+                    c,
+                ),
+            ).toBe("On Plan B");
+        });
+
+        it("finds no clash between add-ons on different plans", () => {
+            const c = fakeCatalog();
+            c.addons = [pack("first", ["b"]), pack("second", ["c"])];
+            expect(c.addons.map((a) => addonClash(a, c))).toEqual(["", ""]);
+        });
+
+        it("counts prospects only on the plans it is offered on", () => {
+            const c = fakeCatalog();
+            const usage = (near: number) => [
+                {
+                    moduleId: "products",
+                    businesses: 5,
+                    measured: true,
+                    using: 5,
+                    highest: 1,
+                    over: 0,
+                    near,
+                    values: null,
+                    line: null,
+                },
+            ];
+            const plan = (planId: string) => ({
+                planId,
+                name: planId,
+                retired: false,
+                businesses: 5,
+                olderVersion: 0,
+            });
+            const pricing = fakePricing({
+                plans: [plan("b"), plan("c")],
+                usage: { b: usage(2), c: usage(4) },
+            });
+            expect(addonProspects(pack("x"), c, pricing)).toBe(
+                "6 businesses near their limit could use it",
+            );
+            expect(addonProspects(pack("x", ["c"]), c, pricing)).toBe(
+                "4 businesses near their limit could use it",
+            );
+        });
     });
 
     it("never reuses an add-on id", () => {

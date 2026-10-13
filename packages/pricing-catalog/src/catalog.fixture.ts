@@ -149,6 +149,8 @@ export function fixtureInput(): CatalogInput {
                 pricePaise: 1_100,
                 mode: "unit",
                 qty: 1,
+                plans: ["b"],
+                max: 4,
             },
             {
                 id: "invoices-alone",
@@ -158,6 +160,17 @@ export function fixtureInput(): CatalogInput {
                 pricePaise: 4_400,
                 mode: "pack",
                 qty: 1,
+            },
+            // The same thing on Plan C: its own price and maximum (DEC-157).
+            {
+                id: "one-person-c",
+                kind: "members",
+                name: "One more person on C",
+                pricePaise: 900,
+                mode: "unit",
+                qty: 1,
+                plans: ["c"],
+                max: 7,
             },
         ],
     };

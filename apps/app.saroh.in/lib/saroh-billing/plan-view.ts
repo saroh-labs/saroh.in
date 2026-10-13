@@ -52,6 +52,11 @@ export interface AddonView {
     totalPaise: number;
     quantity: number;
     heldPaise: number;
+    /**
+     * The most of it the business may hold on its plan (DEC-157). Absent
+     * from an API not yet on that release: the view's `max` stands in.
+     */
+    max?: number;
     available: boolean;
     why: string | null;
 }
@@ -59,6 +64,7 @@ export interface AddonView {
 export interface AddonsView {
     canBuy: boolean;
     why: string | null;
+    /** The ceiling for any add-on. */
     max: number;
     addons: AddonView[];
     heldPaise: number;
@@ -582,6 +588,8 @@ export interface AddonRow {
     total: string;
     isModule: boolean;
     quantity: number;
+    /** No more than this can be held; what is held may already be more. */
+    max: number;
     available: boolean;
     why: string | null;
 }
@@ -605,18 +613,22 @@ export function addonRows(view: AddonsView): AddonRow[] {
             const isModule = a.kind === "module";
             const [one, many] = UNIT[a.kind] ?? [a.kind, a.kind];
             const price = formatInr(a.pricePaise);
+            const max = a.max ?? view.max;
+            // Said only where the plan sets its own, below the ceiling.
+            const upTo = !isModule && max < view.max ? `, up to ${max}` : "";
             return {
                 id: a.id,
                 name: a.name,
                 isModule,
                 quantity: a.quantity,
+                max,
                 available: a.available,
                 why: a.why,
                 line: isModule
                     ? `${price} a month`
                     : a.mode === "unit"
-                      ? `${price} a month per ${one}`
-                      : `+${count(a.qty, one, many)} for ${price} a month`,
+                      ? `${price} a month per ${one}${upTo}`
+                      : `+${count(a.qty, one, many)} for ${price} a month${upTo}`,
                 total:
                     a.quantity > 0
                         ? `${isModule ? "Added" : `${a.quantity} ×`} · ${formatInr(a.heldPaise)} a month`

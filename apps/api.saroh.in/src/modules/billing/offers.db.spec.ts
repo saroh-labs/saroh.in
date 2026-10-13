@@ -818,6 +818,141 @@ describe("add-ons", () => {
         });
     });
 
+    /** One more person, priced and capped for Plan B and for Plan C (DEC-157). */
+    const PER_PLAN = () =>
+        OFFERS((c) => {
+            c.plans[1]!.trial = undefined;
+            c.addons.push(
+                {
+                    id: "person-b",
+                    kind: "members",
+                    name: "One more person",
+                    pricePaise: 222,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["b"],
+                    max: 2,
+                },
+                {
+                    id: "person-c",
+                    kind: "members",
+                    name: "One more person on C",
+                    pricePaise: 111,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["c"],
+                    max: 5,
+                },
+            );
+        });
+    const people = async (organizationId: string) => {
+        const a = await access.resolve(organizationId);
+        return a.source === "catalogue"
+            ? a.modules.find((m) => m.moduleId === "members")?.limit
+            : null;
+    };
+
+    it("a business sees and buys only its plan's add-ons, up to each one's maximum", async () => {
+        await install(PER_PLAN());
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+
+        const view = await addons.list(ctx);
+        expect(view.addons.map((a) => a.id)).toEqual([
+            "things-pack",
+            "bills",
+            "office",
+            "person-b",
+        ]);
+        expect(view.addons.find((a) => a.id === "person-b")).toMatchObject({
+            pricePaise: 222,
+            max: 2,
+            available: true,
+        });
+
+        await expect(addons.set(ctx, "person-c", 1)).rejects.toMatchObject({
+            status: 400,
+            message: "One more person on C isn't offered on Plan B.",
+        });
+        await expect(addons.set(ctx, "person-b", 3)).rejects.toMatchObject({
+            status: 400,
+            message: "You can have up to 2 of One more person on Plan B.",
+        });
+        expect(await prisma.subscriptionAddon.count()).toBe(0);
+        await addons.set(ctx, "person-b", 2);
+        expect(await people(ctx.organizationId)).toBe(3 + 2);
+    });
+
+    it("keeps what was held before the maximum came down, and sells no more", async () => {
+        await install(PER_PLAN());
+        const ctx = await business();
+        const { providerSub, periodEnd } = await onPaidPlan(ctx, "b");
+        await addons.set(ctx, "person-b", 2);
+        // Held from when the add-on allowed more than it does now.
+        await prisma.subscriptionAddon.updateMany({
+            where: { organizationId: ctx.organizationId, addonId: "person-b" },
+            data: { quantity: 4 },
+        });
+
+        const view = await addons.list(ctx);
+        expect(view.addons.find((a) => a.id === "person-b")).toMatchObject({
+            quantity: 4,
+            max: 2,
+            heldPaise: 4 * 222,
+        });
+        expect(await people(ctx.organizationId)).toBe(3 + 4);
+        await expect(addons.set(ctx, "person-b", 5)).rejects.toMatchObject({
+            status: 400,
+            message: "You can have up to 2 of One more person on Plan B.",
+        });
+
+        // The renewal charges all four; nothing was taken away.
+        const next = new Date(periodEnd.getTime() + 30 * DAY);
+        await deliver(providerSub, "charged", { currentPeriodEnd: next });
+        expect(
+            await prisma.subscriptionAddonCharge.findFirstOrThrow({
+                where: { periodStart: periodEnd },
+            }),
+        ).toMatchObject({ addonId: "person-b", quantity: 4, unitPaise: 222 });
+
+        // Fewer is its own choice, and still above the maximum.
+        await addons.set(ctx, "person-b", 3);
+        expect(await people(ctx.organizationId)).toBe(3 + 3);
+    });
+
+    it("an add-on the new plan isn't offered ends with the old plan; nothing is bought in its place", async () => {
+        await install(PER_PLAN());
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+        await addons.set(ctx, "person-b", 2);
+        const owedBefore = await prisma.subscriptionAddonCharge.count();
+
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        expect(r.kind).toBe("UPGRADE");
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        // Until it is authorised, the business is on Plan B with its add-on.
+        expect(await people(ctx.organizationId)).toBe(3 + 2);
+        await deliver(`fake_sub_${r.checkout.id}`, "authenticated");
+
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.c" },
+        });
+        expect(await prisma.subscriptionAddon.count()).toBe(0);
+        expect(await people(ctx.organizationId)).toBe(9);
+        // What the period already owed rides on the new plan's first charge.
+        const owed = await prisma.subscriptionAddonCharge.findMany();
+        expect(owed).toHaveLength(owedBefore);
+        expect(owed.every((o) => o.status === "QUEUED")).toBe(true);
+
+        const view = await addons.list(ctx);
+        expect(view.addons.map((a) => a.id)).not.toContain("person-b");
+        expect(view.addons.find((a) => a.id === "person-c")).toMatchObject({
+            quantity: 0,
+            pricePaise: 111,
+            max: 5,
+        });
+    });
+
     it("a trial's add-ons owe nothing for the trial; a move to Free takes them away", async () => {
         await install();
         const ctx = await business();
