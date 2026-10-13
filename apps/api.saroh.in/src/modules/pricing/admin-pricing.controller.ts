@@ -101,11 +101,19 @@ export class AdminPricingController {
                 key: dto.idempotencyKey,
                 actorUserId: staff.userId,
             },
-            { catalog: dto.catalog, revision: dto.revision },
+            {
+                catalog: dto.catalog,
+                revision: dto.revision,
+                baseVersion: dto.baseVersion,
+            },
             () =>
                 this.writes.saveDraft(
                     staff.userId,
-                    { catalog: dto.catalog, revision: dto.revision },
+                    {
+                        catalog: dto.catalog,
+                        revision: dto.revision,
+                        baseVersion: dto.baseVersion,
+                    },
                     new Date(),
                 ),
         );

@@ -36,6 +36,10 @@ export class PreviewTokenDto {
  * the revision it was based on (0 when there is no draft yet). The catalogue
  * is stored as sent and checked on read and on publish, because the shared
  * draft autosaves while it is half-edited (U3's `AdminDraft.valid`).
+ *
+ * A start (`revision` 0) also names the version the editor copied,
+ * `baseVersion` (null when nothing is published): a page that was read
+ * before a newer version was published is refused, not saved over it.
  */
 export class SaveDraftDto {
     @IsObject()
@@ -44,6 +48,11 @@ export class SaveDraftDto {
     @IsInt()
     @Min(0)
     revision!: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    baseVersion?: number | null;
 
     @IsOptional()
     @Transform(trim)

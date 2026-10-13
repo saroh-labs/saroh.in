@@ -63,6 +63,21 @@ export function liveVersionOf(pricing: AdminPricing): AdminVersion | null {
     return pricing.versions.find((v) => v.status === "live") ?? null;
 }
 
+/**
+ * The version an edit starts from: the newest whose go-live has passed,
+ * live or still waiting for billing. A waiting one becomes live as soon as
+ * its plans reach the billing provider, so a draft copied from the version
+ * under it would undo it (the API refuses that start).
+ */
+export function baseVersionOf(pricing: AdminPricing): AdminVersion | null {
+    return (
+        pricing.versions
+            .filter((v) => v.status === "live" || v.status === "waiting")
+            .sort((a, b) => b.version - a.version)
+            .at(0) ?? null
+    );
+}
+
 /** Versions still to go live, soonest first: scheduled, or waiting for billing. */
 export function upcomingVersions(pricing: AdminPricing): AdminVersion[] {
     return pricing.versions
@@ -170,6 +185,51 @@ export function namesList(people: readonly StaffName[]): string {
     return `${names[0]}, ${names[1]} and ${names.length - 2} others`;
 }
 
+/**
+ * A draft that can't be published as it is: a newer version was published
+ * than the one it was started from. Null when it is a copy of the newest.
+ */
+export interface Outdated {
+    /** The version the changes were started from; null: from nothing. */
+    from: number | null;
+    /** The newest published version now; null: nothing is published. */
+    to: number | null;
+    /** What the draft changed from the version it was started from. */
+    changes: string[];
+}
+
+export function outdatedOf(input: {
+    pricing: AdminPricing;
+    draft: unknown;
+    /** The version the draft is a copy of. */
+    startedFrom: number | null;
+}): Outdated | null {
+    const to = baseVersionOf(input.pricing)?.version ?? null;
+    if (input.startedFrom === to) return null;
+    const from = input.pricing.versions.find(
+        (v) => v.version === input.startedFrom,
+    );
+    return {
+        from: input.startedFrom,
+        to,
+        changes: from ? checkDraft(from.catalog, input.draft).changes : [],
+    };
+}
+
+/** What the notice says about a draft a newer version has overtaken. */
+export function outdatedMessage(o: Outdated, saved: boolean): string {
+    const newer =
+        o.to === null ? "The pricing changed" : `Version ${o.to} was published`;
+    const from = o.from === null ? "" : ` from version ${o.from}`;
+    const again =
+        o.to === null
+            ? "make them again"
+            : `make them again on version ${o.to}`;
+    return saved
+        ? `${newer} after this draft was started${from}. Publishing the draft would undo that, so it can't be published. Note your changes, discard the draft and ${again}.`
+        : `${newer} after you started these changes${from}, so they weren't saved. Note them, start again, then ${again}.`;
+}
+
 // ── A refused save ────────────────────────────────────────────────────────
 
 /** A 409's `details`, when it is the draft's conflict shape. */
@@ -186,11 +246,24 @@ export function parseConflict(details: unknown): DraftConflict | null {
                 ? by
                 : null,
         updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : null,
+        ...("newestVersion" in d
+            ? {
+                  newestVersion:
+                      typeof d.newestVersion === "number"
+                          ? d.newestVersion
+                          : null,
+              }
+            : {}),
     };
 }
 
 /** What the conflict notice says. */
 export function conflictMessage(conflict: DraftConflict): string {
+    if (conflict.newestVersion !== undefined) {
+        return conflict.newestVersion === null
+            ? "The pricing changed since you opened this page, so your changes weren't saved. Reload to see it as it is now."
+            : `Version ${conflict.newestVersion} was published since you opened this page, so your changes weren't saved. Reload to start from version ${conflict.newestVersion}.`;
+    }
     if (conflict.revision === null) {
         return "The draft was published or discarded since you opened it. Reload to start from the live pricing.";
     }
