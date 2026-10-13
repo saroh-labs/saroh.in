@@ -102,6 +102,12 @@ export interface CreateOrganizationInput {
      * leads with its next step. Absent: they will decide later.
      */
     goal?: string;
+    /**
+     * The referral code the browser carried from saroh.in (DEC-156), added
+     * by the create action from its cookie, never by a form. The API
+     * decides what it means.
+     */
+    referralCode?: string;
 }
 
 /** Discriminated result so the UI can surface field errors inline. */

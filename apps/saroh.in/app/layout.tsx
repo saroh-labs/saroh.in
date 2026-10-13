@@ -10,6 +10,7 @@ import { pageTitle, SITE_NAME, SITE_URL } from "@/lib/seo";
 import { resourcesContext } from "@/lib/resources-context";
 import { siteTagConfig } from "@/lib/site-tag-config";
 
+import { ReferralKeeper } from "./referral-keeper";
 import { SiteTags } from "./site-tags";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the
@@ -97,7 +98,8 @@ export const metadata: Metadata = {
 
 /**
  * The shell every page shares: fonts, the tags and the recorder behind the
- * cookie notice (`site-tags.tsx`) and the light-only scheme. Pages bring their own chrome
+ * cookie notice (`site-tags.tsx`), the referral code a visitor arrived with
+ * (`referral-keeper.tsx`) and the light-only scheme. Pages bring their own chrome
  * through route groups: `(v2)` the Marketing Site V2 pages, `(standalone)`
  * the waitlist and the sign-up hand-off, `(preview)` the pricing draft.
  *
@@ -121,6 +123,7 @@ export default function RootLayout({
                     config={siteTagConfig()}
                     privacyHref={privacy?.href}
                 />
+                <ReferralKeeper />
                 <a
                     href="#main"
                     className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[90] focus:rounded-lg focus:bg-foreground focus:px-[13px] focus:py-[9px] focus:text-[13px] focus:text-background"

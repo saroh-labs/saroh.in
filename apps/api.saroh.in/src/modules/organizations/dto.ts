@@ -36,6 +36,7 @@ import type { AcceptedBusinessType } from "./business-type";
 import { ACCEPTED_BUSINESS_TYPES } from "./business-type";
 import type { OrganizationKind } from "./organization-kind";
 import { ORGANIZATION_KINDS } from "./organization-kind";
+import { referralCodeOf } from "./referral";
 
 export { BUSINESS_TYPES, type BusinessType } from "./business-type";
 
@@ -187,6 +188,19 @@ export class OnboardOrganizationDto {
     @IsOptional()
     @IsIn(FIRST_GOALS, { message: "goal is not one Saroh offers" })
     goal?: FirstGoal;
+
+    /**
+     * The referral code the browser carried from saroh.in, if any
+     * (DEC-156). Never refused: anything not shaped like a code is dropped
+     * here, and one that names no business is ignored by the service
+     * (`referral.ts`), so a bad link can't stop a business being made.
+     */
+    @Transform(
+        ({ value }: { value: unknown }) => referralCodeOf(value) ?? undefined,
+    )
+    @IsOptional()
+    @IsString()
+    referralCode?: string;
 }
 
 const DIGITS_MESSAGE = `The counter is ${MIN_COUNTER_DIGITS} to ${MAX_COUNTER_DIGITS} digits.`;

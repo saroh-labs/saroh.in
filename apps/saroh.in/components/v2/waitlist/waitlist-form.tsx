@@ -9,6 +9,7 @@ import { NO_OFFER, WAITLIST_CONTACT, WAITLIST_KINDS } from "@/content/waitlist";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
 import { readAddress } from "@/lib/page-address";
+import { keptReferral } from "@/lib/referral";
 import { fireConversion } from "@/lib/tags";
 import type {
     WaitlistResponse,
@@ -62,7 +63,9 @@ const SEND_FAILED: Record<string, string> = {
  *
  * The plan, source, referral and saved template come from the page's
  * address (`?plan=`, `?src=`, `?ref=`, `?template=`), read here in the
- * browser, so the page itself reads no query and stays static. A template
+ * browser, so the page itself reads no query and stays static. With no
+ * `?ref=` of its own, it sends the business's referral code the visitor
+ * arrived on another page with, if one was kept (`lib/referral.ts`). A template
  * is kept only when it is one of `templates` (the gallery's), and the form
  * and its done state say it is saved.
  */
@@ -111,7 +114,11 @@ export function WaitlistForm({
 
     const onSubmit = handleSubmit(async (values) => {
         const parsed = waitlistSchema.parse(values);
-        const { plan, src, ref: referral, template } = fromAddress();
+        const { plan, src, ref: linked, template } = fromAddress();
+        // This page's own `?ref=`, an entrant's id, comes first. With none,
+        // the business's code a visitor arrived on another page with
+        // (DEC-156); the API tells the two apart.
+        const referral = linked ?? keptReferral(document.cookie) ?? undefined;
         let result: WaitlistResponse;
         try {
             const response = await fetch("/api/waitlist", {
@@ -152,7 +159,8 @@ export function WaitlistForm({
             kind: parsed.kind,
             src,
             plan,
-            ref: referral !== undefined,
+            // The page's own link only: a kept code says nothing to GA.
+            ref: linked !== undefined,
             template,
         });
         if (result.created) fireConversion("waitlist_joined");

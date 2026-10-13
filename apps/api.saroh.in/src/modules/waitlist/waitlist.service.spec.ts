@@ -16,15 +16,21 @@ jest.mock("../../common/email", () => ({
 jest.mock("nodemailer", () => ({
     createTransport: jest.fn(() => ({ sendMail: jest.fn() })),
 }));
+// Which business a code is has its own spec (`organizations/referral.spec.ts`).
+jest.mock("../organizations/referral", () => ({
+    businessByReferralCode: jest.fn().mockResolvedValue(null),
+}));
 
 import { prisma } from "@saroh/database";
 import nodemailer from "nodemailer";
 
 import * as email from "../../common/email";
+import { businessByReferralCode as businessByReferralCodeFn } from "../organizations/referral";
 import { WaitlistService } from "./waitlist.service";
 
 const findUnique = prisma.waitlistSignup.findUnique as jest.Mock;
 const create = prisma.waitlistSignup.create as jest.Mock;
+const businessByReferralCode = businessByReferralCodeFn as unknown as jest.Mock;
 
 const V2 = {
     email: "founder@example.test",
@@ -39,6 +45,7 @@ describe("WaitlistService", () => {
         jest.clearAllMocks();
         service = new WaitlistService();
         findUnique.mockResolvedValue(null);
+        businessByReferralCode.mockResolvedValue(null);
         create.mockImplementation(
             ({ data }: { data: { refCode: string | null } }) =>
                 Promise.resolve({ position: 312, refCode: data.refCode }),
@@ -237,7 +244,78 @@ describe("WaitlistService", () => {
             await service.join({ ...V2, ref: "../../etc" });
 
             expect(findUnique).toHaveBeenCalledTimes(1); // the repeat check only
+            expect(businessByReferralCode).not.toHaveBeenCalled();
             expect(create).toHaveBeenCalled();
+        });
+
+        describe("a business's referral code (DEC-156)", () => {
+            it("keeps the business on the entry when the id is no entrant's", async () => {
+                businessByReferralCode.mockResolvedValue("org_rye");
+                await service.join({ ...V2, ref: "abcdefgh" });
+
+                expect(businessByReferralCode).toHaveBeenCalledWith("abcdefgh");
+                expect(create).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({
+                            referredById: null,
+                            referredByOrganizationId: "org_rye",
+                        }),
+                    }),
+                );
+            });
+
+            it("keeps nobody for a code neither table knows", async () => {
+                await service.join({ ...V2, ref: "abcdefgh" });
+
+                expect(create).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({
+                            referredById: null,
+                            referredByOrganizationId: null,
+                        }),
+                    }),
+                );
+            });
+
+            it("never reads an entrant's id as a business's code", async () => {
+                withOwner();
+                businessByReferralCode.mockResolvedValue("org_rye");
+                await service.join({
+                    ...V2,
+                    ref: "abcdefgh",
+                    ipHash: "hash-new",
+                });
+
+                expect(businessByReferralCode).not.toHaveBeenCalled();
+                expect(create).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({
+                            referredById: "wl_owner",
+                            referredByOrganizationId: null,
+                        }),
+                    }),
+                );
+            });
+
+            it("not even an entrant's own id, on a self-referral", async () => {
+                withOwner();
+                businessByReferralCode.mockResolvedValue("org_rye");
+                await service.join({
+                    ...V2,
+                    ref: "abcdefgh",
+                    ipHash: "hash-owner",
+                });
+
+                expect(businessByReferralCode).not.toHaveBeenCalled();
+                expect(create).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        data: expect.objectContaining({
+                            referredById: null,
+                            referredByOrganizationId: null,
+                        }),
+                    }),
+                );
+            });
         });
     });
 

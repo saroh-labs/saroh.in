@@ -220,6 +220,36 @@ describe("what they chose to do first (UX audit, 10 Oct)", () => {
     });
 });
 
+describe("the referral code a browser carried (DEC-156)", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const taken = (body: unknown) =>
+        pipe.transform(body, {
+            type: "body",
+            metatype: OnboardOrganizationDto,
+        }) as Promise<OnboardOrganizationDto>;
+
+    it("keeps one shaped like a code, trimmed and lower-cased", async () => {
+        expect(
+            (await taken({ name: "Asha", referralCode: " ABCD2345 " }))
+                .referralCode,
+        ).toBe("abcd2345");
+    });
+
+    it.each([
+        ["too short", "abc"],
+        ["a letter the alphabet leaves out", "abcdefgl"],
+        ["an address", "https://saroh.in/?ref=abcd2345"],
+        ["far too long", "a".repeat(5000)],
+        ["a number", 12345678],
+        ["a list", ["abcd2345"]],
+        ["nothing", ""],
+    ])("drops %s and still takes the business", async (_what, referralCode) => {
+        const dto = await taken({ name: "Asha", referralCode });
+        expect(dto.name).toBe("Asha");
+        expect(dto.referralCode).toBeUndefined();
+    });
+});
+
 describe('setup\'s "Is it registered?" (prelaunch)', () => {
     const errors = async (body: unknown) =>
         (await validate(plainToInstance(OnboardingProfileDto, body))).map(
