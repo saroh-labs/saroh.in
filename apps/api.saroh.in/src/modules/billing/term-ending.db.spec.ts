@@ -401,4 +401,27 @@ describe("the first month's end (DEC-093) against a free trial's", () => {
         expect(email.subject).toMatch(/^Term \d+'s Plan B trial ends on /);
         expect(email.html).toContain("charge");
     });
+
+    it("says nothing of a charge to a business leaving at the month's end (DEC-159)", async () => {
+        const b = await business();
+        const endsAt = new Date(Date.now() + 3 * DAY);
+        const sub = await onPlanB(
+            b.organizationId,
+            { cycle: "month", startAt: endsAt },
+            { chargeNowPaise: 100, endsAt },
+        );
+        // Free, or a cheaper plan, chosen for the month's end.
+        await prisma.subscription.update({
+            where: { id: sub.id },
+            data: { cancelAtPeriodEnd: true },
+        });
+        await enqueueBillingEmail(prisma, {
+            kind: "TRIAL_ENDING",
+            organizationId: b.organizationId,
+            subscriptionId: sub.id,
+            endsAt: endsAt.toISOString(),
+        });
+        await runMail();
+        expect(sent).toHaveLength(0);
+    });
 });

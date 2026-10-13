@@ -27,8 +27,9 @@ import { card } from "./styles";
 /**
  * The plan picker, add-ons and coupon ("Saroh Settings" design, Plan and
  * billing): Monthly | Yearly when the catalogue offers yearly, a row per
- * plan with what it unlocks (the catalogue's card lines, UX-045) and its
- * button — "Start N-day trial", "Upgrade", "Switch", "Keep …" — and the
+ * plan with what it unlocks (the catalogue's card lines, UX-045), when a
+ * change to it would start (DEC-159: "Starts today", or "From ‹date›") and
+ * its button — "Start N-day trial", "Upgrade", "Switch", "Keep …" — and the
  * Coupon card, whose code is checked on Apply (UX-046) and goes with the
  * next change's quote. Picking a row opens the change (`ChangePlanDialog`).
  *
@@ -134,8 +135,8 @@ export function PlanChooser({
                         {!canChange
                             ? "These are Saroh's plans and what each is for."
                             : yearly.on
-                              ? "Monthly is autopay for 12 months and yearly is one payment. Before either ends, we ask you to pay for the next term. Upgrades start today, and downgrades from your next charge."
-                              : "Plans are paid monthly by autopay, for 12 months. Before that ends, we ask you to pay for the next term. Upgrades start today, and downgrades from your next charge."}
+                              ? "Monthly is autopay for 12 months and yearly is one payment. Before either ends, we ask you to pay for the next term. Upgrades start today. A cheaper plan or Free starts when what you've paid for ends."
+                              : "Plans are paid monthly by autopay, for 12 months. Before that ends, we ask you to pay for the next term. Upgrades start today. A cheaper plan or Free starts when what you've paid for ends."}
                     </span>
                     {yearly.on && rows ? (
                         <Segmented
@@ -187,6 +188,7 @@ export function PlanChooser({
                                         {row.note.iso ? (
                                             <ViewerDate iso={row.note.iso} />
                                         ) : null}
+                                        {row.note.tail}
                                     </p>
                                 ) : null}
                                 {row.lines.length > 0 ? (

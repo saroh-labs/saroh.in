@@ -50,7 +50,7 @@ test("shows the plan, the picker and Saroh's invoices", async ({ page }) => {
     const picker = page.getByRole("region", { name: "Change plan" });
     await expect(
         picker.getByText(
-            "Monthly is autopay for 12 months and yearly is one payment. Before either ends, we ask you to pay for the next term. Upgrades start today, and downgrades from your next charge.",
+            "Monthly is autopay for 12 months and yearly is one payment. Before either ends, we ask you to pay for the next term. Upgrades start today. A cheaper plan or Free starts when what you've paid for ends.",
         ),
     ).toBeVisible();
     // The plan it's on: "Current plan", or a plan given for a while (UX-044).

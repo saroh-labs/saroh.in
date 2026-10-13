@@ -41,6 +41,8 @@ import {
     assertBillingMayStart,
     dropLiveCheckoutsInTx,
 } from "./business-closing";
+import type { FirstMonthMove } from "./change-timing";
+import { leavesWithCycle, paidUntil } from "./change-timing";
 import type {
     ChangeKind,
     ChangeQuote,
@@ -109,6 +111,12 @@ export interface ChangePlanQuoteView {
     effectiveAt: string | null;
     /** A trial's end, when its first charge is taken (U16); else null. */
     trialEndsAt: string | null;
+    /**
+     * A change made during the first month (DEC-159): `NOW` — a dearer
+     * plan, which ends the month and starts today at its full price;
+     * `AT_END` — it waits for the month to end. Null outside a first month.
+     */
+    firstMonth: FirstMonthMove | null;
     /**
      * The coupon (U16): its code, what it takes off each of the first
      * `charges` charges before GST, and that first charge after it.
@@ -231,15 +239,18 @@ const SUB_SELECT = {
  * from the live version, and every amount from `quoteChange` on the server
  * (KTD-18). The site's `?plan=&cycle=` only preselects the same two.
  *
- * - **To a free plan**: no checkout. At the end of the period already paid
- *   (the provider subscription is told to end with it), or at once when
- *   nothing is paid at the provider.
+ * - **To a free plan**: no checkout. At the end of what is already paid, a
+ *   period or a first month (the provider subscription is told to end with
+ *   it), or at once when nothing is paid at the provider.
  * - **To a paid plan**: a checkout — a new provider subscription on the
  *   plan's provider plan, authorised by the business on the provider's page
  *   — completed by the webhook. An upgrade is on the new plan as soon as
  *   it's authorised, paying the difference for the rest of the period; a
  *   cheaper plan or the other cycle starts at the period's end. A new
  *   checkout replaces an open one.
+ * - **During the first month** (DEC-159, `change-timing.ts`): a dearer plan
+ *   starts today at its full price and ends the month; any other plan, and
+ *   Free, wait for the month to end. Never a second first month.
  *
  * - **Offers** (U16): a paid plan's free trial where it would be NEW and
  *   the business never had one (TRIAL: on the plan once authorised, the
@@ -529,17 +540,26 @@ export class CheckoutService {
         const trialFirstPaise = catalog ? planFirstPaise(catalog, planId) : 0;
         const term = await this.termOfSubscription(subscription, now);
         const termEndsAt = term?.endsAt ?? null;
+        // A year chosen during the first month is a move up or not by what
+        // its plan costs a month (DEC-159).
+        const targetMonthlyPaise =
+            subscription?.status === "TRIALING" && target.interval === "year"
+                ? (await this.plans.resolveCatalogue(input.plan, "month", now))
+                      .priceCents
+                : undefined;
+        const asked = {
+            subscription,
+            target,
+            now,
+            trialDays,
+            trialFirstPaise,
+            termEndsAt,
+            targetMonthlyPaise,
+        };
         let coupon: PricingCoupon | null = null;
         const code = input.coupon?.trim();
         if (code) {
-            const plain = quoteChange({
-                subscription,
-                target,
-                now,
-                trialDays,
-                trialFirstPaise,
-                termEndsAt,
-            });
+            const plain = quoteChange(asked);
             if (!COUPON_KINDS.includes(plain.kind)) {
                 throw new BadRequestException({
                     message:
@@ -555,15 +575,7 @@ export class CheckoutService {
                 now,
             });
         }
-        const quote = quoteChange({
-            subscription,
-            target,
-            now,
-            trialDays,
-            trialFirstPaise,
-            termEndsAt,
-            coupon,
-        });
+        const quote = quoteChange({ ...asked, coupon });
         const addonsEnding = await this.addonsEnding(
             subscription,
             quote.kind,
@@ -632,6 +644,7 @@ export class CheckoutService {
             startAt: quote.startAt?.toISOString() ?? null,
             effectiveAt: quote.effectiveAt?.toISOString() ?? null,
             trialEndsAt: quote.trialEndsAt?.toISOString() ?? null,
+            firstMonth: quote.firstMonth,
             coupon:
                 coupon && quote.discountCharges > 0
                     ? {
@@ -652,9 +665,11 @@ export class CheckoutService {
     }
 
     /**
-     * To a free plan. Paid at the provider: a pending move at the period's
-     * end, and the provider subscription told to end with it. Otherwise on
-     * it now. Either way an open or scheduled checkout is given up.
+     * To a free plan. Paid at the provider: a pending move at the end of
+     * what is paid (the period, or the first month), and the provider
+     * subscription told to end with it — a first month's at once, so its
+     * full charge is never taken (`change-timing.ts`). Otherwise on it now.
+     * Either way an open or scheduled checkout is given up.
      */
     private async toFree(
         ctx: OrganizationContext,
@@ -673,10 +688,8 @@ export class CheckoutService {
                 "changed-plan",
             );
             const live = sub && sub.status !== "CANCELLED" ? sub : null;
-            const periodEnd =
-                live?.currentPeriodEnd && live.currentPeriodEnd > now
-                    ? live.currentPeriodEnd
-                    : null;
+            // The date the quote gave, read again under the lock.
+            const paidTo = paidUntil(live, now);
             if (!sub) {
                 await tx.subscription.create({
                     data: {
@@ -688,19 +701,12 @@ export class CheckoutService {
                 });
                 return now;
             }
-            // A trial paid nothing ahead, so it ends now (U16).
-            if (
-                live?.provider &&
-                live.providerSubscriptionId &&
-                billedByProvider(live) &&
-                live.status !== "TRIALING" &&
-                periodEnd
-            ) {
+            if (live?.provider && live.providerSubscriptionId && paidTo) {
                 await tx.subscription.update({
                     where: { id: sub.id },
                     data: {
                         pendingPlanId: target.id,
-                        pendingFrom: periodEnd,
+                        pendingFrom: paidTo,
                         cancelAtPeriodEnd: true,
                         // Chosen here, not a term run out (DEC-100).
                         freeChosenAt: now,
@@ -710,9 +716,9 @@ export class CheckoutService {
                     organizationId: ctx.organizationId,
                     provider: live.provider,
                     providerSubscriptionId: live.providerSubscriptionId,
-                    atCycleEnd: true,
+                    atCycleEnd: leavesWithCycle(live),
                 });
-                return periodEnd;
+                return paidTo;
             }
             // Nothing paid ahead: on Free now. A provider subscription still
             // running (a past-due one) is ended at once.

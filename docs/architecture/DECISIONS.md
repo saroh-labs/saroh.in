@@ -1928,3 +1928,32 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A catalogue made before the row is offered it on the Modules tab ("Add Variants row"). It arrives with no limit on any plan and hidden from the pricing page, so nothing changes until a number is set and the version is published.
 - Only behind `PLAN_ENFORCEMENT`, and fail open as every limit is: a plan that can't be read refuses nothing.
 - Code: `billing/item-limits.ts` (the rule), `products/variant-cap.ts` (the two writes that add a variant: a new variant, a copy), `itemLimitNotice` in `@saroh/pricing-catalog` (the words, shared with the editor).
+
+## DEC-159 The first-month offer is its plan's; a dearer plan starts today, anything else when what was paid runs out
+
+**Status: Accepted — 2026-10-13, built** · owner (after a test payment on the dev environment: a business in its first month moved between paid plans, each time with nothing charged, and so used the dearest plan for the first month's amount) · amends DEC-093
+
+- **The first-month offer belongs to the plan it is set on.** The catalogue says which plans carry one. A plan without it starts at its full price from Free, charged as it is authorised.
+- **Once per business.** A business has the offer when it first starts a paid plan that carries it, and never again, whatever happens after (`hadTrial`, as before). No plan chosen during a first month gets a first month of its own.
+- **Moving up during the first month starts today at the full price.** A plan that costs more a month than the one the business is on ends the first month there: its full first charge is taken now and its 12-month term starts now. What the first month cost is not refunded and not set against it. Nobody uses a dearer plan for the first month's amount.
+- **Moving down during the first month waits for the month to end.** A cheaper paid plan, or Free, takes effect when the first month ends and never at once. The business keeps the plan it started until then, and nothing more is charged for it.
+- **No refunds, so a move down never comes before what was paid for has run out.** In a paid period a cheaper plan, the other cycle or Free takes effect at the end of the cycle already paid. The business keeps its plan until then, and the screen says the date.
+- **Upgrades in a paid period start today**, paying the difference for the rest of the period, as before.
+- Decided in the same spirit:
+    - **The same price is not a move up.** A different plan at the same price waits for the end of the first month, as it waits for the end of a paid period.
+    - **Yearly during the first month** follows what the plan costs a month: a dearer plan's year starts today, as one payment. The year of the plan it is on, or of a cheaper one, is paid now and starts when the first month ends.
+    - **Cancelling during the first month** is the move to Free: the plan runs to the month's end, nothing more is charged, then Free.
+    - **Free first days** (a first month that costs nothing) follow the same rules.
+    - **A change that waits is replaced by the next change.** Free chosen instead gives up the plan that was authorised for the date. A dearer plan chosen instead starts today and nothing waits any more. A plan that waits and whose autopay is then withdrawn at the provider becomes Free on the same date, because nothing would pay for the plan the business is on.
+    - **A change that already waits has no way to undo it on the screen** other than choosing another plan. The plan it is on reads "you're already on" it, as before this decision. Wanted next: a way to keep the current plan.
+    - **Add-ons.** A dearer plan started today starts afresh, like any plan started at its full price: every add-on held ends with the first month and nothing owed for them is charged. A plan that starts at the month's end keeps the add-ons it is offered and ends the rest (DEC-157). Free ends them all. The quote names what ends before the business confirms.
+    - **A coupon** is for a checkout that starts a plan. It can be used on the dearer plan started today, and not on a plan that waits. One used on the first checkout is not carried to another plan, and since it was never redeemed it can still be used.
+    - **The provider's side ending early never cuts a plan short.** If the provider's subscription ends before the date the business's move waits for, the plan stays to that date.
+- **The business is told before it confirms.** The quote and the dialog say "Starts today" with what is paid now for a move up, and "From ‹date›: you keep ‹plan› until then" for anything that waits. The plan picker says the same on each row.
+- **Supersedes in DEC-093:** nothing of how a plan is paid. It replaces what was built on it: another paid plan chosen during the first month kept the first month and moved the business at once with nothing charged, and Free during the first month took effect at once. DEC-093's "Cancel before the month ends and you pay nothing more" stands, and the plan now runs to the month's end.
+- Consequences:
+    - A business in its first month when this ships is not moved or charged by it. Its next change follows these rules.
+    - The first month's provider subscription is cancelled at once when the business leaves it, in every case, so the full charge due at the month's end is never taken for a plan the business has left. Saroh keeps the plan running to the date by itself, and the hourly sweep or the new plan's first charge applies the move.
+    - No schema change. The quote gains `firstMonth` (`NOW`, `AT_END` or null).
+    - The Terms and the Refund and Cancellation Policy do not say that moving up during the introductory month is charged in full that day. The owner's text to settle.
+- Rules: `apps/api.saroh.in/src/modules/billing/change-timing.ts` (`paidUntil`, `firstMonthEnd`, `firstMonthMove`, `leavesWithCycle`, `runsToMoveDate`), read by `checkout-quote.ts`, `checkout.service.ts` and `billing-webhook.service.ts`. The words: `apps/app.saroh.in/lib/saroh-billing/quote-words.ts` and `plan-view.ts` (`pickerRows`, `waitingMove`). `PRICING_ROLLOUT.md` › "During the first month".

@@ -243,11 +243,12 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
   (`billing:manage`). The client sends a plan id and a cycle only; the plan
   row comes from the live version and every amount from `quoteChange`
   (integer paise, GST per line). The kinds:
-    - **Free**: at the end of the period paid at the provider (a pending
-      move, the provider subscription told to end with the period), else at
-      once. No checkout.
+    - **Free**: at the end of what is paid at the provider, a period or a
+      first month (a pending move, the provider subscription told to end
+      with it), else at once. No checkout.
     - **NEW** (from Free, cancelled, or a plan not billed through the
-      provider): a checkout; on the plan once its first charge is paid.
+      provider; also a dearer plan chosen during the first month, DEC-159):
+      a checkout; on the plan once its first charge is paid.
     - **UPGRADE** (pricier, same cycle, mid-period): a checkout whose
       provider subscription starts at the period's end with the difference
       for what's left (prorated, GST added) as an upfront charge; on the plan
@@ -256,6 +257,9 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
       taking it to): a checkout authorised now that starts on the date; it
       waits as the subscription's pending move, and the old provider
       subscription is told to end with the period.
+    - **When it takes effect** is one rule, `change-timing.ts` (DEC-159):
+      a dearer plan today, anything else once what was paid for has run
+      out. See "During the first month" below.
 - **A checkout** (`BillingCheckout`) is OPEN until the webhook completes it,
   lapses after a day (the sweep cancels it at the provider), and is replaced
   by a newer one. The provider's authorisation link is returned once and never
@@ -268,7 +272,10 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
   plan. `charged` renews (new period end, a due move applied); `pending` is
   PAST_DUE; `halted` is CANCELLED — read as Free — and the provider
   subscription is cancelled; `cancelled`/`completed` applies a move to Free or
-  to an authorised plan, else CANCELLED.
+  to an authorised plan, else CANCELLED. A provider subscription that ends
+  ahead of the date the business's move waits for changes nothing: the
+  plan is paid to that date (`runsToMoveDate`), and the sweep or the new
+  plan's first charge applies the move then.
 - **Moves** (KTD-4) apply on the renewal webhook or the hourly
   `billing.moves.apply` sweep, and only when ready (`moveReadiness`): never
   while the version's provider plans aren't SYNCED, and never at a new amount
@@ -294,9 +301,46 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   trial's end, no invoice, and the trial-ending email queued a few days
   ahead (`TRIAL_ENDING_NOTICE_DAYS`; it re-reads the checkout for a coupon).
   The first charge makes it `ACTIVE` and is invoiced as a new plan's first
-  (`NEW`); a failed one is `pending` then `halted` → Free. Another paid plan
-  during a trial is a `TRIAL` to the same end; Free during a trial is at
-  once. One trial per business, ever.
+  (`NEW`); a failed one is `pending` then `halted` → Free. One trial per
+  business, ever, and it is the offer of the plan it was started on: no
+  other plan continues it (DEC-159, "During the first month" below).
+- **During the first month** (DEC-159; `change-timing.ts`, read by the
+  quote, the change and the webhook). "First month" is any `TRIALING`
+  subscription billed at the provider: the nominal first month, or free
+  first days.
+    - **A plan that costs more a month** is a `NEW` checkout: its full
+      first charge now, its 12-month term from now, no offer of its own.
+      Paid → on it, `ACTIVE`; the first month's provider subscription is
+      cancelled at once. What the first month cost is not refunded or set
+      against it. Yearly of a dearer plan is the same, as one payment.
+    - **A plan that costs the same or less** (the plan's own yearly row
+      included) is a `SCHEDULED` checkout from the month's end, with
+      nothing owed now. **Free**, or cancelling, is a pending move to Free
+      on the same date. The business keeps its plan until then.
+    - **Nothing more is charged for the plan it leaves.** A first month's
+      provider subscription has no cycle to end with, so it is cancelled
+      at once (`leavesWithCycle`), never "at cycle end", and its
+      `cancelled` event leaves the plan where it is until the date.
+      **Unverified against Razorpay:** that an authenticated subscription
+      with a later `start_at` cancels cleanly at once, and that it then
+      sends `subscription.cancelled`.
+    - **A change that waits is replaced by the next one.** Free instead
+      gives up the plan it authorised (its checkout CANCELLED, its
+      provider subscription cancelled); a dearer plan today clears the
+      pending move. A plan that waits and is then ended at the provider
+      (the mandate withdrawn) becomes Free on the same date, since nothing
+      would bill the plan it is on.
+    - **Add-ons.** A dearer plan today starts afresh, like any `NEW`: every
+      add-on held ends, and nothing owed for the first month's is charged.
+      A plan from the month's end keeps the add-ons it is offered and ends
+      the rest (DEC-157); Free ends them all. The quote names them first.
+    - **A coupon** goes on a checkout that starts a plan, so it can be
+      used on the dearer plan today (`NEW`) and not on a plan that waits.
+      The first checkout's coupon is not carried to another plan. It was
+      never redeemed (that happens with its first discounted charge), so
+      it can still be used.
+    - **The trial-ending email** says nothing to a business leaving at the
+      month's end (`cancelAtPeriodEnd`); the move-down notice tells it.
 - **Yearly** is the plan's yearly row ("pay for N months, get 12", priced
   at publish) on its yearly provider plan, sold only while yearly is on.
 - **Coupons** (`?coupon=` on the quote, `coupon` on the change) apply to a
@@ -427,8 +471,9 @@ Code: `checkout-quote.ts` (the rule, with `TERM_CHARGES` and
   open-ended. **Yearly** is one payment for the year: a provider order for
   exactly what the quote says is due (`payNowTotalPaise`, a coupon already
   off), no mandate and no Offer; the checkout keeps `providerPlanId`
-  `"one-time"`. A yearly plan never has a trial; yearly while a trial runs
-  starts the year now. A move to yearly from monthly is paid now for a year
+  `"one-time"`. A yearly plan never has a trial; yearly during a first
+  month starts the year now for a dearer plan, and at the month's end for
+  the plan it is on or a cheaper one (DEC-159). A move to yearly from monthly is paid now for a year
   that starts at the period's end (SCHEDULED); a pricier year mid-year pays
   the difference now.
 - **The first month.** The catalogue's trial may carry `firstPaise` (before
@@ -607,7 +652,11 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
 - **Settings › Plan and billing** (owner only, as before): Your plan (from
   `GET …/billing/access` and the subscription), the plan picker (from
   `GET /public/pricing`; Monthly | Yearly only while yearly is on; "Start
-  N-day trial" only where `GET …/billing/change-plan` quotes a `TRIAL`),
+  N-day trial" only where `GET …/billing/change-plan` quotes a `TRIAL`;
+  each other plan's row says when a change to it would start, from the same
+  quote: "Starts today: ‹amount› now" for an upgrade, "From ‹date›: you
+  keep ‹plan› until then" for anything that waits, and no button on the
+  plan a change already waits for, DEC-159),
   add-ons, a coupon held for the next change, and Saroh's invoices with
   their PDF (`/api/saroh-invoices/:id/pdf`, a proxy). Changing plan is the
   quote, a confirm, then Razorpay's window over the page (the

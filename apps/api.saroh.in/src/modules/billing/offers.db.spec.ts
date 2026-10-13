@@ -340,37 +340,66 @@ describe("trials", () => {
         const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
         if (r.kind !== "TRIAL") throw new Error("expected a trial");
         await deliver(`fake_sub_${r.checkout.id}`, "authenticated");
-        // Back to Free during the trial: at once, nothing was paid ahead.
+        const ends = (await sub(ctx.organizationId)).currentPeriodEnd!;
+        // Back to Free during the trial: when it ends, never before (DEC-159).
         const free = await checkout.changePlan(ctx, {
             plan: "free",
             cycle: "month",
         });
-        expect(free.kind).toBe("TO_FREE");
+        expect(free).toMatchObject({
+            kind: "TO_FREE",
+            effectiveAt: ends.toISOString(),
+        });
+        expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.b");
+        const later = new Date(ends.getTime() + 1000);
+        await sweep.sweep(later);
         expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.free");
 
-        const again = await checkout.quote(ctx, { plan: "b", cycle: "month" });
+        const again = await checkout.quote(
+            ctx,
+            { plan: "b", cycle: "month" },
+            later,
+        );
         expect(again.kind).toBe("NEW");
     });
 
-    it("another plan during a trial keeps the trial's end", async () => {
+    it("a dearer plan during a trial ends it: paid in full today, invoiced as a new plan's first charge, with no add-ons carried (DEC-159)", async () => {
         await install();
         const ctx = await business();
+        const cRow = await row("c");
         const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
         if (r.kind !== "TRIAL") throw new Error("expected a trial");
         await deliver(`fake_sub_${r.checkout.id}`, "authenticated");
-        const ends = (await sub(ctx.organizationId)).currentPeriodEnd!;
+        await addons.set(ctx, "things-pack", 1);
 
         const c = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
         expect(c).toMatchObject({
-            kind: "TRIAL",
-            quote: { chargeNowPaise: 0, trialEndsAt: ends.toISOString() },
+            kind: "NEW",
+            quote: {
+                firstMonth: "NOW",
+                trialEndsAt: null,
+                chargeNowPaise: 0,
+                payNowTotalPaise: withGstPaise(cRow.priceCents),
+                // It starts afresh: the quote names what ends, before Confirm.
+                addonsEnding: [
+                    { id: "things-pack", quantity: 1, onNewPlan: null },
+                ],
+            },
         });
         if (c.kind === "TO_FREE") throw new Error("unreachable");
-        await deliver(`fake_sub_${c.checkout.id}`, "authenticated");
+        const end = new Date(Date.now() + 30 * DAY);
+        await deliver(`fake_sub_${c.checkout.id}`, "activated", {
+            currentPeriodEnd: end,
+        });
         expect(await sub(ctx.organizationId)).toMatchObject({
-            status: "TRIALING",
+            status: "ACTIVE",
             plan: { key: "catalog.c" },
-            currentPeriodEnd: ends,
+            currentPeriodEnd: end,
+        });
+        expect(await prisma.subscriptionAddon.count()).toBe(0);
+        expect(await prisma.sarohInvoice.findFirstOrThrow()).toMatchObject({
+            source: "NEW",
+            taxablePaise: cRow.priceCents,
         });
     });
 });

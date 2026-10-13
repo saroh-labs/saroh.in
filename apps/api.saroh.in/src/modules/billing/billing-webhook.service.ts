@@ -28,6 +28,7 @@ import { checkoutClearsAddons } from "./addons-ending";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { isOneTime } from "./billing-term";
 import { billingMayChargeFor } from "./business-closing";
+import { leavesWithCycle, runsToMoveDate } from "./change-timing";
 import { periodEnd, periodStart } from "./checkout-quote";
 import { redeemCouponInTx, trialNoticeAt } from "./offers";
 import type { AppliedMove } from "./plan-moves";
@@ -43,7 +44,7 @@ import type {
 import { BILLING_PROVIDER_FACTORY } from "./providers/billing-provider.port";
 import { SarohInvoicesService } from "./saroh-invoices.service";
 import { isLegalSubscriptionTransition } from "./subscription-state";
-import { endTermAtInTx } from "./term-end";
+import { endTermAtInTx, freePlanRowInTx } from "./term-end";
 
 type Tx = Prisma.TransactionClient;
 
@@ -126,7 +127,9 @@ const ENDED_PHASES: readonly BillingEventPhase[] = ["cancelled", "completed"];
  *       (a failed charge Razorpay retries) → PAST_DUE. `halted` (it gave
  *       up) → CANCELLED, which the access read takes as Free. Cancelled or
  *       completed → its move to Free or to a plan it authorised applies;
- *       otherwise CANCELLED.
+ *       otherwise CANCELLED. Ended ahead of the date its move waits for
+ *       (a first month's is ended at once): the plan runs on to that date,
+ *       which it is paid to (DEC-159, `change-timing.ts`).
  *     An illegal move is rejected (200, the inbox row left unprocessed).
  *
  * CREDENTIAL BOUNDARY: reads/writes ONLY the billing models (`Subscription`,
@@ -358,13 +361,31 @@ export class BillingWebhookService {
                 where: { id: checkout.id },
                 data: { status: "CANCELLED", endedReason: `provider:${phase}` },
             });
-            await tx.subscription.updateMany({
+            const waiting = await tx.subscription.findFirst({
                 where: {
                     organizationId: checkout.organizationId,
                     pendingPlanId: checkout.planId,
                 },
-                data: { pendingPlanId: null, pendingFrom: null },
+                select: {
+                    id: true,
+                    cancelAtPeriodEnd: true,
+                    plan: { select: { version: true } },
+                },
             });
+            if (waiting) {
+                // The plan it is on was already told to end with what was
+                // paid, and nothing bills it after that: Free from the
+                // same date, never a plan nobody pays for (DEC-159).
+                const free = waiting.cancelAtPeriodEnd
+                    ? await freePlanRowInTx(tx, waiting.plan.version)
+                    : null;
+                await tx.subscription.update({
+                    where: { id: waiting.id },
+                    data: free
+                        ? { pendingPlanId: free.id }
+                        : { pendingPlanId: null, pendingFrom: null },
+                });
+            }
             return { result: { status: "processed", changed: true } };
         }
 
@@ -501,12 +522,14 @@ export class BillingWebhookService {
                 });
             }
             // The one it replaces runs to the end of the period paid; the
-            // add-ons owed then ride on this one's first charge (U16).
+            // add-ons owed then ride on this one's first charge (U16). In
+            // a first month it is ended at once, so its full charge is
+            // never taken; the plan still runs to the month's end.
             if (oldProvider && !renewal) {
                 await enqueueProviderCancel(tx, {
                     organizationId: org,
                     ...oldProvider,
-                    atCycleEnd: true,
+                    atCycleEnd: leavesWithCycle(sub),
                 });
                 await rehomeAddonChargesInTx(tx, {
                     organizationId: org,
@@ -532,10 +555,13 @@ export class BillingWebhookService {
 
         // NEW, UPGRADE or TRIAL: on the plan now. An upgrade keeps the
         // period already paid (its own charges start when it ends); a new
-        // plan's period starts with this first charge; a trial runs to its
-        // end, when the first charge is taken (U16).
+        // plan's period starts with this first charge, and so does a dearer
+        // plan's chosen during the first month (DEC-159), which ends the
+        // month; a trial runs to its end, when the first charge is taken
+        // (U16).
         const trial = checkout.kind === "TRIAL";
-        // Another plan while a trial runs keeps the trial's add-ons.
+        // Another plan while a trial runs keeps the trial's add-ons: only
+        // a checkout made before DEC-159, which no longer quotes one.
         const continuing =
             trial && sub?.status === "TRIALING" && Boolean(oldProvider);
         const currentPeriodEnd =
@@ -687,6 +713,7 @@ export class BillingWebhookService {
                 providerSubscriptionId: true,
                 providerEventAt: true,
                 currentPeriodEnd: true,
+                cancelAtPeriodEnd: true,
                 pendingFrom: true,
                 plan: { select: { version: true } },
             },
@@ -734,6 +761,17 @@ export class BillingWebhookService {
         // Ending: a move to Free, or to a plan it authorised, takes over
         // from the subscription that ended with its period.
         if (ENDED_PHASES.includes(phase) && current !== "CANCELLED") {
+            // Ended ahead of the date the business's move waits for (a
+            // first month's is ended at once): the plan is paid to that
+            // date and stays until then. The sweep, or the first charge of
+            // the plan it authorised, applies the move on the date.
+            if (runsToMoveDate(sub, now)) {
+                await tx.subscription.update({
+                    where: { id: sub.id },
+                    data: { ...stamp },
+                });
+                return { result: { status: "processed", changed: false } };
+            }
             if (sub.pendingFrom) {
                 const applied = await applyDueMoveInTx(
                     tx,
