@@ -14,8 +14,11 @@ describe("limit words", () => {
 
     it("finds a row's words by its catalogue id", () => {
         expect(limitWordsFor("members")?.paused).toBe(
-            "New invites, and new people taking bookings, are paused. Everyone already on the team keeps access, and view-only people can still be invited.",
+            "New invites, and new people taking bookings, are paused. Everyone already on the team keeps access.",
         );
+        // No words of their own for people who only look (DEC-155).
+        expect(limitWordsFor("reviewers")).toBeNull();
+        expect(LIMIT_WORDS.reviewers).toBeUndefined();
         expect(limitWordsFor("orders")?.monthly).toBe(true);
     });
 

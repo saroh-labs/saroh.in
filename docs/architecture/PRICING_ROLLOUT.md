@@ -150,7 +150,8 @@ and the admin's usage lines and impact (`ImpactService`).
 - **What is counted:** products not archived; orders this month that
   stand (not cancelled, not an online checkout nobody paid); bookings this
   month that are confirmed (a course's sessions left out); posts live on
-  a site; people in the business plus open invitations; connected payment
+  a site; everyone in the business whatever their role, plus open
+  invitations and bookable staff with no login (DEC-155); connected payment
   and messaging providers. A month is the business's own, in its zone.
 - **Where it is refused:** making, copying, importing or un-archiving a
   product; an order taken by hand; a booking, by hand or on the booking

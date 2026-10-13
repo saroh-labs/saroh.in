@@ -15,7 +15,6 @@ const measure: PauseMeasure = {
             kind: "member",
             label: "Asha",
             owner: false,
-            seat: "seat",
         },
         {
             id: "inv_1",
@@ -23,7 +22,6 @@ const measure: PauseMeasure = {
             kind: "invite",
             label: "ravi@example.com",
             owner: false,
-            seat: "seat",
         },
     ],
     products: { cut: { createdAt: CUT_AT, id: "p_9" }, count: 4 },

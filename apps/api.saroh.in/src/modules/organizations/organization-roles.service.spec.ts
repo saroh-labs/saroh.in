@@ -15,7 +15,6 @@ jest.mock("@saroh/database", () => ({
             findMany: jest.fn(),
         },
         organizationInvitation: { findMany: jest.fn() },
-        // The role save and its seat checks share one transaction (DEC-105).
         $transaction: jest.fn(),
     },
 }));
@@ -554,81 +553,47 @@ describe("the plan's Custom roles row (DEC-099)", () => {
     });
 });
 
-// DEC-105: a role's people move between seats and view-only places with it.
-describe("seats follow a role's permissions (DEC-105)", () => {
-    it("says whether holding a role uses a seat, by its permissions", async () => {
+// DEC-155: everyone uses one team seat whatever their role can do, so a
+// role's permissions never move anyone on or off a seat.
+describe("a role's permissions never change who uses a seat (DEC-155)", () => {
+    it("says nothing about seats on a role: every role uses one", async () => {
         role.findMany!.mockResolvedValue([
             { ...STOCK_CLERK, key: "looker", actions: ["order:read"] },
             { ...STOCK_CLERK, key: "desk", actions: ["booking:write"] },
         ]);
         const roles = await service().list("org_1");
-        const seat = Object.fromEntries(roles.map((r) => [r.key, r.usesSeat]));
-        expect(seat).toEqual({
-            OWNER: true,
-            ADMIN: true,
-            MEMBER: true,
-            REVIEWER: false,
-            looker: false,
-            desk: true,
-        });
+        expect(roles.map((r) => r.key)).toEqual([
+            "OWNER",
+            "ADMIN",
+            "MEMBER",
+            "REVIEWER",
+            "looker",
+            "desk",
+        ]);
+        for (const r of roles) expect(r).not.toHaveProperty("usesSeat");
     });
 
-    it("checks the team seats for the people a write permission moves onto them", async () => {
+    it("never asks the team limit when a role gains or sheds a write permission", async () => {
+        const room = jest.spyOn(planMeter, "roomInTx");
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        // A role that only looks is given a write: its people already
+        // hold their seats.
         stored(STOCK_CLERK);
-        membership.findMany!.mockResolvedValue([
-            { extraActions: [], staffMember: null },
-            // Takes bookings: already on a seat.
-            { extraActions: [], staffMember: { status: "ACTIVE" } },
-        ]);
-        invitation.findMany!.mockResolvedValue([{ id: "inv_1" }]);
-        const room = jest.spyOn(planMeter, "roomInTx").mockResolvedValue(null);
-        const out = await service().update(OWNER, "stock-clerk", {
+        await service().update(OWNER, "stock-clerk", {
             actions: ["order:read", "booking:write"],
         });
-        expect(room).toHaveBeenCalledWith(prisma, "org_1", "members", {
-            adding: 2,
-        });
-        expect(room).toHaveBeenCalledWith(prisma, "org_1", "reviewers", {
-            adding: 0,
-        });
-        expect(out.usesSeat).toBe(true);
-        room.mockRestore();
-    });
-
-    it("a full team stops the save", async () => {
-        stored(STOCK_CLERK);
-        membership.findMany!.mockResolvedValue([
-            { extraActions: [], staffMember: null },
-        ]);
-        const room = jest
-            .spyOn(planMeter, "roomInTx")
-            .mockRejectedValueOnce(
-                new ForbiddenException("PLAN_LIMIT_REACHED"),
-            );
-        await expect(
-            service().update(OWNER, "stock-clerk", {
-                actions: ["order:read", "booking:write"],
-            }),
-        ).rejects.toThrow(ForbiddenException);
-        expect(role.updateMany).not.toHaveBeenCalled();
-        room.mockRestore();
-    });
-
-    it("counts people a role sheds its writes from toward view-only people", async () => {
+        // And the other way.
         stored({ ...STOCK_CLERK, actions: ["order:read", "booking:write"] });
-        membership.findMany!.mockResolvedValue([
-            { extraActions: [], staffMember: null },
-        ]);
-        const room = jest.spyOn(planMeter, "roomInTx").mockResolvedValue(null);
         await service().update(OWNER, "stock-clerk", {
             actions: ["order:read"],
         });
-        expect(room).toHaveBeenCalledWith(prisma, "org_1", "reviewers", {
-            adding: 1,
-        });
-        expect(room).toHaveBeenCalledWith(prisma, "org_1", "members", {
-            adding: 0,
-        });
+        expect(role.updateMany).toHaveBeenCalledTimes(2);
+        expect(room).not.toHaveBeenCalled();
+        expect(withRoom).not.toHaveBeenCalled();
+        // Nobody's seat is read to decide it.
+        expect(membership.findMany).not.toHaveBeenCalled();
+        expect(invitation.findMany).not.toHaveBeenCalled();
         room.mockRestore();
+        withRoom.mockRestore();
     });
 });

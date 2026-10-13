@@ -14,8 +14,7 @@
  * | `ordersPerMonth`   | orders placed this month that stand: not cancelled, and not an online checkout nobody paid (OQ-7); one to be paid on handover stands from the start |
  * | `bookingsPerMonth` | bookings customers made on the site this month that stand (CONFIRMED), a course's sessions left out; the team's own bookings never count (DEC-095) |
  * | `blogPosts`        | posts live on a site that isn't deleted                                |
- * | `teamMembers`      | people who use a seat (`seats.ts`: a role that can change something, or taking bookings), plus such invitations still open, plus bookable staff with no login (DEC-105) |
- * | `reviewers`        | view-only people (a role that only looks, approves or comments), plus such invitations still open: the catalogue's "View-only people" |
+ * | `teamMembers`      | everyone in the business, whatever their role (`seats.ts`, DEC-155): team members, invitations still open, and bookable staff with no login (DEC-111) |
  * | `integrations`     | connected payment and messaging providers                              |
  * | `shopLocations`    | locations not deleted whose settings say `SHOP` (customers visit); an online-only one, or one with no settings, never counts |
  * | `sites`            | websites not deleted                                                   |
@@ -40,8 +39,7 @@ import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
 import { COUNTED_SAROH_DELIVERIES } from "../communications/saroh-delivery";
-import type { SeatKind } from "./seats";
-import { BOOKABLE_STAFF, countedOnDiary, roleActionsOf, seatOf } from "./seats";
+import { BOOKABLE_STAFF, countedOnDiary } from "./seats";
 
 /** The limit keys metering counts, in `MODULE_MAP`'s words. */
 export const METERED_LIMIT_KEYS = [
@@ -50,7 +48,6 @@ export const METERED_LIMIT_KEYS = [
     "bookingsPerMonth",
     "blogPosts",
     "teamMembers",
-    "reviewers",
     "integrations",
     "shopLocations",
     "sites",
@@ -152,7 +149,6 @@ export type MeterDb = Pick<
     | "membership"
     | "staffMember"
     | "organizationInvitation"
-    | "organizationRole"
     | "merchantPaymentProvider"
     | "communicationProvider"
     | "businessProfile"
@@ -173,27 +169,8 @@ export function monthFirstDay(now: Date, zone: string): Date {
     return new Date(Date.UTC(local.year, local.month - 1, 1));
 }
 
-/** The seat kind each people limit counts (DEC-105). */
-export function seatKindCounted(key: "teamMembers" | "reviewers"): SeatKind {
-    return key === "reviewers" ? "viewOnly" : "seat";
-}
-
-/** What a membership row needs read to be classified (`seats.ts`). */
-export const SEAT_MEMBER_SELECT = {
-    role: true,
-    extraActions: true,
-    staffMember: { select: { status: true } },
-} as const;
-
-/** One membership as {@link SEAT_MEMBER_SELECT} reads it. */
-export interface SeatMemberRow {
-    role: string;
-    extraActions: string[];
-    staffMember: { status: string } | null;
-}
-
 /**
- * Bookable staff with no login (DEC-105, UX-053): on the diary, taking
+ * Bookable staff with no login (DEC-111, UX-053): on the diary, taking
  * bookings, and no team member behind them. Each uses a seat; one who is
  * a team member is counted once, through their membership.
  */
@@ -201,48 +178,33 @@ export function loginlessStaff(): Prisma.StaffMemberWhereInput {
     return { status: BOOKABLE_STAFF, membershipId: null };
 }
 
-/** What an open invitation needs read to be classified (#868). */
+/** What an open invitation needs read to be counted (#868). */
 export const SEAT_INVITE_SELECT = {
-    role: true,
     staffMember: { select: { status: true, membershipId: true } },
 } as const;
 
 /** One open invitation as {@link SEAT_INVITE_SELECT} reads it. */
 export interface SeatInviteRow {
-    role: string;
     /** The diary person it gives a login to (#868), if any. */
     staffMember?: { status: string; membershipId: string | null } | null;
 }
 
 /**
- * How many of these people and open invitations are of `kind`: a seat
- * (they can change something, or take bookings) or view-only. `loginless`
- * is the business's bookable staff with no login ({@link loginlessStaff}):
- * seats too. An invite that gives one of them a login is that same person
- * (#868, `countedOnDiary`), so it isn't counted again.
+ * The team seats a business uses (DEC-155): one for every team member,
+ * whatever their role, one for every open invitation, and one for each of
+ * its bookable staff with no login ({@link loginlessStaff}). An invite
+ * that gives one of those a login is that same person (#868,
+ * `countedOnDiary`), so it isn't counted again.
  */
-export function countSeatKind(
-    kind: SeatKind,
-    roles: readonly { key: string; actions: string[] }[],
-    members: readonly SeatMemberRow[],
+export function countSeats(
+    members: number,
     invites: readonly SeatInviteRow[],
     loginless = 0,
 ): number {
-    const lookup = roleActionsOf(roles);
-    const people = members.filter(
-        (m) =>
-            seatOf(
-                lookup,
-                m.role,
-                m.extraActions,
-                m.staffMember?.status === BOOKABLE_STAFF,
-            ) === kind,
-    ).length;
     const waiting = invites.filter(
-        (i) =>
-            !countedOnDiary(i.staffMember) && seatOf(lookup, i.role) === kind,
+        (i) => !countedOnDiary(i.staffMember),
     ).length;
-    return people + waiting + (kind === "seat" ? loginless : 0);
+    return members + waiting + loginless;
 }
 
 /** Invitations still open at `now`: they hold a place until answered. */
@@ -340,31 +302,19 @@ export async function countUsage(
                     site: { organizationId, deletedAt: null },
                 },
             });
-        case "teamMembers":
-        case "reviewers": {
-            // Classified by permissions, never role names (DEC-105): the
-            // business's own roles are read with the people who hold them.
-            const kind = seatKindCounted(key);
-            const [members, invites, roles, loginless] = await Promise.all([
-                db.membership.findMany({
-                    where: { organizationId },
-                    select: SEAT_MEMBER_SELECT,
-                }),
+        case "teamMembers": {
+            // Everyone, whatever their role (DEC-155): no role is read.
+            const [members, invites, loginless] = await Promise.all([
+                db.membership.count({ where: { organizationId } }),
                 db.organizationInvitation.findMany({
                     where: { organizationId, ...openInvitations(now) },
                     select: SEAT_INVITE_SELECT,
                 }),
-                db.organizationRole.findMany({
-                    where: { organizationId },
-                    select: { key: true, actions: true },
+                db.staffMember.count({
+                    where: { organizationId, ...loginlessStaff() },
                 }),
-                kind === "seat"
-                    ? db.staffMember.count({
-                          where: { organizationId, ...loginlessStaff() },
-                      })
-                    : 0,
             ]);
-            return countSeatKind(kind, roles, members, invites, loginless);
+            return countSeats(members, invites, loginless);
         }
         case "integrations": {
             const [payments, messaging] = await Promise.all([

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { RETIRED_MODULE_IDS } from "./module-map";
+
 /**
  * The pricing catalogue: one snapshot of plans, the module-by-plan matrix and
  * the offers (yearly, GST display, trials, add-ons). A published snapshot is a
@@ -136,13 +138,32 @@ export const addonSchema = z.object({
     qty: z.number().int().positive(),
 });
 
+/**
+ * A snapshot's rows, less the ones the product has retired
+ * (`RETIRED_MODULE_IDS`): a version published while one was sold still
+ * reads, without it. An add-on that only switched such a row on goes too.
+ */
 const catalogShape = z.object({
     plans: z.array(planSchema).min(1),
     groups: z.array(groupSchema),
-    modules: z.array(moduleSchema),
+    modules: z
+        .array(moduleSchema)
+        .transform((rows) => rows.filter((m) => !RETIRED_MODULE_IDS.has(m.id))),
     yearly: yearlySchema,
     gst: gstSchema,
-    addons: z.array(addonSchema).default([]),
+    addons: z
+        .array(addonSchema)
+        .default([])
+        .transform((rows) =>
+            rows.filter(
+                (a) =>
+                    !(
+                        a.kind === "module" &&
+                        a.module !== undefined &&
+                        RETIRED_MODULE_IDS.has(a.module)
+                    ),
+            ),
+        ),
 });
 
 function duplicates(ids: readonly string[]): string[] {

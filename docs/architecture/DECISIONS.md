@@ -1206,7 +1206,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-105 Team seats count people who can change things; view-only people have their own limit
 
-**Status: Accepted — 2026-10-07** · user · from the UX audit (D6)
+**Status: Superseded in part by DEC-155 — 2026-10-13** (was Accepted 2026-10-07) · user · from the UX audit (D6) · the separate view-only limit is gone; bookable staff using a seat stands
 
 - Decision: anyone whose role carries a write permission (books, sells, edits), including bookable staff, uses a team seat. People whose role carries only view permissions don't use a seat. They count toward a separate per-plan limit, the one Reviewers use today, which can change by policy.
 - Consequences: metering classifies a member by their role's permissions, not its name. The catalogue's Reviewers row becomes the view-only people limit.
@@ -1302,7 +1302,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 - Context: the published Terms promise that on a move to a lower plan, what's over the new plan's limits becomes read-only, with an email 7 days before, nothing deleted, and moving back up restoring everything at once. Before this, nothing paused; only adding more was refused.
 - Decision:
-    - What's over the limits is worked out from the plan the business reads now and a fixed order; nothing is stored per item. Team (seats as DEC-105 and DEC-111 count them, view-only people against their own limit): the owner always stays, then the earliest to join, then open invitations. Products and posts: the newest stay. Locations (SHOP storefronts, DEC-109) and websites (DEC-094): the first made stay.
+    - What's over the limits is worked out from the plan the business reads now and a fixed order; nothing is stored per item. Team (seats as DEC-105 and DEC-111 count them, view-only people against their own limit; since DEC-155 everyone counts against the one team limit): the owner always stays, then the earliest to join, then open invitations. Products and posts: the newest stay. Locations (SHOP storefronts, DEC-109) and websites (DEC-094): the first made stay.
     - Paused people can't open the business, and take no new bookings (diary people with no login and paused members' own diary rows). Paused products and posts are hidden from the site and read-only. A paused location stops taking orders; a paused website stops orders, bookings, class packs and plans sold online. Invoices, orders, customers and payment records are never touched, and bookings already made are kept.
     - **The pause waits 7 days after a notice (owner, 9 Oct).** Moves known ahead (an offer's end, a term's end, a chosen move) are told at 30, 7 and 1 days; moves that happen at once (a failed payment the provider gave up on, cancelling now, an operator change) are told within the hour and pause 7 days later. The billing moves themselves are unchanged.
     - **Locations and bookings (owner, 9 Oct):** bookings belong to the business, not a location, so a paused location stops orders and a paused website stops bookings; the Terms stand as written.
@@ -1870,3 +1870,17 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **One exception to "no scheduled deploys" (DEC-107), once.** Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026 only: the first starts early, waits for the instant and deploys every app; the second deploys only what is still unopened. Both do nothing in another year and are deleted after launch. The rule stands for everything else.
 - Plans show in the workspace at launch, which DEC-136 left open.
 - Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.
+
+## DEC-155 Everyone in a business uses one team seat, whatever their role
+
+**Status: Accepted — 2026-10-13, built** · owner · supersedes the view-only part of DEC-105 and the Reviewer rule of #794 · amends DEC-114
+
+- Context: since 6 Oct (#794) Reviewers were left off the team count, and since DEC-105 anyone whose role only looks used no seat and counted toward a separate limit of their own (the catalogue's `reviewers` row, "View-only people").
+- Decision: every person in a business uses one team seat, whatever their role: Owner, Admin, Member, Reviewer and any role the business made. There is no free or separate allowance for people who only look. The team count is every team member, every open invitation, and everyone on the diary who takes bookings with no login (DEC-111, unchanged).
+- The Reviewer role itself is unchanged: the same permissions, and still the sites it is invited to.
+- Consequences:
+    - Inviting anyone, a Reviewer included, is checked against the one team limit. A change of role, of a role's permissions or of someone's extra permissions never changes the count, so none of them asks the plan.
+    - The `reviewers` row is retired from the catalogue (`RETIRED_MODULE_IDS` in `@saroh/pricing-catalog`), with its limit key, its words and its place on Team, Plan and the pricing table. A version published while it was sold still carries the row in the database; every reader drops it on read, so it shows, counts and caps nothing. No migration, and no stored row is rewritten.
+    - Moving to a lower plan (DEC-114): the owner always stays, then the earliest to join up to the limit, Reviewers placed by when they joined like anyone else. A limit of one keeps the owner alone.
+    - The move-down notice's claim is keyed by the limits it named, which no longer include a view-only one. A business told under the old key is told again and gets its 7 days again before anything pauses.
+    - The member, invitation and role views no longer carry `usesSeat`.

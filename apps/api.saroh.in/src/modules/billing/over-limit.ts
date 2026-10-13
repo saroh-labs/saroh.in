@@ -16,12 +16,11 @@
  *
  * **Who and what stays** (the order is fixed; the owner can't pick):
  *
- * - Team (`teamMembers`, DEC-105, DEC-111): the owner always; then everyone
- *   who uses a seat, by when they joined (a team member's membership, a
- *   diary person with no login), earliest first; then open invitations, by
- *   when they were sent. Past the limit, a team member can't open the
- *   business and an invitation can't be accepted. View-only people
- *   (`reviewers`) the same way, against their own limit.
+ * - Team (`teamMembers`, DEC-155, DEC-111): the owner always; then everyone
+ *   else, whatever their role, by when they joined (a team member's
+ *   membership, a diary person with no login), earliest first; then open
+ *   invitations, by when they were sent. Past the limit, a team member
+ *   can't open the business and an invitation can't be accepted.
  * - Products and blog posts: the most recently created, up to the limit,
  *   stay on the site; older ones are hidden from it and read-only in the
  *   workspace.
@@ -35,12 +34,9 @@
  */
 import type { ModuleAccess } from "@saroh/pricing-catalog";
 
-import type { SeatKind } from "./seats";
-
 /** The catalogue rows whose limits pause things, and the key each meters. */
 export const PAUSE_ROWS = {
     members: "teamMembers",
-    reviewers: "reviewers",
     products: "products",
     blog: "blogPosts",
     locations: "shopLocations",
@@ -53,7 +49,6 @@ export type PauseKey = (typeof PAUSE_ROWS)[PauseRow];
 /** The keys, in a fixed order (the claim's key is built in it). */
 export const PAUSE_KEYS: readonly PauseKey[] = [
     "teamMembers",
-    "reviewers",
     "products",
     "blogPosts",
     "shopLocations",
@@ -66,7 +61,6 @@ export type PauseLimits = Record<PauseKey, number | null>;
 /** Nothing capped: what a business off the catalogue, or unenforced, reads. */
 export const UNCAPPED: PauseLimits = {
     teamMembers: null,
-    reviewers: null,
     products: null,
     blogPosts: null,
     shopLocations: null,
@@ -246,25 +240,23 @@ export interface TeamPerson extends Dated {
     /** What they are called in a notice: a name, else an email. */
     label: string;
     owner: boolean;
-    seat: SeatKind;
 }
 
 /**
- * Who of one seat kind stays: the owner always (never paused, whatever
- * the limit), then team members and diary people by when they joined,
- * then open invitations by when they were sent; up to `limit` in all.
+ * Who stays: the owner always (never paused, whatever the limit), then
+ * team members and diary people by when they joined, whatever their role
+ * (DEC-155), then open invitations by when they were sent; up to `limit`
+ * in all. A limit of one keeps the owner alone.
  */
 export function keepTeam(
     people: readonly TeamPerson[],
-    seat: SeatKind,
     limit: number | null,
 ): { kept: TeamPerson[]; paused: TeamPerson[] } {
-    const mine = people.filter((p) => p.seat === seat);
-    const owners = mine.filter((p) => p.owner).sort(byOldest);
-    const joined = mine
+    const owners = people.filter((p) => p.owner).sort(byOldest);
+    const joined = people
         .filter((p) => !p.owner && p.kind !== "invite")
         .sort(byOldest);
-    const invites = mine.filter((p) => p.kind === "invite").sort(byOldest);
+    const invites = people.filter((p) => p.kind === "invite").sort(byOldest);
     const ordered = [...owners, ...joined, ...invites];
     if (limit === null) return { kept: ordered, paused: [] };
     const room = Math.max(0, limit - owners.length);
@@ -350,7 +342,7 @@ export function pausedFromMeasure(
 
 /** What a notice lists: exactly what will pause. */
 export interface PauseSummary {
-    /** People by name (or email), team then view-only, in pause order. */
+    /** People by name (or email), in pause order. */
     people: string[];
     products: number;
     posts: number;

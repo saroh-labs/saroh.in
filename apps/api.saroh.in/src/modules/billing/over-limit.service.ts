@@ -25,7 +25,7 @@ import {
     pauseLimitsOf,
     pausesFrom,
 } from "./over-limit";
-import { BOOKABLE_STAFF, countedOnDiary, roleActionsOf, seatOf } from "./seats";
+import { BOOKABLE_STAFF, countedOnDiary } from "./seats";
 
 /** The tables measuring reads. */
 export type OverLimitDb = Pick<
@@ -33,7 +33,6 @@ export type OverLimitDb = Pick<
     | "membership"
     | "staffMember"
     | "organizationInvitation"
-    | "organizationRole"
     | "product"
     | "post"
     | "store"
@@ -269,8 +268,8 @@ export async function measurePauses(
     limits: PauseLimits,
 ): Promise<PauseMeasure> {
     const [people, products, posts, locations, sites] = await Promise.all([
-        limits.teamMembers !== null || limits.reviewers !== null
-            ? teamPaused(db, organizationId, limits)
+        limits.teamMembers !== null
+            ? teamPaused(db, organizationId, limits.teamMembers)
             : Promise.resolve([] as TeamPerson[]),
         newestCut(
             limits.products,
@@ -342,22 +341,20 @@ async function newestCut(
     return { cut: row, count: total - limit };
 }
 
-/** The team, in pause order, past each seat kind's limit (DEC-105). */
+/** The team past its limit, in pause order: everyone counts (DEC-155). */
 async function teamPaused(
     db: OverLimitDb,
     organizationId: string,
-    limits: PauseLimits,
+    limit: number,
 ): Promise<TeamPerson[]> {
     const now = new Date();
-    const [members, diary, invites, roles] = await Promise.all([
+    const [members, diary, invites] = await Promise.all([
         db.membership.findMany({
             where: { organizationId },
             select: {
                 id: true,
                 role: true,
-                extraActions: true,
                 createdAt: true,
-                staffMember: { select: { status: true } },
                 user: { select: { name: true, email: true } },
             },
         }),
@@ -374,17 +371,11 @@ async function teamPaused(
             select: {
                 id: true,
                 email: true,
-                role: true,
                 createdAt: true,
                 staffMember: { select: { status: true, membershipId: true } },
             },
         }),
-        db.organizationRole.findMany({
-            where: { organizationId },
-            select: { key: true, actions: true },
-        }),
     ]);
-    const lookup = roleActionsOf(roles);
     const people: TeamPerson[] = [
         ...members.map((m): TeamPerson => ({
             id: m.id,
@@ -392,12 +383,6 @@ async function teamPaused(
             kind: "member",
             label: m.user.name?.trim() ? m.user.name.trim() : m.user.email,
             owner: m.role === "OWNER",
-            seat: seatOf(
-                lookup,
-                m.role,
-                m.extraActions,
-                m.staffMember?.status === BOOKABLE_STAFF,
-            ),
         })),
         ...diary.map((d): TeamPerson => ({
             id: d.id,
@@ -405,7 +390,6 @@ async function teamPaused(
             kind: "diary",
             label: d.name,
             owner: false,
-            seat: "seat",
         })),
         ...invites
             .filter((i) => !countedOnDiary(i.staffMember))
@@ -415,11 +399,7 @@ async function teamPaused(
                 kind: "invite",
                 label: i.email,
                 owner: false,
-                seat: seatOf(lookup, i.role),
             })),
     ];
-    return [
-        ...keepTeam(people, "seat", limits.teamMembers).paused,
-        ...keepTeam(people, "viewOnly", limits.reviewers).paused,
-    ];
+    return keepTeam(people, limit).paused;
 }

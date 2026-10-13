@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 
-import { countSeatKind } from "../billing/metering";
-import { CALENDAR_ONLY_ACTIONS } from "./calendar-only-role";
+import { countSeats } from "../billing/metering";
 import {
     assertDiaryInvitable,
     countedOnDiary,
@@ -15,7 +14,6 @@ import {
  * Calendar only by default, and counted once.
  */
 
-const ROLES = [{ key: "calendar-only", actions: [...CALENDAR_ONLY_ACTIONS] }];
 const loginless = { status: "ACTIVE", membershipId: null };
 
 describe("the role an invite asks for", () => {
@@ -64,36 +62,25 @@ describe("who on the diary can be invited", () => {
     });
 });
 
-describe("seat counting with a diary invite (DEC-105)", () => {
+describe("seat counting with a diary invite (DEC-155)", () => {
     it("counts the invite as the diary person it names, once", () => {
         // The person on the diary with no login holds one seat; the invite
         // that gives them a login is them, not one more.
-        const invites = [{ role: "calendar-only", staffMember: loginless }];
-        expect(countSeatKind("seat", ROLES, [], invites, 1)).toBe(1);
-        expect(countSeatKind("viewOnly", ROLES, [], invites, 1)).toBe(0);
+        expect(countSeats(0, [{ staffMember: loginless }], 1)).toBe(1);
     });
 
-    it("counts it at its role once they have a login, or are archived", () => {
+    it("counts it as one more once they have a login, or are archived", () => {
         const linked = { status: "ACTIVE", membershipId: "m_1" };
         const archived = { status: "ARCHIVED", membershipId: null };
         expect(
-            countSeatKind(
-                "seat",
-                ROLES,
-                [],
-                [
-                    { role: "calendar-only", staffMember: linked },
-                    { role: "calendar-only", staffMember: archived },
-                ],
-            ),
+            countSeats(0, [{ staffMember: linked }, { staffMember: archived }]),
         ).toBe(2);
     });
 
-    it("counts an ordinary invite as before", () => {
-        expect(countSeatKind("seat", ROLES, [], [{ role: "MEMBER" }])).toBe(1);
-        expect(
-            countSeatKind("viewOnly", ROLES, [], [{ role: "REVIEWER" }]),
-        ).toBe(1);
+    it("counts an ordinary invite as one seat, whatever role it names", () => {
+        // A Member's and a Reviewer's alike: an invite carries no role here.
+        expect(countSeats(0, [{}, { staffMember: null }])).toBe(2);
+        expect(countSeats(3, [{}], 2)).toBe(6);
     });
 
     it("says who is counted on the diary and who joins taking bookings", () => {

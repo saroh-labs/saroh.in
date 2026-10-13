@@ -80,15 +80,7 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
     teamMembers: {
         what: "team members",
         one: "team member",
-        paused: "New invites, and new people taking bookings, are paused. Everyone already on the team keeps access, and view-only people can still be invited.",
-        monthly: false,
-    },
-    // The catalogue's "View-only people" (DEC-105): people whose role only
-    // looks, approves or comments. They use no team seat.
-    reviewers: {
-        what: "view-only people",
-        one: "view-only person",
-        paused: "New invites for view-only people are paused. Everyone you have keeps access.",
+        paused: "New invites, and new people taking bookings, are paused. Everyone already on the team keeps access.",
         monthly: false,
     },
     shopLocations: {

@@ -116,23 +116,21 @@ export function inviteSchema(known: {
 export type InviteValues = z.infer<ReturnType<typeof inviteSchema>>;
 
 /**
- * What the plan's team cap counts, said plainly (UX-028, DEC-105): "2 people
- * including you · 1 invite waiting · 1 view-only person". The seats count
- * everyone who can change something, the owner included, everyone on the
- * diary with no login (`noLogin`), and every such invite not yet answered;
- * people who only look use no seat, and are said apart (`billing/seats.ts`
- * on the API).
+ * What the plan's team cap counts, said plainly (UX-028, DEC-155): "2 people
+ * including you · 1 invite waiting". Everyone uses one team seat whatever
+ * their role, the owner and Reviewers included, and so does everyone on
+ * the diary with no login (`noLogin`) and every invite not yet answered
+ * (`billing/seats.ts` on the API).
  */
 export function teamCountLine(
     people: number,
     waiting: number,
-    viewOnly = 0,
     noLogin = 0,
 ): string {
     const parts = [
         people === 1 ? "Just you" : `${people} people including you`,
     ];
-    // Bookable staff with no login use a seat too (DEC-105, UX-053).
+    // Bookable staff with no login use a seat too (DEC-111, UX-053).
     if (noLogin > 0) {
         parts.push(
             `${count(noLogin, "person", "people")} taking bookings with no sign-in`,
@@ -141,82 +139,51 @@ export function teamCountLine(
     if (waiting > 0) {
         parts.push(`${count(waiting, "invite")} waiting`);
     }
-    if (viewOnly > 0) {
-        parts.push(
-            `${count(viewOnly, "view-only person", "view-only people")}, no seat`,
-        );
-    }
     return parts.join(" · ");
 }
 
-/** Whether a role, a person or an invite uses a team seat (DEC-105). */
-export function usesSeat(x: { usesSeat?: boolean } | undefined): boolean {
-    // Unknown (an older API): counted, the way the API meters what it can't
-    // tell apart.
-    return x?.usesSeat !== false;
-}
-
 /**
- * The Team line's three counts: seats taken, seat invites waiting, and
- * view-only people with their invites. An invite for someone on the diary
- * with no login is that person, already counted among those taking
- * bookings with no login (#868), so it isn't counted again.
+ * The Team line's counts: people on the team and invites waiting, at any
+ * role (DEC-155). An invite for someone on the diary with no login is that
+ * person, already counted among those taking bookings with no login
+ * (#868), so it isn't counted again.
  */
 export function teamCounts(
-    members: readonly { usesSeat?: boolean }[],
-    invitations: readonly { usesSeat?: boolean; countedOnDiary?: boolean }[],
-): { people: number; waiting: number; viewOnly: number } {
-    const seated = (xs: readonly { usesSeat?: boolean }[]) =>
-        xs.filter((x) => usesSeat(x)).length;
-    const open = invitations.filter((i) => i.countedOnDiary !== true);
+    members: readonly unknown[],
+    invitations: readonly { countedOnDiary?: boolean }[],
+): { people: number; waiting: number } {
     return {
-        people: seated(members),
-        waiting: seated(open),
-        viewOnly: members.length + open.length - seated(members) - seated(open),
+        people: members.length,
+        waiting: invitations.filter((i) => i.countedOnDiary !== true).length,
     };
 }
 
-/** The plan's caps on Team, as the page reads them (U14, DEC-105). */
+/** The plan's cap on Team, as the page reads it (U14, DEC-155). */
 export interface TeamLimit {
     /** The team seats, open invites counted, have reached their cap. */
     full: boolean;
     /** The notice's reason, in the design's words. */
     why: string;
-    /** The view-only people cap is reached too (their own, DEC-105). */
-    reviewersFull?: boolean;
-    /** Its reason, in the same words. */
-    reviewersWhy?: string;
 }
 
 /**
- * Who Invite can still ask (UX-028, DEC-105). Full seats stop roles that
- * can change something, not view-only ones, which have a cap of their
- * own, and the other way round: the dialog stays open with the roles that
- * don't fit disabled and the reason beside them. Only when both caps are
- * reached is there no one to invite.
+ * Whether Invite can ask anyone new (UX-028, DEC-155). A full team stops
+ * every role alike, a Reviewer too: the dialog shows the roles disabled
+ * with the reason beside them. Someone already on the diary is the one
+ * exception, and the dialog's own (#868).
  */
 export function inviteRoom(limit: TeamLimit | null | undefined): {
-    /** Anyone at all can be invited. */
+    /** Someone new can be invited. */
     open: boolean;
-    /** Why a role that takes a seat can't be picked; null when it can. */
-    seatReason: string | null;
-    /** Why a view-only role can't be picked; null when it can. */
-    viewOnlyReason: string | null;
+    /** Why no role can be picked for someone new; null when one can. */
+    reason: string | null;
 } {
-    if (!limit) return { open: true, seatReason: null, viewOnlyReason: null };
-    return {
-        open: !(limit.full && limit.reviewersFull === true),
-        seatReason: limit.full
-            ? `${limit.why} (invites count too). View-only people don't take a seat.`
-            : null,
-        viewOnlyReason: limit.reviewersFull
-            ? `${limit.reviewersWhy ?? "You've reached your plan's view-only people"} (invites count too).`
-            : null,
-    };
+    if (!limit?.full) return { open: true, reason: null };
+    return { open: false, reason: `${limit.why} (invites count too).` };
 }
 
 /**
- * Team's Invite button (UX-028, DEC-105, #868, #800): what it says, whether
+ * Team's Invite button (UX-028, DEC-155, #868, #800): what it says, whether
  * the dialog may give someone on the diary a login, and — when there is no
  * one it could invite — why, said on a press instead of a dialog the API
  * would refuse.
@@ -233,14 +200,8 @@ export function inviteButton(
     if (!limit?.full) {
         return { label: "Invite someone", diary: true, refused: null };
     }
+    // Someone on the diary with no login holds their seat already (#868).
     const diary = !over && diaryPeople > 0;
-    if (inviteRoom(limit).open) {
-        return {
-            label: "Invite someone view-only",
-            diary: !over,
-            refused: null,
-        };
-    }
     if (diary) {
         return {
             label: "Invite someone on the diary",
@@ -259,7 +220,7 @@ export function inviteButton(
 
 /**
  * The people on the diary who take bookings with no login: each uses a team
- * seat (DEC-105, UX-053). One who is a team member is counted on Team
+ * seat (DEC-111, UX-053). One who is a team member is counted on Team
  * already, so is left out.
  */
 export function bookableWithNoLogin(

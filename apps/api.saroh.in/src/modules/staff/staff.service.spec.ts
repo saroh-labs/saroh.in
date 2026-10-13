@@ -39,9 +39,8 @@ jest.mock("@saroh/database", () => {
             // Whose diary a Calendar only person is (#868).
             findUnique: jest.fn(),
         },
-        // The business's own roles: what a linked member's seat reads
-        // (DEC-105), and the Calendar only role a first diary person makes
-        // (#868).
+        // The business's own roles: the Calendar only role a first diary
+        // person makes (#868).
         organizationRole: { findMany: jest.fn(), upsert: jest.fn() },
         booking: { findMany: jest.fn() },
         // No hours saved: opening hours cut nothing (DEC-087, DEC-096).
@@ -484,17 +483,10 @@ describe("StaffService — It's just me", () => {
         });
     });
 
-    it("adds no team seat for someone who already uses one (DEC-105)", async () => {
-        const roles = [{ key: "x", actions: [] }];
-        const members = [{ id: "m_me", role: "OWNER", extraActions: [] }];
+    it("adds no team seat for someone who already uses one (DEC-155)", async () => {
         const { diarySeatDelta } = jest.requireActual("./staff-seats");
         expect(
-            diarySeatDelta(
-                null,
-                { status: "ACTIVE", membershipId: "m_me" },
-                members,
-                roles,
-            ),
+            diarySeatDelta(null, { status: "ACTIVE", membershipId: "m_me" }),
         ).toBe(0);
     });
 
