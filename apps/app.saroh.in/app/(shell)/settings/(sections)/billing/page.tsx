@@ -18,12 +18,13 @@ import { whoCanChange } from "@/components/shared/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { planSummary, usageLine } from "@/lib/saroh-billing/plan";
-import type { Cycle } from "@/lib/saroh-billing/plan-view";
+import type { Cycle, RowQuote } from "@/lib/saroh-billing/plan-view";
 import {
     addonRows,
     billedCycle,
     billedPlanId,
     pickerRows,
+    waitingMove,
     yearlyOffer,
     yourPlan,
 } from "@/lib/saroh-billing/plan-view";
@@ -138,23 +139,46 @@ export default async function PlanBillingPage() {
                   usage.status === "ok" ? usage.usage : null,
               );
 
-    // "Start N-day trial" only where this business would get one: ask.
+    // What a change to each plan would be, asked of the API: "Start N-day
+    // trial" only where this business would get one, and when a change
+    // would start (DEC-159). The plan it's on is asked only on the other
+    // cycle. A quote that can't be read says nothing on its row.
     const billed = billedPlanId(catalog, subscription);
-    const trialIds = catalog
-        ? offeredPlans(catalog).filter(
-              (p) => p.trial?.on && p.pricePaise > 0 && p.id !== billed,
+    const onCycle = billedCycle(subscription);
+    const yearly = yearlyOffer(catalog);
+    const cycles: Cycle[] = yearly.on ? ["month", "year"] : ["month"];
+    const asked = catalog
+        ? cycles.flatMap((cycle) =>
+              offeredPlans(catalog)
+                  .filter(
+                      (p) =>
+                          p.id !== billed ||
+                          (p.pricePaise > 0 && cycle !== onCycle),
+                  )
+                  .map((p) => ({ planId: p.id, cycle })),
           )
         : [];
+    const quotes: Record<Cycle, Map<string, RowQuote>> = {
+        month: new Map(),
+        year: new Map(),
+    };
+    for (const { planId, cycle, quote } of await Promise.all(
+        asked.map(async (a) => ({
+            ...a,
+            quote: await quotePlan(a.planId, a.cycle),
+        })),
+    )) {
+        if (quote) quotes[cycle].set(planId, quote);
+    }
     const trials = new Set(
-        (
-            await Promise.all(
-                trialIds.map(async (p) => {
-                    const q = await quotePlan(p.id, "month");
-                    return q?.kind === "TRIAL" ? p.id : null;
-                }),
-            )
-        ).filter((id): id is string => id !== null),
+        Array.from(quotes.month).flatMap(([id, q]) =>
+            q.kind === "TRIAL" ? [id] : [],
+        ),
     );
+    const waiting =
+        access?.source === "catalogue"
+            ? waitingMove({ access, checkouts: checkoutsView })
+            : null;
 
     // A plan given for a while (a launch offer) is the one it's on (UX-044).
     const override =
@@ -166,7 +190,15 @@ export default async function PlanBillingPage() {
         ? (Object.fromEntries(
               (["month", "year"] as const).map((cycle) => [
                   cycle,
-                  pickerRows({ catalog, subscription, cycle, trials, given }),
+                  pickerRows({
+                      catalog,
+                      subscription,
+                      cycle,
+                      trials,
+                      given,
+                      quotes: quotes[cycle],
+                      waiting,
+                  }),
               ]),
           ) as Record<Cycle, ReturnType<typeof pickerRows>>)
         : null;
@@ -192,7 +224,7 @@ export default async function PlanBillingPage() {
                 <YourPlan {...plan} canChange={canChange} />
                 <PlanChooser
                     rows={rows}
-                    yearly={yearlyOffer(catalog)}
+                    yearly={yearly}
                     initialCycle={billedCycle(subscription)}
                     currentPlan={
                         access?.source === "catalogue"

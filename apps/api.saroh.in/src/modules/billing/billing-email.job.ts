@@ -240,6 +240,7 @@ export class BillingEmailHandler {
                 select: {
                     status: true,
                     currentPeriodEnd: true,
+                    cancelAtPeriodEnd: true,
                     provider: true,
                     providerSubscriptionId: true,
                     plan: { select: { name: true, priceCents: true } },
@@ -264,6 +265,9 @@ export class BillingEmailHandler {
             ) {
                 return "not_trialing";
             }
+            // Leaving at the month's end (DEC-159): no charge follows, and
+            // the move-down notice says where it lands.
+            if (sub.cancelAtPeriodEnd) return "leaving";
             // What the first charge will be: the plan, less a coupon the
             // trial's checkout carries (U16).
             const checkout =

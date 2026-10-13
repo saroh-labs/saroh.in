@@ -73,6 +73,53 @@ describe("PlanChooser", () => {
         expect(html).not.toContain("trial");
     });
 
+    it("says when a change would start, and offers no button for one that already waits (DEC-159)", () => {
+        const timed: PickerRow[] = [
+            {
+                ...rows[0],
+                cta: null,
+                note: {
+                    lead: "From ",
+                    iso: "2027-12-31T00:00:00.000Z",
+                    tail: ": you keep Plan B until then.",
+                },
+            },
+            { ...rows[1], cta: null, note: null },
+            {
+                ...rows[1],
+                planId: "c",
+                name: "Plan C",
+                current: false,
+                cta: "Upgrade",
+                note: {
+                    lead: "Starts today: ₹65.49 now (incl. GST)",
+                    iso: null,
+                },
+            },
+        ];
+        const html = renderToStaticMarkup(
+            <PlanChooser
+                rows={{ month: timed, year: timed }}
+                yearly={{ on: false }}
+                initialCycle="month"
+                canChange
+                addons={null}
+                currentPlan="Plan B"
+            />,
+        );
+        expect(html).toMatch(
+            /From <time[^>]*>[^<]*2027<\/time>: you keep Plan B until then\./,
+        );
+        expect(html).toContain("Starts today: ₹65.49 now (incl. GST)");
+        expect(html).toContain(
+            "Upgrades start today. A cheaper plan or Free starts when what you&#x27;ve paid for ends.",
+        );
+        // One button: the upgrade. The plan it moves to has none.
+        expect(html.match(/aria-label="[^"]*: Plan [A-C]"/g)).toEqual([
+            'aria-label="Upgrade: Plan C"',
+        ]);
+    });
+
     it("says nothing of yearly when the catalogue has no yearly billing", () => {
         const draw = (
             yearly: { on: false } | { on: true; freeMonths: number },

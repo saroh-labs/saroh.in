@@ -33,8 +33,10 @@ export function addonsNotOffered<T extends { addonId: string }>(
 }
 
 /**
- * A completed checkout that starts with no add-ons at all: a new plan, or
- * a trial that isn't another plan chosen while a trial runs (U16).
+ * A completed checkout that starts with no add-ons at all: a new plan (a
+ * dearer one chosen during the first month included, DEC-159), or a trial
+ * that isn't another plan chosen while a trial runs (U16; quoted only
+ * before DEC-159).
  */
 export function checkoutClearsAddons(
     kind: string,

@@ -69,6 +69,8 @@ const STATE_OPTIONS = [
  * goes with the quote; one the API refuses is said here, with a way on
  * without it. Add-ons the new plan isn't offered end with the old one
  * (DEC-157): the quote names them and a note says so before Confirm.
+ * When the change starts is said first (DEC-159): "Starts today" with what
+ * is paid now, or "From ‹date›" with the plan kept until then.
  *
  * The design moves plan on a click; real money asks first (design
  * deviation, U14).
@@ -305,6 +307,12 @@ export function ChangePlanDialog({
                         {summary?.title ?? `Change to ${picked?.name ?? ""}`}
                     </DialogTitle>
                     <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
+                        {quoting.state === "ready" && summary?.from ? (
+                            <>
+                                From <ViewerDate iso={summary.from.iso} />: you
+                                keep {summary.from.keep} until then.{" "}
+                            </>
+                        ) : null}
                         {quoting.state === "loading"
                             ? "Working out the price…"
                             : quoting.state === "failed"

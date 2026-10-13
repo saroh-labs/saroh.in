@@ -7,6 +7,8 @@
  * - An upgrade mid-period: on the plan once authorised, the difference now.
  * - A cheaper plan and Free: at the period's end, applied by the sweep or
  *   the subscription's own ending.
+ * - During the first month (DEC-159): a dearer plan today at its full
+ *   price; a cheaper plan and Free at the month's end, never before.
  * - Failed renewals: PAST_DUE, then halted → Free.
  * - Webhooks: deduplicated by event id, and an older one never undoes a
  *   newer one (activated replayed after cancelled).
@@ -703,6 +705,400 @@ describe("moves and the provider", () => {
         expect(await sub(ctx.organizationId)).toMatchObject({
             planId: b2.id,
             providerSubscriptionId: `fake_sub_${r.checkout.id}`,
+        });
+    });
+});
+
+describe("during the first month (DEC-159)", () => {
+    /** The first-month offer on both paid plans, as when the rule was made. */
+    const BOTH = () =>
+        fakeCatalog((c) => {
+            c.plans[1]!.trial = { on: true, days: 30, firstPaise: 700 };
+            c.plans[2]!.trial = { on: true, days: 30, firstPaise: 700 };
+        });
+    /** The offer on Plan B alone: Plan C starts at its full price. */
+    const B_ONLY = () =>
+        fakeCatalog((c) => {
+            c.plans[1]!.trial = { on: true, days: 30, firstPaise: 700 };
+        });
+
+    /** Free → `plan` with its first-month offer, authorised. */
+    async function inFirstMonth(ctx: OrganizationContext, plan: string) {
+        const r = await checkout.changePlan(ctx, { plan, cycle: "month" });
+        if (r.kind !== "TRIAL") throw new Error("expected a first month");
+        expect(r.quote.chargeNowPaise).toBe(700);
+        const providerSub = `fake_sub_${r.checkout.id}`;
+        await deliver(providerSub, "authenticated");
+        return { providerSub, ends: new Date(r.quote.trialEndsAt!) };
+    }
+
+    it("a dearer plan starts today at its full price and ends the month; its own offer never applies", async () => {
+        await install(1, BOTH());
+        const ctx = await business();
+        const c = await row("c");
+        const first = await inFirstMonth(ctx, "b");
+
+        const q = await checkout.quote(ctx, { plan: "c", cycle: "month" });
+        expect(q).toMatchObject({
+            kind: "NEW",
+            firstMonth: "NOW",
+            startAt: null,
+            effectiveAt: null,
+            trialEndsAt: null,
+            chargeNowPaise: 0,
+            payNowTotalPaise: withGstPaise(c.priceCents),
+            mandateCheck: "PAID",
+            termCharges: 12,
+        });
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        if (r.kind !== "NEW") throw new Error("expected a plan started now");
+        expect(fake.createCalls[1]).toMatchObject({
+            providerPlanId: `plan_${c.id}`,
+            startAt: null,
+            upfront: null,
+            totalCount: 12,
+        });
+
+        // Authorised alone moves nothing: the full first charge is the way on.
+        const providerSub = `fake_sub_${r.checkout.id}`;
+        await deliver(providerSub, "authenticated");
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            status: "TRIALING",
+            currentPeriodEnd: first.ends,
+        });
+
+        const end = new Date(Date.now() + 30 * DAY);
+        await deliver(providerSub, "activated", { currentPeriodEnd: end });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            planId: c.id,
+            status: "ACTIVE",
+            providerSubscriptionId: providerSub,
+            currentPeriodEnd: end,
+            pendingPlanId: null,
+            cancelAtPeriodEnd: false,
+        });
+        // The first month's subscription is ended at once, never at E.
+        expect(await cancelJobs()).toContainEqual({
+            provider: "RAZORPAY",
+            providerSubscriptionId: first.providerSub,
+            atCycleEnd: false,
+        });
+        await deliver(first.providerSub, "cancelled");
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            planId: c.id,
+            status: "ACTIVE",
+        });
+        // One offer per business: only the first checkout was a first month.
+        expect(
+            await prisma.billingCheckout.count({
+                where: { organizationId: ctx.organizationId, kind: "TRIAL" },
+            }),
+        ).toBe(1);
+    });
+
+    it("a cheaper plan waits for the month's end: nothing owed now, the plan kept, and no hop back for the first month's amount", async () => {
+        await install(1, BOTH());
+        const ctx = await business();
+        const b = await row("b");
+        const first = await inFirstMonth(ctx, "c");
+
+        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
+        expect(r).toMatchObject({
+            kind: "SCHEDULED",
+            quote: {
+                firstMonth: "AT_END",
+                startAt: first.ends.toISOString(),
+                effectiveAt: first.ends.toISOString(),
+                trialEndsAt: null,
+                payNowTotalPaise: 0,
+                mandateCheck: "REFUNDED",
+                firstChargePaise: b.priceCents,
+            },
+        });
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        expect(fake.createCalls[1]).toMatchObject({
+            providerPlanId: `plan_${b.id}`,
+            startAt: first.ends,
+            upfront: null,
+        });
+
+        const next = `fake_sub_${r.checkout.id}`;
+        await deliver(next, "authenticated");
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.c" },
+            status: "TRIALING",
+            providerSubscriptionId: first.providerSub,
+            pendingPlanId: b.id,
+            pendingFrom: first.ends,
+            cancelAtPeriodEnd: true,
+        });
+        // Plan C's full charge must never be taken at the month's end.
+        expect(await cancelJobs()).toContainEqual({
+            provider: "RAZORPAY",
+            providerSubscriptionId: first.providerSub,
+            atCycleEnd: false,
+        });
+        // The provider says so at once; the plan is paid to the month's end.
+        await expect(deliver(first.providerSub, "cancelled")).resolves.toEqual({
+            status: "processed",
+            changed: false,
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.c" },
+            status: "TRIALING",
+            pendingPlanId: b.id,
+        });
+        expect(await access.resolve(ctx.organizationId)).toMatchObject({
+            planId: "c",
+        });
+        expect((await sweep.sweep(new Date())).applied).toBe(0);
+        // Plan C again is the plan it's on: nothing to buy, nothing to hop to.
+        await expect(
+            checkout.changePlan(ctx, { plan: "c", cycle: "month" }),
+        ).rejects.toThrow(/already on/);
+
+        // The month's end: Plan B's first full charge applies the move.
+        const end = new Date(first.ends.getTime() + 30 * DAY);
+        await deliver(next, "charged", {
+            currentPeriodEnd: end,
+            now: new Date(first.ends.getTime() + 1000),
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            planId: b.id,
+            status: "ACTIVE",
+            providerSubscriptionId: next,
+            currentPeriodEnd: end,
+            pendingPlanId: null,
+            pendingFrom: null,
+            cancelAtPeriodEnd: false,
+        });
+    });
+
+    it("Free, or cancelling: the plan runs to the month's end, nothing more is charged, and the offer is used", async () => {
+        await install(1, BOTH());
+        const ctx = await business();
+        const b = await row("b");
+        const free = await row("free");
+        const first = await inFirstMonth(ctx, "b");
+
+        const r = await checkout.changePlan(ctx, {
+            plan: "free",
+            cycle: "month",
+        });
+        expect(r).toMatchObject({
+            kind: "TO_FREE",
+            effectiveAt: first.ends.toISOString(),
+            quote: { firstMonth: "AT_END", payNowTotalPaise: 0 },
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            status: "TRIALING",
+            pendingPlanId: free.id,
+            pendingFrom: first.ends,
+            cancelAtPeriodEnd: true,
+        });
+        expect(await cancelJobs()).toEqual([
+            {
+                provider: "RAZORPAY",
+                providerSubscriptionId: first.providerSub,
+                atCycleEnd: false,
+            },
+        ]);
+        await expect(deliver(first.providerSub, "cancelled")).resolves.toEqual({
+            status: "processed",
+            changed: false,
+        });
+        expect(await access.resolve(ctx.organizationId)).toMatchObject({
+            planId: "b",
+        });
+        expect((await sweep.sweep(new Date())).applied).toBe(0);
+
+        const later = new Date(first.ends.getTime() + 1000);
+        expect((await sweep.sweep(later)).applied).toBe(1);
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            planId: free.id,
+            status: "ACTIVE",
+            provider: null,
+            providerSubscriptionId: null,
+            pendingPlanId: null,
+            cancelAtPeriodEnd: false,
+        });
+        // Its one offer is used: the same plan again is its full price.
+        expect(
+            await checkout.quote(ctx, { plan: "b", cycle: "month" }, later),
+        ).toMatchObject({
+            kind: "NEW",
+            firstMonth: null,
+            payNowTotalPaise: withGstPaise(b.priceCents),
+        });
+    });
+
+    it("a change that waits is replaced by the next one: Free instead, or the dearer plan today", async () => {
+        await install(1, BOTH());
+        const ctx = await business();
+        const c = await row("c");
+        const free = await row("free");
+        const first = await inFirstMonth(ctx, "c");
+
+        const down = await checkout.changePlan(ctx, {
+            plan: "b",
+            cycle: "month",
+        });
+        if (down.kind === "TO_FREE") throw new Error("unreachable");
+        await deliver(`fake_sub_${down.checkout.id}`, "authenticated");
+
+        // Free instead: the plan it authorised is given up, the date kept.
+        await checkout.changePlan(ctx, { plan: "free", cycle: "month" });
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: down.checkout.id },
+            }),
+        ).toMatchObject({ status: "CANCELLED", endedReason: "changed-plan" });
+        expect(await cancelJobs()).toContainEqual({
+            provider: "RAZORPAY",
+            providerSubscriptionId: `fake_sub_${down.checkout.id}`,
+            atCycleEnd: false,
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.c" },
+            pendingPlanId: free.id,
+            pendingFrom: first.ends,
+            cancelAtPeriodEnd: true,
+        });
+
+        // A second business, on Plan B with Free waiting, moves up instead.
+        const other = await business();
+        await inFirstMonth(other, "b");
+        await checkout.changePlan(other, { plan: "free", cycle: "month" });
+        const up = await checkout.changePlan(other, {
+            plan: "c",
+            cycle: "month",
+        });
+        if (up.kind !== "NEW") throw new Error("expected a plan started now");
+        const end = new Date(Date.now() + 30 * DAY);
+        await deliver(`fake_sub_${up.checkout.id}`, "activated", {
+            currentPeriodEnd: end,
+        });
+        expect(await sub(other.organizationId)).toMatchObject({
+            planId: c.id,
+            status: "ACTIVE",
+            currentPeriodEnd: end,
+            pendingPlanId: null,
+            pendingFrom: null,
+            cancelAtPeriodEnd: false,
+            freeChosenAt: null,
+        });
+    });
+
+    it("a plan that waits and is ended at the provider lands on Free at the same date, never on a plan nobody pays for", async () => {
+        await install(1, BOTH());
+        const ctx = await business();
+        const free = await row("free");
+        const first = await inFirstMonth(ctx, "c");
+        const down = await checkout.changePlan(ctx, {
+            plan: "b",
+            cycle: "month",
+        });
+        if (down.kind === "TO_FREE") throw new Error("unreachable");
+        const next = `fake_sub_${down.checkout.id}`;
+        await deliver(next, "authenticated");
+        await deliver(first.providerSub, "cancelled");
+
+        // The mandate for Plan B is withdrawn before it ever charged.
+        await deliver(next, "cancelled");
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: down.checkout.id },
+            }),
+        ).toMatchObject({ status: "CANCELLED" });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.c" },
+            status: "TRIALING",
+            pendingPlanId: free.id,
+            pendingFrom: first.ends,
+            cancelAtPeriodEnd: true,
+        });
+        const later = new Date(first.ends.getTime() + 1000);
+        expect((await sweep.sweep(later)).applied).toBe(1);
+        expect((await sub(ctx.organizationId)).planId).toBe(free.id);
+    });
+
+    it("a plan with no offer starts at its full price from Free; the offer stays its own plan's", async () => {
+        await install(1, B_ONLY());
+        const ctx = await business();
+        const b = await row("b");
+        const c = await row("c");
+
+        expect(
+            await checkout.quote(ctx, { plan: "b", cycle: "month" }),
+        ).toMatchObject({ kind: "TRIAL", chargeNowPaise: 700 });
+        const q = await checkout.quote(ctx, { plan: "c", cycle: "month" });
+        expect(q).toMatchObject({
+            kind: "NEW",
+            firstMonth: null,
+            startAt: null,
+            trialEndsAt: null,
+            chargeNowPaise: 0,
+            payNowTotalPaise: withGstPaise(c.priceCents),
+            mandateCheck: "PAID",
+        });
+        const { periodEnd } = await onPaidPlan(ctx, "c");
+        expect(fake.createCalls[0]).toMatchObject({
+            providerPlanId: `plan_${c.id}`,
+            startAt: null,
+            upfront: null,
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            planId: c.id,
+            status: "ACTIVE",
+        });
+        // Down to the plan with the offer, in a paid period: at the period's
+        // end and at its full price. The offer is for starting a paid plan.
+        expect(
+            await checkout.quote(ctx, { plan: "b", cycle: "month" }),
+        ).toMatchObject({
+            kind: "SCHEDULED",
+            firstMonth: null,
+            effectiveAt: periodEnd.toISOString(),
+            chargeNowPaise: 0,
+            payNowTotalPaise: 0,
+            firstChargePaise: b.priceCents,
+        });
+    });
+});
+
+describe("what was paid for runs out first (DEC-159)", () => {
+    it("a paid period ended early at the provider still runs to its end before the move to Free", async () => {
+        await install(1);
+        const ctx = await business();
+        const { periodEnd } = await onPaidPlan(ctx, "b");
+        const providerSub = (await sub(ctx.organizationId))
+            .providerSubscriptionId;
+        const free = await row("free");
+        await checkout.changePlan(ctx, { plan: "free", cycle: "month" });
+
+        // Days before the period's end, not with it.
+        await expect(deliver(providerSub ?? "", "cancelled")).resolves.toEqual({
+            status: "processed",
+            changed: false,
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            status: "ACTIVE",
+            pendingPlanId: free.id,
+            pendingFrom: periodEnd,
+        });
+        expect(await access.resolve(ctx.organizationId)).toMatchObject({
+            planId: "b",
+        });
+
+        const later = new Date(periodEnd.getTime() + 1000);
+        expect((await sweep.sweep(later)).applied).toBe(1);
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            planId: free.id,
+            status: "ACTIVE",
+            provider: null,
         });
     });
 });
