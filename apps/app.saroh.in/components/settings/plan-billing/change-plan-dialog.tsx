@@ -322,7 +322,7 @@ export function ChangePlanDialog({
                             <div
                                 key={l.label}
                                 className={
-                                    "grid grid-cols-1 gap-1 px-3.5 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4" +
+                                    "grid grid-cols-2 gap-1 px-3.5 py-2.5 sm:grid-cols-[minmax(1fr,1fr)_auto] sm:gap-4" +
                                     (i > 0 ? " border-t border-border/70" : "")
                                 }
                             >
