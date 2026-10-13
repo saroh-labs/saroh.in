@@ -1871,17 +1871,20 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Plans show in the workspace at launch, which DEC-136 left open.
 - Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.
 
-## DEC-157 An add-on is priced and capped for the plans it names
+## DEC-155 Everyone in a business uses one team seat, whatever their role
 
-**Status: Accepted — 2026-10-13, built** · owner (packs and extra seats cost differently on each plan, and each plan has its own ceiling on how many can be held)
+**Status: Accepted — 2026-10-13, built** · owner · supersedes the view-only part of DEC-105 and the Reviewer rule of #794 · amends DEC-114
 
-- An add-on in the catalogue may name the plans it is offered on (`plans`) and the most of it one business may hold (`max`). Naming no plan means every plan, and no maximum means the ceiling for any add-on (`MAX_ADDON_QUANTITY`), so a catalogue published before this reads as it always did.
-- "The same thing at another price on another plan" is two add-ons of one kind, each naming its plans, with its own price and maximum. The operator sets all of it in Admin › Plans › Offers; nothing is released.
-- A plan has one price for a thing. A catalogue does not validate when two add-ons of the same kind (and the same module, for a module on its own) are offered on the same plan, when an add-on names a plan that isn't there, or when a maximum is below 1 or above the ceiling.
-- A business sees and buys only the add-ons offered on its plan. More than the maximum is refused in words; the pricing page shows a plan-specific add-on under the plans it names, and not at all when none of them can be chosen.
-- **A maximum never takes anything away.** A business that holds more than a maximum set since keeps all of it, is charged for all of it and has all of it in its limit; it can hold fewer, and cannot buy more.
-- **A change of plan ends the add-ons the new plan isn't offered.** They end with the old plan (an upgrade, a move at the period's end, a move from a publish), and the new plan's own add-on is never bought for the business: it chooses that in Settings › Plan. What a period already owed is still charged, as when an add-on is removed by hand. An add-on held on a plan it isn't offered on counts for nothing and is charged nothing, whatever path left it there.
-- Rules: `packages/pricing-catalog/src/schema.ts` (`addonOfferedOn`, `addonMaxQuantity`), `apps/api.saroh.in/src/modules/billing/offers.ts` (`addonProblem`), `addon-charges.ts` (`endAddonsNotOfferedInTx`). `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
+- Context: since 6 Oct (#794) Reviewers were left off the team count, and since DEC-105 anyone whose role only looks used no seat and counted toward a separate limit of their own (the catalogue's `reviewers` row, "View-only people").
+- Decision: every person in a business uses one team seat, whatever their role: Owner, Admin, Member, Reviewer and any role the business made. There is no free or separate allowance for people who only look. The team count is every team member, every open invitation, and everyone on the diary who takes bookings with no login (DEC-111, unchanged).
+- The Reviewer role itself is unchanged: the same permissions, and still the sites it is invited to.
+- Consequences:
+    - Inviting anyone, a Reviewer included, is checked against the one team limit. A change of role, of a role's permissions or of someone's extra permissions never changes the count, so none of them asks the plan.
+    - The `reviewers` row is retired from the catalogue (`RETIRED_MODULE_IDS` in `@saroh/pricing-catalog`), with its limit key, its words and its place on Team, Plan and the pricing table. A version published while it was sold still carries the row in the database; every reader drops it on read, so it shows, counts and caps nothing. No migration, and no stored row is rewritten.
+    - Moving to a lower plan (DEC-114): the owner always stays, then the earliest to join up to the limit, Reviewers placed by when they joined like anyone else. A limit of one keeps the owner alone.
+    - The move-down notice's claim is keyed by the limits it named, which no longer include a view-only one. A business told under the old key is told again and gets its 7 days again before anything pauses.
+    - The member, invitation and role views no longer carry `usesSeat`.
+
 ## DEC-156 Who referred a business is recorded when the business is made
 
 **Status: Accepted — 2026-10-13, built** · owner (record it from launch, so referrals made before the referral programme opens are known) · builds on DEC-102 · #809, #810 are not built by this
@@ -1898,19 +1901,19 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Until sign-up opens, the waitlist keeps it.** Someone who arrives by a business's link and joins the waitlist has that business kept on their entry (`WaitlistSignup.referredByOrganizationId`). When they make a business with no code in the browser, the entry's is used, found by the account's confirmed email. A code the browser carried comes first.
 - **Who sees it.** Operators, on the business's page in the console: "Referred by ‹business›" and the day. No business is shown who referred it or whom it referred, and no screen or message says anything follows from a referral.
 - Consequences: three nullable columns, an index and a foreign key (`20261122100000_organization_referred_by`). `POST /organizations` takes an optional `referralCode` and never refuses it, so the API is released before the workspace sends one. The rules are `apps/api.saroh.in/src/modules/organizations/referral.ts`; the cookie is `apps/saroh.in/lib/referral.ts` and `apps/app.saroh.in/lib/organizations/referral-carry.ts`. The Privacy Policy's Cookies section does not yet name this cookie: the owner's text to settle before launch.
-## DEC-155 Everyone in a business uses one team seat, whatever their role
 
-**Status: Accepted — 2026-10-13, built** · owner · supersedes the view-only part of DEC-105 and the Reviewer rule of #794 · amends DEC-114
+## DEC-157 An add-on is priced and capped for the plans it names
 
-- Context: since 6 Oct (#794) Reviewers were left off the team count, and since DEC-105 anyone whose role only looks used no seat and counted toward a separate limit of their own (the catalogue's `reviewers` row, "View-only people").
-- Decision: every person in a business uses one team seat, whatever their role: Owner, Admin, Member, Reviewer and any role the business made. There is no free or separate allowance for people who only look. The team count is every team member, every open invitation, and everyone on the diary who takes bookings with no login (DEC-111, unchanged).
-- The Reviewer role itself is unchanged: the same permissions, and still the sites it is invited to.
-- Consequences:
-    - Inviting anyone, a Reviewer included, is checked against the one team limit. A change of role, of a role's permissions or of someone's extra permissions never changes the count, so none of them asks the plan.
-    - The `reviewers` row is retired from the catalogue (`RETIRED_MODULE_IDS` in `@saroh/pricing-catalog`), with its limit key, its words and its place on Team, Plan and the pricing table. A version published while it was sold still carries the row in the database; every reader drops it on read, so it shows, counts and caps nothing. No migration, and no stored row is rewritten.
-    - Moving to a lower plan (DEC-114): the owner always stays, then the earliest to join up to the limit, Reviewers placed by when they joined like anyone else. A limit of one keeps the owner alone.
-    - The move-down notice's claim is keyed by the limits it named, which no longer include a view-only one. A business told under the old key is told again and gets its 7 days again before anything pauses.
-    - The member, invitation and role views no longer carry `usesSeat`.
+**Status: Accepted — 2026-10-13, built** · owner (packs and extra seats cost differently on each plan, and each plan has its own ceiling on how many can be held)
+
+- An add-on in the catalogue may name the plans it is offered on (`plans`) and the most of it one business may hold (`max`). Naming no plan means every plan, and no maximum means the ceiling for any add-on (`MAX_ADDON_QUANTITY`), so a catalogue published before this reads as it always did.
+- "The same thing at another price on another plan" is two add-ons of one kind, each naming its plans, with its own price and maximum. The operator sets all of it in Admin › Plans › Offers; nothing is released.
+- A plan has one price for a thing. A catalogue does not validate when two add-ons of the same kind (and the same module, for a module on its own) are offered on the same plan, when an add-on names a plan that isn't there, or when a maximum is below 1 or above the ceiling.
+- A business sees and buys only the add-ons offered on its plan. More than the maximum is refused in words; the pricing page shows a plan-specific add-on under the plans it names, and not at all when none of them can be chosen.
+- **A maximum never takes anything away.** A business that holds more than a maximum set since keeps all of it, is charged for all of it and has all of it in its limit; it can hold fewer, and cannot buy more.
+- **A change of plan ends the add-ons the new plan isn't offered.** They end with the old plan (an upgrade, a move at the period's end, a move from a publish), and the new plan's own add-on is never bought for the business: it chooses that in Settings › Plan. What a period already owed is still charged, as when an add-on is removed by hand. An add-on held on a plan it isn't offered on counts for nothing and is charged nothing, whatever path left it there.
+- Rules: `packages/pricing-catalog/src/schema.ts` (`addonOfferedOn`, `addonMaxQuantity`), `apps/api.saroh.in/src/modules/billing/offers.ts` (`addonProblem`), `addon-charges.ts` (`endAddonsNotOfferedInTx`). `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
+
 ## DEC-158 A plan caps how many variants one product may have
 
 **Status: Accepted — 2026-10-13, built** · owner (decided the cap; "variants do not count towards the product limit")
