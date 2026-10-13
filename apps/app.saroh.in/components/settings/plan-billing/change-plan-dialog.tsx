@@ -328,17 +328,22 @@ export function ChangePlanDialog({
                 {summary && summary.lines.length > 0 ? (
                     <dl className="grid gap-0 overflow-hidden rounded-lg border border-border text-[13px]">
                         {summary.lines.map((l, i) => (
+                            // The label keeps its own words' width (up to
+                            // a little over half the row) and the amount
+                            // wraps beside it. A label column that may
+                            // shrink to nothing breaks "Term" a letter a
+                            // line once the amount is a sentence.
                             <div
                                 key={l.label}
                                 className={
-                                    "grid grid-cols-2 gap-1 px-3.5 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4" +
+                                    "grid grid-cols-[fit-content(55%)_minmax(0,1fr)] gap-4 px-3.5 py-2.5" +
                                     (i > 0 ? " border-t border-border/70" : "")
                                 }
                             >
                                 <dt className="text-muted-foreground">
                                     {l.label}
                                 </dt>
-                                <dd className="m-0 font-medium tabular-nums sm:text-right">
+                                <dd className="m-0 text-right font-medium tabular-nums">
                                     {l.iso ? (
                                         <ViewerDate iso={l.iso} />
                                     ) : (
