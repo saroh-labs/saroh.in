@@ -7,7 +7,11 @@ import {
     withGstPaise,
 } from "@saroh/pricing-catalog";
 
+import type { AuditService } from "../audit/audit.service";
+import { AuditAction, AuditOutcome } from "../audit/audit.service";
 import { billingMayCharge } from "../organizations/organization-lifecycle.policy";
+import type { HeldAddon } from "./addons-ending";
+import { addonsNotOffered } from "./addons-ending";
 import type { AddonChargeLine } from "./offers";
 import { addonPeriodLine, catalogueOfVersion } from "./offers";
 import type { BillingProviderFactory } from "./providers/billing-provider.port";
@@ -240,12 +244,12 @@ export async function clearAddonsInTx(
 export async function endAddonsNotOfferedInTx(
     tx: Tx,
     subscriptionId: string,
-): Promise<string[]> {
+): Promise<HeldAddon[]> {
     const sub = await tx.subscription.findUnique({
         where: { id: subscriptionId },
         select: {
             plan: { select: { key: true, version: true } },
-            addons: { select: { addonId: true } },
+            addons: { select: { addonId: true, quantity: true } },
         },
     });
     if (!sub || sub.addons.length === 0) return [];
@@ -254,17 +258,53 @@ export async function endAddonsNotOfferedInTx(
         ? await catalogueOfVersion(tx, sub.plan.version)
         : null;
     if (!catalog || !planId) return [];
-    const ended = sub.addons
-        .map((held) => held.addonId)
-        .filter((id) => {
-            const addon = catalog.addons.find((a) => a.id === id);
-            return addon !== undefined && !addonOfferedOn(addon, planId);
-        });
+    // The rule the change's quote names them by (`addons-ending.ts`).
+    const ended = addonsNotOffered(catalog, planId, sub.addons);
     if (ended.length === 0) return [];
     await tx.subscriptionAddon.deleteMany({
-        where: { subscriptionId, addonId: { in: ended } },
+        where: {
+            subscriptionId,
+            addonId: { in: ended.map((e) => e.addonId) },
+        },
     });
     return ended;
+}
+
+/** The add-ons a plan change ended, for the audit log after commit. */
+export interface EndedAddons {
+    organizationId: string;
+    subscriptionId: string;
+    /** Who made the change; null: the provider's event, or the sweep. */
+    actorUserId: string | null;
+    addons: HeldAddon[];
+}
+
+/**
+ * One row per add-on a plan change ended (DEC-157), written as an add-on
+ * change is: what it held, now none, and why. Nothing is written when none
+ * ended.
+ */
+export async function recordAddonsEnded(
+    audit: AuditService | undefined,
+    ended: EndedAddons | undefined,
+): Promise<void> {
+    if (!audit || !ended) return;
+    for (const addon of ended.addons) {
+        await audit.record({
+            action: AuditAction.PlanAddonChange,
+            actorUserId: ended.actorUserId ?? "billing-provider",
+            organizationId: ended.organizationId,
+            targetType: "subscription",
+            targetId: ended.subscriptionId,
+            outcome: AuditOutcome.Success,
+            metadata: {
+                addonId: addon.addonId,
+                from: addon.quantity,
+                to: 0,
+                reason: "plan-change",
+            },
+        });
+    }
 }
 
 /** The rows a charge at `chargedAt` took, for its invoice's lines. */

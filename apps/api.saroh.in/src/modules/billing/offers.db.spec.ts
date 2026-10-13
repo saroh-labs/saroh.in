@@ -30,6 +30,7 @@ import { gstPaise, planRows, withGstPaise } from "@saroh/pricing-catalog";
 
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AuditService } from "../audit/audit.service";
 import { AddonsSyncHandler, BILLING_ADDONS_SYNC_TYPE } from "./addon-charges";
 import { AddonsService } from "./addons.service";
 import { BILLING_EMAIL_TYPE } from "./billing-email.job";
@@ -927,17 +928,72 @@ describe("add-ons", () => {
         await addons.set(ctx, "person-b", 2);
         const owedBefore = await prisma.subscriptionAddonCharge.count();
 
+        // The quote names it before the business confirms, with Plan C's own.
+        const ending = [
+            {
+                id: "person-b",
+                name: "One more person",
+                quantity: 2,
+                onNewPlan: "One more person on C",
+            },
+        ];
+        expect(
+            (await checkout.quote(ctx, { plan: "c", cycle: "month" }))
+                .addonsEnding,
+        ).toEqual(ending);
+        // Free ends it too, and offers nothing in its place.
+        expect(
+            (await checkout.quote(ctx, { plan: "free", cycle: "month" }))
+                .addonsEnding,
+        ).toEqual([{ ...ending[0], onNewPlan: null }]);
+        // The plan it is on ends nothing.
+        expect(
+            (await checkout.quote(ctx, { plan: "b", cycle: "month" }))
+                .addonsEnding,
+        ).toEqual([]);
+
         const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
         expect(r.kind).toBe("UPGRADE");
         if (r.kind === "TO_FREE") throw new Error("unreachable");
+        expect(r.quote.addonsEnding).toEqual(ending);
         // Until it is authorised, the business is on Plan B with its add-on.
         expect(await people(ctx.organizationId)).toBe(3 + 2);
+        // With the audit log on, as the module runs it.
+        webhooks = new BillingWebhookService(
+            new FakeBillingProviderFactory(fake),
+            new AuditService(),
+            new SarohInvoicesService(SELLER),
+        );
         await deliver(`fake_sub_${r.checkout.id}`, "authenticated");
 
         expect(await sub(ctx.organizationId)).toMatchObject({
             plan: { key: "catalog.c" },
         });
         expect(await prisma.subscriptionAddon.count()).toBe(0);
+        // The operator sees what ended, and that the plan change ended it.
+        const audited = await prisma.auditEvent.findMany({
+            where: {
+                organizationId: ctx.organizationId,
+                action: "organization.plan.addon.changed",
+            },
+        });
+        expect(audited).toHaveLength(1);
+        expect(audited[0]).toMatchObject({
+            actorUserId: "owner-user",
+            targetType: "subscription",
+            outcome: "SUCCESS",
+            metadata: {
+                addonId: "person-b",
+                from: 2,
+                to: 0,
+                reason: "plan-change",
+            },
+        });
+        // Nothing left to name once it is on Plan C.
+        expect(
+            (await checkout.quote(ctx, { plan: "b", cycle: "month" }))
+                .addonsEnding,
+        ).toEqual([]);
         expect(await people(ctx.organizationId)).toBe(9);
         // What the period already owed rides on the new plan's first charge.
         const owed = await prisma.subscriptionAddonCharge.findMany();

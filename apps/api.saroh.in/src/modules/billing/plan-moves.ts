@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 import { unsyncedCatalogueVersions } from "@saroh/database";
 
 import { clearAddonsInTx, endAddonsNotOfferedInTx } from "./addon-charges";
+import type { HeldAddon } from "./addons-ending";
 import { periodEnd } from "./checkout-quote";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 
@@ -90,7 +91,12 @@ const PLAN_SELECT = {
 } as const;
 
 export type AppliedMove =
-    | { applied: true; planId: string }
+    | {
+          applied: true;
+          planId: string;
+          /** The add-ons the new plan isn't offered, ended with the move. */
+          endedAddons: HeldAddon[];
+      }
     | { applied: false; readiness: MoveReadiness };
 
 /**
@@ -202,6 +208,6 @@ export async function applyDueMoveInTx(
 
     await tx.subscription.update({ where: { id: sub.id }, data });
     // Add-ons the plan it is on now isn't offered end with the old one.
-    await endAddonsNotOfferedInTx(tx, sub.id);
-    return { applied: true, planId: target.id };
+    const endedAddons = await endAddonsNotOfferedInTx(tx, sub.id);
+    return { applied: true, planId: target.id, endedAddons };
 }

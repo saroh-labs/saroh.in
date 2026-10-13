@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChangeQuote } from "./plan-view";
-import { quoteSummary } from "./quote-words";
+import { endingAddonsNote, quoteSummary } from "./quote-words";
 
 /** Made up on purpose: Plan C at ₹222, a first month of ₹7 — no real prices. */
 const quote = (over: Partial<ChangeQuote> = {}): ChangeQuote => ({
@@ -173,5 +173,63 @@ describe("quoteSummary (DEC-093)", () => {
             ),
         ).toMatchObject({ confirm: "Move to Plan A", toPayment: false });
         expect(quoteSummary(quote({ kind: "NONE" })).confirm).toBeNull();
+    });
+});
+
+describe("endingAddonsNote (DEC-157)", () => {
+    const person = {
+        id: "person-b",
+        name: "One more person",
+        quantity: 2,
+        onNewPlan: "One more person on C",
+    };
+
+    it("names one add-on that ends, how many are held, and the new plan's own", () => {
+        expect(
+            endingAddonsNote(quote({ addonsEnding: [person] }), {
+                currentPlan: "Plan B",
+            }),
+        ).toBe(
+            "This add-on ends with Plan B: One more person × 2. After the change you can add One more person on C on Plan C, from Add-ons on this page. Nothing is added for you.",
+        );
+    });
+
+    it("lists several, and says nothing of the new plan when it has none of the kind", () => {
+        expect(
+            endingAddonsNote(
+                quote({
+                    addonsEnding: [
+                        { ...person, onNewPlan: null },
+                        {
+                            id: "bills",
+                            name: "Bills on their own",
+                            quantity: 1,
+                            onNewPlan: null,
+                        },
+                    ],
+                }),
+                { currentPlan: "Plan B" },
+            ),
+        ).toBe(
+            "These add-ons end with Plan B: One more person × 2, Bills on their own.",
+        );
+    });
+
+    it("names a new plan's add-on once, however many it stands in for", () => {
+        const note = endingAddonsNote(
+            quote({
+                addonsEnding: [
+                    person,
+                    { ...person, id: "person-old", name: "A person" },
+                ],
+            }),
+        );
+        expect(note).toContain("end with your current plan:");
+        expect(note?.match(/One more person on C/g)).toHaveLength(1);
+    });
+
+    it("is nothing when none ends, or the API sent none", () => {
+        expect(endingAddonsNote(quote({ addonsEnding: [] }))).toBeNull();
+        expect(endingAddonsNote(quote())).toBeNull();
     });
 });

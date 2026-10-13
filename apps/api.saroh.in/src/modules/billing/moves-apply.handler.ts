@@ -4,8 +4,10 @@ import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { dayWords } from "../../common/words-format";
+import { AuditService } from "../audit/audit.service";
 import { businessTimezone } from "../bookings/staff-availability";
 import { noticeOf } from "../notifications/notice-target";
+import { recordAddonsEnded } from "./addon-charges";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { planEndingNotice } from "./billing-emails";
 import { isOneTime } from "./billing-term";
@@ -71,6 +73,9 @@ export const BILLING_SWEEP_EVERY_MS = 60 * 60 * 1000;
 
 const BATCH = 200;
 
+/** Who the audit log names for what the sweep did: no person. */
+const SWEEP_ACTOR = "system:billing-sweep";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface SweepOutcome {
@@ -93,6 +98,7 @@ export class MovesApplyHandler {
         // injects nothing here and this stands (a spec passes its own).
         @Optional()
         private readonly domains: DomainPlanService = domainPlan,
+        @Optional() private readonly audit?: AuditService,
     ) {}
 
     readonly handle = async (_job: Job): Promise<void> => {
@@ -131,19 +137,27 @@ export class MovesApplyHandler {
                     pendingFrom: { lte: now },
                     ...(tried.size ? { id: { notIn: [...tried] } } : {}),
                 },
-                select: { id: true },
+                select: { id: true, organizationId: true },
                 orderBy: { pendingFrom: "asc" },
                 take: BATCH,
             });
             if (due.length === 0) break;
-            for (const { id } of due) {
+            for (const { id, organizationId } of due) {
                 tried.add(id);
                 try {
                     const r = await prisma.$transaction((tx) =>
                         applyDueMoveInTx(tx, id, now),
                     );
-                    if (r.applied) out.applied += 1;
-                    else out.waiting += 1;
+                    if (r.applied) {
+                        out.applied += 1;
+                        // Add-ons the new plan isn't offered (DEC-157).
+                        await recordAddonsEnded(this.audit, {
+                            organizationId,
+                            subscriptionId: id,
+                            actorUserId: SWEEP_ACTOR,
+                            addons: r.endedAddons,
+                        });
+                    } else out.waiting += 1;
                 } catch (error) {
                     // One that fails never stops the rest.
                     this.logger.error(
