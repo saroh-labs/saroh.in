@@ -202,9 +202,11 @@ describe("the Offers tab", () => {
                 "Plan A already has Extra products. A plan takes one of them.",
             ),
         ).toHaveLength(2);
-        const [first] = within(panel).getAllByRole("group", {
-            name: "Plans Extra products is offered on",
-        });
+        const first = within(panel)
+            .getAllByRole("group", {
+                name: "Plans Extra products is offered on",
+            })
+            .at(0);
         if (!first) throw new Error("expected an add-on row");
         fireEvent.click(within(first).getByRole("button", { name: "Plan A" }));
         expect(
