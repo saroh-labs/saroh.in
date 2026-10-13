@@ -196,7 +196,7 @@ function render(
 
 const button = (name: string) =>
     Array.from(host.querySelectorAll("button")).find(
-        (b) => b.textContent?.trim() === name,
+        (b) => b.textContent.trim() === name,
     );
 const rowsShown = () => host.querySelectorAll("ol > li").length;
 const pick = (value: string) => {
