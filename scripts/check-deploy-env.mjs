@@ -173,6 +173,19 @@ if (
         "apps/saroh.in has a LAUNCH_AT and the gated apps/accounts.saroh.in has none: the site would open onto a locked sign-up",
     );
 
+// A deploy build reads what it draws (Saroh's published plans) afresh. The
+// kept Next.js cache replays an earlier build's "force-cache" answers, so the
+// workflow drops them before it builds (DEV_LEARNINGS, 13 Oct 2026).
+{
+    const workflow = readFileSync(WORKFLOW, "utf8");
+    const drop = workflow.indexOf("rm -rf apps/*/.next/cache/fetch-cache");
+    const build = workflow.indexOf("pnpm cf:build");
+    if (drop === -1 || build === -1 || drop > build)
+        problems.push(
+            `${WORKFLOW}: the build must drop apps/*/.next/cache/fetch-cache before "pnpm cf:build", or a deploy draws the plans an earlier build fetched`,
+        );
+}
+
 if (problems.length) {
     console.error(`check:deploy-env:\n  ${problems.join("\n  ")}`);
     process.exit(1);

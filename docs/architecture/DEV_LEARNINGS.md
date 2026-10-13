@@ -4507,3 +4507,24 @@ agent edits is run once against the local stack before the gate
 **Rule**: after typing in a list's search, a browser test waits for the
 count or for the row it does not expect to go, then clicks.
 **Category**: tests · `.agents/skills/saroh-browser-tests/SKILL.md`
+
+
+## A new plan version was published, and the pricing page still showed the old one
+
+**Symptom**: version 4 of the plans went live on the development API
+(`GET /public/pricing` answered it), the marketing site was rebuilt twice
+after that, and its pricing page still drew version 3: the old prices and a
+yearly switch the new version doesn't have.
+**Cause**: the site is static and reads the published plans once, as it is
+built, with `cache: "force-cache"`. The deploy workflow keeps `.next/cache`
+between runs so a build recompiles only what changed, and that folder also
+holds every answer a build fetched (`fetch-cache`). So each build replayed
+the answer the first one got. A publish started a new build, as designed,
+and the build never asked the API.
+**Fix**: the deploy workflow removes `apps/*/.next/cache/fetch-cache` before
+it builds. The compile cache stays.
+**Check**: `check:deploy-env` fails when the workflow builds without dropping
+it first.
+**Rule**: a cache kept between builds may hold code, never data. Anything a
+static build reads from the API is read afresh by every deploy.
+**Category**: devops · `docs/patterns/devops-tooling-and-deploy.md`
