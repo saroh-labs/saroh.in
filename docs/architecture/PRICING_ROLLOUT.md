@@ -333,7 +333,14 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   the new plan isn't offered (`endAddonsNotOfferedInTx`) and buys nothing
   in their place; what the period already owed is still charged. An
   add-on whose id the new version doesn't have at all is left held and
-  inert, as before.
+  inert, as before. The quote (`GET …/billing/change-plan`) names the
+  add-ons held today that the change ends (`addonsEnding`: id, name,
+  quantity, and `onNewPlan`, the new plan's own add-on of the kind or
+  null), by the same rule (`addons-ending.ts`), and the change-plan dialog
+  says so before Confirm; a client reads a missing field as none. Each
+  one ended is an audit row after commit (`organization.plan.addon.changed`,
+  `reason: "plan-change"`). Not said: whether the business will be over a
+  limit afterwards, which the quote has no counts for.
   Billed after the period, on the provider subscription's next charge
   (`SubscriptionAddonCharge`): bought part-way, what's left of the period
   (prorated); each later period, the whole of it for what's held at its

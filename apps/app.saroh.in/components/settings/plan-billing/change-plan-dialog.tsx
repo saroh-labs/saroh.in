@@ -25,7 +25,10 @@ import {
     quoteChangeAction,
 } from "@/lib/saroh-billing/billing-actions";
 import type { ChangeQuote, Cycle } from "@/lib/saroh-billing/plan-view";
-import { quoteSummary } from "@/lib/saroh-billing/quote-words";
+import {
+    endingAddonsNote,
+    quoteSummary,
+} from "@/lib/saroh-billing/quote-words";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -64,7 +67,8 @@ const STATE_OPTIONS = [
  * the plan moves as soon as Razorpay says so, webhook or not. Where the
  * window can't open, the provider's page link is the fallback. The coupon held on the Coupon card
  * goes with the quote; one the API refuses is said here, with a way on
- * without it.
+ * without it. Add-ons the new plan isn't offered end with the old one
+ * (DEC-157): the quote names them and a note says so before Confirm.
  *
  * The design moves plan on a click; real money asks first (design
  * deviation, U14).
@@ -140,6 +144,11 @@ export function ChangePlanDialog({
     const summary =
         quoting.state === "ready"
             ? quoteSummary(quoting.quote, { currentPlan })
+            : null;
+    // What the change takes away, said before Confirm (DEC-157).
+    const endingAddons =
+        quoting.state === "ready" && summary?.confirm
+            ? endingAddonsNote(quoting.quote, { currentPlan })
             : null;
 
     function confirm() {
@@ -339,6 +348,15 @@ export function ChangePlanDialog({
                             </div>
                         ))}
                     </dl>
+                ) : null}
+
+                {endingAddons ? (
+                    <p
+                        role="note"
+                        className="text-pretty text-[12.5px] text-foreground/80"
+                    >
+                        {endingAddons}
+                    </p>
                 ) : null}
 
                 {dropped ? (

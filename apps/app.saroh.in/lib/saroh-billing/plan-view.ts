@@ -101,6 +101,20 @@ export interface ChangeQuote {
     payNowTotalPaise: number;
     /** What setting up autopay takes now: a real charge, a refunded check, or none. */
     mandateCheck: "PAID" | "REFUNDED" | "NONE";
+    /**
+     * The add-ons held today that end with this change (DEC-157). An API
+     * from before it sends none, which reads as none ending.
+     */
+    addonsEnding?: EndingAddon[];
+}
+
+/** An add-on that ends with a plan change, and how many are held. */
+export interface EndingAddon {
+    id: string;
+    name: string;
+    quantity: number;
+    /** The new plan's own add-on of the kind, to add after; null: none. */
+    onNewPlan: string | null;
 }
 
 /**
