@@ -23,6 +23,10 @@
  * | `visitsPerMonth`   | this month's site views (`site.view`), from the daily rollup          |
  * | `sarohEmailsPerMonth` | emails Saroh queued for the business this month (`SAROH` deliveries), unless stopped before they went or failed with no try left (DEC-086) |
  *
+ * A cap inside one thing (a product's variants, `variantsPerProduct`) is
+ * not counted here: it has no total across the business, so it is no meter
+ * (`item-limits.ts`).
+ *
  * A month is the business's own (its zone, `businessTimezone`): the 1st
  * starts at midnight there, not in UTC. Visits are the exception: the
  * rollup (`AnalyticsDailyAggregate`) buckets by UTC day, so a month of

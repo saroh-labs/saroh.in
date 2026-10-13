@@ -83,4 +83,10 @@ describe("USAGE_NOTE_WORDS (UX-089)", () => {
             "Online only, no locations",
         );
     });
+
+    it("says a cap inside each product has no total (DEC-158)", () => {
+        expect(USAGE_NOTE_WORDS["per-product"]).toBe(
+            "Each product has its own count",
+        );
+    });
 });

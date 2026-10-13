@@ -7,6 +7,8 @@ import { LIMIT_WARN_AT } from "@saroh/pricing-catalog";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { CatalogueAccessService } from "./catalogue-access.service";
+import type { ItemCap } from "./item-limits";
+import { itemCapOf } from "./item-limits";
 import type { MeteredLimitKey } from "./metering";
 import { countUsage, meteredKeyOf, quietAtOne } from "./metering";
 import { moduleLocked, planLimitReached } from "./plan-limit-errors";
@@ -292,6 +294,21 @@ export class MeteringService {
         if (gate === "open") return true;
         const used = await countUsage(prisma, organizationId, gate.key, now);
         return gate.soft || used + adding <= gate.limit;
+    }
+
+    /**
+     * The cap a row puts inside one thing (a product's variants, DEC-158;
+     * `item-limits.ts`), for the write to hold what it adds against
+     * (`assertItemRoom`). Null when nothing caps it: as {@link enforcedRow},
+     * so nothing behind the kill switch, off the catalogue, on a version
+     * without the row, or when the plan couldn't be read (logged).
+     */
+    async itemCap(
+        organizationId: string,
+        moduleId: string,
+        now: Date = new Date(),
+    ): Promise<ItemCap | null> {
+        return itemCapOf(await this.enforcedRow(organizationId, moduleId, now));
     }
 
     /** The check itself, for a row already read. */

@@ -1,5 +1,6 @@
 "use client";
 
+import type { VariantCap } from "@/lib/billing/variant-cap";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
@@ -99,6 +100,8 @@ export interface ProductEditorProps {
      * read-only. The page passes `canWrite` false with it; this says why.
      */
     paused?: boolean;
+    /** The plan's cap on one product's variants (DEC-158); null for none. */
+    variantCap?: VariantCap | null;
 }
 
 const PRODUCTS_HREF = "/commerce/products";
@@ -148,6 +151,7 @@ function EditorBody({
     allergens,
     defaults: initialDefaults,
     paused = false,
+    variantCap = null,
 }: ProductEditorProps) {
     const router = useRouter();
     const {
@@ -426,6 +430,7 @@ function EditorBody({
                                 listings={listings}
                                 gstRegistered={gstRateNeeded}
                                 businessPriceMode={businessPriceMode}
+                                variantCap={variantCap}
                             />
                             {businessTracks ? (
                                 <StockSection

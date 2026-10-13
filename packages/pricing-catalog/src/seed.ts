@@ -163,6 +163,26 @@ const input: CatalogInput = {
             },
         },
         {
+            id: "variants",
+            name: "Variants",
+            group: "selling",
+            pricing: "show",
+            what: "The sizes, shades or colours one product comes in.",
+            cells: {
+                free: C("Up to 4 a product", "Up to 4 variants a product", 4),
+                grow: C(
+                    "Up to 40 a product",
+                    "Up to 40 variants a product",
+                    40,
+                ),
+                pro: C(
+                    "Up to 150 a product",
+                    "Up to 150 variants a product",
+                    150,
+                ),
+            },
+        },
+        {
             id: "orders",
             name: "Orders",
             group: "selling",

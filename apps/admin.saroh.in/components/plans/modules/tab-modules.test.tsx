@@ -295,6 +295,33 @@ describe("All modules", () => {
         ).toBeNull();
     });
 
+    it("offers the Variants row to a catalogue without it, and adds it under its id (DEC-158)", async () => {
+        open();
+        expect(
+            screen.getByText(/This catalogue has no Variants row/),
+        ).toBeTruthy();
+        fireEvent.click(
+            screen.getByRole("button", { name: "Add Variants row" }),
+        );
+        // Offered once: the line goes when the row is there.
+        expect(screen.queryByText(/has no Variants row/)).toBeNull();
+        expect(
+            screen.getByRole("region", { name: "Module details: Variants" }),
+        ).toBeTruthy();
+        const c = await saved();
+        const at = c.modules.findIndex((m) => m.id === "variants");
+        // Under its own id, never one "Add module" would make up.
+        expect(at).toBeGreaterThanOrEqual(0);
+        expect(c.modules[at]).toMatchObject({
+            name: "Variants",
+            group: c.groups[0]?.id,
+            pricing: "hidden",
+        });
+        for (const cell of Object.values(c.modules[at]?.cells ?? {})) {
+            expect(cell).toMatchObject({ inc: true, limit: null });
+        }
+    });
+
     it("can be read but not changed without pricing:edit", () => {
         open(
             tabData({
@@ -314,6 +341,9 @@ describe("All modules", () => {
         // Nothing to add or rename without pricing:edit: the controls aren't drawn.
         expect(screen.queryByRole("button", { name: "Add module" })).toBeNull();
         expect(screen.queryByRole("button", { name: "Add group" })).toBeNull();
+        expect(
+            screen.queryByRole("button", { name: "Add Variants row" }),
+        ).toBeNull();
         expect(
             matrix().queryByRole("button", { name: "Rename Group one" }),
         ).toBeNull();

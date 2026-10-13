@@ -325,6 +325,27 @@ export function fakeMeteredCatalog(edit?: (c: Catalog) => void): Catalog {
 }
 
 /**
+ * {@link fakeMeteredCatalog} with the row that caps a product's variants
+ * (DEC-158, `billing/item-limits.ts`): `variants` at 3 / 5 a product, no
+ * cap on `pro`. Made up, as the rest. `products` stays 3 / 5 / no cap.
+ */
+export function fakeVariantCatalog(edit?: (c: Catalog) => void): Catalog {
+    return fakeMeteredCatalog((c) => {
+        c.modules.push({
+            id: "variants",
+            name: "Kinds",
+            group: "g",
+            cells: {
+                free: { inc: true, text: "Up to 3 a thing", limit: 3 },
+                grow: { inc: true, text: "Up to 5 a thing", limit: 5 },
+                pro: { inc: true, text: "No cap" },
+            },
+        } as unknown as Catalog["modules"][number]);
+        edit?.(c);
+    });
+}
+
+/**
  * {@link fakeMeteredCatalog} with the Payments rows (the plan's say over
  * taking money online, `billing/online-payments-plan.ts`): `payments` and
  * `subscriptions`, both locked on `free` and on from `grow`. Made up, as

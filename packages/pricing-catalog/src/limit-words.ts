@@ -45,7 +45,7 @@ export interface LimitWords {
 }
 
 /**
- * The words for each metered limit key (`MODULE_MAP.limitKey`), once: the
+ * The words for each limit key (`MODULE_MAP.limitKey`), once: the
  * API's refusals and inbox notices (U13) and the merchant app's notices
  * (U14) read the same sentences, so a screen and the 403 behind it never
  * disagree. The team's is the design's ("Saroh Settings", Team).
@@ -55,6 +55,14 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         what: "products",
         one: "product",
         paused: "You can't add more products.",
+        monthly: false,
+    },
+    // Counted inside one product, never across the business (DEC-158):
+    // `itemLimitNotice` says it, and no screen shows a total.
+    variantsPerProduct: {
+        what: "variants a product",
+        one: "variant a product",
+        paused: "No more can be added to this one.",
         monthly: false,
     },
     ordersPerMonth: {

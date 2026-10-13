@@ -1,11 +1,14 @@
 import { prisma } from "@saroh/database";
+import { limitWithin } from "@saroh/pricing-catalog";
 
 import { meteredKeyOf, usageByModule } from "../billing/metering";
 
 /** Why a count reads as it does, where the number alone would mislead. */
 export type UsageNote =
     /** Locations at 0 because every storefront it has sells online only. */
-    "online-only";
+    | "online-only"
+    /** A cap inside each product (variants, DEC-158): there is no total. */
+    | "per-product";
 
 export interface CatalogueUsage {
     /** Metering's count by catalogue row id, for the metered rows asked for. */
@@ -41,13 +44,15 @@ export async function catalogueUsage(
 /**
  * The note beside a row's count: a locations row at 0 for a business whose
  * storefronts all sell online says so, rather than a bare 0 that reads as
- * "not set up".
+ * "not set up". A row capped inside each product has no count at all, and
+ * says that instead of reading as something nobody measured.
  */
 export function usageNote(
     moduleId: string,
     usage: number | null,
     storefronts: number,
 ): UsageNote | null {
+    if (limitWithin(moduleId) === "product") return "per-product";
     return meteredKeyOf(moduleId) === "shopLocations" &&
         usage === 0 &&
         storefronts > 0

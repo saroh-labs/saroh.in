@@ -44,7 +44,10 @@ describe("planRows", () => {
             invoicing: false,
             roles: false,
             members: 1,
+            variants: 2,
         });
+        // No cap is `true`, as for any included row.
+        expect(entitlementsFor(fixture(), "c").variants).toBe(true);
     });
 });
 
@@ -90,6 +93,7 @@ describe("plan keys", () => {
                 "storage",
                 "subscriptions",
                 "themes",
+                "variants",
                 "visits",
                 "website",
             ].sort(),

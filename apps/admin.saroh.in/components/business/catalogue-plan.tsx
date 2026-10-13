@@ -146,11 +146,13 @@ export function CataloguePlan({
                                         )}
                                     </td>
                                     <td className="py-2 text-right tabular-nums">
-                                        {m.usage ?? (
-                                            <span className="text-muted-foreground">
-                                                Not measured
-                                            </span>
-                                        )}
+                                        {m.usage ??
+                                            (m.usageNote ===
+                                            "per-product" ? null : (
+                                                <span className="text-muted-foreground">
+                                                    Not measured
+                                                </span>
+                                            ))}
                                         {m.usageNote && (
                                             <span className="block text-[12.5px] text-muted-foreground">
                                                 {USAGE_NOTE_WORDS[m.usageNote]}

@@ -26,6 +26,15 @@ describe("limit words", () => {
         expect(limitWordsFor("locations")?.what).toBe("places customers visit");
     });
 
+    it("words variants as a cap inside one product (DEC-158)", () => {
+        expect(limitWordsFor("variants")).toMatchObject({
+            what: "variants a product",
+            one: "variant a product",
+            paused: "No more can be added to this one.",
+            monthly: false,
+        });
+    });
+
     it("has none for a switch or an unknown row", () => {
         expect(limitWordsFor("invoicing")).toBeNull();
         expect(limitWordsFor("toString")).toBeNull();

@@ -1870,3 +1870,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **One exception to "no scheduled deploys" (DEC-107), once.** Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026 only: the first starts early, waits for the instant and deploys every app; the second deploys only what is still unopened. Both do nothing in another year and are deleted after launch. The rule stands for everything else.
 - Plans show in the workspace at launch, which DEC-136 left open.
 - Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.
+
+## DEC-158 A plan caps how many variants one product may have
+
+**Status: Accepted — 2026-10-13, built** · owner (decided the cap; "variants do not count towards the product limit")
+
+- A plan may cap the variants of **one product**: a small number on the free plan, more on each paid plan. The numbers are the catalogue's, set per plan in Admin › Plans on the row `variants`, and raised for one business with a limit override. None is written in code.
+- **Variants never count as products.** The products limit counts products; this is its own cap, inside each product.
+- **It is a cap inside one thing, not a count across the business** (`MODULE_MAP.variants.within`). So it has no usage meter, no "used X of Y", no notice at 80%, and nothing is ever "over" in total or paused for it. The one thing that happens: a save that would take a product past its cap is refused, with the usual plan-limit notice and its way to another plan.
+- **Nothing is removed and selling is never blocked.** A product that already has more than the cap (made before it, or after a move to a lower plan) keeps every variant, keeps selling, and is still edited, reordered and made smaller. Only adding one more is refused while it is at or past the cap. A copy of such a product is refused too, since the copy would start past the cap; the original is untouched.
+- **The row is a limit, never a lock.** A plan whose cell has no number, or leaves the row out, caps nothing. A catalogue version published before the row existed caps nothing either, so no business loses the ability to add variants when this ships.
+- A catalogue made before the row is offered it on the Modules tab ("Add Variants row"). It arrives with no limit on any plan and hidden from the pricing page, so nothing changes until a number is set and the version is published.
+- Only behind `PLAN_ENFORCEMENT`, and fail open as every limit is: a plan that can't be read refuses nothing.
+- Code: `billing/item-limits.ts` (the rule), `products/variant-cap.ts` (the two writes that add a variant: a new variant, a copy), `itemLimitNotice` in `@saroh/pricing-catalog` (the words, shared with the editor).

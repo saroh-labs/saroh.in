@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     catalogPlanIdForKey,
     catalogueModulesFor,
+    limitWithin,
     MODULE_MAP,
     moduleForLegacyKey,
 } from "./module-map";
@@ -61,6 +62,24 @@ describe("module map (KTD-8)", () => {
             legacyEntitlementKey: null,
         });
         expect(catalogueModulesFor("WEBSITE")).not.toContain("qr-branding");
+    });
+
+    it("caps variants inside a product, never across the business (DEC-158)", () => {
+        expect(MODULE_MAP.variants).toEqual({
+            registry: null,
+            limitKey: "variantsPerProduct",
+            legacyEntitlementKey: null,
+            within: "product",
+        });
+        expect(limitWithin("variants")).toBe("product");
+        // Under no registry module: the row never decides whether Commerce is on.
+        expect(catalogueModulesFor("COMMERCE")).not.toContain("variants");
+        // Every other limit is a count across the business.
+        for (const [id, e] of Object.entries(MODULE_MAP)) {
+            if (id !== "variants") expect(e.within).toBeUndefined();
+        }
+        expect(limitWithin("products")).toBeNull();
+        expect(limitWithin("toString")).toBeNull();
     });
 
     it("reads a legacy raise's key as its row", () => {

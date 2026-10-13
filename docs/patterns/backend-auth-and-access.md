@@ -418,6 +418,16 @@ orgId)` (`organizations/organization-kind.ts`).
   plan override reads `FREE_ENTITLEMENTS` until the backfills reach it
   (`docs/architecture/PRICING_ROLLOUT.md`). Never read `Plan.entitlements`
   directly for access.
+- **Current** (DEC-158) — **A cap inside one thing is not a meter.** A
+  catalogue row whose cap is on what ONE thing holds (`variants`: a
+  product's variants) says so in `MODULE_MAP` (`within`) and is checked
+  through `planMeter.itemCap(org, row)` and `assertItemRoom(cap, has,
+adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
+  never added to `METERED_LIMIT_KEYS`: it has no count across the
+  business, so no usage, notice or pause. Only a write that adds is
+  refused; one that adds nothing always passes, so a thing past its cap
+  stays editable. A cell without a number, a cell that leaves the row out
+  and a version without the row all cap nothing.
 - **Current** (plans catalogue U13) — **A plan limit is checked where the
   write happens, behind the kill switch.** A write that adds a metered
   thing calls `planMeter.roomInTx(tx, org, row)` on its own transaction

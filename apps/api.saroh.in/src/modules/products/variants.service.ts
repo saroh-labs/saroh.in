@@ -17,6 +17,7 @@ import { assertMrpAtOrAbovePrice, moneyToCents } from "./product-rules";
 import { ProductsService } from "./products.service";
 import { serializeVariant } from "./serialize";
 import { lockProduct, lockProductStock } from "./stock-levels";
+import { assertVariantRoom, variantCap } from "./variant-cap";
 import type {
     CreateVariantDto,
     ReorderVariantsDto,
@@ -40,6 +41,10 @@ const SKU_TAKEN = {
  *
  * #510: a new variant is sold wherever its product is listed, and counted
  * at every storefront that counts the product per variant.
+ *
+ * DEC-158: a plan may cap how many variants one product has. Only adding
+ * one is checked (`variant-cap.ts`); a product past the cap keeps every
+ * variant and can still be edited, reordered and made smaller.
  *
  * #531: the work takes a `ProductScope`; the storefront-shaped methods are
  * the old routes' aliases (resolve, then call the scoped one).
@@ -103,6 +108,9 @@ export class VariantsService {
             dto,
         );
 
+        // The plan's cap on one product's variants (DEC-158); null caps
+        // nothing, and nothing is counted then.
+        const cap = await variantCap(organizationId);
         const last = await prisma.productVariant.findFirst({
             where: { productId },
             orderBy: { position: "desc" },
@@ -112,6 +120,8 @@ export class VariantsService {
             const variant = await prisma.$transaction(async (tx) => {
                 // Lock order: the product, then its stock rows.
                 await lockProduct(tx, productId);
+                // Counted under the lock: two adds can't share the last place.
+                await assertVariantRoom(tx, cap, productId);
                 const created = await tx.productVariant.create({
                     data: {
                         productId,

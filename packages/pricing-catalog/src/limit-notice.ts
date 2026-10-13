@@ -140,3 +140,44 @@ export function limitNotice(
         soft,
     };
 }
+
+/** What a per-item cap says when a write would pass it. */
+export interface ItemLimitNotice {
+    title: string;
+    body: string;
+    cta: string;
+}
+
+/**
+ * The notice for a cap inside one thing (`ModuleMapEntry.within`: the
+ * variants of one product, DEC-158). There is no share used and no 80%
+ * line: it is said only where one more wouldn't fit. `has` is what the
+ * thing holds now; one already past the cap keeps it all, and the notice
+ * says so. `stopped` replaces `pausedText` where the write isn't an add to
+ * the thing in hand (a copy that would start past the cap).
+ *
+ * Null when nothing caps the row.
+ */
+export function itemLimitNotice(
+    access: Pick<ModuleAccess, "limit" | "plan" | "upgradeTo"> &
+        Partial<Pick<ModuleAccess, "upgradeUncapped">>,
+    has: number,
+    what: string,
+    pausedText: string,
+    stopped?: string,
+): ItemLimitNotice | null {
+    if (access.limit === null) return null;
+    const L = access.limit;
+    const n = Number.isFinite(has) ? Math.max(0, Math.floor(has)) : 0;
+    const up = access.upgradeTo;
+    const kept =
+        !stopped && n > L ? ` It keeps the ${formatCount(n)} it has.` : "";
+    const more = up
+        ? ` ${up} ${access.upgradeUncapped === true ? "has no limit" : "allows more"}.`
+        : " Talk to us if you need more.";
+    return {
+        title: `You can have up to ${formatCount(L)} ${countedWhat(what, L)} on ${access.plan}`,
+        body: (stopped ?? pausedText) + kept + more,
+        cta: up ? "See plans" : "See your plan",
+    };
+}

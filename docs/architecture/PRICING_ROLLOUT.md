@@ -164,6 +164,20 @@ and the admin's usage lines and impact (`ImpactService`).
   can't be read (logged `plan_meter_unresolved`).
 - **Notices:** `plan.limit.notice` at 80%, at the limit and past a soft
   cap, once each per limit and month (`backend-jobs.md`).
+- **A cap inside one thing (DEC-158):** the row `variants` caps how many
+  variants ONE product may have. It is not counted across the business
+  (`MODULE_MAP.variants.within`, `billing/item-limits.ts`), so it has no
+  `usage`, no notice and no "over": only a new variant, or a copy, that
+  would take a product past the cap is refused (`PLAN_LIMIT_REACHED`, in
+  per-product words). A product already past it keeps every variant and
+  every other save. Variants never count as products. A cell with no
+  number, a cell that leaves the row out, and a version published before
+  the row existed all cap nothing. Set per plan in Admin › Plans; a limit
+  override raises it for one business. A catalogue made before the row
+  gets it from the Modules tab's "Add Variants row" (it must carry the id
+  `variants`; "Add module" makes an id of its own, which governs nothing):
+  it arrives with no limit on any plan and hidden from the pricing page,
+  so adding it changes nothing until a number is set and published.
 
 ## A business's own domain (DEC-139)
 
@@ -586,6 +600,10 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
   `LIMIT_WORDS` (`@saroh/pricing-catalog`, shared with the API's
   refusals). Only while `enforced` (the access view's
   `PLAN_ENFORCEMENT`): nothing is shown that nothing would stop.
+- **Variants a product** (DEC-158): no notice on a list and no meter. The
+  product editor's Variants turns "Add to list" off once the product's
+  list holds the plan's number, and the line beside it says the cap and
+  the way to more (`lib/billing/variant-cap.ts`), in the refusal's words.
 - **Locks**: a module shut only by the plan (`ENTITLEMENT_REQUIRED` alone)
   stays in the rail with a lock and its page says which plan has it
   (`PlanLocked`). A catalogue row locks a rail entry only where the API

@@ -15,8 +15,13 @@
  */
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import type { LimitPeriod, ModuleAccess } from "@saroh/pricing-catalog";
-import { limitNotice } from "@saroh/pricing-catalog";
+import {
+    itemLimitNotice,
+    LIMIT_WORDS,
+    limitNotice,
+} from "@saroh/pricing-catalog";
 
+import type { ItemCap, ItemLimitKey } from "./item-limits";
 import type { MeteredLimitKey } from "./metering";
 import { METER_WORDS } from "./metering";
 
@@ -45,8 +50,12 @@ function upgradeOf(row: ModuleAccess): UpgradeTo | null {
 export interface PlanLimitDetails {
     code: typeof PLAN_LIMIT_REACHED;
     moduleId: string;
-    limitKey: MeteredLimitKey;
+    limitKey: MeteredLimitKey | ItemLimitKey;
     limit: number;
+    /**
+     * The count against `limit`: across the business, or, for a cap inside
+     * one thing (`item-limits.ts`), what that thing holds now.
+     */
     used: number;
     per: LimitPeriod;
     plan: { id: string; name: string };
@@ -88,6 +97,44 @@ export function planLimitReached(
         limitKey: key,
         limit,
         used,
+        per: row.per,
+        plan: { id: row.planId, name: row.plan },
+        upgradeTo: upgradeOf(row),
+        notice,
+    };
+    return new ForbiddenException({ message: notice.title, details });
+}
+
+/**
+ * 403: the write would take one thing past the plan's cap on what it holds
+ * (`item-limits.ts`: a product's variants). The same `PLAN_LIMIT_REACHED`
+ * shape, so the app shows its usual notice; the words are the per-item
+ * ones (`itemLimitNotice`), which never speak of a total.
+ */
+export function itemLimitReached(
+    cap: ItemCap,
+    has: number,
+    stopped?: string,
+): ForbiddenException {
+    const { row, key, limit } = cap;
+    const words = LIMIT_WORDS[key];
+    const notice = itemLimitNotice(
+        { ...row, limit },
+        has,
+        words.what,
+        words.paused,
+        stopped,
+    ) ?? {
+        title: `You've reached your ${words.what} limit on ${row.plan}`,
+        body: stopped ?? words.paused,
+        cta: "See your plan",
+    };
+    const details: PlanLimitDetails = {
+        code: PLAN_LIMIT_REACHED,
+        moduleId: row.moduleId,
+        limitKey: key,
+        limit,
+        used: has,
         per: row.per,
         plan: { id: row.planId, name: row.plan },
         upgradeTo: upgradeOf(row),
