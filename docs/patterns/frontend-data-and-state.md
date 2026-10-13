@@ -38,6 +38,15 @@ There is no client-side server-state library and no global client store.
   `cache()`, as `getActiveOrgId` in `lib/api/http.ts` does.
 - **Current** — **Never trust the client for the organization.** The header is a
   hint; the API derives membership from the session.
+- **Current** — **A draft copied from a published version says which one.**
+  The admin console's plans draft sends the version it copied when it
+  starts (`baseVersion`), and the API refuses the start, and later the
+  publish, when a newer version has been published since
+  (`catalogue-writes.service.ts`, `components/plans/draft-store.tsx`). The
+  page is read again when it comes back into view
+  (`components/plans/use-page-return.ts`); a page the browser's Back
+  restored is loaded again, because Next drops a `router.refresh()` asked
+  for as it restores. DEV_LEARNINGS, 13 Oct 2026.
 
 ## The screen updates by itself: live refresh — **Current** (10 Oct 2026)
 

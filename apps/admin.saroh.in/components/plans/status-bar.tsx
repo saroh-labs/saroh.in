@@ -6,13 +6,14 @@ import { ArrowUpRight } from "lucide-react";
 import { useState } from "react";
 
 import { OperatorDialog } from "@/components/operator-dialog";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { previewPricingAction } from "@/lib/pricing-actions";
 import {
     changeCount,
     draftSummary,
     namesList,
     otherEditors,
+    outdatedMessage,
     publishedByName,
     upcomingVersions,
 } from "@/lib/pricing-draft";
@@ -26,14 +27,20 @@ import { useFlash } from "./toast";
  * The bar above the tabs (plans catalogue U6), in the design's two states:
  * Live (version, who published it, anything scheduled), or the amber Draft
  * banner (what it changes and does, Preview, Discard, Review & publish).
- * Below it, a refused save says who saved since, with Reload.
+ * Below it, a refused save says who saved since, with Reload; and a draft
+ * a newer version has overtaken says so, and what it had changed.
  */
 export function StatusBar() {
-    const { hasDraft } = useDraft();
+    const { hasDraft, outdated, conflict } = useDraft();
+    // Someone else's save is the news until it is reloaded; otherwise a
+    // newer version is, as soon as the page has read it.
+    const overtaken =
+        outdated !== null &&
+        (conflict === null || conflict.newestVersion !== undefined);
     return (
         <div className="grid gap-3">
             {hasDraft ? <DraftBanner /> : <LiveBar />}
-            <ConflictNotice />
+            {overtaken ? <OutdatedNotice /> : <ConflictNotice />}
         </div>
     );
 }
@@ -42,7 +49,7 @@ const BAR_BUTTON = "h-[34px] rounded-[9px] px-3.5 text-[13px]";
 
 function LiveBar() {
     const { pricing, access } = usePlans();
-    const { live } = useDraft();
+    const { live, base } = useDraft();
     const next = upcomingVersions(pricing).at(0);
 
     return (
@@ -78,6 +85,11 @@ function LiveBar() {
                         ? `Version ${next.version} is waiting for billing`
                         : `Version ${next.version} goes live ${formatDate(next.goLiveAt)}`}
                 </Badge>
+            )}
+            {base && base.version !== live?.version && (
+                <span className="text-[12.5px] text-muted-foreground">
+                    What you see and edit below is version {base.version}.
+                </span>
             )}
             <span className="text-[12.5px] text-muted-foreground sm:ml-auto">
                 {access.canEdit
@@ -148,6 +160,7 @@ function DraftBanner() {
                         {count}
                     </span>
                     <SaveState />
+                    {access.canEdit && <SaveDraftButton />}
                 </p>
                 <p className="text-[12.5px] leading-normal text-muted-foreground">
                     {draftSummary({
@@ -217,16 +230,50 @@ function DraftBanner() {
     );
 }
 
-/** Saving, saved, or not saved with a way to try again. */
+/**
+ * "Save draft": the draft autosaves, and this saves it now, so nobody has
+ * to trust a pause. It reads "Saved" (and can't be pressed) when what is on
+ * screen is saved, "Saving…" while a save is on its way, and "Save draft"
+ * when something isn't saved yet. A save that fails or is refused says so
+ * in `SaveState` and the notices below, not here.
+ */
+function SaveDraftButton() {
+    const { save, saving, revision, flush, retry } = useDraft();
+    const unsaved = save === "saving" || save === "failed" || revision === 0;
+    const label = saving ? "Saving…" : unsaved ? "Save draft" : "Saved";
+    return (
+        <Button
+            type="button"
+            variant="outline"
+            className="h-[26px] rounded-[7px] px-2.5 text-[12px] coarse:h-11"
+            disabled={saving || !unsaved || save === "conflict"}
+            aria-busy={saving}
+            onClick={() => (save === "failed" ? retry() : void flush())}
+        >
+            {label}
+        </Button>
+    );
+}
+
+/** Saving, when it was saved, or not saved with a way to try again. */
 function SaveState() {
-    const { save, saveError, retry } = useDraft();
+    const { save, saving, savedAt, saveError, retry } = useDraft();
     if (save === "saving") {
         return (
-            <span className="text-[12px] text-muted-foreground">Saving…</span>
+            <span className="text-[12px] text-muted-foreground">
+                {saving ? "Saving…" : "Not saved yet"}
+            </span>
         );
     }
-    if (save === "saved") {
-        return <span className="text-[12px] text-muted-foreground">Saved</span>;
+    if ((save === "saved" || save === "idle") && savedAt) {
+        return (
+            <span
+                className="text-[12px] text-muted-foreground"
+                suppressHydrationWarning
+            >
+                Saved {formatDateTime(savedAt)}
+            </span>
+        );
     }
     if (save === "failed") {
         return (
@@ -245,6 +292,54 @@ function SaveState() {
     return null;
 }
 
+/**
+ * A newer version was published than the one these changes were started
+ * from. They stay on screen and are listed here, so they can be made again
+ * on the newer version; nothing publishes them over it.
+ */
+function OutdatedNotice() {
+    const { outdated, revision, reload } = useDraft();
+    if (!outdated) return null;
+    const saved = revision > 0;
+    return (
+        <div
+            role="alert"
+            className="flex flex-wrap items-start gap-x-4 gap-y-2 rounded-[12px] border border-warning/30 bg-warning-subtle px-4 py-3 text-[13px] text-warning-subtle-foreground"
+        >
+            <div className="grid min-w-0 flex-[1_1_280px] gap-1.5">
+                <p>{outdatedMessage(outdated, saved)}</p>
+                {outdated.changes.length > 0 && (
+                    <ul
+                        aria-label="Your changes"
+                        className="grid list-disc gap-0.5 pl-[18px] text-[12.5px]"
+                    >
+                        {outdated.changes.slice(0, 8).map((c, i) => (
+                            <li key={`${i}-${c}`}>{c}</li>
+                        ))}
+                        {outdated.changes.length > 8 && (
+                            <li className="list-none">
+                                and {outdated.changes.length - 8} more
+                            </li>
+                        )}
+                    </ul>
+                )}
+            </div>
+            {!saved && (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className={BAR_BUTTON}
+                    onClick={reload}
+                >
+                    {outdated.to === null
+                        ? "Start again"
+                        : `Start again from version ${outdated.to}`}
+                </Button>
+            )}
+        </div>
+    );
+}
+
 function ConflictNotice() {
     const { conflict, saveError, reload } = useDraft();
     if (!conflict) return null;
@@ -260,7 +355,9 @@ function ConflictNotice() {
                 className={BAR_BUTTON}
                 onClick={reload}
             >
-                Reload draft
+                {conflict.newestVersion === undefined
+                    ? "Reload draft"
+                    : "Reload"}
             </Button>
         </div>
     );

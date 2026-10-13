@@ -4508,7 +4508,6 @@ agent edits is run once against the local stack before the gate
 count or for the row it does not expect to go, then clicks.
 **Category**: tests · `.agents/skills/saroh-browser-tests/SKILL.md`
 
-
 ## A new plan version was published, and the pricing page still showed the old one
 
 **Symptom**: version 4 of the plans went live on the development API
@@ -4528,3 +4527,47 @@ it first.
 **Rule**: a cache kept between builds may hold code, never data. Anything a
 static build reads from the API is read afresh by every deploy.
 **Category**: devops · `docs/patterns/devops-tooling-and-deploy.md`
+
+## A second plan version was published from the version before the last one, and undid it
+
+**Symptom**: on the development console, version 5 of the plans was
+published with three wording changes. Ten minutes later one more change was
+published as version 6, and version 6 was version 4 plus that one change:
+everything version 5 had changed was gone. Nothing warned anyone.
+**Cause**: a draft is a copy of a published version, and neither side
+checked which one.
+
+- A version with paid plans isn't live at once: it waits until its plans
+  are at the billing provider, and the version before it stays live. The
+  editor showed and copied the live version, so in that wait it opened on
+  the old wording, and the first edit started a draft from the version
+  under the one just published. Publish was held while the version waited;
+  the draft stayed, and went out once it was live.
+- The editor never said which version it had copied; the API wrote down
+  whichever was live. So a page that was read before a publish (a second
+  tab, a page the browser's Back restored as it was left) started its draft
+  from the old version just the same.
+- A page restored by Back was never read again: Next puts its own router
+  state back as the page is shown, and drops a `router.refresh()` asked for
+  at that moment.
+
+Reproduced in a browser on the local stack, on each of the three.
+**Fix**: a draft starts from the newest published version, waiting or live,
+and the editor shows that one. A start names the version it copied, and the
+API refuses it (409, the draft's conflict shape with `newestVersion`) when a
+newer one has been published; a publish is refused the same way when one
+went live after the draft was started. The refused changes stay on screen,
+listed, with "Start again from version N". The page is read again when it
+comes back into view, after every write that changes versions and while a
+version waits for billing; restored by Back, it loads again. The status bar
+has a Save draft button that says Saved, and when.
+**Check**: `catalogue-writes.db.spec.ts` (a stale start, a start under a
+waiting version, a publish a scheduled version overtook), `draft-dto.spec.ts`,
+and `plans-shell.test.tsx` (the start names its version, a refused start
+keeps the edit, focus and Back read the page again).
+**Rule**: a draft that is a copy of something says what it copied, and the
+server refuses it when that is no longer the newest; it never fills that in
+for the client. "Live" and "the newest published" are different while a
+version waits, and an editor starts from the newest. A page restored from
+the back/forward cache is loaded again, not refreshed.
+**Category**: admin · pricing · `docs/patterns/frontend-data-and-state.md`
