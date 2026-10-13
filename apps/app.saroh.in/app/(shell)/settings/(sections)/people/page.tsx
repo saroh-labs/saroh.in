@@ -79,7 +79,7 @@ export default async function PeoplePage() {
         // To leave out a hidden module's permissions (DEC-073); null, when
         // they can't be read, holds nothing back.
         modulesOrUnknown(),
-        // Who takes bookings with no login: a team seat each (DEC-105,
+        // Who takes bookings with no login: a team seat each (DEC-111,
         // UX-053). Unread (no diary, or no right to it), nobody is added.
         canManage ? listStaff().catch(() => null) : Promise.resolve(null),
         // Past the plan's team limit (#800): who is paused, and why.
@@ -88,24 +88,11 @@ export default async function PeoplePage() {
     // The plan, for whoever changes the team or its roles.
     const access =
         canManage || canEditRoles ? await billingAccessOrNull() : null;
-    // The plan's team seats (U14, DEC-105): people who can change something
-    // plus such invites, as the API counts.
+    // The plan's team seats (U14, DEC-155): everyone, whatever their role,
+    // plus open invites, as the API counts. A soft cap never stops an invite.
     const team = canManage ? rowNotice(access, "members") : null;
-    // View-only people have their own cap (DEC-105): full seats still
-    // invite one, and the other way round. A soft cap never stops an invite.
-    const reviewers = canManage ? rowNotice(access, "reviewers") : null;
     const seats = team?.on && !team.soft ? team : null;
-    const viewOnly =
-        reviewers?.on && !reviewers.soft && reviewers.full ? reviewers : null;
-    const teamLimit =
-        seats || viewOnly
-            ? {
-                  full: seats?.full === true,
-                  why: seats?.why ?? "",
-                  reviewersFull: viewOnly !== null,
-                  reviewersWhy: viewOnly?.why,
-              }
-            : null;
+    const teamLimit = seats ? { full: seats.full, why: seats.why } : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);
     const pausedPeople = pausedTeam(paused);
 

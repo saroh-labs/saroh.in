@@ -25,6 +25,7 @@ import { businessTypeWrite } from "./business-type";
 import { startingZone } from "./business-zone";
 import type { OnboardOrganizationDto } from "./dto";
 import { DEFAULT_ORGANIZATION_KIND } from "./organization-kind";
+import { referringBusiness } from "./referral";
 import { slugify } from "./slug";
 
 /**
@@ -109,6 +110,8 @@ export class OrganizationOnboardingService {
         // and the business is a BUSINESS, as every business was.
         const kind = dto.kind ?? DEFAULT_ORGANIZATION_KIND;
 
+        const referredBy = await this.referredBy(userId, dto.referralCode);
+
         const onboarded = await prisma.$transaction(async (tx) => {
             /*
              * Fail fast on a taken address with a clear 409 rather than a raw
@@ -123,8 +126,20 @@ export class OrganizationOnboardingService {
                 });
             }
 
+            // Who referred it (DEC-156), written here and nowhere else: no
+            // later write names these two columns, so it is never changed.
             const organization = await tx.organization.create({
-                data: { name: dto.name, slug, kind },
+                data: {
+                    name: dto.name,
+                    slug,
+                    kind,
+                    ...(referredBy
+                        ? {
+                              referredByOrganizationId: referredBy,
+                              referredAt: new Date(),
+                          }
+                        : {}),
+                },
                 select: { id: true, slug: true },
             });
 
@@ -206,6 +221,26 @@ export class OrganizationOnboardingService {
         }
 
         return onboarded;
+    }
+
+    /**
+     * The business that referred this one, or null (`referral.ts` holds the
+     * rules). A read that fails records nobody rather than stop the setup:
+     * WARN `referral_lookup_failed`, and any at all is worth a look, since
+     * each is a referral that went unrecorded.
+     */
+    private async referredBy(
+        userId: string,
+        code: string | undefined,
+    ): Promise<string | null> {
+        try {
+            return await referringBusiness({ code, userId });
+        } catch (reason) {
+            this.logger.warn(
+                `referral_lookup_failed user=${userId} reason=${reason instanceof Error ? reason.name : "unknown"}`,
+            );
+            return null;
+        }
     }
 
     /**

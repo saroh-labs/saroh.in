@@ -12,6 +12,7 @@ describe("cardLines", () => {
             "11 things",
             "11 orders a month",
             "1 person",
+            "2 kinds a thing",
         ]);
     });
 
@@ -24,6 +25,7 @@ describe("cardLines", () => {
             "Orders",
             "Invoices",
             "3 people",
+            "22 kinds a thing",
         ]);
     });
 

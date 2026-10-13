@@ -17,12 +17,14 @@ export interface EffectivePlan {
 }
 
 /** Why a count reads as it does (the API's `UsageNote`). */
-export type UsageNote = "online-only";
+export type UsageNote = "online-only" | "per-product";
 
 /** What each usage note says beside the count. */
 export const USAGE_NOTE_WORDS: Record<UsageNote, string> = {
     // Owner, 8 Oct: only places customers visit count as locations.
     "online-only": "Online only, no locations",
+    // A cap inside each product (variants, DEC-158): nothing to total.
+    "per-product": "Each product has its own count",
 };
 
 /**

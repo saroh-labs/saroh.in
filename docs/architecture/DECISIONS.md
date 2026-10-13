@@ -1206,7 +1206,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-105 Team seats count people who can change things; view-only people have their own limit
 
-**Status: Accepted — 2026-10-07** · user · from the UX audit (D6)
+**Status: Superseded in part by DEC-155 — 2026-10-13** (was Accepted 2026-10-07) · user · from the UX audit (D6) · the separate view-only limit is gone; bookable staff using a seat stands
 
 - Decision: anyone whose role carries a write permission (books, sells, edits), including bookable staff, uses a team seat. People whose role carries only view permissions don't use a seat. They count toward a separate per-plan limit, the one Reviewers use today, which can change by policy.
 - Consequences: metering classifies a member by their role's permissions, not its name. The catalogue's Reviewers row becomes the view-only people limit.
@@ -1302,7 +1302,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 - Context: the published Terms promise that on a move to a lower plan, what's over the new plan's limits becomes read-only, with an email 7 days before, nothing deleted, and moving back up restoring everything at once. Before this, nothing paused; only adding more was refused.
 - Decision:
-    - What's over the limits is worked out from the plan the business reads now and a fixed order; nothing is stored per item. Team (seats as DEC-105 and DEC-111 count them, view-only people against their own limit): the owner always stays, then the earliest to join, then open invitations. Products and posts: the newest stay. Locations (SHOP storefronts, DEC-109) and websites (DEC-094): the first made stay.
+    - What's over the limits is worked out from the plan the business reads now and a fixed order; nothing is stored per item. Team (seats as DEC-105 and DEC-111 count them, view-only people against their own limit; since DEC-155 everyone counts against the one team limit): the owner always stays, then the earliest to join, then open invitations. Products and posts: the newest stay. Locations (SHOP storefronts, DEC-109) and websites (DEC-094): the first made stay.
     - Paused people can't open the business, and take no new bookings (diary people with no login and paused members' own diary rows). Paused products and posts are hidden from the site and read-only. A paused location stops taking orders; a paused website stops orders, bookings, class packs and plans sold online. Invoices, orders, customers and payment records are never touched, and bookings already made are kept.
     - **The pause waits 7 days after a notice (owner, 9 Oct).** Moves known ahead (an offer's end, a term's end, a chosen move) are told at 30, 7 and 1 days; moves that happen at once (a failed payment the provider gave up on, cancelling now, an operator change) are told within the hour and pause 7 days later. The billing moves themselves are unchanged.
     - **Locations and bookings (owner, 9 Oct):** bookings belong to the business, not a location, so a paused location stops orders and a paused website stops bookings; the Terms stand as written.
@@ -1870,3 +1870,61 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **One exception to "no scheduled deploys" (DEC-107), once.** Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026 only: the first starts early, waits for the instant and deploys every app; the second deploys only what is still unopened. Both do nothing in another year and are deleted after launch. The rule stands for everything else.
 - Plans show in the workspace at launch, which DEC-136 left open.
 - Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.
+
+## DEC-155 Everyone in a business uses one team seat, whatever their role
+
+**Status: Accepted — 2026-10-13, built** · owner · supersedes the view-only part of DEC-105 and the Reviewer rule of #794 · amends DEC-114
+
+- Context: since 6 Oct (#794) Reviewers were left off the team count, and since DEC-105 anyone whose role only looks used no seat and counted toward a separate limit of their own (the catalogue's `reviewers` row, "View-only people").
+- Decision: every person in a business uses one team seat, whatever their role: Owner, Admin, Member, Reviewer and any role the business made. There is no free or separate allowance for people who only look. The team count is every team member, every open invitation, and everyone on the diary who takes bookings with no login (DEC-111, unchanged).
+- The Reviewer role itself is unchanged: the same permissions, and still the sites it is invited to.
+- Consequences:
+    - Inviting anyone, a Reviewer included, is checked against the one team limit. A change of role, of a role's permissions or of someone's extra permissions never changes the count, so none of them asks the plan.
+    - The `reviewers` row is retired from the catalogue (`RETIRED_MODULE_IDS` in `@saroh/pricing-catalog`), with its limit key, its words and its place on Team, Plan and the pricing table. A version published while it was sold still carries the row in the database; every reader drops it on read, so it shows, counts and caps nothing. No migration, and no stored row is rewritten.
+    - Moving to a lower plan (DEC-114): the owner always stays, then the earliest to join up to the limit, Reviewers placed by when they joined like anyone else. A limit of one keeps the owner alone.
+    - The move-down notice's claim is keyed by the limits it named, which no longer include a view-only one. A business told under the old key is told again and gets its 7 days again before anything pauses.
+    - The member, invitation and role views no longer carry `usesSeat`.
+
+## DEC-156 Who referred a business is recorded when the business is made
+
+**Status: Accepted — 2026-10-13, built** · owner (record it from launch, so referrals made before the referral programme opens are known) · builds on DEC-102 · #809, #810 are not built by this
+
+- **What is recorded.** A visitor who reaches saroh.in by a business's referral link (`?ref=`, the "Made with Saroh" credit of DEC-102) and later makes a business has that fact kept on the new business: which business referred it and when (`Organization.referredByOrganizationId`, `referredAt`). Nothing else of a referral programme exists yet.
+- **Written once.** Only as the business is made. Nothing changes it afterwards.
+- **How the code travels.** saroh.in keeps the code in one first-party cookie, `saroh_ref`, on the domain it shares with accounts and the workspace, for 90 days. The workspace's server reads it as the business is made, sends it to the API with the business, and clears it once the business exists. It is functional: set whatever the cookie notice was answered, holding the eight characters from the link and nothing about the visitor, and never given to an analytics, advertising or recording tag. The address it came from is still cut before any tag loads (DEC-127).
+- **The last link wins** in the browser. A page cannot tell a real code from a mistyped one, so a newer link replaces an older one.
+- **The API decides, from the database.**
+    - A malformed or unknown code, or a deleted business's, refers nobody, and the new business is made all the same. The caller is never told which.
+    - Nobody refers themselves: someone who is already in the referring business, in any role, is not recorded as referred by it. A business can never name itself (a CHECK on the column).
+    - One level: only the business whose code was carried is recorded.
+- **A waitlist entry's id is not a business's code.** Both arrive as `?ref=` and look alike, so they are told apart by table, never by shape. saroh.in keeps no code from the waitlist page, where `?ref=` is an entrant's id. The waitlist looks for an entrant first and a business only when there is none. Setup reads businesses only, and a code that is also an entrant's id refers nobody.
+- **Until sign-up opens, the waitlist keeps it.** Someone who arrives by a business's link and joins the waitlist has that business kept on their entry (`WaitlistSignup.referredByOrganizationId`). When they make a business with no code in the browser, the entry's is used, found by the account's confirmed email. A code the browser carried comes first.
+- **Who sees it.** Operators, on the business's page in the console: "Referred by ‹business›" and the day. No business is shown who referred it or whom it referred, and no screen or message says anything follows from a referral.
+- Consequences: three nullable columns, an index and a foreign key (`20261122100000_organization_referred_by`). `POST /organizations` takes an optional `referralCode` and never refuses it, so the API is released before the workspace sends one. The rules are `apps/api.saroh.in/src/modules/organizations/referral.ts`; the cookie is `apps/saroh.in/lib/referral.ts` and `apps/app.saroh.in/lib/organizations/referral-carry.ts`. The Privacy Policy's Cookies section does not yet name this cookie: the owner's text to settle before launch.
+
+## DEC-157 An add-on is priced and capped for the plans it names
+
+**Status: Accepted — 2026-10-13, built** · owner (packs and extra seats cost differently on each plan, and each plan has its own ceiling on how many can be held)
+
+- An add-on in the catalogue may name the plans it is offered on (`plans`) and the most of it one business may hold (`max`). Naming no plan means every plan, and no maximum means the ceiling for any add-on (`MAX_ADDON_QUANTITY`), so a catalogue published before this reads as it always did.
+- "The same thing at another price on another plan" is two add-ons of one kind, each naming its plans, with its own price and maximum. The operator sets all of it in Admin › Plans › Offers; nothing is released.
+- A plan has one price for a thing. A catalogue does not validate when two add-ons of the same kind (and the same module, for a module on its own) are offered on the same plan, when an add-on names a plan that isn't there, or when a maximum is below 1 or above the ceiling.
+- A business sees and buys only the add-ons offered on its plan. More than the maximum is refused in words; the pricing page shows a plan-specific add-on under the plans it names, and not at all when none of them can be chosen.
+- **A maximum never takes anything away.** A business that holds more than a maximum set since keeps all of it, is charged for all of it and has all of it in its limit; it can hold fewer, and cannot buy more.
+- **A change of plan ends the add-ons the new plan isn't offered.** They end with the old plan (an upgrade, a move at the period's end, a move from a publish), and the new plan's own add-on is never bought for the business: it chooses that in Settings › Plan. What a period already owed is still charged, as when an add-on is removed by hand. An add-on held on a plan it isn't offered on counts for nothing and is charged nothing, whatever path left it there.
+- **The business is told before it confirms.** The change-plan quote names the add-ons held today that the change ends (`addonsEnding`: the add-on, how many, and the new plan's own add-on of that kind when it can be added there), and the dialog says so in a note above Confirm. No price is shown for the new plan's add-on, since it is not being bought. The quote and the change share one rule (`addons-ending.ts`), so the note cannot name anything the change does not end. A move to a free plan, or a checkout that starts afresh, names every add-on held.
+- **The operator sees it.** Each add-on a plan change ends is written to the audit log after the change commits, as `organization.plan.addon.changed` with what was held, `to: 0` and `reason: "plan-change"`. The actor is whoever made the checkout, the billing provider for a move its event applied, or the hourly sweep. No email is sent for it.
+- Rules: `packages/pricing-catalog/src/schema.ts` (`addonOfferedOn`, `addonMaxQuantity`), `apps/api.saroh.in/src/modules/billing/offers.ts` (`addonProblem`), `addon-charges.ts` (`endAddonsNotOfferedInTx`, `recordAddonsEnded`), `addons-ending.ts` (`addonsNotOffered`, `addonsEndingWith`). `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
+
+## DEC-158 A plan caps how many variants one product may have
+
+**Status: Accepted — 2026-10-13, built** · owner (decided the cap; "variants do not count towards the product limit")
+
+- A plan may cap the variants of **one product**: a small number on the free plan, more on each paid plan. The numbers are the catalogue's, set per plan in Admin › Plans on the row `variants`, and raised for one business with a limit override. None is written in code.
+- **Variants never count as products.** The products limit counts products; this is its own cap, inside each product.
+- **It is a cap inside one thing, not a count across the business** (`MODULE_MAP.variants.within`). So it has no usage meter, no "used X of Y", no notice at 80%, and nothing is ever "over" in total or paused for it. The one thing that happens: a save that would take a product past its cap is refused, with the usual plan-limit notice and its way to another plan.
+- **Nothing is removed and selling is never blocked.** A product that already has more than the cap (made before it, or after a move to a lower plan) keeps every variant, keeps selling, and is still edited, reordered and made smaller. Only adding one more is refused while it is at or past the cap. A copy of such a product is refused too, since the copy would start past the cap; the original is untouched.
+- **The row is a limit, never a lock.** A plan whose cell has no number, or leaves the row out, caps nothing. A catalogue version published before the row existed caps nothing either, so no business loses the ability to add variants when this ships.
+- A catalogue made before the row is offered it on the Modules tab ("Add Variants row"). It arrives with no limit on any plan and hidden from the pricing page, so nothing changes until a number is set and the version is published.
+- Only behind `PLAN_ENFORCEMENT`, and fail open as every limit is: a plan that can't be read refuses nothing.
+- Code: `billing/item-limits.ts` (the rule), `products/variant-cap.ts` (the two writes that add a variant: a new variant, a copy), `itemLimitNotice` in `@saroh/pricing-catalog` (the words, shared with the editor).

@@ -5,7 +5,7 @@ import { SEED_CATALOG } from "./seed";
 
 /**
  * The plan rules the sample catalogue carries, per plan (DEC-099, DEC-103,
- * DEC-105). The real catalogue lives in the database; this keeps the sample
+ * DEC-155). The real catalogue lives in the database; this keeps the sample
  * one, which every test and seeded business reads, in the decided shape.
  */
 const at = (planId: string, moduleId: string) =>
@@ -30,11 +30,12 @@ describe("plan rules in the sample catalogue", () => {
         expect(at("pro", "review").state).toBe("on");
     });
 
-    it("the reviewers row is the view-only people limit, on every plan (DEC-105)", () => {
-        const row = SEED_CATALOG.modules.find((m) => m.id === "reviewers");
-        expect(row?.name).toBe("View-only people");
+    it("has one team row for everyone, and none for people who only look (DEC-155)", () => {
+        const ids = SEED_CATALOG.modules.map((m) => m.id);
+        expect(ids).toContain("members");
+        expect(ids).not.toContain("reviewers");
         for (const plan of ["free", "grow", "pro"]) {
-            expect(at(plan, "reviewers").state).toBe("on");
+            expect(at(plan, "members").limit).toBeGreaterThan(0);
         }
     });
 });

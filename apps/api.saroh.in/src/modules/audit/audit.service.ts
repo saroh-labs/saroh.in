@@ -40,7 +40,8 @@ export const AuditAction = {
     ModuleDisable: "organization.module.disabled",
     PlanChange: "organization.plan.changed",
     // An add-on bought, changed or removed from Settings › Plan (U16);
-    // metadata: the add-on, and its quantity before and after.
+    // metadata: the add-on, and its quantity before and after. One a plan
+    // change ended (DEC-157) says so: `reason: "plan-change"`.
     PlanAddonChange: "organization.plan.addon.changed",
     StorefrontHoursUpdate: "storefront.hours.update",
     // How a storefront's orders leave, or when they count as late (B17);

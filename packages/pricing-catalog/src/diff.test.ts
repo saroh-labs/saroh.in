@@ -87,6 +87,47 @@ describe("diff", () => {
         ]);
     });
 
+    it("words where an add-on is offered and how many can be held", () => {
+        const b = edit(fixture(), (c) => {
+            c.addons[0].plans = ["c", "b"];
+            c.addons[0].max = 5;
+            c.addons[1].max = undefined;
+            c.addons[3].pricePaise = 800;
+            c.addons.push({
+                id: "more-orders",
+                kind: "orders",
+                name: "More orders",
+                pricePaise: 700,
+                mode: "pack",
+                qty: 11,
+                plans: ["a"],
+            });
+        });
+        expect(diff(fixture(), b)).toEqual([
+            "More things: offered on Plan B and Plan C",
+            "More things: a business can hold up to 5",
+            "One more person: no maximum of its own",
+            "Add-on changed: One more person on C",
+            "New add-on: More orders on Plan A",
+        ]);
+        expect(diff(b, fixture())).toEqual([
+            "More things: offered on every plan",
+            "More things: no maximum of its own",
+            "One more person: a business can hold up to 4",
+            "Add-on changed: One more person on C",
+            "Add-on removed: More orders",
+        ]);
+        // Empty and absent both mean every plan; the order doesn't matter.
+        const same = edit(b, (c) => {
+            c.addons[0].plans = ["b", "c"];
+        });
+        expect(diff(b, same)).toEqual([]);
+        const empty = edit(fixture(), (c) => {
+            c.addons[0].plans = [];
+        });
+        expect(diff(fixture(), empty)).toEqual([]);
+    });
+
     it("words a first month that starts or stops costing something", () => {
         const a = edit(fixture(), (c) => {
             c.plans[1].trial = { on: true, days: 30 };

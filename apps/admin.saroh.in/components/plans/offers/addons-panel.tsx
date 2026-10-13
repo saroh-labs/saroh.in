@@ -1,6 +1,7 @@
 "use client";
 
 import type { Addon, AddonMode } from "@saroh/pricing-catalog";
+import { addonMaxQuantity, MAX_ADDON_QUANTITY } from "@saroh/pricing-catalog";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Select,
@@ -9,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
+import type { ReactNode } from "react";
 import { useId } from "react";
 
 import { AddButton } from "../add-button";
@@ -18,12 +20,15 @@ import { fieldClass, RupeesField, WholeField } from "./number-field";
 import {
     ADDON_KIND_ORDER,
     ADDON_KIND_WORDS,
+    addonClash,
     addonProspects,
+    addonReach,
     addonSummary,
     canAddKind,
     modulesSomePlanLacks,
     newAddon,
     newAddonId,
+    toggleAddonPlan,
 } from "./offers";
 import { OfferCard, Segmented } from "./parts";
 
@@ -35,8 +40,10 @@ const MODES: { value: AddonMode; label: string }[] = [
 const SMALL = "text-[11.5px] text-muted-foreground";
 
 /**
- * Add-ons any plan can buy, billed monthly with it (plans catalogue U9).
- * They are part of the draft, so each change here is a draft change.
+ * Add-ons a plan can buy, billed monthly with it (plans catalogue U9). Each
+ * is offered on every plan or on the plans it names, with its own price
+ * and the most a business can hold (DEC-157). They are part of the draft,
+ * so each change here is a draft change.
  */
 export function AddonsPanel() {
     const { catalog, edit, canEdit } = useDraft();
@@ -54,7 +61,8 @@ export function AddonsPanel() {
             <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-2">
                 <span className="font-semibold">Add-ons</span>
                 <span className="text-[12.5px] text-muted-foreground">
-                    Any plan can buy them, billed monthly with the plan.
+                    Billed monthly with the plan. For a price or a maximum that
+                    differs by plan, add one for each plan.
                 </span>
             </div>
             {catalog.addons.length === 0 && (
@@ -84,6 +92,36 @@ export function AddonsPanel() {
     );
 }
 
+/** One plan an add-on is offered on, or "Every plan": pressed when it is. */
+function PlanChip({
+    on,
+    disabled,
+    onClick,
+    children,
+}: {
+    on: boolean;
+    disabled: boolean;
+    onClick: () => void;
+    children: ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            aria-pressed={on}
+            disabled={disabled}
+            onClick={onClick}
+            className={cn(
+                "h-[26px] cursor-pointer rounded-[6px] border px-2.5 text-[12px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
+                on
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border-strong text-muted-foreground hover:text-foreground active:bg-secondary",
+            )}
+        >
+            {children}
+        </button>
+    );
+}
+
 function AddonRow({ addon }: { addon: Addon }) {
     const { catalog, edit, canEdit } = useDraft();
     const { pricing } = usePlans();
@@ -93,11 +131,20 @@ function AddonRow({ addon }: { addon: Addon }) {
     const prospects = addonProspects(addon, catalog, pricing);
     const options = modulesSomePlanLacks(catalog);
 
+    const clash = addonClash(addon, catalog);
+
     function set(patch: Partial<Addon>) {
         edit((c) => {
-            c.addons = c.addons.map((x) =>
-                x.id === addon.id ? { ...x, ...patch } : x,
-            );
+            c.addons = c.addons.map((x) => {
+                if (x.id !== addon.id) return x;
+                const next = { ...x, ...patch };
+                // Every plan and the ceiling are said by leaving them out.
+                if (!next.plans?.length) delete next.plans;
+                if (next.max === undefined || next.max >= MAX_ADDON_QUANTITY) {
+                    delete next.max;
+                }
+                return next;
+            });
         });
     }
 
@@ -184,6 +231,20 @@ function AddonRow({ addon }: { addon: Addon }) {
                         onPaise={(pricePaise) => set({ pricePaise })}
                     />
                 </label>
+                {!isModule && (
+                    <label className="grid w-[92px] gap-1">
+                        <span className={SMALL}>At most</span>
+                        <WholeField
+                            value={addonMaxQuantity(addon)}
+                            min={1}
+                            max={MAX_ADDON_QUANTITY}
+                            disabled={!canEdit}
+                            aria-describedby={`${id}-reach`}
+                            className="h-8 w-full min-w-0 px-[9px] text-[12.5px]"
+                            onValue={(max) => set({ max })}
+                        />
+                    </label>
+                )}
                 {canEdit && (
                     <button
                         type="button"
@@ -201,10 +262,46 @@ function AddonRow({ addon }: { addon: Addon }) {
                     </button>
                 )}
             </div>
+            <div
+                role="group"
+                aria-label={`Plans ${addon.name} is offered on`}
+                className="flex flex-wrap items-center gap-1.5"
+            >
+                <span className={SMALL}>Offered on</span>
+                <PlanChip
+                    on={!addon.plans?.length}
+                    disabled={!canEdit}
+                    onClick={() => set({ plans: undefined })}
+                >
+                    Every plan
+                </PlanChip>
+                {catalog.plans.map((p) => (
+                    <PlanChip
+                        key={p.id}
+                        on={addon.plans?.includes(p.id) ?? false}
+                        disabled={!canEdit}
+                        onClick={() =>
+                            set({
+                                plans: toggleAddonPlan(addon, catalog, p.id),
+                            })
+                        }
+                    >
+                        {p.name}
+                    </PlanChip>
+                ))}
+            </div>
             <div className="flex flex-wrap gap-x-3.5 gap-y-1.5 text-[12.5px]">
                 <span className="text-foreground/90">
                     {addonSummary(addon, catalog)}
                 </span>
+                <span id={`${id}-reach`} className="text-foreground/90">
+                    {addonReach(addon, catalog)}
+                </span>
+                {clash && (
+                    <span role="status" className="text-warning">
+                        {clash}
+                    </span>
+                )}
                 {prospects && (
                     <span className="text-muted-foreground">{prospects}</span>
                 )}

@@ -9,6 +9,8 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
 import {
+    addonMaxQuantity,
+    addonOfferedOn,
     CATALOG_PLAN_KEY_PREFIX,
     catalogPlanIdForKey,
     gstPaise,
@@ -50,6 +52,11 @@ export interface AddonView {
     quantity: number;
     /** What those cost a month before GST: `quantity` × `pricePaise` (U14). */
     heldPaise: number;
+    /**
+     * The most the business may hold (DEC-157). It may already hold more,
+     * from before the maximum came down: that stays, and no more is sold.
+     */
+    max: number;
     /** Whether it can be bought on the business's plan, and if not why. */
     available: boolean;
     why: string | null;
@@ -60,6 +67,7 @@ export interface AddonsView {
     /** Whether the business can buy add-ons now, and if not why. */
     canBuy: boolean;
     why: string | null;
+    /** The ceiling for any add-on; each one's own is `AddonView.max`. */
     max: number;
     addons: AddonView[];
     /** Every add-on held, a month before GST: the cards' sum (U14). */
@@ -95,7 +103,9 @@ type Sub = Prisma.SubscriptionGetPayload<{ select: typeof SUB_SELECT }>;
  * changed and removed by the business, on top of a paid plan billed through
  * Saroh's provider. Their definitions come from the version the business's
  * plan is on, never the live one; what it holds is `SubscriptionAddon`,
- * which the access read (U12) adds to its limits at once.
+ * which the access read (U12) adds to its limits at once. A business sees
+ * and buys only the add-ons offered on its plan, up to each one's maximum
+ * (DEC-157).
  *
  * Billed monthly with the plan, after the period (`addon-charges.ts`): more
  * bought part-way through a period owes what is left of it, prorated; every
@@ -262,26 +272,30 @@ function addonViews(
     sub: Sub,
     blocked: boolean,
 ): AddonView[] {
-    return catalog.addons.map((a) => {
-        const quantity =
-            sub.addons.find((h) => h.addonId === a.id)?.quantity ?? 0;
-        const problem = addonProblem(catalog, planId, a, 1);
-        return {
-            id: a.id,
-            kind: a.kind,
-            module: a.module ?? null,
-            name: a.name,
-            mode: a.mode,
-            qty: a.mode === "unit" ? 1 : a.qty,
-            pricePaise: a.pricePaise,
-            gstPaise: gstPaise(a.pricePaise),
-            totalPaise: withGstPaise(a.pricePaise),
-            quantity,
-            heldPaise: quantity * a.pricePaise,
-            available: !blocked && !problem,
-            why: problem,
-        };
-    });
+    // Only what its plan is offered: another plan's add-on is not its to see.
+    return catalog.addons
+        .filter((a) => addonOfferedOn(a, planId))
+        .map((a) => {
+            const quantity =
+                sub.addons.find((h) => h.addonId === a.id)?.quantity ?? 0;
+            const problem = addonProblem(catalog, planId, a, 1);
+            return {
+                id: a.id,
+                kind: a.kind,
+                module: a.module ?? null,
+                name: a.name,
+                mode: a.mode,
+                qty: a.mode === "unit" ? 1 : a.qty,
+                pricePaise: a.pricePaise,
+                gstPaise: gstPaise(a.pricePaise),
+                totalPaise: withGstPaise(a.pricePaise),
+                quantity,
+                heldPaise: quantity * a.pricePaise,
+                max: addonMaxQuantity(a),
+                available: !blocked && !problem,
+                why: problem,
+            };
+        });
 }
 
 /**

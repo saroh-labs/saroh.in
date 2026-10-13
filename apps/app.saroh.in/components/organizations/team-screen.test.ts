@@ -175,11 +175,7 @@ describe("TeamScreen at the plan's team limit (UX-028)", () => {
         expiresAt: "2026-10-14T00:00:00.000Z",
         createdAt: "2026-10-07T00:00:00.000Z",
     };
-    const renderAt = (teamLimit: {
-        full: boolean;
-        why: string;
-        reviewersFull?: boolean;
-    }) =>
+    const renderAt = (teamLimit: { full: boolean; why: string }) =>
         renderToString(
             createElement(TeamScreen, {
                 organizationName: "Rye Bakery",
@@ -200,21 +196,18 @@ describe("TeamScreen at the plan's team limit (UX-028)", () => {
         expect(html).toContain("Just you · 1 invite waiting");
     });
 
-    it("still invites someone view-only while seats are full", () => {
-        expect(renderAt({ full: true, why: "Team is full" })).toContain(
-            "Invite someone view-only",
-        );
-        expect(
-            renderAt({ full: true, why: "Team is full", reviewersFull: true }),
-        ).toContain("Team is full");
+    it("a full team invites nobody, at any role", () => {
+        const full = renderAt({ full: true, why: "Team is full" });
+        expect(full).toContain("Team is full");
+        expect(full).not.toContain("view-only");
         expect(renderAt({ full: false, why: "" })).toContain("Invite someone");
     });
 });
 
-// DEC-105: the line counts seats by what each person can do, as the API
-// says, and view-only people apart.
-describe("TeamScreen seats and view-only people (DEC-105)", () => {
-    it("counts a view-only custom role apart from the seats", () => {
+// DEC-155: everyone uses one team seat, so the line counts everyone
+// together, whatever their role.
+describe("TeamScreen counts everyone on the team (DEC-155)", () => {
+    it("counts a Reviewer and a role that only looks with everyone else", () => {
         const html = renderToString(
             createElement(TeamScreen, {
                 organizationName: "Rye Bakery",
@@ -224,19 +217,17 @@ describe("TeamScreen seats and view-only people (DEC-105)", () => {
                         name: "Asha",
                         role: "OWNER",
                         isSelf: true,
-                        usesSeat: true,
                     }),
                     member({
                         userId: "u2",
                         name: "Kiran",
                         roleKey: "looker",
-                        usesSeat: false,
                     }),
                     member({
                         userId: "u3",
-                        name: "Dev",
-                        roleKey: "front-desk",
-                        usesSeat: true,
+                        name: "Priya",
+                        role: "REVIEWER",
+                        roleKey: "REVIEWER",
                     }),
                 ],
                 invitations: [],
@@ -249,8 +240,8 @@ describe("TeamScreen seats and view-only people (DEC-105)", () => {
                 teamLimit: { full: false, why: "" },
             }),
         );
-        expect(html).toContain(
-            "2 people including you · 1 view-only person, no seat",
-        );
+        expect(html).toContain("3 people including you");
+        expect(html).not.toContain("view-only");
+        expect(html).not.toContain("no seat");
     });
 });

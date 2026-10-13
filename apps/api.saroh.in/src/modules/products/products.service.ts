@@ -71,6 +71,7 @@ import {
     serializeProductListItem,
 } from "./serialize";
 import { lockProduct, lockProductStock } from "./stock-levels";
+import { variantCap } from "./variant-cap";
 
 const STOCK_ROW = {
     select: { onHand: true, promised: true, lowStockAlert: true },
@@ -1011,6 +1012,7 @@ export class ProductsService {
     async duplicateIn(scope: ProductScope, productId: string) {
         const { organizationId, storeId } = scope;
         let copyId: string;
+        const cap = await variantCap(organizationId);
         try {
             copyId = await prisma.$transaction(async (tx) => {
                 // A copy is one more product on the plan's cap (U13).
@@ -1020,6 +1022,7 @@ export class ProductsService {
                     productId,
                     storeId,
                     actor: priceActor(scope),
+                    variantCap: cap,
                 });
             });
         } catch (error) {

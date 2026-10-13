@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { businessByReferralCode } from "../organizations/referral";
 import type { WaitlistKind, WaitlistPlan } from "./waitlist-keys";
 import {
     businessKey,
@@ -23,7 +24,10 @@ export interface JoinWaitlistInput {
     country?: string;
     plan?: WaitlistPlan;
     source?: string;
-    /** The referral id from the visitor's link. */
+    /**
+     * The `?ref=` from the visitor's link: another entrant's referral id,
+     * or a business's referral code (DEC-156).
+     */
     ref?: string;
     /** A gallery template's slug; one the gallery doesn't show is dropped. */
     template?: string;
@@ -76,7 +80,11 @@ export class WaitlistService {
             return { created: false };
         }
 
-        const referredById = await this.referrer(input.ref, key, input.ipHash);
+        const { referredById, referredByOrganizationId } = await this.referrer(
+            input.ref,
+            key,
+            input.ipHash,
+        );
         const data = {
             email,
             emailKey: key,
@@ -90,6 +98,7 @@ export class WaitlistService {
             template: businessName ? waitlistTemplate(input.template) : null,
             source: cleanSource(input.source),
             referredById,
+            referredByOrganizationId,
             ipHash: input.ipHash ?? null,
         };
 
@@ -134,24 +143,40 @@ export class WaitlistService {
     }
 
     /**
-     * The entry whose link this is, or null: an unknown or malformed id, or
-     * a self-referral — the same person (normalised email) or the same
-     * address (ipHash) as the link's owner — credits nobody.
+     * Who the link's `?ref=` credits, if anyone. An entrant's id and a
+     * business's code look alike, so they are told apart by table, entrants
+     * first:
+     *
+     * - The entry whose link this is. A self-referral — the same person
+     *   (normalised email) or the same address (ipHash) as the link's
+     *   owner — credits nobody, and is never read as a business's code.
+     * - Else the business whose referral code it is (DEC-156), kept on the
+     *   entry until its owner signs up (`organizations/referral.ts`).
+     * - An unknown or malformed one credits nobody.
      */
     private async referrer(
         ref: string | undefined,
         emailKey: string,
         ipHash: string | undefined,
-    ): Promise<string | null> {
-        if (!ref || !REF_CODE_PATTERN.test(ref)) return null;
+    ): Promise<{
+        referredById: string | null;
+        referredByOrganizationId: string | null;
+    }> {
+        const nobody = { referredById: null, referredByOrganizationId: null };
+        if (!ref || !REF_CODE_PATTERN.test(ref)) return nobody;
         const owner = await prisma.waitlistSignup.findUnique({
             where: { refCode: ref },
             select: { id: true, emailKey: true, ipHash: true },
         });
-        if (!owner) return null;
-        if (owner.emailKey === emailKey) return null;
-        if (ipHash && owner.ipHash === ipHash) return null;
-        return owner.id;
+        if (!owner) {
+            return {
+                ...nobody,
+                referredByOrganizationId: await businessByReferralCode(ref),
+            };
+        }
+        if (owner.emailKey === emailKey) return nobody;
+        if (ipHash && owner.ipHash === ipHash) return nobody;
+        return { ...nobody, referredById: owner.id };
     }
 }
 

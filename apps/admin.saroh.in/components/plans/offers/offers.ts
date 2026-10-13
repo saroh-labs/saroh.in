@@ -6,6 +6,9 @@ import type {
     Trial,
 } from "@saroh/pricing-catalog";
 import {
+    addonMaxQuantity,
+    addonOfferedOn,
+    addonPlanNames,
     cellOf,
     formatInr,
     GST_PERCENT,
@@ -137,10 +140,11 @@ export function newAddon(
     id: string,
 ): Addon | null {
     if (!canAddKind(catalog, kind)) return null;
+    let addon: Addon;
     if (kind === "module") {
         const m = modulesSomePlanLacks(catalog).at(0);
         if (!m) return null;
-        return {
+        addon = {
             id,
             kind,
             module: m.id,
@@ -149,15 +153,79 @@ export function newAddon(
             mode: "pack",
             qty: 1,
         };
+    } else {
+        addon = {
+            id,
+            kind,
+            name: ADDON_KIND_WORDS[kind].name,
+            pricePaise: 0,
+            mode: "pack",
+            qty: 1,
+        };
     }
-    return {
-        id,
-        kind,
-        name: ADDON_KIND_WORDS[kind].name,
-        pricePaise: 0,
-        mode: "pack",
-        qty: 1,
-    };
+    // A second one for the same thing starts on the plans the others leave,
+    // so the draft still has one price a plan (DEC-157).
+    const others = addonSiblings(addon, catalog);
+    if (others.length > 0) {
+        const free = catalog.plans
+            .filter((p) => !others.some((o) => addonOfferedOn(o, p.id)))
+            .map((p) => p.id);
+        if (free.length > 0) addon.plans = free;
+    }
+    return addon;
+}
+
+/** The other add-ons for the same thing: its kind, and its module if any. */
+function addonSiblings(addon: Addon, catalog: Catalog): Addon[] {
+    return catalog.addons.filter(
+        (x) =>
+            x.id !== addon.id &&
+            x.kind === addon.kind &&
+            x.module === addon.module,
+    );
+}
+
+/**
+ * The plans an add-on names after one is ticked or unticked, in catalogue
+ * order; undefined when none is left, which is every plan.
+ */
+export function toggleAddonPlan(
+    addon: Addon,
+    catalog: Catalog,
+    planId: string,
+): string[] | undefined {
+    const named = addon.plans ?? [];
+    const next = named.includes(planId)
+        ? named.filter((id) => id !== planId)
+        : [...named, planId];
+    const ordered = catalog.plans
+        .map((p) => p.id)
+        .filter((id) => next.includes(id));
+    return ordered.length > 0 ? ordered : undefined;
+}
+
+/**
+ * Why the draft won't publish with this add-on where it is, or empty: a
+ * plan it shares with another add-on for the same thing (the schema's rule).
+ */
+export function addonClash(addon: Addon, catalog: Catalog): string {
+    for (const other of addonSiblings(addon, catalog)) {
+        const shared = catalog.plans.find(
+            (p) => addonOfferedOn(addon, p.id) && addonOfferedOn(other, p.id),
+        );
+        if (shared) {
+            return `${shared.name} already has ${other.name || "another one"}. A plan takes one of them.`;
+        }
+    }
+    return "";
+}
+
+/** Where it is offered and how many a business can hold, in words. */
+export function addonReach(addon: Addon, catalog: Catalog): string {
+    const on = addonPlanNames(catalog, addon);
+    const where = on ? `On ${on}` : "On every plan";
+    if (addon.kind === "module") return where;
+    return `${where}, up to ${addonMaxQuantity(addon)} a business`;
 }
 
 /** An id the schema takes (`^[a-z][a-z0-9-]*`) that no add-on has yet. */
@@ -184,8 +252,9 @@ export function addonSummary(addon: Addon, catalog: Catalog): string {
 }
 
 /**
- * Who could use it today, from the page's counts: businesses on a plan
- * without the module, or near or over the limit it raises. Empty when
+ * Who could use it today, from the page's counts: businesses on a plan it
+ * is offered on, without the module or near or over the limit it raises.
+ * Empty when
  * nobody, or when the counts aren't measured.
  */
 export function addonProspects(
@@ -198,6 +267,7 @@ export function addonProspects(
     if (!m) return "";
     let n = 0;
     for (const plan of pricing.plans) {
+        if (!addonOfferedOn(addon, plan.planId)) continue;
         const cell = cellOf(m, plan.planId);
         if (addon.kind === "module") {
             if (!cell.inc) n += plan.businesses;

@@ -39,6 +39,64 @@ describe("addonProblem", () => {
         );
     });
 
+    describe("per plan (DEC-157)", () => {
+        const perPlan = fakeCatalog((c) => {
+            c.addons.push(
+                {
+                    id: "person-b",
+                    kind: "members",
+                    name: "One more person",
+                    pricePaise: 222,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["b"],
+                    max: 2,
+                },
+                {
+                    id: "person-c",
+                    kind: "members",
+                    name: "One more person on C",
+                    pricePaise: 111,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["c"],
+                },
+            );
+        });
+        const of = (id: string) => perPlan.addons.find((a) => a.id === id)!;
+
+        it("only on a plan it is offered on", () => {
+            expect(addonProblem(perPlan, "b", of("person-b"), 1)).toBeNull();
+            expect(addonProblem(perPlan, "c", of("person-b"), 1)).toBe(
+                "One more person isn't offered on Plan C.",
+            );
+            expect(addonProblem(perPlan, "b", of("person-c"), 1)).toBe(
+                "One more person on C isn't offered on Plan B.",
+            );
+            // Naming no plan, or none, is every plan, as it always was.
+            expect(addonProblem(perPlan, "b", of("things-pack"), 1)).toBeNull();
+            expect(
+                addonProblem(
+                    perPlan,
+                    "b",
+                    { ...of("things-pack"), plans: [] },
+                    1,
+                ),
+            ).toBeNull();
+        });
+
+        it("up to its own maximum, or the ceiling without one", () => {
+            expect(addonProblem(perPlan, "b", of("person-b"), 2)).toBeNull();
+            expect(addonProblem(perPlan, "b", of("person-b"), 3)).toBe(
+                "You can have up to 2 of One more person on Plan B.",
+            );
+            expect(addonProblem(perPlan, "c", of("person-c"), 99)).toBeNull();
+            expect(addonProblem(perPlan, "c", of("person-c"), 100)).toMatch(
+                /^Choose from 0 to 99/,
+            );
+        });
+    });
+
     it("refuses a quantity out of range", () => {
         expect(addonProblem(catalog, "b", addon("things-pack"), 100)).toMatch(
             /^Choose from 0 to 99/,

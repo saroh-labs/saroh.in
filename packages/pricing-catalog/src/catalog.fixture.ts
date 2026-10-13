@@ -130,6 +130,28 @@ export function fixtureInput(): CatalogInput {
                     c: { inc: true, text: "33", card: "33 people", limit: 33 },
                 },
             },
+            // Capped inside one thing (`within`), not across the business.
+            {
+                id: "variants",
+                name: "Kinds of a thing",
+                group: "g1",
+                what: "The kinds one thing comes in.",
+                cells: {
+                    a: {
+                        inc: true,
+                        text: "Up to 2 a thing",
+                        card: "2 kinds a thing",
+                        limit: 2,
+                    },
+                    b: {
+                        inc: true,
+                        text: "Up to 22 a thing",
+                        card: "22 kinds a thing",
+                        limit: 22,
+                    },
+                    c: { inc: true, text: "No limit", card: "" },
+                },
+            },
         ],
         yearly: { on: true, paid: 9 },
         gst: { show: "excl" },
@@ -149,6 +171,8 @@ export function fixtureInput(): CatalogInput {
                 pricePaise: 1_100,
                 mode: "unit",
                 qty: 1,
+                plans: ["b"],
+                max: 4,
             },
             {
                 id: "invoices-alone",
@@ -158,6 +182,17 @@ export function fixtureInput(): CatalogInput {
                 pricePaise: 4_400,
                 mode: "pack",
                 qty: 1,
+            },
+            // The same thing on Plan C: its own price and maximum (DEC-157).
+            {
+                id: "one-person-c",
+                kind: "members",
+                name: "One more person on C",
+                pricePaise: 900,
+                mode: "unit",
+                qty: 1,
+                plans: ["c"],
+                max: 7,
             },
         ],
     };

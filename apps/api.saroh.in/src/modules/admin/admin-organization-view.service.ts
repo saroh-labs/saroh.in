@@ -65,6 +65,11 @@ export interface OrganizationFacts {
     dataKeptUntil: Date | null;
     /** When the retention eraser finished with it; null until then. */
     retentionErasedAt: Date | null;
+    /**
+     * The business that referred it and when that was recorded (DEC-156),
+     * or null. For operators: no business is shown who it referred.
+     */
+    referredBy: { id: string; name: string; at: Date | null } | null;
     timezone: string | null;
     country: string | null;
     counts: {
@@ -467,6 +472,8 @@ export class AdminOrganizationViewService {
                 legalHoldByUserId: true,
                 deletedRetainedAt: true,
                 retentionErasedAt: true,
+                referredAt: true,
+                referredByOrganization: { select: { id: true, name: true } },
                 businessProfile: { select: { timezone: true, country: true } },
             },
         });
@@ -495,6 +502,8 @@ export class AdminOrganizationViewService {
             legalHoldAt,
             legalHoldReason,
             legalHoldByUserId,
+            referredAt,
+            referredByOrganization,
             ...rest
         } = organization;
         const holders = legalHoldByUserId
@@ -518,6 +527,9 @@ export class AdminOrganizationViewService {
                 organization.deletedRetainedAt
                     ? retentionEndsAt(organization.deletedRetainedAt)
                     : null,
+            referredBy: referredByOrganization
+                ? { ...referredByOrganization, at: referredAt }
+                : null,
             timezone: businessProfile?.timezone ?? null,
             country: businessProfile?.country ?? null,
             counts: { members, sites, orders, openOrders, bookings, contacts },

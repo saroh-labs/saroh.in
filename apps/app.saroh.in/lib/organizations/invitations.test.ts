@@ -162,7 +162,7 @@ describe("invitationMeta", () => {
     });
 });
 
-describe("the team cap, said (UX-028, DEC-105)", () => {
+describe("the team cap, said (UX-028, DEC-155)", () => {
     it("counts the owner and the invites waiting", () => {
         expect(teamCountLine(1, 0)).toBe("Just you");
         expect(teamCountLine(1, 1)).toBe("Just you · 1 invite waiting");
@@ -171,21 +171,22 @@ describe("the team cap, said (UX-028, DEC-105)", () => {
         );
     });
 
-    it("says view-only people apart: they use no seat", () => {
-        expect(teamCountLine(1, 0, 1)).toBe(
-            "Just you · 1 view-only person, no seat",
-        );
-        expect(teamCountLine(2, 1, 3)).toBe(
-            "2 people including you · 1 invite waiting · 3 view-only people, no seat",
-        );
+    it("says nobody apart: no line of their own for people who only look", () => {
+        for (const line of [
+            teamCountLine(1, 0),
+            teamCountLine(4, 2),
+            teamCountLine(4, 2, 3),
+        ]) {
+            expect(line).not.toMatch(/view-only|no seat/i);
+        }
     });
 
     it("says the bookable staff with no login: they take seats too (UX-053)", () => {
-        expect(teamCountLine(1, 0, 0, 1)).toBe(
+        expect(teamCountLine(1, 0, 1)).toBe(
             "Just you · 1 person taking bookings with no sign-in",
         );
-        expect(teamCountLine(2, 1, 1, 3)).toBe(
-            "2 people including you · 3 people taking bookings with no sign-in · 1 invite waiting · 1 view-only person, no seat",
+        expect(teamCountLine(2, 1, 3)).toBe(
+            "2 people including you · 3 people taking bookings with no sign-in · 1 invite waiting",
         );
         expect(
             bookableWithNoLogin([
@@ -198,49 +199,33 @@ describe("the team cap, said (UX-028, DEC-105)", () => {
         expect(bookableWithNoLogin(null)).toBe(0);
     });
 
-    it("counts seats by what the API says each uses, never by role name", () => {
-        expect(
-            teamCounts(
-                [
-                    { usesSeat: true },
-                    { usesSeat: false },
-                    // An older API: counted.
-                    {},
-                ],
-                [{ usesSeat: false }, { usesSeat: true }],
-            ),
-        ).toEqual({ people: 2, waiting: 1, viewOnly: 2 });
+    it("counts everyone and every invite, whatever the role", () => {
+        const members = [
+            { role: "OWNER" },
+            { role: "REVIEWER" },
+            { role: "MEMBER" },
+        ];
+        const invites = [
+            { role: "REVIEWER" },
+            { role: "MEMBER" },
+            // Someone on the diary with no login: counted there.
+            { role: "calendar-only", countedOnDiary: true },
+        ];
+        expect(teamCounts(members, invites)).toEqual({ people: 3, waiting: 2 });
+        // What an older API still sends is ignored: they use a seat.
+        const old = [{ usesSeat: false, countedOnDiary: false }];
+        expect(teamCounts(old, old)).toEqual({ people: 1, waiting: 1 });
     });
 
-    it("keeps Invite open for view-only people while the seats are full", () => {
-        expect(inviteRoom(null)).toEqual({
+    it("a full team invites nobody new, at any role", () => {
+        expect(inviteRoom(null)).toEqual({ open: true, reason: null });
+        expect(inviteRoom({ full: false, why: "" })).toEqual({
             open: true,
-            seatReason: null,
-            viewOnlyReason: null,
+            reason: null,
         });
-        const full = inviteRoom({ full: true, why: "Your team is full" });
-        expect(full.open).toBe(true);
-        expect(full.seatReason).toBe(
-            "Your team is full (invites count too). View-only people don't take a seat.",
-        );
-        expect(full.viewOnlyReason).toBeNull();
-        expect(
-            inviteRoom({ full: true, why: "x", reviewersFull: true }).open,
-        ).toBe(false);
-    });
-
-    it("keeps Invite open for seats while view-only people are full", () => {
-        const room = inviteRoom({
-            full: false,
-            why: "",
-            reviewersFull: true,
-            reviewersWhy: "You've reached your 1 view-only person on Plan A",
-        });
-        expect(room).toEqual({
-            open: true,
-            seatReason: null,
-            viewOnlyReason:
-                "You've reached your 1 view-only person on Plan A (invites count too).",
+        expect(inviteRoom({ full: true, why: "Your team is full" })).toEqual({
+            open: false,
+            reason: "Your team is full (invites count too).",
         });
     });
 });
@@ -249,8 +234,6 @@ describe("inviteButton (UX-028, #868, #800)", () => {
     const FULL = {
         full: true,
         why: "You've reached your team members limit on Free",
-        reviewersFull: true,
-        reviewersWhy: "You've reached your 1 view-only person on Free",
     };
 
     it("invites anyone while there is room", () => {
@@ -284,13 +267,14 @@ describe("inviteButton (UX-028, #868, #800)", () => {
         expect(b.refused).toContain("Plan and billing");
     });
 
-    it("over the limit with view-only room, invites view-only people only", () => {
-        expect(
-            inviteButton({ ...FULL, reviewersFull: false }, 2, true),
-        ).toEqual({
-            label: "Invite someone view-only",
-            diary: false,
-            refused: null,
-        });
+    it("never offers a way round a full team for people who only look", () => {
+        for (const b of [
+            inviteButton(FULL, 0),
+            inviteButton(FULL, 2),
+            inviteButton(FULL, 2, true),
+        ]) {
+            expect(b.label).not.toMatch(/view-only/i);
+            expect(b.refused ?? "").not.toMatch(/view-only/i);
+        }
     });
 });

@@ -209,7 +209,6 @@ export default async function PlanBillingPage() {
                                         ? `${formatInr(addonsView.heldPaise)} a month in add-ons`
                                         : ""
                                 }
-                                max={addonsView?.max ?? 0}
                                 canChange={
                                     canChange && (addonsView?.canBuy ?? false)
                                 }

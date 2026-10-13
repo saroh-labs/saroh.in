@@ -18,7 +18,7 @@ import type {
     Prisma,
 } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { BillingCycle } from "@saroh/pricing-catalog";
+import type { BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import { catalogPlanIdForKey, withGstPaise } from "@saroh/pricing-catalog";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -33,6 +33,8 @@ import { gstinProblem, stateCode } from "../invoices/gst-states";
 import { authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
+import type { EndingAddon } from "./addons-ending";
+import { addonsEndingWith } from "./addons-ending";
 import type { Term } from "./billing-term";
 import { isOneTime, ONE_TIME_PAYMENT, termOf } from "./billing-term";
 import {
@@ -125,6 +127,12 @@ export interface ChangePlanQuoteView {
     payNowTotalPaise: number;
     /** What setting up autopay takes now, named honestly (DEC-093). */
     mandateCheck: MandateCheck;
+    /**
+     * The add-ons held today that end with this change (DEC-157), by the
+     * rule the change itself ends them by (`addons-ending.ts`). Empty when
+     * none does.
+     */
+    addonsEnding: EndingAddon[];
 }
 
 /** A checkout as the business sees it; never the provider's link. */
@@ -270,12 +278,12 @@ export class CheckoutService {
     ): Promise<ChangePlanQuoteView> {
         authorize(ctx, "billing:read");
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const { target, quote, coupon } = await this.resolve(
+        const { target, quote, coupon, addonsEnding } = await this.resolve(
             ctx.organizationId,
             input,
             now,
         );
-        return this.quoteView(target, quote, coupon);
+        return this.quoteView(target, quote, coupon, addonsEnding);
     }
 
     async current(
@@ -428,12 +436,9 @@ export class CheckoutService {
         authorize(ctx, "billing:manage");
         const billTo = checkoutBillTo(input);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const { target, quote, subscription, coupon } = await this.resolve(
-            ctx.organizationId,
-            input,
-            now,
-        );
-        const view = this.quoteView(target, quote, coupon);
+        const { target, quote, subscription, coupon, addonsEnding } =
+            await this.resolve(ctx.organizationId, input, now);
+        const view = this.quoteView(target, quote, coupon, addonsEnding);
         if (quote.kind === "NONE") {
             throw new ConflictException(`You're already on ${target.name}.`);
         }
@@ -559,13 +564,56 @@ export class CheckoutService {
             termEndsAt,
             coupon,
         });
-        return { target, quote, subscription, coupon };
+        const addonsEnding = await this.addonsEnding(
+            subscription,
+            quote.kind,
+            subscription?.status === "TRIALING" &&
+                billedByProvider(subscription),
+            catalog ? { catalog, planId, paid: target.priceCents > 0 } : null,
+        );
+        return { target, quote, subscription, coupon, addonsEnding };
+    }
+
+    /**
+     * The add-ons the business holds today that this change would end
+     * (DEC-157), for the quote to name before it confirms. A cancelled
+     * plan's count for nothing already, so none of them is named.
+     */
+    private async addonsEnding(
+        sub: {
+            id: string;
+            status: string;
+            plan: { key: string; version: number };
+        } | null,
+        kind: ChangeKind,
+        /** A trial runs at the provider: another plan keeps its add-ons. */
+        trialing: boolean,
+        target: { catalog: Catalog; planId: string; paid: boolean } | null,
+    ): Promise<EndingAddon[]> {
+        if (!sub || sub.status === "CANCELLED" || kind === "NONE") return [];
+        const held = await prisma.subscriptionAddon.findMany({
+            where: { subscriptionId: sub.id },
+            select: { addonId: true, quantity: true },
+        });
+        if (held.length === 0) return [];
+        const planId = catalogPlanIdForKey(sub.plan.key);
+        const catalog = planId
+            ? await catalogueOfVersion(prisma, sub.plan.version)
+            : null;
+        return addonsEndingWith({
+            kind,
+            trialing,
+            held,
+            current: catalog && planId ? { catalog, planId } : null,
+            target,
+        });
     }
 
     private quoteView(
         target: Plan,
         quote: ChangeQuote,
         coupon: PricingCoupon | null = null,
+        addonsEnding: EndingAddon[] = [],
     ): ChangePlanQuoteView {
         return {
             plan: {
@@ -599,6 +647,7 @@ export class CheckoutService {
             termCharges: quote.termCharges,
             payNowTotalPaise: quote.payNowTotalPaise,
             mandateCheck: quote.mandateCheck,
+            addonsEnding,
         };
     }
 

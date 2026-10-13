@@ -126,7 +126,8 @@ into access; `EntitlementService`, module availability and
   catalogue row or a live plan override. Otherwise (no row, no override) it
   reads `FREE_ENTITLEMENTS`.
 - **Then** its live overrides (plan, remove, grant, limit, raise) and the
-  add-ons on its subscription, read from the same version.
+  add-ons on its subscription, read from the same version: each one
+  offered on the plan it is billed on, for all that is held (DEC-157).
 - **The limit map** `check`/`can` read: every catalogue row by id (its cap,
   `true`, or `false`), a row's legacy key beside it (`teamMembers`), and the
   keys no row sells — from the business's own legacy row while it is still on
@@ -150,7 +151,8 @@ and the admin's usage lines and impact (`ImpactService`).
 - **What is counted:** products not archived; orders this month that
   stand (not cancelled, not an online checkout nobody paid); bookings this
   month that are confirmed (a course's sessions left out); posts live on
-  a site; people in the business plus open invitations; connected payment
+  a site; everyone in the business whatever their role, plus open
+  invitations and bookable staff with no login (DEC-155); connected payment
   and messaging providers. A month is the business's own, in its zone.
 - **Where it is refused:** making, copying, importing or un-archiving a
   product; an order taken by hand; a booking, by hand or on the booking
@@ -164,6 +166,20 @@ and the admin's usage lines and impact (`ImpactService`).
   can't be read (logged `plan_meter_unresolved`).
 - **Notices:** `plan.limit.notice` at 80%, at the limit and past a soft
   cap, once each per limit and month (`backend-jobs.md`).
+- **A cap inside one thing (DEC-158):** the row `variants` caps how many
+  variants ONE product may have. It is not counted across the business
+  (`MODULE_MAP.variants.within`, `billing/item-limits.ts`), so it has no
+  `usage`, no notice and no "over": only a new variant, or a copy, that
+  would take a product past the cap is refused (`PLAN_LIMIT_REACHED`, in
+  per-product words). A product already past it keeps every variant and
+  every other save. Variants never count as products. A cell with no
+  number, a cell that leaves the row out, and a version published before
+  the row existed all cap nothing. Set per plan in Admin › Plans; a limit
+  override raises it for one business. A catalogue made before the row
+  gets it from the Modules tab's "Add Variants row" (it must carry the id
+  `variants`; "Add module" makes an id of its own, which governs nothing):
+  it arrives with no limit on any plan and hidden from the pricing page,
+  so adding it changes nothing until a number is set and published.
 
 ## A business's own domain (DEC-139)
 
@@ -305,6 +321,26 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   billed through the provider, trialing or paid up; definitions from the
   plan's own version; a module add-on only where the plan leaves the module
   out, a pack only where the plan caps what it raises. Limits move at once.
+  **Per plan (DEC-157):** an add-on may name the plans it is offered on
+  (`plans`; none named is every plan) and the most a business may hold
+  (`max`; none is `MAX_ADDON_QUANTITY`), both set in Admin › Plans ›
+  Offers. A price that differs by plan is two add-ons of one kind, each
+  naming its plans; the catalogue refuses two of a kind on one plan. A
+  business is listed, sold, counted and charged only the add-ons its plan
+  is offered. More than the maximum is refused; what is already held above
+  a maximum set since is kept, counted and charged, and only buying more
+  is refused. A plan change (an upgrade, a move applied) ends the add-ons
+  the new plan isn't offered (`endAddonsNotOfferedInTx`) and buys nothing
+  in their place; what the period already owed is still charged. An
+  add-on whose id the new version doesn't have at all is left held and
+  inert, as before. The quote (`GET …/billing/change-plan`) names the
+  add-ons held today that the change ends (`addonsEnding`: id, name,
+  quantity, and `onNewPlan`, the new plan's own add-on of the kind or
+  null), by the same rule (`addons-ending.ts`), and the change-plan dialog
+  says so before Confirm; a client reads a missing field as none. Each
+  one ended is an audit row after commit (`organization.plan.addon.changed`,
+  `reason: "plan-change"`). Not said: whether the business will be over a
+  limit afterwards, which the quote has no counts for.
   Billed after the period, on the provider subscription's next charge
   (`SubscriptionAddonCharge`): bought part-way, what's left of the period
   (prorated); each later period, the whole of it for what's held at its
@@ -586,6 +622,10 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
   `LIMIT_WORDS` (`@saroh/pricing-catalog`, shared with the API's
   refusals). Only while `enforced` (the access view's
   `PLAN_ENFORCEMENT`): nothing is shown that nothing would stop.
+- **Variants a product** (DEC-158): no notice on a list and no meter. The
+  product editor's Variants turns "Add to list" off once the product's
+  list holds the plan's number, and the line beside it says the cap and
+  the way to more (`lib/billing/variant-cap.ts`), in the refusal's words.
 - **Locks**: a module shut only by the plan (`ENTITLEMENT_REQUIRED` alone)
   stays in the rail with a lock and its page says which plan has it
   (`PlanLocked`). A catalogue row locks a rail entry only where the API

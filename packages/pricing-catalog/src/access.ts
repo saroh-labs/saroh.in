@@ -7,7 +7,7 @@ import {
     priceOverridePaise,
 } from "./overrides";
 import type { Catalog, LimitPeriod, OffState } from "./schema";
-import { cellOf } from "./schema";
+import { addonOfferedOn, cellOf } from "./schema";
 
 /** Add-ons a business has bought: an add-on id from its version, and how many. */
 export interface BoughtAddon {
@@ -66,7 +66,9 @@ function moduleOf(o: Override): string | null {
 /**
  * What one business gets for one catalogue module: its plan on its version,
  * then its overrides in order (plan, remove, grant, limit, raise), then the
- * add-ons it bought, read from the same version (KTD-5).
+ * add-ons it bought, read from the same version (KTD-5). An add-on counts
+ * only on a plan it is offered on (DEC-157), and for all that is held: its
+ * maximum stops more being bought, never what a business already has.
  *
  * A module the catalogue doesn't know is on: the catalogue only takes away
  * what it lists. The rollout gate (DEC-057) is the caller's, and comes first.
@@ -159,7 +161,8 @@ export function resolveAccess(
         const n = Math.max(0, Math.trunc(bought.quantity));
         if (!n) continue;
         const a = catalog.addons.find((x) => x.id === bought.addonId);
-        if (!a) continue;
+        // The plan it is billed on, where it was bought; not a plan override.
+        if (!a || !addonOfferedOn(a, input.planId)) continue;
         if (a.kind === "module") {
             if (a.module === moduleId && !r.inc) {
                 r.inc = true;

@@ -1,5 +1,7 @@
 import { formatInr } from "@saroh/pricing-catalog";
 
+import { listWords } from "@/lib/modules/switch-plan";
+
 import type { ChangeQuote, Cycle } from "./plan-view";
 
 /**
@@ -40,6 +42,33 @@ const withGst = (paise: number) => `${formatInr(paise)} (incl. GST)`;
 
 const REFUNDED =
     "Nothing is owed today. To set up UPI Autopay or a card, Razorpay takes a small amount and refunds it.";
+
+/**
+ * The add-ons that end with the change (DEC-157), said before the business
+ * confirms: which, how many, and the new plan's own when it has one. It is
+ * never bought for the business, so no price is said. Null when none ends
+ * (or the API sent none).
+ */
+export function endingAddonsNote(
+    q: ChangeQuote,
+    opts: { currentPlan?: string | null } = {},
+): string | null {
+    const ending = q.addonsEnding ?? [];
+    if (ending.length === 0) return null;
+    const current = opts.currentPlan ?? "your current plan";
+    const held = ending
+        .map((a) => (a.quantity > 1 ? `${a.name} × ${a.quantity}` : a.name))
+        .join(", ");
+    const said =
+        ending.length === 1
+            ? `This add-on ends with ${current}: ${held}.`
+            : `These add-ons end with ${current}: ${held}.`;
+    const own = ending
+        .flatMap((a) => (a.onNewPlan ? [a.onNewPlan] : []))
+        .filter((name, i, all) => all.indexOf(name) === i);
+    if (own.length === 0) return said;
+    return `${said} After the change you can add ${listWords(own)} on ${q.plan.name}, from Add-ons on this page. Nothing is added for you.`;
+}
 
 /** A change's quote in words, from the plan the business is on now. */
 export function quoteSummary(

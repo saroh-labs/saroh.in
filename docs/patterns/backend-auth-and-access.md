@@ -210,15 +210,17 @@ what the API allows.
   asks the plan's `roles` row ("Custom roles", UX-030; Pro only, DEC-099) —
   taking one away never does. So does giving an invented role a permission
   it didn't have; taking one away or renaming never asks.
-- **Current** (DEC-105) — **Seats follow permissions, never role names.**
-  `billing/seats.ts` decides who uses a team seat: anyone whose role and
-  extras hold a permission outside `VIEW_ONLY_ACTIONS` (every `…:read`,
-  `customer:sensitive`, `order:export`, `site:comment`, `site:approve`), or
-  who takes bookings (an ACTIVE `StaffMember`). Everyone else is view-only
-  and counts toward the `reviewers` row ("View-only people"). Metering,
-  inviting, changing a role, giving an extra and re-permissioning a role all
-  classify through it, and the member, invitation and role views carry
-  `usesSeat` so Team never guesses from a key.
+- **Current** (DEC-155, 13 Oct; was DEC-105) — **Everyone uses one team
+  seat, whatever their role.** `billing/seats.ts` says who: every
+  `Membership` (Owner, Admin, Member, Reviewer, any role the business made),
+  every open invitation, and everyone on the diary who takes bookings with
+  no login (an ACTIVE `StaffMember` with no membership, DEC-111). There is
+  no separate or free allowance for Reviewers or other people who only look,
+  and no `reviewers` row. Only what adds a person asks the plan (`members`):
+  an invite, and a diary person with no login. A change of role, of a role's
+  permissions or of someone's extras never changes the count and never asks.
+  Don't classify by permission to decide a seat, and don't add `usesSeat`
+  back to a view.
 - **Current** (F16, DEC-048) — **A storefront's people are on the team.**
   Accepting a storefront invite (`members/members.service.ts`) also makes a
   `Membership` in the store's business, in the same transaction, in the
@@ -270,8 +272,8 @@ what the API allows.
   cancel, outcome or pay link on another's booking is a 403 ("Your role
   changes only your own bookings."), and a booking by hand is with
   themselves. They hear no business-wide booking alerts. A new booking read
-  or write spreads the same. **Seats:** the role holds `booking:write`, so
-  it is a seat (DEC-105); an open invite naming a diary person with no login
+  or write spreads the same. **Seats:** they use one, as everyone does
+  (DEC-155); an open invite naming a diary person with no login
   is that person, counted once (`countedOnDiary` in `billing/seats.ts`, read
   by metering, the invite's meter check and Team's count line).
   `calendar-only-role.spec.ts`, `diary-invite.spec.ts`, `own-diary.spec.ts`,
@@ -418,6 +420,16 @@ orgId)` (`organizations/organization-kind.ts`).
   plan override reads `FREE_ENTITLEMENTS` until the backfills reach it
   (`docs/architecture/PRICING_ROLLOUT.md`). Never read `Plan.entitlements`
   directly for access.
+- **Current** (DEC-158) — **A cap inside one thing is not a meter.** A
+  catalogue row whose cap is on what ONE thing holds (`variants`: a
+  product's variants) says so in `MODULE_MAP` (`within`) and is checked
+  through `planMeter.itemCap(org, row)` and `assertItemRoom(cap, has,
+adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
+  never added to `METERED_LIMIT_KEYS`: it has no count across the
+  business, so no usage, notice or pause. Only a write that adds is
+  refused; one that adds nothing always passes, so a thing past its cap
+  stays editable. A cell without a number, a cell that leaves the row out
+  and a version without the row all cap nothing.
 - **Current** (plans catalogue U13) — **A plan limit is checked where the
   write happens, behind the kill switch.** A write that adds a metered
   thing calls `planMeter.roomInTx(tx, org, row)` on its own transaction
@@ -447,8 +459,8 @@ orgId)` (`organizations/organization-kind.ts`).
   floor (`LEGACY_FLOOR_ENTITLEMENTS`) still applies, so nothing new locks
   behind the switch. The `storefronts` floor counts what `shopLocations`
   counts and is asked where a storefront becomes a SHOP, never on creating
-  an online one (DEC-109, `billing/legacy-location-floor.ts`). Team members never count a Reviewer, so moving
-  someone off Reviewer is metered. Over after a downgrade,
+  an online one (DEC-109, `billing/legacy-location-floor.ts`). Team members count everyone, a Reviewer included
+  (DEC-155), so a change of role is never metered. Over after a downgrade,
   existing things stay readable and editable; only adding is refused. A
   new write that adds a metered thing, or a new switch row, gets its call
   and a row in `billing/plan-limits.db.spec.ts`.

@@ -1,5 +1,6 @@
 import type { BillingCycle, Catalog, Cell } from "@saroh/pricing-catalog";
 import {
+    addonOfferedOn,
     cellOf,
     formatCount,
     formatInr,
@@ -287,7 +288,7 @@ export function catalogueImpact(input: ImpactInput): Impact {
             continue;
         }
         const pros = businesses.filter((b) => {
-            if (!mod) return false;
+            if (!mod || !addonOfferedOn(a, b.planId)) return false;
             const c = cellOf(mod, b.planId);
             if (a.kind === "module") return !c.inc;
             return (

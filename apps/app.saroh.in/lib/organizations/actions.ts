@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { env } from "@/env";
@@ -13,6 +13,11 @@ import {
     ACTIVE_ORG_NAME_COOKIE,
     ACTIVE_ORG_USER_COOKIE,
 } from "./left-business";
+import {
+    carriedReferral,
+    REFERRAL_COOKIE,
+    referralCookieDomain,
+} from "./referral-carry";
 
 import type {
     AddressAvailability,
@@ -136,13 +141,32 @@ export async function checkAddress(
 /**
  * Onboarding: create an organization and immediately make it the active one so
  * the dashboard renders under the new tenant on the next navigation/refresh.
+ *
+ * A referral code the browser carried from saroh.in goes with it (DEC-156,
+ * `referral-carry.ts`): read here on the server, never from the form, and
+ * cleared once the business exists, so the next business this browser makes
+ * isn't put down to the same link.
  */
 export async function createOrganization(
     input: CreateOrganizationInput,
 ): Promise<OrganizationResult<{ id: string; slug: string }>> {
-    const res = await createOrganizationApi(input);
+    const jar = await cookies();
+    const referralCode = carriedReferral(jar.get(REFERRAL_COOKIE)?.value);
+    // `referralCode` is the cookie's or nothing, whatever the caller sent.
+    const res = await createOrganizationApi({ ...input, referralCode });
     if (res.ok) {
         await writeActiveOrgCookie(res.data.id, input.name);
+        if (jar.has(REFERRAL_COOKIE)) {
+            const from = await headers();
+            const domain = referralCookieDomain(
+                from.get("x-forwarded-host") ?? from.get("host"),
+            );
+            jar.set(REFERRAL_COOKIE, "", {
+                path: "/",
+                maxAge: 0,
+                ...(domain ? { domain } : {}),
+            });
+        }
     }
     return res;
 }

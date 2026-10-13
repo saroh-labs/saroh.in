@@ -1,5 +1,6 @@
 import type { AddonKind, Catalog } from "@saroh/pricing-catalog";
 import {
+    addonPlanNames,
     cardLines,
     cellOf,
     formatInr,
@@ -58,7 +59,12 @@ const UNIT: Record<Exclude<AddonKind, "module">, [string, string]> = {
 
 function addonViews(catalog: Catalog, withGst: boolean): AddonView[] {
     const money = (p: number) => formatInr(withGst ? withGstPaise(p) : p);
-    return catalog.addons.map((a) => {
+    const offered = { plans: offeredPlans(catalog) };
+    return catalog.addons.flatMap((a) => {
+        // Named plans (DEC-157): shown under them, and not at all when a
+        // visitor can choose none of them.
+        const on = addonPlanNames(offered, a);
+        if (a.plans?.length && !on) return [];
         const pr = money(a.pricePaise);
         let line: string;
         if (a.kind === "module") {
@@ -70,7 +76,7 @@ function addonViews(catalog: Catalog, withGst: boolean): AddonView[] {
             const [one, many] = UNIT[a.kind];
             line = `+${a.qty} ${a.qty > 1 ? many : one} for ${pr} a month`;
         }
-        return { id: a.id, name: a.name, line };
+        return [{ id: a.id, name: a.name, line, on }];
     });
 }
 

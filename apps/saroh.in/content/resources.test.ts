@@ -100,9 +100,10 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         const refundsAfter = at("2026-10-04T18:31:00Z");
         // The Terms' and Privacy's date moved to 10 Oct when both were
         // aligned with India's DPDP Act (rev 55): until that day only the
-        // Refunds page shows.
+        // Refunds page shows. Privacy's moved again to 13 Oct with the
+        // referral code cookie (DEC-156).
         const termsBefore = at("2026-10-08T18:31:00Z");
-        const privacyAfter = at("2026-10-09T18:31:00Z");
+        const privacyAfter = at("2026-10-12T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
         for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);

@@ -5,7 +5,7 @@
  * month made online (the booking page told only that the business isn't
  * taking bookings; the team's own bookings never capped, DEC-095), blog posts put live, team members invited, integrations
  * connected, websites made, locations turned into places customers visit,
- * Reviewers left off the team count, the soft caps (storage, visits) that
+ * Reviewers counted on the team like anyone else, the soft caps (storage, visits) that
  * tell and never refuse, and the switches — custom roles, themes, site
  * review. Existing
  * things stay editable; only adding is refused. With `PLAN_ENFORCEMENT`
@@ -421,7 +421,7 @@ describe("team members (DB, U13)", () => {
     });
 });
 
-describe("bookable staff use team seats (DB, DEC-105, UX-053)", () => {
+describe("bookable staff use team seats (DB, DEC-111, UX-053)", () => {
     it("counts someone on the diary with no login, and frees the seat when archived", async () => {
         const b = await business("free");
         // The owner and one person with no login fill Plan A's two seats.
@@ -649,25 +649,13 @@ describe("locations customers visit (DB, U13)", () => {
     });
 });
 
-describe("team members leave Reviewers out (DB, U13)", () => {
-    it("invites a Reviewer at the cap, and refuses making them a Member", async () => {
+describe("team members count everyone, Reviewers too (DB, DEC-155)", () => {
+    it("refuses a Reviewer at the cap, and never a change of role", async () => {
         const b = await business("free");
         const site = await prisma.site.create({
             data: { organizationId: b.orgId, name: "Site", slug: uniq("s") },
         });
-        // Plan A has 2: the owner and one open invitation.
-        await members.invite(b.owner, {
-            email: `${uniq("asha")}@example.test`,
-            role: "MEMBER",
-        } as never);
-        await expect(
-            members.invite(b.owner, {
-                email: `${uniq("rev")}@example.test`,
-                role: "REVIEWER",
-                siteIds: [site.id],
-            } as never),
-        ).resolves.toBeDefined();
-
+        // Plan A has 2: the owner and one Reviewer fill it.
         const reviewer = await prisma.user.create({
             data: { email: `${uniq("r")}@example.test` },
         });
@@ -678,8 +666,15 @@ describe("team members leave Reviewers out (DB, U13)", () => {
                 role: "REVIEWER",
             },
         });
+        expect(await countUsage(prisma, b.orgId, "teamMembers")).toBe(2);
+
+        // A third person is refused, as a Reviewer or as anyone else.
         const body = await refused(
-            members.updateRole(b.owner, reviewer.id, { role: "MEMBER" }),
+            members.invite(b.owner, {
+                email: `${uniq("rev")}@example.test`,
+                role: "REVIEWER",
+                siteIds: [site.id],
+            } as never),
         );
         expect(body.details).toMatchObject({
             code: "PLAN_LIMIT_REACHED",
@@ -687,16 +682,62 @@ describe("team members leave Reviewers out (DB, U13)", () => {
             limit: 2,
             used: 2,
         });
-        const still = await prisma.membership.findUniqueOrThrow({
-            where: {
-                organizationId_userId: {
-                    organizationId: b.orgId,
-                    userId: reviewer.id,
-                },
-            },
-            select: { role: true },
+        await refused(
+            members.invite(b.owner, {
+                email: `${uniq("asha")}@example.test`,
+                role: "MEMBER",
+            } as never),
+        );
+        expect(
+            await prisma.organizationInvitation.count({
+                where: { organizationId: b.orgId },
+            }),
+        ).toBe(0);
+
+        // A change of role adds nobody: at the cap it goes through, off
+        // Reviewer and back.
+        const roleOf = async () =>
+            (
+                await prisma.membership.findUniqueOrThrow({
+                    where: {
+                        organizationId_userId: {
+                            organizationId: b.orgId,
+                            userId: reviewer.id,
+                        },
+                    },
+                    select: { role: true },
+                })
+            ).role;
+        await members.updateRole(b.owner, reviewer.id, { role: "MEMBER" });
+        expect(await roleOf()).toBe("MEMBER");
+        await members.updateRole(b.owner, reviewer.id, {
+            role: "REVIEWER",
+            siteIds: [site.id],
         });
-        expect(still.role).toBe("REVIEWER");
+        expect(await roleOf()).toBe("REVIEWER");
+        expect(await countUsage(prisma, b.orgId, "teamMembers")).toBe(2);
+    });
+
+    it("an open Reviewer invitation holds a seat, and sending it again adds nobody", async () => {
+        const b = await business("free");
+        const site = await prisma.site.create({
+            data: { organizationId: b.orgId, name: "Site", slug: uniq("s") },
+        });
+        const invite = (email: string, role = "REVIEWER") =>
+            members.invite(b.owner, {
+                email,
+                role,
+                ...(role === "REVIEWER" ? { siteIds: [site.id] } : {}),
+            } as never);
+        const priya = `${uniq("priya")}@example.test`;
+        // Plan A has 2: the owner and the Reviewer's open invitation.
+        await invite(priya);
+        expect(await countUsage(prisma, b.orgId, "teamMembers")).toBe(2);
+        await refused(invite(`${uniq("ravi")}@example.test`, "MEMBER"));
+        // Sent again, at the same role or another: the same one person.
+        await expect(invite(priya)).resolves.toBeDefined();
+        await expect(invite(priya, "MEMBER")).resolves.toBeDefined();
+        expect(await countUsage(prisma, b.orgId, "teamMembers")).toBe(2);
     });
 });
 

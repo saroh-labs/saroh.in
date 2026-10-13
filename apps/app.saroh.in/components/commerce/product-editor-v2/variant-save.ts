@@ -1,3 +1,4 @@
+import type { PlanRefusal } from "@/lib/billing/refusal";
 import {
     createVariant,
     deleteVariant,
@@ -33,6 +34,11 @@ export interface VariantSave {
     failed: string | null;
     /** Said as a toast (a refused option change). */
     toast?: string;
+    /**
+     * The plan refused a new variant (its cap on one product's variants,
+     * DEC-158): shown as the plan's notice, with its way to more.
+     */
+    plan?: PlanRefusal;
 }
 
 /**
@@ -55,6 +61,7 @@ export async function saveVariantList(input: {
 }): Promise<VariantSave> {
     const { product, storeId, rows, base, optionId, titleOf, listings } = input;
     let why: string | null = null;
+    let plan: PlanRefusal | undefined;
     let next = rows;
     let saved = base;
     const replace = (key: string, patch: Partial<VariantRow>) => {
@@ -104,6 +111,7 @@ export async function saveVariantList(input: {
                 const res = await createVariant(product.id, body);
                 if (!res.ok) {
                     why ??= res.error;
+                    plan ??= res.plan;
                     continue;
                 }
                 // Saved: a retry must update it, not make it twice. Sold,
@@ -153,7 +161,7 @@ export async function saveVariantList(input: {
     } catch {
         why ??= DROPPED;
     }
-    return { next, saved, why, failed: why };
+    return { next, saved, why, failed: why, ...(plan ? { plan } : {}) };
 }
 
 /** "Sell it at": one call per storefront that changes; the first refusal. */

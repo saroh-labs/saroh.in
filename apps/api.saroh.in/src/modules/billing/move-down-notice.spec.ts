@@ -46,7 +46,6 @@ const MEASURE: PauseMeasure = {
             kind: "member",
             label: "Asha",
             owner: false,
-            seat: "seat",
         },
     ],
     products: { cut: { id: "p", createdAt: NOW }, count: 2 },

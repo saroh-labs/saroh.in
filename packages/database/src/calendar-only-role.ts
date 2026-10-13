@@ -17,7 +17,7 @@
  * payment, invoice, order, pack or membership power, so no figures and no
  * desk payment (`mayTakeDeskPayment` needs `invoice:write`).
  *
- * It changes bookings, so whoever holds it uses a team seat (DEC-105) —
+ * Whoever holds it uses a team seat, as everyone does (DEC-155) —
  * as they did before, taking bookings with no login.
  *
  * Like "Storefront team", it is an ordinary role row (`OrganizationRole`,

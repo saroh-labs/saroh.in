@@ -7,11 +7,13 @@ import {
     productFacts,
     recordPrices,
 } from "../audit/price-history";
+import type { ItemCap } from "../billing/item-limits";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { assertSameCurrency } from "../stores/currency";
 import type { MrpJudged } from "./product-rules";
 import { firstOverMrp, hasMrp, overMrpMessage } from "./product-rules";
 import { readShopFields } from "./serialize";
+import { assertCopyFits } from "./variant-cap";
 
 /**
  * Duplicate a catalogue product (#518): a draft to start the next one from.
@@ -83,6 +85,8 @@ export async function duplicateProduct(
         storeId: string;
         /** Who is copying: the copy's price history starts with them. */
         actor: PriceActor;
+        /** The plan's cap on a product's variants (`variantCap`), if any. */
+        variantCap?: ItemCap | null;
     },
 ): Promise<string> {
     const { organizationId, productId, storeId } = input;
@@ -106,6 +110,9 @@ export async function duplicateProduct(
         },
     });
     if (!source) throw new NotFoundException("Product not found");
+    // A copy is a new product: it can't start past the plan's cap on
+    // variants (DEC-158), though the original keeps all of its own.
+    assertCopyFits(input.variantCap ?? null, source.variants.length);
 
     // The copy takes the original's price, MRP and GST, so it is judged as
     // any product is (`product-rules.ts`): one whose amount to pay is above

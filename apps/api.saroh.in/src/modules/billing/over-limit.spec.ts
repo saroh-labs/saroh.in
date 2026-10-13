@@ -60,6 +60,8 @@ describe("pauseLimitsOf", () => {
     it("reads each row's cap; a row off caps at nothing, unknown or uncapped caps nothing", () => {
         const l = pauseLimitsOf([
             row("members", { limit: 4 }),
+            // A row the product retired (DEC-155), were one ever to reach
+            // here: it caps nothing.
             row("reviewers", { limit: 2 }),
             row("products", { limit: 10 }),
             row("blog", { state: "locked", inc: false }),
@@ -67,7 +69,6 @@ describe("pauseLimitsOf", () => {
         ]);
         expect(l).toEqual({
             teamMembers: 4,
-            reviewers: 2,
             products: 10,
             blogPosts: 0,
             shopLocations: null,
@@ -89,6 +90,12 @@ describe("pauseLimitsOf", () => {
             moveDownClaimKey(limits({ products: 11 })),
         );
         expect(moveDownClaimKey(a).startsWith("move-down:")).toBe(true);
+    });
+
+    it("names no limit of their own for people who only look (DEC-155)", () => {
+        expect(limitsKey(limits({ teamMembers: 4 }))).toBe(
+            "teamMembers=4,products=none,blogPosts=none,shopLocations=none,sites=none",
+        );
     });
 });
 
@@ -158,36 +165,74 @@ describe("team: the owner, then the earliest to join", () => {
         kind: "member",
         label: id,
         owner: false,
-        seat: "seat",
         ...patch,
     });
+    // Two Reviewers among them: a role is no part of a `TeamPerson`, so
+    // they are placed by when they joined like anyone else (DEC-155).
     const team = [
         person("late", 9),
         person("owner", 5, { owner: true }),
         person("early", 1),
         person("diary", 3, { kind: "diary" }),
         person("invite", 0, { kind: "invite" }),
-        person("viewer1", 2, { seat: "viewOnly" }),
-        person("viewer2", 4, { seat: "viewOnly" }),
+        person("reviewer1", 2),
+        person("reviewer2", 4),
     ];
+    const ids = (people: readonly TeamPerson[]) => people.map((p) => p.id);
 
     it("keeps the owner first, then members and diary people by join date, invitations last", () => {
-        const { kept, paused } = keepTeam(team, "seat", 3);
-        expect(kept.map((p) => p.id)).toEqual(["owner", "early", "diary"]);
-        expect(paused.map((p) => p.id)).toEqual(["late", "invite"]);
+        const { kept, paused } = keepTeam(team, 3);
+        expect(ids(kept)).toEqual(["owner", "early", "reviewer1"]);
+        expect(ids(paused)).toEqual(["diary", "reviewer2", "late", "invite"]);
+    });
+
+    it("counts everyone against the one limit, Reviewers like anyone else (DEC-155)", () => {
+        // Seven people and a limit of five: the two who came last pause,
+        // and an earlier Reviewer keeps their place ahead of a later Member.
+        const { kept, paused } = keepTeam(team, 5);
+        expect(ids(kept)).toEqual([
+            "owner",
+            "early",
+            "reviewer1",
+            "diary",
+            "reviewer2",
+        ]);
+        expect(ids(paused)).toEqual(["late", "invite"]);
+        expect(kept.length + paused.length).toBe(team.length);
+    });
+
+    it("keeps the owner alone at a limit of 1", () => {
+        const { kept, paused } = keepTeam(team, 1);
+        expect(ids(kept)).toEqual(["owner"]);
+        expect(ids(paused)).toEqual([
+            "early",
+            "reviewer1",
+            "diary",
+            "reviewer2",
+            "late",
+            "invite",
+        ]);
+    });
+
+    it("keeps the owner though they joined last, and only them at 1", () => {
+        // A business handed on: the owner's membership is the newest.
+        const handed = [
+            person("first", 1),
+            person("second", 2),
+            person("owner", 30, { owner: true }),
+        ];
+        expect(ids(keepTeam(handed, 1).kept)).toEqual(["owner"]);
+        expect(ids(keepTeam(handed, 2).kept)).toEqual(["owner", "first"]);
+        expect(ids(keepTeam(handed, 2).paused)).toEqual(["second"]);
     });
 
     it("never pauses the owner, even at a limit of 0", () => {
-        expect(keepTeam(team, "seat", 0).kept.map((p) => p.id)).toEqual([
-            "owner",
-        ]);
+        expect(ids(keepTeam(team, 0).kept)).toEqual(["owner"]);
     });
 
-    it("counts view-only people against their own limit (DEC-105)", () => {
-        expect(keepTeam(team, "viewOnly", 1).paused.map((p) => p.id)).toEqual([
-            "viewer2",
-        ]);
-        expect(keepTeam(team, "seat", null).paused).toEqual([]);
+    it("pauses nobody with no limit, or with room for all", () => {
+        expect(keepTeam(team, null).paused).toEqual([]);
+        expect(keepTeam(team, team.length).paused).toEqual([]);
     });
 });
 
@@ -260,7 +305,6 @@ describe("what a notice lists", () => {
                 kind: "member",
                 label: "Asha",
                 owner: false,
-                seat: "seat",
             },
             {
                 id: "m4",
@@ -268,7 +312,6 @@ describe("what a notice lists", () => {
                 kind: "member",
                 label: "Ravi",
                 owner: false,
-                seat: "seat",
             },
         ],
         products: { cut: { id: "p", createdAt: at(1) }, count: 4 },
