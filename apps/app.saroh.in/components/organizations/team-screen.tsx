@@ -64,7 +64,6 @@ import {
     inviteSchema,
     teamCountLine,
     teamCounts,
-    usesSeat,
 } from "@/lib/organizations/invitations";
 import { isOnlyOwner, onlyOwnerLine } from "@/lib/organizations/leave-business";
 import {
@@ -288,9 +287,9 @@ export function TeamScreen({
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [removing, setRemoving] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
-    // Full seats still invite someone view-only, who takes no seat (UX-028,
-    // DEC-105). With both caps reached, it says why, as the design flashes
-    // it: the invite would be refused, invites count too, and where more is.
+    // A full team invites nobody new, at any role (UX-028, DEC-155): the
+    // button says why, as the design flashes it — the invite would be
+    // refused, invites count too, and where more is.
     const room = inviteRoom(teamLimit);
     // Past the plan's limit (#800): the team is over it, not just at it.
     const over = teamOverLimit(paused);
@@ -299,7 +298,7 @@ export function TeamScreen({
     // would be paused (`inviteButton`).
     const invite = inviteButton(teamLimit, diaryPeople.length, over);
     const invitableDiary = invite.diary ? diaryPeople : [];
-    // What the seats count (DEC-105), from what the API says each uses.
+    // What the seats count (DEC-155): everyone, and every open invite.
     const counts = teamCounts(members, invitations);
     const openInvite = () => {
         if (invite.refused) {
@@ -394,7 +393,6 @@ export function TeamScreen({
                     {teamCountLine(
                         counts.people,
                         counts.waiting,
-                        counts.viewOnly,
                         bookableNoLogin,
                     )}
                     {over
@@ -494,8 +492,7 @@ export function TeamScreen({
                     book={book}
                     members={members}
                     invitations={invitations}
-                    seatReason={room.seatReason}
-                    viewOnlyReason={room.viewOnlyReason}
+                    seatReason={room.reason}
                     diaryPeople={invitableDiary}
                     // The new invite shows at the top of People.
                     onSent={() => setTab("people")}
@@ -1194,7 +1191,6 @@ function InviteSheet({
     members,
     invitations,
     seatReason,
-    viewOnlyReason,
     diaryPeople,
     onSent,
 }: {
@@ -1205,10 +1201,8 @@ function InviteSheet({
     book: RoleBook;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
-    /** The seats are full (UX-028): only someone view-only, and why. */
+    /** The team is full (UX-028): only someone on the diary, and why. */
     seatReason: string | null;
-    /** The view-only people are full (DEC-105): only a seat, and why. */
-    viewOnlyReason: string | null;
     /** Who on the diary could be given a login (#868). */
     diaryPeople: DiaryPerson[];
     onSent: () => void;
@@ -1219,18 +1213,7 @@ function InviteSheet({
         invitedEmails: invitations.map((i) => i.email),
     });
     const offered = book.all.filter((r) => r.key !== "OWNER");
-    // Why a role can't be picked for want of room on the plan: by whether
-    // holding it uses a seat (DEC-105), never by its name.
-    const roomFor = (r: Role): string | null =>
-        usesSeat(r) ? seatReason : viewOnlyReason;
-    // Picked to start with: Member, or with the seats full the first
-    // view-only role the inviter may give.
-    const startRole =
-        (seatReason
-            ? offered.find(
-                  (r) => roomFor(r) === null && book.withinReach(r.key),
-              )?.key
-            : undefined) ?? "MEMBER";
+    const startRole = "MEMBER";
     const form = useForm<InviteValues>({
         resolver: zodResolver(schema),
         defaultValues: {
@@ -1245,9 +1228,10 @@ function InviteSheet({
     const { send } = useHold();
     const role = useWatch({ control: form.control, name: "role" });
     const staffId = useWatch({ control: form.control, name: "staffId" });
-    // Someone already on the diary takes bookings, so holds a seat
-    // whatever the role: the invite adds nobody to either cap (#868).
-    const noRoom = (r: Role): string | null => (staffId ? null : roomFor(r));
+    // Why no role can be picked for want of room on the plan: every role
+    // uses a seat (DEC-155). Someone already on the diary holds theirs, so
+    // the invite adds nobody (#868).
+    const noRoom = staffId ? null : seatReason;
 
     function pickDiaryPerson(next: string) {
         form.setValue("staffId", next);
@@ -1382,9 +1366,9 @@ function InviteSheet({
                             >
                                 Role
                             </p>
-                            {!staffId && (seatReason ?? viewOnlyReason) ? (
+                            {noRoom ? (
                                 <p className="text-[12px] leading-[1.45] text-muted-foreground">
-                                    {seatReason ?? viewOnlyReason}
+                                    {noRoom}
                                 </p>
                             ) : null}
                             <ChoiceGroup
@@ -1399,10 +1383,9 @@ function InviteSheet({
                                     // at a role that can do more than
                                     // the inviter.
                                     const beyond = !book.withinReach(r);
-                                    // Full seats take no one who needs
-                                    // one; full view-only places take no
-                                    // one view-only.
-                                    const full = noRoom(offer);
+                                    // A full team takes no one new, at
+                                    // any role.
+                                    const full = noRoom;
                                     const off = beyond || full !== null;
                                     const checked = r === field.value;
                                     return {

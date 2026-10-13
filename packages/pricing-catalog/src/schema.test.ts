@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveAccess, resolveAllAccess } from "./access";
+import { cardLines } from "./card-lines";
 import { edit, fixture, fixtureInput } from "./catalog.fixture";
+import { entitlementsFor } from "./plan-rows";
 import {
     addonMaxQuantity,
     addonOfferedOn,
@@ -33,6 +36,75 @@ describe("the catalogue schema", () => {
         expect(cellOf(c.modules[0], "c")).toEqual({
             inc: false,
             off: "locked",
+        });
+    });
+
+    // A version published while "View-only people" was sold (DEC-105)
+    // still carries its row; DEC-155 retired it.
+    describe("a snapshot with the retired reviewers row", () => {
+        const old = () => {
+            const input = fixtureInput();
+            input.modules.push({
+                id: "reviewers",
+                name: "View-only people",
+                group: "g2",
+                what: "People who only look.",
+                cells: {
+                    a: { inc: true, text: "1", card: "", limit: 1 },
+                    b: { inc: true, text: "2", card: "2 lookers", limit: 2 },
+                    c: { inc: true, text: "22", card: "", limit: 22 },
+                },
+            });
+            return input;
+        };
+
+        it("still reads, without the row", () => {
+            const r = validateCatalog(old());
+            expect(r.ok).toBe(true);
+            const c = catalogSchema.parse(old());
+            expect(c.modules.map((m) => m.id)).not.toContain("reviewers");
+            expect(c.modules.map((m) => m.id)).toEqual(
+                fixture().modules.map((m) => m.id),
+            );
+        });
+
+        it("caps and shows nothing for it, on any plan", () => {
+            const c = catalogSchema.parse(old());
+            const access = { catalog: c, planId: "a", now: new Date(0) };
+            expect(
+                resolveAllAccess(access).map((m) => m.moduleId),
+            ).not.toContain("reviewers");
+            // Asked for by name it is a row the catalogue doesn't know: on,
+            // with no cap.
+            expect(resolveAccess(access, "reviewers")).toMatchObject({
+                state: "on",
+                limit: null,
+            });
+            expect(entitlementsFor(c, "a")).not.toHaveProperty("reviewers");
+            expect(cardLines(c, "b").lines.map((l) => l.t)).not.toContain(
+                "2 lookers",
+            );
+            // The team's own cap is untouched.
+            expect(resolveAccess(access, "members").limit).toBe(1);
+        });
+
+        it("drops an add-on that only switched it on, and keeps the rest", () => {
+            const input = old();
+            input.addons?.push({
+                id: "lookers-alone",
+                kind: "module",
+                module: "reviewers",
+                name: "Lookers",
+                pricePaise: 1_100,
+                mode: "pack",
+                qty: 1,
+            });
+            const r = validateCatalog(input);
+            expect(r.ok).toBe(true);
+            const c = catalogSchema.parse(input);
+            expect(c.addons.map((a) => a.id)).toEqual(
+                fixture().addons.map((a) => a.id),
+            );
         });
     });
 

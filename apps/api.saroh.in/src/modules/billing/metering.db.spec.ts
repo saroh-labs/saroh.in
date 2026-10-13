@@ -51,20 +51,27 @@ const handler = new PlanLimitNoticeHandler(access, meter);
 let seq = 0;
 const uniq = (p: string) => `${p}-${++seq}-${tag}`;
 
-async function install(version: number, catalog: Catalog) {
+async function install(
+    version: number,
+    catalog: Catalog,
+    liveSinceMinutes = 24 * 60,
+) {
     await writeCatalogueVersion(prisma, {
         version,
         catalog,
-        goLiveAt: new Date(Date.now() - 24 * 60 * MINUTE),
+        goLiveAt: new Date(Date.now() - liveSinceMinutes * MINUTE),
         policy: "keep",
         planRows: planRows(catalog, version),
     });
 }
 
-/** A business on `planId`@V, with the kill switch on (or not) for it alone. */
+/**
+ * A business on `planId`@V (or `over.version`), with the kill switch on (or
+ * not) for it alone.
+ */
 async function business(
     planId: string | null,
-    over: { enforce?: boolean; zone?: string } = {},
+    over: { enforce?: boolean; zone?: string; version?: number } = {},
 ) {
     const org = await prisma.organization.create({
         data: { name: "Metered", slug: uniq("meter") },
@@ -74,7 +81,7 @@ async function business(
             where: {
                 key_version_interval: {
                     key: `catalog.${planId}`,
-                    version: V,
+                    version: over.version ?? V,
                     interval: "month",
                 },
             },
@@ -434,7 +441,8 @@ describe("what each limit counts (DB, U13)", () => {
         expect(await countUsage(prisma, orgId, "integrations")).toBe(2);
     });
 
-    it("leaves Reviewers out of the team, and counts them on their own cap", async () => {
+    // DEC-155: everyone uses one team seat, whatever their role.
+    it("counts Reviewers on the team like anyone else, people and invitations", async () => {
         const { orgId } = await business("free");
         for (const role of ["OWNER", "REVIEWER"]) {
             const user = await prisma.user.create({
@@ -444,6 +452,8 @@ describe("what each limit counts (DB, U13)", () => {
                 data: { organizationId: orgId, userId: user.id, role },
             });
         }
+        // Only the people so far: the Owner and the Reviewer.
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(2);
         for (const role of ["MEMBER", "REVIEWER"]) {
             await prisma.organizationInvitation.create({
                 data: {
@@ -456,13 +466,25 @@ describe("what each limit counts (DB, U13)", () => {
                 },
             });
         }
-        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(2);
-        // The Reviewer in the business and the open Reviewer invitation.
-        expect(await countUsage(prisma, orgId, "reviewers")).toBe(2);
+        // An invitation that has lapsed holds no place.
+        await prisma.organizationInvitation.create({
+            data: {
+                organizationId: orgId,
+                email: `${uniq("i")}@example.test`,
+                role: "REVIEWER",
+                tokenHash: uniq("t"),
+                status: "PENDING",
+                expiresAt: new Date(Date.now() - MINUTE),
+            },
+        });
+        // Both people and both open invitations, the Reviewers included.
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(4);
+        expect(
+            (await countUsageAcross(prisma, "teamMembers", [orgId])).get(orgId),
+        ).toBe(4);
     });
 
-    // DEC-105: a role of the business's own is judged on its permissions.
-    it("seats a role that books, not one that only looks; bookable staff always", async () => {
+    it("seats every role of the business's own, looking or changing; bookable staff once", async () => {
         const { orgId } = await business("pro");
         await prisma.organizationRole.createMany({
             data: [
@@ -491,10 +513,9 @@ describe("what each limit counts (DB, U13)", () => {
         await join("looker");
         await join("front-desk");
         const trainer = await join("looker");
-        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(1);
-        expect(await countUsage(prisma, orgId, "reviewers")).toBe(2);
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(3);
 
-        // On the diary, taking bookings: a seat whatever the role.
+        // On the diary as themselves: still their one seat.
         await prisma.staffMember.create({
             data: {
                 organizationId: orgId,
@@ -502,8 +523,56 @@ describe("what each limit counts (DB, U13)", () => {
                 name: "Trainer",
             },
         });
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(3);
+        // Someone on the diary with no login: a seat of their own (DEC-111).
+        await prisma.staffMember.create({
+            data: { organizationId: orgId, name: "Helper" },
+        });
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(4);
+        expect(
+            (await countUsageAcross(prisma, "teamMembers", [orgId])).get(orgId),
+        ).toBe(4);
+    });
+
+    // DEC-155 retired the separate allowance for people who only look. A
+    // version published while it was sold still carries its row, and a
+    // business that hasn't moved since still reads that version.
+    it("reads a stored version that still has the retired reviewers row, and caps nothing by it", async () => {
+        // An older version than the live one, so V stays live for the rest.
+        const old = V - 1;
+        const stored = fakeMeteredCatalog();
+        const team = stored.modules.find((m) => m.id === "members");
+        if (!team) throw new Error("the fixture has no members row");
+        stored.modules.push({ ...team, id: "reviewers", name: "Lookers" });
+        // Written as it was published: the row, and its entitlement.
+        await install(old, stored, 48 * 60);
+        const row = await prisma.pricingCatalogVersion.findUniqueOrThrow({
+            where: { version: old },
+            select: { catalog: true },
+        });
+        expect(JSON.stringify(row.catalog)).toContain('"reviewers"');
+
+        const { orgId } = await business("free", { version: old });
+        const a = await access.resolve(orgId);
+        expect(a.source).toBe("catalogue");
+        if (a.source !== "catalogue") return;
+        expect(a.modules.map((m) => m.moduleId)).toContain("members");
+        expect(a.modules.map((m) => m.moduleId)).not.toContain("reviewers");
+
+        // Plan A seats two: an Owner and a Reviewer fill it, on the one row.
+        for (const role of ["OWNER", "REVIEWER"]) {
+            const user = await prisma.user.create({
+                data: { email: `${uniq("m")}@example.test` },
+            });
+            await prisma.membership.create({
+                data: { organizationId: orgId, userId: user.id, role },
+            });
+        }
         expect(await countUsage(prisma, orgId, "teamMembers")).toBe(2);
-        expect(await countUsage(prisma, orgId, "reviewers")).toBe(1);
+        expect(await meter.hasRoom(orgId, "members")).toBe(false);
+        // Nothing is enforced on the retired row.
+        expect(await meter.enforcedRow(orgId, "reviewers")).toBeNull();
+        expect(await meter.hasRoom(orgId, "reviewers")).toBe(true);
     });
 
     it("counts live locations customers visit, never an online one", async () => {
@@ -623,7 +692,6 @@ describe("what each limit counts (DB, U13)", () => {
             "bookingsPerMonth",
             "blogPosts",
             "teamMembers",
-            "reviewers",
             "integrations",
             "shopLocations",
             "sites",
@@ -654,7 +722,6 @@ describe("what each limit counts (DB, U13)", () => {
                 "orders",
                 "products",
                 "locations",
-                "reviewers",
                 "sites",
                 "storage",
                 "visits",

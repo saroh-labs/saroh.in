@@ -45,7 +45,7 @@ import type { BookingBrief } from "./off-bookings";
 import { bookingsInSpans, MAX_LISTED, upcomingBookings } from "./off-bookings";
 import type { OffSpan } from "./off-range";
 import { offRangeRefusal, offSpans } from "./off-range";
-import { diarySeatsAdded } from "./staff-seats";
+import { diarySeatDelta } from "./staff-seats";
 
 const DAY = 86_400_000;
 /** How far back a person's read carries time off and extra hours. */
@@ -258,18 +258,14 @@ export class StaffService {
 
         const created = await this.guardLink(() =>
             prisma.$transaction(async (tx) => {
-                // Everyone who takes bookings uses a team seat, with a
-                // login or without (DEC-105, UX-053).
+                // Someone who takes bookings with no login uses a team
+                // seat of their own (DEC-111, UX-053); a team member's is
+                // theirs already (DEC-155).
                 await planMeter.roomInTx(tx, ctx.organizationId, "members", {
-                    adding: await diarySeatsAdded(
-                        tx,
-                        ctx.organizationId,
-                        null,
-                        {
-                            status: "ACTIVE",
-                            membershipId: dto.membershipId ?? null,
-                        },
-                    ),
+                    adding: diarySeatDelta(null, {
+                        status: "ACTIVE",
+                        membershipId: dto.membershipId ?? null,
+                    }),
                 });
                 // Whoever is on the diary can be given a login as Calendar
                 // only (#868): the business has the role from its first.
@@ -312,9 +308,8 @@ export class StaffService {
     /**
      * "It's just me": the caller on the diary as themselves, linked to
      * their own membership, which is read from the session and never sent.
-     * A team member who can change services already uses a team seat, so
-     * taking bookings adds none and no plan limit is asked (DEC-105,
-     * `staff-seats.ts`). Someone who was on it and archived comes back as
+     * A team member already uses a team seat, so taking bookings adds
+     * none and no plan limit is asked (DEC-155, `staff-seats.ts`). Someone who was on it and archived comes back as
      * they were, given the week and services sent only where they had
      * none; someone already on it is answered as they are.
      */
@@ -390,15 +385,10 @@ export class StaffService {
         };
         await this.guardLink(() =>
             prisma.$transaction(async (tx) => {
-                // Back from archived, or unlinked from a login: a team seat
-                // again (DEC-105, UX-053). Freeing one never asks.
+                // Back from archived with no login, or unlinked from one: a
+                // team seat again (DEC-111, UX-053). Freeing one never asks.
                 await planMeter.roomInTx(tx, ctx.organizationId, "members", {
-                    adding: await diarySeatsAdded(
-                        tx,
-                        ctx.organizationId,
-                        person,
-                        after,
-                    ),
+                    adding: diarySeatDelta(person, after),
                 });
                 return tx.staffMember.update({
                     where: { id: person.id },

@@ -253,23 +253,11 @@ const input: CatalogInput = {
             name: "Team members",
             group: "team",
             pricing: "show",
-            what: "People who can change things, and everyone who takes bookings, with a login or without. View-only people use no seat.",
+            what: "Everyone in your business, whatever their role, and everyone who takes bookings, with a login or without.",
             cells: {
                 free: C("2", "2 team members", 2),
                 grow: C("4", "4 team members", 4),
                 pro: C("200", "200 team members", 200),
-            },
-        },
-        {
-            id: "reviewers",
-            name: "View-only people",
-            group: "team",
-            pricing: "show",
-            what: "People who can only look and approve, never change anything. They use no team seat.",
-            cells: {
-                free: C("1", "", 1),
-                grow: C("3", "", 3),
-                pro: C("100", "", 100),
             },
         },
         {

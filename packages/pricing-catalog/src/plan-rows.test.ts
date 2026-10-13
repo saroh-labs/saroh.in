@@ -81,7 +81,6 @@ describe("plan keys", () => {
                 "products",
                 "qr-branding",
                 "review",
-                "reviewers",
                 "reviews",
                 "roles",
                 "saroh-emails",

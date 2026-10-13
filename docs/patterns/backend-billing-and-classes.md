@@ -119,8 +119,9 @@ moving back up restores everything at once.
   pauses); fails open (`over_limit_unresolved`).
 - **The order** (the owner can't pick): team — the owner always, then team
   members and diary people with no login by when they joined
-  (`Membership.createdAt`), then open invitations, against `members`;
-  view-only people against `reviewers` (DEC-105, DEC-111). Products and
+  (`Membership.createdAt`), then open invitations, against `members`.
+  Everyone counts, a Reviewer like anyone else, and a limit of one keeps the
+  owner alone (DEC-155, DEC-111). Products and
   blog posts — the newest by `createdAt` stay (a `Cut`: the oldest kept,
   spread as `keptByCut` into a read). Locations (`SHOP` only, DEC-109) and
   websites (DEC-094) — the first made stay.

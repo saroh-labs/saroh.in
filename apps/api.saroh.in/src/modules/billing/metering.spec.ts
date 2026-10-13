@@ -14,10 +14,9 @@ const tx = {
     order: { count: jest.fn() },
     booking: { count: jest.fn() },
     post: { count: jest.fn() },
-    membership: { findMany: jest.fn() },
+    membership: { count: jest.fn() },
     staffMember: { count: jest.fn() },
     organizationInvitation: { findMany: jest.fn() },
-    organizationRole: { findMany: jest.fn() },
     merchantPaymentProvider: { count: jest.fn() },
     communicationProvider: { count: jest.fn() },
     businessProfile: { findUnique: jest.fn() },
@@ -58,7 +57,10 @@ import {
 import type { CatalogueAccessService } from "./catalogue-access.service";
 import {
     bytesToGb,
+    type countSeats,
     countUsage,
+    isMeteredLimitKey,
+    METERED_LIMIT_KEYS,
     meteredKeyOf,
     meteredModules,
     monthFirstDay,
@@ -139,7 +141,6 @@ describe("which rows metering counts", () => {
             blog: "blogPosts",
             products: "products",
             orders: "ordersPerMonth",
-            reviewers: "reviewers",
             bookings: "bookingsPerMonth",
             members: "teamMembers",
             integrations: "integrations",
@@ -150,6 +151,13 @@ describe("which rows metering counts", () => {
             "saroh-emails": "sarohEmailsPerMonth",
         });
         expect(meteredKeyOf("roles")).toBeNull();
+    });
+
+    it("counts nothing of its own for people who only look (DEC-155)", () => {
+        // The row a catalogue published before may still carry.
+        expect(meteredKeyOf("reviewers")).toBeNull();
+        expect(isMeteredLimitKey("reviewers")).toBe(false);
+        expect(METERED_LIMIT_KEYS).not.toContain("reviewers");
     });
 });
 
@@ -210,32 +218,19 @@ describe("what each count asks", () => {
         });
     });
 
-    /** People as `SEAT_MEMBER_SELECT` reads them. */
-    const person = (
-        role: string,
-        extraActions: string[] = [],
-        staff = false,
-    ) => ({
-        role,
-        extraActions,
-        staffMember: staff ? { status: "ACTIVE" } : null,
-    });
+    /** Who is on the team: how many people, their invites, the diary. */
     const team = (
-        members: ReturnType<typeof person>[],
-        invites: string[] = [],
-        roles: { key: string; actions: string[] }[] = [],
+        members: number,
+        invites: Parameters<typeof countSeats>[1] = [],
         loginless = 0,
     ) => {
-        tx.membership.findMany.mockResolvedValue(members);
+        tx.membership.count.mockResolvedValue(members);
         tx.staffMember.count.mockResolvedValue(loginless);
-        tx.organizationInvitation.findMany.mockResolvedValue(
-            invites.map((role) => ({ role })),
-        );
-        tx.organizationRole.findMany.mockResolvedValue(roles);
+        tx.organizationInvitation.findMany.mockResolvedValue(invites);
     };
 
     it("adds open invitations to the people in the business", async () => {
-        team([person("OWNER"), person("MEMBER")], ["ADMIN"]);
+        team(2, [{}]);
         expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
             3,
         );
@@ -245,61 +240,35 @@ describe("what each count asks", () => {
                 status: "PENDING",
                 expiresAt: { gt: now },
             },
-            // With the diary person an invite names (#868).
+            // With the diary person an invite names (#868), and no role.
             select: {
-                role: true,
                 staffMember: { select: { status: true, membershipId: true } },
             },
         });
     });
 
-    // DEC-105: classified by permissions, never by the role's name.
-    it("counts a seat for anyone who can change something, view-only people apart", async () => {
-        const roles = [
-            { key: "looker", actions: ["order:read", "contact:read"] },
-            { key: "front-desk", actions: ["booking:write"] },
-        ];
-        team(
-            [
-                person("OWNER"),
-                person("REVIEWER"),
-                person("looker"),
-                person("front-desk"),
-            ],
-            ["looker", "REVIEWER", "front-desk"],
-            roles,
-        );
-        // Owner and the booking role (a person and an invite).
+    // DEC-155: everyone uses a seat, whatever their role. The count asks
+    // for every membership, with no filter on the role and no role read.
+    it("counts every person in the business, Reviewers and other view-only roles too", async () => {
+        // Say an Owner, a Reviewer, someone at a role that only looks and
+        // a Member, with an invite open for each kind.
+        team(4, [{}, {}, {}]);
         expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
-            3,
+            7,
         );
-        // Reviewer and the view-only role, people and invites both.
-        expect(await countUsage(tx as never, "org", "reviewers", now)).toBe(4);
-    });
-
-    it("gives a seat to a view-only person who takes bookings or holds a write extra", async () => {
-        const roles = [{ key: "looker", actions: ["booking:read"] }];
-        team(
-            [
-                person("looker", [], true),
-                person("looker", ["booking:write"]),
-                person("looker"),
-            ],
-            [],
-            roles,
-        );
-        expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
-            2,
-        );
-        expect(await countUsage(tx as never, "org", "reviewers", now)).toBe(1);
+        expect(tx.membership.count).toHaveBeenCalledWith({
+            where: { organizationId: "org" },
+        });
     });
 
     // UX-053: someone on the diary with no login takes bookings, so uses a
     // seat; one who is a team member counts once, through their membership.
     it("gives a seat to each bookable person with no login, and never twice", async () => {
-        team([person("OWNER"), person("REVIEWER", [], true)], [], [], 2);
+        const loginless = { status: "ACTIVE", membershipId: null };
+        // The invite that gives one of them a login is that person (#868).
+        team(2, [{ staffMember: loginless }, { staffMember: null }], 2);
         expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
-            4,
+            5,
         );
         expect(tx.staffMember.count).toHaveBeenCalledWith({
             where: {
@@ -308,10 +277,6 @@ describe("what each count asks", () => {
                 membershipId: null,
             },
         });
-        // Never view-only.
-        tx.staffMember.count.mockClear();
-        expect(await countUsage(tx as never, "org", "reviewers", now)).toBe(0);
-        expect(tx.staffMember.count).not.toHaveBeenCalled();
     });
 
     it("counts only live locations customers visit", async () => {
@@ -779,13 +744,9 @@ describe("MeteringService", () => {
 
     it("checks on the write's own transaction with it on", async () => {
         const { meter } = meterFor("free");
-        tx.membership.findMany.mockResolvedValue([
-            { role: "OWNER", extraActions: [], staffMember: null },
-            { role: "MEMBER", extraActions: [], staffMember: null },
-        ]);
+        tx.membership.count.mockResolvedValue(2);
         tx.staffMember.count.mockResolvedValue(0);
         tx.organizationInvitation.findMany.mockResolvedValue([]);
-        tx.organizationRole.findMany.mockResolvedValue([]);
         const write = jest.fn(() => Promise.resolve("done"));
         await expect(meter.withRoom("org", "members", write)).rejects.toThrow(
             ForbiddenException,

@@ -198,7 +198,7 @@ describe("inviting someone on the diary (#868)", () => {
         ).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it("lists the invite as that person, on a seat, counted on the diary", async () => {
+    it("lists the invite as that person, counted on the diary", async () => {
         db.organizationInvitation!.findMany!.mockResolvedValue([
             {
                 id: "inv_1",
@@ -214,7 +214,6 @@ describe("inviting someone on the diary (#868)", () => {
         const [invite] = await service.listInvitations(owner);
         expect(invite).toMatchObject({
             roleKey: "calendar-only",
-            usesSeat: true,
             countedOnDiary: true,
             staff: { id: "staff_priya", name: "Priya" },
         });

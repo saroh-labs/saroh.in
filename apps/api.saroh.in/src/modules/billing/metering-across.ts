@@ -10,14 +10,12 @@ import type { MeterDb, MeteredLimitKey } from "./metering";
 import {
     bytesToGb,
     countedSarohEmails,
-    countSeatKind,
+    countSeats,
     loginlessStaff,
     monthFirstDay,
     monthWindow,
     openInvitations,
     SEAT_INVITE_SELECT,
-    SEAT_MEMBER_SELECT,
-    seatKindCounted,
     SHOP_KIND,
     siteViewTotals,
     standingBookings,
@@ -221,14 +219,13 @@ export async function countUsageAcross(
             }
             return out;
         }
-        case "teamMembers":
-        case "reviewers": {
-            // The same classification as `countUsage` (DEC-105), per business.
-            const kind = seatKindCounted(key);
-            const [members, invites, roles, loginless] = await Promise.all([
-                db.membership.findMany({
+        case "teamMembers": {
+            // The same count as `countUsage` (DEC-155), per business.
+            const [members, invites, loginless] = await Promise.all([
+                db.membership.groupBy({
+                    by: ["organizationId"],
                     where: { organizationId: { in: ids } },
-                    select: { organizationId: true, ...SEAT_MEMBER_SELECT },
+                    _count: { _all: true },
                 }),
                 db.organizationInvitation.findMany({
                     where: {
@@ -237,33 +234,22 @@ export async function countUsageAcross(
                     },
                     select: { organizationId: true, ...SEAT_INVITE_SELECT },
                 }),
-                db.organizationRole.findMany({
-                    where: { organizationId: { in: ids } },
-                    select: { organizationId: true, key: true, actions: true },
+                db.staffMember.groupBy({
+                    by: ["organizationId"],
+                    where: {
+                        organizationId: { in: ids },
+                        ...loginlessStaff(),
+                    },
+                    _count: { _all: true },
                 }),
-                kind === "seat"
-                    ? db.staffMember.groupBy({
-                          by: ["organizationId"],
-                          where: {
-                              organizationId: { in: ids },
-                              ...loginlessStaff(),
-                          },
-                          _count: { _all: true },
-                      })
-                    : [],
             ]);
-            const loginlessOf = new Map(
-                loginless.map((r) => [r.organizationId, r._count._all]),
-            );
-            const rolesOf = byOrganization(roles);
-            const membersOf = byOrganization(members);
+            const membersOf = tally(members, "organizationId");
+            const loginlessOf = tally(loginless, "organizationId");
             const invitesOf = byOrganization(invites);
             const out = new Map<string, number>();
             for (const id of ids) {
-                const n = countSeatKind(
-                    kind,
-                    rolesOf.get(id) ?? [],
-                    membersOf.get(id) ?? [],
+                const n = countSeats(
+                    membersOf.get(id) ?? 0,
                     invitesOf.get(id) ?? [],
                     loginlessOf.get(id) ?? 0,
                 );

@@ -1,6 +1,5 @@
 import { CALENDAR_ONLY_ACTIONS as STORED_ACTIONS } from "@saroh/database";
 
-import { seatOf, VIEW_ONLY_ACTIONS } from "../billing/seats";
 import { mayTakeDeskPayment } from "../bookings/booking-access";
 import {
     CALENDAR_ONLY_ACTIONS,
@@ -82,16 +81,8 @@ describe("the Calendar only role (#868)", () => {
         expect(unstored.has("contact:read")).toBe(false);
     });
 
-    it("uses a team seat: it changes bookings (DEC-105)", () => {
+    it("changes bookings: the diary is theirs to work", () => {
         expect(resolved.has("booking:write")).toBe(true);
-        expect(VIEW_ONLY_ACTIONS.has("booking:write")).toBe(false);
-        const roles = new Map([
-            [CALENDAR_ONLY_ROLE_KEY, [...CALENDAR_ONLY_ACTIONS]],
-        ]);
-        expect(seatOf(roles, CALENDAR_ONLY_ROLE_KEY)).toBe("seat");
-        // Even an owner who trims it to looking: they take bookings.
-        const trimmed = new Map([[CALENDAR_ONLY_ROLE_KEY, ["booking:read"]]]);
-        expect(seatOf(trimmed, CALENDAR_ONLY_ROLE_KEY, [], true)).toBe("seat");
     });
 
     it("is judged by the policy on its own key", () => {

@@ -45,13 +45,6 @@ export interface OrganizationMember {
      * Absent from an older API.
      */
     extraActions?: string[];
-    /**
-     * They use a team seat (DEC-105): their role or extras can change
-     * something, or they take bookings. False for someone who only looks,
-     * who counts toward the plan's view-only people. Absent from an older
-     * API.
-     */
-    usesSeat?: boolean;
 }
 
 export interface MemberStorefront {
@@ -78,11 +71,6 @@ export interface OrganizationInvitation {
     status: string;
     expiresAt: string;
     createdAt: string;
-    /**
-     * The role invited to uses a team seat (DEC-105); false for one that
-     * only looks. Absent from an older API.
-     */
-    usesSeat?: boolean;
     /** The person on the diary it gives a login to (#868), if any. */
     staff?: { id: string; name: string } | null;
     /**

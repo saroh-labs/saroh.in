@@ -111,19 +111,11 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: "storageGb",
         legacyEntitlementKey: null,
     },
+    /** Everyone in the business, whatever their role (DEC-155). */
     members: {
         registry: null,
         limitKey: "teamMembers",
         legacyEntitlementKey: "teamMembers",
-    },
-    /**
-     * Reviewers only read, comment on and approve the sites they're invited to
-     * (DEC-006): they use no team seat, but a plan caps how many.
-     */
-    reviewers: {
-        registry: null,
-        limitKey: "reviewers",
-        legacyEntitlementKey: null,
     },
     roles: { registry: null, limitKey: null, legacyEntitlementKey: null },
     integrations: {
@@ -162,6 +154,16 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         legacyEntitlementKey: null,
     },
 };
+
+/**
+ * Rows the product no longer sells, which a snapshot published before may
+ * still carry. Read out of every snapshot (`catalogSchema`), so an old
+ * version shows, counts and enforces nothing for them.
+ *
+ * - `reviewers`: the separate allowance for people who only look. Everyone
+ *   uses one team seat now, on `members` (DEC-155).
+ */
+export const RETIRED_MODULE_IDS: ReadonlySet<string> = new Set(["reviewers"]);
 
 /**
  * The catalogue rows that sit under one registry module, in `MODULE_MAP`'s

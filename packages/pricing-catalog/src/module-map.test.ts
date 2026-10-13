@@ -5,6 +5,7 @@ import {
     catalogueModulesFor,
     MODULE_MAP,
     moduleForLegacyKey,
+    RETIRED_MODULE_IDS,
 } from "./module-map";
 
 describe("module map (KTD-8)", () => {
@@ -36,8 +37,13 @@ describe("module map (KTD-8)", () => {
         expect(MODULE_MAP.sites.limitKey).toBe("sites");
         expect(MODULE_MAP.storage.limitKey).toBe("storageGb");
         expect(MODULE_MAP.visits.limitKey).toBe("visitsPerMonth");
-        // Reviewers use no team seat, but have their own cap.
-        expect(MODULE_MAP.reviewers.limitKey).toBe("reviewers");
+        // Everyone uses a team seat (DEC-155): no row of their own for
+        // people who only look, and the old one reads as retired.
+        expect(MODULE_MAP.members.limitKey).toBe("teamMembers");
+        expect(MODULE_MAP.reviewers).toBeUndefined();
+        expect(RETIRED_MODULE_IDS.has("reviewers")).toBe(true);
+        for (const id of Array.from(RETIRED_MODULE_IDS))
+            expect(MODULE_MAP[id]).toBeUndefined();
         // Invoicing needs no module (DEC-070), so nothing it governs can lock.
         expect(MODULE_MAP.invoicing.registry).toBeNull();
         // Saroh's emails (DEC-086) count, but never gate Communications.
