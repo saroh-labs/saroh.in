@@ -7,7 +7,7 @@
  * after closing, suspended accounts, and "If there's a breach"; the QR code
  * maker's email, 10 Oct, is NOT YET in the owner's doc: a minimal factual
  * addition for the owner to review; the referral code cookie, 13 Oct
- * (DEC-156), the owner's agreed sentence, also not yet in the doc). Published VERBATIM at
+ * (DEC-156), the owner's agreed sentence, rev 74). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *

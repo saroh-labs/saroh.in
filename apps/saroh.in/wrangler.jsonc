@@ -56,6 +56,11 @@
         "DEV_REDIRECT_ORIGIN": "https://saroh.in",
         "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
         "RESOURCES_PREVIEW": "1",
+        // The site as it will be after early access opens ("Start free",
+        // Sign in, Pricing), so launch is rehearsed here first. Production
+        // opens by LAUNCH_AT below; this environment is behind the access
+        // key either way.
+        "NEXT_PUBLIC_LAUNCH_MODE": "open",
         // The Templates gallery's switch (DEC-135): "on" here. Production
         // leaves it out, which is off: no /templates and no link to it.
         "NEXT_PUBLIC_TEMPLATES": "on",
