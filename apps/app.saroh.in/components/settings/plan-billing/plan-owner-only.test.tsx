@@ -239,6 +239,7 @@ const addons: AddonRow[] = [
         total: "",
         isModule: false,
         quantity: 1,
+        max: 5,
         available: true,
         why: null,
     },
@@ -249,6 +250,7 @@ const addons: AddonRow[] = [
         total: "",
         isModule: true,
         quantity: 0,
+        max: 1,
         available: true,
         why: null,
     },
@@ -256,7 +258,7 @@ const addons: AddonRow[] = [
 
 const addonsCard = (canChange: boolean) =>
     renderToStaticMarkup(
-        <AddonsCard rows={addons} sum="" max={5} canChange={canChange} />,
+        <AddonsCard rows={addons} sum="" canChange={canChange} />,
     );
 
 describe("add-ons, read without billing:manage", () => {
@@ -273,6 +275,23 @@ describe("add-ons, read without billing:manage", () => {
         expect(all).toHaveLength(3);
         for (const button of all) {
             expect(button).not.toContain('disabled=""');
+        }
+    });
+
+    it("stops More at the add-on's own maximum, and never Fewer (DEC-157)", () => {
+        // Held above a maximum that came down since: kept, and no more.
+        for (const quantity of [5, 7]) {
+            const html = renderToStaticMarkup(
+                <AddonsCard
+                    rows={addons.slice(0, 1).map((a) => ({ ...a, quantity }))}
+                    sum=""
+                    canChange
+                />,
+            );
+            const [fewer, more] = buttons(html);
+            expect(fewer).not.toContain('disabled=""');
+            expect(more).toContain('disabled=""');
+            expect(html).toContain(`>${quantity}<`);
         }
     });
 });

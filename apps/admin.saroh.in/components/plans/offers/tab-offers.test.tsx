@@ -137,6 +137,90 @@ describe("the Offers tab", () => {
         ).toHaveProperty("disabled", true);
     });
 
+    it("sets the plans an add-on is offered on and the most a business can hold (DEC-157)", async () => {
+        vi.useFakeTimers();
+        draw();
+        const panel = screen.getByRole("region", { name: "Add-ons" });
+        fireEvent.click(
+            within(panel).getByRole("button", { name: /Add products/ }),
+        );
+        const plans = within(panel).getByRole("group", {
+            name: "Plans Extra products is offered on",
+        });
+        const chip = (name: string) =>
+            within(plans).getByRole("button", { name });
+        expect(chip("Every plan").getAttribute("aria-pressed")).toBe("true");
+        expect(within(panel).getByText("On every plan, up to 99 a business"));
+
+        fireEvent.click(chip("Plan C"));
+        fireEvent.click(chip("Plan B"));
+        expect(chip("Every plan").getAttribute("aria-pressed")).toBe("false");
+        expect(chip("Plan B").getAttribute("aria-pressed")).toBe("true");
+        const most = within(panel).getByLabelText("At most");
+        fireEvent.focus(most);
+        fireEvent.change(most, { target: { value: "4" } });
+        fireEvent.blur(most);
+        expect(
+            within(panel).getByText("On Plan B and Plan C, up to 4 a business"),
+        ).toBeTruthy();
+        expect(
+            screen.getByText(/New add-on: Extra products on Plan B and Plan C/),
+        ).toBeTruthy();
+
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        const sent = () =>
+            (
+                actions.savePricingDraftAction.mock.calls.at(-1)?.[0] as {
+                    catalog: { addons: Record<string, unknown>[] };
+                }
+            ).catalog.addons[0];
+        // In catalogue order, whatever order they were ticked in.
+        expect(sent()).toMatchObject({ plans: ["b", "c"], max: 4 });
+
+        // Every plan and the ceiling are said by leaving them out.
+        fireEvent.click(chip("Every plan"));
+        fireEvent.focus(most);
+        fireEvent.change(most, { target: { value: "99" } });
+        fireEvent.blur(most);
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        expect(sent()).not.toHaveProperty("plans");
+        expect(sent()).not.toHaveProperty("max");
+    });
+
+    it("warns where two add-ons for the same thing share a plan", () => {
+        draw();
+        const panel = screen.getByRole("region", { name: "Add-ons" });
+        const add = () =>
+            fireEvent.click(
+                within(panel).getByRole("button", { name: /Add products/ }),
+            );
+        add();
+        // Every plan is taken, so a second one clashes until one is narrowed.
+        add();
+        expect(
+            within(panel).getAllByText(
+                "Plan A already has Extra products. A plan takes one of them.",
+            ),
+        ).toHaveLength(2);
+        const [first] = within(panel).getAllByRole("group", {
+            name: "Plans Extra products is offered on",
+        });
+        if (!first) throw new Error("expected an add-on row");
+        fireEvent.click(within(first).getByRole("button", { name: "Plan A" }));
+        expect(
+            within(panel).queryAllByText(/A plan takes one of them/),
+        ).toHaveLength(2);
+        const rows = within(panel).getAllByRole("group", {
+            name: "Plans Extra products is offered on",
+        });
+        const second = rows.at(1);
+        if (!second) throw new Error("expected a second add-on row");
+        fireEvent.click(within(second).getByRole("button", { name: "Plan B" }));
+        expect(
+            within(panel).queryByText(/A plan takes one of them/),
+        ).toBeNull();
+    });
+
     it("draws read-only without pricing:edit", () => {
         draw({
             access: {

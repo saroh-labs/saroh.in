@@ -1,7 +1,10 @@
 import type { BillingCheckout, Prisma } from "@saroh/database";
 import type { Addon, BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import {
+    addonMaxQuantity,
+    addonOfferedOn,
     cellOf,
+    MAX_ADDON_QUANTITY,
     trialFirstPaise,
     validateCatalog,
 } from "@saroh/pricing-catalog";
@@ -22,8 +25,8 @@ type Db = Pick<Tx, "pricingCatalogVersion">;
 export const TRIAL_ENDING_NOTICE_DAYS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The most of one add-on a business can hold. */
-export const MAX_ADDON_QUANTITY = 99;
+/** The most of one add-on a business can hold; an add-on may set less. */
+export { MAX_ADDON_QUANTITY };
 
 const parsed = new Map<string, Catalog>();
 
@@ -109,9 +112,13 @@ export function trialNoticeAt(endsAt: Date, now: Date): Date {
 // ── Add-ons ────────────────────────────────────────────────────────────
 
 /**
- * Why an add-on can't be held on a plan, or null when it can: a module
+ * Why an add-on can't be held on a plan, or null when it can: only on a
+ * plan it is offered on and up to its own maximum (DEC-157); a module
  * add-on only where the plan leaves its module out (and one of it), a pack
  * or unit only where the plan has a cap on what it raises.
+ *
+ * This is asked when more is bought. What is already held is never judged
+ * by it: a maximum lowered since leaves a holding as it is.
  */
 export function addonProblem(
     catalog: Catalog,
@@ -127,6 +134,9 @@ export function addonProblem(
         return `Choose from 0 to ${MAX_ADDON_QUANTITY}.`;
     }
     const planName = catalog.plans.find((p) => p.id === planId)?.name ?? "";
+    if (!addonOfferedOn(addon, planId)) {
+        return `${addon.name} isn't offered on ${planName || "your plan"}.`;
+    }
     if (addon.kind === "module") {
         const mod = catalog.modules.find((m) => m.id === addon.module);
         if (!mod) return `${addon.name} isn't offered.`;
@@ -143,6 +153,10 @@ export function addonProblem(
     }
     if (cell.limit === null) {
         return `${planName} has no cap on ${mod.name}.`;
+    }
+    const max = addonMaxQuantity(addon);
+    if (quantity > max) {
+        return `You can have up to ${max} of ${addon.name} on ${planName}.`;
     }
     return null;
 }

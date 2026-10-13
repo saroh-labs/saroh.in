@@ -674,6 +674,25 @@ describe("addonRows", () => {
         ).toBe("2 × · ₹222 a month");
     });
 
+    it("says the plan's own maximum, and keeps what is held above it (DEC-157)", () => {
+        // None of its own: the ceiling, and nothing said.
+        expect(addonRows(view())[0]).toMatchObject({
+            max: 20,
+            line: "+100 products for ₹111 a month",
+        });
+        expect(addonRows(view({ max: 4 }))[0]).toMatchObject({
+            max: 4,
+            line: "+100 products for ₹111 a month, up to 4",
+        });
+        expect(
+            addonRows(view({ max: 4, mode: "unit", kind: "members" }))[0].line,
+        ).toBe("₹111 a month per team member, up to 4");
+        // Held from before the maximum came down: shown as held.
+        expect(
+            addonRows(view({ max: 4, quantity: 6, heldPaise: 66_600 }))[0],
+        ).toMatchObject({ quantity: 6, max: 4, total: "6 × · ₹666 a month" });
+    });
+
     it("leaves out one the plan can't take unless it's held", () => {
         expect(addonRows(view({ available: false }))).toEqual([]);
         expect(

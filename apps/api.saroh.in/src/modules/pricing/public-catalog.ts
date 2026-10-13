@@ -8,7 +8,8 @@ import type { Catalog } from "@saroh/pricing-catalog";
  * - `catalog` is a full snapshot (`@saroh/pricing-catalog` `Catalog`, amounts
  *   in paise) with everything a visitor must not see taken out: retired
  *   plans, modules hidden from the pricing page, the add-ons that hang on
- *   those modules, and the dashboard rail wiring (`menu`/`child`). It still
+ *   those modules or are offered only on retired plans, and the dashboard
+ *   rail wiring (`menu`/`child`). It still
  *   passes `catalogSchema`, so saroh.in can `parseCatalog` it and run
  *   `cardLines`, `planPricePaise` and the rest on it unchanged.
  * - `version` and `goLiveAt` name the published version; both are null on a
@@ -40,9 +41,17 @@ export function publicCatalog(c: Catalog): Catalog {
             return { ...rest, cells };
         });
     const moduleIds = new Set(modules.map((m) => m.id));
-    const addons = c.addons.filter((a) =>
-        moduleIds.has(a.kind === "module" ? (a.module ?? "") : a.kind),
-    );
+    const addons = c.addons
+        .filter((a) =>
+            moduleIds.has(a.kind === "module" ? (a.module ?? "") : a.kind),
+        )
+        // An add-on names only plans a visitor can see; one whose plans are
+        // all retired goes with them, never onto every plan (DEC-157).
+        .flatMap((a) => {
+            if (!a.plans?.length) return [a];
+            const shown = a.plans.filter((id) => planIds.has(id));
+            return shown.length ? [{ ...a, plans: shown }] : [];
+        });
     const groupIds = new Set(modules.map((m) => m.group));
     return {
         plans,

@@ -40,12 +40,17 @@ export interface RemovedPlan {
     plan: Plan;
     index: number;
     cells: Record<string, Cell>;
+    /** The add-ons as they were, where any named this plan. */
+    addons?: Addon[];
 }
 
 /**
  * Remove a plan that isn't live yet, with its cells. A live plan is retired
  * instead (its businesses stay on it), so this refuses one; and the last
  * plan stays, since a catalogue needs one. Returns what it took, or null.
+ *
+ * An add-on that named the plan stops naming it; one that named only this
+ * plan goes with it, since naming none would put it on every plan.
  */
 export function removePlan(
     catalog: Catalog,
@@ -70,7 +75,16 @@ export function removePlan(
         }
     }
     catalog.plans.splice(index, 1);
-    return { plan, index, cells };
+    if (!catalog.addons.some((a) => a.plans?.includes(planId))) {
+        return { plan, index, cells };
+    }
+    const addons = catalog.addons;
+    catalog.addons = addons.flatMap((a) => {
+        if (!a.plans?.includes(planId)) return [a];
+        const plans = a.plans.filter((id) => id !== planId);
+        return plans.length > 0 ? [{ ...a, plans }] : [];
+    });
+    return { plan, index, cells, addons };
 }
 
 /** Undo `removePlan`: the plan back at its place, with its cells. */
@@ -85,6 +99,14 @@ export function restorePlan(catalog: Catalog, removed: RemovedPlan): void {
         if (m.id in removed.cells)
             m.cells[removed.plan.id] = removed.cells[m.id];
     }
+    // Each add-on that named the plan names it again; one that went with
+    // it is back at its place. Anything edited since is kept as it is now.
+    removed.addons?.forEach((was, i) => {
+        if (!was.plans?.includes(removed.plan.id)) return;
+        const now = catalog.addons.find((a) => a.id === was.id);
+        if (now) now.plans = was.plans;
+        else catalog.addons.splice(Math.min(i, catalog.addons.length), 0, was);
+    });
 }
 
 /** What removing a module took, so Undo can put it back where it was. */

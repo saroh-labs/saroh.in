@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { edit, fixture, fixtureInput } from "./catalog.fixture";
 import {
+    addonMaxQuantity,
+    addonOfferedOn,
+    addonPlanNames,
     catalogSchema,
     cellOf,
+    MAX_ADDON_QUANTITY,
+    parseCatalog,
     trialFirstPaise,
     validateCatalog,
 } from "./schema";
@@ -148,6 +153,96 @@ describe("the catalogue schema", () => {
             a[0] = { ...a[0], mode: "bulk" };
         });
         expect(errorsOf(badMode).length).toBeGreaterThan(0);
+    });
+
+    it("offers an add-on on every plan unless it names some (DEC-157)", () => {
+        const c = fixture();
+        const [things, person, , personC] = c.addons;
+        expect(c.plans.every((p) => addonOfferedOn(things, p.id))).toBe(true);
+        expect(addonOfferedOn({ plans: [] }, "a")).toBe(true);
+        expect(c.plans.filter((p) => addonOfferedOn(person, p.id))).toEqual([
+            c.plans[1],
+        ]);
+        expect(addonPlanNames(c, things)).toBe("");
+        expect(addonPlanNames(c, personC)).toBe("Plan C");
+        expect(addonPlanNames(c, { plans: ["c", "a", "b"] })).toBe(
+            "Plan A, Plan B and Plan C",
+        );
+        expect(addonMaxQuantity(things)).toBe(MAX_ADDON_QUANTITY);
+        expect(addonMaxQuantity(person)).toBe(4);
+    });
+
+    it("rejects an add-on's unknown plan and a maximum out of range", () => {
+        const withAddon = (patch: Record<string, unknown>) => {
+            const input = fixtureInput();
+            const addons = (input.addons ?? []) as Record<string, unknown>[];
+            addons[1] = { ...addons[1], ...patch };
+            return { ...input, addons };
+        };
+        expect(errorsOf(withAddon({ plans: ["b", "zz"] })).join()).toMatch(
+            /One more person is offered on an unknown plan: zz/,
+        );
+        for (const max of [0, -1, MAX_ADDON_QUANTITY + 1]) {
+            expect(errorsOf(withAddon({ max })).join()).toMatch(
+                /One more person's maximum must be from 1 to 99/,
+            );
+        }
+        expect(errorsOf(withAddon({ max: 1.5 })).length).toBeGreaterThan(0);
+        expect(errorsOf(withAddon({ max: 1 }))).toEqual([]);
+        expect(errorsOf(withAddon({ max: MAX_ADDON_QUANTITY }))).toEqual([]);
+    });
+
+    it("rejects two add-ons for the same thing on one plan", () => {
+        const withAddon = (i: number, patch: Record<string, unknown>) => {
+            const input = fixtureInput();
+            const addons = (input.addons ?? []) as Record<string, unknown>[];
+            addons[i] = { ...addons[i], ...patch };
+            return { ...input, addons };
+        };
+        // Both name Plan C.
+        expect(errorsOf(withAddon(1, { plans: ["b", "c"] })).join()).toMatch(
+            /One more person and One more person on C are both offered on Plan C; a plan takes one of them/,
+        );
+        // One names no plan, so it is on every plan the other names.
+        expect(errorsOf(withAddon(3, { plans: undefined })).join()).toMatch(
+            /both offered on Plan B/,
+        );
+        expect(errorsOf(withAddon(3, { plans: [] })).join()).toMatch(
+            /both offered on Plan B/,
+        );
+        // Module add-ons clash only over the same module.
+        const twoModules = fixtureInput();
+        twoModules.addons?.push({
+            id: "roles-alone",
+            kind: "module",
+            module: "roles",
+            name: "Roles",
+            pricePaise: 4_400,
+            mode: "pack",
+            qty: 1,
+        });
+        expect(errorsOf(twoModules)).toEqual([]);
+        twoModules.addons?.push({
+            id: "roles-again",
+            kind: "module",
+            module: "roles",
+            name: "Roles again",
+            pricePaise: 5_500,
+            mode: "pack",
+            qty: 1,
+            plans: ["a"],
+        });
+        expect(errorsOf(twoModules).join()).toMatch(
+            /Roles and Roles again are both offered on Plan A/,
+        );
+    });
+
+    it("still reads a snapshot written before add-ons named plans", () => {
+        const input = fixtureInput();
+        input.addons = input.addons?.slice(0, 1);
+        const c = parseCatalog(JSON.parse(JSON.stringify(input)));
+        expect(c.addons[0]).not.toHaveProperty("plans");
+        expect(c.addons[0]).not.toHaveProperty("max");
     });
 
     it("round-trips through JSON, as a version row stores it", () => {

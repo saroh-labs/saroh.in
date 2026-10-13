@@ -1,7 +1,11 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import { catalogPlanIdForKey, withGstPaise } from "@saroh/pricing-catalog";
+import {
+    addonOfferedOn,
+    catalogPlanIdForKey,
+    withGstPaise,
+} from "@saroh/pricing-catalog";
 
 import { billingMayCharge } from "../organizations/organization-lifecycle.policy";
 import type { AddonChargeLine } from "./offers";
@@ -32,6 +36,9 @@ type Tx = Prisma.TransactionClient;
  * - A plan change that hands billing to a new provider subscription takes
  *   its rows along (`rehomeInTx`); leaving for Free drops them
  *   (`clearInTx`) with the add-ons.
+ * - An add-on is held, counted and charged only on a plan it is offered on
+ *   (DEC-157): a change of plan ends the ones the new plan isn't offered
+ *   (`endAddonsNotOfferedInTx`), and the renewal charges none of them.
  *
  * Unverified provider behaviour is in `PRICING_ROLLOUT.md` (U16).
  */
@@ -130,7 +137,7 @@ export async function rollAddonChargesInTx(
         ? await catalogueOfVersion(tx, sub.plan.version)
         : null;
     const lines: AddonChargeLine[] = [];
-    if (catalog && sub.addons.length > 0) {
+    if (catalog && planId && sub.addons.length > 0) {
         const done = await tx.subscriptionAddonCharge.findMany({
             where: {
                 subscriptionId: sub.id,
@@ -145,6 +152,8 @@ export async function rollAddonChargesInTx(
             if (!addon || held.quantity <= 0 || already.has(addon.id)) {
                 continue;
             }
+            // Another plan's add-on adds nothing here, so it owes nothing.
+            if (!addonOfferedOn(addon, planId)) continue;
             lines.push(
                 addonPeriodLine(
                     addon,
@@ -218,6 +227,44 @@ export async function clearAddonsInTx(
         where: { subscriptionId, status: { in: ["QUEUED", "SENT"] } },
         data: { status: "DROPPED" },
     });
+}
+
+/**
+ * The subscription is on another plan now (an upgrade, a move applied):
+ * an add-on held that the new plan isn't offered ends with the old plan
+ * (DEC-157). The new plan's own add-on of that kind is never bought for the
+ * business; it chooses that in Settings › Plan. What a period already owes
+ * stays owed, as when an add-on is removed by hand. An add-on the plan's
+ * version doesn't have at all is left as it always was: held, and inert.
+ */
+export async function endAddonsNotOfferedInTx(
+    tx: Tx,
+    subscriptionId: string,
+): Promise<string[]> {
+    const sub = await tx.subscription.findUnique({
+        where: { id: subscriptionId },
+        select: {
+            plan: { select: { key: true, version: true } },
+            addons: { select: { addonId: true } },
+        },
+    });
+    if (!sub || sub.addons.length === 0) return [];
+    const planId = catalogPlanIdForKey(sub.plan.key);
+    const catalog = planId
+        ? await catalogueOfVersion(tx, sub.plan.version)
+        : null;
+    if (!catalog || !planId) return [];
+    const ended = sub.addons
+        .map((held) => held.addonId)
+        .filter((id) => {
+            const addon = catalog.addons.find((a) => a.id === id);
+            return addon !== undefined && !addonOfferedOn(addon, planId);
+        });
+    if (ended.length === 0) return [];
+    await tx.subscriptionAddon.deleteMany({
+        where: { subscriptionId, addonId: { in: ended } },
+    });
+    return ended;
 }
 
 /** The rows a charge at `chargedAt` took, for its invoice's lines. */

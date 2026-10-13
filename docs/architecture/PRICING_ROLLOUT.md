@@ -126,7 +126,8 @@ into access; `EntitlementService`, module availability and
   catalogue row or a live plan override. Otherwise (no row, no override) it
   reads `FREE_ENTITLEMENTS`.
 - **Then** its live overrides (plan, remove, grant, limit, raise) and the
-  add-ons on its subscription, read from the same version.
+  add-ons on its subscription, read from the same version: each one
+  offered on the plan it is billed on, for all that is held (DEC-157).
 - **The limit map** `check`/`can` read: every catalogue row by id (its cap,
   `true`, or `false`), a row's legacy key beside it (`teamMembers`), and the
   keys no row sells — from the business's own legacy row while it is still on
@@ -305,6 +306,19 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   billed through the provider, trialing or paid up; definitions from the
   plan's own version; a module add-on only where the plan leaves the module
   out, a pack only where the plan caps what it raises. Limits move at once.
+  **Per plan (DEC-157):** an add-on may name the plans it is offered on
+  (`plans`; none named is every plan) and the most a business may hold
+  (`max`; none is `MAX_ADDON_QUANTITY`), both set in Admin › Plans ›
+  Offers. A price that differs by plan is two add-ons of one kind, each
+  naming its plans; the catalogue refuses two of a kind on one plan. A
+  business is listed, sold, counted and charged only the add-ons its plan
+  is offered. More than the maximum is refused; what is already held above
+  a maximum set since is kept, counted and charged, and only buying more
+  is refused. A plan change (an upgrade, a move applied) ends the add-ons
+  the new plan isn't offered (`endAddonsNotOfferedInTx`) and buys nothing
+  in their place; what the period already owed is still charged. An
+  add-on whose id the new version doesn't have at all is left held and
+  inert, as before.
   Billed after the period, on the provider subscription's next charge
   (`SubscriptionAddonCharge`): bought part-way, what's left of the period
   (prorated); each later period, the whole of it for what's held at its

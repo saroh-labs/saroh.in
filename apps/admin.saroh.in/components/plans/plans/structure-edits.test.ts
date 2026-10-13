@@ -71,6 +71,41 @@ describe("taking back what was only in the draft", () => {
         expect(c.modules[0]?.cells[id]).toEqual({ inc: false, off: "hidden" });
     });
 
+    it("takes a removed plan off the add-ons that named it; Undo puts it back (DEC-157)", () => {
+        const live = tabCatalog();
+        const c = tabCatalog();
+        const id = addPlan(c, 1);
+        const addon = (aid: string, plans?: string[]) => ({
+            id: aid,
+            kind: "module" as const,
+            module: "things",
+            name: aid,
+            pricePaise: 0,
+            mode: "pack" as const,
+            qty: 1,
+            ...(plans ? { plans } : {}),
+        });
+        c.addons = [
+            addon("both", ["b", id]),
+            addon("only", [id]),
+            addon("other", ["c"]),
+        ];
+        const removed = removePlan(c, live, id);
+        if (!removed) throw new Error("expected the plan to go");
+        // Naming none would mean every plan, so the one left with none goes.
+        expect(c.addons.map((a) => [a.id, a.plans])).toEqual([
+            ["both", ["b"]],
+            ["other", ["c"]],
+        ]);
+        expect(validateCatalog(c).ok).toBe(true);
+        restorePlan(c, removed);
+        expect(c.addons.map((a) => [a.id, a.plans])).toEqual([
+            ["both", ["b", id]],
+            ["only", [id]],
+            ["other", ["c"]],
+        ]);
+    });
+
     it("never removes a live plan (it's retired instead) or the last one", () => {
         const live = tabCatalog();
         const c = tabCatalog();

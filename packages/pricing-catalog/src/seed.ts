@@ -367,7 +367,30 @@ const input: CatalogInput = {
     ],
     yearly: { on: true, paid: 10 },
     gst: { show: "excl" },
-    addons: [],
+    // One thing sold at a price and a maximum of its own on each plan
+    // (DEC-157). Made up, like every number here.
+    addons: [
+        {
+            id: "member-grow",
+            kind: "members",
+            name: "Extra team member",
+            pricePaise: 5_000,
+            mode: "unit",
+            qty: 1,
+            plans: ["grow"],
+            max: 3,
+        },
+        {
+            id: "member-pro",
+            kind: "members",
+            name: "Extra team member",
+            pricePaise: 4_000,
+            mode: "unit",
+            qty: 1,
+            plans: ["pro"],
+            max: 10,
+        },
+    ],
 };
 
 /** Version 1, validated. */

@@ -5,6 +5,8 @@ import { Container } from "../container";
 /** "Need a little more?": the catalogue's add-ons, only when it has some. */
 export function Addons({ addons }: { addons: AddonView[] }) {
     if (!addons.length) return null;
+    // Some are for one plan only: each card then says which.
+    const anyPlan = addons.every((a) => !a.on);
     return (
         <Container
             as="section"
@@ -19,7 +21,9 @@ export function Addons({ addons }: { addons: AddonView[] }) {
                     Need a little more?
                 </h2>
                 <p className="m-0 text-base text-mk-copy">
-                    Add to any plan, billed monthly with it.
+                    {anyPlan
+                        ? "Add to any plan, billed monthly with it."
+                        : "Add to your plan, billed monthly with it."}
                 </p>
             </div>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-3">
@@ -34,6 +38,11 @@ export function Addons({ addons }: { addons: AddonView[] }) {
                         <span className="text-[14.5px] text-mk-copy">
                             {a.line}
                         </span>
+                        {a.on ? (
+                            <span className="text-[13px] font-semibold text-mk-copy">
+                                On {a.on}
+                            </span>
+                        ) : null}
                     </div>
                 ))}
             </div>

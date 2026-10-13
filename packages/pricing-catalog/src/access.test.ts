@@ -315,6 +315,32 @@ describe("resolveAccess", () => {
             ).toBeNull();
         });
 
+        it("counts an add-on only on a plan it is offered on (DEC-157)", () => {
+            const held = [{ addonId: "one-person", quantity: 2 }];
+            expect(resolveAccess(on("b", [], held), "members").limit).toBe(5);
+            // Plan C has its own; Plan B's is nothing there.
+            expect(resolveAccess(on("c", [], held), "members")).toMatchObject({
+                limit: 33,
+                override: "",
+            });
+            expect(
+                resolveAccess(
+                    on("c", [], [{ addonId: "one-person-c", quantity: 2 }]),
+                    "members",
+                ).limit,
+            ).toBe(35);
+        });
+
+        it("keeps all that is held when the maximum is lower", () => {
+            // Six held where the add-on now allows four: still plan + six.
+            expect(
+                resolveAccess(
+                    on("b", [], [{ addonId: "one-person", quantity: 6 }]),
+                    "members",
+                ).limit,
+            ).toBe(9);
+        });
+
         it("ignores an add-on its version doesn't have", () => {
             expect(
                 resolveAccess(

@@ -1,6 +1,6 @@
 import { formatInr } from "./price";
 import type { Catalog } from "./schema";
-import { cellOf } from "./schema";
+import { addonPlanNames, cellOf } from "./schema";
 
 const PRICING_WORDS = {
     show: "shown",
@@ -158,9 +158,26 @@ function offersDiff(a: Catalog, b: Catalog): string[] {
     }
     for (const x of b.addons) {
         const o = a.addons.find((y) => y.id === x.id);
-        if (!o) out.push(`New add-on: ${x.name}`);
-        else if (JSON.stringify(o) !== JSON.stringify(x)) {
+        const on = addonPlanNames(b, x);
+        if (!o) {
+            out.push(`New add-on: ${x.name}${on ? ` on ${on}` : ""}`);
+            continue;
+        }
+        const { plans: wasPlans, max: wasMax, ...was } = o;
+        const { plans: nowPlans, max: nowMax, ...now } = x;
+        if (JSON.stringify(was) !== JSON.stringify(now)) {
             out.push(`Add-on changed: ${x.name}`);
+        }
+        const planKey = (ids?: string[]) => [...(ids ?? [])].sort().join();
+        if (planKey(wasPlans) !== planKey(nowPlans)) {
+            out.push(`${x.name}: offered on ${on || "every plan"}`);
+        }
+        if (wasMax !== nowMax) {
+            out.push(
+                nowMax === undefined
+                    ? `${x.name}: no maximum of its own`
+                    : `${x.name}: a business can hold up to ${nowMax}`,
+            );
         }
     }
     for (const x of a.addons) {
