@@ -7,6 +7,8 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ScrollX } from "@saroh/ui/scroll-x";
 import { Fragment, useMemo, useState } from "react";
 
+import { addKnownRow, knownRowsMissing } from "@/lib/pricing-starter";
+
 import { AddButton } from "../add-button";
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
@@ -97,6 +99,23 @@ export function TabModules() {
         setAdded(id);
     }
 
+    /** A row the product knows by id that this catalogue lacks (DEC-158). */
+    function addKnown(rowId: string) {
+        const made: { id: string | null; group: string | null } = {
+            id: null,
+            group: null,
+        };
+        edit((c) => {
+            made.id = addKnownRow(c, rowId);
+            made.group = c.modules.find((x) => x.id === made.id)?.group ?? null;
+        });
+        if (!made.id) return;
+        const group = made.group;
+        setSearch("");
+        if (group) setClosed((s) => ({ ...s, [group]: false }));
+        setDetail(made.id);
+    }
+
     function removeModuleNow(m: CatalogModule) {
         const taken: { r: ReturnType<typeof removeModule> } = { r: null };
         edit((c) => {
@@ -176,6 +195,22 @@ export function TabModules() {
                     A module sits in a row group. Add a group first.
                 </p>
             )}
+
+            {canEdit &&
+                knownRowsMissing(catalog).map((row) => (
+                    <p
+                        key={row.id}
+                        className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[12.5px] text-muted-foreground"
+                    >
+                        <span>
+                            This catalogue has no {row.name} row, so no plan
+                            limits how many a product can have.
+                        </span>
+                        <AddButton onClick={() => addKnown(row.id)}>
+                            Add {row.name} row
+                        </AddButton>
+                    </p>
+                ))}
 
             <p className="flex flex-wrap gap-x-3.5 gap-y-1 text-[12px] text-muted-foreground">
                 <span>Click a cell to edit it plan by plan.</span>

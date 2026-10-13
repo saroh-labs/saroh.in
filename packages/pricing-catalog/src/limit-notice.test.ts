@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { limitNotice } from "./limit-notice";
+import { itemLimitNotice, limitNotice } from "./limit-notice";
 
 const access = { inc: true, limit: 100, plan: "Plan A", upgradeTo: "Plan B" };
 
@@ -212,5 +212,69 @@ describe("limitNotice", () => {
                 limitNotice(access, 100, "things", "Paused."),
             ).not.toHaveProperty("href");
         });
+    });
+});
+
+describe("itemLimitNotice (a cap inside one thing, DEC-158)", () => {
+    const what = "variants a product";
+    const paused = "No more can be added to this one.";
+    const row = { limit: 22, plan: "Plan A", upgradeTo: "Plan B" };
+
+    it("says the cap, what stops and the plan with more", () => {
+        expect(itemLimitNotice(row, 22, what, paused)).toEqual({
+            title: "You can have up to 22 variants a product on Plan A",
+            body: "No more can be added to this one. Plan B allows more.",
+            cta: "See plans",
+        });
+    });
+
+    it("says a thing already past the cap keeps what it has", () => {
+        expect(itemLimitNotice(row, 33, what, paused)?.body).toBe(
+            "No more can be added to this one. It keeps the 33 it has. Plan B allows more.",
+        );
+    });
+
+    it("says a higher plan with no cap has no limit, and one of a thing as one", () => {
+        const n = itemLimitNotice(
+            { ...row, limit: 1, upgradeUncapped: true },
+            1,
+            what,
+            paused,
+        );
+        expect(n?.title).toBe(
+            "You can have up to 1 variant a product on Plan A",
+        );
+        expect(n?.body).toBe(
+            "No more can be added to this one. Plan B has no limit.",
+        );
+    });
+
+    it("on the top plan, asks to talk and points at the plan", () => {
+        expect(
+            itemLimitNotice({ ...row, upgradeTo: "" }, 22, what, paused),
+        ).toMatchObject({
+            body: "No more can be added to this one. Talk to us if you need more.",
+            cta: "See your plan",
+        });
+    });
+
+    it("takes the write's own words where it isn't an add to the thing", () => {
+        expect(
+            itemLimitNotice(
+                row,
+                0,
+                what,
+                paused,
+                "A copy would have 33, so it can't be made.",
+            )?.body,
+        ).toBe(
+            "A copy would have 33, so it can't be made. Plan B allows more.",
+        );
+    });
+
+    it("has nothing to say with no cap", () => {
+        expect(
+            itemLimitNotice({ ...row, limit: null }, 500, what, paused),
+        ).toBeNull();
     });
 });

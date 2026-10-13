@@ -1911,3 +1911,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - Moving to a lower plan (DEC-114): the owner always stays, then the earliest to join up to the limit, Reviewers placed by when they joined like anyone else. A limit of one keeps the owner alone.
     - The move-down notice's claim is keyed by the limits it named, which no longer include a view-only one. A business told under the old key is told again and gets its 7 days again before anything pauses.
     - The member, invitation and role views no longer carry `usesSeat`.
+## DEC-158 A plan caps how many variants one product may have
+
+**Status: Accepted — 2026-10-13, built** · owner (decided the cap; "variants do not count towards the product limit")
+
+- A plan may cap the variants of **one product**: a small number on the free plan, more on each paid plan. The numbers are the catalogue's, set per plan in Admin › Plans on the row `variants`, and raised for one business with a limit override. None is written in code.
+- **Variants never count as products.** The products limit counts products; this is its own cap, inside each product.
+- **It is a cap inside one thing, not a count across the business** (`MODULE_MAP.variants.within`). So it has no usage meter, no "used X of Y", no notice at 80%, and nothing is ever "over" in total or paused for it. The one thing that happens: a save that would take a product past its cap is refused, with the usual plan-limit notice and its way to another plan.
+- **Nothing is removed and selling is never blocked.** A product that already has more than the cap (made before it, or after a move to a lower plan) keeps every variant, keeps selling, and is still edited, reordered and made smaller. Only adding one more is refused while it is at or past the cap. A copy of such a product is refused too, since the copy would start past the cap; the original is untouched.
+- **The row is a limit, never a lock.** A plan whose cell has no number, or leaves the row out, caps nothing. A catalogue version published before the row existed caps nothing either, so no business loses the ability to add variants when this ships.
+- A catalogue made before the row is offered it on the Modules tab ("Add Variants row"). It arrives with no limit on any plan and hidden from the pricing page, so nothing changes until a number is set and the version is published.
+- Only behind `PLAN_ENFORCEMENT`, and fail open as every limit is: a plan that can't be read refuses nothing.
+- Code: `billing/item-limits.ts` (the rule), `products/variant-cap.ts` (the two writes that add a variant: a new variant, a copy), `itemLimitNotice` in `@saroh/pricing-catalog` (the words, shared with the editor).

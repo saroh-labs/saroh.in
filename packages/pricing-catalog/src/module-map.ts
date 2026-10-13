@@ -34,7 +34,17 @@ export interface ModuleMapEntry {
     limitKey: string | null;
     /** The `Plan.entitlements` key a legacy `raise` override names, if any. */
     legacyEntitlementKey: string | null;
+    /**
+     * Set when the cap is on what one thing holds (the variants of one
+     * product), not on a count across the business. Such a row has no
+     * business-wide usage: no meter, no 80% notice, nothing to be "over" in
+     * total. Only a write that adds to one thing past the cap is refused.
+     */
+    within?: LimitWithin;
 }
+
+/** What a per-item cap is counted inside. */
+export type LimitWithin = "product";
 
 export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
     website: {
@@ -71,6 +81,18 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: "COMMERCE",
         limitKey: "products",
         legacyEntitlementKey: null,
+    },
+    /**
+     * Variants one product may have (DEC-158): a cap inside each product,
+     * never a count across the business, and they never count as products.
+     * Under no registry module, so the row never decides whether Commerce
+     * is on; a version without the row caps nothing.
+     */
+    variants: {
+        registry: null,
+        limitKey: "variantsPerProduct",
+        legacyEntitlementKey: null,
+        within: "product",
     },
     orders: {
         registry: "COMMERCE",
@@ -175,6 +197,16 @@ export function catalogueModulesFor(registry: RegistryModuleKey): string[] {
     return Object.entries(MODULE_MAP)
         .filter(([, e]) => e.registry === registry)
         .map(([moduleId]) => moduleId);
+}
+
+/**
+ * What a row's cap is counted inside, or null for a count across the
+ * business (and for a switch, or a row this table doesn't know).
+ */
+export function limitWithin(moduleId: string): LimitWithin | null {
+    return Object.prototype.hasOwnProperty.call(MODULE_MAP, moduleId)
+        ? (MODULE_MAP[moduleId].within ?? null)
+        : null;
 }
 
 /** The catalogue row a legacy entitlement key belongs to, if any. */

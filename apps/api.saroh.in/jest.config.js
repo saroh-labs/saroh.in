@@ -194,6 +194,9 @@ module.exports = {
         // price-history.db.spec.ts needs Postgres.
         "<rootDir>/src/modules/products/products.price-history.spec.ts",
         "<rootDir>/src/modules/products/over-mrp.spec.ts",
+        // DEC-158: the plan's cap on a product's variants, where adding one
+        // and copying a product ask it. variant-cap.db.spec.ts needs Postgres.
+        "<rootDir>/src/modules/products/variant-cap.spec.ts",
         // #519 the Products list's "Needs you": pure.
         "<rootDir>/src/modules/products/catalogue-needs.spec.ts",
         // The Products list's query: a page by number and its sizes, with a

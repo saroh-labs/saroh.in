@@ -1,5 +1,6 @@
 import { unstable_rethrow } from "next/navigation";
 
+import { variantCapOf } from "@/lib/billing/variant-cap";
 import { readMissingRates } from "@/lib/gst-rates/service";
 import { businessModeOf } from "@/lib/gst/price-mode";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -14,6 +15,7 @@ import {
     listAllergens,
 } from "@/lib/products/settings";
 import { DEFAULT_SKU_PATTERN } from "@/lib/products/sku-pattern";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { productCategoriesHref } from "@/lib/stores/links";
 import { getStorefront } from "@/lib/stores/storefronts";
@@ -30,6 +32,10 @@ import { getStorefront } from "@/lib/stores/storefronts";
  * `stores` is the business's storefronts: with more than one, the Variants
  * section says where each variant is sold ("Sell it at", #525), read from
  * the product's listings; unreadable, it is left out rather than guessed.
+ *
+ * `variantCap` is the plan's cap on one product's variants (DEC-158), so
+ * Variants can say it before a save; null when nothing caps them or the
+ * plan couldn't be read, and the API still refuses and says why.
  */
 export async function loadEditorContext(
     store: { id: string; name: string },
@@ -49,6 +55,7 @@ export async function loadEditorContext(
         listings,
         businessSettings,
         rates,
+        billing,
     ] = await Promise.all([
         getStorefront(store.id).catch(() => null),
         listCategories(),
@@ -81,6 +88,7 @@ export async function loadEditorContext(
         // business is known to be registered. Unknown asks for nothing, so
         // a read that failed never blocks a save.
         readMissingRates(),
+        billingAccessOrNull(),
     ]);
     return {
         storeId: store.id,
@@ -109,5 +117,6 @@ export async function loadEditorContext(
         sku: sku ?? { pattern: DEFAULT_SKU_PATTERN, suggest: true, n: 1 },
         allergens: (allergens ?? []).map((a) => ({ id: a.id, name: a.name })),
         defaults,
+        variantCap: variantCapOf(billing),
     };
 }

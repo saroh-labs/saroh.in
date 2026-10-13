@@ -22,6 +22,10 @@
  * | `visitsPerMonth`   | this month's site views (`site.view`), from the daily rollup          |
  * | `sarohEmailsPerMonth` | emails Saroh queued for the business this month (`SAROH` deliveries), unless stopped before they went or failed with no try left (DEC-086) |
  *
+ * A cap inside one thing (a product's variants, `variantsPerProduct`) is
+ * not counted here: it has no total across the business, so it is no meter
+ * (`item-limits.ts`).
+ *
  * A month is the business's own (its zone, `businessTimezone`): the 1st
  * starts at midnight there, not in UTC. Visits are the exception: the
  * rollup (`AnalyticsDailyAggregate`) buckets by UTC day, so a month of
@@ -56,6 +60,14 @@ export const METERED_LIMIT_KEYS = [
     "sarohEmailsPerMonth",
 ] as const;
 export type MeteredLimitKey = (typeof METERED_LIMIT_KEYS)[number];
+
+/**
+ * The limit keys capped inside one thing, in `MODULE_MAP`'s words (DEC-158).
+ * Never metered: no count across the business exists for them. Their rule
+ * is `item-limits.ts`.
+ */
+export const ITEM_LIMIT_KEYS = ["variantsPerProduct"] as const;
+export type ItemLimitKey = (typeof ITEM_LIMIT_KEYS)[number];
 
 const METERED: ReadonlySet<string> = new Set(METERED_LIMIT_KEYS);
 
