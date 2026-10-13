@@ -61,6 +61,13 @@ Meta alike.
   business" still fills the site in.
 - Only where a tag may load: with nothing accepted, in the team's browser
   or off production, the address is left as it is.
+- **A business's referral code is kept, and no tag is given it** (DEC-156,
+  `apps/saroh.in/lib/referral.ts`). A `?ref=` on any page but the waitlist
+  is kept in the first-party cookie `saroh_ref` for 90 days, read through
+  `readAddress()` like every other query, so setup can record which
+  business referred a new one. It is functional, not a tag's: set whatever
+  the notice was answered, never passed to `track()`, `fireConversion()` or
+  the recorder, and `ref` stays off the allow-list above.
 
 One thing a visitor can notice: once they have accepted cookies, the
 address bar no longer shows what was cut. The link preview tool's
@@ -192,6 +199,7 @@ passing through `/welcome`.
 | What the notice says, case by case                      | `question()` in `apps/saroh.in/app/site-tags.tsx`                    |
 | Loading and stopping the tags; sending a conversion     | `apps/saroh.in/lib/tags.ts`                                          |
 | What a tag may see of the address                       | `apps/saroh.in/lib/page-address.ts`                                  |
+| The referral code kept for setup (not a tag's)          | `apps/saroh.in/lib/referral.ts`, `app/referral-keeper.tsx`           |
 | The cookie notice                                       | `apps/saroh.in/app/site-tags.tsx`                                    |
 | The waitlist conversion                                 | `apps/saroh.in/components/v2/waitlist/waitlist-form.tsx`             |
 | The sign-up hand-off                                    | `apps/saroh.in/lib/welcome.ts`, `lib/welcome-forward.ts`, `/welcome` |

@@ -4,6 +4,7 @@ import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { cache } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
@@ -28,6 +29,7 @@ import {
 import { NotesPanel } from "@/components/business/notes-panel";
 import { OpenAccess } from "@/components/business/open-access";
 import { PlanActions, RevokeLimit } from "@/components/business/plan-actions";
+import { ReferredBy } from "@/components/business/referred-by";
 import { SiteTrackers } from "@/components/business/site-trackers";
 import { WhatTheySee } from "@/components/business/what-they-see";
 import { Facts, Panel } from "@/components/panel";
@@ -645,6 +647,19 @@ function Business({
                                         "On this instance since",
                                         formatDate(facts.createdAt),
                                     ],
+                                    ...(facts.referredBy
+                                        ? ([
+                                              [
+                                                  "Referred by",
+                                                  <ReferredBy
+                                                      key="r"
+                                                      referredBy={
+                                                          facts.referredBy
+                                                      }
+                                                  />,
+                                              ],
+                                          ] as [string, ReactNode][])
+                                        : []),
                                     ...(facts.suspendedAt
                                         ? ([
                                               [

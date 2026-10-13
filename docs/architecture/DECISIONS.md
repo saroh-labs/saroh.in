@@ -1870,3 +1870,20 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **One exception to "no scheduled deploys" (DEC-107), once.** Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026 only: the first starts early, waits for the instant and deploys every app; the second deploys only what is still unopened. Both do nothing in another year and are deleted after launch. The rule stands for everything else.
 - Plans show in the workspace at launch, which DEC-136 left open.
 - Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.
+
+## DEC-156 Who referred a business is recorded when the business is made
+
+**Status: Accepted — 2026-10-13, built** · owner (record it from launch, so referrals made before the referral programme opens are known) · builds on DEC-102 · #809, #810 are not built by this
+
+- **What is recorded.** A visitor who reaches saroh.in by a business's referral link (`?ref=`, the "Made with Saroh" credit of DEC-102) and later makes a business has that fact kept on the new business: which business referred it and when (`Organization.referredByOrganizationId`, `referredAt`). Nothing else of a referral programme exists yet.
+- **Written once.** Only as the business is made. Nothing changes it afterwards.
+- **How the code travels.** saroh.in keeps the code in one first-party cookie, `saroh_ref`, on the domain it shares with accounts and the workspace, for 90 days. The workspace's server reads it as the business is made, sends it to the API with the business, and clears it once the business exists. It is functional: set whatever the cookie notice was answered, holding the eight characters from the link and nothing about the visitor, and never given to an analytics, advertising or recording tag. The address it came from is still cut before any tag loads (DEC-127).
+- **The last link wins** in the browser. A page cannot tell a real code from a mistyped one, so a newer link replaces an older one.
+- **The API decides, from the database.**
+    - A malformed or unknown code, or a deleted business's, refers nobody, and the new business is made all the same. The caller is never told which.
+    - Nobody refers themselves: someone who is already in the referring business, in any role, is not recorded as referred by it. A business can never name itself (a CHECK on the column).
+    - One level: only the business whose code was carried is recorded.
+- **A waitlist entry's id is not a business's code.** Both arrive as `?ref=` and look alike, so they are told apart by table, never by shape. saroh.in keeps no code from the waitlist page, where `?ref=` is an entrant's id. The waitlist looks for an entrant first and a business only when there is none. Setup reads businesses only, and a code that is also an entrant's id refers nobody.
+- **Until sign-up opens, the waitlist keeps it.** Someone who arrives by a business's link and joins the waitlist has that business kept on their entry (`WaitlistSignup.referredByOrganizationId`). When they make a business with no code in the browser, the entry's is used, found by the account's confirmed email. A code the browser carried comes first.
+- **Who sees it.** Operators, on the business's page in the console: "Referred by ‹business›" and the day. No business is shown who referred it or whom it referred, and no screen or message says anything follows from a referral.
+- Consequences: three nullable columns, an index and a foreign key (`20261122100000_organization_referred_by`). `POST /organizations` takes an optional `referralCode` and never refuses it, so the API is released before the workspace sends one. The rules are `apps/api.saroh.in/src/modules/organizations/referral.ts`; the cookie is `apps/saroh.in/lib/referral.ts` and `apps/app.saroh.in/lib/organizations/referral-carry.ts`. The Privacy Policy's Cookies section does not yet name this cookie: the owner's text to settle before launch.

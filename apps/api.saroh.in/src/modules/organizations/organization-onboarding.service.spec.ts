@@ -45,6 +45,12 @@ jest.mock("../../common/email", () => ({
     sendWelcomeEmail: jest.fn().mockResolvedValue("sent"),
 }));
 
+// Who referred a business has its own spec (`referral.spec.ts`); here it
+// answers what each test says.
+jest.mock("./referral", () => ({
+    referringBusiness: jest.fn().mockResolvedValue(null),
+}));
+
 import { prisma, startOnFreePlan as startOnFreePlanFn } from "@saroh/database";
 
 import { sendWelcomeEmail as sendWelcomeEmailFn } from "../../common/email";
@@ -53,6 +59,7 @@ import type { AuditService } from "../audit/audit.service";
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
 import type { OnboardOrganizationDto } from "./dto";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
+import { referringBusiness as referringBusinessFn } from "./referral";
 
 const orgFindUnique = prisma.organization.findUnique as jest.Mock;
 const orgCreate = prisma.organization.create as jest.Mock;
@@ -67,6 +74,7 @@ const membershipCreate = prisma.membership.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
 const startOnFreePlan = startOnFreePlanFn as unknown as jest.Mock;
 const sendWelcomeEmail = sendWelcomeEmailFn as unknown as jest.Mock;
+const referringBusiness = referringBusinessFn as unknown as jest.Mock;
 
 describe("OrganizationOnboardingService.onboard", () => {
     // AuditService.record is fire-and-forget (never throws); a jest mock stands
@@ -84,6 +92,74 @@ describe("OrganizationOnboardingService.onboard", () => {
         orgCreate.mockResolvedValue({ id: "org_1", slug: "acme" });
         profileCreate.mockResolvedValue({ id: "bp_1" });
         membershipCreate.mockResolvedValue({ id: "mem_1" });
+        referringBusiness.mockResolvedValue(null);
+    });
+
+    describe("who referred it (DEC-156)", () => {
+        it("asks with the code the browser carried and the caller, and records the business and the moment", async () => {
+            referringBusiness.mockResolvedValue("org_referrer");
+            const before = Date.now();
+
+            await service.onboard("user_1", {
+                name: "Acme",
+                referralCode: "abcd2345",
+            });
+
+            expect(referringBusiness).toHaveBeenCalledWith({
+                code: "abcd2345",
+                userId: "user_1",
+            });
+            const { data } = (
+                orgCreate.mock.calls[0] as [{ data: Record<string, unknown> }]
+            )[0];
+            expect(data.referredByOrganizationId).toBe("org_referrer");
+            expect((data.referredAt as Date).getTime()).toBeGreaterThanOrEqual(
+                before,
+            );
+        });
+
+        it("writes neither column when nobody referred it", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                referralCode: "abcd2345",
+            });
+
+            expect(orgCreate).toHaveBeenCalledWith({
+                data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
+                select: { id: true, slug: true },
+            });
+        });
+
+        it("still asks with no code, for the one a waitlist entry kept", async () => {
+            await service.onboard("user_1", { name: "Acme" });
+
+            expect(referringBusiness).toHaveBeenCalledWith({
+                code: undefined,
+                userId: "user_1",
+            });
+        });
+
+        it("makes the business, with nobody recorded, when the lookup fails", async () => {
+            referringBusiness.mockRejectedValue(new Error("database away"));
+
+            await expect(
+                service.onboard("user_1", { name: "Acme" }),
+            ).resolves.toEqual({ id: "org_1", slug: "acme" });
+            expect(orgCreate).toHaveBeenCalledWith({
+                data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
+                select: { id: true, slug: true },
+            });
+        });
+
+        it("keeps the referring business out of the audit event", async () => {
+            referringBusiness.mockResolvedValue("org_referrer");
+
+            await service.onboard("user_1", { name: "Acme" });
+
+            expect(JSON.stringify(record.mock.calls)).not.toContain(
+                "org_referrer",
+            );
+        });
     });
 
     it("creates org + profile + OWNER membership atomically in one transaction", async () => {

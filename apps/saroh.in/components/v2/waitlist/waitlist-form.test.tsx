@@ -190,6 +190,67 @@ describe("the waitlist_joined ad conversion (DEC-127)", () => {
         expect(handed).toContain("utm_source=instagram");
     });
 
+    describe("a business's referral code kept from another page (DEC-156)", () => {
+        const keep = (code: string) => {
+            document.cookie = `saroh_ref=${code}; Path=/`;
+        };
+        const sent = () =>
+            JSON.parse(
+                (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string,
+            ) as Record<string, unknown>;
+        afterEach(() => {
+            document.cookie = "saroh_ref=; Max-Age=0; Path=/";
+        });
+
+        it("goes to the API when this page has no ?ref= of its own, and to no tag", async () => {
+            accepted(ADVERTISING, BOTH);
+            keep("wxyz6789");
+            answer(joined);
+            renderForm("?src=home-hero");
+            fill();
+            await submit();
+            await screen.findByText("Glow Studio is #7 on the list.");
+
+            expect(sent()).toMatchObject({ ref: "wxyz6789", src: "home-hero" });
+            // GA's `ref` is this page's own link, and there was none.
+            expect(gtag).toHaveBeenCalledWith(
+                "event",
+                "waitlist_join",
+                expect.objectContaining({ ref: false }),
+            );
+            const handed = JSON.stringify([
+                gtag.mock.calls,
+                window.dataLayer?.map((e) =>
+                    Array.from(e as ArrayLike<unknown>),
+                ),
+                window.fbq?.queue,
+                window.location.href,
+            ]);
+            expect(handed).not.toContain("wxyz6789");
+        });
+
+        it("gives way to this page's own ?ref=, an entrant's id", async () => {
+            keep("wxyz6789");
+            answer(joined);
+            renderForm("?ref=hjkmnpqr");
+            fill();
+            await submit();
+            await screen.findByText("Glow Studio is #7 on the list.");
+
+            expect(sent()).toMatchObject({ ref: "hjkmnpqr" });
+        });
+
+        it("sends no ref when nothing was kept", async () => {
+            answer(joined);
+            renderForm("?src=home-hero");
+            fill();
+            await submit();
+            await screen.findByText("Glow Studio is #7 on the list.");
+
+            expect(sent().ref).toBeUndefined();
+        });
+    });
+
     it("sends none when advertising cookies weren't accepted", async () => {
         accepted(ADVERTISING, { analytics: true, ads: false });
         answer(joined);
