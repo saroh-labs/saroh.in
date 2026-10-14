@@ -12,6 +12,10 @@ import {
 import type { BillingAccessView } from "@/lib/billing/access";
 
 import type { NextCharge, SarohSubscription } from "./plan";
+import type { PlanNote, StatusPart } from "./plan-status";
+import { nextParts } from "./plan-status";
+
+export type { PlanNote, PlanNoteKind } from "./plan-status";
 
 /**
  * Settings › Plan and billing on the plans catalogue (U14), as data: "Your
@@ -218,16 +222,6 @@ export function billedPlanId(
     return catalog?.plans.find((p) => p.pricePaise === 0)?.id ?? null;
 }
 
-/** A note on "Your plan": words around one date, and what can be done. */
-export interface PlanNote {
-    tone: "info" | "attention";
-    lead: string;
-    iso: string | null;
-    tail: string;
-    /** Opens the change dialog for a plan: to authorise or start again. */
-    action: { label: string; planId: string; cycle: Cycle } | null;
-}
-
 export interface YourPlanView {
     name: string;
     /** "₹111 a month + GST", "₹0"; null on a plan given for a while. */
@@ -235,7 +229,11 @@ export interface YourPlanView {
     /** On a plan given for a while (a launch offer): free until this. */
     freeUntil: string | null;
     includes: string;
+    /** "You're on the pricing from version 2.", or "" on the live one. */
+    versionNote: string;
     next: NextCharge;
+    /** After "You're on ‹plan›" on the status line: what happens next. */
+    status: StatusPart[];
     method: string | null;
     notes: PlanNote[];
     /**
@@ -298,16 +296,18 @@ export function yourPlan(input: {
             ? `${priceWords(paise, yearlyPaise !== null ? "year" : "month")} + GST`
             : "₹0";
 
-    const version =
+    const versionNote =
         access.version !== null &&
         input.liveVersion !== null &&
         access.version !== input.liveVersion
-            ? ` · You're on the pricing from version ${access.version}.`
+            ? `You're on the pricing from version ${access.version}.`
             : "";
-    const includes = (row?.tagline ?? "") + version;
+    const includes =
+        (row?.tagline ?? "") + (versionNote ? ` · ${versionNote}` : "");
 
     const notes: PlanNote[] = [];
     let next: NextCharge = { kind: "text", text: "Nothing to pay" };
+    let firstMonth = false;
 
     const move = access.pendingMove;
     // Only the version changes (Free v1 to Free v2): not a plan change, so
@@ -323,6 +323,7 @@ export function yourPlan(input: {
         notes.push(
             override.expiresAt
                 ? {
+                      kind: "given",
                       tone: "info",
                       lead: `${name} is yours, free, until `,
                       iso: override.expiresAt,
@@ -330,6 +331,7 @@ export function yourPlan(input: {
                       action: null,
                   }
                 : {
+                      kind: "given",
                       tone: "info",
                       lead: `${name} is yours, free, until Saroh changes it.`,
                       iso: null,
@@ -340,10 +342,11 @@ export function yourPlan(input: {
     }
 
     if (sub?.status === "CANCELLED") {
-        next = { kind: "text", text: "Nothing. The plan has ended" };
+        next = { kind: "text", text: "Nothing to pay. The plan has ended" };
     } else if (sub?.status === "PAST_DUE") {
         next = { kind: "text", text: "Payment overdue" };
         notes.push({
+            kind: "overdue",
             tone: "attention",
             lead: "The last payment didn't go through. Nothing has been switched off yet.",
             iso: null,
@@ -362,7 +365,9 @@ export function yourPlan(input: {
             amount: `${formatInr(paise)} + GST${input.addonsHeld ? " + add-ons" : ""}`,
         };
         if (sub.status === "TRIALING") {
+            firstMonth = true;
             notes.push({
+                kind: "firstMonth",
                 tone: "info",
                 lead: "Your first month runs to ",
                 iso: sub.currentPeriodEnd,
@@ -382,6 +387,7 @@ export function yourPlan(input: {
         // Due, and waiting on the business: the one move that needs a tap.
         const to = planName(catalog, move.planId);
         notes.push({
+            kind: "authorise",
             tone: "attention",
             lead: samePlan
                 ? `${to}'s new price was due to start on `
@@ -396,6 +402,7 @@ export function yourPlan(input: {
         const to = planName(catalog, move.planId);
         if (move.waiting === "held") {
             notes.push({
+                kind: "move",
                 tone: "info",
                 lead: `Your plan moves to ${to} from `,
                 iso: move.from,
@@ -404,6 +411,7 @@ export function yourPlan(input: {
             });
         } else {
             notes.push({
+                kind: "move",
                 tone: "info",
                 lead: `Your plan changes to ${to} on `,
                 iso: move.from,
@@ -419,6 +427,7 @@ export function yourPlan(input: {
         notes.push(
             renewed
                 ? {
+                      kind: "renewed",
                       tone: "info",
                       lead: `Your next 12 months of ${name} start on `,
                       iso: scheduled.startAt,
@@ -426,6 +435,7 @@ export function yourPlan(input: {
                       action: null,
                   }
                 : {
+                      kind: "scheduled",
                       tone: "info",
                       lead: `${scheduled.plan.name} starts on `,
                       iso: scheduled.startAt,
@@ -444,6 +454,7 @@ export function yourPlan(input: {
         notes.push(
             term.renewOpen
                 ? {
+                      kind: "renew",
                       tone: "attention",
                       lead: year
                           ? "The year you paid for ends on "
@@ -453,6 +464,7 @@ export function yourPlan(input: {
                       action: { label: "Renew", planId, cycle },
                   }
                 : {
+                      kind: "term",
                       tone: "info",
                       lead: year
                           ? "Paid for the year, to "
@@ -466,14 +478,32 @@ export function yourPlan(input: {
 
     const open = input.checkouts?.open;
 
+    // A plan given for a while says so before what is charged: nothing is.
+    const status: StatusPart[] = [
+        ...(given
+            ? [
+                  override.expiresAt
+                      ? { lead: "Free until ", iso: override.expiresAt }
+                      : { lead: "Free until Saroh changes it" },
+              ]
+            : []),
+        ...nextParts(next, {
+            firstMonth,
+            cycle: yearlyPaise !== null ? "year" : "month",
+            price: given ? null : priceText,
+        }),
+    ];
+
     return {
         name,
         price: given ? null : priceText,
         freeUntil: given ? (override.expiresAt ?? null) : null,
         includes,
+        versionNote,
         next,
+        status,
         method: sub?.provider
-            ? `Through ${PROVIDER_NAMES[sub.provider] ?? sub.provider}`
+            ? `Paid through ${PROVIDER_NAMES[sub.provider] ?? sub.provider}`
             : null,
         notes,
         pending: open
@@ -486,24 +516,53 @@ export function yourPlan(input: {
     };
 }
 
-/** One row of the plan picker. */
+/**
+ * A plan card's button, in words that say what it does: "Upgrade to Plan C"
+ * (starts today), "Move to Plan A from ‹date›" (waits for what is paid to
+ * run out, DEC-159), "Start Plan B", "Start with the first month", "Start
+ * 14-day trial", "Bill yearly", "Keep Plan B".
+ */
+export interface PlanCta {
+    label: string;
+    /** The date the label ends with, after "from "; null: none. */
+    iso: string | null;
+    /** A move up: the filled button. Anything else is the quiet one. */
+    primary: boolean;
+}
+
+/** One plan of the plan picker: a card. */
 export interface PickerRow {
     planId: string;
     name: string;
     /** "₹111 a month + GST", or "₹0". */
     price: string;
+    /** The same, in two sizes: "₹111", then "a month + GST" ("" on ₹0). */
+    amount: string;
+    per: string;
+    /** Who it's for: the catalogue's one line. */
     what: string;
+    /** "First month ₹1 + GST" or "14-day free trial", only where this business would get it. */
+    offer: string | null;
     current: boolean;
-    /** "Start 14-day trial", "Upgrade", "Switch", "Bill yearly", "Keep Plan B"; null when there's nothing to do. */
-    cta: string | null;
-    /** The catalogue card's lead ("Everything in Plan A, plus:") and its first lines. */
+    /** Null when there's nothing to do: the plan it's on, or one that already waits. */
+    cta: PlanCta | null;
+    /** A change to this plan already waits for this date; the card says so in the button's place. */
+    scheduled: string | null;
+    /** The catalogue card's lead ("Everything in Plan A, plus:") and every line of it. */
     lead: string;
     lines: string[];
     /**
      * Where the business stands with it: under a plan given for a while,
      * or when a change to it would start (DEC-159). Words around one date.
+     * `brief` is the same without the date, for under a button or a state
+     * that has just said it.
      */
-    note: { lead: string; iso: string | null; tail?: string } | null;
+    note: {
+        lead: string;
+        iso: string | null;
+        tail?: string;
+        brief?: string;
+    } | null;
 }
 
 /** What `GET …/billing/change-plan` said of one plan, as a row needs it. */
@@ -544,20 +603,19 @@ export function waitingMove(input: {
     return { planId: move.planId, iso: move.from, cycle: null };
 }
 
-/** How many of a plan card's lines the picker shows. */
-export const PICKER_LINES = 4;
-
 /**
  * The plan picker for one cycle: the offered plans in catalogue order, the
  * one billed marked current, each other one an upgrade (later in the list),
  * a switch (earlier), or its trial — only where this business would get one
  * (`trials`: plan ids the API quoted as a TRIAL). Each says what it unlocks,
- * from the catalogue's own card lines (UX-045).
+ * from the catalogue's own card lines, all of them (UX-045).
  *
  * When a change would start is the API's (`quotes`, DEC-159): a dearer plan
  * "Starts today" with what is paid now, and any other "From ‹date›", the
- * end of what is paid, with the plan kept until then. A change that already
- * waits (`waiting`) says so on its row, with no button to make it twice.
+ * end of what is paid, with the plan kept until then. The button says the
+ * same: "Upgrade to ‹plan›", or "Move to ‹plan› from ‹date›". A change that
+ * already waits (`waiting`) says so on its card, with no button to make it
+ * twice.
  *
  * Under a plan given for a while (a launch offer, UX-044), that plan is the
  * one it's on — "You're on this until …", no trial on it — and the plan it's
@@ -589,7 +647,11 @@ export function pickerRows(input: {
     const onCycle = billedCycle(input.subscription);
     const onName = plans[onAt]?.name ?? "your plan";
     const now = input.now ?? new Date();
+    const kept = `You keep ${onName} until then.`;
     const keep = `: you keep ${onName} until then.`;
+    // Nothing is paid for yet: a paid plan is started, not upgraded to.
+    const onFree =
+        (plans.find((p) => p.id === billedId)?.pricePaise ?? 0) === 0;
     return plans.map((p, i) => {
         const up = i > onAt;
         const held = p.id === givenId;
@@ -631,9 +693,9 @@ export function pickerRows(input: {
                 ? `Starts today: ${formatInr(quoted.payNowTotalPaise)} now (incl. GST)`
                 : null;
         const timing = awaited
-            ? { lead: "From ", iso: awaited.iso, tail: keep }
+            ? { lead: "From ", iso: awaited.iso, tail: keep, brief: kept }
             : later
-              ? { lead: "From ", iso: later, tail: keep }
+              ? { lead: "From ", iso: later, tail: keep, brief: kept }
               : today
                 ? {
                       lead:
@@ -657,37 +719,58 @@ export function pickerRows(input: {
               : givenId
                 ? null
                 : timing;
+        const pricePaise = planPricePaise(catalog, p, cycle);
+        const scheduled = awaited && !givenId ? awaited.iso : null;
+        const quiet = (label: string): PlanCta => ({
+            label: later ? `${label} from ` : label,
+            iso: later,
+            primary: false,
+        });
+        const cta: PlanCta | null = held
+            ? { label: `Keep ${p.name}`, iso: null, primary: false }
+            : current || (givenId && samePlan) || scheduled
+              ? null
+              : firstPaise > 0
+                ? {
+                      label: "Start with the first month",
+                      iso: null,
+                      primary: true,
+                  }
+                : trialDays
+                  ? {
+                        label: `Start ${trialDays}-day trial`,
+                        iso: null,
+                        primary: true,
+                    }
+                  : samePlan
+                    ? quiet(cycle === "year" ? "Bill yearly" : "Bill monthly")
+                    : up && !later
+                      ? {
+                            label: onFree
+                                ? `Start ${p.name}`
+                                : `Upgrade to ${p.name}`,
+                            iso: null,
+                            primary: true,
+                        }
+                      : quiet(`Move to ${p.name}`);
         return {
             planId: p.id,
             name: p.name,
-            price: free
-                ? "₹0"
-                : `${priceWords(planPricePaise(catalog, p, cycle), cycle)} + GST`,
-            what:
-                p.tagline +
-                (firstPaise > 0
-                    ? ` · first month ${formatInr(firstPaise)} + GST`
+            price: free ? "₹0" : `${priceWords(pricePaise, cycle)} + GST`,
+            amount: free ? "₹0" : formatInr(pricePaise),
+            per: free ? "" : `${per(cycle)} + GST`,
+            what: p.tagline,
+            offer:
+                firstPaise > 0
+                    ? `First month ${formatInr(firstPaise)} + GST`
                     : trialDays
-                      ? ` · ${trialDays}-day free trial`
-                      : ""),
+                      ? `${trialDays}-day free trial`
+                      : null,
             current,
-            cta: held
-                ? `Keep ${p.name}`
-                : current || (givenId && samePlan) || (awaited && !givenId)
-                  ? null
-                  : firstPaise > 0
-                    ? "Start with the first month"
-                    : trialDays
-                      ? `Start ${trialDays}-day trial`
-                      : samePlan
-                        ? cycle === "year"
-                            ? "Bill yearly"
-                            : "Bill monthly"
-                        : up
-                          ? "Upgrade"
-                          : "Switch",
+            cta,
+            scheduled,
             lead: card.lead,
-            lines: card.lines.slice(0, PICKER_LINES).map((l) => l.t),
+            lines: card.lines.map((l) => l.t),
             note,
         };
     });

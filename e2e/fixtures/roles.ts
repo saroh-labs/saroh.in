@@ -347,7 +347,7 @@ export async function expectPlanReadOnly(page: Page): Promise<void> {
     ).toBeVisible();
     await expect(
         picker.getByRole("button", {
-            name: /^(Upgrade|Switch|Start |Keep |Bill (yearly|monthly))/,
+            name: /^(Upgrade to |Move to |Start |Keep |Bill (yearly|monthly))/,
         }),
     ).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Coupon" })).toHaveCount(0);

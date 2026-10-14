@@ -1,22 +1,28 @@
 import { Button } from "@saroh/ui/button";
+import { Notice } from "@saroh/ui/notice";
 import Link from "next/link";
+import { Fragment } from "react";
 
 import { ChangePaymentMethod } from "@/components/settings/change-payment-method";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { FACT_DOT } from "@/lib/format/join";
 import type { NextCharge } from "@/lib/saroh-billing/plan";
+import type { StatusPart } from "@/lib/saroh-billing/plan-status";
+import { nextParts, planMessage } from "@/lib/saroh-billing/plan-status";
 import type { PendingCheckout, PlanNote } from "@/lib/saroh-billing/plan-view";
 
-import { Notice } from "@saroh/ui/notice";
 import { CheckoutPending } from "./checkout-pending";
-import { card } from "./styles";
 
-/** The card's shape, from the catalogue (`yourPlan`) or a legacy row (`planSummary`). */
+/** The section's shape, from the catalogue (`yourPlan`) or a legacy row (`planSummary`). */
 export interface YourPlanProps {
     name: string;
     price: string | null;
     freeUntil?: string | null;
+    /** A line under the status: a legacy plan's contents, or the pricing version it's on. */
     includes: string;
     next: NextCharge;
+    /** What follows "You're on ‹plan›"; left out, it is read off `next`. */
+    status?: StatusPart[];
     method: string | null;
     footnote: string;
     notes?: PlanNote[];
@@ -24,121 +30,106 @@ export interface YourPlanProps {
     /** A plan change waiting for its payment (DEC-093). */
     pending?: PendingCheckout | null;
     /**
-     * `billing:manage`. Without it the card is read: no change of payment
+     * `billing:manage`. Without it the section is read: no change of payment
      * method, no way into a plan change and no payment to carry on.
      */
     canChange?: boolean;
 }
 
 /** Where a note's action goes: the picker, with its plan's change open. */
-function changeHref(planId: string, cycle: string) {
+export function changeHref(planId: string, cycle: string) {
     return `/settings/billing?${new URLSearchParams({ plan: planId, cycle }).toString()}#change-plan`;
 }
 
+/** A note's words, around its one date. */
+export function NoteWords({ note }: { note: PlanNote }) {
+    return (
+        <>
+            {note.lead}
+            {note.iso ? <ViewerDate iso={note.iso} /> : null}
+            {note.tail}
+        </>
+    );
+}
+
 /**
- * "Your plan" ("Saroh Settings" design): the plan, its price, what it's
- * for, the next charge and how it's paid; then anything under way (a move
- * on a date, a payment to authorise, a plan given for a while, the term and
- * its renewal, a checkout waiting for its payment), and the line about last
- * month along the foot — left out until there is such a summary (UX-080).
+ * "Your plan" (owner, 13 Oct 2026): ONE status line that is always there,
+ * the plan and what happens next ("You're on Plan B · First month until
+ * ‹date› · then ‹amount› a month"), with how it's paid under it; then at
+ * most ONE message, only when something needs the business (`planMessage`:
+ * a payment under way or failed first, then a plan change on its way, then
+ * any other warning). What is true but asks nothing (the first month's
+ * small print, the 12-month term) is behind "How billing works", under the
+ * plans. The line about last month is the foot, left out until there is
+ * such a summary (UX-080).
  */
 export function YourPlan(props: YourPlanProps) {
-    const { next, canChange = true } = props;
+    const { canChange = true } = props;
+    const status =
+        props.status ?? nextParts(props.next, { price: props.price });
+    const { message } = planMessage({
+        notes: props.notes ?? [],
+        warning: props.warning,
+        pending: Boolean(props.pending && canChange),
+    });
     return (
-        <section aria-label="Your plan" className={card}>
-            <div className="flex flex-wrap items-start gap-3.5 px-[18px] py-4">
-                <div className="min-w-0 flex-[1_1_260px]">
-                    <p className="text-[12px] text-muted-foreground">
-                        Your plan
+        <section aria-label="Your plan" className="grid gap-3">
+            <div className="grid gap-1.5">
+                <h2 className="label">Your plan</h2>
+                <p className="text-pretty text-[15px] leading-normal text-foreground/80">
+                    <span className="font-display text-[19px] font-semibold tracking-[-0.01em] text-foreground">
+                        You&apos;re on {props.name}
+                    </span>
+                    {status.map((part) => (
+                        <Fragment key={`${part.lead}${part.iso ?? ""}`}>
+                            {FACT_DOT}
+                            {part.lead}
+                            {part.iso ? <ViewerDate iso={part.iso} /> : null}
+                            {part.tail}
+                        </Fragment>
+                    ))}
+                </p>
+                {props.method ? (
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-foreground/80">
+                        {props.method}
+                        {canChange ? <ChangePaymentMethod /> : null}
                     </p>
-                    <p className="mt-0.5 font-display text-[24px] font-semibold tracking-[-0.02em]">
-                        {props.name}{" "}
-                        {props.price ? (
-                            <span className="text-[15px] font-medium text-foreground/80">
-                                {props.price}
-                            </span>
-                        ) : props.freeUntil ? (
-                            <span className="text-[15px] font-medium text-foreground/80">
-                                free until <ViewerDate iso={props.freeUntil} />
-                            </span>
-                        ) : null}
+                ) : null}
+                {props.includes ? (
+                    <p className="text-pretty text-[13px] text-foreground/80">
+                        {props.includes}
                     </p>
-                    {props.includes ? (
-                        <p className="mt-1 text-pretty text-[13px] text-foreground/80">
-                            {props.includes}
-                        </p>
-                    ) : null}
-                </div>
-                <div className="flex-[0_1_auto] sm:text-right">
-                    <p className="text-[12px] text-muted-foreground">
-                        Next charge
-                    </p>
-                    <p className="mt-0.5 text-[14px] font-semibold">
-                        {next.kind === "charge" ? (
-                            <>
-                                <ViewerDate iso={next.iso} /> · {next.amount}
-                            </>
-                        ) : next.kind === "ends" ? (
-                            <>
-                                Ends <ViewerDate iso={next.iso} />
-                            </>
-                        ) : next.kind === "paidTo" ? (
-                            <>
-                                Paid to <ViewerDate iso={next.iso} />
-                            </>
-                        ) : (
-                            next.text
-                        )}
-                    </p>
-                    {props.method ? (
-                        <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground sm:justify-end">
-                            {props.method}
-                            {canChange ? <ChangePaymentMethod /> : null}
-                        </p>
-                    ) : null}
-                </div>
+                ) : null}
             </div>
-            {props.warning ? (
-                <Notice tone="warning" role="note" layout="banner">
-                    {props.warning}
-                </Notice>
-            ) : null}
-            {(props.notes ?? []).map((n) => (
+            {message === "pending" && props.pending ? (
+                <CheckoutPending pending={props.pending} />
+            ) : message && message !== "pending" ? (
                 <Notice
-                    key={`${n.lead}${n.iso ?? ""}`}
-                    tone={n.tone === "attention" ? "warning" : "neutral"}
+                    tone={message.tone === "attention" ? "warning" : "neutral"}
                     role="note"
-                    layout="banner"
                     align="center"
-                >
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                        <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">
-                            <span>
-                                {n.lead}
-                                {n.iso ? <ViewerDate iso={n.iso} /> : null}
-                                {n.tail}
-                            </span>
-                        </p>
-                        {n.action && canChange ? (
+                    action={
+                        message.action && canChange ? (
                             <Button asChild size="sm" variant="outline">
                                 <Link
                                     href={changeHref(
-                                        n.action.planId,
-                                        n.action.cycle,
+                                        message.action.planId,
+                                        message.action.cycle,
                                     )}
                                 >
-                                    {n.action.label}
+                                    {message.action.label}
                                 </Link>
                             </Button>
-                        ) : null}
-                    </div>
+                        ) : undefined
+                    }
+                >
+                    <p className="text-pretty font-medium">
+                        <NoteWords note={message} />
+                    </p>
                 </Notice>
-            ))}
-            {props.pending && canChange ? (
-                <CheckoutPending pending={props.pending} />
             ) : null}
             {props.footnote ? (
-                <p className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[13px] text-foreground/80">
+                <p className="text-pretty text-[13px] text-foreground/80">
                     {props.footnote}
                 </p>
             ) : null}

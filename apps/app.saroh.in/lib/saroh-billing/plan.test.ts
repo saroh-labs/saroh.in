@@ -81,7 +81,7 @@ describe("planSummary", () => {
             iso: "2026-10-04T00:00:00.000Z",
             amount: "₹1,499",
         });
-        expect(s.method).toBe("Through Razorpay");
+        expect(s.method).toBe("Paid through Razorpay");
         expect(s.warning).toBeNull();
     });
 

@@ -92,11 +92,11 @@ describe("Settings › Plan and billing, by who is reading", () => {
     it("opens for an Admin to read, saying only the owner can change it", async () => {
         const html = await page(ADMIN);
         expect(html).toContain("Your plan");
-        expect(html).toContain("Plan B");
+        expect(html).toContain("You&#x27;re on Plan B");
         expect(html).toContain(READ_ONLY);
         expect(html).not.toContain("An owner or admin");
         // How it's paid is read, with no way to change it.
-        expect(html).toContain("Through Razorpay");
+        expect(html).toContain("Paid through Razorpay");
         expect(html).not.toMatch(/>Change</);
         expect(html).not.toContain('aria-label="Coupon"');
         expect(html).toContain("Invoices");
@@ -131,9 +131,13 @@ const rows: PickerRow[] = [
         planId: "a",
         name: "Plan A",
         price: "₹0",
+        amount: "₹0",
+        per: "",
         what: "For A.",
+        offer: null,
         current: false,
-        cta: "Move to Plan A",
+        cta: { label: "Move to Plan A", iso: null, primary: false },
+        scheduled: null,
         lead: "",
         lines: ["10 things"],
         note: null,
@@ -142,9 +146,13 @@ const rows: PickerRow[] = [
         planId: "b",
         name: "Plan B",
         price: "₹111 a month + GST",
+        amount: "₹111",
+        per: "a month + GST",
         what: "For B.",
+        offer: null,
         current: true,
-        cta: "Keep Plan B",
+        cta: { label: "Keep Plan B", iso: null, primary: false },
+        scheduled: null,
         lead: "Everything in Plan A, plus:",
         lines: ["A team of 3"],
         note: null,
@@ -167,7 +175,9 @@ describe("the plans, read without billing:manage", () => {
     it("shows each plan and where the business stands, and no way to change or a coupon", () => {
         const html = chooser(false);
         expect(html).toContain("Plan A");
-        expect(html).toContain("₹111 a month + GST");
+        expect(html).toContain(">₹111<");
+        expect(html).toContain("a month + GST");
+        expect(html).toContain("A team of 3");
         expect(html).toContain("Current plan");
         expect(html).toContain("These are Saroh&#x27;s plans");
         expect(html).not.toContain("Move to Plan A");
@@ -179,23 +189,24 @@ describe("the plans, read without billing:manage", () => {
 
     it("keeps the buttons and the coupon for the owner", () => {
         const html = chooser(true);
-        expect(html).toContain('aria-label="Move to Plan A: Plan A"');
-        expect(html).toContain('aria-label="Keep Plan B: Plan B"');
+        expect(html).toMatch(/<button[^>]*>.*?Move to Plan A.*?<\/button>/);
+        expect(html).toMatch(/<button[^>]*>.*?Keep Plan B.*?<\/button>/);
         expect(html).toContain('aria-label="Coupon code"');
     });
 });
 
-const yourPlan = (canChange: boolean) =>
+const yourPlan = (canChange: boolean, waiting = true) =>
     renderToStaticMarkup(
         <YourPlan
             name="Plan B"
             price="₹111 a month + GST"
             includes="For B."
             next={{ kind: "text", text: "Nothing to pay" }}
-            method="Through Razorpay"
+            method="Paid through Razorpay"
             footnote=""
             notes={[
                 {
+                    kind: "authorise",
                     tone: "attention",
                     lead: "Your payment didn't go through.",
                     iso: null,
@@ -203,11 +214,15 @@ const yourPlan = (canChange: boolean) =>
                     action: { label: "Authorise", planId: "b", cycle: "month" },
                 },
             ]}
-            pending={{
-                planName: "Plan B",
-                expiresAt: "2031-03-08T00:00:00.000Z",
-                handoff: null,
-            }}
+            pending={
+                waiting
+                    ? {
+                          planName: "Plan B",
+                          expiresAt: "2031-03-08T00:00:00.000Z",
+                          handoff: null,
+                      }
+                    : null
+            }
             canChange={canChange}
         />,
     );
@@ -215,7 +230,7 @@ const yourPlan = (canChange: boolean) =>
 describe("Your plan, read without billing:manage", () => {
     it("says what is under way, with no payment method to change and no payment to carry on", () => {
         const html = yourPlan(false);
-        expect(html).toContain("Through Razorpay");
+        expect(html).toContain("Paid through Razorpay");
         expect(html).toContain("Your payment didn&#x27;t go through.");
         expect(html).not.toMatch(/>Change</);
         expect(html).not.toContain("Authorise");
@@ -224,10 +239,15 @@ describe("Your plan, read without billing:manage", () => {
     });
 
     it("keeps all three for the owner", () => {
+        // One message at a time: the payment under way, then the note.
         const html = yourPlan(true);
         expect(html).toMatch(/>Change</);
-        expect(html).toContain("Authorise");
         expect(html).toContain("Checking your payment for Plan B");
+        expect(html).not.toContain("Authorise");
+        const after = yourPlan(true, false);
+        expect(after).toMatch(/>Change</);
+        expect(after).toContain("Authorise");
+        expect(after).toContain("#change-plan");
     });
 });
 

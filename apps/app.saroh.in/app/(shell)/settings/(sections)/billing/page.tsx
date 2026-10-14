@@ -5,6 +5,7 @@ import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
 import { notFound } from "next/navigation";
 
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
+import { HowBillingWorks } from "@/components/settings/plan-billing/how-billing-works";
 import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
 import { SarohInvoices } from "@/components/settings/plan-billing/saroh-invoices";
 import type { YourPlanProps } from "@/components/settings/plan-billing/your-plan";
@@ -18,6 +19,7 @@ import { whoCanChange } from "@/components/shared/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { planSummary, usageLine } from "@/lib/saroh-billing/plan";
+import { planMessage } from "@/lib/saroh-billing/plan-status";
 import type { Cycle, RowQuote } from "@/lib/saroh-billing/plan-view";
 import {
     addonRows,
@@ -42,10 +44,12 @@ import {
 import { requireSession } from "@/lib/session";
 
 /**
- * Settings → Plan and billing ("Saroh Settings" design; plans catalogue
- * U14): the plan this business is on and what it pays, the plans it could
- * be on (changed through a quote, a confirm and the payment page), add-ons,
- * a coupon, and Saroh's invoices to it.
+ * Settings → Plan and billing (plans catalogue U14; laid out as the owner
+ * asked on 13 Oct 2026): one status line (the plan this business is on and
+ * what happens next) with at most one message under it, the plans it could
+ * be on as cards side by side (changed through a quote, a confirm and the
+ * payment page), "How billing works" for what is true and asks nothing,
+ * add-ons, a coupon, and Saroh's invoices to it.
  *
  * Opened by whoever the API reads it to (`billing:read`: Owner and Admin
  * by default), and changed by the Owner alone (`billing:manage`, DEC-131
@@ -120,24 +124,26 @@ export default async function PlanBillingPage() {
     const addonsView = addons?.status === "ok" ? addons.data : null;
     const checkoutsView = checkouts?.status === "ok" ? checkouts.data : null;
 
-    const plan: YourPlanProps =
+    const onCatalogue =
         access?.source === "catalogue"
-            ? {
-                  ...yourPlan({
-                      access,
-                      subscription,
-                      catalog,
-                      liveVersion: pricing?.version ?? null,
-                      checkouts: checkoutsView,
-                      addonsHeld: (addonsView?.heldPaise ?? 0) > 0,
-                  }),
-                  footnote,
-              }
-            : planSummary(
+            ? yourPlan({
+                  access,
                   subscription,
-                  businessName,
-                  usage.status === "ok" ? usage.usage : null,
-              );
+                  catalog,
+                  liveVersion: pricing?.version ?? null,
+                  checkouts: checkoutsView,
+                  addonsHeld: (addonsView?.heldPaise ?? 0) > 0,
+              })
+            : null;
+    // The plan's one line is on its card: under the status, only the
+    // pricing version it is held on is left to say.
+    const plan: YourPlanProps = onCatalogue
+        ? { ...onCatalogue, includes: onCatalogue.versionNote, footnote }
+        : planSummary(
+              subscription,
+              businessName,
+              usage.status === "ok" ? usage.usage : null,
+          );
 
     // What a change to each plan would be, asked of the API: "Start N-day
     // trial" only where this business would get one, and when a change
@@ -209,6 +215,13 @@ export default async function PlanBillingPage() {
         checkouts === null ? "any plan change waiting for payment" : null,
     ].filter((m): m is string => m !== null);
     const partial = missing.length === 0 ? null : missing.join(" and ");
+    // What "Your plan" doesn't say as its one message is kept, closed,
+    // under the plans.
+    const { rest } = planMessage({
+        notes: plan.notes ?? [],
+        warning: plan.warning,
+        pending: Boolean(plan.pending && canChange),
+    });
 
     return (
         <SettingsPanel header={header}>
@@ -232,6 +245,13 @@ export default async function PlanBillingPage() {
                             : (subscription?.plan.name ?? "Free")
                     }
                     canChange={canChange}
+                    foot={
+                        <HowBillingWorks
+                            notes={rest}
+                            yearly={yearly.on}
+                            canChange={canChange}
+                        />
+                    }
                     addons={
                         addonList.length > 0 ? (
                             <AddonsCard
