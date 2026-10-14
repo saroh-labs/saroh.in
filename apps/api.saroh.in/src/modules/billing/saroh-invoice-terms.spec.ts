@@ -2,8 +2,8 @@
  * The pure rules of Saroh's own invoices (pricing catalogue U17): GST per
  * line, the CGST + SGST / IGST split, the place of supply, numbering, when a
  * renewal is a new period, the seller from configuration and the paper.
- * Every amount is made up (111, 222, 999), or the owner's worked GST
- * examples (₹1.00 across states, ₹1,500.00 within Haryana); no plan's price.
+ * Every amount is made up (111, 222, 999, 3, 1,111); never a real plan's
+ * price, since the repo is public.
  */
 import { gstPaise } from "@saroh/pricing-catalog";
 
@@ -405,23 +405,23 @@ describe("sarohInvoicePaper", () => {
         expect(view.lines[0]!.sub).toBe("GST @ 18% · less ₹111.00 discount");
     });
 
-    it("interstate: ₹1.00 → IGST @ 18% ₹0.18 → total ₹1.18 (the owner's example)", () => {
-        const view = paper([{ unitPaise: 100 }], "INTER");
+    it("interstate: ₹3.00 → IGST @ 18% ₹0.54 → total ₹3.54", () => {
+        const view = paper([{ unitPaise: 300 }], "INTER");
         expect(view.sums).toEqual([
-            ["Taxable value", "₹1.00"],
-            ["IGST @ 18%", "₹0.18"],
+            ["Taxable value", "₹3.00"],
+            ["IGST @ 18%", "₹0.54"],
         ]);
-        expect(view.total).toBe("₹1.18");
+        expect(view.total).toBe("₹3.54");
     });
 
-    it("within Haryana: ₹1,500.00 → CGST @ 9% ₹135.00 + SGST @ 9% ₹135.00 → ₹1,770.00 (the owner's example)", () => {
-        const view = paper([{ unitPaise: 150_000 }], "INTRA");
+    it("within the seller's state: ₹1,111.00 → CGST @ 9% ₹99.99 + SGST @ 9% ₹99.99 → ₹1,310.98", () => {
+        const view = paper([{ unitPaise: 111_100 }], "INTRA");
         expect(view.sums).toEqual([
-            ["Taxable value", "₹1,500.00"],
-            ["CGST @ 9%", "₹135.00"],
-            ["SGST @ 9%", "₹135.00"],
+            ["Taxable value", "₹1,111.00"],
+            ["CGST @ 9%", "₹99.99"],
+            ["SGST @ 9%", "₹99.99"],
         ]);
-        expect(view.total).toBe("₹1,770.00");
+        expect(view.total).toBe("₹1,310.98");
     });
 
     it("rounds GST once per line, half up, the odd paisa to CGST; the invoice adds the lines", () => {
@@ -547,12 +547,12 @@ describe("billing emails", () => {
             businessName: "Shop",
             number: "SA/26-27/0001",
             planName: "Plan B",
-            total: "₹1.18",
+            total: "₹3.54",
             period: "14 Oct to 13 Nov 2026",
             firstMonth: true,
         });
         expect(first.html).toContain(
-            "We&#39;ve charged ₹1.18 for the first month of Shop&#39;s Plan B plan, 14 Oct to 13 Nov 2026.",
+            "We&#39;ve charged ₹3.54 for the first month of Shop&#39;s Plan B plan, 14 Oct to 13 Nov 2026.",
         );
         expect(first.html).toContain("Settings › Plan and billing.");
         const renewal = invoiceEmail({
