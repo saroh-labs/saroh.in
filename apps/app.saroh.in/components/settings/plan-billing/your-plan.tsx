@@ -59,9 +59,9 @@ export function NoteWords({ note }: { note: PlanNote }) {
  * most ONE message, only when something needs the business (`planMessage`:
  * a payment under way or failed first, then a plan change on its way, then
  * any other warning). What is true but asks nothing (the first month's
- * small print, the 12-month term) is behind "How billing works", under the
- * plans. The line about last month is the foot, left out until there is
- * such a summary (UX-080).
+ * small print, how many charges its autopay covers) is behind "How billing
+ * works", under the plans. The line about last month is the foot, left
+ * out until there is such a summary (UX-080).
  */
 export function YourPlan(props: YourPlanProps) {
     const { canChange = true } = props;

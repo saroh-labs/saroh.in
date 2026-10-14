@@ -41,7 +41,7 @@ export function CompareTable({
                 tabIndex={0}
                 className="relative min-w-0 overflow-x-auto rounded-[18px] border border-border bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]"
             >
-                <table className="w-full min-w-[680px] border-collapse text-[15px]">
+                <table className="w-full min-w-[680px] table-fixed border-collapse text-[15px]">
                     <thead>
                         <tr className="text-left">
                             <th

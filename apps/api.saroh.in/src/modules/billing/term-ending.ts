@@ -1,30 +1,39 @@
 import type { Prisma } from "@saroh/database";
 import { liveCatalogueVersion } from "@saroh/database";
-import { addMonthsUtc } from "@saroh/pricing-catalog";
+import { addMonthsUtc, AUTOPAY_CHARGES_DEFAULT } from "@saroh/pricing-catalog";
 
 import type { Term } from "./billing-term";
-import { ONE_TIME_PAYMENT, termOf } from "./billing-term";
-import { RENEW_WINDOW_DAYS, TERM_CHARGES } from "./checkout-quote";
+import {
+    autopayChargesOfVersion,
+    ONE_TIME_PAYMENT,
+    TERM_CHECKOUT_SELECT,
+    termCheckoutOf,
+    termOf,
+} from "./billing-term";
+import { RENEW_WINDOW_DAYS } from "./checkout-quote";
 import type { PlanEndingStage } from "./plan-ending";
 import { PLAN_ENDING_NOTICE_DAYS, planEndingStage } from "./plan-ending";
 
 type Tx = Prisma.TransactionClient;
 
 /**
- * A 12-month term about to end (DEC-100): a monthly plan's 12 charges are
- * done, or a yearly plan's paid year is ending. Inside the renew window
- * (the last `RENEW_WINDOW_DAYS`) the business is asked to pay for the next
- * term, 30, 7 and 1 days ahead, the #805 plan-ending pattern: an inbox
- * notice (`plan.ending`) and an email to its billing people, each claimed
- * once per subscription, end and stage as a `CustomerNotice`. Paying
- * resubscribes it (the RENEW checkout); not paying moves it to Free at the
- * end (`term-end.ts`).
+ * An autopay about to run out (DEC-100, DEC-161): the monthly charges one
+ * approval covers (12 today) are done, or a yearly plan's paid year is
+ * ending. Inside the renew window (the last `RENEW_WINDOW_DAYS`) the
+ * business is asked to approve the next autopay (or pay for the next year),
+ * 30, 7 and 1 days ahead, the #805 plan-ending pattern: an inbox notice
+ * (`plan.ending`) and an email to its billing people, each claimed once per
+ * subscription, end and stage as a `CustomerNotice`. Approving resubscribes
+ * it (the RENEW checkout); not approving moves it to Free at the end
+ * (`term-end.ts`).
  *
  * A business that has already arranged what follows — the renewal or
- * another paid plan authorised (a SCHEDULED checkout), or a move that takes
- * over before the end — is not asked. One whose owner chose Free (or
- * cancelled) for the period's end (`freeChosenAt`) isn't asked either: it
- * is told its plan moves to Free then, as it chose (`chosenFree`).
+ * another paid plan authorised (a SCHEDULED checkout), or a move to Free
+ * that takes over before the end — is not asked. A "move them" to a newer
+ * version is not an arrangement: it keeps the same autopay, which still
+ * runs out (DEC-161). One whose owner chose Free (or cancelled) for the
+ * period's end (`freeChosenAt`) isn't asked either: it is told its plan
+ * moves to Free then, as it chose (`chosenFree`).
  */
 
 /** The once-only claim on each notice (`CustomerNotice.kind`). */
@@ -118,22 +127,23 @@ export async function termEndingOf(
                 providerSubscriptionId: sub.providerSubscriptionId,
             },
         },
-        select: {
-            providerPlanId: true,
-            cycle: true,
-            startAt: true,
-            completedAt: true,
-            createdAt: true,
-        },
+        select: TERM_CHECKOUT_SELECT,
     });
-    const term = termOf(sub, checkout, now);
+    const term = termOf(sub, await termCheckoutOf(db, checkout), now);
     if (!term?.renewOpen) return null;
     const stage = termEndingStage(term.endsAt, now);
     if (!stage) return null;
-    // Arranged already: a move that takes over first, a paid plan to come,
-    // or a renewal (or other plan) authorised and waiting.
-    if (sub.pendingFrom && sub.pendingFrom < term.endsAt) return null;
-    if ((sub.pendingPlan?.priceCents ?? 0) > 0) return null;
+    // Arranged already: a move to Free that takes over first, or a renewal
+    // (or other plan) authorised and waiting. A paid move without a
+    // checkout is a "move them" (DEC-161): it keeps this autopay, which
+    // still runs out, so the business is still asked.
+    if (
+        sub.pendingFrom &&
+        sub.pendingFrom < term.endsAt &&
+        (sub.pendingPlan?.priceCents ?? 0) === 0
+    ) {
+        return null;
+    }
     const waiting = await db.billingCheckout.findFirst({
         where: { organizationId: sub.organizationId, status: "SCHEDULED" },
         select: { id: true },
@@ -166,19 +176,60 @@ export async function termEndingOf(
 }
 
 /**
- * Subscriptions whose term may end within the renew window, by id: yearly
- * plans paid once by their period's end,
- * monthly autopay by when their charges started (12 months before the end,
- * with a few days' slack for short months; `termEndingOf` decides).
+ * The charges window of a monthly autopay covering `charges` charges that
+ * runs out between now and the renew window's end: when its charges
+ * started, with a few days' slack for short months.
+ */
+function startedBetween(charges: number, now: Date, horizon: Date) {
+    const slack = 3 * DAY_MS;
+    const from = new Date(addMonthsUtc(now, -charges).getTime() - slack);
+    const to = new Date(addMonthsUtc(horizon, -charges).getTime() + slack);
+    return [
+        { startAt: { gte: from, lte: to } },
+        { startAt: null, completedAt: { gte: from, lte: to } },
+        {
+            startAt: null,
+            completedAt: null,
+            createdAt: { gte: from, lte: to },
+        },
+    ];
+}
+
+/**
+ * Subscriptions whose autopay or paid year may end within the renew
+ * window, by id: yearly plans paid once by their period's end, monthly
+ * autopay by when its charges started (as many months before the end as
+ * the autopay covers, which is its catalogue version's count, DEC-161;
+ * `termEndingOf` decides).
  */
 export async function termEndingCandidates(
-    db: Pick<Tx, "subscription" | "billingCheckout">,
+    db: Pick<Tx, "subscription" | "billingCheckout" | "pricingCatalogVersion">,
     now: Date,
 ): Promise<string[]> {
     const horizon = new Date(now.getTime() + RENEW_WINDOW_DAYS * DAY_MS);
-    const slack = 3 * DAY_MS;
-    const from = new Date(addMonthsUtc(now, -TERM_CHARGES).getTime() - slack);
-    const to = new Date(addMonthsUtc(horizon, -TERM_CHARGES).getTime() + slack);
+    // Each version's count; versions that share one share a window.
+    const versions = await db.pricingCatalogVersion.findMany({
+        select: { version: true },
+    });
+    const byCount = new Map<number, number[]>();
+    for (const { version } of versions) {
+        const count = await autopayChargesOfVersion(db, version);
+        byCount.set(count, [...(byCount.get(count) ?? []), version]);
+    }
+    const known = versions.map((v) => v.version);
+    const windows = [
+        ...[...byCount].flatMap(([count, vs]) =>
+            startedBetween(count, now, horizon).map((w) => ({
+                ...w,
+                plan: { version: { in: vs } },
+            })),
+        ),
+        // A plan from before the catalogue: the 12 it had then.
+        ...startedBetween(AUTOPAY_CHARGES_DEFAULT, now, horizon).map((w) => ({
+            ...w,
+            plan: { version: { notIn: known } },
+        })),
+    ];
     const [yearly, monthly] = await Promise.all([
         db.subscription.findMany({
             where: {
@@ -194,15 +245,7 @@ export async function termEndingCandidates(
                 status: "COMPLETED",
                 cycle: "month",
                 providerPlanId: { not: ONE_TIME_PAYMENT },
-                OR: [
-                    { startAt: { gte: from, lte: to } },
-                    { startAt: null, completedAt: { gte: from, lte: to } },
-                    {
-                        startAt: null,
-                        completedAt: null,
-                        createdAt: { gte: from, lte: to },
-                    },
-                ],
+                OR: windows,
             },
             select: { provider: true, providerSubscriptionId: true },
         }),

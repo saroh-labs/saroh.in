@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
+    "catalogue:import": "tsx src/cli/catalogue-import.cli.ts",
     "test": "jest",
     "test:unit": "jest",
     "test:int": "jest -c jest.integration.config.js",

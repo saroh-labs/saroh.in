@@ -90,6 +90,11 @@ export interface PendingMove {
     version: number;
     from: Date;
     waiting: "held" | "authorise" | null;
+    /**
+     * What the plan it moves to costs, before GST, per its own cycle
+     * (DEC-161): the screen says a price change ahead with it.
+     */
+    pricePaise: number;
 }
 
 /** Why a business is read off the legacy path instead of the catalogue. */
@@ -419,6 +424,7 @@ export class CatalogueAccessService {
                                   : readiness === "needs-authorisation"
                                     ? "authorise"
                                     : null,
+                          pricePaise: live.pendingPlan.priceCents,
                       }
                     : null,
             modules,
@@ -493,6 +499,7 @@ export class CatalogueAccessService {
                       version: a.pendingMove.version,
                       from: a.pendingMove.from.toISOString(),
                       waiting: a.pendingMove.waiting,
+                      pricePaise: a.pendingMove.pricePaise,
                   }
                 : null,
             modules: moduleAccessViews(

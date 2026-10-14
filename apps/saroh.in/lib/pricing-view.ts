@@ -1,6 +1,5 @@
-import type { AddonKind, Catalog } from "@saroh/pricing-catalog";
+import type { Catalog } from "@saroh/pricing-catalog";
 import {
-    addonPlanNames,
     cardLines,
     cellOf,
     formatInr,
@@ -20,7 +19,6 @@ import {
 } from "@/content/types";
 
 import type {
-    AddonView,
     CompareRow,
     PlanCardView,
     PricingPageModel,
@@ -28,6 +26,7 @@ import type {
     ViewKey,
 } from "./pricing-model";
 import { viewKey } from "./pricing-model";
+import { usageView } from "./pricing-usage";
 
 /**
  * The pricing page as words, worked out on the server from the catalogue
@@ -39,7 +38,6 @@ import { viewKey } from "./pricing-model";
 
 export { viewKey } from "./pricing-model";
 export type {
-    AddonView,
     CompareRow,
     Cycle,
     PlanCardView,
@@ -47,38 +45,6 @@ export type {
     PricingView,
     ViewKey,
 } from "./pricing-model";
-
-/** "team member" / "team members": what one unit of an add-on adds. */
-const UNIT: Record<Exclude<AddonKind, "module">, [string, string]> = {
-    members: ["team member", "team members"],
-    products: ["product", "products"],
-    orders: ["order a month", "orders a month"],
-    bookings: ["online booking a month", "online bookings a month"],
-    integrations: ["connection", "connections"],
-};
-
-function addonViews(catalog: Catalog, withGst: boolean): AddonView[] {
-    const money = (p: number) => formatInr(withGst ? withGstPaise(p) : p);
-    const offered = { plans: offeredPlans(catalog) };
-    return catalog.addons.flatMap((a) => {
-        // Named plans (DEC-157): shown under them, and not at all when a
-        // visitor can choose none of them.
-        const on = addonPlanNames(offered, a);
-        if (a.plans?.length && !on) return [];
-        const pr = money(a.pricePaise);
-        let line: string;
-        if (a.kind === "module") {
-            const m = catalog.modules.find((x) => x.id === a.module);
-            line = `${m ? m.name : a.name} on a plan that doesn't include it, ${pr} a month`;
-        } else if (a.mode === "unit") {
-            line = `${pr} a month per ${UNIT[a.kind][0]}`;
-        } else {
-            const [one, many] = UNIT[a.kind];
-            line = `+${a.qty} ${a.qty > 1 ? many : one} for ${pr} a month`;
-        }
-        return [{ id: a.id, name: a.name, line, on }];
-    });
-}
 
 function planViews(
     catalog: Catalog,
@@ -175,7 +141,7 @@ export function pricingPageModel(catalog: Catalog): PricingPageModel {
             const y = yearly && yearlyOn;
             views[viewKey(yearly, withGst)] = {
                 plans: planViews(catalog, y, withGst),
-                addons: addonViews(catalog, withGst),
+                usage: usageView(catalog, withGst),
                 footnote: footnote(catalog, y, withGst),
             };
         }
@@ -215,7 +181,7 @@ export function placeholderPricingModel(): PricingPageModel {
             trial: "",
             lines: [{ t: PLAN_DETAILS_PLACEHOLDER, soon: false }],
         })),
-        addons: [],
+        usage: null,
         footnote: "",
     };
     return {

@@ -644,7 +644,7 @@ describe("catalogue writes (DB, U4)", () => {
             expect(await prisma.pricingCatalogVersion.count()).toBe(2);
         });
 
-        it("moves each subscription at its first renewal at least 7 days after go-live, and tells only those whose plan changes", async () => {
+        it("moves each subscription at its first renewal at least 7 days after go-live (30 for a new price, DEC-161), and tells only those whose plan changes", async () => {
             await installV1();
             const now = Date.now();
             const soon = new Date(now + 3 * DAY);
@@ -674,12 +674,21 @@ describe("catalogue writes (DB, U4)", () => {
                 where: { id: cancelled.id },
                 data: { status: "CANCELLED" },
             });
+            // Plan B on autopay: the provider charges what it pays now.
+            await prisma.subscription.update({
+                where: { id: onB.id },
+                data: {
+                    provider: "RAZORPAY",
+                    providerSubscriptionId: `sub_cw_${tag}`,
+                },
+            });
 
             const d = await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
                 baseVersion: 1,
             });
+            const goLive = Date.now();
             const r = await controller.publish(staff(ana), {
                 revision: d.revision,
                 policy: "move",
@@ -697,9 +706,13 @@ describe("catalogue writes (DB, U4)", () => {
                 version: 2,
                 interval: "month",
             });
-            // Renews in 3 days: too soon, so the renewal a month on.
+            // Renews in 3 days: too soon, so the renewal a month on, which
+            // is at least the 30 days a new price needs (DEC-161).
             const nextMonth = addMonthsUtc(soon, 1);
             expect(b.pendingFrom?.getTime()).toBe(nextMonth.getTime());
+            expect(nextMonth.getTime() - goLive).toBeGreaterThanOrEqual(
+                30 * DAY,
+            );
 
             const c = await prisma.subscription.findUniqueOrThrow({
                 where: { id: onC.id },
@@ -725,11 +738,13 @@ describe("catalogue writes (DB, U4)", () => {
             expect(notices[0]!.payload).toMatchObject({
                 subscriptionId: onB.id,
             });
+            // Plan B costs more on v2: told 30 days ahead, not 7.
             expect(notices[0]!.runAt.getTime()).toBe(
-                nextMonth.getTime() - 7 * DAY,
+                nextMonth.getTime() - 30 * DAY,
             );
 
-            // The notice, run twice, tells the business once.
+            // The notice, run twice, tells the business once: the new
+            // amount, approval, and the price kept until then.
             const handler = new MoveNoticeHandler();
             await handler.handle(notices[0]!);
             await handler.handle(notices[0]!);
@@ -737,7 +752,23 @@ describe("catalogue writes (DB, U4)", () => {
                 where: { organizationId: onB.organizationId },
             });
             expect(told).toHaveLength(1);
-            expect(told[0]!.title).toContain("Plan B");
+            expect(told[0]!.title).toMatch(/^Your Plan B price changes on /);
+            expect(told[0]!.body).toContain(
+                "Approve the new amount in Plan and billing. Until you do, you keep paying",
+            );
+            // …and by email, once.
+            const emails = await prisma.job.findMany({
+                where: {
+                    type: "billing.email",
+                    organizationId: onB.organizationId,
+                },
+            });
+            expect(emails).toHaveLength(1);
+            expect(emails[0]!.payload).toMatchObject({
+                kind: "PRICE_CHANGE",
+                subscriptionId: onB.id,
+                pendingFrom: nextMonth.toISOString(),
+            });
         });
 
         it("schedules a version: the live one is served until then, nothing else publishes, and cancelling removes it and its moves", async () => {

@@ -145,6 +145,39 @@ describe("quoteChange", () => {
     });
 });
 
+describe("how many charges the autopay covers (DEC-161)", () => {
+    it("is the target version's setting, 12 when unset; one for a year paid once", () => {
+        expect(
+            quoteChange({ subscription: null, target: C, now: NOW })
+                .termCharges,
+        ).toBe(12);
+        expect(
+            quoteChange({
+                subscription: null,
+                target: C,
+                now: NOW,
+                autopayCharges: 60,
+            }).termCharges,
+        ).toBe(60);
+        expect(
+            quoteChange({
+                subscription: null,
+                target: B_YEAR,
+                now: NOW,
+                autopayCharges: 60,
+            }).termCharges,
+        ).toBe(1);
+        expect(
+            quoteChange({
+                subscription: sub(),
+                target: FREE,
+                now: NOW,
+                autopayCharges: 60,
+            }).termCharges,
+        ).toBe(0);
+    });
+});
+
 describe("during the first month (DEC-159)", () => {
     const trialing = sub({ status: "TRIALING" });
 

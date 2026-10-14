@@ -10,13 +10,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
+import { Field, focusFirstError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { GST_STATES } from "@/lib/invoices/gst";
@@ -51,6 +52,51 @@ type Quoting =
 type Answer =
     | { key: string; state: "ready"; quote: ChangeQuote }
     | { key: string; state: "failed"; error: string };
+
+/** The registered address's fields, by the API's field names. */
+type AddressField = "addressLine1" | "addressLine2" | "city" | "postalCode";
+const ADDRESS_FIELDS: AddressField[] = [
+    "addressLine1",
+    "addressLine2",
+    "city",
+    "postalCode",
+];
+
+/**
+ * What is wrong with the registered address typed at checkout, by field:
+ * nothing typed is fine unless a GSTIN was given (a registered buyer's
+ * invoice carries their address, CGST Rule 46(e)); anything typed needs
+ * the first line, the city and a six-digit PIN, as the API asks.
+ */
+export function addressProblems(
+    a: Record<AddressField, string>,
+    gstinGiven: boolean,
+): Partial<Record<AddressField, string>> {
+    const line1 = a.addressLine1.trim();
+    const city = a.city.trim();
+    const pin = a.postalCode.replace(/\s+/g, "");
+    const any = Boolean(line1 || a.addressLine2.trim() || city || pin);
+    if (!any && !gstinGiven) return {};
+    const out: Partial<Record<AddressField, string>> = {};
+    if (!line1) {
+        out.addressLine1 = gstinGiven
+            ? "Add the registered address: it prints on Saroh's invoice with your GSTIN."
+            : "Add the address's first line.";
+    }
+    if (!city) out.city = "Add the city.";
+    if (!pin) out.postalCode = "Add the PIN code.";
+    else if (!/^[1-9][0-9]{5}$/.test(pin)) {
+        out.postalCode = "A PIN code is six digits, like 560038.";
+    }
+    return out;
+}
+
+const NO_ADDRESS: Record<AddressField, string> = {
+    addressLine1: "",
+    addressLine2: "",
+    city: "",
+    postalCode: "",
+};
 
 const STATE_OPTIONS = [
     { value: "", label: "As on the business's details" },
@@ -115,6 +161,12 @@ export function ChangePlanDialog({
     const [billingState, setBillingState] = useState("");
     const [gstin, setGstin] = useState("");
     const [gstinError, setGstinError] = useState<string | null>(null);
+    const [address, setAddress] =
+        useState<Record<AddressField, string>>(NO_ADDRESS);
+    const [addressErrors, setAddressErrors] = useState<
+        Partial<Record<AddressField, string>>
+    >({});
+    const detailsRef = useRef<HTMLDetailsElement>(null);
     const [pending, start] = useTransition();
     const [attempt, setAttempt] = useState(0);
 
@@ -163,13 +215,36 @@ export function ChangePlanDialog({
             ? endingAddonsNote(quoting.quote, { currentPlan })
             : null;
 
+    // The profile has no registered address: the invoice's details ask
+    // for it (an API from before the field asks nothing).
+    const asksAddress =
+        quoting.state === "ready" &&
+        quoting.quote.registeredAddress === false &&
+        Boolean(summary?.toPayment);
+
+    /** Open the details and put the keyboard on the first field in error. */
+    function showProblems() {
+        if (detailsRef.current) detailsRef.current.open = true;
+        requestAnimationFrame(() => focusFirstError(detailsRef.current));
+    }
+
     function confirm() {
         if (!picked || quoting.state !== "ready") return;
         const g = gstin.trim().toUpperCase();
         if (g && !/^[0-9A-Z]{15}$/.test(g)) {
             setGstinError("A GSTIN is 15 characters.");
+            showProblems();
             return;
         }
+        const problems = asksAddress
+            ? addressProblems(address, Boolean(g))
+            : {};
+        setAddressErrors(problems);
+        if (Object.keys(problems).length) {
+            showProblems();
+            return;
+        }
+        const typed = asksAddress && address.addressLine1.trim();
         start(async () => {
             const res = await runAction(() =>
                 changePlanAction({
@@ -178,12 +253,30 @@ export function ChangePlanDialog({
                     coupon: code || undefined,
                     billingState: billingState || undefined,
                     gstin: g || undefined,
+                    registeredAddress: typed
+                        ? {
+                              line1: address.addressLine1,
+                              line2: address.addressLine2,
+                              city: address.city,
+                              postalCode: address.postalCode,
+                          }
+                        : undefined,
                 }),
             );
             if (!res) return;
             if (!res.ok) {
-                if (res.field === "gstin") setGstinError(res.error);
-                else if (res.field === "coupon" && code) {
+                if (res.field === "gstin") {
+                    setGstinError(res.error);
+                    showProblems();
+                } else if (
+                    res.field &&
+                    (ADDRESS_FIELDS as string[]).includes(res.field)
+                ) {
+                    setAddressErrors({
+                        [res.field as AddressField]: res.error,
+                    });
+                    showProblems();
+                } else if (res.field === "coupon" && code) {
                     setDropped({ code, error: res.error });
                     onCouponRefused(res.error);
                 } else showError(res.error);
@@ -352,7 +445,7 @@ export function ChangePlanDialog({
                             // The label keeps its own words' width (up to
                             // a little over half the row) and the amount
                             // wraps beside it. A label column that may
-                            // shrink to nothing breaks "Term" a letter a
+                            // shrink to nothing breaks "Autopay" a letter a
                             // line once the amount is a sentence.
                             <div
                                 key={l.label}
@@ -393,14 +486,19 @@ export function ChangePlanDialog({
                 ) : null}
 
                 {summary?.toPayment ? (
-                    <details className="group rounded-lg border border-border px-3.5 py-2.5 text-[13px]">
+                    <details
+                        ref={detailsRef}
+                        className="group rounded-lg border border-border px-3.5 py-2.5 text-[13px]"
+                    >
                         <summary className="cursor-pointer font-semibold">
-                            Details for Saroh&apos;s invoice (optional)
+                            Details for Saroh&apos;s invoice
+                            {asksAddress ? null : " (optional)"}
                         </summary>
                         <div className="mt-3 grid gap-3">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="bill-state">
                                     State your business is registered in
+                                    {asksAddress ? <Optional /> : null}
                                 </Label>
                                 <OptionSelect
                                     id="bill-state"
@@ -410,7 +508,10 @@ export function ChangePlanDialog({
                                 />
                             </div>
                             <div className="grid gap-1.5">
-                                <Label htmlFor="bill-gstin">GSTIN</Label>
+                                <Label htmlFor="bill-gstin">
+                                    GSTIN
+                                    {asksAddress ? <Optional /> : null}
+                                </Label>
                                 <Input
                                     id="bill-gstin"
                                     value={gstin}
@@ -442,6 +543,25 @@ export function ChangePlanDialog({
                                     </p>
                                 )}
                             </div>
+                            {asksAddress ? (
+                                <CheckoutAddressFields
+                                    value={address}
+                                    errors={addressErrors}
+                                    // Asked for with a GSTIN; optional without.
+                                    optional={!gstin.trim()}
+                                    onChange={(field, v) => {
+                                        setAddress((a) => ({
+                                            ...a,
+                                            [field]: v,
+                                        }));
+                                        setAddressErrors((e) => {
+                                            const { [field]: _gone, ...rest } =
+                                                e;
+                                            return rest;
+                                        });
+                                    }}
+                                />
+                            ) : null}
                         </div>
                     </details>
                 ) : null}
@@ -479,5 +599,97 @@ export function ChangePlanDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** "(optional)" after a label, as `Field` writes it. */
+function Optional() {
+    return (
+        <span className="font-normal text-muted-foreground"> (optional)</span>
+    );
+}
+
+/**
+ * The business's registered address, asked for when its profile has none
+ * and kept there (Settings › Business shows it after): it prints on
+ * Saroh's invoice, required with a GSTIN (CGST Rule 46(e)).
+ */
+function CheckoutAddressFields({
+    value,
+    errors,
+    optional,
+    onChange,
+}: {
+    value: Record<AddressField, string>;
+    errors: Partial<Record<AddressField, string>>;
+    optional: boolean;
+    onChange: (field: AddressField, value: string) => void;
+}) {
+    return (
+        <div
+            role="group"
+            aria-labelledby="bill-address-label"
+            className="grid gap-3"
+        >
+            <div>
+                <p
+                    id="bill-address-label"
+                    className="text-[13px] font-semibold"
+                >
+                    Registered address
+                </p>
+                <p className="text-[12px] text-muted-foreground">
+                    It prints on Saroh&apos;s invoice and is saved to your
+                    business details.
+                </p>
+            </div>
+            <Field
+                label="Address line 1"
+                optional={optional}
+                error={errors.addressLine1}
+            >
+                <Input
+                    id="bill-address-line1"
+                    value={value.addressLine1}
+                    onChange={(e) => onChange("addressLine1", e.target.value)}
+                    maxLength={120}
+                    autoComplete="address-line1"
+                />
+            </Field>
+            <Field label="Address line 2" optional error={errors.addressLine2}>
+                <Input
+                    id="bill-address-line2"
+                    value={value.addressLine2}
+                    onChange={(e) => onChange("addressLine2", e.target.value)}
+                    maxLength={120}
+                    autoComplete="address-line2"
+                />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="City" optional={optional} error={errors.city}>
+                    <Input
+                        id="bill-city"
+                        value={value.city}
+                        onChange={(e) => onChange("city", e.target.value)}
+                        maxLength={60}
+                        autoComplete="address-level2"
+                    />
+                </Field>
+                <Field
+                    label="PIN code"
+                    optional={optional}
+                    error={errors.postalCode}
+                >
+                    <Input
+                        id="bill-pin"
+                        value={value.postalCode}
+                        onChange={(e) => onChange("postalCode", e.target.value)}
+                        maxLength={12}
+                        inputMode="numeric"
+                        autoComplete="postal-code"
+                    />
+                </Field>
+            </div>
+        </div>
     );
 }

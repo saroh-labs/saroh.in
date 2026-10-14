@@ -16,7 +16,6 @@ import type { Catalog } from "@saroh/pricing-catalog";
 import {
     CATALOG_PLAN_KEY_PREFIX,
     catalogPlanIdForKey,
-    MOVE_NOTICE_DAYS,
     validateCatalog,
 } from "@saroh/pricing-catalog";
 
@@ -27,6 +26,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import type { MoveNoticePayload } from "../pricing/moves.service";
 import {
+    noticeDaysFor,
     pendingFromFor,
     PRICING_MOVE_NOTICE_TYPE,
     samePlan,
@@ -356,8 +356,9 @@ export class AdminOverridesService {
 
     /**
      * Move the business to its plan on the live catalogue version: now, or
-     * at its first renewal at least {@link MOVE_NOTICE_DAYS} days away
-     * (`moveDateFor`, KTD-4), told ahead when its plan reads differently
+     * at its first renewal at least 7 days away, 30 when its price changes
+     * (`noticeDaysFor`, `moveDateFor`, KTD-4, DEC-161: the business then
+     * approves the new amount), told ahead when its plan reads differently
      * there. "Now" is refused for a provider-managed subscription, as a plan
      * change is; at renewal, the renewal path applies it.
      */
@@ -426,10 +427,13 @@ export class AdminOverridesService {
                     },
                 });
             } else {
+                // 30 days' notice when the price changes (DEC-161), else 7.
+                const noticeDays = noticeDaysFor(sub.plan, target);
                 pendingFrom = pendingFromFor(
                     sub.currentPeriodEnd,
                     now,
                     interval,
+                    noticeDays,
                 );
                 // Both columns together (the table's CHECK).
                 await tx.subscription.update({
@@ -447,8 +451,7 @@ export class AdminOverridesService {
                             type: PRICING_MOVE_NOTICE_TYPE,
                             organizationId: command.organizationId,
                             runAt: new Date(
-                                pendingFrom.getTime() -
-                                    MOVE_NOTICE_DAYS * DAY_MS,
+                                pendingFrom.getTime() - noticeDays * DAY_MS,
                             ),
                             payload: { ...payload },
                         },

@@ -716,6 +716,7 @@ export class BillingWebhookService {
                 cancelAtPeriodEnd: true,
                 pendingFrom: true,
                 plan: { select: { version: true } },
+                pendingPlan: { select: { priceCents: true } },
             },
         });
 
@@ -733,12 +734,49 @@ export class BillingWebhookService {
         const current = sub.status as SubscriptionStatus;
         const stamp = event.eventAt ? { providerEventAt: event.eventAt } : {};
 
-        // Completed (DEC-093): its 12 charges are done, and the last one
-        // paid for a period still running. The plan stays until that period
-        // ends: a renewal or a move already waiting takes over on its date;
-        // with neither, it moves to Free then.
+        // Completed (DEC-093, DEC-161): the charges its autopay covered are
+        // done, and the last one paid for a period still running. The plan
+        // stays until that period ends: a renewal or a move already waiting
+        // takes over on its date; with neither, it moves to Free then.
         if (phase === "completed" && current !== "CANCELLED") {
             const endsAt = event.currentPeriodEnd ?? sub.currentPeriodEnd;
+            // A "move them" to a newer version (a paid move with no checkout
+            // of the business's own) rode on this autopay, which has run out:
+            // nothing will bill it. Unless the business approved the next
+            // autopay or a new amount (a SCHEDULED checkout), the plan runs
+            // to the end of what was paid, then Free — never cut short at
+            // once because a new price was still waiting for approval.
+            if (
+                sub.pendingFrom &&
+                (sub.pendingPlan?.priceCents ?? 0) > 0 &&
+                endsAt &&
+                endsAt > now
+            ) {
+                const approved = await tx.billingCheckout.findFirst({
+                    where: {
+                        organizationId: sub.organizationId,
+                        status: "SCHEDULED",
+                    },
+                    select: { id: true },
+                });
+                const free = await freePlanRowInTx(tx, sub.plan.version);
+                if (!approved && free) {
+                    await tx.subscription.update({
+                        where: { id: sub.id },
+                        data: { pendingPlanId: null, pendingFrom: null },
+                    });
+                    const set = await endTermAtInTx(
+                        tx,
+                        { ...sub, pendingFrom: null },
+                        endsAt,
+                    );
+                    await tx.subscription.update({
+                        where: { id: sub.id },
+                        data: { ...stamp },
+                    });
+                    return { result: { status: "processed", changed: set } };
+                }
+            }
             if (sub.pendingFrom && sub.pendingFrom > now) {
                 await tx.subscription.update({
                     where: { id: sub.id },

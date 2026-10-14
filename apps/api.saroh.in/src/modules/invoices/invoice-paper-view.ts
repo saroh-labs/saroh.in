@@ -70,6 +70,8 @@ export interface PaperLine {
     /** "9993", spaced like the screen; empty on an unregistered paper. */
     hsn: string;
     quantity: string;
+    /** The price of one, on a paper whose table has a rate column. */
+    rate?: string;
     amount: string;
 }
 
@@ -80,12 +82,23 @@ export interface PaperView {
     dates: string;
     /** "Against KD/26-27/0001" on a credit note; "Supplementary to …". */
     related: string | null;
+    /**
+     * One more line under the dates on the right ("Payment status: Paid").
+     * Only Saroh's own invoices to businesses set it.
+     */
+    status?: string | null;
     seller: {
         name: string;
         /** Legal name, registered address, contact email: those it has. */
         lines: string[];
         /** "GSTIN … · Karnataka (29)", or "Not registered for GST". */
         tax: string;
+        /**
+         * One small line under the tax line: the product the seller sells
+         * under ("Saroh is a product of …"). Only Saroh's own invoices to
+         * businesses set it.
+         */
+        product?: string | null;
     };
     billedTo: {
         name: string;
@@ -97,6 +110,12 @@ export interface PaperView {
     placeOfSupply: string | null;
     /** Whether the HSN / SAC column has a heading (a registered paper). */
     hsnColumn: boolean;
+    /**
+     * The table's own headings where they differ from a business's paper:
+     * the code column's ("SAC"), a rate column, and the amount column's
+     * ("TAXABLE VALUE"). Only Saroh's own invoices to businesses set it.
+     */
+    table?: { code: string; rate: boolean; amount: string } | null;
     lines: PaperLine[];
     /** Taxable value and its CGST + SGST or IGST, or a typed tax. */
     sums: [string, string][];
@@ -115,6 +134,12 @@ export interface PaperView {
      * it or the business set none; absent from Saroh's own invoices.
      */
     howToPay?: string[] | null;
+    /**
+     * Who signs it (CGST Rule 46(q)): "For ‹legal name›", "Authorised
+     * signatory" and the note that it is computer-generated, one quiet
+     * block under the total. Only Saroh's own invoices to businesses set it.
+     */
+    signature?: { for: string; role: string; note: string } | null;
 }
 
 const MONTHS = [

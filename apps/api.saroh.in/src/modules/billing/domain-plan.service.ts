@@ -56,7 +56,7 @@ export interface DomainStanding {
  *   always asked.
  * - **An end known ahead**, while the plan still includes a domain: a plan
  *   override's end, a move waiting on the subscription (`pendingFrom`), or
- *   a 12-month term nobody has paid for again (`termEndingOf`), whichever
+ *   an autopay nobody has approved again (`termEndingOf`), whichever
  *   comes first and reads without a domain. Only within the 30 days the
  *   plan's own notices cover.
  * - **The clock**, once it doesn't: the business's `DOMAIN_PLAN_ENDED`

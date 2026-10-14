@@ -101,6 +101,50 @@ export async function retryProviderPlanSyncInTx(
     return reset.count;
 }
 
+/** The provider plan id a row settled on a local database carries. */
+export const LOCAL_PROVIDER_PLAN_PREFIX = "local_";
+
+/**
+ * Settle a version's PENDING provider plans on a developer's own database,
+ * with no billing provider asked: each becomes SYNCED with a stand-in id
+ * (`local_<row id>`), so the version can go live there. Only the
+ * `catalogue:import` command calls this, after refusing any database that
+ * isn't on this machine (`assertLocalDatabaseTarget`) and only when no
+ * platform Razorpay keys are set: without them the sync job could only
+ * retry until the rows were FAILED, and the copy of the dev environment's
+ * pricing would sit "waiting for billing" behind the seed's sample.
+ *
+ * The stand-in id is no plan anywhere: a checkout on it is refused by the
+ * provider, as every checkout is locally without keys. The sync job queued
+ * by the publish finds nothing PENDING and stops. Returns how many rows it
+ * settled.
+ */
+export async function settleProviderPlansLocallyInTx(
+    tx: Tx,
+    version: number,
+    now: Date,
+): Promise<number> {
+    const rows = await tx.pricingProviderPlan.findMany({
+        where: {
+            status: "PENDING",
+            plan: { version, key: { startsWith: "catalog." } },
+        },
+        select: { id: true },
+    });
+    for (const row of rows) {
+        await tx.pricingProviderPlan.update({
+            where: { id: row.id },
+            data: {
+                status: "SYNCED",
+                providerPlanId: `${LOCAL_PROVIDER_PLAN_PREFIX}${row.id}`,
+                syncedAt: now,
+                lastError: null,
+            },
+        });
+    }
+    return rows.length;
+}
+
 export interface SyncOutcome {
     synced: number;
     failed: number;

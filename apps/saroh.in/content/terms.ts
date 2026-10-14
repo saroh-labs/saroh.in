@@ -9,7 +9,12 @@
  * on businesses' goods and disputes; and the 10 Oct alignment with India's
  * DPDP Act, rev 55 (and rev 68: closing an account keeps data 180 days): downloading your data in Settings, the business as Data
  * Fiduciary and Saroh as its Data Processor, and suspending at once for what
- * the law prohibits, with what is kept of a suspended account). Published
+ * the law prohibits, with what is kept of a suspended account; and the
+ * 14 Oct change, DEC-161, the owner's approved sentences: no term and no
+ * price lock — each autopay covers 12 monthly charges and the next is
+ * approved before it runs out, and a price that goes up is told at least
+ * 30 days ahead by email and approved, the old price kept until then; the
+ * yearly payment left out while yearly is switched off). Published
  * VERBATIM at /terms: do not reword it here. A change comes from the owner's
  * text, and moves `publishOn` (`content/resources.ts`), which is the "Last
  * updated" date the page shows.
@@ -37,16 +42,15 @@ Keep your sign-in safe. You're responsible for what happens in your account, inc
 ## Plans and billing
 
 - Each plan's price, limits and add-ons are shown on saroh.in/pricing and in the app before you choose. Prices are shown before GST; GST is added as the law requires, and you get a tax invoice for every charge.
-- A paid plan runs for a term of 12 months at the price you chose, paid monthly by UPI Autopay or card, or once for the year. Your price doesn't change during your term.
-- Before your term ends, we email you asking you to pay for the next term, at the price then. Paying starts your next term. If you don't pay, your plan moves to Free when the term ends.
+- A paid plan is paid monthly by UPI Autopay or card. Each autopay you approve covers 12 monthly charges; before it runs out we ask you to approve the next one, and if you don't, your plan moves to Free.
 - We send a receipt with its tax invoice after every payment.
 - If you start with an introductory first month, you pay the amount shown when you sign up, and your plan's full price starts on the date shown unless you cancel before then. We email you 3 days before.
-- We'll give you at least 30 days' notice by email before a price you pay goes up. A new price applies only from your next term.
+- We'll give you at least 30 days' notice by email before a price you pay goes up, and ask you to approve the new amount. Until you do, you keep paying the price you have.
 - When you reach a plan's limit, Saroh warns you first, then asks you to move up a plan or add an add-on. It never deletes what you already have.
 
 ## Moving to a lower plan
 
-If your plan moves to a lower one (you cancel, don't pay for the next term, or a payment fails), what's over the new plan's limits becomes read-only: team members beyond the limit are paused, products and posts beyond the limit are hidden from your site, and extra locations stop taking orders and bookings. We email you 7 days before it happens. Nothing is deleted, your invoices, orders and customers stay, and moving back up restores everything at once.
+If your plan moves to a lower one (you cancel, don't approve the next autopay, or a payment fails), what's over the new plan's limits becomes read-only: team members beyond the limit are paused, products and posts beyond the limit are hidden from your site, and extra locations stop taking orders and bookings. We email you 7 days before it happens. Nothing is deleted, your invoices, orders and customers stay, and moving back up restores everything at once.
 
 ## Cancelling and refunds
 

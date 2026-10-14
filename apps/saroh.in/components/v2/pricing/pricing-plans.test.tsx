@@ -121,7 +121,7 @@ describe("PricingPlans", () => {
         ).toBeGreaterThan(0);
     });
 
-    it("no yearly switch when yearly is off; add-ons show when there are some", () => {
+    it("no yearly switch when yearly is off", () => {
         render(
             <PricingPlans
                 model={pricingPageModel(
@@ -132,9 +132,74 @@ describe("PricingPlans", () => {
             />,
         );
         expect(screen.queryByRole("radiogroup")).toBeNull();
+    });
+
+    it("usage beyond the plan: a table with the plans as columns, its notes, the GST switch", () => {
+        const { container } = render(
+            <PricingPlans
+                model={pricingPageModel(
+                    fakeCatalog((c) => {
+                        const p = c.modules.find((m) => m.id === "products");
+                        if (p) {
+                            p.what = "What you sell.";
+                            p.cells.grow = { inc: true, text: "3", limit: 3 };
+                            delete p.cells.pro;
+                        }
+                    }),
+                )}
+            />,
+        );
+        const section = container.querySelector<HTMLElement>("#usage");
+        if (!section) throw new Error("no usage section");
+        const s = within(section);
         expect(
-            screen.getByRole("heading", { name: "Need a little more?" }),
+            s.getByRole("heading", { name: "Usage beyond your plan" }),
         ).toBeTruthy();
+        const table = s.getByRole("table", { name: "Usage beyond your plan" });
+        expect(
+            within(table)
+                .getAllByRole("columnheader")
+                .map((h) => h.textContent),
+        ).toEqual([
+            "What you use",
+            `Plan A${formatInr(0)}`,
+            `Plan B${formatInr(11_100)}`,
+            `Plan C${formatInr(22_200)}`,
+        ]);
+        expect(
+            within(table).getByRole("columnheader", { name: /Plan B/ })
+                .className,
+        ).toContain("bg-mk-tint");
+        const products = within(table).getByRole("row", { name: /Products/ });
+        expect(within(products).getByText("What you sell.")).toBeTruthy();
+        expect(
+            within(products)
+                .getAllByRole("cell")
+                .map((c) => c.textContent),
+        ).toEqual([
+            "No limit",
+            `3 included, then ${formatInr(11_100)} per 3`,
+            "\u2014Not included",
+        ]);
+        expect(s.getAllByRole("listitem").at(-1)?.textContent).toMatch(
+            /^Prices are before GST/,
+        );
+        fireEvent.click(screen.getByRole("checkbox"));
+        expect(
+            within(products).getByText(
+                `3 included, then ${formatInr(withGstPaise(11_100))} per 3`,
+            ),
+        ).toBeTruthy();
+        expect(s.getAllByRole("listitem").at(-1)?.textContent).toMatch(
+            /^Prices include/,
+        );
+    });
+
+    it("no usage section when nothing can be added", () => {
+        const { container } = render(
+            <PricingPlans model={pricingPageModel(fakeCatalog())} />,
+        );
+        expect(container.querySelector("#usage")).toBeNull();
     });
 
     it("the placeholder: names only, no price, no switches", () => {

@@ -59,8 +59,10 @@ export interface CreateSubscriptionInput {
     /** When the recurring charges start; absent or null: at authorisation. */
     startAt?: Date | null;
     /**
-     * How many charges the subscription makes (DEC-093: a 12-month term,
-     * then a one-tap renewal). Absent: the adapter's own open-ended count.
+     * How many charges the subscription makes: what one autopay approval
+     * covers (DEC-161, the catalogue's `autopay.charges`, 12 today), then
+     * the business approves the next. Absent: the adapter's own open-ended
+     * count.
      */
     totalCount?: number;
     /**

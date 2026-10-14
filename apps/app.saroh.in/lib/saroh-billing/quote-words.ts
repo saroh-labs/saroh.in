@@ -10,7 +10,10 @@ import type { ChangeQuote, Cycle } from "./plan-view";
  * doesn't go through — said exactly as the payment window will say it.
  * Every amount is the API's (KTD-18); nothing here adds GST or a total.
  *
- * - Monthly is autopay for 12 charges, then a one-tap renewal.
+ * - Monthly is autopay. One approval covers so many monthly charges
+ *   (`termCharges`, 12 today); before it runs out we ask the business to
+ *   approve the next one (DEC-161). Never "term": it is not a price
+ *   promise, and prices can change with notice and approval.
  * - Yearly is one payment for 12 months, no autopay.
  * - Setting up autopay always takes a payment. When it's a real charge (a
  *   first month, a first charge, an upgrade's difference) it says so and
@@ -101,8 +104,8 @@ export function quoteSummary(
               value: "Before the year ends, we ask you to pay for the next one",
           }
         : {
-              label: "Term",
-              value: `${q.termCharges || 12} monthly charges, then we ask you to pay for the next 12`,
+              label: "Autopay",
+              value: `Covers ${q.termCharges || 12} monthly charges. Before it runs out, we ask you to approve the next one`,
           };
     const coupon: QuoteLine[] = q.coupon
         ? [
@@ -246,17 +249,30 @@ export function quoteSummary(
                       ...toPayment,
                       from: waitsFor(q.startAt),
                   }
-                : {
-                      title: `Move to ${plan}`,
-                      lead: `${firstMonth}${REFUNDED} Nothing changes until it starts.`,
-                      lines: [
-                          { label: "Starts", value: "", iso: q.startAt },
-                          recurring,
-                          term,
-                      ],
-                      ...toPayment,
-                      from: waitsFor(q.startAt),
-                  };
+                : plan === opts.currentPlan
+                  ? {
+                        // The plan it's on at a new price (DEC-161).
+                        title: `Approve ${plan}'s new price`,
+                        lead: `${REFUNDED} You keep paying your current price until it starts.`,
+                        lines: [
+                            { label: "Starts", value: "", iso: q.startAt },
+                            recurring,
+                            term,
+                        ],
+                        ...toPayment,
+                        from: null,
+                    }
+                  : {
+                        title: `Move to ${plan}`,
+                        lead: `${firstMonth}${REFUNDED} Nothing changes until it starts.`,
+                        lines: [
+                            { label: "Starts", value: "", iso: q.startAt },
+                            recurring,
+                            term,
+                        ],
+                        ...toPayment,
+                        from: waitsFor(q.startAt),
+                    };
         }
         case "RENEW":
             return oneTime
@@ -270,8 +286,8 @@ export function quoteSummary(
                       ...toPayment,
                   }
                 : {
-                      title: `Renew ${plan}`,
-                      lead: `Your next 12 months start the day this term ends, at today's price. ${REFUNDED}`,
+                      title: `Approve your next ${plan} autopay`,
+                      lead: `Your next autopay starts the day this one runs out, at today's price. ${REFUNDED}`,
                       lines: [
                           { label: "From", value: "", iso: q.startAt },
                           recurring,

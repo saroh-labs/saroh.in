@@ -117,6 +117,13 @@ export interface ChangeQuote {
      * from before it sends none, which reads as none ending.
      */
     addonsEnding?: EndingAddon[];
+    /**
+     * Whether the business has its registered address on its profile.
+     * False: the dialog asks for it, required with a GSTIN (Saroh's invoice
+     * to a registered buyer carries their address, CGST Rule 46(e)). An API
+     * from before it sends none, which asks nothing.
+     */
+    registeredAddress?: boolean;
 }
 
 /** An add-on that ends with a plan change, and how many are held. */
@@ -160,11 +167,20 @@ export interface CheckoutView {
     payment?: PaymentKind;
 }
 
-/** The 12-month term of the plan it's on (DEC-093, #803). */
+/**
+ * What the plan it's on was approved for (DEC-093, DEC-161, #803): when its
+ * autopay runs out (or the year paid ends), and whether the request to
+ * approve the next is open. Not a price promise: prices can change.
+ */
 export interface TermView {
     endsAt: string;
     payment: PaymentKind;
     renewOpen: boolean;
+    /**
+     * Monthly charges the autopay covers (1 for a year paid once). Absent
+     * from an API before DEC-161, which made every autopay for 12.
+     */
+    charges?: number;
 }
 
 export interface CheckoutsView {
@@ -383,6 +399,19 @@ export function yourPlan(input: {
         given &&
         (override.expiresAt === null ||
             (move !== null && override.expiresAt > move.from));
+    // A new price for the plan it pays for (DEC-161): no price lock, at
+    // least 30 days' notice, and the business approves the new amount.
+    // Until it does, it keeps paying what it pays.
+    const newPrice =
+        move &&
+        samePlan &&
+        !given &&
+        paise > 0 &&
+        move.pricePaise !== undefined &&
+        move.pricePaise > 0 &&
+        move.pricePaise !== paise
+            ? `${priceWords(move.pricePaise, yearlyPaise !== null ? "year" : "month")} + GST`
+            : null;
     if (move?.waiting === "authorise") {
         // Due, and waiting on the business: the one move that needs a tap.
         const to = planName(catalog, move.planId);
@@ -390,13 +419,35 @@ export function yourPlan(input: {
             kind: "authorise",
             tone: "attention",
             lead: samePlan
-                ? `${to}'s new price was due to start on `
+                ? `${to}'s new price${newPrice ? `, ${newPrice},` : ""} was due to start on `
                 : `Your plan was due to move to ${to} on `,
             iso: move.from,
             tail: samePlan
-                ? ". Authorise the new amount to keep it. Until then nothing changes."
-                : `. Authorise the new amount to move. Until then you stay on ${name}.`,
-            action: { label: "Authorise", planId: move.planId, cycle },
+                ? `. Approve the new amount to move to it. Until you do, you keep paying ${priceText}.`
+                : `. Approve the new amount to move. Until then you stay on ${name}.`,
+            action: { label: "Approve", planId: move.planId, cycle },
+        });
+    } else if (
+        move &&
+        newPrice &&
+        move.waiting !== "held" &&
+        // Approved already: the note below says when it starts.
+        input.checkouts?.scheduled?.plan.id !== planId
+    ) {
+        // Approving quotes the live row: offered once its version is live.
+        const live =
+            input.liveVersion !== null && move.version <= input.liveVersion;
+        notes.push({
+            kind: "priceChange",
+            tone: "attention",
+            lead: `${name}'s price changes to ${newPrice} on `,
+            iso: move.from,
+            tail: live
+                ? `. Approve the new amount before then. Until you do, you keep paying ${priceText}.`
+                : `. We'll ask you to approve the new amount. Until you do, you keep paying ${priceText}.`,
+            action: live
+                ? { label: "Approve", planId: move.planId, cycle }
+                : null,
         });
     } else if (move && !samePlan && !underOverride) {
         const to = planName(catalog, move.planId);
@@ -421,7 +472,8 @@ export function yourPlan(input: {
         }
     }
     const scheduled = input.checkouts?.scheduled ?? null;
-    // The same plan scheduled is its renewal (DEC-093).
+    // The same plan scheduled is its renewal (DEC-093), or its new price
+    // approved (DEC-161).
     const renewed = scheduled !== null && scheduled.plan.id === planId;
     if (scheduled && (!move || samePlan || renewed)) {
         notes.push(
@@ -429,9 +481,12 @@ export function yourPlan(input: {
                 ? {
                       kind: "renewed",
                       tone: "info",
-                      lead: `Your next 12 months of ${name} start on `,
+                      lead:
+                          scheduled.payment === "ONE_TIME"
+                              ? `Your next year of ${name} starts on `
+                              : `Your next autopay for ${name} starts on `,
                       iso: scheduled.startAt,
-                      tail: ", as you authorised.",
+                      tail: ", as you approved.",
                       action: null,
                   }
                 : {
@@ -439,18 +494,20 @@ export function yourPlan(input: {
                       tone: "info",
                       lead: `${scheduled.plan.name} starts on `,
                       iso: scheduled.startAt,
-                      tail: ", as you authorised. Everything stays until then.",
+                      tail: ", as you approved. Everything stays until then.",
                       action: null,
                   },
         );
     }
 
-    // The term (DEC-093, #803): when it ends, and the one-tap renewal in its
-    // last days. Left alone, the plan runs to the end and then it's Free.
-    // A plan the business is leaving has no charges left to run (DEC-159).
+    // How long the autopay runs (DEC-093, DEC-161, #803): when it runs out,
+    // and the request to approve the next in its last days. Left alone, the
+    // plan runs to the end and then it's Free. Not a price promise. A plan
+    // the business is leaving has no charges left to run (DEC-159).
     const leaving = Boolean(sub?.cancelAtPeriodEnd) && !term?.renewOpen;
     if (term && !given && !renewed && !leaving) {
         const year = term.payment === "ONE_TIME";
+        const charges = term.charges ?? 12;
         notes.push(
             term.renewOpen
                 ? {
@@ -458,19 +515,27 @@ export function yourPlan(input: {
                       tone: "attention",
                       lead: year
                           ? "The year you paid for ends on "
-                          : `Your 12 months of ${name} end on `,
+                          : `Your autopay for ${name} runs out on `,
                       iso: term.endsAt,
-                      tail: `. Pay for the next term to keep ${name} from that day, at today's price. Otherwise you move to Free then.`,
-                      action: { label: "Renew", planId, cycle },
+                      tail: year
+                          ? `. Pay for the next year to keep ${name} from that day, at today's price. Otherwise you move to Free then.`
+                          : `. Approve the next one to keep ${name} from that day, at today's price. Otherwise you move to Free then.`,
+                      action: {
+                          label: year ? "Renew" : "Approve",
+                          planId,
+                          cycle,
+                      },
                   }
                 : {
                       kind: "term",
                       tone: "info",
                       lead: year
                           ? "Paid for the year, to "
-                          : "Your 12 monthly charges run to ",
+                          : `Your autopay covers ${charges} monthly charges, to `,
                       iso: term.endsAt,
-                      tail: ". In its last 30 days we ask you to pay for the next term, and paying starts it.",
+                      tail: year
+                          ? ". Before it ends, we ask you to pay for the next year."
+                          : ". Before it runs out, we ask you to approve the next one.",
                       action: null,
                   },
         );

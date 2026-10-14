@@ -277,7 +277,7 @@ const envSchema = z.object({
         .string()
         .regex(/^[0-9]{4,8}$/, "a 4–8 digit SAC")
         .optional(),
-    // The series prefix: 1–3 capitals or digits (SRH → SRH/26-27/00001).
+    // The series prefix: 1–3 capitals or digits (SA → SA/26-27/0001, DEC-162).
     SAROH_INVOICE_PREFIX: z
         .string()
         .regex(/^[A-Z0-9]{1,3}$/, "1–3 capitals or digits")

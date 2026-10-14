@@ -22,9 +22,10 @@ import {
 } from "./term-ending";
 
 /**
- * The billing sweep's step for terms that end (DEC-100, `term-ending.ts`):
- * every subscription whose 12-month term ends within the renew window is
- * asked, once per stage, to pay for the next term (or, when its owner
+ * The billing sweep's step for autopays that run out (DEC-100, DEC-161,
+ * `term-ending.ts`): every subscription whose autopay (or paid year) ends
+ * within the renew window is asked, once per stage, to approve the next
+ * autopay or pay for the next year (or, when its owner
  * chose Free for then, told it moves to Free as it chose) — an inbox notice
  * (`plan.ending`, opening the plans) and a `TERM_ENDING` billing email,
  * claimed as a `CustomerNotice` on one transaction. One that fails never
@@ -100,7 +101,12 @@ async function remindTerm(
         }
         const words = ending.chosenFree
             ? freeChosenNotice({ ...said, pauses, domain })
-            : termEndingNotice({ ...said, pauses, domain });
+            : termEndingNotice({
+                  ...said,
+                  payment: term.payment,
+                  pauses,
+                  domain,
+              });
         const notice = await tx.notification.create({
             data: {
                 organizationId,

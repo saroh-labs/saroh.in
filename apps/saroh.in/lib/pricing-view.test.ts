@@ -124,56 +124,31 @@ describe("pricingPageModel", () => {
         expect(JSON.stringify(model)).not.toContain("Secret");
     });
 
-    it("add-ons: packs, units and modules, in words", () => {
-        const { addons } = pricingPageModel(fakeCatalog()).views["month-excl"];
-        expect(addons.map((a) => a.line)).toEqual([
-            `+3 products for ${formatInr(11_100)} a month`,
-            `Extra on a plan that doesn't include it, ${formatInr(22_200)} a month`,
-        ]);
-        expect(addons.map((a) => a.on)).toEqual(["", ""]);
-    });
-
-    it("add-ons for some plans say which, each at its own price (DEC-157)", () => {
-        const catalog = fakeCatalog((c) => {
-            c.plans[2].retired = true;
-            c.addons = [
-                {
-                    id: "items-grow",
-                    kind: "products",
-                    name: "More items",
-                    pricePaise: 11_100,
-                    mode: "pack",
-                    qty: 3,
-                    plans: ["grow"],
-                    max: 4,
-                },
-                {
-                    id: "items-free",
-                    kind: "products",
-                    name: "More items",
-                    pricePaise: 5_500,
-                    mode: "unit",
-                    qty: 1,
-                    plans: ["free", "pro"],
-                },
-                // Only on a plan nobody can choose now: not shown.
-                {
-                    id: "extra-pro",
-                    kind: "module",
-                    module: "extra",
-                    name: "Extra",
-                    pricePaise: 22_200,
-                    mode: "unit",
-                    qty: 1,
-                    plans: ["pro"],
-                },
-            ];
+    it("usage: the section per view, null when nothing can be added", () => {
+        const model = pricingPageModel(fakeCatalog());
+        // The fixture's caps are words only: no row has one to raise.
+        expect(model.views["month-excl"].usage).toBeNull();
+        const capped = pricingPageModel(
+            fakeCatalog((c) => {
+                const p = c.modules.find((m) => m.id === "products");
+                if (p) p.cells.grow = { inc: true, text: "3", limit: 3 };
+            }),
+        );
+        expect(capped.views["month-excl"].usage?.rows[1]).toMatchObject({
+            label: "Products",
+            cells: [
+                "No limit",
+                `3 included, then ${formatInr(11_100)} per 3`,
+                "No limit",
+            ],
         });
-        const { addons } = pricingPageModel(catalog).views["month-excl"];
-        expect(addons.map((a) => [a.on, a.line])).toEqual([
-            ["Plan B", `+3 products for ${formatInr(11_100)} a month`],
-            ["Plan A", `${formatInr(5_500)} a month per product`],
-        ]);
+        expect(capped.views["month-incl"].usage?.rows[1]).toMatchObject({
+            cells: [
+                "No limit",
+                `3 included, then ${formatInr(withGstPaise(11_100))} per 3`,
+                "No limit",
+            ],
+        });
     });
 });
 
@@ -186,6 +161,7 @@ describe("placeholderPricingModel", () => {
         const { plans } = model.views["month-excl"];
         expect(plans.map((p) => p.name)).toEqual(["Free", "Grow", "Pro"]);
         expect(plans.every((p) => p.price === PRICE_PLACEHOLDER)).toBe(true);
+        expect(model.views["month-excl"].usage).toBeNull();
         expect(JSON.stringify(model)).not.toMatch(NO_PRICE);
     });
 });

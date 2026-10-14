@@ -18,6 +18,7 @@ import {
     moveDownEmail,
     paymentFailedEmail,
     planEndingEmail,
+    priceChangeEmail,
     termEndingEmail,
     trialEndingEmail,
 } from "./billing-emails";
@@ -25,9 +26,10 @@ import type { DomainPlanService } from "./domain-plan.service";
 import { domainPlan } from "./domain-plan.service";
 import { paidFirstMonth } from "./offers";
 import { MOVE_DOWN_CLAIM_KIND } from "./over-limit";
+import { priceChangeOf, priceWords } from "./price-change";
 import { composeRenewalReminder } from "./renewal-reminder";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
-import { SAROH_TIMEZONE } from "./saroh-invoice-terms";
+import { FIRST_MONTH_KEY, SAROH_TIMEZONE } from "./saroh-invoice-terms";
 import { sarohSeller } from "./saroh-seller";
 import { termEndingOf } from "./term-ending";
 
@@ -37,8 +39,8 @@ type Tx = Prisma.TransactionClient;
  * Saroh's own billing mail to a business (pricing catalogue U17): the
  * invoice for a charge with its PDF, a payment that failed, a first month
  * or a free trial ending (queued by U16), a plan about to renew (#804), a
- * plan that ends on a date (#805), a 12-month term that ends (DEC-100) and
- * a move to a lower plan
+ * plan that ends on a date (#805), an autopay that runs out (DEC-100,
+ * DEC-161), a price change ahead (DEC-161) and a move to a lower plan
  * that pauses things (#801), and the business's own domain stopping with
  * its plan (DEC-139), all queued by the billing sweep. Written on the caller's transaction (the outbox),
  * so the invoice or the failed charge and its email commit together, and a
@@ -48,7 +50,8 @@ type Tx = Prisma.TransactionClient;
  * Re-read, then decide. An invoice already emailed (`emailedAt`) is not
  * sent again. A failed payment that has since been paid, a trial that is
  * no longer one, a renewal that no longer charges as told, a plan whose
- * end was moved or taken away, or a term renewed or moved since, says
+ * end was moved or taken away, an autopay renewed or moved since, or a
+ * price change cancelled or already approved, says
  * nothing. Each kind sends at most once per event,
  * claimed as a `CustomerNotice` once its email has left.
  *
@@ -118,6 +121,17 @@ export async function billingRecipients(
 
 const money = (paise: number) => moneyWordsMinor(paise, "INR");
 const day = (d: Date) => dayWords(d, SAROH_TIMEZONE, { year: true });
+/** The year in India's zone: the end of "14 Oct 2026". */
+const year = (d: Date) => day(d).slice(-4);
+
+/** "14 Oct to 13 Nov 2026"; the year on both ends only when they differ. */
+export function periodWords(start: Date, end: Date): string {
+    const from =
+        year(start) === year(end)
+            ? dayWords(start, SAROH_TIMEZONE, { year: false })
+            : day(start);
+    return `${from} to ${day(end)}`;
+}
 
 @Injectable()
 export class BillingEmailHandler {
@@ -140,6 +154,7 @@ export class BillingEmailHandler {
         if (p.kind === "INVOICE") return this.invoice(job, p);
         if (p.kind === "PLAN_ENDING") return this.planEnding(job, p);
         if (p.kind === "TERM_ENDING") return this.termEnding(job, p);
+        if (p.kind === "PRICE_CHANGE") return this.priceChange(job, p);
         if (p.kind === "MOVE_DOWN") return this.moveDown(job, p);
         if (p.kind === "DOMAIN") return this.domain(job, p);
         if (p.kind === "RENEWAL") {
@@ -179,8 +194,9 @@ export class BillingEmailHandler {
             total: money(invoice.totalPaise),
             period:
                 invoice.periodStart && invoice.periodEnd
-                    ? `${day(invoice.periodStart)} to ${day(invoice.periodEnd)}`
+                    ? periodWords(invoice.periodStart, invoice.periodEnd)
                     : null,
+            firstMonth: invoice.chargeKey.startsWith(FIRST_MONTH_KEY),
         });
         const { file, fileName } = await renderSarohInvoicePdf(invoice);
         const sent = await this.deliver(job, p.organizationId, words, [
@@ -351,10 +367,42 @@ export class BillingEmailHandler {
     }
 
     /**
-     * A 12-month term's end, 30, 7 or 1 days ahead (DEC-100). Re-read with
-     * the sweep's own rule (`termEndingOf`): a term renewed or another plan
-     * authorised since, a move that takes over first, or an end that moved
-     * says nothing. The price is the plan's on the live catalogue now.
+     * A price change ahead (DEC-161), sent with its inbox notice at least
+     * 30 days before the new price was to start. Re-read
+     * (`priceChangeOf`): a move cancelled, replaced or applied, or a new
+     * amount already approved, says nothing.
+     */
+    private priceChange(
+        job: Job,
+        p: Extract<BillingEmailPayload, { kind: "PRICE_CHANGE" }>,
+    ): Promise<void> {
+        const eventKey = `saroh-billing:price-change:${p.subscriptionId}:${p.pendingFrom}`;
+        return this.once(job, p.organizationId, eventKey, async () => {
+            const change = await priceChangeOf(prisma, p);
+            if (change?.organizationId !== p.organizationId) {
+                return "price_change_gone";
+            }
+            const org = await prisma.organization.findUnique({
+                where: { id: p.organizationId },
+                select: { name: true },
+            });
+            return priceChangeEmail({
+                businessName: org?.name ?? "your business",
+                planName: change.planName,
+                changesOn: day(change.pendingFrom),
+                now: priceWords(change.fromPaise, change.interval),
+                next: priceWords(change.toPaise, change.interval),
+                url: `${appBase()}/settings/billing`,
+            });
+        });
+    }
+
+    /**
+     * An autopay running out (or a year paid ending), 30, 7 or 1 days ahead
+     * (DEC-100, DEC-161). Re-read with the sweep's own rule
+     * (`termEndingOf`): the next autopay or another plan approved since, a
+     * move to Free that takes over first, or an end that moved says
+     * nothing. The price is the plan's on the live catalogue now.
      */
     private termEnding(
         job: Job,
@@ -382,6 +430,7 @@ export class BillingEmailHandler {
                 planName: ending.planName,
                 endsOn: day(ending.term.endsAt),
                 payment: ending.term.payment,
+                charges: ending.term.charges,
                 price:
                     ending.nextPricePaise === null
                         ? null
