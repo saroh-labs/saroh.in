@@ -190,7 +190,7 @@ describe("usageView notes", () => {
         expect(lines().notes).toEqual([
             "What you add is billed with your plan after the month it covers, or after the year on a yearly plan. Added part-way through, it costs only the days left.",
             "Add or remove it any time in Settings › Plan and billing, and your allowance changes at once.",
-            "On Plan B and Plan C, bookings past the allowance still come in, so no customer is turned away. We let you know when you pass it.",
+            "On Plan B and Plan C, online bookings past the allowance still come in, so no customer is turned away. We let you know when you pass it.",
             "On Plan A, the allowance is what you get: adding more is for paid plans.",
             `Prices are before GST. ${GST_PERCENT}% GST is added to your bill.`,
         ]);

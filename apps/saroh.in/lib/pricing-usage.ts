@@ -11,6 +11,7 @@ import {
     formatCount,
     formatInr,
     GST_PERCENT,
+    limitWordsFor,
     offeredPlans,
     withGstPaise,
 } from "@saroh/pricing-catalog";
@@ -145,6 +146,12 @@ export function usageRows(
     return { rows, modules };
 }
 
+/** What a row counts, in words: "online bookings", else its name. */
+function counted(m: CatalogModule): string {
+    const what = limitWordsFor(m.id)?.what;
+    return what ? what.replace(/ a month$/, "") : m.name.toLowerCase();
+}
+
 /** "Plan B and Plan C". */
 function names(list: string[]): string {
     const rest = list.slice(0, -1);
@@ -189,7 +196,7 @@ export function usageNotes(
             }),
         );
         notes.push(
-            `On ${names(on.map((p) => p.name))}, ${names(soft.map((m) => m.name.toLowerCase()))} past the allowance still come in, so no customer is turned away. We let you know when you pass it.`,
+            `On ${names(on.map((p) => p.name))}, ${names(soft.map(counted))} past the allowance still come in, so no customer is turned away. We let you know when you pass it.`,
         );
     }
     const free = plans.filter((p) => p.pricePaise === 0);
