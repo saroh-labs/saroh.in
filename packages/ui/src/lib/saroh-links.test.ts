@@ -55,23 +55,25 @@ describe("sarohFooterLinks", () => {
     });
 
     it("leaves out a page that is not published yet", () => {
-        // Terms and Privacy both from 10 Oct: on the 9th, neither.
+        // The day before each one's own day, whatever those days are now.
+        const dayBefore = (day: string) =>
+            new Date(new Date(`${day}T12:00:00+05:30`).getTime() - 86_400_000);
         expect(
-            sarohFooterLinks(new Date("2026-10-09T12:00:00+05:30")).map(
+            sarohFooterLinks(dayBefore(PUBLISHED_ON.privacy)).map(
                 (l) => l.label,
             ),
-        ).toEqual(["Help"]);
+        ).not.toContain("Privacy");
         expect(
-            sarohFooterLinks(new Date("2026-10-07T12:00:00+05:30")).map(
-                (l) => l.label,
-            ),
-        ).toEqual(["Help"]);
+            sarohFooterLinks(dayBefore(PUBLISHED_ON.terms)).map((l) => l.label),
+        ).not.toContain("Terms");
     });
 
     it("begins each page at midnight in India", () => {
-        const labels = (iso: string) =>
-            sarohFooterLinks(new Date(iso)).map((l) => l.label);
-        expect(labels("2026-10-09T18:29:59.999Z")).not.toContain("Privacy");
-        expect(labels("2026-10-09T18:30:00.000Z")).toContain("Privacy");
+        const labels = (at: Date) => sarohFooterLinks(at).map((l) => l.label);
+        const midnight = new Date(`${PUBLISHED_ON.privacy}T00:00:00+05:30`);
+        expect(labels(new Date(midnight.getTime() - 1))).not.toContain(
+            "Privacy",
+        );
+        expect(labels(midnight)).toContain("Privacy");
     });
 });

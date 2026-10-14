@@ -1,3 +1,4 @@
+import { PUBLISHED_ON } from "@saroh/ui/lib/saroh-links";
 import { describe, expect, it } from "vitest";
 
 import { resourceItems } from "@/components/v2/nav-items";
@@ -8,6 +9,7 @@ import { galleryTemplates } from "./templates";
 
 import type { PublishContext } from "./resources";
 import {
+    LEGAL_PAGES,
     RESOURCE_PAGES,
     dayStartsAt,
     isPublished,
@@ -278,4 +280,19 @@ describe("the list", () => {
             expect(() => dayStartsAt(p.publishOn)).not.toThrow();
         }
     });
+});
+
+// The other apps' footers link Privacy, Terms and Help from the day each
+// publishes here, and read those days from `@saroh/ui`. The same check sits
+// beside that table, but a change to this site's dates doesn't run the
+// package's tests, so a date moved here went out with the other one stale.
+describe("the days the other apps' footers go by", () => {
+    it.each(["privacy", "terms"] as const)(
+        "%s publishes on the day @saroh/ui says",
+        (id) => {
+            expect(LEGAL_PAGES.find((p) => p.id === id)?.publishOn).toBe(
+                PUBLISHED_ON[id],
+            );
+        },
+    );
 });

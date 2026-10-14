@@ -4640,3 +4640,21 @@ asserts the plan kept, the dates and what the provider is told.
 business once. A state like `TRIALING` says where a business is, never what
 its next change costs: ask `change-timing.ts`.
 **Category**: backend · `docs/patterns/backend-billing-and-classes.md`
+
+## The Privacy page's date moved, and the footer's copy of it didn't
+
+**Symptom**: a later pull request failed CI on
+`packages/ui/src/lib/saroh-links.test.ts`: "privacy is the marketing site's
+own publishOn", expected 10 Oct, received 13 Oct. The change that moved the
+date had passed the gate and CI the day before.
+**Cause**: the day a legal page publishes is written twice: in the marketing
+site's table (`content/resources.ts`) and in `@saroh/ui` (`PUBLISHED_ON`),
+which the other apps' footers read. The test that holds them together lives
+in the package, and the gate and CI run only the tests of what a change
+touches. A change to the site's table alone never ran it.
+**Fix**: the package's date follows the site's.
+**Check**: the marketing site's own `content/resources.test.ts` now compares
+the two as well, so moving either date runs a test that sees both.
+**Rule**: a test that ties two files together sits where a change to either
+one runs it, or it is written on both sides.
+**Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`
