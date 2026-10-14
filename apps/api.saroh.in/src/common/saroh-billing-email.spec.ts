@@ -26,10 +26,10 @@ import { sendSarohBillingEmail } from "./email";
 
 const mail = {
     to: ["owner@example.test", "admin@example.test"],
-    subject: "Your Saroh invoice SRH/26-27/00001",
+    subject: "Your Saroh invoice SA/26/10/0001",
     html: "<p>Invoice</p>",
     attachments: [
-        { filename: "SRH-26-27-00001.pdf", content: Buffer.from("%PDF") },
+        { filename: "SA-26-10-0001.pdf", content: Buffer.from("%PDF") },
     ],
 };
 
@@ -57,7 +57,7 @@ describe("sendSarohBillingEmail on the fake transport (U17)", () => {
         expect(tlsConnect).not.toHaveBeenCalled();
         expect(info).toHaveBeenCalledTimes(1);
         const line = String(info.mock.calls[0][0]);
-        expect(line).toContain("SRH/26-27/00001");
+        expect(line).toContain("SA/26/10/0001");
         expect(line).toContain("2 recipient(s)");
         // The addresses and the body stay out of the log.
         expect(line).not.toContain("@example.test");

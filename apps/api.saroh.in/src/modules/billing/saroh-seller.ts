@@ -20,11 +20,11 @@ export interface SarohSeller {
     address: string | null;
     email: string | null;
     sac: string | null;
-    /** The series prefix: SRH → SRH/26-27/00001. */
+    /** The series prefix: SA → SA/26/10/0001 (DEC-162). */
     prefix: string;
 }
 
-export const DEFAULT_SAROH_INVOICE_PREFIX = "SRH";
+export const DEFAULT_SAROH_INVOICE_PREFIX = "SA";
 
 /** The env values the seller is read from (a subset of `env`). */
 export interface SellerEnv {

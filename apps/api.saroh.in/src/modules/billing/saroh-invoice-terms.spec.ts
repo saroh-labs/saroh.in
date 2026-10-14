@@ -9,6 +9,7 @@ import { gstPaise } from "@saroh/pricing-catalog";
 import { invoiceEmail, paymentFailedEmail } from "./billing-emails";
 import { sarohInvoicePaper } from "./saroh-invoice-paper";
 import {
+    MAX_INVOICE_NUMBER_LENGTH,
     paiseToRupees,
     samePeriodWindow,
     sarohInvoiceNumber,
@@ -143,17 +144,30 @@ describe("sarohSupply", () => {
 });
 
 describe("numbering", () => {
-    it("counts per prefix and Indian financial year, in India's zone", () => {
-        expect(sarohSeries("SRH", new Date("2026-09-30T12:00:00Z"))).toBe(
-            "SRH/26-27",
+    it("counts per prefix, year and month, in India's zone", () => {
+        expect(sarohSeries("SA", new Date("2026-10-14T12:00:00Z"))).toBe(
+            "SA/26/10",
         );
-        // 31 March 2027, 20:00 UTC is 1 April in India: the next year.
-        expect(sarohSeries("SRH", new Date("2027-03-31T20:00:00Z"))).toBe(
-            "SRH/27-28",
+        // 31 October 2026, 20:00 UTC is 1 November in India: the next month.
+        expect(sarohSeries("SA", new Date("2026-10-31T20:00:00Z"))).toBe(
+            "SA/26/11",
         );
-        expect(sarohInvoiceNumber("SRH/26-27", 1)).toBe("SRH/26-27/00001");
-        expect(sarohInvoiceNumber("SRH/26-27", 1).length).toBeLessThanOrEqual(
-            16,
+        // January is the same financial year as the October before it, and
+        // reads as its own calendar year and month.
+        expect(sarohSeries("SA", new Date("2027-01-05T12:00:00Z"))).toBe(
+            "SA/27/01",
+        );
+        expect(sarohInvoiceNumber("SA/26/10", 1)).toBe("SA/26/10/0001");
+        expect(sarohInvoiceNumber("SA/26/10", 12345)).toBe("SA/26/10/12345");
+    });
+
+    it("never writes a number GST would refuse for its length", () => {
+        const longest = sarohSeries("SRH", new Date("2026-12-14T12:00:00Z"));
+        expect(sarohInvoiceNumber(longest, 999_999)).toHaveLength(
+            MAX_INVOICE_NUMBER_LENGTH,
+        );
+        expect(() => sarohInvoiceNumber(longest, 1_000_000)).toThrow(
+            /longer than 16/,
         );
     });
 
@@ -208,7 +222,7 @@ describe("sarohSeller", () => {
 
     it("falls back to the default prefix and names what is missing", () => {
         const s = sarohSeller({ SAROH_INVOICE_PREFIX: "toolong" });
-        expect(s.prefix).toBe("SRH");
+        expect(s.prefix).toBe("SA");
         expect(s.gstin).toBeNull();
         expect(sellerGaps(s)).toEqual([
             "SAROH_LEGAL_NAME",
@@ -224,8 +238,8 @@ describe("sarohInvoicePaper", () => {
     const base = {
         id: "inv_1",
         organizationId: "org_1",
-        number: "SRH/26-27/00007",
-        series: "SRH/26-27",
+        number: "SA/26/10/0007",
+        series: "SA/26/10",
         chargeKey: "k",
         source: "RENEWAL",
         provider: "RAZORPAY",
@@ -323,7 +337,7 @@ describe("billing emails", () => {
     it("escapes what a business typed", () => {
         const e = invoiceEmail({
             businessName: "<b>Shop</b>",
-            number: "SRH/26-27/00001",
+            number: "SA/26/10/0001",
             planName: "Plan B",
             total: "₹1",
             period: null,

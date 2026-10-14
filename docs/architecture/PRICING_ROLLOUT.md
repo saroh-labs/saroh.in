@@ -85,7 +85,7 @@ release time.
    `SAROH_INVOICE_PREFIX`; `ENVIRONMENT.md`) set **before the first real
    charge**: each invoice copies them when it is written and is never
    rewritten. The series restarts every financial year
-   (`SRH/26-27/00001`).
+   (`SA/26/10/0001`: prefix, year, month, then a count that starts again each month, DEC-162).
 
 ## How a plan override reads (U5)
 
@@ -539,7 +539,7 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   `charged` for one payment make one invoice. An event with no period end
   is not invoiced.
 - **Numbers** are Saroh's own series, `<prefix>/<financial year>/<5 digits>`
-  (`SRH/26-27/00001`), counted in `SarohInvoiceSequence` inside the
+  (`SA/26/10/0001`: prefix, year, month, then a count that starts again each month, DEC-162), counted in `SarohInvoiceSequence` inside the
   invoice's transaction, so a rolled-back charge leaves no gap. The
   financial year is India's (April–March, `Asia/Kolkata`).
 - **GST** is 18% on the line's amount after any discount, rounded half-up to

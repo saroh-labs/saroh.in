@@ -1972,3 +1972,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - The words: the workspace's notice now reads "We record how Saroh is used and which pages are opened, to make it easier. …", and the setting "Share how I use Saroh and which pages I open (…)". saroh.in's cookie notice is unchanged: "records how the site is used" covers it.
 - Consequences: these events count towards PostHog's free monthly allowance of product-analytics events; a person profile exists for each workspace user's internal id, with no properties set by Saroh. Owner, outside the repo: the Privacy Policy's "What we collect" and "Cookies" must say so before the production deploy (`apps/saroh.in/content/privacy.ts`, the owner's text).
 - Rules: `packages/error-tracking/src/browser.ts` (`pageBeforeSend`, `BrowserTracking.pageview`), `apps/app.saroh.in/lib/usage-sharing/route-shape.ts`, `apps/saroh.in/lib/tags.ts` (`pageRoute`).
+
+## DEC-162 Saroh's own invoice numbers carry the year and the month
+
+- Status: Accepted (owner, 14 Oct 2026)
+- Context: Saroh is a product of Virashi Softwares LLP, which also issues its own invoices from the same GSTIN. GST allows several invoice series from one registration if every number is unique within the financial year, runs in order, and is at most 16 characters (CGST Rule 46(b)), and every series is reported in GSTR-1's documents-issued table.
+- Decision: Saroh's invoices to businesses for their plan are numbered `‹prefix›/‹YY›/‹MM›/‹count›`, for example `SA/26/10/0001`: the prefix (a setting, `SAROH_INVOICE_PREFIX`, default `SA`), the calendar year and month in India's zone, and a count of at least four digits that starts again at 1 each month. Each month is its own series in `SarohInvoiceSequence`, so a month's numbers are one range in that month's return. A number longer than 16 characters is never written: with a prefix of up to three characters a month has room for 999,999.
+- Not changed: the numbering of the invoices a business issues to its own customers (`invoices/numbering.ts`), which follows that business's own settings.
+- Supersedes: the yearly `SRH/26-27/00001` series. Numbers already issued in it stay as they are.
