@@ -231,6 +231,14 @@ jobs:
             - name: Build the packages the app uses
               run: pnpm turbo run build --filter='${{ matrix.pkg }}^...'
 
+            # The kept Next.js cache holds every answer a build fetched with
+            # "force-cache". The marketing site reads Saroh's published plans
+            # that way, once, as it is built: with the old answer still in the
+            # cache, a build after a publish drew the plans from before it.
+            # A deploy reads what it draws afresh; the compile cache stays.
+            - name: Forget what the last build fetched
+              run: rm -rf apps/*/.next/cache/fetch-cache
+
             - name: Build for Cloudflare
               working-directory: ${{ matrix.dir }}
               run: pnpm cf:build

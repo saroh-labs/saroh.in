@@ -348,6 +348,16 @@ model Organization {
   // drawn, which gives it one; referral attribution (#809) reads it.
   referralCode String? @unique
 
+  // The business whose referral code this one's owner arrived with, and
+  // when it was recorded (DEC-156). Written once, as the business is made
+  // (`organizations/referral.ts`), and never changed after. Null: nobody
+  // referred it, or the code was unknown. One level: who referred the
+  // referrer is that business's own row. Shown to operators only.
+  referredByOrganizationId String?
+  referredByOrganization   Organization?  @relation("OrganizationReferrals", fields: [referredByOrganizationId], references: [id], onDelete: SetNull)
+  referredOrganizations    Organization[] @relation("OrganizationReferrals")
+  referredAt               DateTime?
+
   // A customer's message thread with the business (round-2 A13).
   customerThreads        CustomerThread[]
   customerThreadMessages CustomerThreadMessage[]
@@ -377,6 +387,8 @@ model Organization {
   sarohInvoices            SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
   subscriptionAddonCharges SubscriptionAddonCharge[]
+
+  @@index([referredByOrganizationId])
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -5601,6 +5613,13 @@ model WaitlistSignup {
   referredById String?
   referredBy   WaitlistSignup?  @relation("WaitlistReferrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals    WaitlistSignup[] @relation("WaitlistReferrals")
+
+  // The business that sent them, when the link's `?ref=` was a business's
+  // referral code and not an entrant's id (DEC-156). Kept so it can be
+  // recorded on the business they make once sign-up opens. A plain id, no
+  // FK, as `joinedOrganizationId` is: it is read back through the
+  // business's own rules, and a business that is gone refers nobody.
+  referredByOrganizationId String?
 
   ipHash String?
 

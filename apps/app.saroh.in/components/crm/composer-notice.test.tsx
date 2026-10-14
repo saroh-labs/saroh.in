@@ -17,15 +17,13 @@ describe("ComposerNotice", () => {
                     kind: "plan",
                     title: "Sending from your own email comes with Plus.",
                     cta: "See Plus",
-                    href: "/settings/billing?plan=plus#change-plan",
+                    href: "/settings/billing/plans?plan=plus",
                     plan: "Plus",
                 }}
             />,
         );
         expect(html).toContain("comes with Plus");
-        expect(html).toContain(
-            'href="/settings/billing?plan=plus#change-plan"',
-        );
+        expect(html).toContain('href="/settings/billing/plans?plan=plus"');
         expect(html).not.toContain("Connect");
     });
 

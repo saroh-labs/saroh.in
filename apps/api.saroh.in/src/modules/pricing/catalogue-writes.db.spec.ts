@@ -161,6 +161,7 @@ describe("catalogue writes (DB, U4)", () => {
             const first = await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             expect(first).toMatchObject({
                 revision: 1,
@@ -196,6 +197,7 @@ describe("catalogue writes (DB, U4)", () => {
                 controller.saveDraft(staff(ana), {
                     catalog: fakeCatalog() as never,
                     revision: 0,
+                    baseVersion: 1,
                 }),
             ).rejects.toMatchObject({ status: 409 });
 
@@ -219,6 +221,7 @@ describe("catalogue writes (DB, U4)", () => {
             const saved = await controller.saveDraft(staff(ana), {
                 catalog: twoHighlighted as never,
                 revision: 0,
+                baseVersion: 1,
             });
             expect(saved.valid).toBe(false);
             expect(saved.errors).toContain(
@@ -244,11 +247,137 @@ describe("catalogue writes (DB, U4)", () => {
             });
         });
 
+        it("refuses to start a draft from a version that is no longer the newest published", async () => {
+            await installV1(allFree());
+            const first = await controller.saveDraft(staff(ana), {
+                catalog: allFree((c) => {
+                    c.plans[1]!.cta = "Fake wording one";
+                }) as never,
+                revision: 0,
+                baseVersion: 1,
+            });
+            await controller.publish(staff(ana), {
+                revision: first.revision,
+                policy: "keep",
+                reason: "fake publish",
+                idempotencyKey: key(),
+            });
+
+            // Ben's page was read while version 1 was the newest.
+            const stale = {
+                catalog: allFree((c) => {
+                    c.plans[2]!.cta = "Fake wording two";
+                }) as never,
+                revision: 0,
+                baseVersion: 1,
+                idempotencyKey: key(),
+            };
+            await expect(
+                controller.saveDraft(staff(ben), stale),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    message: expect.stringContaining(
+                        "Version 2 has been published since this page was opened",
+                    ),
+                    details: {
+                        revision: null,
+                        updatedBy: null,
+                        newestVersion: 2,
+                        baseVersion: 1,
+                    },
+                },
+            });
+            // A start that doesn't say what it copied is refused too.
+            await expect(
+                controller.saveDraft(staff(ben), {
+                    catalog: stale.catalog,
+                    revision: 0,
+                }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: { details: { newestVersion: 2 } },
+            });
+            expect(await prisma.pricingCatalogDraft.count()).toBe(0);
+
+            // From the newest it starts, and the same key replays the save.
+            const fresh = { ...stale, baseVersion: 2, idempotencyKey: key() };
+            const started = await controller.saveDraft(staff(ben), fresh);
+            expect(started).toMatchObject({ revision: 1, baseVersion: 2 });
+            expect(await controller.saveDraft(staff(ben), fresh)).toEqual(
+                started,
+            );
+        });
+
+        it("starts from a version still waiting for billing, not from the live one under it", async () => {
+            await installV1();
+            const first = await controller.saveDraft(staff(ana), {
+                catalog: pricier() as never,
+                revision: 0,
+                baseVersion: 1,
+            });
+            await controller.publish(staff(ana), {
+                revision: first.revision,
+                policy: "keep",
+                reason: "fake publish",
+                idempotencyKey: key(),
+            });
+            // Version 2 waits for the billing provider: 1 is still live.
+            expect((await liveCatalogueVersion(prisma))?.version).toBe(1);
+
+            await expect(
+                controller.saveDraft(staff(ana), {
+                    catalog: fakeCatalog((c) => {
+                        c.plans[1]!.cta = "Fake wording";
+                    }) as never,
+                    revision: 0,
+                    baseVersion: 1,
+                }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: { details: { newestVersion: 2 } },
+            });
+            const next = await controller.saveDraft(staff(ana), {
+                catalog: fakeCatalog((c) => {
+                    c.plans[1]!.pricePaise = 23_400;
+                    c.plans[1]!.cta = "Fake wording";
+                }) as never,
+                revision: 0,
+                baseVersion: 2,
+            });
+            expect(next.baseVersion).toBe(2);
+        });
+
+        it("starts the first draft from nothing, and only while nothing is published", async () => {
+            const first = await controller.saveDraft(staff(ana), {
+                catalog: allFree() as never,
+                revision: 0,
+                baseVersion: null,
+            });
+            expect(first).toMatchObject({ revision: 1, baseVersion: null });
+            await controller.discardDraft(staff(ana), {
+                revision: 1,
+                idempotencyKey: key(),
+            });
+            await installV1();
+            await expect(
+                controller.saveDraft(staff(ana), {
+                    catalog: allFree() as never,
+                    revision: 0,
+                    baseVersion: null,
+                }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: { details: { newestVersion: 1 } },
+            });
+        });
+
         it("discards only the revision the person saw", async () => {
             await installV1();
             await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             await controller.saveDraft(staff(ben), {
                 catalog: pricier() as never,
@@ -279,6 +408,7 @@ describe("catalogue writes (DB, U4)", () => {
             const d = await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             const r = await controller.publish(staff(ana), {
                 revision: d.revision,
@@ -338,6 +468,7 @@ describe("catalogue writes (DB, U4)", () => {
             const d = await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             await controller.publish(staff(ana), {
                 revision: d.revision,
@@ -370,6 +501,7 @@ describe("catalogue writes (DB, U4)", () => {
                     c.plans[0]!.tagline = "Fake new line";
                 }) as never,
                 revision: 0,
+                baseVersion: 1,
             });
             const r = await controller.publish(staff(ana), {
                 revision: d.revision,
@@ -391,11 +523,69 @@ describe("catalogue writes (DB, U4)", () => {
             ]);
         });
 
+        it("refuses to publish a draft a scheduled version has overtaken, and keeps the draft", async () => {
+            await installV1(allFree());
+            const d = await controller.saveDraft(staff(ana), {
+                catalog: allFree((c) => {
+                    c.plans[1]!.cta = "Fake wording one";
+                }) as never,
+                revision: 0,
+                baseVersion: 1,
+            });
+            // A version scheduled before the draft was started goes live
+            // while the draft is open (written directly: its go-live has
+            // passed by the time of the publish).
+            const scheduled = allFree((c) => {
+                c.plans[2]!.cta = "Fake wording two";
+            });
+            await writeCatalogueVersion(prisma, {
+                version: 2,
+                catalog: scheduled,
+                goLiveAt: new Date(Date.now() - 1000),
+                policy: "keep",
+                planRows: planRows(scheduled, 2),
+            });
+
+            // The draft is still saved: nothing on screen is lost.
+            const saved = await controller.saveDraft(staff(ana), {
+                catalog: allFree((c) => {
+                    c.plans[1]!.cta = "Fake wording three";
+                }) as never,
+                revision: d.revision,
+            });
+            expect(saved).toMatchObject({ revision: 2, baseVersion: 1 });
+
+            await expect(
+                controller.publish(staff(ana), {
+                    revision: saved.revision,
+                    policy: "keep",
+                    reason: "fake publish",
+                    idempotencyKey: key(),
+                }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    message: expect.stringContaining(
+                        "Version 2 was published after this draft was started from version 1",
+                    ),
+                    details: {
+                        revision: 2,
+                        newestVersion: 2,
+                        baseVersion: 1,
+                    },
+                },
+            });
+            expect(await prisma.pricingCatalogVersion.count()).toBe(2);
+            expect(await prisma.pricingCatalogDraft.count()).toBe(1);
+            expect((await liveCatalogueVersion(prisma))?.version).toBe(2);
+        });
+
         it("refuses a draft that changes nothing", async () => {
             await installV1();
             const d = await controller.saveDraft(staff(ana), {
                 catalog: fakeCatalog() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             await expect(
                 controller.publish(staff(ana), {
@@ -412,6 +602,7 @@ describe("catalogue writes (DB, U4)", () => {
             await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             await controller.saveDraft(staff(ben), {
                 catalog: pricier() as never,
@@ -487,6 +678,7 @@ describe("catalogue writes (DB, U4)", () => {
             const d = await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             const r = await controller.publish(staff(ana), {
                 revision: d.revision,
@@ -560,6 +752,7 @@ describe("catalogue writes (DB, U4)", () => {
             const d = await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             const at = new Date(Date.now() + DAY);
             const r = await controller.publish(staff(ana), {
@@ -584,6 +777,7 @@ describe("catalogue writes (DB, U4)", () => {
                     c.plans[2]!.pricePaise = 34_500;
                 }) as never,
                 revision: 0,
+                baseVersion: 1,
             });
             await expect(
                 controller.publish(staff(ana), {
@@ -644,6 +838,7 @@ describe("catalogue writes (DB, U4)", () => {
             const d = await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             await expect(
                 controller.publish(staff(ana), {
@@ -663,6 +858,7 @@ describe("catalogue writes (DB, U4)", () => {
             const d = await controller.saveDraft(staff(ana), {
                 catalog: pricier() as never,
                 revision: 0,
+                baseVersion: 1,
             });
             await controller.publish(staff(ana), {
                 revision: d.revision,
@@ -709,6 +905,7 @@ describe("catalogue writes (DB, U4)", () => {
             await controller.saveDraft(staff(ana), {
                 catalog: fakeCatalog() as never,
                 revision: 0,
+                baseVersion: 2,
             });
             await expect(
                 controller.rollback(staff(ana), 1, {

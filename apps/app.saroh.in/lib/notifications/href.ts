@@ -72,7 +72,7 @@ const HREF: Record<NoticeKind, (id: string | null, type: string) => string> = {
     providers: () => "/settings/providers",
     team: () => "/settings/people",
     // Home while plans aren't shown (DEC-136): the page isn't there.
-    plan: () => (plansShown() ? "/settings/billing#change-plan" : "/"),
+    plan: () => (plansShown() ? "/settings/billing/plans" : "/"),
     products: () => "/commerce/products",
 };
 

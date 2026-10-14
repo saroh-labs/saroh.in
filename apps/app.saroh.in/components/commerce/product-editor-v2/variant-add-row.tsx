@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import type { ReactNode } from "react";
 
 import { productSettingsHref } from "@/lib/products/links";
 import { OptionSelect } from "@saroh/ui/option-select";
@@ -34,6 +35,7 @@ export function VariantAddRow({
     locked,
     note,
     noteBad,
+    noteAction,
     onValue,
     onSku,
     onPrice,
@@ -55,6 +57,8 @@ export function VariantAddRow({
     locked: boolean;
     note: string;
     noteBad: boolean;
+    /** A way out said after the note (the plan with more variants). */
+    noteAction?: ReactNode;
     onValue: (id: string) => void;
     onSku: (sku: string) => void;
     onPrice: (price: string) => void;
@@ -117,6 +121,7 @@ export function VariantAddRow({
                     )}
                 >
                     {note}
+                    {noteAction ? <> {noteAction}</> : null}
                 </span>
             </div>
         </div>

@@ -53,7 +53,6 @@ function row(moduleId: string, limit: number | null): ModuleAccess {
 
 const LOW = [
     row("members", 2),
-    row("reviewers", 1),
     row("products", 2),
     row("blog", 1),
     row("locations", 1),
@@ -64,7 +63,6 @@ const HIGH = LOW.map((m) => ({ ...m, limit: null }));
 const LOW_LIMITS = {
     ...UNCAPPED,
     teamMembers: 2,
-    reviewers: 1,
     products: 2,
     blogPosts: 1,
     shopLocations: 1,
@@ -97,7 +95,6 @@ function seed() {
     };
     tables.staffMember = { findMany: jest.fn(async () => []) };
     tables.organizationInvitation = { findMany: jest.fn(async () => []) };
-    tables.organizationRole = { findMany: jest.fn(async () => []) };
     tables.product = {
         count: jest.fn(async () => 5),
         findFirst: jest.fn(async () => ({ id: "p4", createdAt: ago(4) })),
@@ -126,9 +123,7 @@ function member(id: string, role: string, daysAgo: number) {
     return {
         id,
         role,
-        extraActions: [],
         createdAt: ago(daysAgo),
-        staffMember: null,
         user: { name: id, email: `${id}@example.com` },
     };
 }
@@ -205,6 +200,52 @@ describe("OverLimitService (#800)", () => {
         );
         const p = await service().pausedNow("org", NOW);
         expect([...(p?.memberIds ?? [])].sort()).toEqual(["m-early", "m-late"]);
+    });
+
+    // DEC-155: everyone uses one team seat, so a Reviewer is placed by
+    // when they joined like anyone else. No role's permissions are read
+    // (`organizationRole` isn't seeded: the proxy throws).
+    describe("with Reviewers on the team", () => {
+        const team = () => [
+            member("m-owner", "OWNER", 9),
+            member("m-reviewer-early", "REVIEWER", 8),
+            member("m-member", "MEMBER", 5),
+            member("m-reviewer-late", "REVIEWER", 2),
+        ];
+        const pausedAt = async (limit: number) => {
+            claim = { createdAt: ago(30), kind: "MOVE_DOWN" };
+            tables.membership = { findMany: jest.fn(async () => team()) };
+            modules = LOW.map((m) =>
+                m.moduleId === "members" ? { ...m, limit } : m,
+            );
+            const p = await service().pausedNow("org", NOW);
+            return [...(p?.memberIds ?? [])];
+        };
+
+        it("counts them against the team limit, earliest to join kept", async () => {
+            expect(await pausedAt(2)).toEqual(["m-member", "m-reviewer-late"]);
+            expect(await pausedAt(3)).toEqual(["m-reviewer-late"]);
+        });
+
+        it("keeps the owner alone at a limit of 1", async () => {
+            expect(await pausedAt(1)).toEqual([
+                "m-reviewer-early",
+                "m-member",
+                "m-reviewer-late",
+            ]);
+        });
+
+        it("a retired reviewers row still in the plan caps nothing of its own", async () => {
+            // A catalogue snapshot drops the row on read (`catalogSchema`);
+            // were one to reach here anyway it is a row nothing pauses by.
+            claim = { createdAt: ago(30), kind: "MOVE_DOWN" };
+            tables.membership = { findMany: jest.fn(async () => team()) };
+            modules = [...HIGH, row("reviewers", 0)];
+            const s = await service().standing("org", NOW);
+            expect(s?.limits).not.toHaveProperty("reviewers");
+            expect(s?.over).toBe(false);
+            await expect(service().pausedNow("org", NOW)).resolves.toBeNull();
+        });
     });
 
     it("reads no invoices, orders, customers or payments (the proxy throws)", async () => {

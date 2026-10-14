@@ -14,8 +14,11 @@ describe("limit words", () => {
 
     it("finds a row's words by its catalogue id", () => {
         expect(limitWordsFor("members")?.paused).toBe(
-            "New invites, and new people taking bookings, are paused. Everyone already on the team keeps access, and view-only people can still be invited.",
+            "New invites, and new people taking bookings, are paused. Everyone already on the team keeps access.",
         );
+        // No words of their own for people who only look (DEC-155).
+        expect(limitWordsFor("reviewers")).toBeNull();
+        expect(LIMIT_WORDS.reviewers).toBeUndefined();
         expect(limitWordsFor("orders")?.monthly).toBe(true);
     });
 
@@ -24,6 +27,15 @@ describe("limit words", () => {
         expect(limitWordsFor("visits")?.paused).toMatch(/^Nothing is blocked/);
         expect(limitWordsFor("visits")?.monthly).toBe(true);
         expect(limitWordsFor("locations")?.what).toBe("places customers visit");
+    });
+
+    it("words variants as a cap inside one product (DEC-158)", () => {
+        expect(limitWordsFor("variants")).toMatchObject({
+            what: "variants a product",
+            one: "variant a product",
+            paused: "No more can be added to this one.",
+            monthly: false,
+        });
     });
 
     it("has none for a switch or an unknown row", () => {

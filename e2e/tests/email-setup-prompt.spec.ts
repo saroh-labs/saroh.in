@@ -180,7 +180,7 @@ test("on a plan that can't connect one, it says a paid plan brings it, with See 
     const needs = await openHome(page, org);
     const row = needs.getByRole("link", { name: new RegExp(TITLE) });
     await expect(row).toContainText(`${MISSED} ${PLAN}`);
-    await expect(row).toHaveAttribute("href", "/settings/billing#change-plan");
+    await expect(row).toHaveAttribute("href", "/settings/billing/plans");
     await expect(needs).toContainText("Paid plans");
 
     await openProviders(page);
@@ -188,7 +188,7 @@ test("on a plan that can't connect one, it says a paid plan brings it, with See 
     await expect(prompt).toContainText(`${MISSED} ${PLAN}`);
     await expect(
         prompt.getByRole("link", { name: "See plans" }),
-    ).toHaveAttribute("href", "/settings/billing#change-plan");
+    ).toHaveAttribute("href", "/settings/billing/plans");
     await expect(
         prompt.getByRole("link", { name: "Connect your email" }),
     ).toHaveCount(0);

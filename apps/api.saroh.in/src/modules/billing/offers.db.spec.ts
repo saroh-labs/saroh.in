@@ -30,6 +30,7 @@ import { gstPaise, planRows, withGstPaise } from "@saroh/pricing-catalog";
 
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { AuditService } from "../audit/audit.service";
 import { AddonsSyncHandler, BILLING_ADDONS_SYNC_TYPE } from "./addon-charges";
 import { AddonsService } from "./addons.service";
 import { BILLING_EMAIL_TYPE } from "./billing-email.job";
@@ -339,37 +340,66 @@ describe("trials", () => {
         const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
         if (r.kind !== "TRIAL") throw new Error("expected a trial");
         await deliver(`fake_sub_${r.checkout.id}`, "authenticated");
-        // Back to Free during the trial: at once, nothing was paid ahead.
+        const ends = (await sub(ctx.organizationId)).currentPeriodEnd!;
+        // Back to Free during the trial: when it ends, never before (DEC-159).
         const free = await checkout.changePlan(ctx, {
             plan: "free",
             cycle: "month",
         });
-        expect(free.kind).toBe("TO_FREE");
+        expect(free).toMatchObject({
+            kind: "TO_FREE",
+            effectiveAt: ends.toISOString(),
+        });
+        expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.b");
+        const later = new Date(ends.getTime() + 1000);
+        await sweep.sweep(later);
         expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.free");
 
-        const again = await checkout.quote(ctx, { plan: "b", cycle: "month" });
+        const again = await checkout.quote(
+            ctx,
+            { plan: "b", cycle: "month" },
+            later,
+        );
         expect(again.kind).toBe("NEW");
     });
 
-    it("another plan during a trial keeps the trial's end", async () => {
+    it("a dearer plan during a trial ends it: paid in full today, invoiced as a new plan's first charge, with no add-ons carried (DEC-159)", async () => {
         await install();
         const ctx = await business();
+        const cRow = await row("c");
         const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
         if (r.kind !== "TRIAL") throw new Error("expected a trial");
         await deliver(`fake_sub_${r.checkout.id}`, "authenticated");
-        const ends = (await sub(ctx.organizationId)).currentPeriodEnd!;
+        await addons.set(ctx, "things-pack", 1);
 
         const c = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
         expect(c).toMatchObject({
-            kind: "TRIAL",
-            quote: { chargeNowPaise: 0, trialEndsAt: ends.toISOString() },
+            kind: "NEW",
+            quote: {
+                firstMonth: "NOW",
+                trialEndsAt: null,
+                chargeNowPaise: 0,
+                payNowTotalPaise: withGstPaise(cRow.priceCents),
+                // It starts afresh: the quote names what ends, before Confirm.
+                addonsEnding: [
+                    { id: "things-pack", quantity: 1, onNewPlan: null },
+                ],
+            },
         });
         if (c.kind === "TO_FREE") throw new Error("unreachable");
-        await deliver(`fake_sub_${c.checkout.id}`, "authenticated");
+        const end = new Date(Date.now() + 30 * DAY);
+        await deliver(`fake_sub_${c.checkout.id}`, "activated", {
+            currentPeriodEnd: end,
+        });
         expect(await sub(ctx.organizationId)).toMatchObject({
-            status: "TRIALING",
+            status: "ACTIVE",
             plan: { key: "catalog.c" },
-            currentPeriodEnd: ends,
+            currentPeriodEnd: end,
+        });
+        expect(await prisma.subscriptionAddon.count()).toBe(0);
+        expect(await prisma.sarohInvoice.findFirstOrThrow()).toMatchObject({
+            source: "NEW",
+            taxablePaise: cRow.priceCents,
         });
     });
 });
@@ -815,6 +845,196 @@ describe("add-ons", () => {
         });
         await expect(addons.set(ctx, "nothing", 1)).rejects.toMatchObject({
             status: 404,
+        });
+    });
+
+    /** One more person, priced and capped for Plan B and for Plan C (DEC-157). */
+    const PER_PLAN = () =>
+        OFFERS((c) => {
+            c.plans[1]!.trial = undefined;
+            c.addons.push(
+                {
+                    id: "person-b",
+                    kind: "members",
+                    name: "One more person",
+                    pricePaise: 222,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["b"],
+                    max: 2,
+                },
+                {
+                    id: "person-c",
+                    kind: "members",
+                    name: "One more person on C",
+                    pricePaise: 111,
+                    mode: "unit",
+                    qty: 1,
+                    plans: ["c"],
+                    max: 5,
+                },
+            );
+        });
+    const people = async (organizationId: string) => {
+        const a = await access.resolve(organizationId);
+        return a.source === "catalogue"
+            ? a.modules.find((m) => m.moduleId === "members")?.limit
+            : null;
+    };
+
+    it("a business sees and buys only its plan's add-ons, up to each one's maximum", async () => {
+        await install(PER_PLAN());
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+
+        const view = await addons.list(ctx);
+        expect(view.addons.map((a) => a.id)).toEqual([
+            "things-pack",
+            "bills",
+            "office",
+            "person-b",
+        ]);
+        expect(view.addons.find((a) => a.id === "person-b")).toMatchObject({
+            pricePaise: 222,
+            max: 2,
+            available: true,
+        });
+
+        await expect(addons.set(ctx, "person-c", 1)).rejects.toMatchObject({
+            status: 400,
+            message: "One more person on C isn't offered on Plan B.",
+        });
+        await expect(addons.set(ctx, "person-b", 3)).rejects.toMatchObject({
+            status: 400,
+            message: "You can have up to 2 of One more person on Plan B.",
+        });
+        expect(await prisma.subscriptionAddon.count()).toBe(0);
+        await addons.set(ctx, "person-b", 2);
+        expect(await people(ctx.organizationId)).toBe(3 + 2);
+    });
+
+    it("keeps what was held before the maximum came down, and sells no more", async () => {
+        await install(PER_PLAN());
+        const ctx = await business();
+        const { providerSub, periodEnd } = await onPaidPlan(ctx, "b");
+        await addons.set(ctx, "person-b", 2);
+        // Held from when the add-on allowed more than it does now.
+        await prisma.subscriptionAddon.updateMany({
+            where: { organizationId: ctx.organizationId, addonId: "person-b" },
+            data: { quantity: 4 },
+        });
+
+        const view = await addons.list(ctx);
+        expect(view.addons.find((a) => a.id === "person-b")).toMatchObject({
+            quantity: 4,
+            max: 2,
+            heldPaise: 4 * 222,
+        });
+        expect(await people(ctx.organizationId)).toBe(3 + 4);
+        await expect(addons.set(ctx, "person-b", 5)).rejects.toMatchObject({
+            status: 400,
+            message: "You can have up to 2 of One more person on Plan B.",
+        });
+
+        // The renewal charges all four; nothing was taken away.
+        const next = new Date(periodEnd.getTime() + 30 * DAY);
+        await deliver(providerSub, "charged", { currentPeriodEnd: next });
+        expect(
+            await prisma.subscriptionAddonCharge.findFirstOrThrow({
+                where: { periodStart: periodEnd },
+            }),
+        ).toMatchObject({ addonId: "person-b", quantity: 4, unitPaise: 222 });
+
+        // Fewer is its own choice, and still above the maximum.
+        await addons.set(ctx, "person-b", 3);
+        expect(await people(ctx.organizationId)).toBe(3 + 3);
+    });
+
+    it("an add-on the new plan isn't offered ends with the old plan; nothing is bought in its place", async () => {
+        await install(PER_PLAN());
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+        await addons.set(ctx, "person-b", 2);
+        const owedBefore = await prisma.subscriptionAddonCharge.count();
+
+        // The quote names it before the business confirms, with Plan C's own.
+        const ending = [
+            {
+                id: "person-b",
+                name: "One more person",
+                quantity: 2,
+                onNewPlan: "One more person on C",
+            },
+        ];
+        expect(
+            (await checkout.quote(ctx, { plan: "c", cycle: "month" }))
+                .addonsEnding,
+        ).toEqual(ending);
+        // Free ends it too, and offers nothing in its place.
+        expect(
+            (await checkout.quote(ctx, { plan: "free", cycle: "month" }))
+                .addonsEnding,
+        ).toEqual([{ ...ending[0], onNewPlan: null }]);
+        // The plan it is on ends nothing.
+        expect(
+            (await checkout.quote(ctx, { plan: "b", cycle: "month" }))
+                .addonsEnding,
+        ).toEqual([]);
+
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        expect(r.kind).toBe("UPGRADE");
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        expect(r.quote.addonsEnding).toEqual(ending);
+        // Until it is authorised, the business is on Plan B with its add-on.
+        expect(await people(ctx.organizationId)).toBe(3 + 2);
+        // With the audit log on, as the module runs it.
+        webhooks = new BillingWebhookService(
+            new FakeBillingProviderFactory(fake),
+            new AuditService(),
+            new SarohInvoicesService(SELLER),
+        );
+        await deliver(`fake_sub_${r.checkout.id}`, "authenticated");
+
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.c" },
+        });
+        expect(await prisma.subscriptionAddon.count()).toBe(0);
+        // The operator sees what ended, and that the plan change ended it.
+        const audited = await prisma.auditEvent.findMany({
+            where: {
+                organizationId: ctx.organizationId,
+                action: "organization.plan.addon.changed",
+            },
+        });
+        expect(audited).toHaveLength(1);
+        expect(audited[0]).toMatchObject({
+            actorUserId: "owner-user",
+            targetType: "subscription",
+            outcome: "SUCCESS",
+            metadata: {
+                addonId: "person-b",
+                from: 2,
+                to: 0,
+                reason: "plan-change",
+            },
+        });
+        // Nothing left to name once it is on Plan C.
+        expect(
+            (await checkout.quote(ctx, { plan: "b", cycle: "month" }))
+                .addonsEnding,
+        ).toEqual([]);
+        expect(await people(ctx.organizationId)).toBe(9);
+        // What the period already owed rides on the new plan's first charge.
+        const owed = await prisma.subscriptionAddonCharge.findMany();
+        expect(owed).toHaveLength(owedBefore);
+        expect(owed.every((o) => o.status === "QUEUED")).toBe(true);
+
+        const view = await addons.list(ctx);
+        expect(view.addons.map((a) => a.id)).not.toContain("person-b");
+        expect(view.addons.find((a) => a.id === "person-c")).toMatchObject({
+            quantity: 0,
+            pricePaise: 111,
+            max: 5,
         });
     });
 

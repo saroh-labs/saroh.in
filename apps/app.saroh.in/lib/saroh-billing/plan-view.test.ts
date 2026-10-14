@@ -5,8 +5,14 @@ import { describe, expect, it } from "vitest";
 import { access } from "@/lib/billing/fixtures.test-data";
 
 import type { SarohSubscription } from "./plan";
-import type { AddonsView } from "./plan-view";
-import { addonRows, pickerRows, yearlyOffer, yourPlan } from "./plan-view";
+import type { AddonsView, RowQuote } from "./plan-view";
+import {
+    addonRows,
+    pickerRows,
+    waitingMove,
+    yearlyOffer,
+    yourPlan,
+} from "./plan-view";
 
 /** Made up on purpose: Plan A/B/C, ₹0 / ₹111 / ₹222 — no real prices. */
 const CATALOG: Catalog = parseCatalog({
@@ -90,7 +96,13 @@ describe("yourPlan", () => {
                 iso: "2026-11-01T00:00:00.000Z",
                 amount: "₹111 + GST",
             },
-            method: "Through Razorpay",
+            method: "Paid through Razorpay",
+            status: [
+                {
+                    lead: "Next charge ₹111 + GST on ",
+                    iso: "2026-11-01T00:00:00.000Z",
+                },
+            ],
             notes: [],
         });
     });
@@ -497,7 +509,7 @@ describe("yourPlan", () => {
 });
 
 describe("pickerRows", () => {
-    it("marks the billed plan, and offers each other as an upgrade or a switch", () => {
+    it("marks the billed plan, and offers each other as an upgrade or a move, named", () => {
         const rows = pickerRows({
             catalog: CATALOG,
             subscription: sub(),
@@ -505,9 +517,59 @@ describe("pickerRows", () => {
             trials: new Set(),
         });
         expect(rows.map((r) => [r.name, r.price, r.current, r.cta])).toEqual([
-            ["Plan A", "₹0", false, "Switch"],
+            [
+                "Plan A",
+                "₹0",
+                false,
+                { label: "Move to Plan A", iso: null, primary: false },
+            ],
             ["Plan B", "₹111 a month + GST", true, null],
-            ["Plan C", "₹222 a month + GST", false, "Upgrade"],
+            [
+                "Plan C",
+                "₹222 a month + GST",
+                false,
+                { label: "Upgrade to Plan C", iso: null, primary: true },
+            ],
+        ]);
+        // The price in two sizes: the amount, then what it is for.
+        expect(rows.map((r) => [r.amount, r.per])).toEqual([
+            ["₹0", ""],
+            ["₹111", "a month + GST"],
+            ["₹222", "a month + GST"],
+        ]);
+    });
+
+    it("shows every line of a plan, not the first few", () => {
+        const many = parseCatalog({
+            ...CATALOG,
+            modules: ["one", "two", "three", "four", "five", "six"].map(
+                (id) => ({
+                    id,
+                    name: id,
+                    group: "g",
+                    what: `${id}.`,
+                    cells: {
+                        a: { inc: false, text: "" },
+                        b: { inc: false, text: "" },
+                        c: { inc: true, text: id, card: `Line ${id}` },
+                    },
+                }),
+            ),
+        });
+        const rows = pickerRows({
+            catalog: many,
+            subscription: sub(),
+            cycle: "month",
+            trials: new Set(),
+        });
+        expect(rows[2].lead).toBe("Everything in Plan B, plus:");
+        expect(rows[2].lines).toEqual([
+            "Line one",
+            "Line two",
+            "Line three",
+            "Line four",
+            "Line five",
+            "Line six",
         ]);
     });
 
@@ -538,7 +600,13 @@ describe("pickerRows", () => {
             given: { planId: "c", until: "2027-12-31T00:00:00.000Z" },
         });
         expect(
-            rows.map((r) => [r.name, r.current, r.cta, r.note, r.what]),
+            rows.map((r) => [
+                r.name,
+                r.current,
+                r.cta?.label ?? null,
+                r.note,
+                r.what,
+            ]),
         ).toEqual([
             [
                 "Plan A",
@@ -547,7 +615,7 @@ describe("pickerRows", () => {
                 { lead: "After ", iso: "2027-12-31T00:00:00.000Z" },
                 "For A.",
             ],
-            ["Plan B", false, "Switch", null, "For B."],
+            ["Plan B", false, "Move to Plan B", null, "For B."],
             [
                 "Plan C",
                 true,
@@ -569,9 +637,16 @@ describe("pickerRows", () => {
             trials: new Set(["c"]),
         });
         expect(trial[2]).toMatchObject({
-            cta: "Start 14-day trial",
-            what: "For C. · 14-day free trial",
+            cta: { label: "Start 14-day trial", primary: true },
+            what: "For C.",
+            offer: "14-day free trial",
         });
+        // No offer line on a plan this business would get none on.
+        expect(trial.map((r) => r.offer)).toEqual([
+            null,
+            null,
+            "14-day free trial",
+        ]);
     });
 
     it("a first month that costs something is said with its amount, never as a free trial (DEC-093)", () => {
@@ -590,8 +665,9 @@ describe("pickerRows", () => {
             trials: new Set(["c"]),
         });
         expect(month[2]).toMatchObject({
-            cta: "Start with the first month",
-            what: "For C. · first month ₹7 + GST",
+            cta: { label: "Start with the first month", primary: true },
+            what: "For C.",
+            offer: "First month ₹7 + GST",
         });
         // Yearly is one payment: no trial on it.
         const year = pickerRows({
@@ -600,7 +676,11 @@ describe("pickerRows", () => {
             cycle: "year",
             trials: new Set(["c"]),
         });
-        expect(year[2]).toMatchObject({ cta: "Upgrade", what: "For C." });
+        expect(year[2]).toMatchObject({
+            cta: { label: "Upgrade to Plan C" },
+            what: "For C.",
+            offer: null,
+        });
     });
 
     it("prices yearly by the catalogue's rule, and offers billing the plan yearly", () => {
@@ -610,11 +690,17 @@ describe("pickerRows", () => {
             cycle: "year",
             trials: new Set(),
         });
-        expect(rows.map((r) => [r.price, r.current, r.cta])).toEqual([
-            ["₹0", false, "Switch"],
+        expect(
+            rows.map((r) => [r.price, r.current, r.cta?.label ?? null]),
+        ).toEqual([
+            ["₹0", false, "Move to Plan A"],
             ["₹1,110 a year + GST", false, "Bill yearly"],
-            ["₹2,220 a year + GST", false, "Upgrade"],
+            ["₹2,220 a year + GST", false, "Upgrade to Plan C"],
         ]);
+        expect(rows[1]).toMatchObject({
+            amount: "₹1,110",
+            per: "a year + GST",
+        });
         expect(yearlyOffer(CATALOG)).toEqual({ on: true, freeMonths: 2 });
         expect(
             yearlyOffer({ ...CATALOG, yearly: { on: false, paid: 10 } }),
@@ -628,10 +714,334 @@ describe("pickerRows", () => {
             cycle: "month",
             trials: new Set(["c"]),
         });
-        expect(rows.map((r) => r.cta)).toEqual([
+        // From Free a paid plan is started, not upgraded to.
+        expect(rows.map((r) => r.cta?.label ?? null)).toEqual([
             null,
-            "Upgrade",
+            "Start Plan B",
             "Start 14-day trial",
+        ]);
+        expect(rows.map((r) => r.cta?.primary ?? null)).toEqual([
+            null,
+            true,
+            true,
+        ]);
+    });
+});
+
+describe("pickerRows: when a change would start (DEC-159)", () => {
+    const NOW = new Date("2026-10-13T00:00:00.000Z");
+    const END = "2026-11-01T00:00:00.000Z";
+    const q = (over: Partial<RowQuote>): RowQuote => ({
+        kind: "SCHEDULED",
+        effectiveAt: null,
+        firstMonth: null,
+        payNowTotalPaise: 0,
+        ...over,
+    });
+    const onC = sub({
+        status: "TRIALING",
+        plan: { ...sub().plan, key: "catalog.c", priceCents: 22_200 },
+    });
+
+    it("an upgrade says it starts today and what is paid now; a cheaper plan and Free say the date and the plan kept", () => {
+        const rows = pickerRows({
+            catalog: CATALOG,
+            subscription: sub(),
+            cycle: "month",
+            trials: new Set(),
+            now: NOW,
+            quotes: new Map([
+                ["a", q({ kind: "TO_FREE", effectiveAt: END })],
+                ["c", q({ kind: "UPGRADE", payNowTotalPaise: 6_549 })],
+            ]),
+        });
+        expect(rows.map((r) => [r.name, r.cta, r.note])).toEqual([
+            [
+                "Plan A",
+                // Moving down is the quiet button, and says its date.
+                { label: "Move to Plan A from ", iso: END, primary: false },
+                {
+                    lead: "From ",
+                    iso: END,
+                    tail: ": you keep Plan B until then.",
+                    brief: "You keep Plan B until then.",
+                },
+            ],
+            ["Plan B", null, null],
+            [
+                "Plan C",
+                { label: "Upgrade to Plan C", iso: null, primary: true },
+                { lead: "Starts today: ₹65.49 now (incl. GST)", iso: null },
+            ],
+        ]);
+    });
+
+    it("during the first month: a dearer plan ends the month today, a cheaper one waits for its end, and neither offers a second first month", () => {
+        const firstMonth = parseCatalog({
+            ...CATALOG,
+            plans: CATALOG.plans.map((p) =>
+                p.pricePaise > 0
+                    ? { ...p, trial: { on: true, days: 30, firstPaise: 700 } }
+                    : p,
+            ),
+        });
+        const up = pickerRows({
+            catalog: firstMonth,
+            subscription: sub({ status: "TRIALING" }),
+            cycle: "month",
+            // The API quotes no trial while a first month runs.
+            trials: new Set(),
+            now: NOW,
+            quotes: new Map([
+                [
+                    "a",
+                    q({
+                        kind: "TO_FREE",
+                        effectiveAt: END,
+                        firstMonth: "AT_END",
+                    }),
+                ],
+                [
+                    "c",
+                    q({
+                        kind: "NEW",
+                        firstMonth: "NOW",
+                        payNowTotalPaise: 26_196,
+                    }),
+                ],
+            ]),
+        });
+        expect(up[2]).toMatchObject({
+            cta: { label: "Upgrade to Plan C", iso: null, primary: true },
+            what: "For C.",
+            offer: null,
+            note: {
+                lead: "Starts today: ₹261.96 now (incl. GST). Your first month on Plan B ends.",
+                iso: null,
+            },
+        });
+        expect(up[0]).toMatchObject({
+            cta: { label: "Move to Plan A from ", iso: END, primary: false },
+            note: {
+                lead: "From ",
+                iso: END,
+                tail: ": you keep Plan B until then.",
+            },
+        });
+
+        const down = pickerRows({
+            catalog: firstMonth,
+            subscription: onC,
+            cycle: "month",
+            trials: new Set(),
+            now: NOW,
+            quotes: new Map([
+                [
+                    "b",
+                    q({
+                        kind: "SCHEDULED",
+                        effectiveAt: END,
+                        firstMonth: "AT_END",
+                    }),
+                ],
+            ]),
+        });
+        expect(down[1]).toMatchObject({
+            cta: { label: "Move to Plan B from ", iso: END, primary: false },
+            what: "For B.",
+            offer: null,
+            note: {
+                lead: "From ",
+                iso: END,
+                tail: ": you keep Plan C until then.",
+            },
+        });
+    });
+
+    it("a change that already waits says its date on its row, with no button to make it twice", () => {
+        const rows = pickerRows({
+            catalog: CATALOG,
+            subscription: onC,
+            cycle: "month",
+            trials: new Set(),
+            now: NOW,
+            quotes: new Map([
+                ["a", q({ kind: "TO_FREE", effectiveAt: END })],
+                ["b", q({ kind: "SCHEDULED", effectiveAt: END })],
+            ]),
+            waiting: { planId: "b", iso: END, cycle: "month" },
+        });
+        expect(
+            rows.map((r) => [
+                r.name,
+                r.cta?.label ?? null,
+                r.scheduled,
+                r.note?.tail ?? null,
+            ]),
+        ).toEqual([
+            [
+                "Plan A",
+                "Move to Plan A from ",
+                null,
+                ": you keep Plan C until then.",
+            ],
+            // The plan the change waits for: its date, and no button.
+            ["Plan B", null, END, ": you keep Plan C until then."],
+            ["Plan C", null, null, null],
+        ]);
+        // Authorised monthly: the yearly row of the same plan still offers.
+        const year = pickerRows({
+            catalog: CATALOG,
+            subscription: onC,
+            cycle: "year",
+            trials: new Set(),
+            now: NOW,
+            waiting: { planId: "b", iso: END, cycle: "month" },
+        });
+        expect(year[1]).toMatchObject({
+            cta: { label: "Move to Plan B" },
+            scheduled: null,
+            note: null,
+        });
+    });
+
+    it("says nothing of timing without a quote, or once the date has passed", () => {
+        const rows = pickerRows({
+            catalog: CATALOG,
+            subscription: sub(),
+            cycle: "month",
+            trials: new Set(),
+            now: NOW,
+            quotes: new Map([
+                ["a", q({ kind: "TO_FREE", effectiveAt: NOW.toISOString() })],
+            ]),
+        });
+        expect(rows.map((r) => r.note)).toEqual([null, null, null]);
+        expect(rows.map((r) => r.cta?.label ?? null)).toEqual([
+            "Move to Plan A",
+            null,
+            "Upgrade to Plan C",
+        ]);
+    });
+});
+
+describe("waitingMove (DEC-159)", () => {
+    const END = "2026-11-01T00:00:00.000Z";
+    const scheduled = (planId: string, cycle = "month") => ({
+        id: "co",
+        kind: "SCHEDULED",
+        status: "SCHEDULED",
+        plan: { id: planId, name: planId, version: 3 },
+        cycle,
+        pricePaise: 11_100,
+        startAt: END,
+        expiresAt: END,
+        createdAt: END,
+    });
+    const on = access({ plan: { id: "c", name: "Plan C" } });
+
+    it("is the plan authorised for the date, on the cycle it was authorised on", () => {
+        expect(
+            waitingMove({
+                access: on,
+                checkouts: { open: null, scheduled: scheduled("b") },
+            }),
+        ).toEqual({ planId: "b", iso: END, cycle: "month" });
+    });
+
+    it("is Free chosen for the end of what is paid", () => {
+        expect(
+            waitingMove({
+                access: access({
+                    plan: { id: "c", name: "Plan C" },
+                    pendingMove: {
+                        planId: "a",
+                        fromPlanId: "c",
+                        version: 3,
+                        from: END,
+                        waiting: null,
+                    },
+                }),
+                checkouts: { open: null, scheduled: null },
+            }),
+        ).toEqual({ planId: "a", iso: END, cycle: null });
+    });
+
+    it("is nothing for the plan's own renewal, its next version, or a move that waits on someone", () => {
+        expect(
+            waitingMove({
+                access: on,
+                checkouts: { open: null, scheduled: scheduled("c") },
+            }),
+        ).toBeNull();
+        const move = {
+            planId: "c",
+            fromPlanId: "c",
+            version: 4,
+            from: END,
+            waiting: null,
+        };
+        expect(
+            waitingMove({
+                access: access({ ...on, pendingMove: move }),
+                checkouts: null,
+            }),
+        ).toBeNull();
+        expect(
+            waitingMove({
+                access: access({
+                    ...on,
+                    pendingMove: { ...move, planId: "b", waiting: "authorise" },
+                }),
+                checkouts: null,
+            }),
+        ).toBeNull();
+    });
+});
+
+describe("yourPlan: leaving at the end of what is paid (DEC-159)", () => {
+    it("in the first month it says when the plan ends, and nothing of charges it will never take", () => {
+        const END = "2026-11-01T00:00:00.000Z";
+        const v = yourPlan({
+            access: access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+                pendingMove: {
+                    planId: "a",
+                    fromPlanId: "b",
+                    version: 3,
+                    from: END,
+                    waiting: null,
+                },
+            }),
+            subscription: sub({
+                status: "TRIALING",
+                cancelAtPeriodEnd: true,
+                currentPeriodEnd: END,
+            }),
+            catalog: CATALOG,
+            liveVersion: 3,
+            checkouts: {
+                open: null,
+                scheduled: null,
+                term: {
+                    endsAt: "2027-11-01T00:00:00.000Z",
+                    payment: "AUTOPAY",
+                    renewOpen: false,
+                },
+            },
+            addonsHeld: false,
+        });
+        expect(v.next).toEqual({ kind: "ends", iso: END });
+        expect(v.notes).toEqual([
+            {
+                kind: "move",
+                tone: "info",
+                lead: "Your plan changes to Plan A on ",
+                iso: END,
+                tail: ". Everything stays until then.",
+                action: null,
+            },
         ]);
     });
 });
@@ -672,6 +1082,25 @@ describe("addonRows", () => {
         expect(
             addonRows(view({ quantity: 2, heldPaise: 22_200 }))[0].total,
         ).toBe("2 × · ₹222 a month");
+    });
+
+    it("says the plan's own maximum, and keeps what is held above it (DEC-157)", () => {
+        // None of its own: the ceiling, and nothing said.
+        expect(addonRows(view())[0]).toMatchObject({
+            max: 20,
+            line: "+100 products for ₹111 a month",
+        });
+        expect(addonRows(view({ max: 4 }))[0]).toMatchObject({
+            max: 4,
+            line: "+100 products for ₹111 a month, up to 4",
+        });
+        expect(
+            addonRows(view({ max: 4, mode: "unit", kind: "members" }))[0].line,
+        ).toBe("₹111 a month per team member, up to 4");
+        // Held from before the maximum came down: shown as held.
+        expect(
+            addonRows(view({ max: 4, quantity: 6, heldPaise: 66_600 }))[0],
+        ).toMatchObject({ quantity: 6, max: 4, total: "6 × · ₹666 a month" });
     });
 
     it("leaves out one the plan can't take unless it's held", () => {

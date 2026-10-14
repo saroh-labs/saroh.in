@@ -9,6 +9,7 @@ import {
     analyticsDestination,
     fireConversion,
     NOTHING_ALLOWED,
+    pageRoute,
     resetTags,
     startRecording,
     syncTags,
@@ -314,6 +315,21 @@ describe("allowedNow: who is never tagged", () => {
         accept();
         vi.stubGlobal("navigator", { doNotTrack: "1" });
         expect(allowedNow()).toEqual(NOTHING_ALLOWED);
+    });
+});
+
+describe("pageRoute: the page as a visit may say it (DEC-160)", () => {
+    afterEach(() => window.history.replaceState(null, "", "/"));
+
+    it("is the path, with only the query the allow-list keeps, and no fragment", () => {
+        window.history.replaceState(
+            null,
+            "",
+            "/waitlist?ref=someone&email=a%40example.com&token=t0k3n&utm_source=mail&plan=grow#faq",
+        );
+        expect(pageRoute()).toBe("/waitlist?utm_source=mail&plan=grow");
+        window.history.replaceState(null, "", "/features/orders");
+        expect(pageRoute()).toBe("/features/orders");
     });
 });
 

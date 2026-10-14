@@ -50,12 +50,19 @@
         // "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
         // Session replay on the marketing site: off here (production only).
         "NEXT_PUBLIC_POSTHOG_REPLAY": "off",
+        // Page visits (DEC-160): off here too (production only).
+        "NEXT_PUBLIC_POSTHOG_ANALYTICS": "off",
         "VERCEL_GIT_COMMIT_REF": "development",
         "API_URL": "https://api.saroh.io",
         "DEV_ACCESS_COOKIE_DOMAIN": ".saroh.io",
         "DEV_REDIRECT_ORIGIN": "https://saroh.in",
         "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
         "RESOURCES_PREVIEW": "1",
+        // The site as it will be after early access opens ("Start free",
+        // Sign in, Pricing), so launch is rehearsed here first. Production
+        // opens by LAUNCH_AT below; this environment is behind the access
+        // key either way.
+        "NEXT_PUBLIC_LAUNCH_MODE": "open",
         // The Templates gallery's switch (DEC-135): "on" here. Production
         // leaves it out, which is off: no /templates and no link to it.
         "NEXT_PUBLIC_TEMPLATES": "on",
@@ -87,6 +94,9 @@
                 // Session replay on the marketing site: on (owner, 10 Oct),
                 // and then only after a visitor accepts the cookie notice.
                 "NEXT_PUBLIC_POSTHOG_REPLAY": "on",
+                // Page visits (DEC-160, owner 14 Oct): on, behind the same
+                // answer to the cookie notice, never for the team.
+                "NEXT_PUBLIC_POSTHOG_ANALYTICS": "on",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",

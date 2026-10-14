@@ -12,6 +12,45 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Session replay — every recording played back as a blank black screen
+
+**Symptom**: 14 Oct 2026, four days after session replay went on in
+production. PostHog held three recordings and every one played as an empty
+black screen. Watching the production workspace for ten seconds showed one
+request to PostHog (the project's settings) and no recording being sent at
+all, with nothing in the console.
+**Cause**: one line, and two things that only looked like faults.
+
+- _The blank screen._ `session_recording.maskCapturedNetworkRequestFn` was
+  `() => null`, written to mean "never record a request the page makes".
+  posthog-js asks the same function about the page's **own address**
+  (`{ name: url }`) before it keeps rrweb's "meta" event, and drops the
+  event when the answer is empty. The meta event is where a player learns
+  the page's width and height: without it the player builds the whole page
+  and never shows it. The full snapshot, its styles (inlined, 370 KB of
+  them) and the theme's class were all in the recording.
+- _"Sends nothing."_ The SDK holds a new recording until the person first
+  touches the page (a click or a key: "no interaction since
+  recording started"), so a tab nobody uses is never billed. And it sends
+  nothing at all, errors included, from a browser driven by automation
+  (`navigator.webdriver`). A ten-second look without a click, or any look
+  through a test browser, sees no request.
+
+**Fix**: `replayAddressOnly` (`packages/error-tracking/src/browser.ts`)
+answers the page's address without its query string or fragment, and null
+for anything that carries more than a `name` (a request). Nothing else
+changed: no request, header or body is recorded.
+**Check**: `replay-playback.workspace.test.ts` and
+`replay-playback.site.test.ts` run the **real** SDK and recorder in a page
+against a fake PostHog, and fail when what is sent has no meta event or no
+full snapshot, when a business's words are readable, or when anything but
+a recording leaves. The older replay tests hand in a fake SDK: they prove
+what Saroh asks for, and nothing about what the SDK does with it.
+**Rule**: a setting handed to a third party's SDK is checked against what
+the SDK then sends, not against the setting. And to look at replay by hand:
+a real browser, a click, and then two seconds.
+`docs/architecture/ERROR_TRACKING_AND_UPTIME.md` → Checking it by hand.
+
 ## Deletion — a deleted business lost its files on day one, while the law needs 180 days and the policy said 30
 
 **Symptom**: none reported. Found 10 Oct 2026 when the Terms and Privacy
@@ -4507,3 +4546,115 @@ agent edits is run once against the local stack before the gate
 **Rule**: after typing in a list's search, a browser test waits for the
 count or for the row it does not expect to go, then clicks.
 **Category**: tests · `.agents/skills/saroh-browser-tests/SKILL.md`
+
+## A new plan version was published, and the pricing page still showed the old one
+
+**Symptom**: version 4 of the plans went live on the development API
+(`GET /public/pricing` answered it), the marketing site was rebuilt twice
+after that, and its pricing page still drew version 3: the old prices and a
+yearly switch the new version doesn't have.
+**Cause**: the site is static and reads the published plans once, as it is
+built, with `cache: "force-cache"`. The deploy workflow keeps `.next/cache`
+between runs so a build recompiles only what changed, and that folder also
+holds every answer a build fetched (`fetch-cache`). So each build replayed
+the answer the first one got. A publish started a new build, as designed,
+and the build never asked the API.
+**Fix**: the deploy workflow removes `apps/*/.next/cache/fetch-cache` before
+it builds. The compile cache stays.
+**Check**: `check:deploy-env` fails when the workflow builds without dropping
+it first.
+**Rule**: a cache kept between builds may hold code, never data. Anything a
+static build reads from the API is read afresh by every deploy.
+**Category**: devops · `docs/patterns/devops-tooling-and-deploy.md`
+
+## A second plan version was published from the version before the last one, and undid it
+
+**Symptom**: on the development console, version 5 of the plans was
+published with three wording changes. Ten minutes later one more change was
+published as version 6, and version 6 was version 4 plus that one change:
+everything version 5 had changed was gone. Nothing warned anyone.
+**Cause**: a draft is a copy of a published version, and neither side
+checked which one.
+
+- A version with paid plans isn't live at once: it waits until its plans
+  are at the billing provider, and the version before it stays live. The
+  editor showed and copied the live version, so in that wait it opened on
+  the old wording, and the first edit started a draft from the version
+  under the one just published. Publish was held while the version waited;
+  the draft stayed, and went out once it was live.
+- The editor never said which version it had copied; the API wrote down
+  whichever was live. So a page that was read before a publish (a second
+  tab, a page the browser's Back restored as it was left) started its draft
+  from the old version just the same.
+- A page restored by Back was never read again: Next puts its own router
+  state back as the page is shown, and drops a `router.refresh()` asked for
+  at that moment.
+
+Reproduced in a browser on the local stack, on each of the three.
+**Fix**: a draft starts from the newest published version, waiting or live,
+and the editor shows that one. A start names the version it copied, and the
+API refuses it (409, the draft's conflict shape with `newestVersion`) when a
+newer one has been published; a publish is refused the same way when one
+went live after the draft was started. The refused changes stay on screen,
+listed, with "Start again from version N". The page is read again when it
+comes back into view, after every write that changes versions and while a
+version waits for billing; restored by Back, it loads again. The status bar
+has a Save draft button that says Saved, and when.
+**Check**: `catalogue-writes.db.spec.ts` (a stale start, a start under a
+waiting version, a publish a scheduled version overtook), `draft-dto.spec.ts`,
+and `plans-shell.test.tsx` (the start names its version, a refused start
+keeps the edit, focus and Back read the page again).
+**Rule**: a draft that is a copy of something says what it copied, and the
+server refuses it when that is no longer the newest; it never fills that in
+for the client. "Live" and "the newest published" are different while a
+version waits, and an editor starts from the newest. A page restored from
+the back/forward cache is loaded again, not refreshed.
+**Category**: admin · pricing · `docs/patterns/frontend-data-and-state.md`
+
+## A business in its first month moved between paid plans for nothing, and used the dearest one for the first month's amount
+
+**Symptom**: found 13 Oct 2026 in a test payment on the dev environment,
+with the first-month offer on both paid plans. A business on Free started
+the dearest plan with its first month, a minute later switched to the
+cheaper one, and two minutes later switched back. Each switch was a new
+checkout with nothing charged and the same first-charge date, and each took
+effect at once.
+**Cause**: the quote read "the business is `TRIALING`" as "another paid
+plan is still a trial, to the same end". It never looked at which plan the
+offer was on or which way the business was moving, so the first month
+followed the business from plan to plan. Free during a first month took
+effect at once for the mirror-image reason: "a trial paid nothing ahead",
+which stopped being true when the first month began to cost something
+(DEC-093).
+**Fix**: DEC-159. When a change takes effect is one rule
+(`billing/change-timing.ts`) that the quote, the change and the webhook all
+read: a dearer plan starts today at its full price, and anything else waits
+until what was paid for has run out, a first month included. The first
+month's provider subscription is cancelled at once when the business leaves
+it, because it has no cycle to end with and would otherwise take the full
+charge at the month's end.
+**Check**: `checkout-quote.spec.ts` fails if any target plan quotes a
+`TRIAL` while one runs. `checkout.db.spec.ts` replays the three steps and
+asserts the plan kept, the dates and what the provider is told.
+**Rule**: an offer belongs to the thing it is set on, and is spent by the
+business once. A state like `TRIALING` says where a business is, never what
+its next change costs: ask `change-timing.ts`.
+**Category**: backend · `docs/patterns/backend-billing-and-classes.md`
+
+## The Privacy page's date moved, and the footer's copy of it didn't
+
+**Symptom**: a later pull request failed CI on
+`packages/ui/src/lib/saroh-links.test.ts`: "privacy is the marketing site's
+own publishOn", expected 10 Oct, received 13 Oct. The change that moved the
+date had passed the gate and CI the day before.
+**Cause**: the day a legal page publishes is written twice: in the marketing
+site's table (`content/resources.ts`) and in `@saroh/ui` (`PUBLISHED_ON`),
+which the other apps' footers read. The test that holds them together lives
+in the package, and the gate and CI run only the tests of what a change
+touches. A change to the site's table alone never ran it.
+**Fix**: the package's date follows the site's.
+**Check**: the marketing site's own `content/resources.test.ts` now compares
+the two as well, so moving either date runs a test that sees both.
+**Rule**: a test that ties two files together sits where a change to either
+one runs it, or it is written on both sides.
+**Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`

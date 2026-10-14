@@ -1411,6 +1411,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 20.19.33
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       posthog-js:
         specifier: 1.435.9
         version: 1.435.9(@types/react@19.2.18)(react@19.2.8)

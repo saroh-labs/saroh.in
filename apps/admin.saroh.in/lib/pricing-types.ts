@@ -150,11 +150,14 @@ export interface DraftSaved {
 /**
  * A refused draft write's `details` (409): who saved since, or
  * `revision: null` when the draft was published or discarded meanwhile.
+ * With `newestVersion`, the refusal is that a newer version was published
+ * than the one these changes were started from.
  */
 export interface DraftConflict {
     revision: number | null;
     updatedBy: StaffName | null;
     updatedAt: string | null;
+    newestVersion?: number | null;
 }
 
 export type PublishPolicy = "keep" | "move";

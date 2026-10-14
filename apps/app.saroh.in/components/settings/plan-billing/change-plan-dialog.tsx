@@ -25,7 +25,10 @@ import {
     quoteChangeAction,
 } from "@/lib/saroh-billing/billing-actions";
 import type { ChangeQuote, Cycle } from "@/lib/saroh-billing/plan-view";
-import { quoteSummary } from "@/lib/saroh-billing/quote-words";
+import {
+    endingAddonsNote,
+    quoteSummary,
+} from "@/lib/saroh-billing/quote-words";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -64,7 +67,10 @@ const STATE_OPTIONS = [
  * the plan moves as soon as Razorpay says so, webhook or not. Where the
  * window can't open, the provider's page link is the fallback. The coupon held on the Coupon card
  * goes with the quote; one the API refuses is said here, with a way on
- * without it.
+ * without it. Add-ons the new plan isn't offered end with the old one
+ * (DEC-157): the quote names them and a note says so before Confirm.
+ * When the change starts is said first (DEC-159): "Starts today" with what
+ * is paid now, or "From ‹date›" with the plan kept until then.
  *
  * The design moves plan on a click; real money asks first (design
  * deviation, U14).
@@ -75,6 +81,8 @@ export function ChangePlanDialog({
     currentPlan,
     onCouponRefused,
     onClose,
+    onChanged,
+    returnTo,
 }: {
     picked: PickedPlan | null;
     coupon: string;
@@ -83,8 +91,16 @@ export function ChangePlanDialog({
     /** The coupon couldn't be used: the Coupon card shows why. */
     onCouponRefused: (error: string) => void;
     onClose: () => void;
+    /**
+     * A change was made, or a payment for one started: where to show how
+     * it stands. Left out, the page it was opened on is read again.
+     */
+    onChanged?: () => void;
+    /** The address the browser's Back returns to from the provider's page. */
+    returnTo?: string;
 }) {
     const router = useRouter();
+    const changed = onChanged ?? (() => router.refresh());
     // Paying: hidden while Razorpay's window is up (a dialog over it would
     // trap its focus), then back to say it's confirming.
     const [paying, setPaying] = useState<"no" | "away" | "confirming">("no");
@@ -141,6 +157,11 @@ export function ChangePlanDialog({
         quoting.state === "ready"
             ? quoteSummary(quoting.quote, { currentPlan })
             : null;
+    // What the change takes away, said before Confirm (DEC-157).
+    const endingAddons =
+        quoting.state === "ready" && summary?.confirm
+            ? endingAddonsNote(quoting.quote, { currentPlan })
+            : null;
 
     function confirm() {
         if (!picked || quoting.state !== "ready") return;
@@ -177,7 +198,7 @@ export function ChangePlanDialog({
                         : `You're on ${picked.name} from today.`,
                 );
                 onClose();
-                router.refresh();
+                changed();
                 return;
             }
             if (res.data.handoff) {
@@ -192,6 +213,7 @@ export function ChangePlanDialog({
                     if (state !== "waiting") {
                         setPaying("no");
                         onClose();
+                        onChanged?.();
                     }
                     return;
                 }
@@ -199,7 +221,7 @@ export function ChangePlanDialog({
                     // Kept: "Your plan" offers to continue the same payment.
                     setPaying("no");
                     onClose();
-                    router.refresh();
+                    changed();
                     return;
                 }
                 setPaying("no");
@@ -210,10 +232,12 @@ export function ChangePlanDialog({
                     "Your plan change is kept under Your plan: continue it from there.",
                 );
                 onClose();
-                router.refresh();
+                changed();
                 return;
             }
-            // Given once and kept nowhere: straight to the browser.
+            // Given once and kept nowhere: straight to the browser. Coming
+            // back lands where the payment's standing is said.
+            if (returnTo) window.history.replaceState(null, "", returnTo);
             window.location.assign(res.data.authorisationUrl);
         });
     }
@@ -227,7 +251,7 @@ export function ChangePlanDialog({
                     if (!open && still) {
                         setPaying("no");
                         onClose();
-                        router.refresh();
+                        changed();
                     }
                 }}
             >
@@ -271,7 +295,7 @@ export function ChangePlanDialog({
                                 onClick={() => {
                                     setPaying("no");
                                     onClose();
-                                    router.refresh();
+                                    changed();
                                 }}
                             >
                                 Done
@@ -296,6 +320,12 @@ export function ChangePlanDialog({
                         {summary?.title ?? `Change to ${picked?.name ?? ""}`}
                     </DialogTitle>
                     <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
+                        {quoting.state === "ready" && summary?.from ? (
+                            <>
+                                From <ViewerDate iso={summary.from.iso} />: you
+                                keep {summary.from.keep} until then.{" "}
+                            </>
+                        ) : null}
                         {quoting.state === "loading"
                             ? "Working out the price…"
                             : quoting.state === "failed"
@@ -319,17 +349,22 @@ export function ChangePlanDialog({
                 {summary && summary.lines.length > 0 ? (
                     <dl className="grid gap-0 overflow-hidden rounded-lg border border-border text-[13px]">
                         {summary.lines.map((l, i) => (
+                            // The label keeps its own words' width (up to
+                            // a little over half the row) and the amount
+                            // wraps beside it. A label column that may
+                            // shrink to nothing breaks "Term" a letter a
+                            // line once the amount is a sentence.
                             <div
                                 key={l.label}
                                 className={
-                                    "grid grid-cols-1 gap-1 px-3.5 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4" +
+                                    "grid grid-cols-[fit-content(55%)_minmax(0,1fr)] gap-4 px-3.5 py-2.5" +
                                     (i > 0 ? " border-t border-border/70" : "")
                                 }
                             >
                                 <dt className="text-muted-foreground">
                                     {l.label}
                                 </dt>
-                                <dd className="m-0 font-medium tabular-nums sm:text-right">
+                                <dd className="m-0 text-right font-medium tabular-nums">
                                     {l.iso ? (
                                         <ViewerDate iso={l.iso} />
                                     ) : (
@@ -339,6 +374,15 @@ export function ChangePlanDialog({
                             </div>
                         ))}
                     </dl>
+                ) : null}
+
+                {endingAddons ? (
+                    <p
+                        role="note"
+                        className="text-pretty text-[12.5px] text-foreground/80"
+                    >
+                        {endingAddons}
+                    </p>
                 ) : null}
 
                 {dropped ? (

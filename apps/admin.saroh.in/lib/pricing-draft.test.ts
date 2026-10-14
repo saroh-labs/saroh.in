@@ -9,12 +9,15 @@ import {
 } from "@/test/pricing-fixture";
 
 import {
+    baseVersionOf,
     changeCount,
     checkDraft,
     conflictMessage,
     draftSummary,
     namesList,
     otherEditors,
+    outdatedMessage,
+    outdatedOf,
     parseConflict,
     publishedByName,
     tabFrom,
@@ -166,6 +169,20 @@ describe("a refused save", () => {
         expect(c && conflictMessage(c)).toMatch(/published or discarded/);
     });
 
+    it("says which version was published since the page was opened", () => {
+        const c = parseConflict({
+            revision: null,
+            updatedBy: null,
+            updatedAt: null,
+            newestVersion: 5,
+            baseVersion: 4,
+        });
+        expect(c?.newestVersion).toBe(5);
+        expect(c && conflictMessage(c)).toBe(
+            "Version 5 was published since you opened this page, so your changes weren't saved. Reload to start from version 5.",
+        );
+    });
+
     it("is not a conflict without the draft's shape", () => {
         expect(parseConflict(undefined)).toBeNull();
         expect(parseConflict(["x"])).toBeNull();
@@ -217,5 +234,60 @@ describe("the first version (nothing live yet)", () => {
                 firstVersion: true,
             }),
         ).toBe("Nothing is live yet: publishing makes this version 1");
+    });
+});
+
+describe("the version an edit starts from", () => {
+    const waitingOverLive = () =>
+        fakePricing({
+            versions: [
+                fakeVersion({ version: 3, status: "scheduled" }),
+                fakeVersion({ version: 2, status: "waiting" }),
+                fakeVersion({ version: 1, status: "live" }),
+            ],
+        });
+
+    it("is the live version", () => {
+        expect(baseVersionOf(fakePricing())?.version).toBe(1);
+    });
+
+    it("is a version waiting for billing above the live one, never a scheduled one", () => {
+        expect(baseVersionOf(waitingOverLive())?.version).toBe(2);
+    });
+
+    it("is nothing before anything is published", () => {
+        expect(
+            baseVersionOf(fakePricing({ liveVersion: null, versions: [] })),
+        ).toBeNull();
+    });
+
+    it("leaves a draft copied from the newest alone", () => {
+        expect(
+            outdatedOf({
+                pricing: waitingOverLive(),
+                draft: fakeCatalog(),
+                startedFrom: 2,
+            }),
+        ).toBeNull();
+    });
+
+    it("says a newer version overtook a draft, and what the draft had changed", () => {
+        const draft = fakeCatalog();
+        draft.plans = draft.plans.map((p) =>
+            p.id === "b" ? { ...p, pricePaise: 22_200 } : p,
+        );
+        const o = outdatedOf({
+            pricing: waitingOverLive(),
+            draft,
+            startedFrom: 1,
+        });
+        expect(o).toMatchObject({ from: 1, to: 2 });
+        expect(o?.changes).toHaveLength(1);
+        expect(o && outdatedMessage(o, true)).toBe(
+            "Version 2 was published after this draft was started from version 1. Publishing the draft would undo that, so it can't be published. Note your changes, discard the draft and make them again on version 2.",
+        );
+        expect(o && outdatedMessage(o, false)).toBe(
+            "Version 2 was published after you started these changes from version 1, so they weren't saved. Note them, start again, then make them again on version 2.",
+        );
     });
 });

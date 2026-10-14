@@ -2,6 +2,8 @@
     "extends": "@saroh/tsconfig/base.json",
     "compilerOptions": {
         "target": "ES2022",
+        // For `import()` in the tests that load the real SDK.
+        "module": "ESNext",
         "lib": ["ES2022", "DOM"]
     },
     "include": ["**/*.ts", "tsup.config.ts"],

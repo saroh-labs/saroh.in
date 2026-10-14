@@ -153,6 +153,16 @@ export interface BusinessPlan {
     }[];
 }
 
+/**
+ * Who referred a business (DEC-156): the business whose referral code its
+ * owner arrived with, and when that was recorded.
+ */
+export interface ReferredByFacts {
+    id: string;
+    name: string;
+    at: string | null;
+}
+
 export interface BusinessView {
     facts: {
         id: string;
@@ -172,6 +182,8 @@ export interface BusinessView {
         dataKeptUntil?: string | null;
         /** When the retention eraser finished with it. */
         retentionErasedAt?: string | null;
+        /** The business that referred it (DEC-156); absent from an older API. */
+        referredBy?: ReferredByFacts | null;
         timezone: string | null;
         country: string | null;
         counts: {

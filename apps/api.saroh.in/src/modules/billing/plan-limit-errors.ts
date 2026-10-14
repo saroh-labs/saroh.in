@@ -17,7 +17,7 @@ import { ConflictException, ForbiddenException } from "@nestjs/common";
 import type { LimitPeriod, ModuleAccess } from "@saroh/pricing-catalog";
 import { limitNotice } from "@saroh/pricing-catalog";
 
-import type { MeteredLimitKey } from "./metering";
+import type { ItemLimitKey, MeteredLimitKey } from "./metering";
 import { METER_WORDS } from "./metering";
 
 export const PLAN_LIMIT_REACHED = "PLAN_LIMIT_REACHED";
@@ -31,7 +31,7 @@ export interface UpgradeTo {
     pricePaise: number;
 }
 
-function upgradeOf(row: ModuleAccess): UpgradeTo | null {
+export function upgradeOf(row: ModuleAccess): UpgradeTo | null {
     return row.upgradePlanId
         ? {
               planId: row.upgradePlanId,
@@ -45,8 +45,12 @@ function upgradeOf(row: ModuleAccess): UpgradeTo | null {
 export interface PlanLimitDetails {
     code: typeof PLAN_LIMIT_REACHED;
     moduleId: string;
-    limitKey: MeteredLimitKey;
+    limitKey: MeteredLimitKey | ItemLimitKey;
     limit: number;
+    /**
+     * The count against `limit`: across the business, or, for a cap inside
+     * one thing (`item-limits.ts`), what that thing holds now.
+     */
     used: number;
     per: LimitPeriod;
     plan: { id: string; name: string };

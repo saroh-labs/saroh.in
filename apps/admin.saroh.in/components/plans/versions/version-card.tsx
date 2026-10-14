@@ -10,6 +10,7 @@ import {
 } from "@/lib/pricing-actions";
 import type { AdminVersion } from "@/lib/pricing-types";
 
+import { useDraft } from "../draft-store";
 import { useFlash } from "../toast";
 import {
     changesShown,
@@ -37,6 +38,7 @@ export function VersionCard({
     rollbackBlockedBy: string | null;
 }) {
     const flash = useFlash();
+    const { refresh } = useDraft();
     const sync = syncLine(v);
     const canRoll = canPublish && v.status === "earlier";
     const canCancel = canPublish && v.status === "scheduled";
@@ -94,6 +96,7 @@ export function VersionCard({
                                         );
                                     if (!r.ok)
                                         return { ok: false, error: r.error };
+                                    refresh();
                                     flash(
                                         r.data.status === "waiting"
                                             ? `Version ${r.data.version} is waiting for billing`
@@ -132,6 +135,7 @@ export function VersionCard({
                                     );
                                     if (!r.ok)
                                         return { ok: false, error: r.error };
+                                    refresh();
                                     flash(`Version ${v.version} won't go live`);
                                     return { ok: true };
                                 }}

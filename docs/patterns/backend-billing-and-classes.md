@@ -98,6 +98,29 @@ is the nominal first month, and its email says "first month" and autopay
 words (`paidFirstMonth` in `offers.ts`). The waitlist's months of a plan
 are a `plan` override with an end date (#805), told as a plan that ends.
 
+**When a plan change takes effect (DEC-159).** One rule,
+`billing/change-timing.ts`, read by the quote (`checkout-quote.ts`), the
+change (`CheckoutService`) and the provider's events
+(`BillingWebhookService`), so the quote says exactly what will happen.
+Saroh refunds nothing, so nothing paid for is cut short:
+
+- A dearer plan starts today. In a paid period it pays the difference for
+  what is left (`UPGRADE`). In the first month (`TRIALING`) the month ends
+  there: the plan's full first charge now, its term from now, no offer of
+  its own (`NEW`).
+- Anything else waits for the end of what is paid, a period or a first
+  month: a plan that costs the same or less, the other cycle, or Free. Ask
+  `paidUntil` for the date; never compare `currentPeriodEnd` yourself, and
+  never special-case `TRIALING` to move at once.
+- The first-month offer belongs to the plan it is set on and is used once
+  per business (`hadTrial`). No path may quote a `TRIAL` while one runs.
+- Ending the provider subscription a business is leaving goes through
+  `leavesWithCycle`: with the cycle in a paid period, at once in a first
+  month (it has no cycle, and left alone would take the full charge).
+  Its `cancelled` event must not move the plan early (`runsToMoveDate`).
+
+Rules and edge cases in `PRICING_ROLLOUT.md` › "During the first month".
+
 Trials, coupons and add-ons (U16) ride the same path: a coupon is
 redeemed and its discount invoiced with the charge it comes off, never at
 checkout, and an add-on is a line on the charge after the period it covers
@@ -119,8 +142,9 @@ moving back up restores everything at once.
   pauses); fails open (`over_limit_unresolved`).
 - **The order** (the owner can't pick): team — the owner always, then team
   members and diary people with no login by when they joined
-  (`Membership.createdAt`), then open invitations, against `members`;
-  view-only people against `reviewers` (DEC-105, DEC-111). Products and
+  (`Membership.createdAt`), then open invitations, against `members`.
+  Everyone counts, a Reviewer like anyone else, and a limit of one keeps the
+  owner alone (DEC-155, DEC-111). Products and
   blog posts — the newest by `createdAt` stay (a `Cut`: the oldest kept,
   spread as `keptByCut` into a read). Locations (`SHOP` only, DEC-109) and
   websites (DEC-094) — the first made stay.
@@ -134,10 +158,10 @@ moving back up restores everything at once.
 - **Every way down is told** (`move-down-notice.ts`, the hourly sweep's
   last step): a plan override's end and a term's end through their own
   30/7/1-day notices, which now list the pauses; a move chosen for the
-  period's end (Free, a cheaper plan, a cancel) 30/7/1 days ahead; and a
-  move that happened at once (a payment that failed for good, a cancel now,
-  a trial dropped, a limit or add-on taken away) within the hour, pausing 7
-  days on. The plan itself moves on its date as before; only the pause
+  period's end or its first month's (Free, a cheaper plan, a cancel;
+  DEC-159) 30/7/1 days ahead; and a move that happened at once (a payment
+  that failed for good, a cancel now, a limit or add-on taken away) within
+  the hour, pausing 7 days on. The plan itself moves on its date as before; only the pause
   waits.
 - **Where it is enforced** — ask `pausedNow(org)` (cached 30 s): a paused
   product's or post's writes refuse with `pausedByPlan` (409

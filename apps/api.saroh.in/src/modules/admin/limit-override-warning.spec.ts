@@ -14,11 +14,17 @@ describe("limitOverrideWarning (#802)", () => {
             "It has 5 already. The business is told now, and 7 days later what is over 3 pauses: its oldest products are hidden from its site and read-only. Nothing is deleted, and raising the limit again restores it at once.",
         );
         expect(limitOverrideWarning({ ...base, rowId: "members" })).toContain(
-            "the team members who joined most recently are paused (the owner never is)",
+            "the people who joined most recently are paused, whatever their role (the owner never is)",
         );
         expect(limitOverrideWarning({ ...base, rowId: "locations" })).toContain(
             "its newest locations stop taking orders",
         );
+    });
+
+    it("has no pause of its own for the retired reviewers row (DEC-155)", () => {
+        expect(
+            limitOverrideWarning({ ...base, rowId: "reviewers" }),
+        ).not.toContain("paused");
     });
 
     it("a row that pauses nothing keeps what it has and stops adding", () => {

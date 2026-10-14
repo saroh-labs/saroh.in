@@ -500,7 +500,8 @@
 
 The signed-in workspace is recorded where `NEXT_PUBLIC_POSTHOG_REPLAY` is `on`
 (production), so the owner can see how people use it and where they get
-lost. A recording must show **Saroh's own interface and nothing of a
+lost. (Which pages are opened is sent separately, as a route's shape and
+never an address or a title: DEC-160, nothing for a screen to mark.) A recording must show **Saroh's own interface and nothing of a
 business's or its customers'**. Three attributes decide that, and the
 default is the safe one.
 

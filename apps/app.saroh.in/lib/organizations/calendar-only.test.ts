@@ -67,22 +67,16 @@ describe("the role picked with a diary person", () => {
     });
 });
 
-describe("Team's seat count with a diary invite (DEC-105)", () => {
+describe("Team's seat count with a diary invite (DEC-155)", () => {
     it("counts the invite once, as the person taking bookings", () => {
         const counts = teamCounts(
-            [{ usesSeat: true }],
-            [
-                { usesSeat: true, countedOnDiary: true },
-                { usesSeat: true },
-                { usesSeat: false },
-            ],
+            [{}],
+            [{ countedOnDiary: true }, {}, { countedOnDiary: false }],
         );
-        expect(counts).toEqual({ people: 1, waiting: 1, viewOnly: 1 });
+        expect(counts).toEqual({ people: 1, waiting: 2 });
         // Priya is said once: on the diary with no login, not as an invite.
-        expect(
-            teamCountLine(counts.people, counts.waiting, counts.viewOnly, 1),
-        ).toBe(
-            "Just you · 1 person taking bookings with no sign-in · 1 invite waiting · 1 view-only person, no seat",
+        expect(teamCountLine(counts.people, counts.waiting, 1)).toBe(
+            "Just you · 1 person taking bookings with no sign-in · 2 invites waiting",
         );
     });
 });

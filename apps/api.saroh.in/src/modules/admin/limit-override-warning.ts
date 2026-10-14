@@ -12,8 +12,7 @@ import { PAUSE_NOTICE_DAYS } from "../billing/over-limit";
 /** What pauses past the limit, per catalogue row, in the console's words. */
 const PAUSES: Record<keyof typeof PAUSE_ROWS, string> = {
     members:
-        "the team members who joined most recently are paused (the owner never is)",
-    reviewers: "the view-only people who joined most recently are paused",
+        "the people who joined most recently are paused, whatever their role (the owner never is)",
     products: "its oldest products are hidden from its site and read-only",
     blog: "its oldest blog posts are hidden from its site and read-only",
     locations:

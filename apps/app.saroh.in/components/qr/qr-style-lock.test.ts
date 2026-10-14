@@ -33,7 +33,7 @@ describe("qrStyleLock (plan U5, R6)", () => {
                 plan: "Plan B",
                 kept: QR_KEPT_LINE,
                 cta: "See Plan B",
-                href: "/settings/billing?plan=b#change-plan",
+                href: "/settings/billing/plans?plan=b",
             });
         }
     });
@@ -44,7 +44,7 @@ describe("qrStyleLock (plan U5, R6)", () => {
         );
         expect(lock?.plan).toBe("a paid plan");
         expect(lock?.cta).toBe("See plans");
-        expect(lock?.href).toBe("/settings/billing#change-plan");
+        expect(lock?.href).toBe("/settings/billing/plans");
     });
 
     it("names no plan, price or catalogue row in its words", () => {
@@ -83,7 +83,7 @@ describe("qrStyleLock (plan U5, R6)", () => {
             plan: "a paid plan",
             kept: QR_KEPT_LINE,
             cta: "See plans",
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
         });
     });
 

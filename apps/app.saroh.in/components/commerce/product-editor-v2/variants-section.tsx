@@ -6,6 +6,10 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { PlanWay } from "@/components/billing/plan-way";
+import type { VariantCap } from "@/lib/billing/variant-cap";
+import { variantCapNote } from "@/lib/billing/variant-cap";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { MrpPricing } from "@/lib/gst/mrp";
 import { optionOverMrpNote } from "@/lib/gst/mrp";
@@ -22,6 +26,7 @@ import {
     variantProblem,
 } from "@/lib/products/variant-rows";
 import { EmptyState } from "@saroh/ui/data-state";
+import { TextLink } from "@saroh/ui/text-link";
 
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
@@ -37,6 +42,10 @@ import { DROPPED, saveVariantList } from "./variant-save";
  * so a size is spelled one way everywhere; its SKU, price and photo can
  * differ, and with more than one storefront, where it is sold ("Sell it at",
  * #525). Rows are staged and edited in place, and saved together.
+ *
+ * A plan may cap how many variants one product has (DEC-158). At the cap
+ * "Add to list" is off and the line beside it says why and where more is;
+ * every row already here stays and can still be edited or removed.
  */
 export function VariantsSection({
     product,
@@ -48,6 +57,7 @@ export function VariantsSection({
     listings,
     gstRegistered = false,
     businessPriceMode = null,
+    variantCap = null,
 }: {
     product: ProductDetail;
     storeId: string;
@@ -63,6 +73,8 @@ export function VariantsSection({
     gstRegistered?: boolean;
     /** How the business's prices carry GST; null when it couldn't be told. */
     businessPriceMode?: GstPriceMode | null;
+    /** The plan's cap on this product's variants; null when nothing caps them. */
+    variantCap?: VariantCap | null;
 }) {
     const { canWrite, saving } = useEditor();
     // While its save runs, the list is what is being sent: typing into it
@@ -179,8 +191,12 @@ export function VariantsSection({
         (newPrice.trim() !== "" && !isMoney(newPrice)) || newOverMrp;
     const allTaken =
         values.length > 0 && values.every((x) => takenIds.includes(x.id));
+    // The list as staged against the plan's cap: removing a row here makes
+    // room, as the save removes before it adds.
+    const capNote = variantCapNote(variantCap, rows.length);
     const addOff =
         locked ||
+        !!capNote ||
         !newValue ||
         takenIds.includes(newValue) ||
         dupSku ||
@@ -200,6 +216,8 @@ export function VariantsSection({
             sellAt,
         });
         if (out.toast) showError(out.toast);
+        // The plan's refusal is its own notice, with the way to more.
+        if (out.plan) showPlanRefusal(out.plan);
         setRows(out.next);
         // On success the rows as saved are the baseline, so the section is
         // clean at once; on a failure it is what did save, so the retry
@@ -395,19 +413,30 @@ export function VariantsSection({
                         priceBad={newPriceBad}
                         addOff={addOff}
                         locked={locked}
-                        noteBad={dupSku || newPriceBad}
+                        noteBad={!capNote && (dupSku || newPriceBad)}
+                        noteAction={
+                            capNote ? (
+                                <PlanWay className="text-[11.5px] leading-[1.45]">
+                                    <TextLink href={capNote.href} tone="muted">
+                                        {capNote.cta}
+                                    </TextLink>
+                                </PlanWay>
+                            ) : null
+                        }
                         note={
-                            values.length === 0
-                                ? `No values for ${opt} yet. Add them above.`
-                                : allTaken
-                                  ? `Every ${opt} is already a variant. Add another value above.`
-                                  : dupSku
-                                    ? "That SKU is already on this product."
-                                    : newOverMrp
-                                      ? mrpNote(newPrice, null)
-                                      : newPriceBad
-                                        ? "A number with at most two decimal places."
-                                        : `Blank price uses the product's ${shownPrice}. Save variants to keep it.`
+                            capNote
+                                ? capNote.text
+                                : values.length === 0
+                                  ? `No values for ${opt} yet. Add them above.`
+                                  : allTaken
+                                    ? `Every ${opt} is already a variant. Add another value above.`
+                                    : dupSku
+                                      ? "That SKU is already on this product."
+                                      : newOverMrp
+                                        ? mrpNote(newPrice, null)
+                                        : newPriceBad
+                                          ? "A number with at most two decimal places."
+                                          : `Blank price uses the product's ${shownPrice}. Save variants to keep it.`
                         }
                         onValue={setNewValue}
                         onSku={setNewSku}

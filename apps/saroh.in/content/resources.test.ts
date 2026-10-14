@@ -1,3 +1,4 @@
+import { PUBLISHED_ON } from "@saroh/ui/lib/saroh-links";
 import { describe, expect, it } from "vitest";
 
 import { resourceItems } from "@/components/v2/nav-items";
@@ -8,6 +9,7 @@ import { galleryTemplates } from "./templates";
 
 import type { PublishContext } from "./resources";
 import {
+    LEGAL_PAGES,
     RESOURCE_PAGES,
     dayStartsAt,
     isPublished,
@@ -100,9 +102,11 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         const refundsAfter = at("2026-10-04T18:31:00Z");
         // The Terms' and Privacy's date moved to 10 Oct when both were
         // aligned with India's DPDP Act (rev 55): until that day only the
-        // Refunds page shows.
+        // Refunds page shows. Privacy's moved again to 13 Oct with the
+        // referral code cookie (DEC-156), and to 14 Oct with page visits
+        // (DEC-160).
         const termsBefore = at("2026-10-08T18:31:00Z");
-        const privacyAfter = at("2026-10-09T18:31:00Z");
+        const privacyAfter = at("2026-10-13T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
         for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);
@@ -277,4 +281,19 @@ describe("the list", () => {
             expect(() => dayStartsAt(p.publishOn)).not.toThrow();
         }
     });
+});
+
+// The other apps' footers link Privacy, Terms and Help from the day each
+// publishes here, and read those days from `@saroh/ui`. The same check sits
+// beside that table, but a change to this site's dates doesn't run the
+// package's tests, so a date moved here went out with the other one stale.
+describe("the days the other apps' footers go by", () => {
+    it.each(["privacy", "terms"] as const)(
+        "%s publishes on the day @saroh/ui says",
+        (id) => {
+            expect(LEGAL_PAGES.find((p) => p.id === id)?.publishOn).toBe(
+                PUBLISHED_ON[id],
+            );
+        },
+    );
 });

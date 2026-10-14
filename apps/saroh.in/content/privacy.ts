@@ -6,7 +6,9 @@
  * Fiduciary and Data Processor named, security logs kept 1 year, 180 days
  * after closing, suspended accounts, and "If there's a breach"; the QR code
  * maker's email, 10 Oct, is NOT YET in the owner's doc: a minimal factual
- * addition for the owner to review). Published VERBATIM at
+ * addition for the owner to review; the referral code cookie, 13 Oct
+ * (DEC-156), the owner's agreed sentence, rev 74; page visits, 14 Oct
+ * (DEC-160), the owner's agreed wording). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -47,7 +49,7 @@ If your website uses analytics or advertising tools that you connect (such as Go
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 1 year |
 | Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites run only the tools you connect yourself |
 | Product usage | Which setup steps your business has completed (a first product, a first order), and errors that happen while you use Saroh. Never your customers' details | To fix problems and make Saroh easier to use |
-| Recordings of use | On saroh.in, only if you accept the cookie notice: what you click, scroll and open. In the workspace: how signed-in people use the screens. Saroh's own buttons, menus and labels show; your customers' details, your figures and anything you type are hidden, and pictures are left out | To find what is confusing or broken. You can turn workspace recording off in Settings › Your profile |
+| Recordings of use and page visits | On saroh.in, only if you accept the cookie notice: what you click, scroll and open, and which pages are opened and for how long. In the workspace: how signed-in people use the screens, and which pages are opened and for how long, kept against an internal id, not your name or email. Saroh's own buttons, menus and labels show; your customers' details, your figures and anything you type are hidden, and pictures are left out | To find what is confusing or broken, and to make Saroh easier. You can turn this off for the workspace in Settings › Your profile |
 
 ## Why we're allowed to
 
@@ -105,7 +107,9 @@ If a breach affects your personal data, we'll tell you and the Data Protection B
 
 ## Cookies
 
-Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits and, if you accept the cookie notice, records how the site is used; recording sets no cookie. Refuse, and neither runs and the site works the same. You can change your answer at any time with "Cookie choices" at the foot of every page. We don't count or record a browser that sends Do Not Track or Global Privacy Control.
+Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits and, if you accept the cookie notice, records how the site is used, including which pages are opened and for how long; this sets no cookie and stores nothing in your browser. Refuse, and neither runs and the site works the same. You can change your answer at any time with "Cookie choices" at the foot of every page. We don't count or record a browser that sends Do Not Track or Global Privacy Control.
+
+If you reach saroh.in from a link on a business's site, saroh.in keeps that business's referral code in a cookie for 90 days, so that if you start a business on Saroh we can record which business referred you. It holds nothing about you and is not shared with anyone.
 
 ## How we protect it
 

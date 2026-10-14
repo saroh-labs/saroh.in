@@ -126,7 +126,8 @@ into access; `EntitlementService`, module availability and
   catalogue row or a live plan override. Otherwise (no row, no override) it
   reads `FREE_ENTITLEMENTS`.
 - **Then** its live overrides (plan, remove, grant, limit, raise) and the
-  add-ons on its subscription, read from the same version.
+  add-ons on its subscription, read from the same version: each one
+  offered on the plan it is billed on, for all that is held (DEC-157).
 - **The limit map** `check`/`can` read: every catalogue row by id (its cap,
   `true`, or `false`), a row's legacy key beside it (`teamMembers`), and the
   keys no row sells — from the business's own legacy row while it is still on
@@ -150,7 +151,8 @@ and the admin's usage lines and impact (`ImpactService`).
 - **What is counted:** products not archived; orders this month that
   stand (not cancelled, not an online checkout nobody paid); bookings this
   month that are confirmed (a course's sessions left out); posts live on
-  a site; people in the business plus open invitations; connected payment
+  a site; everyone in the business whatever their role, plus open
+  invitations and bookable staff with no login (DEC-155); connected payment
   and messaging providers. A month is the business's own, in its zone.
 - **Where it is refused:** making, copying, importing or un-archiving a
   product; an order taken by hand; a booking, by hand or on the booking
@@ -164,6 +166,20 @@ and the admin's usage lines and impact (`ImpactService`).
   can't be read (logged `plan_meter_unresolved`).
 - **Notices:** `plan.limit.notice` at 80%, at the limit and past a soft
   cap, once each per limit and month (`backend-jobs.md`).
+- **A cap inside one thing (DEC-158):** the row `variants` caps how many
+  variants ONE product may have. It is not counted across the business
+  (`MODULE_MAP.variants.within`, `billing/item-limits.ts`), so it has no
+  `usage`, no notice and no "over": only a new variant, or a copy, that
+  would take a product past the cap is refused (`PLAN_LIMIT_REACHED`, in
+  per-product words). A product already past it keeps every variant and
+  every other save. Variants never count as products. A cell with no
+  number, a cell that leaves the row out, and a version published before
+  the row existed all cap nothing. Set per plan in Admin › Plans; a limit
+  override raises it for one business. A catalogue made before the row
+  gets it from the Modules tab's "Add Variants row" (it must carry the id
+  `variants`; "Add module" makes an id of its own, which governs nothing):
+  it arrives with no limit on any plan and hidden from the pricing page,
+  so adding it changes nothing until a number is set and published.
 
 ## A business's own domain (DEC-139)
 
@@ -227,11 +243,12 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
   (`billing:manage`). The client sends a plan id and a cycle only; the plan
   row comes from the live version and every amount from `quoteChange`
   (integer paise, GST per line). The kinds:
-    - **Free**: at the end of the period paid at the provider (a pending
-      move, the provider subscription told to end with the period), else at
-      once. No checkout.
+    - **Free**: at the end of what is paid at the provider, a period or a
+      first month (a pending move, the provider subscription told to end
+      with it), else at once. No checkout.
     - **NEW** (from Free, cancelled, or a plan not billed through the
-      provider): a checkout; on the plan once its first charge is paid.
+      provider; also a dearer plan chosen during the first month, DEC-159):
+      a checkout; on the plan once its first charge is paid.
     - **UPGRADE** (pricier, same cycle, mid-period): a checkout whose
       provider subscription starts at the period's end with the difference
       for what's left (prorated, GST added) as an upfront charge; on the plan
@@ -240,6 +257,9 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
       taking it to): a checkout authorised now that starts on the date; it
       waits as the subscription's pending move, and the old provider
       subscription is told to end with the period.
+    - **When it takes effect** is one rule, `change-timing.ts` (DEC-159):
+      a dearer plan today, anything else once what was paid for has run
+      out. See "During the first month" below.
 - **A checkout** (`BillingCheckout`) is OPEN until the webhook completes it,
   lapses after a day (the sweep cancels it at the provider), and is replaced
   by a newer one. The provider's authorisation link is returned once and never
@@ -252,7 +272,10 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
   plan. `charged` renews (new period end, a due move applied); `pending` is
   PAST_DUE; `halted` is CANCELLED — read as Free — and the provider
   subscription is cancelled; `cancelled`/`completed` applies a move to Free or
-  to an authorised plan, else CANCELLED.
+  to an authorised plan, else CANCELLED. A provider subscription that ends
+  ahead of the date the business's move waits for changes nothing: the
+  plan is paid to that date (`runsToMoveDate`), and the sweep or the new
+  plan's first charge applies the move then.
 - **Moves** (KTD-4) apply on the renewal webhook or the hourly
   `billing.moves.apply` sweep, and only when ready (`moveReadiness`): never
   while the version's provider plans aren't SYNCED, and never at a new amount
@@ -278,9 +301,46 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   trial's end, no invoice, and the trial-ending email queued a few days
   ahead (`TRIAL_ENDING_NOTICE_DAYS`; it re-reads the checkout for a coupon).
   The first charge makes it `ACTIVE` and is invoiced as a new plan's first
-  (`NEW`); a failed one is `pending` then `halted` → Free. Another paid plan
-  during a trial is a `TRIAL` to the same end; Free during a trial is at
-  once. One trial per business, ever.
+  (`NEW`); a failed one is `pending` then `halted` → Free. One trial per
+  business, ever, and it is the offer of the plan it was started on: no
+  other plan continues it (DEC-159, "During the first month" below).
+- **During the first month** (DEC-159; `change-timing.ts`, read by the
+  quote, the change and the webhook). "First month" is any `TRIALING`
+  subscription billed at the provider: the nominal first month, or free
+  first days.
+    - **A plan that costs more a month** is a `NEW` checkout: its full
+      first charge now, its 12-month term from now, no offer of its own.
+      Paid → on it, `ACTIVE`; the first month's provider subscription is
+      cancelled at once. What the first month cost is not refunded or set
+      against it. Yearly of a dearer plan is the same, as one payment.
+    - **A plan that costs the same or less** (the plan's own yearly row
+      included) is a `SCHEDULED` checkout from the month's end, with
+      nothing owed now. **Free**, or cancelling, is a pending move to Free
+      on the same date. The business keeps its plan until then.
+    - **Nothing more is charged for the plan it leaves.** A first month's
+      provider subscription has no cycle to end with, so it is cancelled
+      at once (`leavesWithCycle`), never "at cycle end", and its
+      `cancelled` event leaves the plan where it is until the date.
+      **Unverified against Razorpay:** that an authenticated subscription
+      with a later `start_at` cancels cleanly at once, and that it then
+      sends `subscription.cancelled`.
+    - **A change that waits is replaced by the next one.** Free instead
+      gives up the plan it authorised (its checkout CANCELLED, its
+      provider subscription cancelled); a dearer plan today clears the
+      pending move. A plan that waits and is then ended at the provider
+      (the mandate withdrawn) becomes Free on the same date, since nothing
+      would bill the plan it is on.
+    - **Add-ons.** A dearer plan today starts afresh, like any `NEW`: every
+      add-on held ends, and nothing owed for the first month's is charged.
+      A plan from the month's end keeps the add-ons it is offered and ends
+      the rest (DEC-157); Free ends them all. The quote names them first.
+    - **A coupon** goes on a checkout that starts a plan, so it can be
+      used on the dearer plan today (`NEW`) and not on a plan that waits.
+      The first checkout's coupon is not carried to another plan. It was
+      never redeemed (that happens with its first discounted charge), so
+      it can still be used.
+    - **The trial-ending email** says nothing to a business leaving at the
+      month's end (`cancelAtPeriodEnd`); the move-down notice tells it.
 - **Yearly** is the plan's yearly row ("pay for N months, get 12", priced
   at publish) on its yearly provider plan, sold only while yearly is on.
 - **Coupons** (`?coupon=` on the quote, `coupon` on the change) apply to a
@@ -305,6 +365,26 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   billed through the provider, trialing or paid up; definitions from the
   plan's own version; a module add-on only where the plan leaves the module
   out, a pack only where the plan caps what it raises. Limits move at once.
+  **Per plan (DEC-157):** an add-on may name the plans it is offered on
+  (`plans`; none named is every plan) and the most a business may hold
+  (`max`; none is `MAX_ADDON_QUANTITY`), both set in Admin › Plans ›
+  Offers. A price that differs by plan is two add-ons of one kind, each
+  naming its plans; the catalogue refuses two of a kind on one plan. A
+  business is listed, sold, counted and charged only the add-ons its plan
+  is offered. More than the maximum is refused; what is already held above
+  a maximum set since is kept, counted and charged, and only buying more
+  is refused. A plan change (an upgrade, a move applied) ends the add-ons
+  the new plan isn't offered (`endAddonsNotOfferedInTx`) and buys nothing
+  in their place; what the period already owed is still charged. An
+  add-on whose id the new version doesn't have at all is left held and
+  inert, as before. The quote (`GET …/billing/change-plan`) names the
+  add-ons held today that the change ends (`addonsEnding`: id, name,
+  quantity, and `onNewPlan`, the new plan's own add-on of the kind or
+  null), by the same rule (`addons-ending.ts`), and the change-plan dialog
+  says so before Confirm; a client reads a missing field as none. Each
+  one ended is an audit row after commit (`organization.plan.addon.changed`,
+  `reason: "plan-change"`). Not said: whether the business will be over a
+  limit afterwards, which the quote has no counts for.
   Billed after the period, on the provider subscription's next charge
   (`SubscriptionAddonCharge`): bought part-way, what's left of the period
   (prorated); each later period, the whole of it for what's held at its
@@ -391,8 +471,9 @@ Code: `checkout-quote.ts` (the rule, with `TERM_CHARGES` and
   open-ended. **Yearly** is one payment for the year: a provider order for
   exactly what the quote says is due (`payNowTotalPaise`, a coupon already
   off), no mandate and no Offer; the checkout keeps `providerPlanId`
-  `"one-time"`. A yearly plan never has a trial; yearly while a trial runs
-  starts the year now. A move to yearly from monthly is paid now for a year
+  `"one-time"`. A yearly plan never has a trial; yearly during a first
+  month starts the year now for a dearer plan, and at the month's end for
+  the plan it is on or a cheaper one (DEC-159). A move to yearly from monthly is paid now for a year
   that starts at the period's end (SCHEDULED); a pricier year mid-year pays
   the difference now.
 - **The first month.** The catalogue's trial may carry `firstPaise` (before
@@ -568,24 +649,100 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
   the workspace. It is a third step beside the two above, and none does
   another's work: publishing a catalogue (steps 3 to 5) and
   `PLAN_ENFORCEMENT` (step 6) stay the API's.
-- **Settings › Plan and billing** (owner only, as before): Your plan (from
-  `GET …/billing/access` and the subscription), the plan picker (from
-  `GET /public/pricing`; Monthly | Yearly only while yearly is on; "Start
-  N-day trial" only where `GET …/billing/change-plan` quotes a `TRIAL`),
-  add-ons, a coupon held for the next change, and Saroh's invoices with
-  their PDF (`/api/saroh-invoices/:id/pdf`, a proxy). Changing plan is the
-  quote, a confirm, then Razorpay's window over the page (the
-  `authorisationUrl` page only as a fallback) and a confirm with the
-  provider (DEC-093); a move to Free needs none. The picker lists what each
-  plan unlocks from the catalogue's card lines, prices before GST, and
-  under a plan given for a while marks that plan "You're on this until …"
-  (UX-044/045); a coupon is checked on Apply (UX-046). `?plan=&cycle=` opens that plan's change: every
-  "Upgrade" in the app links there (`upgradeHref`).
+- **Settings › Plan and billing** (read with `billing:read`, changed by the
+  owner alone) is two screens, as the owner asked on 13 and 14 Oct 2026
+  ("multiple info messages are not good"; only the plan the business is on,
+  with the plans on a next screen, on a phone and a desktop alike).
+  **The page itself** (`/settings/billing`), from the top:
+    - **One status line**, always there (`lib/saroh-billing/plan-status.ts`,
+      `nextParts`): the plan and what happens next. "You're on ‹plan› ·
+      First month until ‹date› · then ‹amount› a month", "… · Next charge
+      ‹amount› on ‹date›", "… · Nothing to pay", "… · ‹price› · Paid to
+      ‹date›" (a year paid once), "… · ‹price› · Ends ‹date›" (a plan it
+      is leaving), "… · Free until ‹date› · Nothing to pay" (a plan given
+      for a while). A fact is never broken across lines, and on a phone
+      the plan and each fact take a line of their own. How it is paid and
+      "Change" sit under it.
+    - **At most ONE message** under it, only when something needs the
+      business (`planMessage`), most pressing first: a checkout waiting
+      for its payment (it checks with the provider as it is drawn, and is
+      what stops a second payment), a payment that failed, a change that
+      is due and waits to be authorised, a plan change on its way with its
+      date, the term's renewal in its last days, then a legacy plan's
+      warning. Never two.
+    - **The plan it is on, and only that one**, as one card
+      (`current-plan-card.tsx`): its name with "Current plan", its price,
+      who it is for, every line it includes, and for whoever may change
+      the plan one button to the next screen: "Change plan", or "See
+      plans" on a plan that costs nothing. A change that already waits is
+      said on the card too ("Your plan from ‹date›: ‹plan›"). No other
+      plan is drawn here and none is quoted. Without `billing:manage`
+      there is no button, and a quiet link, "See Saroh's plans", opens the
+      next screen to read.
+    - **"How billing works"**, closed until asked for
+      (`how-billing-works.tsx`): the first month's small print, the
+      12-month term and its end, a plan given for a while, any note the
+      one message left unsaid (with its way on), and how every plan is
+      paid (`billingRules`). The change dialog says the same of the one
+      change it quotes.
+    - Then add-ons, and Saroh's invoices with their PDF
+      (`/api/saroh-invoices/:id/pdf`, a proxy).
+
+    **Change plan** (`/settings/billing/plans`; "Settings › Plan and
+    billing › Change plan", with "Back to Plan and billing"), the next
+    screen:
+    - **Every plan as a card, side by side** once the section has room for
+      them and stacked on a phone (`plan-card.tsx`; from
+      `GET /public/pricing`; Monthly | Yearly only while yearly is on).
+      On each: the name, the price as the largest thing with "a month +
+      GST" beside it, who it is for, the first-month offer only where
+      `GET …/billing/change-plan` quotes a `TRIAL`, then the button at the
+      card's full width, then every line of the plan (the catalogue's card
+      lines, UX-045). The button says what it does, from the same quote
+      (DEC-159): "Upgrade to ‹plan›" (filled; starts today, with "Starts
+      today: ‹amount› now" under it), "Move to ‹plan› from ‹date›" (quiet;
+      "You keep ‹plan› until then" under it), "Start ‹plan›" or "Start
+      with the first month" from Free. The plan it is on carries "Current
+      plan", an Ink edge and a button that is off; under a plan given for
+      a while that plan is marked "You're on this until …" (UX-044). A
+      plan a change already waits for says "Your plan from ‹date›" in the
+      button's place: there is no button to make the change twice, and no
+      way to undo it but choosing another plan.
+    - **"Compare everything on the pricing page"**, to saroh.in's
+      `/pricing`, and the **coupon**, checked on Apply (UX-046) and held
+      for the next change: it is used when a plan is changed, so it is
+      here and not on the page before.
+    - **Choosing a plan** opens its quote, then a confirm, then Razorpay's
+      window over the page (the `authorisationUrl` page only as a
+      fallback) and a confirm with the provider (DEC-093); a move to Free
+      needs none. Cancel leaves the person choosing. Once the change is
+      made, or its payment started (paid, the window closed, or it could
+      not open), the person is taken back to Plan and billing, where the
+      status line and the one message say how it stands; the browser's
+      Back from the provider's own page returns there too. The API gives
+      the provider no return address: a payment still waiting is found by
+      `GET …/billing/checkout` wherever the person arrives, and both
+      screens say it first (`CheckoutPending`), so nobody pays twice.
+    - **Read without `billing:manage`** it is titled "Saroh's plans": the
+      cards and what each is for, no button and no coupon. Someone the
+      plan isn't read to is refused on both screens.
+    - **`?plan=&cycle=` opens that plan's change** here: every "Upgrade"
+      in the app links to it (`upgradeHref`). The addresses from before
+      the plans had a screen of their own still work:
+      `/settings/billing?plan=…` is redirected by the page, and
+      `/settings/billing#change-plan` (in emails Saroh has sent) is sent
+      on from the browser (`old-plan-link.tsx`), since a server never
+      sees a `#`.
+
 - **Limit notices** at 80% and 100% on Products, Orders, Bookings, Blog
   (Posts), Team and Providers, in `limitNotice`'s words with
   `LIMIT_WORDS` (`@saroh/pricing-catalog`, shared with the API's
   refusals). Only while `enforced` (the access view's
   `PLAN_ENFORCEMENT`): nothing is shown that nothing would stop.
+- **Variants a product** (DEC-158): no notice on a list and no meter. The
+  product editor's Variants turns "Add to list" off once the product's
+  list holds the plan's number, and the line beside it says the cap and
+  the way to more (`lib/billing/variant-cap.ts`), in the refusal's words.
 - **Locks**: a module shut only by the plan (`ENTITLEMENT_REQUIRED` alone)
   stays in the rail with a lock and its page says which plan has it
   (`PlanLocked`). A catalogue row locks a rail entry only where the API

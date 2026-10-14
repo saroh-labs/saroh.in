@@ -1,11 +1,12 @@
 # Error tracking and uptime (#103)
 
-> **Status (2026-10-10): the tracker is PostHog (DEC-125).** Errors from
-> every app, nine workspace milestones from the API, and session replay in
-> the workspace (Saroh's interface readable, business data masked) and on
-> saroh.in (behind the cookie notice). **Nothing is sent anywhere until a
-> key is set**, and replay stays off after that until its own switch is on:
-> production only.
+> **Status (2026-10-14): the tracker is PostHog (DEC-125, DEC-160).** Errors
+> from every app, nine workspace milestones from the API, and in the
+> workspace and on saroh.in session replay (Saroh's interface readable,
+> business data masked; saroh.in behind the cookie notice) and page visits
+> (which pages are opened and for how long). **Nothing is sent anywhere
+> until a key is set**, and replay and page visits each stay off after that
+> until their own switch is on: production only.
 > Uptime monitoring and log-based alerts are still open (the end of this
 > page).
 
@@ -29,22 +30,24 @@ which app with `app` (`api` | `application` | `auth` | `admin` | `web` |
    PostHog's own scrubbing is a second net, never the first.
 4. **Never in the way.** PostHog being slow or down never slows or fails a
    request, a page or a sign-up, and an error is always in our own log first.
-5. **Nothing else.** No autocapture, no pageviews, no feature flags, no
-   surveys, no heatmaps, no cookies or browser storage, no `identify()` with
-   personal data. Session replay is the one thing besides errors, in two
-   apps, under the rules below.
+5. **Nothing else.** No autocapture, no feature flags, no surveys, no
+   heatmaps, no dead-click or rage-click capture, no network or console
+   capture, no cookies or browser storage, no `identify()` with personal
+   data. Besides errors there are two things, in two apps, under the rules
+   below: session replay, and page visits (`$pageview` and `$pageleave`,
+   DEC-160, which replaced "no pageviews" on 14 Oct 2026 and nothing else).
 
 ## What is sent, from where
 
-| App                                   | From the browser                                                                                                  | From the server                                                                                                                                                                 |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api.saroh.in` (`api`)                | —                                                                                                                 | Every 5xx (`AllExceptionsFilter` → `reportError`), Better Auth's included (below); a job that failed its **last** attempt (`reportJobError`); the nine milestones               |
-| `app.saroh.in` (`application`)        | Errors: every boundary (`reportError`) and the window's uncaught errors. Session replay, when switched on (below) | Errors while rendering, in a route handler, a Server Action or the proxy (`instrumentation.ts` → `onRequestError`); a crash before Next renders (`worker.ts` → `withCrashPage`) |
-| `accounts.saroh.in` (`auth`)          | Errors only. Never replay: these are the sign-in, sign-up and password pages                                      | The same two                                                                                                                                                                    |
-| `admin.saroh.in` (`admin`)            | Errors only                                                                                                       | The same two                                                                                                                                                                    |
-| `saroh.in` (`web`)                    | Errors. Session replay, when switched on and the cookie notice is accepted (below). Google Analytics is separate  | The same two                                                                                                                                                                    |
-| Merchant sites, `saroh.app` (`sites`) | **Nothing, ever**                                                                                                 | The same two, with the site's host and the route's template, and nothing about the visitor                                                                                      |
-| docs, help, templates, the UI gallery | Nothing (their boundaries only log)                                                                               | Nothing                                                                                                                                                                         |
+| App                                   | From the browser                                                                                                                       | From the server                                                                                                                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api.saroh.in` (`api`)                | —                                                                                                                                      | Every 5xx (`AllExceptionsFilter` → `reportError`), Better Auth's included (below); a job that failed its **last** attempt (`reportJobError`); the nine milestones               |
+| `app.saroh.in` (`application`)        | Errors: every boundary (`reportError`) and the window's uncaught errors. Session replay and page visits, each when switched on (below) | Errors while rendering, in a route handler, a Server Action or the proxy (`instrumentation.ts` → `onRequestError`); a crash before Next renders (`worker.ts` → `withCrashPage`) |
+| `accounts.saroh.in` (`auth`)          | Errors only. Never replay: these are the sign-in, sign-up and password pages                                                           | The same two                                                                                                                                                                    |
+| `admin.saroh.in` (`admin`)            | Errors only                                                                                                                            | The same two                                                                                                                                                                    |
+| `saroh.in` (`web`)                    | Errors. Session replay and page visits, each when switched on and the cookie notice is accepted (below). Google Analytics is separate  | The same two                                                                                                                                                                    |
+| Merchant sites, `saroh.app` (`sites`) | **Nothing, ever**                                                                                                                      | The same two, with the site's host and the route's template, and nothing about the visitor                                                                                      |
+| docs, help, templates, the UI gallery | Nothing (their boundaries only log)                                                                                                    | Nothing                                                                                                                                                                         |
 
 ### Errors inside Better Auth
 
@@ -181,6 +184,27 @@ plan gives 5,000 recordings a month across both apps;
 `NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE` (0 to 1) lowers the share for an
 environment.
 
+**What a recording needs to play** (found the hard way, 14 Oct 2026;
+`DEV_LEARNINGS.md`). A recording is rrweb's "meta" event (the page's
+address, width and height), a full snapshot of the page, and the changes
+after it. Without the meta event a player builds the page and never shows
+it: a blank black screen. posthog-js asks
+`session_recording.maskCapturedNetworkRequestFn` about the page's own
+address before it keeps that event, so the function must answer it
+(`replayAddressOnly`: the address without its query string or fragment)
+and answer null only for a request the page made.
+`replay-playback.*.test.ts` run the real SDK and fail without a meta event
+and a full snapshot. The page's styles are inside the snapshot (rrweb
+inlines every stylesheet it can read; ours are all same-origin), so a
+player needs nothing from our hosts but fonts and, on saroh.in, pictures;
+a font it can't fetch falls back to the system's.
+
+**When the first request leaves.** The SDK holds a new recording until the
+person first touches the page (a click or a key), then sends every two
+seconds or so. A tab nobody touches sends nothing. And a browser driven by
+automation (`navigator.webdriver`) sends nothing at all, errors and page
+visits included: the SDK treats it as a bot.
+
 ### The workspace
 
 It records only when **every** one of these holds (`replayDecision` in
@@ -285,22 +309,86 @@ input masked; text a page marks `data-ph-mask` masked (the waitlist's
 embedded frames and anything marked `data-ph-block` left out. **Nobody is
 identified**: no id is handed in, none is kept, no person profile is made.
 
-**What posthog-js sends when only recording is on** (both apps): one `GET
-…/array/<key>/config` when the instance is made (the project's settings: a
-recording starts only if the project records at all), and `POST …/s/` with
-the recording (`$snapshot` events). `before_send` drops every other event,
-and pageviews, autocapture, heatmaps, web vitals, exceptions, surveys and
-flags are switched off in the config as well.
+## Page visits (the workspace and saroh.in)
+
+Which pages people open and how long they stay (DEC-160, owner, 14 Oct
+2026). Off by default, on in production only, with its own switch
+(`NEXT_PUBLIC_POSTHOG_ANALYTICS`). The same two apps as replay and no
+other, **under exactly the rules replay has** (`replayDecision`,
+`siteReplayDecision`, asked of this switch): never accounts, the admin
+console or a merchant site.
+
+- **What is sent**: `$pageview` for the first page and each page after it,
+  and `$pageleave` when the tab closes or leaves. Each view says how long
+  the page before it was open (`$prev_pageview_duration`), which is how
+  PostHog knows the time on a page. Nothing else: no click, no scroll
+  depth, no heatmap.
+- **The app names the page, never the address bar**
+  (`BrowserTracking.pageview(route)`; posthog-js's own
+  `capture_pageview: "history_change"` is off, because it reads the address
+  at the moment it changes, before the app knows the route).
+    - **The workspace** names the route's shape,
+      `/commerce/orders/[orderId]` (`lib/usage-sharing/route-shape.ts`, from
+      Next's own `useParams`): no record's id, no invitation token, no
+      business name, no query string.
+    - **saroh.in** names its public path and, of its query, only what the
+      allow-list in `lib/page-address.ts` keeps (`utm_…`, `plan`, `src`):
+      no `ref`, `invite`, `email` or `token` (`pageRoute` in `lib/tags.ts`).
+- **Never sent** (`pageBeforeSend`, the last gate): the tab's title (in
+  the workspace it names the business and sometimes a record), the
+  referrer, where the session began, any person property (`$set`,
+  `$set_once`), scroll figures.
+- **Who**: the workspace, the signed-in person who shares usage and has
+  been told (one choice, "Help improve Saroh", and one notice for both
+  recording and page visits), by internal user id and organization id.
+  saroh.in, nobody: an id the SDK makes up for that page load, no person
+  profile; only after the cookie notice's first answer is accepted (the one
+  that says saroh.in "records how the site is used"), never in a team
+  browser, never with Do Not Track or Global Privacy Control, never on a
+  pricing draft preview or the sign-up hand-off.
+- **One instance with the recorder**, so a page's visits and its
+  recordings carry the same session id, and a visit is still sent for a
+  session whose recording was sampled out. Where only page visits are
+  switched on, the recorder is never fetched and no request is made at
+  start-up.
+- **Nothing is stored** (`persistence: "memory"`), so in PostHog a
+  "visitor" and a "session" on saroh.in are **one page load and what is
+  browsed from it**: a reload, a new tab or a return tomorrow is a new
+  visitor. Time on a page and views per page are right; unique visitors
+  and sessions are over-counted, and Google Analytics remains the count of
+  visitors. PostHog's cookieless mode would count a visitor once a day
+  without storing anything, but posthog-js sends no recording in that mode
+  and its sessions are made on PostHog's side, so a page's visits could no
+  longer be tied to its recordings: not used (DEC-160).
+
+**What posthog-js sends when recording and page visits are on** (both
+apps): one `GET …/array/<key>/config` when the instance is made (the
+project's settings: a recording starts only if the project records at
+all), `POST …/s/` with the recording (`$snapshot` events), and `POST
+…/e/` or `…/i/v0/e/` with each `$pageview` and `$pageleave`.
+`before_send` drops every other event, and autocapture, heatmaps, web
+vitals, exceptions, surveys and flags are switched off in the config as
+well. An error is one `POST …/e/` from the browser (`$exception`), and
+one `POST …/i/v0/e/` from the server when the server threw it.
+
+### Checking it by hand
+
+Use a real browser, not one driven by a test tool, and click something:
+the SDK sends nothing from an automated browser, and nothing of a
+recording before the first click or key. Then, within a few seconds: a
+`POST` to `…/s/` (the recording) and one to `…/e/` or `…/i/v0/e/` per
+page opened. In a recording, look for the page itself, not a black frame.
 
 ## Settings
 
-| Variable                                              | Where it is read                                                                                                                                                       | Unset                                                 |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `POSTHOG_KEY`, `POSTHOG_HOST`                         | API: `src/env.ts` → `main.ts` → `common/observability/posthog.ts`. Merchant sites: `env.ts` → `lib/error-tracking.ts`; `worker.ts`                                     | Nothing is sent. The host is the EU cloud             |
-| `POSTHOG_ENVIRONMENT` (`development` \| `production`) | API only, `src/env.ts`                                                                                                                                                 | With a key: nothing is sent, and an ERROR at start-up |
-| `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Workspace, accounts, admin, saroh.in: `env.ts` → `lib/error-tracking.ts` (server) and `lib/error-tracking-browser.ts`; `worker.ts`                                     | Nothing is loaded or sent                             |
-| `NEXT_PUBLIC_POSTHOG_REPLAY` (`on` \| `off`)          | Workspace: `env.ts` → `lib/error-tracking-browser.ts`, `usage-recording.tsx`, the profile page. saroh.in: `env.ts` → `lib/error-tracking-browser.ts`, `app/layout.tsx` | Off                                                   |
-| `NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE` (`0` to `1`)      | Workspace and saroh.in: `env.ts` → `lib/error-tracking-browser.ts`                                                                                                     | Every allowed session (`REPLAY_SAMPLE_RATE`)          |
+| Variable                                              | Where it is read                                                                                                                                                               | Unset                                                 |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| `POSTHOG_KEY`, `POSTHOG_HOST`                         | API: `src/env.ts` → `main.ts` → `common/observability/posthog.ts`. Merchant sites: `env.ts` → `lib/error-tracking.ts`; `worker.ts`                                             | Nothing is sent. The host is the EU cloud             |
+| `POSTHOG_ENVIRONMENT` (`development` \| `production`) | API only, `src/env.ts`                                                                                                                                                         | With a key: nothing is sent, and an ERROR at start-up |
+| `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Workspace, accounts, admin, saroh.in: `env.ts` → `lib/error-tracking.ts` (server) and `lib/error-tracking-browser.ts`; `worker.ts`                                             | Nothing is loaded or sent                             |
+| `NEXT_PUBLIC_POSTHOG_REPLAY` (`on` \| `off`)          | Workspace: `env.ts` → `lib/error-tracking-browser.ts`, `usage-recording.tsx`, the profile page. saroh.in: `env.ts` → `lib/error-tracking-browser.ts`, `app/layout.tsx`         | Off                                                   |
+| `NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE` (`0` to `1`)      | Workspace and saroh.in: `env.ts` → `lib/error-tracking-browser.ts`                                                                                                             | Every allowed session (`REPLAY_SAMPLE_RATE`)          |
+| `NEXT_PUBLIC_POSTHOG_ANALYTICS` (`on` \| `off`)       | Workspace: `env.ts` → `lib/error-tracking-browser.ts`, `usage-recording.tsx`, the profile page. saroh.in: `env.ts` → `lib/error-tracking-browser.ts`, `lib/site-tag-config.ts` | Off                                                   |
 
 The API's and the merchant sites' are set on their hosts. The four apps' go
 in each app's `wrangler.jsonc` `vars` (commented out until the key exists),
@@ -333,13 +421,24 @@ list it.
    dev API; put the key in the dev `vars` of the four apps' `wrangler.jsonc`
    (and `POSTHOG_KEY` in the merchant sites'), and deploy.
 3. Production the same, with `POSTHOG_ENVIRONMENT=production`.
-4. Replay: turn "Record user sessions" on in PostHog. The production `vars`
+4. Page visits (DEC-160): nothing to turn on in PostHog; Web analytics
+   reads `$pageview` and `$pageleave` as they arrive. In the project's
+   settings leave **autocapture, heatmaps, dead clicks, web vitals and
+   exception autocapture off** (the SDK has them off whatever is set
+   there), leave "Cookieless server hash mode" off (not used), and keep
+   **discard client IP data** on. The production `vars` of the workspace
+   and saroh.in say `NEXT_PUBLIC_POSTHOG_ANALYTICS: "on"`; development's
+   say `off`.
+5. Replay: turn "Record user sessions" on in PostHog. Leave the project's
+   "Privacy and masking" settings for replay alone: the SDK's own settings
+   win where both are set, and "mask all element attributes" there would
+   switch off the function that keeps a link's path. The production `vars`
    of the workspace and saroh.in already say `NEXT_PUBLIC_POSTHOG_REPLAY:
 "on"` (owner, 10 Oct), so the next production deploy of each starts it;
    development's say `off`. The API must be released first: the notice's
    dismissal is kept by it (migration
    `20261108120000_user_usage_notice_seen`).
-5. **Before that deploy**, the Privacy Policy must say so: session
+6. **Before that deploy**, the Privacy Policy must say so: session
    recordings of the workspace and of saroh.in under "What we collect", and
    that the cookie notice's answer covers recording under "Cookies"
    (`apps/saroh.in/content/privacy.ts`, the owner's text).
@@ -363,4 +462,3 @@ list it.
 - **Log-based alerts** on `unhandled_exception` rate, `job_failed_final`,
   `error_sink_failed`, `posthog_send_failed` and job-queue ERRORs. Needs the
   logs shipped somewhere first.
-- **PostHog web analytics for saroh.in.** Not built; Google Analytics stays.

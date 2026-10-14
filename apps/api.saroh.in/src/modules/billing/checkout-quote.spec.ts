@@ -17,6 +17,7 @@ const row = (
 ): QuotePlanRow => ({ id, key, version: 1, interval, priceCents });
 
 const FREE = row("free@1", 0);
+const A = row("a@1", 11_100);
 const B = row("b@1", 22_200);
 const C = row("c@1", 33_300);
 const B_YEAR = row("b-year@1", 222_000, "year", "catalog.b");
@@ -144,6 +145,169 @@ describe("quoteChange", () => {
     });
 });
 
+describe("during the first month (DEC-159)", () => {
+    const trialing = sub({ status: "TRIALING" });
+
+    it("a dearer plan starts today at its full price: the month ends, nothing of it carries over", () => {
+        const q = quoteChange({ subscription: trialing, target: C, now: NOW });
+        expect(q).toMatchObject({
+            kind: "NEW",
+            firstMonth: "NOW",
+            startAt: null,
+            effectiveAt: null,
+            trialEndsAt: null,
+            // No first-month amount, no difference: the plan's own charge.
+            chargeNowPaise: 0,
+            firstChargePaise: 33_300,
+            payNowTotalPaise: withGstPaise(33_300),
+            mandateCheck: "PAID",
+            payment: "AUTOPAY",
+            termCharges: 12,
+        });
+    });
+
+    it("the dearer plan's own first-month offer never applies: the business used its one", () => {
+        const q = quoteChange({
+            subscription: trialing,
+            target: C,
+            now: NOW,
+            // The service passes none after a trial; the rule holds anyway.
+            trialDays: 30,
+            trialFirstPaise: 700,
+        });
+        expect(q).toMatchObject({
+            kind: "NEW",
+            payNowTotalPaise: withGstPaise(33_300),
+        });
+    });
+
+    it("a cheaper plan waits for the month's end: authorised now, nothing owed today", () => {
+        const q = quoteChange({ subscription: trialing, target: A, now: NOW });
+        expect(q).toMatchObject({
+            kind: "SCHEDULED",
+            firstMonth: "AT_END",
+            startAt: END,
+            effectiveAt: END,
+            chargeNowPaise: 0,
+            payNowTotalPaise: 0,
+            mandateCheck: "REFUNDED",
+            firstChargePaise: 11_100,
+        });
+    });
+
+    it("a plan at the same price is not a move up: it waits too", () => {
+        const twin = row("twin@1", B.priceCents);
+        expect(
+            quoteChange({ subscription: trialing, target: twin, now: NOW }),
+        ).toMatchObject({
+            kind: "SCHEDULED",
+            firstMonth: "AT_END",
+            startAt: END,
+            payNowTotalPaise: 0,
+        });
+    });
+
+    it("Free, or cancelling, runs to the month's end and charges nothing more", () => {
+        expect(
+            quoteChange({ subscription: trialing, target: FREE, now: NOW }),
+        ).toMatchObject({
+            kind: "TO_FREE",
+            firstMonth: "AT_END",
+            effectiveAt: END,
+            payNowTotalPaise: 0,
+            mandateCheck: "NONE",
+        });
+    });
+
+    it("a month that is over, or one not at the provider, is no first month", () => {
+        const over = sub({ status: "TRIALING", currentPeriodEnd: NOW });
+        expect(
+            quoteChange({ subscription: over, target: FREE, now: NOW }),
+        ).toMatchObject({
+            kind: "TO_FREE",
+            effectiveAt: NOW,
+            firstMonth: null,
+        });
+        expect(
+            quoteChange({ subscription: over, target: C, now: NOW }),
+        ).toMatchObject({ kind: "NEW", firstMonth: null });
+    });
+
+    it("a coupon goes on the dearer plan it starts, never on the plan that waits", () => {
+        const coupon = { discountPaise: 5_000, months: 2 };
+        expect(
+            quoteChange({
+                subscription: trialing,
+                target: C,
+                now: NOW,
+                coupon,
+            }),
+        ).toMatchObject({
+            kind: "NEW",
+            discountPaise: 5_000,
+            discountCharges: 2,
+            payNowTotalPaise: withGstPaise(33_300 - 5_000),
+        });
+        expect(
+            quoteChange({
+                subscription: trialing,
+                target: A,
+                now: NOW,
+                coupon,
+            }),
+        ).toMatchObject({
+            kind: "SCHEDULED",
+            discountPaise: 0,
+            discountCharges: 0,
+        });
+    });
+
+    it("outside a first month nothing changes: an upgrade pays the difference, a downgrade waits for the period's end", () => {
+        expect(
+            quoteChange({ subscription: sub(), target: C, now: NOW }),
+        ).toMatchObject({ kind: "UPGRADE", firstMonth: null, startAt: END });
+        expect(
+            quoteChange({ subscription: sub(), target: A, now: NOW }),
+        ).toMatchObject({
+            kind: "SCHEDULED",
+            firstMonth: null,
+            effectiveAt: END,
+        });
+        expect(
+            quoteChange({ subscription: sub(), target: FREE, now: NOW }),
+        ).toMatchObject({
+            kind: "TO_FREE",
+            firstMonth: null,
+            effectiveAt: END,
+        });
+    });
+
+    it("a plan with no offer, from Free, charges its full first month at once", () => {
+        const fromFree = sub({
+            plan: FREE,
+            provider: null,
+            providerSubscriptionId: null,
+            currentPeriodEnd: null,
+        });
+        expect(
+            quoteChange({
+                subscription: fromFree,
+                target: C,
+                now: NOW,
+                trialDays: null,
+                trialFirstPaise: 0,
+            }),
+        ).toMatchObject({
+            kind: "NEW",
+            firstMonth: null,
+            startAt: null,
+            chargeNowPaise: 0,
+            payNowTotalPaise: withGstPaise(33_300),
+            mandateCheck: "PAID",
+        });
+    });
+});
+
 describe("prorateDifferencePaise", () => {
     it("rounds half-up to the paisa and never charges for a downgrade or a spent period", () => {
         const start = new Date("2026-01-01T00:00:00Z");
@@ -268,19 +432,19 @@ describe("offers in the quote (U16)", () => {
         ).toBe("NEW");
     });
 
-    it("another paid plan while a trial runs stays a trial to the same end; Free ends it now", () => {
+    it("a trial is never quoted while one runs, whatever the target plan offers (DEC-159)", () => {
         const trialing = sub({ status: "TRIALING" });
-        expect(
-            quoteChange({ subscription: trialing, target: C, now: NOW }),
-        ).toMatchObject({
-            kind: "TRIAL",
-            startAt: END,
-            trialEndsAt: END,
-            chargeNowPaise: 0,
-        });
-        expect(
-            quoteChange({ subscription: trialing, target: FREE, now: NOW }),
-        ).toMatchObject({ kind: "TO_FREE", effectiveAt: NOW });
+        for (const target of [A, C, FREE, B_YEAR]) {
+            const q = quoteChange({
+                subscription: trialing,
+                target,
+                now: NOW,
+                trialDays: 30,
+                trialFirstPaise: 700,
+            });
+            expect(q.kind).not.toBe("TRIAL");
+            expect(q.trialEndsAt).toBeNull();
+        }
     });
 
     it("a monthly coupon comes off each of its months; the provider is told the GST-inclusive difference", () => {
@@ -462,14 +626,46 @@ describe("how it's paid (DEC-093)", () => {
         expect(q.chargeNowPaise).toBeGreaterThan(0);
     });
 
-    it("yearly while a trial runs starts the year now", () => {
+    it("yearly during the first month: a dearer plan's year starts now; the same plan's waits for the month's end", () => {
+        const trialing = sub({ status: "TRIALING" });
+        // The plan it's on, billed yearly: not a move up.
+        const same = quoteChange({
+            subscription: trialing,
+            target: B_YEAR,
+            now: NOW,
+            targetMonthlyPaise: B.priceCents,
+        });
+        expect(same).toMatchObject({
+            kind: "SCHEDULED",
+            payment: "ONE_TIME",
+            startAt: END,
+            effectiveAt: END,
+            firstMonth: "AT_END",
+            payNowTotalPaise: withGstPaise(B_YEAR.priceCents),
+        });
+        const dearer = quoteChange({
+            subscription: trialing,
+            target: C_YEAR,
+            now: NOW,
+            targetMonthlyPaise: C.priceCents,
+        });
+        expect(dearer).toMatchObject({
+            kind: "NEW",
+            payment: "ONE_TIME",
+            startAt: null,
+            effectiveAt: null,
+            firstMonth: "NOW",
+            payNowTotalPaise: withGstPaise(C_YEAR.priceCents),
+        });
+        // Not told what the plan costs a month: a twelfth of the year.
         expect(
-            quoteChange({
-                subscription: sub({ status: "TRIALING" }),
-                target: B_YEAR,
-                now: NOW,
-            }),
-        ).toMatchObject({ kind: "NEW", payment: "ONE_TIME" });
+            quoteChange({ subscription: trialing, target: B_YEAR, now: NOW })
+                .kind,
+        ).toBe("SCHEDULED");
+        expect(
+            quoteChange({ subscription: trialing, target: C_YEAR, now: NOW })
+                .kind,
+        ).toBe("NEW");
     });
 
     it("the plan it's on is a renewal from its term's end, inside the last 30 days only", () => {

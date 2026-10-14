@@ -30,6 +30,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import PlanBillingLayout from "@/app/(shell)/settings/(sections)/billing/layout";
+import ChangePlanPage from "@/app/(shell)/settings/(sections)/billing/plans/page";
 import { GET as invoicePdf } from "@/app/api/saroh-invoices/[invoiceId]/pdf/route";
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { PausedBanner, PausedNote } from "@/components/billing/paused-banner";
@@ -120,20 +121,20 @@ function drawn(): string {
                 title="You've reached your 10 things on Plan A"
                 body="You can't add more things."
                 cta="See Plan B"
-                href="/settings/billing?plan=b#change-plan"
+                href="/settings/billing/plans?plan=b"
             />
             <PlanWay>
-                <Link href="/settings/billing#change-plan">See plans</Link>
+                <Link href="/settings/billing/plans">See plans</Link>
             </PlanWay>
             <PlanLockedCard
                 name="Things"
                 plan="Plan B"
-                href="/settings/billing?plan=b#change-plan"
+                href="/settings/billing/plans?plan=b"
             />
             <LimitReachedCard
                 title="You're at 10 things"
                 plan="Plan B"
-                href="/settings/billing?plan=b#change-plan"
+                href="/settings/billing/plans?plan=b"
             />
         </>,
     );
@@ -204,6 +205,12 @@ describe("with plans hidden (the switch unset)", () => {
         );
     });
 
+    it("answers its Change plan screen the same, before any plan is read", async () => {
+        // The layout above it answers first; the page says so too.
+        await expect(ChangePlanPage()).rejects.toThrow("NOT_FOUND");
+        expect(apiFetch).not.toHaveBeenCalled();
+    });
+
     it("answers Saroh's invoice PDF with a 404, unasked", async () => {
         const res = await invoicePdf(new Request("https://app.example.com/"), {
             params: Promise.resolve({ invoiceId: "inv_1" }),
@@ -261,7 +268,7 @@ describe("with plans hidden (the switch unset)", () => {
     it("gives a setup step that is the way to a plan no button", () => {
         const action = {
             label: "See plans",
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
         };
         expect(planRow(action, true, "So money reaches your bank.")).toEqual({
             why: "So money reaches your bank.",
@@ -323,7 +330,7 @@ describe("with plans shown (the switch on)", () => {
         expect(html).toContain("This product is paused.");
         expect(html).toContain("Your Plan B plan ends in");
         expect(html).toContain("You&#x27;ve reached your 10 things on Plan A");
-        expect(html).toContain('href="/settings/billing#change-plan"');
+        expect(html).toContain('href="/settings/billing/plans"');
         expect(html).toContain("See Plan B");
         expect(html).toContain("You&#x27;re at 10 things");
     });
@@ -340,9 +347,7 @@ describe("with plans shown (the switch on)", () => {
             what: "moved the plan from Plan A to Plan B",
             where: { label: "Plan and billing", href: "/settings/billing" },
         });
-        expect(notificationHref(PLAN_NOTICE)).toBe(
-            "/settings/billing#change-plan",
-        );
+        expect(notificationHref(PLAN_NOTICE)).toBe("/settings/billing/plans");
         expect(blockerSentence({ code: "ENTITLEMENT_REQUIRED" })).toContain(
             "Plan and billing",
         );
@@ -352,10 +357,10 @@ describe("with plans shown (the switch on)", () => {
     it("offers the plans where the plan holds the business's own email", () => {
         expect(emailPrompt(NO_EMAIL, MAY)).toMatchObject({
             kind: "plans",
-            action: { href: "/settings/billing#change-plan" },
+            action: { href: "/settings/billing/plans" },
         });
         expect(emailRefusalNote(NO_EMAIL, MAY, WORDS)?.action).toEqual({
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
             label: "See plans",
         });
     });
@@ -363,7 +368,7 @@ describe("with plans shown (the switch on)", () => {
     it("keeps a setup step's way to a plan", () => {
         const action = {
             label: "See plans",
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
         };
         expect(planRow(action, true)).toEqual({ action });
     });

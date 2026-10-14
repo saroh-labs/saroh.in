@@ -6,6 +6,16 @@ import {
     withGstPaise,
 } from "@saroh/pricing-catalog";
 
+import type { FirstMonthMove } from "./change-timing";
+import {
+    billedByProvider,
+    firstMonthEnd,
+    firstMonthMove,
+    paidUntil,
+} from "./change-timing";
+
+export { billedByProvider };
+
 /**
  * How a plan change is made (pricing catalogue U15), as one pure rule the
  * quote, the change and their specs share. Every amount is integer paise,
@@ -13,25 +23,32 @@ import {
  * a cycle (KTD-18).
  *
  * - `NONE`: it is the plan it's on.
- * - `TO_FREE`: a plan that costs nothing. At the end of the period already
- *   paid when there is one at the provider, else at once. No checkout.
+ * - `TO_FREE`: a plan that costs nothing. At the end of what is already
+ *   paid at the provider (a period, or a first month), else at once. No
+ *   checkout.
  * - `NEW`: a paid plan from Free, a cancelled plan, or a plan Saroh doesn't
  *   bill through a provider. A checkout; on the plan once authorised, and the
- *   first charge is the plan's own.
+ *   first charge is the plan's own. Also a dearer plan chosen during the
+ *   first month (DEC-159): the month ends, and the plan starts today at its
+ *   full price.
  * - `UPGRADE`: a pricier plan on the same cycle, mid-period. A checkout; on
  *   the plan once authorised. The difference for the rest of the period is
  *   charged then, and the plan's own charges start when the period ends.
  * - `SCHEDULED`: anything else paid — a cheaper plan, the other cycle, or the
  *   plan a "move them" is taking it to. A checkout authorised now; on the
- *   plan from the date (the period's end, or the move's).
+ *   plan from the date (the period's end, the first month's, or the move's).
  * - `TRIAL` (U16): a paid plan with a free trial, where `NEW` would be and
- *   the business may still have one, or another paid plan while a trial
- *   runs (the same end). A checkout; on the plan once authorised, its first
- *   charge at `startAt`, the trial's end. With the catalogue's nominal first
- *   month (DEC-093) that month's charge is taken at authorisation.
+ *   the business may still have one. A checkout; on the plan once
+ *   authorised, its first charge at `startAt`, the trial's end. With the
+ *   catalogue's nominal first month (DEC-093) that month's charge is taken
+ *   at authorisation. Never another plan while one runs (DEC-159): the offer
+ *   is the plan's it was started on.
  * - `RENEW` (DEC-093, #803): the plan it's on, again, once its 12-month
  *   term is about to end (`RENEW_WINDOW_DAYS`). A checkout authorised now
  *   for a new term starting when this one ends, at the live price.
+ *
+ * When a change takes effect is `change-timing.ts`'s (DEC-159): a dearer
+ * plan today, anything else once what was paid for has run out.
  *
  * How it's paid (DEC-093): monthly on autopay for `TERM_CHARGES` charges,
  * then a one-tap renewal; yearly as one payment for the year, taken when
@@ -116,6 +133,12 @@ export interface ChangeQuote {
     /** A trial's end, when the first charge is taken (TRIAL); else null. */
     trialEndsAt: Date | null;
     /**
+     * A change made during the first month (DEC-159): `NOW` — a dearer
+     * plan, so the month ends and the plan starts today at its full price;
+     * `AT_END` — the month runs out first. Null outside a first month.
+     */
+    firstMonth: FirstMonthMove | null;
+    /**
      * A coupon's discount: off each of the first `discountCharges` charges
      * of the plan, before GST. Zero and zero without one (or where it can't
      * apply).
@@ -183,17 +206,6 @@ export function prorateDifferencePaise(input: {
     if (total === 0n || left === 0n) return 0;
     const a = BigInt(diff) * left;
     return Number((2n * a + total) / (2n * total));
-}
-
-/** The subscription is billed by Saroh's provider, and still running. */
-export function billedByProvider(sub: QuoteSubscription | null): boolean {
-    return Boolean(
-        sub &&
-        sub.status !== "CANCELLED" &&
-        sub.provider &&
-        sub.providerSubscriptionId &&
-        sub.plan.priceCents > 0,
-    );
 }
 
 /**
@@ -282,6 +294,13 @@ export interface QuoteInput {
      * when it has one: the same plan is then a renewal from that date.
      */
     termEndsAt?: Date | null;
+    /**
+     * What the target's plan costs a month before GST, when the target is
+     * its yearly row: a change in the first month is a move up by what the
+     * plans cost a month (DEC-159). Unset, a yearly price is read as a
+     * twelfth of itself.
+     */
+    targetMonthlyPaise?: number;
     /** A coupon to apply, already checked as usable (the service's job). */
     coupon?: QuoteCoupon | null;
 }
@@ -320,6 +339,7 @@ function baseQuote(input: QuoteInput): BaseQuote {
         chargeNowGstPaise: 0,
         chargeNowTotalPaise: 0,
         trialEndsAt: null,
+        firstMonth: null,
     };
     const live = sub && sub.status !== "CANCELLED" ? sub : null;
 
@@ -349,15 +369,17 @@ function baseQuote(input: QuoteInput): BaseQuote {
         live?.currentPeriodEnd && live.currentPeriodEnd > now
             ? live.currentPeriodEnd
             : null;
-    const trialing = live?.status === "TRIALING";
+    const firstMonthEndsAt = firstMonthEnd(live, now);
 
     if (price === 0) {
-        // A trial paid nothing ahead: Free at once.
-        const at =
-            billedByProvider(live) && periodEndAt && !trialing
-                ? periodEndAt
-                : now;
-        return { ...base, kind: "TO_FREE", startAt: null, effectiveAt: at };
+        // What was paid for runs out first, a first month included.
+        return {
+            ...base,
+            kind: "TO_FREE",
+            startAt: null,
+            effectiveAt: paidUntil(live, now) ?? now,
+            firstMonth: firstMonthEndsAt ? "AT_END" : null,
+        };
     }
 
     const onCatalogue = live?.plan.key.startsWith(CATALOG_PLAN_KEY_PREFIX);
@@ -384,19 +406,31 @@ function baseQuote(input: QuoteInput): BaseQuote {
         return { ...base, kind: "NEW", startAt: null, effectiveAt: null };
     }
 
-    // Yearly while a trial runs: one payment, so the year starts now.
-    if (trialing && cycle === "year") {
-        return { ...base, kind: "NEW", startAt: null, effectiveAt: null };
-    }
-    // Another plan while a trial runs: still a trial, to the same end. Its
-    // first month was paid with the first checkout; nothing more now.
-    if (trialing) {
+    // Another plan during the first month (DEC-159). A dearer one starts
+    // today at its full price, with no offer of its own: the month ends
+    // there. Any other waits for the month to end.
+    if (firstMonthEndsAt) {
+        const move = firstMonthMove({
+            fromMonthlyPaise: live.plan.priceCents,
+            toMonthlyPaise:
+                input.targetMonthlyPaise ??
+                (cycle === "year" ? Math.ceil(price / YEAR_MONTHS) : price),
+        });
+        if (move === "NOW") {
+            return {
+                ...base,
+                kind: "NEW",
+                startAt: null,
+                effectiveAt: null,
+                firstMonth: move,
+            };
+        }
         return {
             ...base,
-            kind: "TRIAL",
-            startAt: periodEndAt,
-            effectiveAt: null,
-            trialEndsAt: periodEndAt,
+            kind: "SCHEDULED",
+            startAt: firstMonthEndsAt,
+            effectiveAt: firstMonthEndsAt,
+            firstMonth: move,
         };
     }
     // The plan a "move them" is taking it to, authorised again (OQ-6).

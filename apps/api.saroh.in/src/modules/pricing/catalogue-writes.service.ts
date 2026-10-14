@@ -122,6 +122,13 @@ function canonical(value: unknown): string {
  * Only one version may be scheduled at a time, and nothing is published
  * while one is: the live version is the newest whose go-live has passed, so
  * a version published under a scheduled one would be overtaken by it.
+ *
+ * A draft is a copy of the newest published version (`newestPublished`),
+ * and is only ever published over that one. A start names the version the
+ * editor copied and is refused when a newer one has been published since;
+ * a publish is refused when one has since the draft was started (a
+ * scheduled version reaching its go-live). Otherwise the copy of the older
+ * version would go out as the next one and undo the version between.
  */
 @Injectable()
 export class CatalogueWritesService {
@@ -133,10 +140,19 @@ export class CatalogueWritesService {
      * Save the whole draft. `revision` is the one the editor started from;
      * 0 starts a new draft. Anything else that doesn't match is a 409 naming
      * who saved since, and the editor reloads (the D5 plan-draft rule).
+     *
+     * A start says which version the editor copied (`baseVersion`, null
+     * with nothing published). When that isn't the newest published version
+     * the start is a 409 too: the page was read before that version was
+     * published, and its copy would undo it.
      */
     async saveDraft(
         actorUserId: string,
-        input: { catalog: Record<string, unknown>; revision: number },
+        input: {
+            catalog: Record<string, unknown>;
+            revision: number;
+            baseVersion?: number | null;
+        },
         now: Date,
     ): Promise<DraftSaved> {
         const bytes = Buffer.byteLength(JSON.stringify(input.catalog), "utf8");
@@ -148,7 +164,19 @@ export class CatalogueWritesService {
         const catalog = input.catalog as Prisma.InputJsonObject;
         return prisma.$transaction(async (tx) => {
             if (input.revision === 0) {
-                const live = await liveCatalogueVersion(tx, now);
+                const existing = await tx.pricingCatalogDraft.findUnique({
+                    where: { id: SHARED_DRAFT_ID },
+                    select: { id: true },
+                });
+                // Someone's draft is there already: theirs is the news.
+                if (existing) throw await this.staleDraft(tx);
+                const newest = await this.newestPublished(tx, now);
+                if (
+                    input.baseVersion === undefined ||
+                    input.baseVersion !== newest
+                ) {
+                    throw this.staleBase("start", input.baseVersion, newest);
+                }
                 // Insert-or-nothing: a caught unique violation would abort
                 // the transaction, so the race is read from the count.
                 const made = await tx.pricingCatalogDraft.createMany({
@@ -157,7 +185,7 @@ export class CatalogueWritesService {
                             id: SHARED_DRAFT_ID,
                             catalog,
                             revision: 1,
-                            baseVersion: live?.version ?? null,
+                            baseVersion: newest,
                             updatedByUserId: actorUserId,
                         },
                     ],
@@ -272,6 +300,18 @@ export class CatalogueWritesService {
                 throw new NotFoundException("There's no draft to publish.");
             if (draft.revision !== input.revision) {
                 throw await this.staleDraft(tx);
+            }
+            // A version went live after the draft was started (a scheduled
+            // one reaching its go-live): the draft is a copy of the one
+            // before, and publishing it would undo the newer one.
+            const newest = await this.newestPublished(tx, now);
+            if (draft.baseVersion !== newest) {
+                throw this.staleBase(
+                    "publish",
+                    draft.baseVersion,
+                    newest,
+                    draft.revision,
+                );
             }
             const check = validateCatalog(draft.catalog);
             if (!check.ok) {
@@ -667,6 +707,21 @@ export class CatalogueWritesService {
         return { version: row.version, catalog: check.catalog };
     }
 
+    /**
+     * The version a draft is a copy of: the newest whose go-live has passed,
+     * live or still waiting for the billing provider (a waiting one is live
+     * as soon as its plans are there, so the next version builds on it).
+     * Null before anything is published.
+     */
+    private async newestPublished(tx: Tx, now: Date): Promise<number | null> {
+        const row = await tx.pricingCatalogVersion.findFirst({
+            where: { goLiveAt: { lte: now } },
+            orderBy: { version: "desc" },
+            select: { version: true },
+        });
+        return row?.version ?? null;
+    }
+
     /** A cancelled version's go-live revalidation, provider sync and Free rows, not yet run. */
     private async dropRevalidations(tx: Tx, version: number): Promise<void> {
         const jobs = await tx.job.findMany({
@@ -725,6 +780,37 @@ export class CatalogueWritesService {
                 revision: draft.revision,
                 updatedBy,
                 updatedAt: draft.updatedAt.toISOString(),
+            },
+        });
+    }
+
+    /**
+     * The 409 for a draft that isn't a copy of the newest published version:
+     * a start from a page read before `newest` was published, or a publish
+     * of a draft started before it. The draft's conflict shape, with the
+     * version that is newest now.
+     */
+    private staleBase(
+        at: "start" | "publish",
+        base: number | null | undefined,
+        newest: number | null,
+        revision: number | null = null,
+    ): ConflictException {
+        const from = typeof base === "number" ? ` from version ${base}` : "";
+        const message =
+            newest === null
+                ? "Nothing is published any more. Reload to see the pricing as it is now."
+                : at === "start"
+                  ? `Version ${newest} has been published since this page was opened, so your changes weren't saved. Reload to start from version ${newest}.`
+                  : `Version ${newest} was published after this draft was started${from}, so publishing it would undo version ${newest}. Nothing changed. Discard the draft and make the changes again.`;
+        return new ConflictException({
+            message,
+            details: {
+                revision,
+                updatedBy: null,
+                updatedAt: null,
+                newestVersion: newest,
+                baseVersion: base ?? null,
             },
         });
     }

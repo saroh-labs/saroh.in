@@ -133,7 +133,7 @@ const card = () => host.querySelector<HTMLElement>(`[data-domain="${HOST}"]`);
 const note = () => card()?.querySelector<HTMLElement>("[data-domain-plan]");
 const way = () =>
     note()?.querySelector<HTMLAnchorElement>(
-        'a[href="/settings/billing#change-plan"]',
+        'a[href="/settings/billing/plans"]',
     );
 const item = (name: string, within: ParentNode = document) =>
     Array.from(within.querySelectorAll<HTMLButtonElement>("button")).find(

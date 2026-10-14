@@ -15,6 +15,7 @@ import {
     allowedNow,
     browserOptsOut,
     NOTHING_ALLOWED,
+    pageRoute,
     startRecording,
     syncTags,
 } from "@/lib/tags";
@@ -121,6 +122,13 @@ export function SiteTags({
         }
         return startRecording(recorder);
     }, [record]);
+
+    // Page visits (DEC-160): the same switch, answer and pages as the
+    // recorder, which decides whether one is sent. After the effect above,
+    // so the address is already cut back; named again on every page.
+    useEffect(() => {
+        if (record) browserTracking?.pageview(pageRoute());
+    }, [record, pathname]);
 
     if (!ready || preview || optedOut || handOff) return null;
     const ask = question(config, choices);

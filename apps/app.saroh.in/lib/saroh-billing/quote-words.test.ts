@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChangeQuote } from "./plan-view";
-import { quoteSummary } from "./quote-words";
+import { endingAddonsNote, quoteSummary } from "./quote-words";
 
 /** Made up on purpose: Plan C at ₹222, a first month of ₹7 — no real prices. */
 const quote = (over: Partial<ChangeQuote> = {}): ChangeQuote => ({
@@ -173,5 +173,189 @@ describe("quoteSummary (DEC-093)", () => {
             ),
         ).toMatchObject({ confirm: "Move to Plan A", toPayment: false });
         expect(quoteSummary(quote({ kind: "NONE" })).confirm).toBeNull();
+    });
+});
+
+describe("quoteSummary: when a change starts (DEC-159)", () => {
+    const NOW = new Date("2026-10-13T00:00:00.000Z");
+    const END = "2026-11-06T00:00:00.000Z";
+    const at = (q: ChangeQuote, currentPlan = "Plan B") =>
+        quoteSummary(q, { currentPlan, now: NOW });
+
+    it("a dearer plan chosen during the first month starts today at its full price, and says the month ends", () => {
+        const s = at(quote({ kind: "NEW", firstMonth: "NOW" }));
+        expect(s.title).toBe("Upgrade to Plan C");
+        expect(s.from).toBeNull();
+        expect(s.lines[0]).toEqual({
+            label: "Starts today",
+            value: "₹261.96 now (incl. GST)",
+        });
+        expect(s.lead).toBe(
+            "Plan C starts today at its full price, so your first month on Plan B ends now. What you paid for it isn't refunded. You pay Plan C's first month today as you set up UPI Autopay or a card for it. If it doesn't go through, you stay on Plan B.",
+        );
+        // The plan's own price and term, never a first-month amount.
+        expect(s.lines.map((l) => l.label)).toEqual([
+            "Starts today",
+            "Plan C, monthly",
+            "Term",
+        ]);
+        expect(s).toMatchObject({
+            confirm: "Continue to payment",
+            toPayment: true,
+        });
+    });
+
+    it("the same on yearly: one payment today, the month ends", () => {
+        const s = at(
+            quote({
+                kind: "NEW",
+                firstMonth: "NOW",
+                cycle: "year",
+                payment: "ONE_TIME",
+                termCharges: 1,
+                mandateCheck: "NONE",
+                payNowTotalPaise: 261_960,
+            }),
+        );
+        expect(s.lines[0]).toEqual({
+            label: "Starts today",
+            value: "₹2,619.60 now (incl. GST)",
+        });
+        expect(s.lead).toContain("your first month on Plan B ends now");
+        expect(s.lead).toContain("One payment for 12 months, no autopay.");
+    });
+
+    it("a plan started from Free keeps its own words", () => {
+        const s = at(quote({ firstMonth: null }), "Plan A");
+        expect(s.title).toBe("Start Plan C");
+        expect(s.lines.map((l) => l.label)).not.toContain("Starts today");
+    });
+
+    it("a cheaper plan says the date and the plan kept until then", () => {
+        const s = at(
+            quote({
+                kind: "SCHEDULED",
+                plan: { id: "b", name: "Plan B", version: 3 },
+                startAt: END,
+                effectiveAt: END,
+                payNowTotalPaise: 0,
+                mandateCheck: "REFUNDED",
+            }),
+            "Plan C",
+        );
+        expect(s.title).toBe("Move to Plan B");
+        expect(s.from).toEqual({ iso: END, keep: "Plan C" });
+        expect(s.lead).toMatch(/^Nothing is owed today\./);
+        expect(s.lead).toMatch(/Nothing changes until it starts\.$/);
+        expect(s.lines[0]).toMatchObject({ label: "Starts", iso: END });
+    });
+
+    it("during the first month it says the month runs out first, with nothing more charged", () => {
+        const s = at(
+            quote({
+                kind: "SCHEDULED",
+                firstMonth: "AT_END",
+                plan: { id: "b", name: "Plan B", version: 3 },
+                startAt: END,
+                effectiveAt: END,
+                payNowTotalPaise: 0,
+                mandateCheck: "REFUNDED",
+            }),
+            "Plan C",
+        );
+        expect(s.from).toEqual({ iso: END, keep: "Plan C" });
+        expect(s.lead).toMatch(
+            /^Your first month runs to its end first, and nothing more is charged for Plan C\. /,
+        );
+    });
+
+    it("Free waits for what was paid, and says nothing more is charged", () => {
+        const free = (over: Partial<ChangeQuote>) =>
+            at(
+                quote({
+                    kind: "TO_FREE",
+                    plan: { id: "a", name: "Plan A", version: 3 },
+                    payNowTotalPaise: 0,
+                    mandateCheck: "NONE",
+                    ...over,
+                }),
+            );
+        const paid = free({ effectiveAt: END });
+        expect(paid.from).toEqual({ iso: END, keep: "Plan B" });
+        expect(paid.lead).toBe(
+            "Nothing more is charged. After that, anything over Free's limits stays readable, but you can't add more.",
+        );
+        const first = free({ effectiveAt: END, firstMonth: "AT_END" });
+        expect(first.from).toEqual({ iso: END, keep: "Plan B" });
+        expect(first.lead).toMatch(
+            /^Your first month runs to its end and nothing more is charged\./,
+        );
+        // Nothing paid ahead: today, and no "until then".
+        const today = free({ effectiveAt: NOW.toISOString() });
+        expect(today.from).toBeNull();
+        expect(today.lead).toMatch(/^From today, /);
+    });
+
+    it("an upgrade in a paid period and a renewal say no date to wait for", () => {
+        expect(at(quote({ kind: "UPGRADE", startAt: END })).from).toBeNull();
+        expect(at(quote({ kind: "RENEW", startAt: END })).from).toBeNull();
+    });
+});
+
+describe("endingAddonsNote (DEC-157)", () => {
+    const person = {
+        id: "person-b",
+        name: "One more person",
+        quantity: 2,
+        onNewPlan: "One more person on C",
+    };
+
+    it("names one add-on that ends, how many are held, and the new plan's own", () => {
+        expect(
+            endingAddonsNote(quote({ addonsEnding: [person] }), {
+                currentPlan: "Plan B",
+            }),
+        ).toBe(
+            "This add-on ends with Plan B: One more person × 2. After the change you can add One more person on C on Plan C, from Add-ons on this page. Nothing is added for you.",
+        );
+    });
+
+    it("lists several, and says nothing of the new plan when it has none of the kind", () => {
+        expect(
+            endingAddonsNote(
+                quote({
+                    addonsEnding: [
+                        { ...person, onNewPlan: null },
+                        {
+                            id: "bills",
+                            name: "Bills on their own",
+                            quantity: 1,
+                            onNewPlan: null,
+                        },
+                    ],
+                }),
+                { currentPlan: "Plan B" },
+            ),
+        ).toBe(
+            "These add-ons end with Plan B: One more person × 2, Bills on their own.",
+        );
+    });
+
+    it("names a new plan's add-on once, however many it stands in for", () => {
+        const note = endingAddonsNote(
+            quote({
+                addonsEnding: [
+                    person,
+                    { ...person, id: "person-old", name: "A person" },
+                ],
+            }),
+        );
+        expect(note).toContain("end with your current plan:");
+        expect(note?.match(/One more person on C/g)).toHaveLength(1);
+    });
+
+    it("is nothing when none ends, or the API sent none", () => {
+        expect(endingAddonsNote(quote({ addonsEnding: [] }))).toBeNull();
+        expect(endingAddonsNote(quote())).toBeNull();
     });
 });

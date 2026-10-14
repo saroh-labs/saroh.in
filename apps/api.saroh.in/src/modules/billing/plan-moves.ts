@@ -1,7 +1,8 @@
 import type { Prisma } from "@saroh/database";
 import { unsyncedCatalogueVersions } from "@saroh/database";
 
-import { clearAddonsInTx } from "./addon-charges";
+import { clearAddonsInTx, endAddonsNotOfferedInTx } from "./addon-charges";
+import type { HeldAddon } from "./addons-ending";
 import { periodEnd } from "./checkout-quote";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 
@@ -90,7 +91,12 @@ const PLAN_SELECT = {
 } as const;
 
 export type AppliedMove =
-    | { applied: true; planId: string }
+    | {
+          applied: true;
+          planId: string;
+          /** The add-ons the new plan isn't offered, ended with the move. */
+          endedAddons: HeldAddon[];
+      }
     | { applied: false; readiness: MoveReadiness };
 
 /**
@@ -102,7 +108,8 @@ export type AppliedMove =
  * together. A move the business authorised (its SCHEDULED checkout) also
  * takes that checkout's provider subscription and completes it; a move to a
  * free plan leaves the provider behind (its subscription was told to end
- * with the period when the change was made).
+ * with the period when the change was made). An add-on the new plan isn't
+ * offered ends with the old one (DEC-157); nothing is bought in its place.
  */
 export async function applyDueMoveInTx(
     tx: Tx,
@@ -200,5 +207,7 @@ export async function applyDueMoveInTx(
     }
 
     await tx.subscription.update({ where: { id: sub.id }, data });
-    return { applied: true, planId: target.id };
+    // Add-ons the plan it is on now isn't offered end with the old one.
+    const endedAddons = await endAddonsNotOfferedInTx(tx, sub.id);
+    return { applied: true, planId: target.id, endedAddons };
 }

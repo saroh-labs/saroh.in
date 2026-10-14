@@ -8,7 +8,7 @@ import { DepositField } from "./deposit-field";
 
 /** Made-up plans: never a real plan's name or price. */
 const LOCK: PlanLock = {
-    href: "/settings/billing?plan=b#change-plan",
+    href: "/settings/billing/plans?plan=b",
     name: "Online payments",
     what: "Take payment online.",
     plan: "Plan A",
@@ -60,7 +60,7 @@ describe("DepositField on a plan without online payments", () => {
         expect(html).toContain(
             "Services book &quot;pay at the desk&quot; until then.",
         );
-        expect(html).toContain('href="/settings/billing?plan=b#change-plan"');
+        expect(html).toContain('href="/settings/billing/plans?plan=b"');
         // No price is said.
         expect(html).not.toContain("111");
     });

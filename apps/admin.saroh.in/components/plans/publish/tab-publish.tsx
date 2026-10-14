@@ -82,17 +82,22 @@ export function TabPublish() {
 
     const live = draft.live?.catalog ?? null;
     const scheduled = upcomingVersions(pricing).at(0);
-    const blocked =
-        save === "conflict"
-            ? "Reload the draft first"
-            : !check.valid
-              ? "Fix the draft before publishing"
-              : // The first version has nothing to differ from.
-                check.changes.length === 0 && draft.live
-                ? "Nothing differs from the live version"
-                : scheduled
-                  ? `Version ${scheduled.version} is already scheduled`
-                  : null;
+    const blocked = draft.outdated
+        ? draft.outdated.to === null
+            ? "The pricing changed since this draft was started"
+            : `Version ${draft.outdated.to} was published since this draft was started`
+        : save === "conflict"
+          ? "Reload the draft first"
+          : !check.valid
+            ? "Fix the draft before publishing"
+            : // The first version has nothing to differ from.
+              check.changes.length === 0 && draft.live
+              ? "Nothing differs from the live version"
+              : scheduled
+                ? scheduled.status === "waiting"
+                    ? `Version ${scheduled.version} is still waiting for billing`
+                    : `Version ${scheduled.version} is already scheduled`
+                : null;
 
     if (!hasDraft) {
         // Nothing to review: one line and the way to start, not an empty

@@ -3,7 +3,8 @@
  * against a real Postgres: the owner and the earliest to join open the
  * business, the latest is refused with MEMBER_PAUSED once the business was
  * told at least 7 days ago, not before, and moving back up lets them in at
- * once. With `PLAN_ENFORCEMENT` off nobody is refused.
+ * once. With `PLAN_ENFORCEMENT` off nobody is refused. Reviewers hold a
+ * place like anyone else (DEC-155), and a limit of one keeps the owner alone.
  *
  * Catalogue numbers are made up (`fakeMeteredCatalog`: the first plan
  * seats two). Runs in the integration project (TEST_DATABASE_URL).
@@ -39,13 +40,18 @@ async function planRow(planId: string) {
     });
 }
 
-/** A business on Free@V with an owner and three admins, joined in order. */
-async function business(enforce = true) {
+/**
+ * A business on Free@V with an owner and three more people (admins unless
+ * `roles` says otherwise), joined in order.
+ */
+async function business(
+    enforce = true,
+    roles = ["OWNER", "ADMIN", "ADMIN", "ADMIN"],
+) {
     const org = await prisma.organization.create({
         data: { name: "Rye Bakery", slug: uniq("rye") },
     });
     const people: { userId: string; membershipId: string }[] = [];
-    const roles = ["OWNER", "ADMIN", "ADMIN", "ADMIN"];
     for (let i = 0; i < roles.length; i++) {
         const user = await prisma.user.create({
             data: { email: `${uniq("p")}@example.com`, name: `Person ${i}` },
@@ -168,6 +174,74 @@ describe("opening a business past its team limit (DB, #800)", () => {
         await expect(
             contexts.resolve(late.userId, b.orgId),
         ).resolves.toMatchObject({ role: "ADMIN" });
+    });
+
+    // DEC-155: a Reviewer uses a team seat like anyone else, so is kept or
+    // paused by when they joined, never set apart.
+    it("counts Reviewers like anyone else: the earliest stays, the later pause", async () => {
+        const b = await business(true, [
+            "OWNER",
+            "REVIEWER",
+            "MEMBER",
+            "REVIEWER",
+        ]);
+        await told(b.orgId, 8);
+        const [owner, earlyReviewer, member, lateReviewer] = b.people;
+
+        await expect(
+            contexts.resolve(owner.userId, b.orgId),
+        ).resolves.toMatchObject({ role: "OWNER" });
+        // The plan seats two: the owner and the Reviewer who joined first.
+        await expect(
+            contexts.resolve(earlyReviewer.userId, b.orgId),
+        ).resolves.toMatchObject({ role: "REVIEWER" });
+        for (const late of [member, lateReviewer]) {
+            await expect(
+                contexts.resolve(late.userId, b.orgId),
+            ).rejects.toMatchObject({
+                response: { details: { code: MEMBER_PAUSED } },
+            });
+        }
+        const paused = await overLimit.pausedNow(b.orgId);
+        expect([...(paused?.memberIds ?? [])].sort()).toEqual(
+            [member.membershipId, lateReviewer.membershipId].sort(),
+        );
+    });
+
+    it("keeps the owner alone at a limit of one, though they joined last", async () => {
+        // The owner's membership is the newest: a business handed on.
+        const b = await business(true, [
+            "REVIEWER",
+            "ADMIN",
+            "MEMBER",
+            "OWNER",
+        ]);
+        await prisma.entitlementOverride.create({
+            data: {
+                organizationId: b.orgId,
+                kind: "limit",
+                key: "members",
+                moduleKey: "members",
+                value: 1,
+                reason: "test",
+                grantedByUserId: "staff",
+            },
+        });
+        overLimit.forget(b.orgId);
+        expect((await overLimit.limitsNow(b.orgId))?.teamMembers).toBe(1);
+        await told(b.orgId, 8);
+        const [reviewer, admin, member, owner] = b.people;
+
+        await expect(
+            contexts.resolve(owner.userId, b.orgId),
+        ).resolves.toMatchObject({ role: "OWNER" });
+        for (const other of [reviewer, admin, member]) {
+            await expect(
+                contexts.resolve(other.userId, b.orgId),
+            ).rejects.toMatchObject({
+                response: { details: { code: MEMBER_PAUSED } },
+            });
+        }
     });
 
     it("refuses nobody with plan enforcement off", async () => {

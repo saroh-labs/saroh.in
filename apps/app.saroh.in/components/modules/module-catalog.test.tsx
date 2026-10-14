@@ -191,7 +191,7 @@ describe("Settings › Modules on a plan that won't let it connect (UX-006, UX-0
     const lock = {
         comesWith: "Comes with Grow",
         cta: "See Grow",
-        href: "/settings/billing?plan=grow#change-plan",
+        href: "/settings/billing/plans?plan=grow",
         upgrade: "Grow",
         full: false,
     };
@@ -225,7 +225,7 @@ describe("Settings › Modules on a plan that won't let it connect (UX-006, UX-0
         expect(text).not.toContain("Connect a provider to send messages.");
         expect(
             host.querySelectorAll(
-                'a[href="/settings/billing?plan=grow#change-plan"]',
+                'a[href="/settings/billing/plans?plan=grow"]',
             ),
         ).toHaveLength(2);
         expect(host.querySelector('a[href="/settings/providers"]')).toBeNull();

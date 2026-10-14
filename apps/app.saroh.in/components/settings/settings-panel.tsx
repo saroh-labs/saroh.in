@@ -3,6 +3,7 @@ import { PageContainer } from "@saroh/ui/page-container";
 import type { PageHeaderProps } from "@saroh/ui/page-header";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Lock } from "lucide-react";
+import Link from "next/link";
 
 /**
  * One Settings section's title, beside the side list: the page header every
@@ -12,6 +13,7 @@ import { Lock } from "lucide-react";
  */
 export function SettingsPanelHeader({
     title,
+    parent,
     description,
     count,
     actions,
@@ -20,6 +22,11 @@ export function SettingsPanelHeader({
     holdsData = false,
 }: {
     title: string;
+    /**
+     * The section this page is the next screen of ("Settings › Plan and
+     * billing › Change plan"): its name, and the way back to it.
+     */
+    parent?: { label: string; href: string };
     description?: React.ReactNode;
     /**
      * `PageHeader`'s own: say so when the description shows a record's data,
@@ -38,7 +45,17 @@ export function SettingsPanelHeader({
         <div className={cn("mb-8", className)}>
             <PageHeader
                 className="mb-0"
-                breadcrumb={["Settings", title]}
+                breadcrumb={
+                    parent
+                        ? [
+                              "Settings",
+                              <Link key="parent" href={parent.href}>
+                                  {parent.label}
+                              </Link>,
+                              title,
+                          ]
+                        : ["Settings", title]
+                }
                 holdsData={holdsData}
                 title={title}
                 count={count}

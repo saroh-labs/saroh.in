@@ -15,16 +15,23 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import type { EndedAddons } from "./addon-charges";
 import {
     clearAddonsInTx,
+    endAddonsNotOfferedInTx,
+    recordAddonsEnded,
     rehomeAddonChargesInTx,
     rollAddonChargesInTx,
 } from "./addon-charges";
+import type { HeldAddon } from "./addons-ending";
+import { checkoutClearsAddons } from "./addons-ending";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { isOneTime } from "./billing-term";
 import { billingMayChargeFor } from "./business-closing";
+import { leavesWithCycle, runsToMoveDate } from "./change-timing";
 import { periodEnd, periodStart } from "./checkout-quote";
 import { redeemCouponInTx, trialNoticeAt } from "./offers";
+import type { AppliedMove } from "./plan-moves";
 import { applyDueMoveInTx } from "./plan-moves";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import type {
@@ -37,7 +44,7 @@ import type {
 import { BILLING_PROVIDER_FACTORY } from "./providers/billing-provider.port";
 import { SarohInvoicesService } from "./saroh-invoices.service";
 import { isLegalSubscriptionTransition } from "./subscription-state";
-import { endTermAtInTx } from "./term-end";
+import { endTermAtInTx, freePlanRowInTx } from "./term-end";
 
 type Tx = Prisma.TransactionClient;
 
@@ -70,6 +77,24 @@ interface Completed {
 interface Outcome {
     result: BillingWebhookResult;
     completed?: Completed;
+    /** Add-ons the change ended (DEC-157), for the audit log after commit. */
+    ended?: EndedAddons;
+}
+
+/** What a move that applied ended, for the audit log; nothing when none. */
+function endedByMove(
+    sub: { id: string; organizationId: string },
+    applied: AppliedMove,
+): Pick<Outcome, "ended"> {
+    if (!applied.applied || applied.endedAddons.length === 0) return {};
+    return {
+        ended: {
+            organizationId: sub.organizationId,
+            subscriptionId: sub.id,
+            actorUserId: null,
+            addons: applied.endedAddons,
+        },
+    };
 }
 
 const PAID_PHASES: readonly BillingEventPhase[] = ["activated", "charged"];
@@ -102,7 +127,9 @@ const ENDED_PHASES: readonly BillingEventPhase[] = ["cancelled", "completed"];
  *       (a failed charge Razorpay retries) → PAST_DUE. `halted` (it gave
  *       up) → CANCELLED, which the access read takes as Free. Cancelled or
  *       completed → its move to Free or to a plan it authorised applies;
- *       otherwise CANCELLED.
+ *       otherwise CANCELLED. Ended ahead of the date its move waits for
+ *       (a first month's is ended at once): the plan runs on to that date,
+ *       which it is paid to (DEC-159, `change-timing.ts`).
  *     An illegal move is rejected (200, the inbox row left unprocessed).
  *
  * CREDENTIAL BOUNDARY: reads/writes ONLY the billing models (`Subscription`,
@@ -229,6 +256,7 @@ export class BillingWebhookService {
         });
 
         await this.recordCompleted(outcome.completed);
+        await recordAddonsEnded(this.audit, outcome.ended);
         return outcome.result;
     }
 
@@ -259,6 +287,7 @@ export class BillingWebhookService {
             return this.onCheckout(tx, checkout, event, now);
         });
         await this.recordCompleted(outcome.completed);
+        await recordAddonsEnded(this.audit, outcome.ended);
         return outcome.result;
     }
 
@@ -332,13 +361,31 @@ export class BillingWebhookService {
                 where: { id: checkout.id },
                 data: { status: "CANCELLED", endedReason: `provider:${phase}` },
             });
-            await tx.subscription.updateMany({
+            const waiting = await tx.subscription.findFirst({
                 where: {
                     organizationId: checkout.organizationId,
                     pendingPlanId: checkout.planId,
                 },
-                data: { pendingPlanId: null, pendingFrom: null },
+                select: {
+                    id: true,
+                    cancelAtPeriodEnd: true,
+                    plan: { select: { version: true } },
+                },
             });
+            if (waiting) {
+                // The plan it is on was already told to end with what was
+                // paid, and nothing bills it after that: Free from the
+                // same date, never a plan nobody pays for (DEC-159).
+                const free = waiting.cancelAtPeriodEnd
+                    ? await freePlanRowInTx(tx, waiting.plan.version)
+                    : null;
+                await tx.subscription.update({
+                    where: { id: waiting.id },
+                    data: free
+                        ? { pendingPlanId: free.id }
+                        : { pendingPlanId: null, pendingFrom: null },
+                });
+            }
             return { result: { status: "processed", changed: true } };
         }
 
@@ -355,7 +402,7 @@ export class BillingWebhookService {
             // Its first charge: the date has come; apply the move now.
             const sub = await tx.subscription.findUnique({
                 where: { organizationId: checkout.organizationId },
-                select: { id: true },
+                select: { id: true, organizationId: true },
             });
             if (!sub || !PAID_PHASES.includes(phase)) return ignored;
             const applied = await applyDueMoveInTx(tx, sub.id, now, {
@@ -375,6 +422,7 @@ export class BillingWebhookService {
                     status: applied.applied ? "processed" : "ignored",
                     changed: applied.applied,
                 },
+                ...endedByMove(sub, applied),
             };
         }
 
@@ -474,12 +522,14 @@ export class BillingWebhookService {
                 });
             }
             // The one it replaces runs to the end of the period paid; the
-            // add-ons owed then ride on this one's first charge (U16).
+            // add-ons owed then ride on this one's first charge (U16). In
+            // a first month it is ended at once, so its full charge is
+            // never taken; the plan still runs to the month's end.
             if (oldProvider && !renewal) {
                 await enqueueProviderCancel(tx, {
                     organizationId: org,
                     ...oldProvider,
-                    atCycleEnd: true,
+                    atCycleEnd: leavesWithCycle(sub),
                 });
                 await rehomeAddonChargesInTx(tx, {
                     organizationId: org,
@@ -505,10 +555,13 @@ export class BillingWebhookService {
 
         // NEW, UPGRADE or TRIAL: on the plan now. An upgrade keeps the
         // period already paid (its own charges start when it ends); a new
-        // plan's period starts with this first charge; a trial runs to its
-        // end, when the first charge is taken (U16).
+        // plan's period starts with this first charge, and so does a dearer
+        // plan's chosen during the first month (DEC-159), which ends the
+        // month; a trial runs to its end, when the first charge is taken
+        // (U16).
         const trial = checkout.kind === "TRIAL";
-        // Another plan while a trial runs keeps the trial's add-ons.
+        // Another plan while a trial runs keeps the trial's add-ons: only
+        // a checkout made before DEC-159, which no longer quotes one.
         const continuing =
             trial && sub?.status === "TRIALING" && Boolean(oldProvider);
         const currentPeriodEnd =
@@ -547,16 +600,22 @@ export class BillingWebhookService {
         });
         // A new plan starts with no add-ons; a plan taking over billing
         // takes what was owed on the old one's next charge (U16).
-        if (checkout.kind === "NEW" || (trial && !continuing)) {
+        let endedAddons: HeldAddon[] = [];
+        if (checkoutClearsAddons(checkout.kind, continuing)) {
             await clearAddonsInTx(tx, saved.id);
-        } else if (oldProvider) {
-            await rehomeAddonChargesInTx(tx, {
-                organizationId: org,
-                subscriptionId: saved.id,
-                fromProviderSubscriptionId: oldProvider.providerSubscriptionId,
-                provider: checkout.provider,
-                toProviderSubscriptionId: checkout.providerSubscriptionId,
-            });
+        } else {
+            if (oldProvider) {
+                await rehomeAddonChargesInTx(tx, {
+                    organizationId: org,
+                    subscriptionId: saved.id,
+                    fromProviderSubscriptionId:
+                        oldProvider.providerSubscriptionId,
+                    provider: checkout.provider,
+                    toProviderSubscriptionId: checkout.providerSubscriptionId,
+                });
+            }
+            // The add-ons kept are the ones this plan is offered (DEC-157).
+            endedAddons = await endAddonsNotOfferedInTx(tx, saved.id);
         }
         if (trial) {
             // No plan charge yet: no plan invoice and no redemption until
@@ -619,6 +678,16 @@ export class BillingWebhookService {
                 // UPGRADE), as against a trial or a change that waits.
                 ...(trial ? {} : { upgradedTo: plan.key }),
             },
+            ...(endedAddons.length > 0
+                ? {
+                      ended: {
+                          organizationId: org,
+                          subscriptionId: saved.id,
+                          actorUserId: checkout.createdByUserId,
+                          addons: endedAddons,
+                      },
+                  }
+                : {}),
         };
     }
 
@@ -644,6 +713,7 @@ export class BillingWebhookService {
                 providerSubscriptionId: true,
                 providerEventAt: true,
                 currentPeriodEnd: true,
+                cancelAtPeriodEnd: true,
                 pendingFrom: true,
                 plan: { select: { version: true } },
             },
@@ -691,6 +761,17 @@ export class BillingWebhookService {
         // Ending: a move to Free, or to a plan it authorised, takes over
         // from the subscription that ended with its period.
         if (ENDED_PHASES.includes(phase) && current !== "CANCELLED") {
+            // Ended ahead of the date the business's move waits for (a
+            // first month's is ended at once): the plan is paid to that
+            // date and stays until then. The sweep, or the first charge of
+            // the plan it authorised, applies the move on the date.
+            if (runsToMoveDate(sub, now)) {
+                await tx.subscription.update({
+                    where: { id: sub.id },
+                    data: { ...stamp },
+                });
+                return { result: { status: "processed", changed: false } };
+            }
             if (sub.pendingFrom) {
                 const applied = await applyDueMoveInTx(
                     tx,
@@ -701,7 +782,10 @@ export class BillingWebhookService {
                     ),
                 );
                 if (applied.applied) {
-                    return { result: { status: "processed", changed: true } };
+                    return {
+                        result: { status: "processed", changed: true },
+                        ...endedByMove(sub, applied),
+                    };
                 }
             }
         }
@@ -743,10 +827,14 @@ export class BillingWebhookService {
                 atCycleEnd: false,
             });
         }
-        if (target === "ACTIVE" && phase === "charged") {
-            await this.renewed(tx, sub.id, event, now);
-        }
-        return { result: { status: "processed", changed: true } };
+        const renewal =
+            target === "ACTIVE" && phase === "charged"
+                ? await this.renewed(tx, sub.id, event, now)
+                : null;
+        return {
+            result: { status: "processed", changed: true },
+            ...(renewal?.ended ? { ended: renewal.ended } : {}),
+        };
     }
 
     /** A renewal charge: the new period's end, and a move now due. */
@@ -783,9 +871,15 @@ export class BillingWebhookService {
                 ...(event.eventAt ? { providerEventAt: event.eventAt } : {}),
             },
         });
-        await applyDueMoveInTx(tx, subscriptionId, now, {
+        const applied = await applyDueMoveInTx(tx, subscriptionId, now, {
             currentPeriodEnd: event.currentPeriodEnd ?? undefined,
         });
+        const ended = before
+            ? endedByMove(
+                  { id: subscriptionId, organizationId: before.organizationId },
+                  applied,
+              )
+            : {};
         // Saroh's invoice for the renewal charge (U17).
         if (before) {
             await this.invoices?.invoiceRenewalInTx(tx, {
@@ -810,11 +904,14 @@ export class BillingWebhookService {
                 this.logger.warn(
                     `billing_renewal_business_closed org=${before.organizationId} subscription=${subscriptionId}`,
                 );
-                return { result: { status: "processed", changed: true } };
+                return {
+                    result: { status: "processed", changed: true },
+                    ...ended,
+                };
             }
             await this.afterCharge(tx, subscriptionId, before, event);
         }
-        return { result: { status: "processed", changed: true } };
+        return { result: { status: "processed", changed: true }, ...ended };
     }
 
     /**

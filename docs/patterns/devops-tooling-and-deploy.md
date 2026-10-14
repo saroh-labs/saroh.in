@@ -18,6 +18,11 @@
   the database, content publications are tenant-specific and code releases
   are shared. The API deploys on its own (below). ADR-009 and DEC-025 (Vercel)
   are superseded.
+- **A cache kept between builds holds code, never data.** The deploy keeps
+  `.next/cache` so a build recompiles only what changed, and drops its
+  `fetch-cache` before building: a static page that reads the API as it is
+  built (Saroh's published plans) must read it afresh on every deploy, or a
+  publish rebuilds the old answer. `check:deploy-env` holds the workflow to it.
 
 - pnpm workspaces (`apps/*`, `packages/*`, `tooling/*`, `e2e`) with pnpm
   catalogs, and Turborepo: `build`, `dev`, `lint` and `typecheck` depend on

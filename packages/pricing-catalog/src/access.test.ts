@@ -7,7 +7,7 @@ import {
     resolveAccess,
     resolveAllAccess,
 } from "./access";
-import { fixture } from "./catalog.fixture";
+import { edit, fixture } from "./catalog.fixture";
 import type { Override } from "./overrides";
 
 const now = new Date("2026-10-03T06:00:00Z");
@@ -315,6 +315,32 @@ describe("resolveAccess", () => {
             ).toBeNull();
         });
 
+        it("counts an add-on only on a plan it is offered on (DEC-157)", () => {
+            const held = [{ addonId: "one-person", quantity: 2 }];
+            expect(resolveAccess(on("b", [], held), "members").limit).toBe(5);
+            // Plan C has its own; Plan B's is nothing there.
+            expect(resolveAccess(on("c", [], held), "members")).toMatchObject({
+                limit: 33,
+                override: "",
+            });
+            expect(
+                resolveAccess(
+                    on("c", [], [{ addonId: "one-person-c", quantity: 2 }]),
+                    "members",
+                ).limit,
+            ).toBe(35);
+        });
+
+        it("keeps all that is held when the maximum is lower", () => {
+            // Six held where the add-on now allows four: still plan + six.
+            expect(
+                resolveAccess(
+                    on("b", [], [{ addonId: "one-person", quantity: 6 }]),
+                    "members",
+                ).limit,
+            ).toBe(9);
+        });
+
         it("ignores an add-on its version doesn't have", () => {
             expect(
                 resolveAccess(
@@ -323,6 +349,66 @@ describe("resolveAccess", () => {
                 ).limit,
             ).toBe(111);
         });
+    });
+});
+
+describe("variants a product (DEC-158)", () => {
+    it("reads the plan's cap, and the plan above with more or none", () => {
+        expect(resolveAccess(on("a"), "variants")).toMatchObject({
+            state: "on",
+            limit: 2,
+            upgradeTo: "Plan B",
+            upgradeUncapped: false,
+        });
+        expect(resolveAccess(on("b"), "variants")).toMatchObject({
+            limit: 22,
+            upgradeTo: "Plan C",
+            upgradeUncapped: true,
+        });
+        expect(resolveAccess(on("c"), "variants").limit).toBeNull();
+    });
+
+    it("takes a limit override and a raise for one business, as any limit", () => {
+        const limit: Override = {
+            kind: "limit",
+            key: "variants",
+            moduleKey: "variants",
+            value: 7,
+            createdAt: t(1),
+        };
+        expect(resolveAccess(on("a", [limit]), "variants")).toMatchObject({
+            limit: 7,
+            override: "Limit set by Saroh",
+        });
+        const raise: Override = {
+            kind: "raise",
+            key: "variants",
+            moduleKey: "variants",
+            value: 9,
+            createdAt: t(2),
+        };
+        expect(resolveAccess(on("a", [raise]), "variants")).toMatchObject({
+            limit: 9,
+            override: "Raised by Saroh",
+        });
+        // A raise never lowers.
+        expect(
+            resolveAccess(on("a", [{ ...raise, value: 1 }]), "variants").limit,
+        ).toBe(2);
+    });
+
+    it("has no cap on a version published before the row existed", () => {
+        const older = edit(fixture(), (c) => {
+            c.modules = c.modules.filter((m) => m.id !== "variants");
+        });
+        const r = resolveAccess({ ...on("a"), catalog: older }, "variants");
+        // On and uncapped, never "excluded and locked" (`MISSING_CELL`).
+        expect(r).toMatchObject({ state: "on", inc: true, limit: null });
+        expect(
+            resolveAllAccess({ ...on("a"), catalog: older }).map(
+                (m) => m.moduleId,
+            ),
+        ).not.toContain("variants");
     });
 });
 

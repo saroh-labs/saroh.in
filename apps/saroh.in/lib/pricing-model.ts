@@ -42,6 +42,8 @@ export interface AddonView {
     id: string;
     name: string;
     line: string;
+    /** The plans it is offered on, "Grow and Pro"; empty for every plan. */
+    on: string;
 }
 
 export type CompareRow =

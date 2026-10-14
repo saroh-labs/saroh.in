@@ -136,7 +136,7 @@ describe("what happens when a service is booked online (DEC-088, DEC-089, #821)"
             onlineBookingProblem(svc("PERCENT_50"), view("ONLINE", "PLAN")),
         ).toMatchObject({
             line: "Can't be booked online: it takes payment when they book, and your plan doesn't take payment online.",
-            fix: { href: "/settings/billing#change-plan", label: "See plans" },
+            fix: { href: "/settings/billing/plans", label: "See plans" },
         });
     });
 });

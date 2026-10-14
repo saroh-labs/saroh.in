@@ -18,7 +18,7 @@ import type {
     Prisma,
 } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { BillingCycle } from "@saroh/pricing-catalog";
+import type { BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import { catalogPlanIdForKey, withGstPaise } from "@saroh/pricing-catalog";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
@@ -33,12 +33,16 @@ import { gstinProblem, stateCode } from "../invoices/gst-states";
 import { authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
+import type { EndingAddon } from "./addons-ending";
+import { addonsEndingWith } from "./addons-ending";
 import type { Term } from "./billing-term";
 import { isOneTime, ONE_TIME_PAYMENT, termOf } from "./billing-term";
 import {
     assertBillingMayStart,
     dropLiveCheckoutsInTx,
 } from "./business-closing";
+import type { FirstMonthMove } from "./change-timing";
+import { leavesWithCycle, paidUntil } from "./change-timing";
 import type {
     ChangeKind,
     ChangeQuote,
@@ -108,6 +112,12 @@ export interface ChangePlanQuoteView {
     /** A trial's end, when its first charge is taken (U16); else null. */
     trialEndsAt: string | null;
     /**
+     * A change made during the first month (DEC-159): `NOW` — a dearer
+     * plan, which ends the month and starts today at its full price;
+     * `AT_END` — it waits for the month to end. Null outside a first month.
+     */
+    firstMonth: FirstMonthMove | null;
+    /**
      * The coupon (U16): its code, what it takes off each of the first
      * `charges` charges before GST, and that first charge after it.
      */
@@ -125,6 +135,12 @@ export interface ChangePlanQuoteView {
     payNowTotalPaise: number;
     /** What setting up autopay takes now, named honestly (DEC-093). */
     mandateCheck: MandateCheck;
+    /**
+     * The add-ons held today that end with this change (DEC-157), by the
+     * rule the change itself ends them by (`addons-ending.ts`). Empty when
+     * none does.
+     */
+    addonsEnding: EndingAddon[];
 }
 
 /** A checkout as the business sees it; never the provider's link. */
@@ -223,15 +239,18 @@ const SUB_SELECT = {
  * from the live version, and every amount from `quoteChange` on the server
  * (KTD-18). The site's `?plan=&cycle=` only preselects the same two.
  *
- * - **To a free plan**: no checkout. At the end of the period already paid
- *   (the provider subscription is told to end with it), or at once when
- *   nothing is paid at the provider.
+ * - **To a free plan**: no checkout. At the end of what is already paid, a
+ *   period or a first month (the provider subscription is told to end with
+ *   it), or at once when nothing is paid at the provider.
  * - **To a paid plan**: a checkout — a new provider subscription on the
  *   plan's provider plan, authorised by the business on the provider's page
  *   — completed by the webhook. An upgrade is on the new plan as soon as
  *   it's authorised, paying the difference for the rest of the period; a
  *   cheaper plan or the other cycle starts at the period's end. A new
  *   checkout replaces an open one.
+ * - **During the first month** (DEC-159, `change-timing.ts`): a dearer plan
+ *   starts today at its full price and ends the month; any other plan, and
+ *   Free, wait for the month to end. Never a second first month.
  *
  * - **Offers** (U16): a paid plan's free trial where it would be NEW and
  *   the business never had one (TRIAL: on the plan once authorised, the
@@ -270,12 +289,12 @@ export class CheckoutService {
     ): Promise<ChangePlanQuoteView> {
         authorize(ctx, "billing:read");
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const { target, quote, coupon } = await this.resolve(
+        const { target, quote, coupon, addonsEnding } = await this.resolve(
             ctx.organizationId,
             input,
             now,
         );
-        return this.quoteView(target, quote, coupon);
+        return this.quoteView(target, quote, coupon, addonsEnding);
     }
 
     async current(
@@ -428,12 +447,9 @@ export class CheckoutService {
         authorize(ctx, "billing:manage");
         const billTo = checkoutBillTo(input);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const { target, quote, subscription, coupon } = await this.resolve(
-            ctx.organizationId,
-            input,
-            now,
-        );
-        const view = this.quoteView(target, quote, coupon);
+        const { target, quote, subscription, coupon, addonsEnding } =
+            await this.resolve(ctx.organizationId, input, now);
+        const view = this.quoteView(target, quote, coupon, addonsEnding);
         if (quote.kind === "NONE") {
             throw new ConflictException(`You're already on ${target.name}.`);
         }
@@ -524,17 +540,26 @@ export class CheckoutService {
         const trialFirstPaise = catalog ? planFirstPaise(catalog, planId) : 0;
         const term = await this.termOfSubscription(subscription, now);
         const termEndsAt = term?.endsAt ?? null;
+        // A year chosen during the first month is a move up or not by what
+        // its plan costs a month (DEC-159).
+        const targetMonthlyPaise =
+            subscription?.status === "TRIALING" && target.interval === "year"
+                ? (await this.plans.resolveCatalogue(input.plan, "month", now))
+                      .priceCents
+                : undefined;
+        const asked = {
+            subscription,
+            target,
+            now,
+            trialDays,
+            trialFirstPaise,
+            termEndsAt,
+            targetMonthlyPaise,
+        };
         let coupon: PricingCoupon | null = null;
         const code = input.coupon?.trim();
         if (code) {
-            const plain = quoteChange({
-                subscription,
-                target,
-                now,
-                trialDays,
-                trialFirstPaise,
-                termEndsAt,
-            });
+            const plain = quoteChange(asked);
             if (!COUPON_KINDS.includes(plain.kind)) {
                 throw new BadRequestException({
                     message:
@@ -550,22 +575,57 @@ export class CheckoutService {
                 now,
             });
         }
-        const quote = quoteChange({
+        const quote = quoteChange({ ...asked, coupon });
+        const addonsEnding = await this.addonsEnding(
             subscription,
-            target,
-            now,
-            trialDays,
-            trialFirstPaise,
-            termEndsAt,
-            coupon,
+            quote.kind,
+            subscription?.status === "TRIALING" &&
+                billedByProvider(subscription),
+            catalog ? { catalog, planId, paid: target.priceCents > 0 } : null,
+        );
+        return { target, quote, subscription, coupon, addonsEnding };
+    }
+
+    /**
+     * The add-ons the business holds today that this change would end
+     * (DEC-157), for the quote to name before it confirms. A cancelled
+     * plan's count for nothing already, so none of them is named.
+     */
+    private async addonsEnding(
+        sub: {
+            id: string;
+            status: string;
+            plan: { key: string; version: number };
+        } | null,
+        kind: ChangeKind,
+        /** A trial runs at the provider: another plan keeps its add-ons. */
+        trialing: boolean,
+        target: { catalog: Catalog; planId: string; paid: boolean } | null,
+    ): Promise<EndingAddon[]> {
+        if (!sub || sub.status === "CANCELLED" || kind === "NONE") return [];
+        const held = await prisma.subscriptionAddon.findMany({
+            where: { subscriptionId: sub.id },
+            select: { addonId: true, quantity: true },
         });
-        return { target, quote, subscription, coupon };
+        if (held.length === 0) return [];
+        const planId = catalogPlanIdForKey(sub.plan.key);
+        const catalog = planId
+            ? await catalogueOfVersion(prisma, sub.plan.version)
+            : null;
+        return addonsEndingWith({
+            kind,
+            trialing,
+            held,
+            current: catalog && planId ? { catalog, planId } : null,
+            target,
+        });
     }
 
     private quoteView(
         target: Plan,
         quote: ChangeQuote,
         coupon: PricingCoupon | null = null,
+        addonsEnding: EndingAddon[] = [],
     ): ChangePlanQuoteView {
         return {
             plan: {
@@ -584,6 +644,7 @@ export class CheckoutService {
             startAt: quote.startAt?.toISOString() ?? null,
             effectiveAt: quote.effectiveAt?.toISOString() ?? null,
             trialEndsAt: quote.trialEndsAt?.toISOString() ?? null,
+            firstMonth: quote.firstMonth,
             coupon:
                 coupon && quote.discountCharges > 0
                     ? {
@@ -599,13 +660,16 @@ export class CheckoutService {
             termCharges: quote.termCharges,
             payNowTotalPaise: quote.payNowTotalPaise,
             mandateCheck: quote.mandateCheck,
+            addonsEnding,
         };
     }
 
     /**
-     * To a free plan. Paid at the provider: a pending move at the period's
-     * end, and the provider subscription told to end with it. Otherwise on
-     * it now. Either way an open or scheduled checkout is given up.
+     * To a free plan. Paid at the provider: a pending move at the end of
+     * what is paid (the period, or the first month), and the provider
+     * subscription told to end with it — a first month's at once, so its
+     * full charge is never taken (`change-timing.ts`). Otherwise on it now.
+     * Either way an open or scheduled checkout is given up.
      */
     private async toFree(
         ctx: OrganizationContext,
@@ -624,10 +688,8 @@ export class CheckoutService {
                 "changed-plan",
             );
             const live = sub && sub.status !== "CANCELLED" ? sub : null;
-            const periodEnd =
-                live?.currentPeriodEnd && live.currentPeriodEnd > now
-                    ? live.currentPeriodEnd
-                    : null;
+            // The date the quote gave, read again under the lock.
+            const paidTo = paidUntil(live, now);
             if (!sub) {
                 await tx.subscription.create({
                     data: {
@@ -639,19 +701,12 @@ export class CheckoutService {
                 });
                 return now;
             }
-            // A trial paid nothing ahead, so it ends now (U16).
-            if (
-                live?.provider &&
-                live.providerSubscriptionId &&
-                billedByProvider(live) &&
-                live.status !== "TRIALING" &&
-                periodEnd
-            ) {
+            if (live?.provider && live.providerSubscriptionId && paidTo) {
                 await tx.subscription.update({
                     where: { id: sub.id },
                     data: {
                         pendingPlanId: target.id,
-                        pendingFrom: periodEnd,
+                        pendingFrom: paidTo,
                         cancelAtPeriodEnd: true,
                         // Chosen here, not a term run out (DEC-100).
                         freeChosenAt: now,
@@ -661,9 +716,9 @@ export class CheckoutService {
                     organizationId: ctx.organizationId,
                     provider: live.provider,
                     providerSubscriptionId: live.providerSubscriptionId,
-                    atCycleEnd: true,
+                    atCycleEnd: leavesWithCycle(live),
                 });
-                return periodEnd;
+                return paidTo;
             }
             // Nothing paid ahead: on Free now. A provider subscription still
             // running (a past-due one) is ended at once.

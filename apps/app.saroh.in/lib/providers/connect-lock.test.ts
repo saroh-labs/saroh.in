@@ -53,7 +53,7 @@ describe("connectLocksOf (DEC-091, UX-006)", () => {
             messaging: {
                 comesWith: "Comes with a paid plan",
                 cta: "See plans",
-                href: "/settings/billing#change-plan",
+                href: "/settings/billing/plans",
                 upgrade: null,
                 full: false,
             },
@@ -66,7 +66,7 @@ describe("connectLocksOf (DEC-091, UX-006)", () => {
             expect(lock).toEqual({
                 comesWith: "Comes with Grow",
                 cta: "See Grow",
-                href: "/settings/billing?plan=grow#change-plan",
+                href: "/settings/billing/plans?plan=grow",
                 upgrade: "Grow",
                 full: false,
             });

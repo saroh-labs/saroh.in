@@ -1206,7 +1206,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-105 Team seats count people who can change things; view-only people have their own limit
 
-**Status: Accepted — 2026-10-07** · user · from the UX audit (D6)
+**Status: Superseded in part by DEC-155 — 2026-10-13** (was Accepted 2026-10-07) · user · from the UX audit (D6) · the separate view-only limit is gone; bookable staff using a seat stands
 
 - Decision: anyone whose role carries a write permission (books, sells, edits), including bookable staff, uses a team seat. People whose role carries only view permissions don't use a seat. They count toward a separate per-plan limit, the one Reviewers use today, which can change by policy.
 - Consequences: metering classifies a member by their role's permissions, not its name. The catalogue's Reviewers row becomes the view-only people limit.
@@ -1302,7 +1302,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 - Context: the published Terms promise that on a move to a lower plan, what's over the new plan's limits becomes read-only, with an email 7 days before, nothing deleted, and moving back up restoring everything at once. Before this, nothing paused; only adding more was refused.
 - Decision:
-    - What's over the limits is worked out from the plan the business reads now and a fixed order; nothing is stored per item. Team (seats as DEC-105 and DEC-111 count them, view-only people against their own limit): the owner always stays, then the earliest to join, then open invitations. Products and posts: the newest stay. Locations (SHOP storefronts, DEC-109) and websites (DEC-094): the first made stay.
+    - What's over the limits is worked out from the plan the business reads now and a fixed order; nothing is stored per item. Team (seats as DEC-105 and DEC-111 count them, view-only people against their own limit; since DEC-155 everyone counts against the one team limit): the owner always stays, then the earliest to join, then open invitations. Products and posts: the newest stay. Locations (SHOP storefronts, DEC-109) and websites (DEC-094): the first made stay.
     - Paused people can't open the business, and take no new bookings (diary people with no login and paused members' own diary rows). Paused products and posts are hidden from the site and read-only. A paused location stops taking orders; a paused website stops orders, bookings, class packs and plans sold online. Invoices, orders, customers and payment records are never touched, and bookings already made are kept.
     - **The pause waits 7 days after a notice (owner, 9 Oct).** Moves known ahead (an offer's end, a term's end, a chosen move) are told at 30, 7 and 1 days; moves that happen at once (a failed payment the provider gave up on, cancelling now, an operator change) are told within the hour and pause 7 days later. The billing moves themselves are unchanged.
     - **Locations and bookings (owner, 9 Oct):** bookings belong to the business, not a location, so a paused location stops orders and a paused website stops bookings; the Terms stand as written.
@@ -1438,7 +1438,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 ## DEC-125 PostHog for errors and workspace milestones; never on merchant sites; replay in the workspace (interface readable, business data masked) and on saroh.in (behind consent)
 
-**Status: Accepted — 2026-10-10; Decision 8 amended the same day (Decision 9)** · owner · chooses the tracker #103 left open; see [ERROR_TRACKING_AND_UPTIME.md](./ERROR_TRACKING_AND_UPTIME.md)
+**Status: Accepted — 2026-10-10; Decision 8 amended the same day (Decision 9); Decision 7's "no pageviews" superseded by DEC-160 (2026-10-14), nothing else** · owner · chooses the tracker #103 left open; see [ERROR_TRACKING_AND_UPTIME.md](./ERROR_TRACKING_AND_UPTIME.md)
 
 - Context: #103 built a vendor-neutral `reportError` seam in the API and in every frontend boundary and stopped at the choice of tracker. Nothing left the process, so an error was seen only by whoever read a log, and nobody could say how many businesses finish setting up. The owner chose PostHog's free plan, one project for development and production.
 - Options: Sentry's free plan (one seat); GlitchTip on the API's host (one more service to run); Better Stack; PostHog (errors, product events and session replay in one, EU hosting).
@@ -1870,3 +1870,105 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **One exception to "no scheduled deploys" (DEC-107), once.** Two scheduled runs of `deploy-frontends.yml` on 17 Oct 2026 only: the first starts early, waits for the instant and deploys every app; the second deploys only what is still unopened. Both do nothing in another year and are deleted after launch. The rule stands for everything else.
 - Plans show in the workspace at launch, which DEC-136 left open.
 - Moving or cancelling: `docs/architecture/runbooks/LAUNCH_DAY_17_OCT.md`. The hand steps there remain the fallback.
+
+## DEC-155 Everyone in a business uses one team seat, whatever their role
+
+**Status: Accepted — 2026-10-13, built** · owner · supersedes the view-only part of DEC-105 and the Reviewer rule of #794 · amends DEC-114
+
+- Context: since 6 Oct (#794) Reviewers were left off the team count, and since DEC-105 anyone whose role only looks used no seat and counted toward a separate limit of their own (the catalogue's `reviewers` row, "View-only people").
+- Decision: every person in a business uses one team seat, whatever their role: Owner, Admin, Member, Reviewer and any role the business made. There is no free or separate allowance for people who only look. The team count is every team member, every open invitation, and everyone on the diary who takes bookings with no login (DEC-111, unchanged).
+- The Reviewer role itself is unchanged: the same permissions, and still the sites it is invited to.
+- Consequences:
+    - Inviting anyone, a Reviewer included, is checked against the one team limit. A change of role, of a role's permissions or of someone's extra permissions never changes the count, so none of them asks the plan.
+    - The `reviewers` row is retired from the catalogue (`RETIRED_MODULE_IDS` in `@saroh/pricing-catalog`), with its limit key, its words and its place on Team, Plan and the pricing table. A version published while it was sold still carries the row in the database; every reader drops it on read, so it shows, counts and caps nothing. No migration, and no stored row is rewritten.
+    - Moving to a lower plan (DEC-114): the owner always stays, then the earliest to join up to the limit, Reviewers placed by when they joined like anyone else. A limit of one keeps the owner alone.
+    - The move-down notice's claim is keyed by the limits it named, which no longer include a view-only one. A business told under the old key is told again and gets its 7 days again before anything pauses.
+    - The member, invitation and role views no longer carry `usesSeat`.
+
+## DEC-156 Who referred a business is recorded when the business is made
+
+**Status: Accepted — 2026-10-13, built** · owner (record it from launch, so referrals made before the referral programme opens are known) · builds on DEC-102 · #809, #810 are not built by this
+
+- **What is recorded.** A visitor who reaches saroh.in by a business's referral link (`?ref=`, the "Made with Saroh" credit of DEC-102) and later makes a business has that fact kept on the new business: which business referred it and when (`Organization.referredByOrganizationId`, `referredAt`). Nothing else of a referral programme exists yet.
+- **Written once.** Only as the business is made. Nothing changes it afterwards.
+- **How the code travels.** saroh.in keeps the code in one first-party cookie, `saroh_ref`, on the domain it shares with accounts and the workspace, for 90 days. The workspace's server reads it as the business is made, sends it to the API with the business, and clears it once the business exists. It is functional: set whatever the cookie notice was answered, holding the eight characters from the link and nothing about the visitor, and never given to an analytics, advertising or recording tag. The address it came from is still cut before any tag loads (DEC-127).
+- **The last link wins** in the browser. A page cannot tell a real code from a mistyped one, so a newer link replaces an older one.
+- **The API decides, from the database.**
+    - A malformed or unknown code, or a deleted business's, refers nobody, and the new business is made all the same. The caller is never told which.
+    - Nobody refers themselves: someone who is already in the referring business, in any role, is not recorded as referred by it. A business can never name itself (a CHECK on the column).
+    - One level: only the business whose code was carried is recorded.
+- **A waitlist entry's id is not a business's code.** Both arrive as `?ref=` and look alike, so they are told apart by table, never by shape. saroh.in keeps no code from the waitlist page, where `?ref=` is an entrant's id. The waitlist looks for an entrant first and a business only when there is none. Setup reads businesses only, and a code that is also an entrant's id refers nobody.
+- **Until sign-up opens, the waitlist keeps it.** Someone who arrives by a business's link and joins the waitlist has that business kept on their entry (`WaitlistSignup.referredByOrganizationId`). When they make a business with no code in the browser, the entry's is used, found by the account's confirmed email. A code the browser carried comes first.
+- **Who sees it.** Operators, on the business's page in the console: "Referred by ‹business›" and the day. No business is shown who referred it or whom it referred, and no screen or message says anything follows from a referral.
+- Consequences: three nullable columns, an index and a foreign key (`20261122100000_organization_referred_by`). `POST /organizations` takes an optional `referralCode` and never refuses it, so the API is released before the workspace sends one. The rules are `apps/api.saroh.in/src/modules/organizations/referral.ts`; the cookie is `apps/saroh.in/lib/referral.ts` and `apps/app.saroh.in/lib/organizations/referral-carry.ts`. The Privacy Policy's Cookies section does not yet name this cookie: the owner's text to settle before launch.
+
+## DEC-157 An add-on is priced and capped for the plans it names
+
+**Status: Accepted — 2026-10-13, built** · owner (packs and extra seats cost differently on each plan, and each plan has its own ceiling on how many can be held)
+
+- An add-on in the catalogue may name the plans it is offered on (`plans`) and the most of it one business may hold (`max`). Naming no plan means every plan, and no maximum means the ceiling for any add-on (`MAX_ADDON_QUANTITY`), so a catalogue published before this reads as it always did.
+- "The same thing at another price on another plan" is two add-ons of one kind, each naming its plans, with its own price and maximum. The operator sets all of it in Admin › Plans › Offers; nothing is released.
+- A plan has one price for a thing. A catalogue does not validate when two add-ons of the same kind (and the same module, for a module on its own) are offered on the same plan, when an add-on names a plan that isn't there, or when a maximum is below 1 or above the ceiling.
+- A business sees and buys only the add-ons offered on its plan. More than the maximum is refused in words; the pricing page shows a plan-specific add-on under the plans it names, and not at all when none of them can be chosen.
+- **A maximum never takes anything away.** A business that holds more than a maximum set since keeps all of it, is charged for all of it and has all of it in its limit; it can hold fewer, and cannot buy more.
+- **A change of plan ends the add-ons the new plan isn't offered.** They end with the old plan (an upgrade, a move at the period's end, a move from a publish), and the new plan's own add-on is never bought for the business: it chooses that in Settings › Plan. What a period already owed is still charged, as when an add-on is removed by hand. An add-on held on a plan it isn't offered on counts for nothing and is charged nothing, whatever path left it there.
+- **The business is told before it confirms.** The change-plan quote names the add-ons held today that the change ends (`addonsEnding`: the add-on, how many, and the new plan's own add-on of that kind when it can be added there), and the dialog says so in a note above Confirm. No price is shown for the new plan's add-on, since it is not being bought. The quote and the change share one rule (`addons-ending.ts`), so the note cannot name anything the change does not end. A move to a free plan, or a checkout that starts afresh, names every add-on held.
+- **The operator sees it.** Each add-on a plan change ends is written to the audit log after the change commits, as `organization.plan.addon.changed` with what was held, `to: 0` and `reason: "plan-change"`. The actor is whoever made the checkout, the billing provider for a move its event applied, or the hourly sweep. No email is sent for it.
+- Rules: `packages/pricing-catalog/src/schema.ts` (`addonOfferedOn`, `addonMaxQuantity`), `apps/api.saroh.in/src/modules/billing/offers.ts` (`addonProblem`), `addon-charges.ts` (`endAddonsNotOfferedInTx`, `recordAddonsEnded`), `addons-ending.ts` (`addonsNotOffered`, `addonsEndingWith`). `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
+
+## DEC-158 A plan caps how many variants one product may have
+
+**Status: Accepted — 2026-10-13, built** · owner (decided the cap; "variants do not count towards the product limit")
+
+- A plan may cap the variants of **one product**: a small number on the free plan, more on each paid plan. The numbers are the catalogue's, set per plan in Admin › Plans on the row `variants`, and raised for one business with a limit override. None is written in code.
+- **Variants never count as products.** The products limit counts products; this is its own cap, inside each product.
+- **It is a cap inside one thing, not a count across the business** (`MODULE_MAP.variants.within`). So it has no usage meter, no "used X of Y", no notice at 80%, and nothing is ever "over" in total or paused for it. The one thing that happens: a save that would take a product past its cap is refused, with the usual plan-limit notice and its way to another plan.
+- **Nothing is removed and selling is never blocked.** A product that already has more than the cap (made before it, or after a move to a lower plan) keeps every variant, keeps selling, and is still edited, reordered and made smaller. Only adding one more is refused while it is at or past the cap. A copy of such a product is refused too, since the copy would start past the cap; the original is untouched.
+- **The row is a limit, never a lock.** A plan whose cell has no number, or leaves the row out, caps nothing. A catalogue version published before the row existed caps nothing either, so no business loses the ability to add variants when this ships.
+- A catalogue made before the row is offered it on the Modules tab ("Add Variants row"). It arrives with no limit on any plan and hidden from the pricing page, so nothing changes until a number is set and the version is published.
+- Only behind `PLAN_ENFORCEMENT`, and fail open as every limit is: a plan that can't be read refuses nothing.
+- Code: `billing/item-limits.ts` (the rule), `products/variant-cap.ts` (the two writes that add a variant: a new variant, a copy), `itemLimitNotice` in `@saroh/pricing-catalog` (the words, shared with the editor).
+
+## DEC-159 The first-month offer is its plan's; a dearer plan starts today, anything else when what was paid runs out
+
+**Status: Accepted — 2026-10-13, built** · owner (after a test payment on the dev environment: a business in its first month moved between paid plans, each time with nothing charged, and so used the dearest plan for the first month's amount) · amends DEC-093
+
+- **The first-month offer belongs to the plan it is set on.** The catalogue says which plans carry one. A plan without it starts at its full price from Free, charged as it is authorised.
+- **Once per business.** A business has the offer when it first starts a paid plan that carries it, and never again, whatever happens after (`hadTrial`, as before). No plan chosen during a first month gets a first month of its own.
+- **Moving up during the first month starts today at the full price.** A plan that costs more a month than the one the business is on ends the first month there: its full first charge is taken now and its 12-month term starts now. What the first month cost is not refunded and not set against it. Nobody uses a dearer plan for the first month's amount.
+- **Moving down during the first month waits for the month to end.** A cheaper paid plan, or Free, takes effect when the first month ends and never at once. The business keeps the plan it started until then, and nothing more is charged for it.
+- **No refunds, so a move down never comes before what was paid for has run out.** In a paid period a cheaper plan, the other cycle or Free takes effect at the end of the cycle already paid. The business keeps its plan until then, and the screen says the date.
+- **Upgrades in a paid period start today**, paying the difference for the rest of the period, as before.
+- Decided in the same spirit:
+    - **The same price is not a move up.** A different plan at the same price waits for the end of the first month, as it waits for the end of a paid period.
+    - **Yearly during the first month** follows what the plan costs a month: a dearer plan's year starts today, as one payment. The year of the plan it is on, or of a cheaper one, is paid now and starts when the first month ends.
+    - **Cancelling during the first month** is the move to Free: the plan runs to the month's end, nothing more is charged, then Free.
+    - **Free first days** (a first month that costs nothing) follow the same rules.
+    - **A change that waits is replaced by the next change.** Free chosen instead gives up the plan that was authorised for the date. A dearer plan chosen instead starts today and nothing waits any more. A plan that waits and whose autopay is then withdrawn at the provider becomes Free on the same date, because nothing would pay for the plan the business is on.
+    - **A change that already waits has no way to undo it on the screen** other than choosing another plan. The plan it is on reads "you're already on" it, as before this decision. Wanted next: a way to keep the current plan.
+    - **Add-ons.** A dearer plan started today starts afresh, like any plan started at its full price: every add-on held ends with the first month and nothing owed for them is charged. A plan that starts at the month's end keeps the add-ons it is offered and ends the rest (DEC-157). Free ends them all. The quote names what ends before the business confirms.
+    - **A coupon** is for a checkout that starts a plan. It can be used on the dearer plan started today, and not on a plan that waits. One used on the first checkout is not carried to another plan, and since it was never redeemed it can still be used.
+    - **The provider's side ending early never cuts a plan short.** If the provider's subscription ends before the date the business's move waits for, the plan stays to that date.
+- **The business is told before it confirms.** The quote and the dialog say "Starts today" with what is paid now for a move up, and "From ‹date›: you keep ‹plan› until then" for anything that waits. The plan picker says the same on each row.
+- **Supersedes in DEC-093:** nothing of how a plan is paid. It replaces what was built on it: another paid plan chosen during the first month kept the first month and moved the business at once with nothing charged, and Free during the first month took effect at once. DEC-093's "Cancel before the month ends and you pay nothing more" stands, and the plan now runs to the month's end.
+- Consequences:
+    - A business in its first month when this ships is not moved or charged by it. Its next change follows these rules.
+    - The first month's provider subscription is cancelled at once when the business leaves it, in every case, so the full charge due at the month's end is never taken for a plan the business has left. Saroh keeps the plan running to the date by itself, and the hourly sweep or the new plan's first charge applies the move.
+    - No schema change. The quote gains `firstMonth` (`NOW`, `AT_END` or null).
+    - The Terms and the Refund and Cancellation Policy do not say that moving up during the introductory month is charged in full that day. The owner's text to settle.
+- Rules: `apps/api.saroh.in/src/modules/billing/change-timing.ts` (`paidUntil`, `firstMonthEnd`, `firstMonthMove`, `leavesWithCycle`, `runsToMoveDate`), read by `checkout-quote.ts`, `checkout.service.ts` and `billing-webhook.service.ts`. The words: `apps/app.saroh.in/lib/saroh-billing/quote-words.ts` and `plan-view.ts` (`pickerRows`, `waitingMove`). `PRICING_ROLLOUT.md` › "During the first month".
+
+## DEC-160 Page visits in the workspace and on saroh.in
+
+**Status: Accepted — 2026-10-14** · owner ("turn on PostHog web analytics on saroh.in and in the workspace, so I can see which pages people spend time on") · supersedes in DEC-125 only Decision 7's "no pageviews"; see [ERROR_TRACKING_AND_UPTIME.md](./ERROR_TRACKING_AND_UPTIME.md) → Page visits
+
+- Context: recordings show how one person used a page. Nothing said which pages are opened most, or how long people stay on them, on the site or in the workspace.
+- Decision 1, **`$pageview` and `$pageleave`, and nothing else new**: a view for the first page and each page after it, and a leave when the tab goes, so the time on a page is known. Still no autocapture, heatmaps, dead clicks, surveys, feature flags, network or console capture, and no `identify()` with personal data. Still nothing in the browser of accounts, the admin console or a merchant site (`check:merchant-site-tracking` now refuses the page-visit switch and call there too).
+- Decision 2, **the same people as the recording, by the same rules**. The workspace: a signed-in person who shares usage ("Help improve Saroh", one choice for recording and page visits) and has been shown the notice, in the shell or the goal picker, with neither Do Not Track nor Global Privacy Control; by internal user id and organization id only. saroh.in: only after the cookie notice's first answer is accepted (the one Google Analytics and the recorder wait for), never in a Saroh team browser, never with Do Not Track or Global Privacy Control, never on a pricing draft preview or the sign-up hand-off; about nobody.
+- Decision 3, **the app names the page; the address bar is never read**. The workspace sends the route's shape (`/commerce/orders/[orderId]`, from Next's own parameters), so no record's id, token or business name leaves, and never the tab's title. saroh.in sends its public path and only the query its tag allow-list keeps (`lib/page-address.ts`). The referrer, where the session began and every person property are dropped at the last gate (`pageBeforeSend`). posthog-js's own `history_change` capture is not used: it reads the address as it changes, before the app knows the route.
+- Decision 4, **one PostHog instance with the recorder**, so a page's visits and its recordings share a session id, and a visit is sent for a session whose recording was sampled out. Each has its own switch.
+- Decision 5, **nothing stored; no cookieless mode**. `persistence: "memory"` as before. On saroh.in a "visitor" and a "session" in PostHog are therefore one page load and what is browsed from it: time on a page and views per page are right, unique visitors are over-counted, and Google Analytics remains the visitor count. PostHog's cookieless mode would count a visitor once a day with nothing stored, but posthog-js sends no recording in that mode and makes its sessions on PostHog's side, which would cut page visits off from recordings (Decision 4); it also needs a project setting and the visitor's IP address for its hash.
+- Decision 6, **switchable per environment**: `NEXT_PUBLIC_POSTHOG_ANALYTICS` (`on` | `off`), `on` in the production `vars` of the workspace and saroh.in, `off` in development's. No key, nothing, as ever.
+- The words: the workspace's notice now reads "We record how Saroh is used and which pages are opened, to make it easier. …", and the setting "Share how I use Saroh and which pages I open (…)". saroh.in's cookie notice is unchanged: "records how the site is used" covers it.
+- Consequences: these events count towards PostHog's free monthly allowance of product-analytics events; a person profile exists for each workspace user's internal id, with no properties set by Saroh. Owner, outside the repo: the Privacy Policy's "What we collect" and "Cookies" must say so before the production deploy (`apps/saroh.in/content/privacy.ts`, the owner's text).
+- Rules: `packages/error-tracking/src/browser.ts` (`pageBeforeSend`, `BrowserTracking.pageview`), `apps/app.saroh.in/lib/usage-sharing/route-shape.ts`, `apps/saroh.in/lib/tags.ts` (`pageRoute`).

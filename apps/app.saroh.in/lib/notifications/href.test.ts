@@ -107,25 +107,25 @@ const WRITTEN: {
         type: "plan.limit",
         kind: "plan",
         id: null,
-        href: "/settings/billing#change-plan",
+        href: "/settings/billing/plans",
     },
     {
         type: "plan.changed",
         kind: "plan",
         id: null,
-        href: "/settings/billing#change-plan",
+        href: "/settings/billing/plans",
     },
     {
         type: "plan.ending",
         kind: "plan",
         id: null,
-        href: "/settings/billing#change-plan",
+        href: "/settings/billing/plans",
     },
     {
         type: "plan.move",
         kind: "plan",
         id: null,
-        href: "/settings/billing#change-plan",
+        href: "/settings/billing/plans",
     },
     {
         type: "catalogue.merge-report",
@@ -190,7 +190,7 @@ describe("where a notification opens", () => {
             "/billing/invoices",
         );
         expect(notificationHref({ type: "plan.limit" })).toBe(
-            "/settings/billing#change-plan",
+            "/settings/billing/plans",
         );
     });
 

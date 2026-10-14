@@ -78,7 +78,7 @@ errors) are kept one year.
   either sets it to match the policy and writes it down in the host's own
   runbook, which is not in this public repository.
 
-## Error tracking and product events: PostHog — **Current** (DEC-125)
+## Error tracking and product events: PostHog — **Current** (DEC-125, DEC-160)
 
 What is sent from where, the scrubber's rules, the limits and how to switch
 it on: `docs/architecture/ERROR_TRACKING_AND_UPTIME.md`. The rules a change
@@ -113,6 +113,20 @@ must keep:
   page's address back first. Never accounts, the
   admin console or a merchant site (`check:merchant-site-tracking`). What a
   screen marks, and how: `frontend-design-system.md` → Session recordings.
+- **Page visits are the same two apps, under the same rules** (DEC-160):
+  `$pageview` and `$pageleave` only, switched by
+  `NEXT_PUBLIC_POSTHOG_ANALYTICS`, sent by the instance that records. A
+  page is named by the app (`browserTracking.pageview(route)`), never read
+  from the address bar: the workspace gives the route's shape
+  (`routeShape`), saroh.in the address its allow-list leaves
+  (`pageRoute`). A new screen needs nothing; a new place that calls
+  `pageview` is refused by `replay-scope.test.ts` and
+  `check:merchant-site-tracking`.
+- **A setting handed to the SDK is checked against what the SDK sends.**
+  `replay-playback.*.test.ts` run the real posthog-js and its recorder
+  against a fake PostHog; a change to `replayConfig`, `siteReplayConfig` or
+  the SDK's version runs them. To look by hand: a real browser, and a
+  click (ERROR_TRACKING_AND_UPTIME.md → Checking it by hand).
 - **Degraded paths it adds, and what volume means:**
   `posthog_send_failed` (WARN): PostHog refused a batch or couldn't be
   reached; a steady stream means the key or host is wrong, or PostHog is

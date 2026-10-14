@@ -48,7 +48,7 @@ const LOCK: QrStyleLock = {
     plan: "Plan B",
     kept: QR_KEPT_LINE,
     cta: "See Plan B",
-    href: "/settings/billing?plan=b#change-plan",
+    href: "/settings/billing/plans?plan=b",
 };
 
 const pdf = (name: string, logo = "none") =>
@@ -207,7 +207,7 @@ describe("QrPrintSlot — what it shows", () => {
         );
         const link = line?.querySelector("a");
         expect(link?.getAttribute("href")).toBe(
-            "/settings/billing?plan=b#change-plan",
+            "/settings/billing/plans?plan=b",
         );
         expect(link?.getAttribute("aria-label")).toBe("See Plan B");
         expect(buttons()).toHaveLength(0);

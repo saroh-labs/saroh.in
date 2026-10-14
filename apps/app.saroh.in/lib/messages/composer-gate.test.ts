@@ -75,7 +75,7 @@ describe("composerGate", () => {
             kind: "plan",
             title: "Sending from your own email comes with Plus.",
             cta: "See Plus",
-            href: "/settings/billing?plan=plus#change-plan",
+            href: "/settings/billing/plans?plan=plus",
             plan: "Plus",
         });
     });

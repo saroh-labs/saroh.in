@@ -163,6 +163,26 @@ const input: CatalogInput = {
             },
         },
         {
+            id: "variants",
+            name: "Variants",
+            group: "selling",
+            pricing: "show",
+            what: "The sizes, shades or colours one product comes in.",
+            cells: {
+                free: C("Up to 4 a product", "Up to 4 variants a product", 4),
+                grow: C(
+                    "Up to 40 a product",
+                    "Up to 40 variants a product",
+                    40,
+                ),
+                pro: C(
+                    "Up to 150 a product",
+                    "Up to 150 variants a product",
+                    150,
+                ),
+            },
+        },
+        {
             id: "orders",
             name: "Orders",
             group: "selling",
@@ -253,23 +273,11 @@ const input: CatalogInput = {
             name: "Team members",
             group: "team",
             pricing: "show",
-            what: "People who can change things, and everyone who takes bookings, with a login or without. View-only people use no seat.",
+            what: "Everyone in your business, whatever their role, and everyone who takes bookings, with a login or without.",
             cells: {
                 free: C("2", "2 team members", 2),
                 grow: C("4", "4 team members", 4),
                 pro: C("200", "200 team members", 200),
-            },
-        },
-        {
-            id: "reviewers",
-            name: "View-only people",
-            group: "team",
-            pricing: "show",
-            what: "People who can only look and approve, never change anything. They use no team seat.",
-            cells: {
-                free: C("1", "", 1),
-                grow: C("3", "", 3),
-                pro: C("100", "", 100),
             },
         },
         {
@@ -367,7 +375,30 @@ const input: CatalogInput = {
     ],
     yearly: { on: true, paid: 10 },
     gst: { show: "excl" },
-    addons: [],
+    // One thing sold at a price and a maximum of its own on each plan
+    // (DEC-157). Made up, like every number here.
+    addons: [
+        {
+            id: "member-grow",
+            kind: "members",
+            name: "Extra team member",
+            pricePaise: 5_000,
+            mode: "unit",
+            qty: 1,
+            plans: ["grow"],
+            max: 3,
+        },
+        {
+            id: "member-pro",
+            kind: "members",
+            name: "Extra team member",
+            pricePaise: 4_000,
+            mode: "unit",
+            qty: 1,
+            plans: ["pro"],
+            max: 10,
+        },
+    ],
 };
 
 /** Version 1, validated. */

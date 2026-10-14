@@ -23,7 +23,7 @@ describe("PlanEndingBanner", () => {
         expect(html).toContain('role="status"');
         expect(html).toContain("Your Grow plan ends in 7 days");
         expect(html).toContain("on Free, and everything you made is kept");
-        expect(html).toContain('href="/settings/billing#change-plan"');
+        expect(html).toContain('href="/settings/billing/plans"');
         expect(html).toContain("See plans");
     });
 

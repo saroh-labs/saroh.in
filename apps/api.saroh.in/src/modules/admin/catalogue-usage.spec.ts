@@ -72,4 +72,8 @@ describe("usageNote", () => {
     it("says nothing for another row at 0", () => {
         expect(usageNote("products", 0, 2)).toBeNull();
     });
+
+    it("says a cap inside each product has no total (DEC-158)", () => {
+        expect(usageNote("variants", null, 2)).toBe("per-product");
+    });
 });
