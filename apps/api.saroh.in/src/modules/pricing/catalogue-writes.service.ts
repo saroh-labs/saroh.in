@@ -30,6 +30,7 @@ import {
     enqueueProviderPlanSync,
     PROVIDER_PLAN_SYNC_TYPE,
     retryProviderPlanSyncInTx,
+    settleProviderPlansLocallyInTx,
 } from "../billing/provider-plan-sync.service";
 import type { StaffName } from "./catalogue.service";
 import { DRAFT_SAVE_ACTION, SHARED_DRAFT_ID } from "./catalogue.service";
@@ -83,6 +84,15 @@ export interface PublishResult {
     /** Paid plan × cycle rows queued for the billing provider. */
     providerPlans: number;
 }
+
+/** `catalogue:import`: a publish, and the provider plans it settled locally. */
+export interface ImportResult extends PublishResult {
+    /** Provider plans marked SYNCED with no provider asked (a local database). */
+    settledLocally: number;
+}
+
+/** Who the audit trail says imported a version: a command, not a person. */
+export const IMPORT_ACTOR = "system:catalogue-import";
 
 /** `DELETE /admin/pricing/versions/:v`. */
 export interface CancelResult {
@@ -540,6 +550,97 @@ export class CatalogueWritesService {
         });
     }
 
+    // ── Import (a developer's own database) ─────────────────────────────
+
+    /**
+     * Publish a catalogue snapshot from a file as the next version, live
+     * now, policy keep: the `catalogue:import` command, which copies the
+     * dev environment's live catalogue (Admin › Plans › Download catalogue)
+     * onto a developer's own database. It goes through the same steps as a
+     * publish (`writeVersion`: the `Plan` rows, the change log against the
+     * live version, PENDING provider plans for the paid ones and their sync,
+     * the saroh.in revalidation, the Free rows) and is audited as
+     * `pricing.version.import` by {@link IMPORT_ACTOR}. It doesn't touch
+     * the shared draft: one started before stays a copy of the version
+     * before, so its publish is refused as for any newer version.
+     *
+     * `settleProviderPlans` is for a local database with no billing keys
+     * (the command decides, after its guard): the version's provider plans
+     * are settled in the same transaction
+     * (`settleProviderPlansLocallyInTx`), so it is live at once instead of
+     * waiting for a provider that can't answer.
+     *
+     * A snapshot that doesn't validate is a 400 with the schema's messages;
+     * one that is the live version already is a 409.
+     */
+    async importSnapshot(
+        input: {
+            catalog: unknown;
+            note: string;
+            settleProviderPlans: boolean;
+        },
+        now: Date,
+    ): Promise<ImportResult> {
+        const check = validateCatalog(input.catalog);
+        if (!check.ok) {
+            throw new BadRequestException({
+                message: "That catalogue doesn't validate.",
+                details: { errors: check.errors },
+            });
+        }
+        return this.versionTx(async (tx) => {
+            const result = await this.writeVersion(tx, {
+                actorUserId: null,
+                catalog: check.catalog,
+                goLiveAt: now,
+                now,
+                policy: "keep",
+                note: input.note,
+                same: (live) =>
+                    `That catalogue is version ${live}, which is live already. There's nothing to import.`,
+            });
+            let settledLocally = 0;
+            let status = result.status;
+            if (input.settleProviderPlans && result.status === "waiting") {
+                settledLocally = await settleProviderPlansLocallyInTx(
+                    tx,
+                    result.version,
+                    now,
+                );
+                // Live now, as the sync's go-live would have made it: tell
+                // saroh.in and give the Free rows, as a publish does.
+                status = "live";
+                await enqueueSiteRevalidation(
+                    tx,
+                    { version: result.version, cause: "publish" },
+                    now,
+                );
+                await enqueueFreeRows(
+                    tx,
+                    { version: result.version },
+                    now,
+                    now,
+                );
+            }
+            await this.audit.write(tx, {
+                actorUserId: IMPORT_ACTOR,
+                permission: AdminPermission.PricingPublish,
+                action: "pricing.version.import",
+                targetType: "pricing_version",
+                targetId: String(result.version),
+                outcome: AdminAuditOutcome.Success,
+                metadata: {
+                    version: result.version,
+                    status,
+                    providerPlans: result.providerPlans,
+                    settledLocally,
+                    changes: result.changes.slice(0, 50),
+                },
+            });
+            return { ...result, status, settledLocally };
+        });
+    }
+
     // ── Shared steps ────────────────────────────────────────────────────
 
     /**
@@ -550,7 +651,8 @@ export class CatalogueWritesService {
     private async writeVersion(
         tx: Tx,
         input: {
-            actorUserId: string;
+            /** Null for a version no member of staff published (an import). */
+            actorUserId: string | null;
             catalog: Catalog;
             goLiveAt: Date;
             now: Date;

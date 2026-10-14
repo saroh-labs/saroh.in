@@ -9,6 +9,12 @@
  * one that a commerce-only or bookings-only fixture would never exercise.
  */
 
+// Whether a connection string points at this machine lives beside the
+// database-target guard, so the API's local-only commands share it.
+import { isThrowawayDatabase } from "../database-target";
+
+export { isThrowawayDatabase };
+
 /** Everything the seed writes carries this id prefix, so teardown is exact. */
 export const SEED_PREFIX = "seed_";
 
@@ -22,19 +28,6 @@ export const OWNER_EMAIL = "demo@saroh.dev";
  * environment's demo login shared it). See {@link seedPassword}.
  */
 export const FIXTURE_PASSWORD = "demo-password-123";
-
-/** Hosts that are this machine: a local or CI throwaway database. */
-const THROWAWAY_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-
-/** Whether a connection string points at this machine. */
-export function isThrowawayDatabase(url: string | undefined): boolean {
-    if (!url) return false;
-    try {
-        return THROWAWAY_HOSTS.has(new URL(url).hostname);
-    } catch {
-        return false;
-    }
-}
 
 /**
  * The password the seed gives every login it writes.

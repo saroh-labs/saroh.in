@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { assertDatabaseTarget, resolveDatabaseTarget } from "./database-target";
+import {
+    assertDatabaseTarget,
+    assertLocalDatabaseTarget,
+    isThrowawayDatabase,
+    resolveDatabaseTarget,
+} from "./database-target";
 
 /** The two URLs this repository actually configures, with fake credentials. */
 const SAROH_DEV =
@@ -100,5 +105,49 @@ describe("assertDatabaseTarget", () => {
         expect(() => assertDatabaseTarget(NEONDB, "development", "")).toThrow(
             /Refusing to write/,
         );
+    });
+});
+
+describe("assertLocalDatabaseTarget", () => {
+    const LOCAL_DEV = "postgresql://user:pw@localhost:5432/saroh-dev";
+    const LOCAL_SCRATCH = "postgresql://user:pw@127.0.0.1:5432/saroh_scratch";
+
+    it("knows this machine's hosts", () => {
+        expect(isThrowawayDatabase(LOCAL_DEV)).toBe(true);
+        expect(isThrowawayDatabase("postgresql://u@[::1]:5432/x")).toBe(true);
+        expect(isThrowawayDatabase(SAROH_DEV)).toBe(false);
+        expect(isThrowawayDatabase(undefined)).toBe(false);
+        expect(isThrowawayDatabase("not a url")).toBe(false);
+    });
+
+    it("allows the local dev database in development", () => {
+        expect(
+            assertLocalDatabaseTarget(LOCAL_DEV, "development", undefined)
+                .database,
+        ).toBe("saroh-dev");
+    });
+
+    it("refuses a database on another host, even when it is confirmed", () => {
+        expect(() =>
+            assertLocalDatabaseTarget(SAROH_DEV, "development", "saroh-dev"),
+        ).toThrow(/isn't on this machine/);
+        try {
+            assertLocalDatabaseTarget(SAROH_DEV, "development", undefined);
+        } catch (error) {
+            expect((error as Error).message).not.toContain("pw@");
+        }
+    });
+
+    it("asks a local throwaway database to be named", () => {
+        expect(() =>
+            assertLocalDatabaseTarget(LOCAL_SCRATCH, "development", undefined),
+        ).toThrow(/Refusing to write to "saroh_scratch"/);
+        expect(
+            assertLocalDatabaseTarget(
+                LOCAL_SCRATCH,
+                "development",
+                "saroh_scratch",
+            ).database,
+        ).toBe("saroh_scratch");
     });
 });

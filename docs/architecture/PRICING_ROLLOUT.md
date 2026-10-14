@@ -238,6 +238,10 @@ How a business pays for a catalogue plan. Code: `billing/checkout.service.ts`,
   and saroh.in is told (`pricing.site.revalidate`, cause `go-live`).
   `POST /admin/pricing/versions/:v/provider-sync` (`pricing:publish`) asks
   again for the FAILED rows. Cancelling a version drops its waiting sync.
+  On a developer's own database with no keys, `catalogue:import` (the dev
+  environment's catalogue, copied in) marks its rows SYNCED as `local_…`
+  instead, so the copy is live; nowhere else does (`LOCAL_DEV.md`, "Plans:
+  local matches dev").
 - **Changing plan** — `GET …/billing/change-plan?plan=&cycle=` quotes
   (`billing:read`), `POST …/billing/change-plan {plan, cycle}` changes
   (`billing:manage`). The client sends a plan id and a cycle only; the plan

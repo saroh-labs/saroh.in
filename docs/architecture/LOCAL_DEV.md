@@ -250,6 +250,40 @@ shows how little a Member can open rather than its diary; sign in as
 `meera.nair@` (OWNER) or `pooja.shetty@` (ADMIN) to see the appointments and
 patients.
 
+### Plans: local matches dev
+
+The seed installs a **sample** pricing catalogue (made-up plans, in
+`@saroh/pricing-catalog/seed`); Saroh's real plans live only in each
+environment's database. To make the local workspace and pricing page show the
+plans the dev environment (saroh.io) shows:
+
+1. In admin.saroh.io, open **Plans › Versions** and click **Download
+   catalogue (JSON)** on the live version. The file is
+   `{ version, goLiveAt, catalog }`, the snapshot as stored.
+2. Save it as `.local/catalogue.dev.json` at the repository root. `.local/`
+   is git-ignored: the file carries real prices and never goes in the repo.
+3. From the repository root:
+
+    ```bash
+    pnpm --filter @saroh/api catalogue:import .local/catalogue.dev.json
+    ```
+
+It publishes the file as the next local version, live now, policy "keep",
+through the publish's own code (`CatalogueWritesService.importSnapshot`), and
+prints version numbers and counts only. It refuses any database that is not
+on this machine, and a local one other than `saroh-dev` unless
+`DATABASE_TARGET_CONFIRM` names it. With no `SAROH_RAZORPAY_*` keys (the usual
+case here) a paid plan's provider plan could never sync and the version would
+wait behind the sample for ever, so the import marks them synced with a
+stand-in `local_…` id and says so; checkout still can't charge. With keys set
+it leaves them to the sync job, as a publish does. Run it again after dev
+publishes new pricing; a file that is already live changes nothing.
+
+A fresh database gets the sample again on `db:seed`, so import again after
+it. Re-seeding a database that already has versions keeps them and puts the
+demo businesses on the live version's `pro` plan, so a dev catalogue without
+a `pro` plan stops the seed: seed first, then import.
+
 ## Databases
 
 `packages/database/src/database-target.ts` refuses to migrate or seed a
