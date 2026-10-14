@@ -114,7 +114,8 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         // 10 Oct: aligned with India's DPDP Act (rev 55).
         // Also 10 Oct: the QR code maker's email and how long it is kept
         // (QR codes plan U9). 13 Oct: the referral code cookie (DEC-156).
-        publishOn: "2026-10-13",
+        // 14 Oct: page visits (DEC-160).
+        publishOn: "2026-10-14",
     },
     {
         id: "terms",
