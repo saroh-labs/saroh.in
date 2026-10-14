@@ -38,12 +38,25 @@ export interface PlanCardView {
     lines: { t: string; soon: boolean }[];
 }
 
-export interface AddonView {
-    id: string;
-    name: string;
-    line: string;
-    /** The plans it is offered on, "Grow and Pro"; empty for every plan. */
-    on: string;
+/** A usage cell for a plan that leaves the row out: drawn as a dash. */
+export const NOT_INCLUDED = "Not included";
+
+/** A row of "Usage beyond your plan": a group heading, or a catalogue row. */
+export type UsageRow =
+    | { kind: "group"; label: string }
+    | {
+          kind: "line";
+          label: string;
+          /** The row's one-line description, from the catalogue. */
+          what: string;
+          /** One per plan, in the plan cards' order. */
+          cells: string[];
+      };
+
+export interface UsageView {
+    rows: UsageRow[];
+    /** The short notes under the table. */
+    notes: string[];
 }
 
 export type CompareRow =
@@ -57,7 +70,8 @@ export type CompareRow =
 
 export interface PricingView {
     plans: PlanCardView[];
-    addons: AddonView[];
+    /** "Usage beyond your plan", or null when nothing can be added. */
+    usage: UsageView | null;
     footnote: string;
 }
 
