@@ -46,9 +46,9 @@ function filesWith(app: string, shape: RegExp): string[] {
         .map((file) => path.relative(root, file));
 }
 
-/** Anything that could hand over or start the recorder. */
+/** Anything that could hand over or start the recorder, or page visits (DEC-160). */
 const RECORDER =
-    /posthog-recorder|loadRecorder|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY/;
+    /posthog-recorder|loadRecorder|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY|POSTHOG_ANALYTICS|[Tt]racking\??\.pageview\(/;
 
 const read = (file: string) => readFileSync(path.join(appsDir, file), "utf8");
 
@@ -103,6 +103,23 @@ describe("session replay is the workspace and saroh.in only", () => {
             "app/onboarding/modules/layout.tsx",
             "components/shared/app-shell.tsx",
         ]);
+    });
+
+    it("a page visit is named only by the two components that start the recorder (DEC-160)", () => {
+        expect(filesWith("app.saroh.in", /[Tt]racking\??\.pageview\(/)).toEqual(
+            ["components/shared/workspace-tracking.tsx"],
+        );
+        expect(filesWith("saroh.in", /[Tt]racking\??\.pageview\(/)).toEqual([
+            "app/site-tags.tsx",
+        ]);
+        // The workspace names a route's shape, never the address.
+        expect(
+            read("app.saroh.in/components/shared/workspace-tracking.tsx"),
+        ).toContain("routeShape(usePathname(), useParams())");
+        // saroh.in names the address its allow-list leaves.
+        expect(read("saroh.in/app/site-tags.tsx")).toContain(
+            "browserTracking?.pageview(pageRoute())",
+        );
     });
 
     it("a recording is asked for only where it is switched on, shared, and told", () => {

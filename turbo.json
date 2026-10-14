@@ -38,6 +38,7 @@
         "NEXT_PUBLIC_POSTHOG_HOST",
         "NEXT_PUBLIC_POSTHOG_REPLAY",
         "NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE",
+        "NEXT_PUBLIC_POSTHOG_ANALYTICS",
         // The workspace: whether Saroh's own plans are shown (DEC-136).
         // Compiled into the bundle, so a build with it differs from one
         // without.

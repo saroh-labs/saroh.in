@@ -32,7 +32,8 @@
  *
  *   7. any other app, or `packages/site-blocks`, names Saroh's recorder
  *      (`posthog-recorder`, `loadRecorder`, `startReplay`,
- *      `startSiteReplay`, `startSessionRecording`, `…POSTHOG_REPLAY…`):
+ *      `startSiteReplay`, `startSessionRecording`, `…POSTHOG_REPLAY…`) or
+ *      its page visits (`…POSTHOG_ANALYTICS…`, `tracking.pageview(`, DEC-160):
  *      never a merchant site, never accounts (sign-in, sign-up,
  *      passwords), never the admin console, never anything else;
  *   8. in either of the two, the recorder is handed over anywhere but the
@@ -81,9 +82,12 @@ export const MERCHANT_SITE_ROOTS = ["apps/saroh.app", "packages/site-blocks"];
 export const RECORDING_APPS = ["apps/app.saroh.in", "apps/saroh.in"];
 const RECORDER_HANDOVER = "lib/error-tracking-browser.ts";
 
-/** Anything that could hand over, start or switch on Saroh's recorder. */
+/**
+ * Anything that could hand over, start or switch on Saroh's recorder, or
+ * its page visits (DEC-160), which the same two apps send and no other.
+ */
 const RECORDER =
-    /posthog-recorder|loadRecorder|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY/u;
+    /posthog-recorder|loadRecorder|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY|POSTHOG_ANALYTICS|[Tt]racking\??\.pageview\(/u;
 
 /** Handing the recorder to the tracker: the bundle, or the option that takes it. */
 const HANDOVER = /posthog-recorder|loadRecorder\s*:/u;

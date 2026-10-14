@@ -27,10 +27,16 @@ import {
  *  - **errors**: exceptions only. No request for flags or remote settings,
  *    no pageviews, no autocapture, nothing stored (`persistence: "memory"`),
  *    and `before_send` drops every event that is not an exception.
- *  - **replay** (the workspace and saroh.in only, off unless every rule in
+ *  - **usage** (the workspace and saroh.in only, off unless every rule in
  *    {@link replayDecision} or {@link siteReplayDecision} holds): the
- *    recorder, with every input masked and no network or console.
- *    `before_send` drops every event that is not a recording.
+ *    recorder, with every input masked and no network or console, and
+ *    page visits (DEC-160): `$pageview` when the app says a page was
+ *    opened ({@link BrowserTracking.pageview}) and `$pageleave` when the
+ *    tab goes, so the time on a page is known. One instance for both, so a
+ *    page's visits and its recordings share a session. Each has its own
+ *    switch (`POSTHOG_REPLAY`, `POSTHOG_ANALYTICS`); `before_send` drops
+ *    every event that is not a recording or a page visit, and each of
+ *    those while its switch is off.
  *    - Workspace ({@link replayConfig}): all text is masked but what is
  *      marked `data-ph-unmask` (Saroh's own fixed words); images, media,
  *      frames and anything marked `data-ph-block` are left out.
@@ -56,6 +62,7 @@ export interface BrowserSdkInstance {
     ): unknown;
     startSessionRecording(override?: { sampling?: boolean } | true): void;
     stopSessionRecording(): void;
+    capture(event: string, properties?: Record<string, unknown>): unknown;
 }
 
 /** The part of posthog-js this file uses: `init` with a name makes an instance. */
@@ -84,6 +91,11 @@ export interface BrowserTrackingOptions {
     replay?: string | undefined;
     /** `POSTHOG_REPLAY_SAMPLE`: a share from 0 to 1, or unset for the default. */
     replaySample?: string | undefined;
+    /**
+     * `POSTHOG_ANALYTICS`: page visits are sent only when this is "on"
+     * (DEC-160), and then only where a recording would be allowed too.
+     */
+    analytics?: string | undefined;
 }
 
 /* ------------------------------------------------------------------ *
@@ -267,7 +279,10 @@ export function maskWorkspaceAttribute(
 export interface ReplayFacts {
     /** Which app is asking. Only the workspace ("application") may record. */
     app: TrackedApp;
-    /** `POSTHOG_REPLAY`. */
+    /**
+     * The switch being asked about: `POSTHOG_REPLAY` for a recording,
+     * `POSTHOG_ANALYTICS` for page visits. Every other rule is the same.
+     */
     replay: string | undefined;
     /** The person's saved choice. Anything but `true` is no. */
     sharesUsage: boolean | null | undefined;
@@ -329,7 +344,7 @@ function asksNotToBeTracked(
 export interface SiteReplayFacts {
     /** Which app is asking. Only saroh.in ("web") may record this way. */
     app: TrackedApp;
-    /** `POSTHOG_REPLAY`. */
+    /** The switch asked about: `POSTHOG_REPLAY` or `POSTHOG_ANALYTICS`. */
     replay: string | undefined;
     /**
      * The visitor's answer to the cookie notice's analytics choice, the same
@@ -532,6 +547,56 @@ export function replayBeforeSend(event: SdkEvent | null): SdkEvent | null {
     return clean;
 }
 
+/** Where a person is, and was, as the app named it ({@link BrowserTracking.pageview}). */
+export interface PageRoutes {
+    /** The page on screen: a path, with any query that may be sent. */
+    now?: string | undefined;
+    /** The page before it. */
+    previous?: string | undefined;
+}
+
+/** What the SDK adds about where a session began, and how far a page was scrolled. */
+const ENTRY_PROPERTY =
+    /^\$(?:initial_|session_entry_|prev_pageview_.*(?:scroll|content))/u;
+
+/**
+ * A page visit's last gate (DEC-160): `$pageview` and `$pageleave` only,
+ * and the address in each is the one the **app** named, never the
+ * browser's. The workspace names a route's shape
+ * (`/commerce/orders/[orderId]`), so no record's id, token or business name
+ * leaves; saroh.in names its public path and the query its allow-list
+ * keeps. The tab's title (it names the business), referrers and where the
+ * session began are dropped, and no person property is set.
+ *
+ * Null when the app has named no page: nothing is guessed from the address
+ * bar.
+ */
+export function pageBeforeSend(
+    event: SdkEvent | null,
+    routes: PageRoutes,
+): SdkEvent | null {
+    if (event?.event !== "$pageview" && event?.event !== "$pageleave")
+        return null;
+    if (!routes.now) return null;
+    const clean = withoutPersonalProperties(event);
+    const properties = { ...(clean.properties ?? {}) };
+    for (const key of Object.keys(properties))
+        if (ENTRY_PROPERTY.test(key)) delete properties[key];
+    const origin =
+        typeof properties.$current_url === "string"
+            ? (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/iu.exec(
+                  properties.$current_url,
+              )?.[0] ?? "")
+            : "";
+    const pathOf = (route: string) => route.split(/[?#]/u)[0] ?? "";
+    properties.$current_url = `${origin}${routes.now.split("#")[0] ?? ""}`;
+    properties.$pathname = pathOf(routes.now);
+    // A leave is from the page on screen; a view comes after the one before.
+    const from = event.event === "$pageleave" ? routes.now : routes.previous;
+    if (from) properties.$prev_pageview_pathname = pathOf(from);
+    return { ...clean, properties };
+}
+
 /** The errors instance: exceptions, and nothing else the SDK can do. */
 export function errorsConfig(host: string): Record<string, unknown> {
     return {
@@ -544,6 +609,28 @@ export function errorsConfig(host: string): Record<string, unknown> {
     } satisfies Partial<PostHogConfig>;
 }
 
+/**
+ * The recorder's `maskCapturedNetworkRequestFn`, which posthog-js asks about
+ * two different things:
+ *
+ * - **the page's own address**, as `{ name: url }` and nothing else, for
+ *   rrweb's "meta" event (the address, the width and the height). A
+ *   recording whose meta event is missing plays back as a blank black
+ *   screen: the player never learns the page's size, so it never shows it.
+ *   Answering null here drops that event (DEV_LEARNINGS, 14 Oct 2026). So
+ *   the address is answered, without its query string or fragment.
+ * - **a request the page made**, with its timing and more beside the
+ *   `name`. Never recorded: null.
+ */
+export function replayAddressOnly(
+    request: { name?: unknown } | null | undefined,
+): { name: string } | null {
+    if (!request || typeof request.name !== "string") return null;
+    const keys = Object.keys(request);
+    if (keys.length !== 1 || keys[0] !== "name") return null;
+    return { name: request.name.split(/[?#]/u)[0] ?? "" };
+}
+
 /** What both recorders share: inputs masked, no network, no console. */
 function recorderBasics(sampleRate: number) {
     return {
@@ -554,7 +641,7 @@ function recorderBasics(sampleRate: number) {
         // No request or response of the page's own is ever recorded.
         recordHeaders: false,
         recordBody: false,
-        maskCapturedNetworkRequestFn: () => null,
+        maskCapturedNetworkRequestFn: replayAddressOnly as never,
         recordCrossOriginIframes: false,
         collectFonts: false,
         captureCanvas: { recordCanvas: false },
@@ -642,8 +729,10 @@ export interface BrowserTracking {
     /** Internal ids sent beside each error. Never a name or an email. */
     setIdentity(ids: { userId?: string; organizationId?: string }): void;
     /**
-     * Start recording if every rule holds ({@link replayDecision}); resolves
-     * whether it started. Safe to call again when a fact changes.
+     * Start what every rule allows ({@link replayDecision}): the recording
+     * (`POSTHOG_REPLAY`), page visits (`POSTHOG_ANALYTICS`), or both;
+     * resolves whether anything started. Safe to call again when a fact
+     * changes.
      */
     startReplay(
         facts: Omit<
@@ -657,9 +746,10 @@ export interface BrowserTracking {
             },
     ): Promise<boolean>;
     /**
-     * saroh.in's: start recording if every rule holds
-     * ({@link siteReplayDecision}); resolves whether it started. Call again
-     * when the visitor's answer changes: anything but "granted" stops it.
+     * saroh.in's: start what every rule allows ({@link siteReplayDecision}):
+     * the recording, page visits, or both; resolves whether anything
+     * started. Call again when the visitor's answer changes: anything but
+     * "granted" stops it.
      */
     startSiteReplay(
         facts: Pick<SiteReplayFacts, "consent" | "teamBrowser"> &
@@ -668,8 +758,17 @@ export interface BrowserTracking {
             >,
     ): Promise<boolean>;
     /**
-     * Stop recording at once (the person opted out, left the shell, or took
-     * their consent back).
+     * Name the page on screen (DEC-160): a path, as it may be sent. The
+     * workspace gives the route's shape (`/commerce/orders/[orderId]`),
+     * saroh.in its public path. A `$pageview` is sent for it once, and only
+     * while page visits are allowed (`startReplay` or `startSiteReplay`
+     * said so); named earlier, it is sent when they first are. Never
+     * guessed from the address bar: no call, no page visit.
+     */
+    pageview(route: string): void;
+    /**
+     * Stop recording and counting at once (the person opted out, left the
+     * shell, or took their consent back).
      */
     stopReplay(): void;
 }
@@ -709,29 +808,82 @@ export function createBrowserTracking(
     // recorder when the person opted out never begins.
     let replayTurn = 0;
 
-    /** Load the SDK and the recorder, make the instance once, and record. */
+    /** What the usage instance may send right now; read at every send. */
+    let live = { record: false, count: false };
+    /** The pages the app has named: what a page visit says, and nothing else. */
+    const routes: PageRoutes = {};
+    /** The page the app last named, sent or not yet. */
+    let wanted: string | undefined;
+
+    /** The usage instance's last gate: a recording, a page visit, or nothing. */
+    const gate = (event: SdkEvent | null): SdkEvent | null => {
+        if (event?.event === "$snapshot")
+            return live.record ? replayBeforeSend(event) : null;
+        return live.count ? pageBeforeSend(event, routes) : null;
+    };
+
+    /** Send the page the app named, once the instance may count visits. */
+    const sendPage = () => {
+        if (!live.count || !replay || !wanted || wanted === routes.now) return;
+        routes.previous = routes.now;
+        routes.now = wanted;
+        try {
+            replay.capture("$pageview");
+        } catch {
+            // The SDK is gone or failing: a visit is not worth an error.
+        }
+    };
+
+    /**
+     * Load the SDK (and the recorder, when a recording is allowed), make the
+     * instance once, then record and count as allowed.
+     */
     const begin = async (
         who: string,
+        allowed: { record: boolean; count: boolean },
         config: () => Record<string, unknown>,
     ): Promise<boolean> => {
-        if (!options.loadRecorder) return false;
-        if (recording && replayUser === who) return true;
+        const { record, count } = allowed;
+        if (!record && !count) return false;
+        if (replay && replayUser === who && live.record === record) {
+            live = { record, count };
+            sendPage();
+            return true;
+        }
         const turn = ++replayTurn;
         try {
             const [loaded] = await Promise.all([
                 loadSdk(),
-                options.loadRecorder(),
+                record ? options.loadRecorder?.() : undefined,
             ]);
             if (turn !== replayTurn) return false;
             // One instance per page: who it is about is fixed when it is made.
             if (!replay || replayUser !== who) {
-                replay = loaded.init(key, config(), `saroh_replay_${turn}`);
+                replay = loaded.init(
+                    key,
+                    {
+                        ...config(),
+                        // Without a recording there is nothing to ask the
+                        // project about: no request at start-up.
+                        advanced_disable_flags: !record,
+                        // `$pageleave` when the tab goes; `$pageview` is
+                        // sent by hand, when the app names the page.
+                        capture_pageleave: count,
+                        before_send: gate,
+                    },
+                    `saroh_replay_${turn}`,
+                );
                 replayUser = who;
+                // A new instance knows no page yet.
+                routes.now = undefined;
+                routes.previous = undefined;
             }
             if (!replay) return false;
+            live = { record, count };
             // No override: the sample rate decides whether this session is kept.
-            replay.startSessionRecording();
-            recording = true;
+            if (record) replay.startSessionRecording();
+            recording = record;
+            sendPage();
             return true;
         } catch {
             return false;
@@ -825,13 +977,22 @@ export function createBrowserTracking(
                 app,
                 replay: options.replay,
             });
-            if (!decision.record || !options.loadRecorder || !facts.userId) {
+            // Page visits: the same rules, asked of their own switch.
+            const counting = replayDecision({
+                ...browserPrivacySignals(),
+                ...facts,
+                app,
+                replay: options.analytics,
+            });
+            const record = decision.record && Boolean(options.loadRecorder);
+            if ((!record && !counting.record) || !facts.userId) {
                 tracking.stopReplay();
                 return false;
             }
             const userId = facts.userId;
             const sample = replaySampleRate(options.replaySample);
-            return begin(userId, () => ({
+            const allowed = { record, count: counting.record };
+            return begin(userId, allowed, () => ({
                 ...replayConfig(host, userId, sample),
                 loaded: (instance: {
                     register?: (p: Record<string, unknown>) => void;
@@ -853,12 +1014,20 @@ export function createBrowserTracking(
                 app,
                 replay: options.replay,
             });
-            if (!decision.record || !options.loadRecorder) {
+            const counting = siteReplayDecision({
+                ...browserPrivacySignals(),
+                ...facts,
+                app,
+                replay: options.analytics,
+            });
+            const record = decision.record && Boolean(options.loadRecorder);
+            if (!record && !counting.record) {
                 tracking.stopReplay();
                 return false;
             }
             const sample = replaySampleRate(options.replaySample);
-            return begin(ANONYMOUS, () => ({
+            const allowed = { record, count: counting.record };
+            return begin(ANONYMOUS, allowed, () => ({
                 ...siteReplayConfig(host, sample),
                 loaded: (instance: {
                     register?: (p: Record<string, unknown>) => void;
@@ -866,8 +1035,15 @@ export function createBrowserTracking(
             }));
         },
 
+        pageview(route) {
+            wanted = route.startsWith("/") ? route.slice(0, 300) : undefined;
+            sendPage();
+        },
+
         stopReplay() {
             replayTurn += 1;
+            // Nothing more leaves, whatever the SDK still tries to send.
+            live = { record: false, count: false };
             if (!recording) return;
             recording = false;
             try {

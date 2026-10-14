@@ -205,7 +205,7 @@ describe("a recording of a workspace screen", () => {
 
     it("reads the notice that says it is being recorded", () => {
         expect(recorded().join(" ")).toContain(
-            "We record how Saroh is used to make it easier.",
+            "We record how Saroh is used and which pages are opened, to make it easier.",
         );
     });
 
