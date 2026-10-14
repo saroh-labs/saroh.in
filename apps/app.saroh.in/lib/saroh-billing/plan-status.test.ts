@@ -133,8 +133,8 @@ describe("planMessage: one message at a time", () => {
 describe("billingRules", () => {
     it("says nothing of yearly when the catalogue has no yearly billing", () => {
         expect(billingRules(false)).toEqual([
-            "Plans are paid monthly by autopay. Each autopay you approve covers 12 monthly charges; before it runs out, we ask you to approve the next one.",
-            "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount; until you do, you keep paying the price you have.",
+            "Plans are paid monthly by autopay. Each autopay you approve covers 12 monthly charges. Before it runs out, we ask you to approve the next one.",
+            "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount. Until you do, you keep paying the price you have.",
             "Upgrades start today. A cheaper plan or Free starts when what you've paid for ends.",
         ]);
         expect(billingRules(false).join(" ")).not.toMatch(/yearly/i);

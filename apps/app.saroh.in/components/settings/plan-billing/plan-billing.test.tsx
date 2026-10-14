@@ -398,10 +398,10 @@ describe("How billing works", () => {
             "Your autopay covers 12 monthly charges, to 31 Dec 2027. Before it runs out, we ask you to approve the next one.",
         );
         expect(said).toContain(
-            "Plans are paid monthly by autopay. Each autopay you approve covers 12 monthly charges; before it runs out, we ask you to approve the next one.",
+            "Plans are paid monthly by autopay. Each autopay you approve covers 12 monthly charges. Before it runs out, we ask you to approve the next one.",
         );
         expect(said).toContain(
-            "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount; until you do, you keep paying the price you have.",
+            "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount. Until you do, you keep paying the price you have.",
         );
         expect(said).not.toMatch(/\bterm\b|price doesn't change/i);
         expect(said).toContain(

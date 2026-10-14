@@ -153,8 +153,8 @@ export function billingRules(yearly: boolean, charges = 12): string[] {
     return [
         yearly
             ? `Monthly is autopay, and each one you approve covers ${charges} monthly charges. Yearly is one payment for the year. Before either runs out, we ask you to approve the next one.`
-            : `Plans are paid monthly by autopay. Each autopay you approve covers ${charges} monthly charges; before it runs out, we ask you to approve the next one.`,
-        "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount; until you do, you keep paying the price you have.",
+            : `Plans are paid monthly by autopay. Each autopay you approve covers ${charges} monthly charges. Before it runs out, we ask you to approve the next one.`,
+        "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount. Until you do, you keep paying the price you have.",
         "Upgrades start today. A cheaper plan or Free starts when what you've paid for ends.",
     ];
 }

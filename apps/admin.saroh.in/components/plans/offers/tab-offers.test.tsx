@@ -118,8 +118,8 @@ describe("the Offers tab", () => {
         const card = screen.getByRole("region", { name: "Autopay" });
         const field = within(card).getByLabelText(
             "Monthly charges one autopay covers",
-        ) as HTMLInputElement;
-        expect(field.value).toBe("12");
+        );
+        expect((field as HTMLInputElement).value).toBe("12");
         fireEvent.focus(field);
         fireEvent.change(field, { target: { value: "60" } });
         fireEvent.blur(field);
@@ -137,15 +137,15 @@ describe("the Offers tab", () => {
         draw();
         const field = screen.getByLabelText(
             "Monthly charges one autopay covers",
-        ) as HTMLInputElement;
+        );
         fireEvent.focus(field);
         fireEvent.change(field, { target: { value: "5000" } });
         fireEvent.blur(field);
-        expect(field.value).toBe("1200");
+        expect((field as HTMLInputElement).value).toBe("1200");
         fireEvent.focus(field);
         fireEvent.change(field, { target: { value: "1" } });
         fireEvent.blur(field);
-        expect(field.value).toBe("2");
+        expect((field as HTMLInputElement).value).toBe("2");
     });
 
     it("puts a yearly count over 12 back to 12 on leaving the field", () => {
