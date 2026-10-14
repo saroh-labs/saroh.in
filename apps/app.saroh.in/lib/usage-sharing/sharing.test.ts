@@ -23,6 +23,21 @@ describe("replaySwitchedOn (DEC-125)", () => {
         ])
             expect(replaySwitchedOn(settings)).toBe(false);
     });
+
+    it("is on where only page visits are (DEC-160): the choice covers both", () => {
+        expect(
+            replaySwitchedOn({ key: "phc_x", replay: "off", analytics: "on" }),
+        ).toBe(true);
+        expect(
+            replaySwitchedOn({ key: "phc_x", replay: "on", analytics: "off" }),
+        ).toBe(true);
+        for (const settings of [
+            { key: undefined, replay: "off", analytics: "on" },
+            { key: "phc_x", replay: "off", analytics: "off" },
+            { key: "phc_x", replay: undefined, analytics: "true" },
+        ])
+            expect(replaySwitchedOn(settings)).toBe(false);
+    });
 });
 
 describe("sharesUsageNow", () => {
@@ -80,7 +95,7 @@ describe("the one-time notice (DEC-125, 10 Oct)", () => {
         expect(
             `${USAGE_NOTICE.body} ${USAGE_NOTICE.turnOff} ${USAGE_NOTICE.settings}.`,
         ).toBe(
-            "We record how Saroh is used to make it easier. Your customers' details and anything you type are hidden. Turn it off in Settings › Your profile.",
+            "We record how Saroh is used and which pages are opened, to make it easier. Your customers' details and anything you type are hidden. Turn it off in Settings › Your profile.",
         );
         expect(USAGE_NOTICE.href).toBe("/settings/profile");
     });

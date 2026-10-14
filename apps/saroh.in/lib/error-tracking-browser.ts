@@ -21,4 +21,6 @@ export const browserTracking = createBrowserTracking({
     replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
     replaySample: env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
     loadRecorder: () => import("posthog-js/dist/posthog-recorder"),
+    // Page visits (DEC-160): off unless this is "on"; the same consent.
+    analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
 });

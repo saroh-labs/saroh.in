@@ -154,7 +154,7 @@ describe("the notice comes before the recording", () => {
     it("says what the owner wrote, with the way to turn it off", () => {
         act(() => root.render(<Page noticeDue noticeSeen={false} />));
         expect(notice()?.textContent).toBe(
-            "We record how Saroh is used to make it easier. Your customers' details and anything you type are hidden. Turn it off in Settings › Your profile.Got it",
+            "We record how Saroh is used and which pages are opened, to make it easier. Your customers' details and anything you type are hidden. Turn it off in Settings › Your profile.Got it",
         );
         const link = notice()?.querySelector("a");
         expect(link?.getAttribute("href")).toBe("/settings/profile");
