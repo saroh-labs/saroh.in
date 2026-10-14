@@ -305,9 +305,16 @@ export async function expectNoWayToPlans(page: Page): Promise<void> {
             .getByRole("link", { name: /^Plan and billing/ }),
     ).toHaveCount(0);
     await expectNotOffered(page, "See plans");
-    await expect(page.getByRole("region", { name: "Change plan" })).toHaveCount(
-        0,
-    );
+    await expect(
+        page.getByRole("region", { name: "Current plan" }),
+    ).toHaveCount(0);
+    await page.goto("/settings/billing/plans");
+    await expect(
+        page.getByRole("heading", {
+            name: "You can't open Plan and billing",
+        }),
+    ).toBeVisible();
+    await expect(page.getByRole("region", { name: "Plans" })).toHaveCount(0);
 }
 
 /** What someone who reads Plan and billing but can't change it reads there. */
@@ -315,10 +322,11 @@ export const PLAN_READ_ONLY = `Your role can read the plan but not change it. ${
 
 /**
  * Plan and billing is this role's to read and the owner's to change
- * (DEC-131, amended 2026-10-11): the page opens with the plan, the plans
- * and Saroh's invoices, says only the owner can change it, and offers no
- * control that would. No plan's button, no coupon, no payment method to
- * change, no payment to carry on, and every add-on control off.
+ * (DEC-131, amended 2026-10-11): the page opens with the plan and Saroh's
+ * invoices, says only the owner can change it, and offers no control that
+ * would: no "Change plan", no payment method to change, no payment to
+ * carry on, and every add-on control off. Saroh's plans are one link away
+ * to read, with no plan's button and no coupon.
  */
 export async function expectPlanReadOnly(page: Page): Promise<void> {
     await page.goto("/settings/billing");
@@ -339,22 +347,36 @@ export async function expectPlanReadOnly(page: Page): Promise<void> {
     await expect(plan.getByRole("link")).toHaveCount(0);
     await expect(plan.getByText(/^Checking your payment/)).toHaveCount(0);
 
-    // The plans are there to read. The only control is Monthly or Yearly,
-    // which changes what is shown and nothing else.
-    const picker = page.getByRole("region", { name: "Change plan" });
+    // The plan it's on, with no button: a link to read Saroh's plans.
+    const current = page.getByRole("region", { name: "Current plan" });
+    await expect(
+        current.getByRole("link", { name: /^(Change plan|See plans)$/ }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Coupon" })).toHaveCount(0);
+
+    // The plans are there to read, on the next screen. The only control
+    // is Monthly or Yearly, which changes what is shown and nothing else.
+    await current.getByRole("link", { name: "See Saroh's plans" }).click();
+    await expect(
+        page.getByRole("heading", { name: "Saroh's plans", level: 1 }),
+    ).toBeVisible();
+    const picker = page.getByRole("region", { name: "Plans" });
     await expect(
         picker.getByText("These are Saroh's plans and what each is for."),
     ).toBeVisible();
     await expect(
         picker.getByRole("button", {
-            name: /^(Upgrade|Switch|Start |Keep |Bill (yearly|monthly))/,
+            name: /^(Upgrade to |Move to |Start |Keep |Bill (yearly|monthly))/,
         }),
     ).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Coupon" })).toHaveCount(0);
     await expect(page.getByLabel("Coupon code")).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    // Add-ons, where the plan has any, are read: every control is off.
+    // Back on Plan and billing: add-ons, where the plan has any, are read,
+    // every control off.
+    await page.getByRole("link", { name: "Back to Plan and billing" }).click();
+    await expect(page.getByRole("region", { name: "Your plan" })).toBeVisible();
     for (const control of await page
         .getByRole("region", { name: "Add-ons" })
         .getByRole("button")

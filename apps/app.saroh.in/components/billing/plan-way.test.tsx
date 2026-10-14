@@ -22,7 +22,7 @@ import {
 } from "./plan-way";
 
 const WHO = "The owner can change the plan in Settings › Plan and billing.";
-const HREF = "/settings/billing?plan=grow#change-plan";
+const HREF = "/settings/billing/plans?plan=grow";
 
 const as = (canChangePlan: boolean, node: React.ReactNode) =>
     renderToStaticMarkup(
@@ -74,7 +74,7 @@ describe("who may open Plan and billing, and who may change the plan", () => {
 
     it("knows a link to the plans from any other", () => {
         expect(isPlanHref(HREF)).toBe(true);
-        expect(isPlanHref("/settings/billing#change-plan")).toBe(true);
+        expect(isPlanHref("/settings/billing/plans")).toBe(true);
         expect(isPlanHref("/settings/providers")).toBe(false);
         expect(isPlanHref(null)).toBe(false);
     });

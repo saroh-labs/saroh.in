@@ -202,7 +202,7 @@ describe("RolesTab where the plan leaves roles of your own off (UX-030)", () => 
     const lock = {
         line: "Roles of your own come with Plan B.",
         cta: "See Plan B",
-        href: "/settings/billing?plan=b#change-plan",
+        href: "/settings/billing/plans?plan=b",
     };
     const renderLocked = (rolesLock: typeof lock | null) =>
         renderToString(
@@ -221,7 +221,7 @@ describe("RolesTab where the plan leaves roles of your own off (UX-030)", () => 
     it("puts the way up where New role was, rather than a refused dialog", () => {
         const html = renderLocked(lock);
         expect(html).toContain("Roles of your own come with Plan B.");
-        expect(html).toContain('href="/settings/billing?plan=b#change-plan"');
+        expect(html).toContain('href="/settings/billing/plans?plan=b"');
         expect(html).toContain("See Plan B");
         expect(html).not.toContain("New role");
     });

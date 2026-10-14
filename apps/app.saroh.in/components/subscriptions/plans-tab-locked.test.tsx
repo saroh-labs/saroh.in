@@ -91,7 +91,7 @@ const LOCK: OnlinePaymentsLock = {
     title: "Memberships come with Plan B",
     body: "You're on Plan A. Members you already have keep renewing. Your plans stay here to edit or archive, but they're off your site, and new plans can't go on sale until you move to Plan B.",
     cta: "See Plan B",
-    href: "/settings/billing?plan=b#change-plan",
+    href: "/settings/billing/plans?plan=b",
 };
 
 function plan(over: Partial<Plan> = {}): Plan {
@@ -169,7 +169,7 @@ describe("the Plans tab without memberships on the plan", () => {
             "Members you already have keep renewing.",
         );
         const way = host.querySelector<HTMLAnchorElement>(
-            'a[href="/settings/billing?plan=b#change-plan"]',
+            'a[href="/settings/billing/plans?plan=b"]',
         );
         expect(way?.textContent).toBe("See Plan B");
         expect(buttons()).not.toContain("New plan");

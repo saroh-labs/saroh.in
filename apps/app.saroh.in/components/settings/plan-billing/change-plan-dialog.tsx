@@ -81,6 +81,8 @@ export function ChangePlanDialog({
     currentPlan,
     onCouponRefused,
     onClose,
+    onChanged,
+    returnTo,
 }: {
     picked: PickedPlan | null;
     coupon: string;
@@ -89,8 +91,16 @@ export function ChangePlanDialog({
     /** The coupon couldn't be used: the Coupon card shows why. */
     onCouponRefused: (error: string) => void;
     onClose: () => void;
+    /**
+     * A change was made, or a payment for one started: where to show how
+     * it stands. Left out, the page it was opened on is read again.
+     */
+    onChanged?: () => void;
+    /** The address the browser's Back returns to from the provider's page. */
+    returnTo?: string;
 }) {
     const router = useRouter();
+    const changed = onChanged ?? (() => router.refresh());
     // Paying: hidden while Razorpay's window is up (a dialog over it would
     // trap its focus), then back to say it's confirming.
     const [paying, setPaying] = useState<"no" | "away" | "confirming">("no");
@@ -188,7 +198,7 @@ export function ChangePlanDialog({
                         : `You're on ${picked.name} from today.`,
                 );
                 onClose();
-                router.refresh();
+                changed();
                 return;
             }
             if (res.data.handoff) {
@@ -203,6 +213,7 @@ export function ChangePlanDialog({
                     if (state !== "waiting") {
                         setPaying("no");
                         onClose();
+                        onChanged?.();
                     }
                     return;
                 }
@@ -210,7 +221,7 @@ export function ChangePlanDialog({
                     // Kept: "Your plan" offers to continue the same payment.
                     setPaying("no");
                     onClose();
-                    router.refresh();
+                    changed();
                     return;
                 }
                 setPaying("no");
@@ -221,10 +232,12 @@ export function ChangePlanDialog({
                     "Your plan change is kept under Your plan: continue it from there.",
                 );
                 onClose();
-                router.refresh();
+                changed();
                 return;
             }
-            // Given once and kept nowhere: straight to the browser.
+            // Given once and kept nowhere: straight to the browser. Coming
+            // back lands where the payment's standing is said.
+            if (returnTo) window.history.replaceState(null, "", returnTo);
             window.location.assign(res.data.authorisationUrl);
         });
     }
@@ -238,7 +251,7 @@ export function ChangePlanDialog({
                     if (!open && still) {
                         setPaying("no");
                         onClose();
-                        router.refresh();
+                        changed();
                     }
                 }}
             >
@@ -282,7 +295,7 @@ export function ChangePlanDialog({
                                 onClick={() => {
                                     setPaying("no");
                                     onClose();
-                                    router.refresh();
+                                    changed();
                                 }}
                             >
                                 Done

@@ -220,7 +220,7 @@ describe("off and limit", () => {
             full: true,
             label: "10 of 10 products",
             reason: "Your plan holds 10 products. You can't add more.",
-            href: "/settings/billing?plan=grow#change-plan",
+            href: "/settings/billing/plans?plan=grow",
             upgradeTo: "Grow",
         };
         const markup = html(<ProductLimitReached meter={meter} />);

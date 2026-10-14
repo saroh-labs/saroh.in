@@ -318,7 +318,7 @@ describe("readyChecklist", () => {
             label: "Take payment online",
             comesWith: "Comes with a paid plan",
             cta: "See plans",
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
         });
         expect(r.outside[0]?.why).toMatch(/How to pay us/);
         // The heading stays about money.
@@ -332,7 +332,7 @@ describe("readyChecklist", () => {
         });
         expect(named.outside[0]).toMatchObject({
             comesWith: "Comes with Plan B",
-            href: "/settings/billing?plan=plan_b#change-plan",
+            href: "/settings/billing/plans?plan=plan_b",
         });
 
         // Payments off and something sells: still the plan, not "Turn on".

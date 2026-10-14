@@ -422,7 +422,7 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
                 why: "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Your customers see their updates only in their account.",
                 comesWith: "Comes with a paid plan",
                 cta: "See plans",
-                href: "/settings/billing#change-plan",
+                href: "/settings/billing/plans",
             },
         ]);
     });

@@ -599,7 +599,7 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
     const lock = {
         comesWith: "Comes with Grow",
         cta: "See Grow",
-        href: "/settings/billing?plan=grow#change-plan",
+        href: "/settings/billing/plans?plan=grow",
         upgrade: "Grow",
         full: false,
     };
@@ -617,7 +617,7 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
         expect(text()).not.toContain("Razorpay or Cashfree");
         expect(
             sheet().querySelector(
-                'a[href="/settings/billing?plan=grow#change-plan"]',
+                'a[href="/settings/billing/plans?plan=grow"]',
             ),
         ).not.toBeNull();
         await press(button(/^Turn on$/));

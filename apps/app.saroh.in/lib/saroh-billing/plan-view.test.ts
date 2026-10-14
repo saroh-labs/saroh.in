@@ -96,7 +96,13 @@ describe("yourPlan", () => {
                 iso: "2026-11-01T00:00:00.000Z",
                 amount: "₹111 + GST",
             },
-            method: "Through Razorpay",
+            method: "Paid through Razorpay",
+            status: [
+                {
+                    lead: "Next charge ₹111 + GST on ",
+                    iso: "2026-11-01T00:00:00.000Z",
+                },
+            ],
             notes: [],
         });
     });
@@ -503,7 +509,7 @@ describe("yourPlan", () => {
 });
 
 describe("pickerRows", () => {
-    it("marks the billed plan, and offers each other as an upgrade or a switch", () => {
+    it("marks the billed plan, and offers each other as an upgrade or a move, named", () => {
         const rows = pickerRows({
             catalog: CATALOG,
             subscription: sub(),
@@ -511,9 +517,59 @@ describe("pickerRows", () => {
             trials: new Set(),
         });
         expect(rows.map((r) => [r.name, r.price, r.current, r.cta])).toEqual([
-            ["Plan A", "₹0", false, "Switch"],
+            [
+                "Plan A",
+                "₹0",
+                false,
+                { label: "Move to Plan A", iso: null, primary: false },
+            ],
             ["Plan B", "₹111 a month + GST", true, null],
-            ["Plan C", "₹222 a month + GST", false, "Upgrade"],
+            [
+                "Plan C",
+                "₹222 a month + GST",
+                false,
+                { label: "Upgrade to Plan C", iso: null, primary: true },
+            ],
+        ]);
+        // The price in two sizes: the amount, then what it is for.
+        expect(rows.map((r) => [r.amount, r.per])).toEqual([
+            ["₹0", ""],
+            ["₹111", "a month + GST"],
+            ["₹222", "a month + GST"],
+        ]);
+    });
+
+    it("shows every line of a plan, not the first few", () => {
+        const many = parseCatalog({
+            ...CATALOG,
+            modules: ["one", "two", "three", "four", "five", "six"].map(
+                (id) => ({
+                    id,
+                    name: id,
+                    group: "g",
+                    what: `${id}.`,
+                    cells: {
+                        a: { inc: false, text: "" },
+                        b: { inc: false, text: "" },
+                        c: { inc: true, text: id, card: `Line ${id}` },
+                    },
+                }),
+            ),
+        });
+        const rows = pickerRows({
+            catalog: many,
+            subscription: sub(),
+            cycle: "month",
+            trials: new Set(),
+        });
+        expect(rows[2].lead).toBe("Everything in Plan B, plus:");
+        expect(rows[2].lines).toEqual([
+            "Line one",
+            "Line two",
+            "Line three",
+            "Line four",
+            "Line five",
+            "Line six",
         ]);
     });
 
@@ -544,7 +600,13 @@ describe("pickerRows", () => {
             given: { planId: "c", until: "2027-12-31T00:00:00.000Z" },
         });
         expect(
-            rows.map((r) => [r.name, r.current, r.cta, r.note, r.what]),
+            rows.map((r) => [
+                r.name,
+                r.current,
+                r.cta?.label ?? null,
+                r.note,
+                r.what,
+            ]),
         ).toEqual([
             [
                 "Plan A",
@@ -553,7 +615,7 @@ describe("pickerRows", () => {
                 { lead: "After ", iso: "2027-12-31T00:00:00.000Z" },
                 "For A.",
             ],
-            ["Plan B", false, "Switch", null, "For B."],
+            ["Plan B", false, "Move to Plan B", null, "For B."],
             [
                 "Plan C",
                 true,
@@ -575,9 +637,16 @@ describe("pickerRows", () => {
             trials: new Set(["c"]),
         });
         expect(trial[2]).toMatchObject({
-            cta: "Start 14-day trial",
-            what: "For C. · 14-day free trial",
+            cta: { label: "Start 14-day trial", primary: true },
+            what: "For C.",
+            offer: "14-day free trial",
         });
+        // No offer line on a plan this business would get none on.
+        expect(trial.map((r) => r.offer)).toEqual([
+            null,
+            null,
+            "14-day free trial",
+        ]);
     });
 
     it("a first month that costs something is said with its amount, never as a free trial (DEC-093)", () => {
@@ -596,8 +665,9 @@ describe("pickerRows", () => {
             trials: new Set(["c"]),
         });
         expect(month[2]).toMatchObject({
-            cta: "Start with the first month",
-            what: "For C. · first month ₹7 + GST",
+            cta: { label: "Start with the first month", primary: true },
+            what: "For C.",
+            offer: "First month ₹7 + GST",
         });
         // Yearly is one payment: no trial on it.
         const year = pickerRows({
@@ -606,7 +676,11 @@ describe("pickerRows", () => {
             cycle: "year",
             trials: new Set(["c"]),
         });
-        expect(year[2]).toMatchObject({ cta: "Upgrade", what: "For C." });
+        expect(year[2]).toMatchObject({
+            cta: { label: "Upgrade to Plan C" },
+            what: "For C.",
+            offer: null,
+        });
     });
 
     it("prices yearly by the catalogue's rule, and offers billing the plan yearly", () => {
@@ -616,11 +690,17 @@ describe("pickerRows", () => {
             cycle: "year",
             trials: new Set(),
         });
-        expect(rows.map((r) => [r.price, r.current, r.cta])).toEqual([
-            ["₹0", false, "Switch"],
+        expect(
+            rows.map((r) => [r.price, r.current, r.cta?.label ?? null]),
+        ).toEqual([
+            ["₹0", false, "Move to Plan A"],
             ["₹1,110 a year + GST", false, "Bill yearly"],
-            ["₹2,220 a year + GST", false, "Upgrade"],
+            ["₹2,220 a year + GST", false, "Upgrade to Plan C"],
         ]);
+        expect(rows[1]).toMatchObject({
+            amount: "₹1,110",
+            per: "a year + GST",
+        });
         expect(yearlyOffer(CATALOG)).toEqual({ on: true, freeMonths: 2 });
         expect(
             yearlyOffer({ ...CATALOG, yearly: { on: false, paid: 10 } }),
@@ -634,10 +714,16 @@ describe("pickerRows", () => {
             cycle: "month",
             trials: new Set(["c"]),
         });
-        expect(rows.map((r) => r.cta)).toEqual([
+        // From Free a paid plan is started, not upgraded to.
+        expect(rows.map((r) => r.cta?.label ?? null)).toEqual([
             null,
-            "Upgrade",
+            "Start Plan B",
             "Start 14-day trial",
+        ]);
+        expect(rows.map((r) => r.cta?.primary ?? null)).toEqual([
+            null,
+            true,
+            true,
         ]);
     });
 });
@@ -672,17 +758,19 @@ describe("pickerRows: when a change would start (DEC-159)", () => {
         expect(rows.map((r) => [r.name, r.cta, r.note])).toEqual([
             [
                 "Plan A",
-                "Switch",
+                // Moving down is the quiet button, and says its date.
+                { label: "Move to Plan A from ", iso: END, primary: false },
                 {
                     lead: "From ",
                     iso: END,
                     tail: ": you keep Plan B until then.",
+                    brief: "You keep Plan B until then.",
                 },
             ],
             ["Plan B", null, null],
             [
                 "Plan C",
-                "Upgrade",
+                { label: "Upgrade to Plan C", iso: null, primary: true },
                 { lead: "Starts today: ₹65.49 now (incl. GST)", iso: null },
             ],
         ]);
@@ -724,15 +812,16 @@ describe("pickerRows: when a change would start (DEC-159)", () => {
             ]),
         });
         expect(up[2]).toMatchObject({
-            cta: "Upgrade",
+            cta: { label: "Upgrade to Plan C", iso: null, primary: true },
             what: "For C.",
+            offer: null,
             note: {
                 lead: "Starts today: ₹261.96 now (incl. GST). Your first month on Plan B ends.",
                 iso: null,
             },
         });
         expect(up[0]).toMatchObject({
-            cta: "Switch",
+            cta: { label: "Move to Plan A from ", iso: END, primary: false },
             note: {
                 lead: "From ",
                 iso: END,
@@ -758,8 +847,9 @@ describe("pickerRows: when a change would start (DEC-159)", () => {
             ]),
         });
         expect(down[1]).toMatchObject({
-            cta: "Switch",
+            cta: { label: "Move to Plan B from ", iso: END, primary: false },
             what: "For B.",
+            offer: null,
             note: {
                 lead: "From ",
                 iso: END,
@@ -781,10 +871,23 @@ describe("pickerRows: when a change would start (DEC-159)", () => {
             ]),
             waiting: { planId: "b", iso: END, cycle: "month" },
         });
-        expect(rows.map((r) => [r.name, r.cta, r.note?.tail ?? null])).toEqual([
-            ["Plan A", "Switch", ": you keep Plan C until then."],
-            ["Plan B", null, ": you keep Plan C until then."],
-            ["Plan C", null, null],
+        expect(
+            rows.map((r) => [
+                r.name,
+                r.cta?.label ?? null,
+                r.scheduled,
+                r.note?.tail ?? null,
+            ]),
+        ).toEqual([
+            [
+                "Plan A",
+                "Move to Plan A from ",
+                null,
+                ": you keep Plan C until then.",
+            ],
+            // The plan the change waits for: its date, and no button.
+            ["Plan B", null, END, ": you keep Plan C until then."],
+            ["Plan C", null, null, null],
         ]);
         // Authorised monthly: the yearly row of the same plan still offers.
         const year = pickerRows({
@@ -795,7 +898,11 @@ describe("pickerRows: when a change would start (DEC-159)", () => {
             now: NOW,
             waiting: { planId: "b", iso: END, cycle: "month" },
         });
-        expect(year[1]).toMatchObject({ cta: "Switch", note: null });
+        expect(year[1]).toMatchObject({
+            cta: { label: "Move to Plan B" },
+            scheduled: null,
+            note: null,
+        });
     });
 
     it("says nothing of timing without a quote, or once the date has passed", () => {
@@ -810,7 +917,11 @@ describe("pickerRows: when a change would start (DEC-159)", () => {
             ]),
         });
         expect(rows.map((r) => r.note)).toEqual([null, null, null]);
-        expect(rows.map((r) => r.cta)).toEqual(["Switch", null, "Upgrade"]);
+        expect(rows.map((r) => r.cta?.label ?? null)).toEqual([
+            "Move to Plan A",
+            null,
+            "Upgrade to Plan C",
+        ]);
     });
 });
 
@@ -924,6 +1035,7 @@ describe("yourPlan: leaving at the end of what is paid (DEC-159)", () => {
         expect(v.next).toEqual({ kind: "ends", iso: END });
         expect(v.notes).toEqual([
             {
+                kind: "move",
                 tone: "info",
                 lead: "Your plan changes to Plan A on ",
                 iso: END,

@@ -20,7 +20,7 @@ vi.mock("next/navigation", () => ({
  * way to the plans for someone who may change the plan, who can as text for
  * anyone else. Only the row's data changes; the one checklist draws it.
  */
-const PLANS = "/settings/billing#change-plan";
+const PLANS = "/settings/billing/plans";
 
 const aside: ReadyAside = {
     key: "payments",

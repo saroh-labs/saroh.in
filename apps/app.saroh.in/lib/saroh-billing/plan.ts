@@ -102,7 +102,7 @@ export interface PlanSummary {
     price: string | null;
     includes: string;
     next: NextCharge;
-    /** How it is paid: "Through Razorpay". Null when nothing is. */
+    /** How it is paid: "Paid through Razorpay". Null when nothing is. */
     method: string | null;
     /** The line along the foot of the card. */
     footnote: string;
@@ -159,7 +159,7 @@ export function planSummary(
     const { plan } = subscription;
     const free = plan.priceCents <= 0;
     const method = subscription.provider
-        ? `Through ${PROVIDER_NAMES[subscription.provider] ?? subscription.provider}`
+        ? `Paid through ${PROVIDER_NAMES[subscription.provider] ?? subscription.provider}`
         : null;
     const base = {
         name: plan.name,
@@ -176,7 +176,7 @@ export function planSummary(
     if (subscription.status === "CANCELLED") {
         return {
             ...base,
-            next: { kind: "text", text: "Nothing. The plan has ended" },
+            next: { kind: "text", text: "Nothing to pay. The plan has ended" },
             warning: `This plan has ended. ${businessName} is back to what Saroh gives every business.`,
         };
     }

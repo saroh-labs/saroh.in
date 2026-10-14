@@ -266,8 +266,8 @@ describe("upgradeLine and upgradeHref", () => {
     });
 
     it("lands on the picker with the plan to look at", () => {
-        expect(upgradeHref("b")).toBe("/settings/billing?plan=b#change-plan");
-        expect(upgradeHref(null)).toBe("/settings/billing#change-plan");
+        expect(upgradeHref("b")).toBe("/settings/billing/plans?plan=b");
+        expect(upgradeHref(null)).toBe("/settings/billing/plans");
     });
 });
 
@@ -320,7 +320,7 @@ describe("onlinePaymentsLock", () => {
             title: "Taking payment online comes with Plan B",
             body: "You're on Plan A. Invoices still go out, as a link to view, and customers pay you another way. Memberships you already have keep renewing.",
             cta: "See Plan B",
-            href: "/settings/billing?plan=b#change-plan",
+            href: "/settings/billing/plans?plan=b",
         });
     });
 
@@ -347,7 +347,7 @@ describe("onlinePaymentsLock", () => {
         expect(lock).toMatchObject({
             title: "Taking payment online isn't in your Plan A plan",
             cta: "See plans",
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
         });
     });
 
@@ -405,7 +405,7 @@ describe("depositLock", () => {
             title: "Deposits are taken online, which comes with Plan B",
             body: 'You\'re on Plan A. Services book "pay at the desk" until then.',
             cta: "See Plan B",
-            href: "/settings/billing?plan=b#change-plan",
+            href: "/settings/billing/plans?plan=b",
         });
         // Plan names only: never a price.
         expect(JSON.stringify(lock)).not.toMatch(/111|₹/);
@@ -464,7 +464,7 @@ describe("membershipPlansLock", () => {
                 title: "Memberships come with Plan B",
                 body: "You're on Plan A. Members you already have keep renewing. Your plans stay here to edit or archive, but they're off your site, and new plans can't go on sale until you move to Plan B.",
                 cta: "See Plan B",
-                href: "/settings/billing?plan=b#change-plan",
+                href: "/settings/billing/plans?plan=b",
             });
         }
     });
@@ -479,7 +479,7 @@ describe("membershipPlansLock", () => {
         ).toMatchObject({
             title: "Memberships aren't in your Plan A plan",
             cta: "See plans",
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
         });
     });
 

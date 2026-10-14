@@ -24,7 +24,7 @@ describe("rolesLock (UX-030)", () => {
             expect(rolesLock(access({ modules: [roles(state)] }))).toEqual({
                 line: "Roles of your own come with Plan B.",
                 cta: "See Plan B",
-                href: "/settings/billing?plan=b#change-plan",
+                href: "/settings/billing/plans?plan=b",
             });
         }
     });
@@ -52,7 +52,7 @@ describe("rolesLock (UX-030)", () => {
         ).toEqual({
             line: "Roles of your own come with Plan C.",
             cta: "See Plan C",
-            href: "/settings/billing?plan=c#change-plan",
+            href: "/settings/billing/plans?plan=c",
         });
     });
 

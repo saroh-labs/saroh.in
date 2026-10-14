@@ -62,7 +62,7 @@ describe("planMeter", () => {
         );
         expect(m?.full).toBe(true);
         expect(m?.reason).toContain("Your plan holds 10 products.");
-        expect(m?.href).toBe("/settings/billing?plan=b#change-plan");
+        expect(m?.href).toBe("/settings/billing/plans?plan=b");
     });
 
     it("is nothing when limits aren't enforced, uncapped or soft", () => {
