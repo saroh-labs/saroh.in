@@ -4,7 +4,6 @@ import {
     MOVE_NOTICE_DAYS,
     moveDateFor,
     moveNoticeDays,
-    PRICE_NOTICE_DAYS,
 } from "@saroh/pricing-catalog";
 
 /**
@@ -12,7 +11,7 @@ import {
  * is published with policy `move`, every subscription on an older catalogue
  * version gets a pending move to the same plan and cycle on the new version,
  * at its first billing date at least {@link MOVE_NOTICE_DAYS} days after the
- * version goes live — {@link PRICE_NOTICE_DAYS} when the price it pays
+ * version goes live — `PRICE_NOTICE_DAYS` when the price it pays
  * changes (DEC-161: no price lock, at least 30 days' notice). The renewal
  * path applies it (U15); it is never applied while the version's paid plans
  * aren't at the billing provider, nor at a new amount the business hasn't
