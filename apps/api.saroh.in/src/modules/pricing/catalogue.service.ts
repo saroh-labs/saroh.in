@@ -138,6 +138,7 @@ function nothingPublished(next: Catalog): Catalog {
         modules: [],
         yearly: { on: false, paid: next.yearly.paid },
         gst: next.gst,
+        autopay: next.autopay,
         addons: [],
     };
 }

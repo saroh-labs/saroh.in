@@ -87,6 +87,15 @@ describe("diff", () => {
         ]);
     });
 
+    it("words a change to how many charges one autopay covers", () => {
+        const b = edit(fixture(), (c) => {
+            c.autopay = { charges: 60 };
+        });
+        expect(diff(fixture(), b)).toEqual([
+            "One autopay covers 12 → 60 monthly charges",
+        ]);
+    });
+
     it("words where an add-on is offered and how many can be held", () => {
         const b = edit(fixture(), (c) => {
             c.addons[0].plans = ["c", "b"];

@@ -3,6 +3,9 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { dayWords } from "../../common/words-format";
+import { enqueueBillingEmail } from "../billing/billing-email.job";
+import { priceChangeNotice } from "../billing/billing-emails";
+import { priceChangeOf, priceWords } from "../billing/price-change";
 import { businessTimezone } from "../bookings/staff-availability";
 import { noticeOf } from "../notifications/notice-target";
 import type { MoveNoticePayload } from "./moves.service";
@@ -36,14 +39,20 @@ export function moveDateWords(at: Date, zone: string): string {
 }
 
 /**
- * Tell a business, seven days ahead (`MOVE_NOTICE_DAYS`), that its Saroh
- * plan moves to the latest version on that date (`pricing.move.notice`).
+ * Tell a business ahead that its Saroh plan moves to the latest version on
+ * that date (`pricing.move.notice`): 7 days ahead (`MOVE_NOTICE_DAYS`), or
+ * 30 when the price it pays changes (`PRICE_NOTICE_DAYS`, DEC-161).
+ *
+ * A price change says the new amount and the one it pays now, asks the
+ * business to approve the new amount, and says that until it does it keeps
+ * paying the price it has (`billing/price-change.ts`); it goes by email to
+ * its billing people too (`PRICE_CHANGE`). Any other move says only that
+ * the plan changes; what exactly changes is on Settings › Plan.
  *
  * Re-read, then decide: a move cancelled (the version was), replaced (a
  * newer publish moved it again) or already applied says nothing. Once per
  * move, claimed as a `CustomerNotice` before the inbox row is written, so a
- * redelivered job can't tell the business twice. What exactly changes and
- * the price are shown on Settings › Plan (U14); this notice carries neither.
+ * redelivered job can't tell the business twice.
  */
 @Injectable()
 export class MoveNoticeHandler {
@@ -78,6 +87,18 @@ export class MoveNoticeHandler {
         const when = moveDateWords(sub.pendingFrom, zone);
         const eventKey = `plan-move:${p.subscriptionId}:${p.pendingFrom}`;
         const planName = sub.pendingPlan.name;
+        const change = await priceChangeOf(prisma, p);
+        const words = change
+            ? priceChangeNotice({
+                  planName,
+                  changesOn: when,
+                  now: priceWords(change.fromPaise, change.interval),
+                  next: priceWords(change.toPaise, change.interval),
+              })
+            : {
+                  title: `Your ${planName} plan changes on ${when}`,
+                  body: `Saroh has updated its plans. From ${when}, your business is on the latest ${planName} plan.`,
+              };
         await prisma.$transaction(async (tx) => {
             const claim = await tx.customerNotice.createMany({
                 data: [
@@ -95,8 +116,8 @@ export class MoveNoticeHandler {
                     organizationId: sub.organizationId,
                     // It opens Plan and billing.
                     ...noticeOf(PLAN_MOVE_NOTIFICATION_TYPE, {}),
-                    title: `Your ${planName} plan changes on ${when}`,
-                    body: `Saroh has updated its plans. From ${when}, your business is on the latest ${planName} plan.`,
+                    title: words.title,
+                    body: words.body,
                 },
                 select: { id: true },
             });
@@ -104,6 +125,17 @@ export class MoveNoticeHandler {
                 where: { organizationId: sub.organizationId, eventKey },
                 data: { notificationId: notice.id },
             });
+            // A price change is told by email too (the Terms' "at least
+            // 30 days' notice by email"), on the same transaction.
+            if (change) {
+                await enqueueBillingEmail(tx, {
+                    kind: "PRICE_CHANGE",
+                    organizationId: sub.organizationId,
+                    subscriptionId: p.subscriptionId,
+                    pendingPlanId: p.pendingPlanId,
+                    pendingFrom: p.pendingFrom,
+                });
+            }
         });
     };
 }

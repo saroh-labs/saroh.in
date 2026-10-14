@@ -101,10 +101,10 @@ async function wipe() {
     await prisma.plan.deleteMany({});
 }
 
-async function install(catalog: Catalog = TERMS()) {
-    const rows = planRows(catalog, 1);
+async function install(catalog: Catalog = TERMS(), version = 1) {
+    const rows = planRows(catalog, version);
     const { planIds } = await writeCatalogueVersion(prisma, {
-        version: 1,
+        version,
         catalog,
         goLiveAt: new Date(Date.now() - DAY),
         policy: "keep",
@@ -517,6 +517,7 @@ describe("the end of a term", () => {
             endsAt: termEnds.toISOString(),
             payment: "AUTOPAY",
             renewOpen: true,
+            charges: 12,
         });
 
         const q = await checkout.quote(ctx, { plan: "c", cycle: "month" }, now);
@@ -571,5 +572,131 @@ describe("the end of a term", () => {
         const q = await checkout.quote(ctx, { plan: "c", cycle: "month" });
         expect(q.kind).toBe("NONE");
         expect((await checkout.current(ctx)).term?.renewOpen).toBe(false);
+    });
+});
+
+describe("how many charges one autopay covers is a catalogue setting (DEC-161)", () => {
+    it("a version that covers 60: the autopay is made for 60 and runs out 60 months on", async () => {
+        await install(
+            TERMS((c) => {
+                c.autopay = { charges: 60 };
+            }),
+        );
+        const ctx = await business();
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        expect(r.quote).toMatchObject({ payment: "AUTOPAY", termCharges: 60 });
+        expect(fake.createCalls[0]).toMatchObject({ totalCount: 60 });
+        await deliver(`fake_sub_${r.checkout.id}`, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+        const term = (await checkout.current(ctx)).term;
+        const done = await prisma.billingCheckout.findUniqueOrThrow({
+            where: { id: r.checkout.id },
+        });
+        expect(term).toMatchObject({ payment: "AUTOPAY", charges: 60 });
+        expect(term?.endsAt).toBe(
+            addMonthsUtc(done.completedAt ?? done.createdAt, 60).toISOString(),
+        );
+    });
+
+    it("an autopay made on 12 keeps 12 when a later version covers 60", async () => {
+        await install();
+        const ctx = await business();
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        await deliver(`fake_sub_${r.checkout.id}`, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+        await install(
+            TERMS((c) => {
+                c.autopay = { charges: 60 };
+            }),
+            2,
+        );
+        expect((await checkout.current(ctx)).term?.charges).toBe(12);
+        // A business starting now gets the new count.
+        const other = await business();
+        await checkout.changePlan(other, { plan: "c", cycle: "month" });
+        expect(fake.createCalls.at(-1)).toMatchObject({ totalCount: 60 });
+    });
+});
+
+describe("a new price waits for approval (DEC-161)", () => {
+    /** On Plan C v1 at 333, with v2 charging 444 waiting since `due`. */
+    async function waitingForApproval(due: Date) {
+        await install();
+        const ctx = await business();
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        const ref = `fake_sub_${r.checkout.id}`;
+        await deliver(ref, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 5 * DAY),
+        });
+        await install(
+            TERMS((c) => {
+                c.plans[2]!.pricePaise = 44_400;
+            }),
+            2,
+        );
+        const v2 = await prisma.plan.findUniqueOrThrow({
+            where: {
+                key_version_interval: {
+                    key: "catalog.c",
+                    version: 2,
+                    interval: "month",
+                },
+            },
+        });
+        await prisma.subscription.update({
+            where: { organizationId: ctx.organizationId },
+            data: { pendingPlanId: v2.id, pendingFrom: due },
+        });
+        return { ctx, ref, v2 };
+    }
+
+    it("not approved by the date: it keeps paying the price it has, on the plan it has", async () => {
+        const { ctx, ref, v2 } = await waitingForApproval(
+            new Date(Date.now() - DAY),
+        );
+        await sweep.sweep(new Date());
+        const next = new Date(Date.now() + 35 * DAY);
+        await deliver(ref, "charged", { currentPeriodEnd: next });
+        const still = await sub(ctx.organizationId);
+        expect(still).toMatchObject({
+            status: "ACTIVE",
+            plan: { key: "catalog.c", version: 1, priceCents: 33_300 },
+            providerSubscriptionId: ref,
+            pendingPlanId: v2.id,
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: next,
+        });
+        // Nothing told the provider to stop charging.
+        expect(
+            await prisma.job.count({
+                where: { type: BILLING_PROVIDER_CANCEL_TYPE },
+            }),
+        ).toBe(0);
+    });
+
+    it("its autopay runs out while the new price waits: kept to the end of what was paid, then Free", async () => {
+        const { ctx, ref } = await waitingForApproval(
+            new Date(Date.now() - DAY),
+        );
+        const end = new Date(Date.now() + 20 * DAY);
+        await deliver(ref, "completed", { currentPeriodEnd: end });
+        const still = await sub(ctx.organizationId);
+        expect(still).toMatchObject({
+            status: "ACTIVE",
+            plan: { key: "catalog.c", version: 1 },
+            cancelAtPeriodEnd: true,
+            pendingFrom: end,
+        });
+        const free = await prisma.plan.findUniqueOrThrow({
+            where: { id: still.pendingPlanId ?? "" },
+        });
+        expect(free.priceCents).toBe(0);
+        await sweep.sweep(new Date(end.getTime() + DAY));
+        expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.free");
     });
 });

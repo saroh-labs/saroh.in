@@ -2,7 +2,8 @@
  * The words of Saroh's own billing mail to a business (pricing catalogue
  * U17): the invoice for a charge, a payment that failed, a first month
  * (DEC-093) or a free trial about to end, a plan about to renew (#804), a plan that ends on a date
- * (#805), a 12-month term about to end (DEC-100), what a move to a
+ * (#805), an autopay about to run out (DEC-100, DEC-161), a price change
+ * ahead (DEC-161), what a move to a
  * lower plan pauses (#801), and what happens to the business's own domain
  * when its plan stops including one (DEC-139). Pure; every value is
  * escaped, since a business's name is text its owner typed. Merchant
@@ -269,17 +270,21 @@ export function planEndingNotice(input: {
 export type TermPayment = "AUTOPAY" | "ONE_TIME";
 
 /**
- * A 12-month term ends soon (DEC-100): the monthly plan's 12 charges are
- * done, or the year paid for is ending. Asks for the next term's payment
- * at the price now; with none, the plan moves to Free at the end. Sent 30,
- * 7 and 1 days ahead. `price` is the plan's live price before GST, worded
- * ("₹999"), or null when the live catalogue no longer has the plan.
+ * An autopay runs out soon (DEC-100, DEC-161): the monthly charges one
+ * approval covers (`charges`, 12 today) are done, or the year paid for is
+ * ending. Asks the business to approve the next autopay (or pay for the
+ * next year) at the price now; without it, the plan moves to Free at the
+ * end. Sent 30, 7 and 1 days ahead. `price` is the plan's live price before
+ * GST, worded ("₹999"), or null when the live catalogue no longer has the
+ * plan. Never "term": it is not a price promise.
  */
 export function termEndingEmail(input: {
     businessName: string;
     planName: string;
     endsOn: string;
     payment: TermPayment;
+    /** Monthly charges the autopay covers (AUTOPAY only). */
+    charges?: number;
     price: string | null;
     payUrl: string;
     /** The owner chose Free for the end: say so, ask nothing. */
@@ -290,27 +295,40 @@ export function termEndingEmail(input: {
     domain?: DomainWords | null;
 }): RenderedEmail {
     if (input.chosenFree) return freeChosenEmail(input);
-    const done =
-        input.payment === "AUTOPAY"
-            ? `${input.businessName}'s 12 monthly payments for the ${input.planName} plan are done, and its term ends on ${input.endsOn}.`
-            : `The year ${input.businessName} paid for on the ${input.planName} plan ends on ${input.endsOn}.`;
+    if (input.payment === "ONE_TIME") {
+        const price = input.price
+            ? ` The price now is ${input.price} for the year plus GST.`
+            : "";
+        return {
+            subject: `Pay for ${input.businessName}'s next ${input.planName} year by ${input.endsOn}`,
+            html: wrap(
+                `Your ${input.planName} year ends on ${input.endsOn}`,
+                [
+                    `The year ${input.businessName} paid for on the ${input.planName} plan ends on ${input.endsOn}.`,
+                    `To keep ${input.planName}, pay for the next year in Plan and billing. It starts when this one ends.${price}`,
+                    `If you don't pay, ${input.businessName} moves to the Free plan on ${input.endsOn}. Everything you made is kept.`,
+                    ...pausesParagraphs(input.pauses),
+                    ...domainParagraphs(input.domain),
+                ],
+                { label: "Pay for the next year", href: input.payUrl },
+            ),
+        };
+    }
     const price = input.price
-        ? input.payment === "AUTOPAY"
-            ? ` The price now is ${input.price} a month plus GST, for another 12 months.`
-            : ` The price now is ${input.price} for the year plus GST.`
+        ? ` The price now is ${input.price} a month plus GST.`
         : "";
     return {
-        subject: `Pay for ${input.businessName}'s next ${input.planName} term by ${input.endsOn}`,
+        subject: `Approve ${input.businessName}'s next ${input.planName} autopay by ${input.endsOn}`,
         html: wrap(
-            `Your ${input.planName} term ends on ${input.endsOn}`,
+            `Your ${input.planName} autopay runs out on ${input.endsOn}`,
             [
-                done,
-                `To keep ${input.planName}, pay for the next term in Plan and billing. Paying starts your next term when this one ends.${price}`,
-                `If you don't pay, ${input.businessName} moves to the Free plan on ${input.endsOn}. Everything you made is kept.`,
+                `The autopay you approved for ${input.businessName}'s ${input.planName} plan covers ${input.charges ?? 12} monthly charges, and it runs out on ${input.endsOn}.`,
+                `To keep ${input.planName}, approve the next autopay in Plan and billing. It's one confirmation, and it starts when this one runs out.${price}`,
+                `If you don't, ${input.businessName} moves to the Free plan on ${input.endsOn}. Everything you made is kept.`,
                 ...pausesParagraphs(input.pauses),
                 ...domainParagraphs(input.domain),
             ],
-            { label: "Pay for the next term", href: input.payUrl },
+            { label: "Approve the next autopay", href: input.payUrl },
         ),
     };
 }
@@ -362,15 +380,65 @@ export function freeChosenNotice(input: {
 export function termEndingNotice(input: {
     planName: string;
     endsOn: string;
+    /** Monthly autopay (the default), or a year paid once. */
+    payment?: TermPayment;
     pauses?: PausesWords | null;
     domain?: DomainWords | null;
 }): {
     title: string;
     body: string;
 } {
+    const after = `If you don't, your business moves to Free on ${input.endsOn}.${pausesSentence(input.pauses)}${domainSentence(input.domain)} Everything you made is kept.`;
+    if (input.payment === "ONE_TIME") {
+        return {
+            title: `Your ${input.planName} year ends on ${input.endsOn}`,
+            body: `To keep ${input.planName}, pay for the next year in Plan and billing. ${after}`,
+        };
+    }
     return {
-        title: `Your ${input.planName} term ends on ${input.endsOn}`,
-        body: `To keep ${input.planName}, pay for the next term in Plan and billing. If you don't, your business moves to Free on ${input.endsOn}.${pausesSentence(input.pauses)}${domainSentence(input.domain)} Everything you made is kept.`,
+        title: `Your ${input.planName} autopay runs out on ${input.endsOn}`,
+        body: `To keep ${input.planName}, approve the next autopay in Plan and billing. ${after}`,
+    };
+}
+
+/**
+ * A price change ahead (DEC-161): a new catalogue version changes what the
+ * business pays for its plan, from `from` (at least 30 days after this
+ * notice). The business approves the new amount; until it does, it keeps
+ * paying the price it has. `now` and `next` are worded with their cycle
+ * and "plus GST" ("₹999 a month plus GST").
+ */
+export interface PriceChangeWords {
+    businessName: string;
+    planName: string;
+    changesOn: string;
+    now: string;
+    next: string;
+    url: string;
+}
+
+export function priceChangeEmail(input: PriceChangeWords): RenderedEmail {
+    return {
+        subject: `${input.businessName}'s ${input.planName} price changes on ${input.changesOn}`,
+        html: wrap(
+            `Your ${input.planName} price changes on ${input.changesOn}`,
+            [
+                `From ${input.changesOn}, the ${input.planName} plan is ${input.next}. ${input.businessName} pays ${input.now} now.`,
+                `Your autopay never changes its amount by itself, so we ask you to approve the new one in Plan and billing. It's one confirmation.`,
+                `Until you approve it, you keep paying ${input.now}, and everything stays as it is. To change your plan or move to Free instead, open Plan and billing.`,
+            ],
+            { label: "Approve the new amount", href: input.url },
+        ),
+    };
+}
+
+/** The same in the business's inbox (`plan.move`). */
+export function priceChangeNotice(
+    input: Omit<PriceChangeWords, "businessName" | "url">,
+): { title: string; body: string } {
+    return {
+        title: `Your ${input.planName} price changes on ${input.changesOn}`,
+        body: `From ${input.changesOn}, ${input.planName} is ${input.next} (now ${input.now}). Approve the new amount in Plan and billing. Until you do, you keep paying ${input.now}.`,
     };
 }
 

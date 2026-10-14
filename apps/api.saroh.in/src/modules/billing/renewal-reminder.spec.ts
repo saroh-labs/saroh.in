@@ -20,7 +20,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const now = new Date("2026-11-10T06:00:00.000Z");
 const renewsAt = new Date(now.getTime() + 2 * DAY);
 
-/** Monthly autopay on Plan B, five months into its 12-month term. */
+/** Monthly autopay on Plan B, five months into the 12 charges it covers. */
 function facts(over: Partial<RenewalFacts> = {}): RenewalFacts {
     return {
         status: "ACTIVE",
@@ -36,6 +36,7 @@ function facts(over: Partial<RenewalFacts> = {}): RenewalFacts {
             startAt: null,
             completedAt: addMonthsUtc(renewsAt, -5),
             createdAt: addMonthsUtc(renewsAt, -5),
+            autopayCharges: 12,
         },
         scheduled: null,
         ...over,
@@ -124,6 +125,7 @@ describe("when a renewal reminder is due (#804)", () => {
                         startAt: null,
                         completedAt: addMonthsUtc(renewsAt, -12),
                         createdAt: addMonthsUtc(renewsAt, -12),
+                        autopayCharges: 12,
                     },
                 }),
             ),
@@ -139,12 +141,31 @@ describe("when a renewal reminder is due (#804)", () => {
                     startAt: null,
                     completedAt: addMonthsUtc(renewsAt, -monthsAgo),
                     createdAt: addMonthsUtc(renewsAt, -monthsAgo),
+                    autopayCharges: 12,
                 },
             });
         // The period ending 11 months in starts the 12th charge.
         expect(reason(started(11))).toBe("remind");
-        // The period ending 12 months in is the term's end: no charge.
+        // The period ending 12 months in is where the autopay runs out: no
+        // charge.
         expect(reason(started(12))).toBe("term_ends");
+    });
+
+    it("monthly: an autopay made for 60 charges is reminded at month 12, and runs out at 60 (DEC-161)", () => {
+        const started = (monthsAgo: number) =>
+            facts({
+                checkout: {
+                    providerPlanId: "plan_test_b",
+                    cycle: "month",
+                    startAt: null,
+                    completedAt: addMonthsUtc(renewsAt, -monthsAgo),
+                    createdAt: addMonthsUtc(renewsAt, -monthsAgo),
+                    autopayCharges: 60,
+                },
+            });
+        expect(reason(started(12))).toBe("remind");
+        expect(reason(started(59))).toBe("remind");
+        expect(reason(started(60))).toBe("term_ends");
     });
 
     it("an open-ended autopay (yearly before DEC-093, or no checkout) is reminded", () => {
@@ -157,6 +178,7 @@ describe("when a renewal reminder is due (#804)", () => {
                         startAt: null,
                         completedAt: addMonthsUtc(renewsAt, -24),
                         createdAt: addMonthsUtc(renewsAt, -24),
+                        autopayCharges: 12,
                     },
                 }),
             ),

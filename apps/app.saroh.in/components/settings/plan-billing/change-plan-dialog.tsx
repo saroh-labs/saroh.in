@@ -352,7 +352,7 @@ export function ChangePlanDialog({
                             // The label keeps its own words' width (up to
                             // a little over half the row) and the amount
                             // wraps beside it. A label column that may
-                            // shrink to nothing breaks "Term" a letter a
+                            // shrink to nothing breaks "Autopay" a letter a
                             // line once the amount is a sentence.
                             <div
                                 key={l.label}

@@ -19,6 +19,7 @@ type Cycle = "month" | "year";
 export type PlanNoteKind =
     | "overdue"
     | "authorise"
+    | "priceChange"
     | "move"
     | "scheduled"
     | "renewed"
@@ -80,15 +81,16 @@ export function nextParts(
 
 /**
  * Which note may be the page's one message, most pressing first: a payment
- * that failed, a change that is due and waits on the business, a plan
- * change that is on its way, the term's renewal, then any other warning.
- * A kind left out is a background fact and never the message: a plan given
- * for a while (the status line and its card say it), the first month and
- * the 12-month term.
+ * that failed, a change that is due and waits on the business, a new price
+ * to approve (DEC-161) or a plan change on its way, the request to approve
+ * the next autopay, then any other warning. A kind left out is a background
+ * fact and never the message: a plan given for a while (the status line and
+ * its card say it), the first month and how many charges the autopay covers.
  */
 const RANK: Partial<Record<PlanNoteKind, number>> = {
     overdue: 0,
     authorise: 1,
+    priceChange: 2,
     move: 2,
     scheduled: 2,
     renewed: 3,
@@ -139,14 +141,20 @@ export function planMessage(input: {
 }
 
 /**
- * How Saroh's plans are paid, said once for every business. The same
- * sentences the change dialog's quote says of one change.
+ * How Saroh's plans are paid, said once for every business (DEC-161): an
+ * autopay covers so many monthly charges (`charges`, the live catalogue's
+ * `autopay.charges`, 12 today) and we ask for the next before it runs out;
+ * prices can change, with at least 30 days' notice and the business's
+ * approval. Never "term": the number is how long one approval lasts, not a
+ * price promise. The same sentences the change dialog's quote says of one
+ * change.
  */
-export function billingRules(yearly: boolean): string[] {
+export function billingRules(yearly: boolean, charges = 12): string[] {
     return [
         yearly
-            ? "Monthly is autopay for 12 months and yearly is one payment. Before either ends, we ask you to pay for the next term."
-            : "Plans are paid monthly by autopay, for 12 months. Before that ends, we ask you to pay for the next term.",
+            ? `Monthly is autopay, and each one you approve covers ${charges} monthly charges. Yearly is one payment for the year. Before either runs out, we ask you to approve the next one.`
+            : `Plans are paid monthly by autopay. Each autopay you approve covers ${charges} monthly charges. Before it runs out, we ask you to approve the next one.`,
+        "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount. Until you do, you keep paying the price you have.",
         "Upgrades start today. A cheaper plan or Free starts when what you've paid for ends.",
     ];
 }

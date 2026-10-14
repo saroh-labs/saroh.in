@@ -7,7 +7,7 @@
  * - **A dearer plan starts today.** In a paid period it pays the difference
  *   for what is left of the period. In the first month (a plan's first-month
  *   offer, or free first days: `TRIALING`) the month ends there: the dearer
- *   plan's full first charge is taken now and its 12-month term starts now.
+ *   plan's full first charge is taken now and its autopay starts now.
  *   The offer belongs to the plan it was started on and is used once, so
  *   nobody uses a dearer plan for the first month's amount.
  * - **Anything else waits until what was paid for has run out**: a plan

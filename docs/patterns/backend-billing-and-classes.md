@@ -67,20 +67,40 @@ paper view. Written by the billing webhook with the charge, once per
 charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
 invoices (U17)".
 
-**How a plan is paid (DEC-093, #803).** Monthly is autopay for 12 charges
-(`TERM_CHARGES`), yearly one payment for the year (a provider order, never
-autopay, never a trial). The catalogue's trial may carry a nominal first
-month (`trial.firstPaise`), taken as the mandate is authorised and invoiced
-on its own (`first-month:<checkout>`). The term's end is `billing-term.ts`:
-in its last 30 days the same plan quotes as `RENEW` (a SCHEDULED checkout
-from the term's end that cancels nothing), and a term nobody renews runs to
-the end of what was paid and then moves to Free (`term-end.ts`: a monthly
-subscription's `completed`; the hourly sweep for a year paid once). The
-business is asked to pay for the next term, never renewed by itself
-(DEC-100): the hourly sweep sends the request 30, 7 and 1 days before the
-end, in the inbox and by email, once per stage (`term-ending.ts`,
-`term-ending-notice.ts`), and says nothing once a renewal or another plan
-is authorised. A business whose owner chose Free or cancelled for the
+**How a plan is paid (DEC-093, DEC-161, #803).** Monthly is autopay; one
+approval covers the catalogue's `autopay.charges` monthly charges (12
+today, 2 to 1,200, edited in Admin › Plans › Offers). It is read from the
+version of the plan being bought (`quoteChange`'s `autopayCharges`, sent as
+the provider's `totalCount`) and later from the version of the checkout's
+plan (`termCheckoutOf`), so an autopay keeps the count it was made with;
+never a constant, never a column. Yearly is one payment for the year (a
+provider order, never autopay, never a trial). The catalogue's trial may
+carry a nominal first month (`trial.firstPaise`), taken as the mandate is
+authorised and invoiced on its own (`first-month:<checkout>`). Where the
+autopay runs out is `billing-term.ts` (the code says "term"; a business
+never reads it, and it is no price promise): in its last 30 days the same
+plan quotes as `RENEW` (a SCHEDULED checkout from that day that cancels
+nothing), and one nobody approves runs to the end of what was paid and
+then moves to Free (`term-end.ts`: a monthly subscription's `completed`,
+which also replaces a "move them" still waiting for approval; the hourly
+sweep for a year paid once). The business is asked to approve the next
+autopay, never renewed by itself (DEC-100): the hourly sweep sends the
+request 30, 7 and 1 days before the end, in the inbox and by email, once
+per stage (`term-ending.ts`, `term-ending-notice.ts`), and says nothing
+once a renewal or another plan is authorised.
+
+**No price lock (DEC-161).** A version published with "move them" that
+changes what a business pays moves it at its first billing date at least
+30 days after go-live (`PRICE_NOTICE_DAYS`, `moveNoticeDays`; 7 for any
+other move) and tells it 30 days ahead, by email (`PRICE_CHANGE`) and in
+the inbox (`move-notice.handler.ts`, `price-change.ts`), and on the plan
+screen from the publish. The provider never changes an autopay's amount:
+the business approves the new one (the SCHEDULED checkout). Until it does
+the move waits (`moveReadiness` → `needs-authorisation`) and it keeps
+paying the price it has on the autopay it has — nothing moves it to Free
+or stops a charge. Words a business reads never say "term", "your price
+doesn't change" or "pay for the next term". Rules in `PRICING_ROLLOUT.md`
+› "Price changes (DEC-161)". A business whose owner chose Free or cancelled for the
 period's end (`Subscription.freeChosenAt`, set by Plan and billing's move
 to Free and by cancel, cleared wherever `cancelAtPeriodEnd` is) is told
 its plan moves to Free then, as it chose, and never asked to pay; the
