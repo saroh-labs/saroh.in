@@ -7,15 +7,15 @@ import type { PricingPageModel } from "@/lib/pricing-model";
 import { viewKey } from "@/lib/pricing-model";
 
 import { Container } from "../container";
-import { Addons } from "./addons";
 import { BillingToggle } from "./billing-toggle";
 import { CompareTable } from "./compare-table";
 import { GstToggle } from "./gst-toggle";
 import { PlanCards } from "./plan-cards";
+import { UsageTable } from "./usage-table";
 
 /**
  * Everything on the pricing page the two switches change: the plan cards,
- * the footnote, the add-ons and the comparison table's prices. The server
+ * the footnote, the usage table and the comparison table's prices. The server
  * worked out every combination (`pricingPageModel`); this only picks one,
  * and sends `pricing_toggle` when the visitor flips a switch.
  */
@@ -76,7 +76,7 @@ export function PricingPlans({ model }: { model: PricingPageModel }) {
                     </div>
                 ) : null}
             </Container>
-            <Addons addons={view.addons} />
+            <UsageTable plans={view.plans} usage={view.usage} />
             <CompareTable
                 plans={view.plans}
                 rows={model.rows}
