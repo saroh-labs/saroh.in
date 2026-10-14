@@ -89,3 +89,19 @@ export function rollbackBlocked(input: {
     }
     return null;
 }
+
+/**
+ * The live version as a file, for `catalogue:import` on a developer's own
+ * database (`LOCAL_DEV.md`, "Plans: local matches dev"): its snapshot as
+ * `/admin/pricing` returns it, the one stored, with its number and go-live.
+ */
+export function catalogueFile(v: AdminVersion): { name: string; text: string } {
+    return {
+        name: `catalogue-v${v.version}.json`,
+        text: `${JSON.stringify(
+            { version: v.version, goLiveAt: v.goLiveAt, catalog: v.catalog },
+            null,
+            2,
+        )}\n`,
+    };
+}

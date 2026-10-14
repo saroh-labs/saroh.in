@@ -50,6 +50,19 @@ export interface DatabaseTarget {
     host: string;
 }
 
+/** Hosts that are this machine: a local or CI throwaway database. */
+const THROWAWAY_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/** Whether a connection string points at this machine. */
+export function isThrowawayDatabase(url: string | undefined): boolean {
+    if (!url) return false;
+    try {
+        return THROWAWAY_HOSTS.has(new URL(url).hostname);
+    } catch {
+        return false;
+    }
+}
+
 /** Parse the connection string into its non-secret parts. */
 export function resolveDatabaseTarget(
     url: string | undefined = process.env.DATABASE_URL,
@@ -110,4 +123,28 @@ export function assertDatabaseTarget(
             `${expected}\n` +
             `If this is deliberate, name it: ${CONFIRM_VAR}=${target.database} <command>`,
     );
+}
+
+/**
+ * {@link assertDatabaseTarget}, and only on this machine: for a command that
+ * writes what only a developer's own database should get (the API's
+ * `catalogue:import`, which copies the dev environment's pricing in). A
+ * database on any other host is refused whatever `DATABASE_TARGET_CONFIRM`
+ * says; on this machine the usual allow-list or confirmation applies, so a
+ * throwaway database is named on purpose. Names the database and host,
+ * never the connection string.
+ */
+export function assertLocalDatabaseTarget(
+    url: string | undefined = process.env.DATABASE_URL,
+    nodeEnv: string = process.env.NODE_ENV ?? "development",
+    confirm: string | undefined = process.env[CONFIRM_VAR],
+): DatabaseTarget {
+    const target = resolveDatabaseTarget(url);
+    if (!isThrowawayDatabase(url)) {
+        throw new Error(
+            `Refusing to write to "${target.database}" on ${target.host}: ` +
+                `it isn't on this machine. This command only writes to a local database.`,
+        );
+    }
+    return assertDatabaseTarget(url, nodeEnv, confirm);
 }

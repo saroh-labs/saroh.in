@@ -60,4 +60,8 @@ export * from "./backfill/order-numbers";
 export * from "./pricing-catalogue";
 // The guard every seed and backfill runs before writing, exported so a CLI
 // in the API can refuse a database nobody asked for in the same words.
-export { assertDatabaseTarget } from "./database-target";
+export {
+    assertDatabaseTarget,
+    assertLocalDatabaseTarget,
+    isThrowawayDatabase,
+} from "./database-target";

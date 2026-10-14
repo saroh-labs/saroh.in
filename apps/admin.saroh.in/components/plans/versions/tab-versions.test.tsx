@@ -220,6 +220,68 @@ describe("the Versions tab", () => {
         ).toBeTruthy();
     });
 
+    it("downloads the live version's catalogue as stored, for anyone who can read Plans", async () => {
+        const made: Blob[] = [];
+        const createObjectURL = vi.fn((blob: Blob) => {
+            made.push(blob);
+            return "blob:catalogue";
+        });
+        const revokeObjectURL = vi.fn();
+        Object.assign(URL, { createObjectURL, revokeObjectURL });
+        let saved: { href: string; download: string } | null = null;
+        const click = vi
+            .spyOn(HTMLAnchorElement.prototype, "click")
+            .mockImplementation(function (this: HTMLAnchorElement) {
+                saved = {
+                    href: this.getAttribute("href") ?? "",
+                    download: this.download,
+                };
+            });
+        draw({
+            access: {
+                canEdit: false,
+                canPublish: false,
+                canManageCoupons: false,
+            },
+        });
+        // Only the live version offers it.
+        expect(
+            within(card(3)).queryByRole("button", {
+                name: "Download catalogue (JSON)",
+            }),
+        ).toBeNull();
+        expect(
+            within(card(1)).queryByRole("button", {
+                name: "Download catalogue (JSON)",
+            }),
+        ).toBeNull();
+        fireEvent.click(
+            within(card(2)).getByRole("button", {
+                name: "Download catalogue (JSON)",
+            }),
+        );
+        expect(saved).toEqual({
+            href: "blob:catalogue",
+            download: "catalogue-v2.json",
+        });
+        expect(revokeObjectURL).toHaveBeenCalledWith("blob:catalogue");
+        const live = history().versions.find((v) => v.version === 2);
+        expect(made).toHaveLength(1);
+        // jsdom's Blob has no text(); its FileReader reads one.
+        const text = await new Promise<string>((done) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+                done(typeof reader.result === "string" ? reader.result : "");
+            reader.readAsText(made[0]);
+        });
+        expect(JSON.parse(text)).toEqual({
+            version: 2,
+            goLiveAt: live?.goLiveAt,
+            catalog: live?.catalog,
+        });
+        click.mockRestore();
+    });
+
     it("offers no cancel or roll back without pricing:publish", () => {
         draw({
             access: {
