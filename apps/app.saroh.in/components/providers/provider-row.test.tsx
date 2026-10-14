@@ -42,15 +42,13 @@ describe("a provider row the plan won't let the business connect (UX-006)", () =
             lock: {
                 comesWith: "Comes with Grow",
                 cta: "See Grow",
-                href: "/settings/billing?plan=grow#change-plan",
+                href: "/settings/billing/plans?plan=grow",
                 upgrade: "Grow",
                 full: false,
             },
         });
         expect(html).toContain("Comes with Grow");
-        expect(html).toContain(
-            'href="/settings/billing?plan=grow#change-plan"',
-        );
+        expect(html).toContain('href="/settings/billing/plans?plan=grow"');
         expect(html).not.toContain(">Connect<");
     });
 

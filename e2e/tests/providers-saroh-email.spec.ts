@@ -272,7 +272,7 @@ test("on a plan with no room to connect its own email, the block offers plans, n
     ).toHaveCount(0);
     await expect(card.getByRole("link", { name: "See plans" })).toHaveAttribute(
         "href",
-        "/settings/billing#change-plan",
+        "/settings/billing/plans",
     );
     await noSideways(page);
 });

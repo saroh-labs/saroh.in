@@ -149,7 +149,7 @@ const cap = (over: Partial<VariantCap> = {}): VariantCap => ({
     plan: "Plan A",
     upgradeTo: "Plan B",
     uncapped: false,
-    href: "/settings/billing?plan=b#change-plan",
+    href: "/settings/billing/plans?plan=b",
     ...over,
 });
 
@@ -232,7 +232,7 @@ describe("Variants at the plan's cap (DEC-158)", () => {
         render(3, cap());
         expect(host.textContent).toContain(AT_CAP);
         const link = host.querySelector<HTMLAnchorElement>(
-            'a[href="/settings/billing?plan=b#change-plan"]',
+            'a[href="/settings/billing/plans?plan=b"]',
         );
         expect(link?.textContent).toBe("See Plan B");
         // A value still to be had doesn't turn the button back on.

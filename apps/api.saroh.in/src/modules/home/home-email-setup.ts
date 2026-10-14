@@ -45,7 +45,7 @@ export async function noEmailProvider(
         return {
             code: NO_EMAIL_PLAN_CODE,
             title: EMAIL_SETUP_TITLE,
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
             severity: "SETUP",
             moduleKey: "COMMUNICATIONS",
             tag: "Paid plans",

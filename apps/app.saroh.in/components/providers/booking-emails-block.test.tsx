@@ -46,7 +46,7 @@ describe("BookingEmailsBlock's main action", () => {
     it("is See plans, to the plan picker, when it hasn't — near and paused too", () => {
         for (const s of ["SENDING", "NEAR", "PAUSED"] as const) {
             const html = render(state(false, s));
-            expect(html).toContain('href="/settings/billing#change-plan"');
+            expect(html).toContain('href="/settings/billing/plans"');
             expect(html).toContain("See plans");
             expect(html).not.toContain("Connect your email");
         }

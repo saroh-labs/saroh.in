@@ -44,7 +44,7 @@ describe("emailPrompt (DEC-011, 7 Oct)", () => {
             title: "Your customers get no emails from you",
             text: `${MISSED} Connecting your own email comes with a paid plan.`,
             action: {
-                href: "/settings/billing#change-plan",
+                href: "/settings/billing/plans",
                 label: "See plans",
             },
         });
@@ -96,7 +96,7 @@ describe("emailRefusalNote: where a send is refused", () => {
         expect(emailRefusalNote(free, all, INVOICE_EMAIL_WORDS)).toEqual({
             text: "Invoices are emailed from your own email provider, and connecting one comes with a paid plan.",
             action: {
-                href: "/settings/billing#change-plan",
+                href: "/settings/billing/plans",
                 label: "See plans",
             },
         });

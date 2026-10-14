@@ -6,12 +6,11 @@ import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { Check } from "lucide-react";
+import { TextLink } from "@saroh/ui/text-link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
 import { useEffect, useState, useTransition } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { MARKETING_URL } from "@/lib/help/links";
 import type { CouponCheck } from "@/lib/saroh-billing/billing-actions";
 import { checkCouponAction } from "@/lib/saroh-billing/billing-actions";
 import type { Cycle, PickerRow } from "@/lib/saroh-billing/plan-view";
@@ -21,17 +20,36 @@ import { runAction } from "@/lib/api/run-action";
 import { Segmented } from "@saroh/ui/segmented";
 import type { PickedPlan } from "./change-plan-dialog";
 import { ChangePlanDialog } from "./change-plan-dialog";
+import { PlanCard } from "./plan-card";
 import { RefreshButton } from "./refresh-button";
-import { card } from "./styles";
+import { BILLING_HREF, card } from "./styles";
 
 /**
- * The plan picker, add-ons and coupon ("Saroh Settings" design, Plan and
- * billing): Monthly | Yearly when the catalogue offers yearly, a row per
- * plan with what it unlocks (the catalogue's card lines, UX-045), when a
- * change to it would start (DEC-159: "Starts today", or "From ‹date›") and
- * its button — "Start N-day trial", "Upgrade", "Switch", "Keep …" — and the
+ * Side by side once the section has room for every card (about 250px
+ * each), as many columns as there are plans; stacked below that. The
+ * section's own width decides, not the window's: the menu and the Settings
+ * list beside it take a third of a laptop's screen. `PlanCard` joins the
+ * shared rows at the same widths (`SHARED_ROWS`).
+ */
+const COLUMNS: Record<number, string> = {
+    1: "",
+    2: "[@container(min-width:500px)]:grid-cols-2 [@container(min-width:500px)]:gap-y-0",
+    3: "[@container(min-width:750px)]:grid-cols-3 [@container(min-width:750px)]:gap-y-0",
+    4: "[@container(min-width:1000px)]:grid-cols-4 [@container(min-width:1000px)]:gap-y-0",
+};
+
+/**
+ * The plans and the coupon, on Settings › Plan and billing › Change plan
+ * (owner, 14 Oct 2026): Monthly | Yearly when the catalogue offers yearly,
+ * then the plans as cards side by side (`PlanCard`), each with its price,
+ * who it's for, a button that says what it does and when (DEC-159:
+ * "Upgrade to ‹plan›" starts today, "Move to ‹plan› from ‹date›" waits)
+ * and every line of what it unlocks (the catalogue's card lines, UX-045).
+ * Under them, the way to the full comparison on the pricing page, then the
  * Coupon card, whose code is checked on Apply (UX-046) and goes with the
- * next change's quote. Picking a row opens the change (`ChangePlanDialog`).
+ * next change's quote. Picking a plan opens the change
+ * (`ChangePlanDialog`); once it is made, or its payment started, the
+ * person is back on Plan and billing.
  *
  * `?plan=&cycle=` on the address opens that plan's change straight away:
  * it is where every "Upgrade" in the app lands (`upgradeHref`).
@@ -41,7 +59,6 @@ export function PlanChooser({
     yearly,
     initialCycle,
     canChange,
-    addons,
     currentPlan,
 }: {
     /** Per cycle; null when Saroh's price list couldn't be read. */
@@ -50,8 +67,6 @@ export function PlanChooser({
     initialCycle: Cycle;
     /** `billing:manage`: who may change the plan. */
     canChange: boolean;
-    /** The Add-ons card, between the picker and the coupon, as drawn. */
-    addons: ReactNode;
     /** The plan it's on now, for the quote's "you stay on …". */
     currentPlan: string;
 }) {
@@ -89,8 +104,7 @@ export function PlanChooser({
     // Tidied away: the same link may open it again later.
     if (arrival === null && arrived !== null) setArrived(null);
     useEffect(() => {
-        if (wanted)
-            router.replace(`${pathname}#change-plan`, { scroll: false });
+        if (wanted) router.replace(pathname, { scroll: false });
     }, [wanted, pathname, router]);
 
     function apply() {
@@ -126,18 +140,15 @@ export function PlanChooser({
     return (
         <>
             <section
-                id="change-plan"
-                aria-label="Change plan"
-                className={cn(card, "scroll-mt-4")}
+                aria-label="Plans"
+                className="grid gap-3 [container-type:inline-size]"
             >
-                <div className="flex flex-wrap items-center gap-2.5 border-b border-border/70 px-[18px] py-3">
-                    <span className="flex-[1_1_260px] text-[12.5px] text-muted-foreground">
-                        {!canChange
-                            ? "These are Saroh's plans and what each is for."
-                            : yearly.on
-                              ? "Monthly is autopay for 12 months and yearly is one payment. Before either ends, we ask you to pay for the next term. Upgrades start today. A cheaper plan or Free starts when what you've paid for ends."
-                              : "Plans are paid monthly by autopay, for 12 months. Before that ends, we ask you to pay for the next term. Upgrades start today. A cheaper plan or Free starts when what you've paid for ends."}
-                    </span>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <p className="min-w-0 flex-[1_1_260px] text-pretty text-[13.5px] text-foreground/80">
+                        {canChange
+                            ? "Choose a plan to see what the change costs and when it starts. Nothing changes until you confirm."
+                            : "These are Saroh's plans and what each is for."}
+                    </p>
                     {yearly.on && rows ? (
                         <Segmented
                             label="Billing"
@@ -159,90 +170,38 @@ export function PlanChooser({
                         title={couldntLoad("Saroh's plans")}
                         description={nothingChanged("Your plan is as it was.")}
                         action={<RefreshButton />}
-                        className="rounded-none border-0"
+                        className={card}
                     />
                 ) : (
-                    shown.map((row, i) => (
-                        <div
-                            key={row.planId}
-                            data-plan={row.planId}
-                            className={cn(
-                                "flex flex-wrap items-center gap-3 px-[18px] py-[13px]",
-                                i > 0 && "border-t border-border/70",
-                                row.current && "bg-muted/50",
-                            )}
-                        >
-                            <div className="min-w-0 flex-[1_1_240px]">
-                                <p className="text-[14px] font-semibold">
-                                    {row.name}{" "}
-                                    <span className="font-medium text-foreground/80">
-                                        {row.price}
-                                    </span>
-                                </p>
-                                <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                    {row.what}
-                                </p>
-                                {row.note ? (
-                                    <p className="mt-1 text-[12.5px] font-semibold text-foreground/80">
-                                        {row.note.lead}
-                                        {row.note.iso ? (
-                                            <ViewerDate iso={row.note.iso} />
-                                        ) : null}
-                                        {row.note.tail}
-                                    </p>
-                                ) : null}
-                                {row.lines.length > 0 ? (
-                                    <ul
-                                        aria-label={`What ${row.name} gives you`}
-                                        className="mt-1.5 grid gap-0.5 text-[12.5px] text-foreground/80"
-                                    >
-                                        {row.lead ? (
-                                            <li className="text-muted-foreground">
-                                                {row.lead}
-                                            </li>
-                                        ) : null}
-                                        {row.lines.map((l) => (
-                                            <li
-                                                key={l}
-                                                className="flex items-start gap-1.5"
-                                            >
-                                                <Check
-                                                    aria-hidden
-                                                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
-                                                />
-                                                {l}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : null}
-                            </div>
-                            {row.current && !(row.cta && canChange) ? (
-                                <span className="text-[12.5px] font-semibold text-foreground/80">
-                                    Current plan
-                                </span>
-                            ) : row.cta && canChange ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    aria-label={`${row.cta}: ${row.name}`}
-                                    onClick={() =>
-                                        setPicked({
-                                            planId: row.planId,
-                                            name: row.name,
-                                            cycle,
-                                        })
-                                    }
-                                >
-                                    {row.cta}
-                                </Button>
-                            ) : null}
-                        </div>
-                    ))
+                    <ul
+                        className={cn(
+                            "grid gap-3",
+                            COLUMNS[shown.length] ?? COLUMNS[3],
+                        )}
+                    >
+                        {shown.map((row) => (
+                            <PlanCard
+                                key={row.planId}
+                                row={row}
+                                beside={shown.length}
+                                canChange={canChange}
+                                onPick={() =>
+                                    setPicked({
+                                        planId: row.planId,
+                                        name: row.name,
+                                        cycle,
+                                    })
+                                }
+                            />
+                        ))}
+                    </ul>
                 )}
+                <p className="text-center text-[13px]">
+                    <TextLink href={`${MARKETING_URL}/pricing`} external>
+                        Compare everything on the pricing page
+                    </TextLink>
+                </p>
             </section>
-
-            {addons}
 
             {canChange ? (
                 <section
@@ -344,6 +303,11 @@ export function PlanChooser({
                     setChecked(null);
                 }}
                 onClose={() => setPicked(null)}
+                // Made, or its payment started: back to Plan and billing,
+                // where the status line and the one message say how it
+                // stands.
+                onChanged={() => router.push(BILLING_HREF)}
+                returnTo={BILLING_HREF}
             />
         </>
     );

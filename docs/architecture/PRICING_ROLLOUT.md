@@ -649,23 +649,91 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
   the workspace. It is a third step beside the two above, and none does
   another's work: publishing a catalogue (steps 3 to 5) and
   `PLAN_ENFORCEMENT` (step 6) stay the API's.
-- **Settings › Plan and billing** (owner only, as before): Your plan (from
-  `GET …/billing/access` and the subscription), the plan picker (from
-  `GET /public/pricing`; Monthly | Yearly only while yearly is on; "Start
-  N-day trial" only where `GET …/billing/change-plan` quotes a `TRIAL`;
-  each other plan's row says when a change to it would start, from the same
-  quote: "Starts today: ‹amount› now" for an upgrade, "From ‹date›: you
-  keep ‹plan› until then" for anything that waits, and no button on the
-  plan a change already waits for, DEC-159),
-  add-ons, a coupon held for the next change, and Saroh's invoices with
-  their PDF (`/api/saroh-invoices/:id/pdf`, a proxy). Changing plan is the
-  quote, a confirm, then Razorpay's window over the page (the
-  `authorisationUrl` page only as a fallback) and a confirm with the
-  provider (DEC-093); a move to Free needs none. The picker lists what each
-  plan unlocks from the catalogue's card lines, prices before GST, and
-  under a plan given for a while marks that plan "You're on this until …"
-  (UX-044/045); a coupon is checked on Apply (UX-046). `?plan=&cycle=` opens that plan's change: every
-  "Upgrade" in the app links there (`upgradeHref`).
+- **Settings › Plan and billing** (read with `billing:read`, changed by the
+  owner alone) is two screens, as the owner asked on 13 and 14 Oct 2026
+  ("multiple info messages are not good"; only the plan the business is on,
+  with the plans on a next screen, on a phone and a desktop alike).
+  **The page itself** (`/settings/billing`), from the top:
+    - **One status line**, always there (`lib/saroh-billing/plan-status.ts`,
+      `nextParts`): the plan and what happens next. "You're on ‹plan› ·
+      First month until ‹date› · then ‹amount› a month", "… · Next charge
+      ‹amount› on ‹date›", "… · Nothing to pay", "… · ‹price› · Paid to
+      ‹date›" (a year paid once), "… · ‹price› · Ends ‹date›" (a plan it
+      is leaving), "… · Free until ‹date› · Nothing to pay" (a plan given
+      for a while). A fact is never broken across lines, and on a phone
+      the plan and each fact take a line of their own. How it is paid and
+      "Change" sit under it.
+    - **At most ONE message** under it, only when something needs the
+      business (`planMessage`), most pressing first: a checkout waiting
+      for its payment (it checks with the provider as it is drawn, and is
+      what stops a second payment), a payment that failed, a change that
+      is due and waits to be authorised, a plan change on its way with its
+      date, the term's renewal in its last days, then a legacy plan's
+      warning. Never two.
+    - **The plan it is on, and only that one**, as one card
+      (`current-plan-card.tsx`): its name with "Current plan", its price,
+      who it is for, every line it includes, and for whoever may change
+      the plan one button to the next screen: "Change plan", or "See
+      plans" on a plan that costs nothing. A change that already waits is
+      said on the card too ("Your plan from ‹date›: ‹plan›"). No other
+      plan is drawn here and none is quoted. Without `billing:manage`
+      there is no button, and a quiet link, "See Saroh's plans", opens the
+      next screen to read.
+    - **"How billing works"**, closed until asked for
+      (`how-billing-works.tsx`): the first month's small print, the
+      12-month term and its end, a plan given for a while, any note the
+      one message left unsaid (with its way on), and how every plan is
+      paid (`billingRules`). The change dialog says the same of the one
+      change it quotes.
+    - Then add-ons, and Saroh's invoices with their PDF
+      (`/api/saroh-invoices/:id/pdf`, a proxy).
+
+    **Change plan** (`/settings/billing/plans`; "Settings › Plan and
+    billing › Change plan", with "Back to Plan and billing"), the next
+    screen:
+    - **Every plan as a card, side by side** once the section has room for
+      them and stacked on a phone (`plan-card.tsx`; from
+      `GET /public/pricing`; Monthly | Yearly only while yearly is on).
+      On each: the name, the price as the largest thing with "a month +
+      GST" beside it, who it is for, the first-month offer only where
+      `GET …/billing/change-plan` quotes a `TRIAL`, then the button at the
+      card's full width, then every line of the plan (the catalogue's card
+      lines, UX-045). The button says what it does, from the same quote
+      (DEC-159): "Upgrade to ‹plan›" (filled; starts today, with "Starts
+      today: ‹amount› now" under it), "Move to ‹plan› from ‹date›" (quiet;
+      "You keep ‹plan› until then" under it), "Start ‹plan›" or "Start
+      with the first month" from Free. The plan it is on carries "Current
+      plan", an Ink edge and a button that is off; under a plan given for
+      a while that plan is marked "You're on this until …" (UX-044). A
+      plan a change already waits for says "Your plan from ‹date›" in the
+      button's place: there is no button to make the change twice, and no
+      way to undo it but choosing another plan.
+    - **"Compare everything on the pricing page"**, to saroh.in's
+      `/pricing`, and the **coupon**, checked on Apply (UX-046) and held
+      for the next change: it is used when a plan is changed, so it is
+      here and not on the page before.
+    - **Choosing a plan** opens its quote, then a confirm, then Razorpay's
+      window over the page (the `authorisationUrl` page only as a
+      fallback) and a confirm with the provider (DEC-093); a move to Free
+      needs none. Cancel leaves the person choosing. Once the change is
+      made, or its payment started (paid, the window closed, or it could
+      not open), the person is taken back to Plan and billing, where the
+      status line and the one message say how it stands; the browser's
+      Back from the provider's own page returns there too. The API gives
+      the provider no return address: a payment still waiting is found by
+      `GET …/billing/checkout` wherever the person arrives, and both
+      screens say it first (`CheckoutPending`), so nobody pays twice.
+    - **Read without `billing:manage`** it is titled "Saroh's plans": the
+      cards and what each is for, no button and no coupon. Someone the
+      plan isn't read to is refused on both screens.
+    - **`?plan=&cycle=` opens that plan's change** here: every "Upgrade"
+      in the app links to it (`upgradeHref`). The addresses from before
+      the plans had a screen of their own still work:
+      `/settings/billing?plan=…` is redirected by the page, and
+      `/settings/billing#change-plan` (in emails Saroh has sent) is sent
+      on from the browser (`old-plan-link.tsx`), since a server never
+      sees a `#`.
+
 - **Limit notices** at 80% and 100% on Products, Orders, Bookings, Blog
   (Posts), Team and Providers, in `limitNotice`'s words with
   `LIMIT_WORDS` (`@saroh/pricing-catalog`, shared with the API's

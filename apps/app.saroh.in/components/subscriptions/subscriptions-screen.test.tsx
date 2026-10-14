@@ -188,7 +188,7 @@ const LOCK: OnlinePaymentsLock = {
     title: "Memberships come with Plan B",
     body: "You're on Plan A.",
     cta: "See Plan B",
-    href: "/settings/billing?plan=b#change-plan",
+    href: "/settings/billing/plans?plan=b",
 };
 
 let root: Root;

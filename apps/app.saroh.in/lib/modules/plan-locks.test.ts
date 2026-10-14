@@ -9,7 +9,7 @@ import type { ModuleView } from "./schema";
 const LOCK: ConnectLock = {
     comesWith: "Comes with Plan B",
     cta: "See Plan B",
-    href: "/settings/billing?plan=b#change-plan",
+    href: "/settings/billing/plans?plan=b",
     upgrade: "Plan B",
     full: false,
 };

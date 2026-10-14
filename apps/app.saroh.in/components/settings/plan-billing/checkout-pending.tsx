@@ -14,7 +14,8 @@ import { Notice } from "@saroh/ui/notice";
 import { useCheckoutConfirm } from "./use-checkout-confirm";
 
 /**
- * A plan change waiting for its payment, on "Your plan" (DEC-093, UX-003).
+ * A plan change waiting for its payment: "Your plan"'s one message while
+ * it waits, before any other (DEC-093, UX-003; `planMessage`).
  * Arriving here — back from Razorpay by hand, or after the window closed —
  * checks once with Razorpay through the API, so a payment the webhook
  * hasn't brought yet still moves the plan. It never offers to start again
@@ -49,12 +50,7 @@ export function CheckoutPending({ pending }: { pending: PendingCheckout }) {
 
     const checking = phase === "checking" || phase === "idle";
     return (
-        <Notice
-            tone="warning"
-            layout="banner"
-            aria-live="polite"
-            align="center"
-        >
+        <Notice tone="warning" aria-live="polite" align="center">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">
                     {checking ? (

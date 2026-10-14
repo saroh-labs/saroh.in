@@ -95,7 +95,7 @@ const LOCK: TrackersLock = {
     line: TRACKERS_LOCKED_LINE,
     kept: TRACKERS_KEPT_LINE,
     cta: "See Plan B",
-    href: "/settings/billing?plan=b#change-plan",
+    href: "/settings/billing/plans?plan=b",
 };
 
 function viewOf(over: Partial<SearchTrackingView> = {}): SearchTrackingView {
@@ -395,9 +395,7 @@ describe("connecting a tracker", () => {
         expect(host.querySelector('[role="dialog"]')).toBe(null);
         expect(text()).toContain(TRACKERS_LOCKED_LINE);
         expect(
-            host.querySelector(
-                'a[href="/settings/billing?plan=b#change-plan"]',
-            ),
+            host.querySelector('a[href="/settings/billing/plans?plan=b"]'),
         ).not.toBe(null);
         expect(buttonIn(host, "Set up")).toBeUndefined();
     });
@@ -612,7 +610,7 @@ describe("on a plan without trackers", () => {
         render(ok(viewOf()), { lock: LOCK });
         expect(text()).toContain(TRACKERS_LOCKED_LINE);
         expect(
-            host.querySelector('a[href="/settings/billing?plan=b#change-plan"]')
+            host.querySelector('a[href="/settings/billing/plans?plan=b"]')
                 ?.textContent,
         ).toBe("See Plan B");
         expect(buttonIn(host, "Set up")).toBeUndefined();

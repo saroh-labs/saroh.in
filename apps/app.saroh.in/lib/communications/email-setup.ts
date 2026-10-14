@@ -45,7 +45,7 @@ export const EMAIL_PROMPT_PLAN =
     "Connecting your own email comes with a paid plan.";
 
 export const CONNECT_EMAIL_HREF = "/settings/providers";
-export const SEE_PLANS_HREF = "/settings/billing#change-plan";
+export const SEE_PLANS_HREF = "/settings/billing/plans";
 
 export interface EmailAction {
     href: string;
