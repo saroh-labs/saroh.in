@@ -43,7 +43,7 @@ export interface PausedView {
 }
 
 /** Where to keep everything. */
-export const PLAN_AND_BILLING_HREF = "/settings/billing#change-plan";
+export const PLAN_AND_BILLING_HREF = "/settings/billing/plans";
 
 /**
  * Whether a listed row (a product, a post) is past the cut: created before

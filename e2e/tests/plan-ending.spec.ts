@@ -33,8 +33,6 @@ test("a plan that ends soon says when above the page, and leads to choosing a pl
     await expectNothingHiddenSideways(page);
 
     await banner.getByRole("link", { name: "See plans" }).click();
-    await expect(page).toHaveURL(/\/settings\/billing#change-plan$/);
-    await expect(
-        page.getByRole("region", { name: "Change plan" }),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/\/settings\/billing\/plans$/);
+    await expect(page.getByRole("region", { name: "Plans" })).toBeVisible();
 });

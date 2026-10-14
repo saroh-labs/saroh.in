@@ -51,7 +51,7 @@ const list: Checklist = {
             why: "Until then, customers pay you the ways you set in How to pay us.",
             comesWith: "Comes with a paid plan",
             cta: "See plans",
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
         },
     ],
 };
@@ -62,7 +62,7 @@ describe("the plan's aside on the setup checklists (DEC-092)", () => {
         expect(html).toContain("1 of 2 done");
         expect(html).toContain("Take payment online");
         expect(html).toContain("Comes with a paid plan");
-        expect(html).toContain('href="/settings/billing#change-plan"');
+        expect(html).toContain('href="/settings/billing/plans"');
         expect(html).toContain("See plans");
     });
 
@@ -72,7 +72,7 @@ describe("the plan's aside on the setup checklists (DEC-092)", () => {
         );
         expect(html).toContain("1 of 2 done");
         expect(html).toContain("Comes with a paid plan");
-        expect(html).toContain('href="/settings/billing#change-plan"');
+        expect(html).toContain('href="/settings/billing/plans"');
     });
 
     it("Home's bar counts the steps, never the aside", () => {

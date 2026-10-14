@@ -1,13 +1,17 @@
 import { PartialRead } from "@/components/shared/failed-read";
-import { formatInr, offeredPlans } from "@saroh/pricing-catalog";
+import { formatInr } from "@saroh/pricing-catalog";
+import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
-import { NOTHING_CHANGED } from "@saroh/ui/lib/state-copy";
-import { notFound } from "next/navigation";
+import { NOTHING_CHANGED, planLabel } from "@saroh/ui/lib/state-copy";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
+import { CurrentPlanCard } from "@/components/settings/plan-billing/current-plan-card";
 import { HowBillingWorks } from "@/components/settings/plan-billing/how-billing-works";
-import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
+import { OldPlanLink } from "@/components/settings/plan-billing/old-plan-link";
 import { SarohInvoices } from "@/components/settings/plan-billing/saroh-invoices";
+import { PLANS_HREF } from "@/components/settings/plan-billing/styles";
 import type { YourPlanProps } from "@/components/settings/plan-billing/your-plan";
 import { YourPlan } from "@/components/settings/plan-billing/your-plan";
 import {
@@ -19,49 +23,40 @@ import { whoCanChange } from "@/components/shared/who-can-change";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { planSummary, usageLine } from "@/lib/saroh-billing/plan";
+import { readPlanBasics, readPlanCards } from "@/lib/saroh-billing/plan-reads";
 import { planMessage } from "@/lib/saroh-billing/plan-status";
-import type { Cycle, RowQuote } from "@/lib/saroh-billing/plan-view";
-import {
-    addonRows,
-    billedCycle,
-    billedPlanId,
-    pickerRows,
-    waitingMove,
-    yearlyOffer,
-    yourPlan,
-} from "@/lib/saroh-billing/plan-view";
+import { addonRows, yourPlan } from "@/lib/saroh-billing/plan-view";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import {
-    getBillingAccess,
-    getCheckouts,
     getPlanUsage,
-    getSarohSubscription,
     listAddons,
     listSarohInvoices,
-    livePricing,
-    quotePlan,
 } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 /**
  * Settings → Plan and billing (plans catalogue U14; laid out as the owner
- * asked on 13 Oct 2026): one status line (the plan this business is on and
- * what happens next) with at most one message under it, the plans it could
- * be on as cards side by side (changed through a quote, a confirm and the
- * payment page), "How billing works" for what is true and asks nothing,
- * add-ons, a coupon, and Saroh's invoices to it.
+ * asked on 13 and 14 Oct 2026): one status line (the plan this business is
+ * on and what happens next) with at most one message under it, then ONLY
+ * the plan it is on, as one card with a button to the next screen where
+ * every plan is (`./plans`, "Change plan"). Then "How billing works" for
+ * what is true and asks nothing, add-ons, and Saroh's invoices to it. The
+ * coupon is used when a plan is changed, so it is on the next screen.
  *
  * Opened by whoever the API reads it to (`billing:read`: Owner and Admin
  * by default), and changed by the Owner alone (`billing:manage`, DEC-131
  * amended 2026-10-11). The tab (`SETTINGS_PAGES`), this page and every plan
  * prompt ask the same two (`lib/billing/plan-access.ts`), so none sends a
  * person to a page that turns them away. Someone who may read but not
- * change (an Admin) sees the plan, the plans and the invoices with no
- * button to press, and that only the owner can.
+ * change (an Admin) sees the plan and the invoices with no button to press,
+ * that only the owner can, and a link to read Saroh's plans.
  *
  * Reads degrade per source: the plan and access are the page (a failure is
  * the section's boundary); the price list, invoices, add-ons and checkouts
  * each say when they couldn't be read, and the rest still shows.
+ *
+ * A link to a plan's change made before the plans had their own screen
+ * (`?plan=&cycle=`, `#change-plan`) is sent on to it.
  *
  * Not found while plans aren't shown (DEC-136): the segment's layout
  * answers first, and the page says so too.
@@ -85,9 +80,24 @@ async function settle<T>(p: Promise<T>): Promise<T | null> {
     }
 }
 
-export default async function PlanBillingPage() {
+export default async function PlanBillingPage({
+    searchParams,
+}: {
+    searchParams?: Promise<{
+        plan?: string | string[];
+        cycle?: string | string[];
+    }>;
+} = {}) {
     if (!plansShown()) notFound();
     await requireSession();
+    // Where every "Upgrade" used to land: the plan's change opens on the
+    // next screen now. Not kept by a browser: it is the address that moved.
+    const query = (await searchParams) ?? {};
+    if (typeof query.plan === "string" && query.plan) {
+        const on = new URLSearchParams({ plan: query.plan });
+        if (typeof query.cycle === "string") on.set("cycle", query.cycle);
+        redirect(`${PLANS_HREF}?${on.toString()}`);
+    }
     const org = await resolveActiveOrganization();
     // Unknown (no business resolved) opens, and the API decides.
     const mayOpen = org === null || mayOpenPlan(org);
@@ -98,23 +108,17 @@ export default async function PlanBillingPage() {
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
 
-    const [read, accessRead, pricing, invoices, addons, checkouts, usage] =
-        await Promise.all([
-            getSarohSubscription(),
-            getBillingAccess(),
-            livePricing(),
-            settle(listSarohInvoices()),
-            settle(listAddons()),
-            settle(getCheckouts()),
-            getPlanUsage(),
-        ]);
-    if (read.status === "denied" || accessRead.status === "denied") {
+    const [basics, invoices, addons, usage] = await Promise.all([
+        readPlanBasics(),
+        settle(listSarohInvoices()),
+        settle(listAddons()),
+        getPlanUsage(),
+    ]);
+    if (basics === null) {
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
 
-    const subscription = read.subscription;
-    const access = accessRead.data;
-    const catalog = pricing?.catalog ?? null;
+    const { subscription, access, catalog } = basics;
     const businessName = org?.name ?? "this business";
     // No summary exists yet: the line is left out rather than promised
     // (UX-080).
@@ -122,7 +126,6 @@ export default async function PlanBillingPage() {
         usage.status === "ok" ? usageLine(usage.usage, businessName) : "";
 
     const addonsView = addons?.status === "ok" ? addons.data : null;
-    const checkoutsView = checkouts?.status === "ok" ? checkouts.data : null;
 
     const onCatalogue =
         access?.source === "catalogue"
@@ -130,8 +133,8 @@ export default async function PlanBillingPage() {
                   access,
                   subscription,
                   catalog,
-                  liveVersion: pricing?.version ?? null,
-                  checkouts: checkoutsView,
+                  liveVersion: basics.liveVersion,
+                  checkouts: basics.checkouts,
                   addonsHeld: (addonsView?.heldPaise ?? 0) > 0,
               })
             : null;
@@ -145,78 +148,28 @@ export default async function PlanBillingPage() {
               usage.status === "ok" ? usage.usage : null,
           );
 
-    // What a change to each plan would be, asked of the API: "Start N-day
-    // trial" only where this business would get one, and when a change
-    // would start (DEC-159). The plan it's on is asked only on the other
-    // cycle. A quote that can't be read says nothing on its row.
-    const billed = billedPlanId(catalog, subscription);
-    const onCycle = billedCycle(subscription);
-    const yearly = yearlyOffer(catalog);
-    const cycles: Cycle[] = yearly.on ? ["month", "year"] : ["month"];
-    const asked = catalog
-        ? cycles.flatMap((cycle) =>
-              offeredPlans(catalog)
-                  .filter(
-                      (p) =>
-                          p.id !== billed ||
-                          (p.pricePaise > 0 && cycle !== onCycle),
-                  )
-                  .map((p) => ({ planId: p.id, cycle })),
-          )
-        : [];
-    const quotes: Record<Cycle, Map<string, RowQuote>> = {
-        month: new Map(),
-        year: new Map(),
-    };
-    for (const { planId, cycle, quote } of await Promise.all(
-        asked.map(async (a) => ({
-            ...a,
-            quote: await quotePlan(a.planId, a.cycle),
-        })),
-    )) {
-        if (quote) quotes[cycle].set(planId, quote);
-    }
-    const trials = new Set(
-        Array.from(quotes.month).flatMap(([id, q]) =>
-            q.kind === "TRIAL" ? [id] : [],
-        ),
-    );
-    const waiting =
-        access?.source === "catalogue"
-            ? waitingMove({ access, checkouts: checkoutsView })
+    // Only the plan it's on is drawn here, so no other plan is quoted.
+    const cards = await readPlanCards(basics, { quotes: false });
+    const current = cards.rows
+        ? (cards.rows[cards.cycle].find((r) => r.current) ?? null)
+        : null;
+    const comingName = cards.waiting
+        ? cards.rows?.month.find((r) => r.planId === cards.waiting?.planId)
+              ?.name
+        : undefined;
+    const coming =
+        cards.waiting && comingName
+            ? { name: comingName, iso: cards.waiting.iso }
             : null;
-
-    // A plan given for a while (a launch offer) is the one it's on (UX-044).
-    const override =
-        access?.source === "catalogue" ? access.planOverride : null;
-    const given = override
-        ? { planId: override.planKey, until: override.expiresAt ?? null }
-        : null;
-    const rows = catalog
-        ? (Object.fromEntries(
-              (["month", "year"] as const).map((cycle) => [
-                  cycle,
-                  pickerRows({
-                      catalog,
-                      subscription,
-                      cycle,
-                      trials,
-                      given,
-                      quotes: quotes[cycle],
-                      waiting,
-                  }),
-              ]),
-          ) as Record<Cycle, ReturnType<typeof pickerRows>>)
-        : null;
 
     const addonList = addonsView ? addonRows(addonsView) : [];
     const missing = [
         addons === null ? "your add-ons" : null,
-        checkouts === null ? "any plan change waiting for payment" : null,
+        basics.checkoutsRead ? null : "any plan change waiting for payment",
     ].filter((m): m is string => m !== null);
     const partial = missing.length === 0 ? null : missing.join(" and ");
     // What "Your plan" doesn't say as its one message is kept, closed,
-    // under the plans.
+    // under the plan.
     const { rest } = planMessage({
         notes: plan.notes ?? [],
         warning: plan.warning,
@@ -225,6 +178,7 @@ export default async function PlanBillingPage() {
 
     return (
         <SettingsPanel header={header}>
+            <OldPlanLink />
             <div className="grid gap-4">
                 {partial ? (
                     <PartialRead things={partial} so={NOTHING_CHANGED} />
@@ -235,39 +189,37 @@ export default async function PlanBillingPage() {
                     </ReadOnlyNote>
                 )}
                 <YourPlan {...plan} canChange={canChange} />
-                <PlanChooser
-                    rows={rows}
-                    yearly={yearly}
-                    initialCycle={billedCycle(subscription)}
-                    currentPlan={
-                        access?.source === "catalogue"
-                            ? (access.plan?.name ?? "Free")
-                            : (subscription?.plan.name ?? "Free")
-                    }
+                {onCatalogue && (current || cards.rows === null) ? (
+                    <CurrentPlanCard
+                        row={current}
+                        coming={coming}
+                        canChange={canChange}
+                    />
+                ) : canChange ? (
+                    // A plan from before the catalogue has no card of its
+                    // own: the way to the plans is still here.
+                    <p>
+                        <Button asChild variant="outline">
+                            <Link href={PLANS_HREF}>{planLabel()}</Link>
+                        </Button>
+                    </p>
+                ) : null}
+                <HowBillingWorks
+                    notes={rest}
+                    yearly={cards.yearly.on}
                     canChange={canChange}
-                    foot={
-                        <HowBillingWorks
-                            notes={rest}
-                            yearly={yearly.on}
-                            canChange={canChange}
-                        />
-                    }
-                    addons={
-                        addonList.length > 0 ? (
-                            <AddonsCard
-                                rows={addonList}
-                                sum={
-                                    addonsView && addonsView.heldPaise > 0
-                                        ? `${formatInr(addonsView.heldPaise)} a month in add-ons`
-                                        : ""
-                                }
-                                canChange={
-                                    canChange && (addonsView?.canBuy ?? false)
-                                }
-                            />
-                        ) : null
-                    }
                 />
+                {addonList.length > 0 ? (
+                    <AddonsCard
+                        rows={addonList}
+                        sum={
+                            addonsView && addonsView.heldPaise > 0
+                                ? `${formatInr(addonsView.heldPaise)} a month in add-ons`
+                                : ""
+                        }
+                        canChange={canChange && (addonsView?.canBuy ?? false)}
+                    />
+                ) : null}
                 <SarohInvoices
                     invoices={invoices?.status === "ok" ? invoices.data : null}
                 />

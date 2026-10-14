@@ -8,7 +8,6 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
 import { useEffect, useState, useTransition } from "react";
 
 import { MARKETING_URL } from "@/lib/help/links";
@@ -23,7 +22,7 @@ import type { PickedPlan } from "./change-plan-dialog";
 import { ChangePlanDialog } from "./change-plan-dialog";
 import { PlanCard } from "./plan-card";
 import { RefreshButton } from "./refresh-button";
-import { card } from "./styles";
+import { BILLING_HREF, card } from "./styles";
 
 /**
  * Side by side once the section has room for every card (about 250px
@@ -40,16 +39,17 @@ const COLUMNS: Record<number, string> = {
 };
 
 /**
- * The plans, add-ons and coupon on Settings › Plan and billing: Monthly |
- * Yearly when the catalogue offers yearly, then the plans as cards side by
- * side (`PlanCard`; owner, 13 Oct 2026), each with its price, who it's
- * for, a button that says what it does and when (DEC-159: "Upgrade to
- * ‹plan›" starts today, "Move to ‹plan› from ‹date›" waits) and every line
- * of what it unlocks (the catalogue's card lines, UX-045). Under them, the
- * way to the full comparison on the pricing page and `foot` ("How billing
- * works"). Then the Add-ons card and the Coupon card, whose code is
- * checked on Apply (UX-046) and goes with the next change's quote. Picking
- * a plan opens the change (`ChangePlanDialog`).
+ * The plans and the coupon, on Settings › Plan and billing › Change plan
+ * (owner, 14 Oct 2026): Monthly | Yearly when the catalogue offers yearly,
+ * then the plans as cards side by side (`PlanCard`), each with its price,
+ * who it's for, a button that says what it does and when (DEC-159:
+ * "Upgrade to ‹plan›" starts today, "Move to ‹plan› from ‹date›" waits)
+ * and every line of what it unlocks (the catalogue's card lines, UX-045).
+ * Under them, the way to the full comparison on the pricing page, then the
+ * Coupon card, whose code is checked on Apply (UX-046) and goes with the
+ * next change's quote. Picking a plan opens the change
+ * (`ChangePlanDialog`); once it is made, or its payment started, the
+ * person is back on Plan and billing.
  *
  * `?plan=&cycle=` on the address opens that plan's change straight away:
  * it is where every "Upgrade" in the app lands (`upgradeHref`).
@@ -59,8 +59,6 @@ export function PlanChooser({
     yearly,
     initialCycle,
     canChange,
-    addons,
-    foot,
     currentPlan,
 }: {
     /** Per cycle; null when Saroh's price list couldn't be read. */
@@ -69,10 +67,6 @@ export function PlanChooser({
     initialCycle: Cycle;
     /** `billing:manage`: who may change the plan. */
     canChange: boolean;
-    /** The Add-ons card, between the picker and the coupon, as drawn. */
-    addons: ReactNode;
-    /** Under the plans: "How billing works". */
-    foot?: ReactNode;
     /** The plan it's on now, for the quote's "you stay on …". */
     currentPlan: string;
 }) {
@@ -110,8 +104,7 @@ export function PlanChooser({
     // Tidied away: the same link may open it again later.
     if (arrival === null && arrived !== null) setArrived(null);
     useEffect(() => {
-        if (wanted)
-            router.replace(`${pathname}#change-plan`, { scroll: false });
+        if (wanted) router.replace(pathname, { scroll: false });
     }, [wanted, pathname, router]);
 
     function apply() {
@@ -147,22 +140,15 @@ export function PlanChooser({
     return (
         <>
             <section
-                id="change-plan"
-                aria-label="Change plan"
-                className="grid scroll-mt-4 gap-3 [container-type:inline-size]"
+                aria-label="Plans"
+                className="grid gap-3 [container-type:inline-size]"
             >
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <div className="min-w-0 flex-[1_1_260px]">
-                        <h2 className="font-display text-[17px] font-semibold">
-                            Plans
-                        </h2>
-                        {canChange ? null : (
-                            <p className="mt-0.5 text-[13px] text-foreground/80">
-                                These are Saroh&apos;s plans and what each is
-                                for.
-                            </p>
-                        )}
-                    </div>
+                    <p className="min-w-0 flex-[1_1_260px] text-pretty text-[13.5px] text-foreground/80">
+                        {canChange
+                            ? "Choose a plan to see what the change costs and when it starts. Nothing changes until you confirm."
+                            : "These are Saroh's plans and what each is for."}
+                    </p>
                     {yearly.on && rows ? (
                         <Segmented
                             label="Billing"
@@ -215,10 +201,7 @@ export function PlanChooser({
                         Compare everything on the pricing page
                     </TextLink>
                 </p>
-                {foot}
             </section>
-
-            {addons}
 
             {canChange ? (
                 <section
@@ -320,6 +303,11 @@ export function PlanChooser({
                     setChecked(null);
                 }}
                 onClose={() => setPicked(null)}
+                // Made, or its payment started: back to Plan and billing,
+                // where the status line and the one message say how it
+                // stands.
+                onChanged={() => router.push(BILLING_HREF)}
+                returnTo={BILLING_HREF}
             />
         </>
     );

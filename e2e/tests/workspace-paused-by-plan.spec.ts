@@ -65,7 +65,7 @@ test.describe("workspace: what a lower plan paused", () => {
         );
         await expect(
             banner.getByRole("link", { name: "See plans" }),
-        ).toHaveAttribute("href", "/settings/billing#change-plan");
+        ).toHaveAttribute("href", "/settings/billing/plans");
     });
 
     test("Products tags the paused rows and says why above them", async ({

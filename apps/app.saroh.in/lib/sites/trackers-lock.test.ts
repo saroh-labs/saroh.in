@@ -32,7 +32,7 @@ describe("trackersLock (DEC-108, U7)", () => {
                 line: TRACKERS_LOCKED_LINE,
                 kept: TRACKERS_KEPT_LINE,
                 cta: "See Plan B",
-                href: "/settings/billing?plan=b#change-plan",
+                href: "/settings/billing/plans?plan=b",
             });
         }
     });
@@ -42,7 +42,7 @@ describe("trackersLock (DEC-108, U7)", () => {
             access({ modules: [trackers("locked", false)] }),
         );
         expect(lock?.cta).toBe("See plans");
-        expect(lock?.href).toBe("/settings/billing#change-plan");
+        expect(lock?.href).toBe("/settings/billing/plans");
     });
 
     it("names no plan, module or row in its words", () => {
@@ -80,7 +80,7 @@ describe("trackersLock (DEC-108, U7)", () => {
             line: TRACKERS_LOCKED_LINE,
             kept: TRACKERS_KEPT_LINE,
             cta: "See Plan B",
-            href: "/settings/billing?plan=b#change-plan",
+            href: "/settings/billing/plans?plan=b",
         });
         expect(trackersLockOfRefusal(undefined)).toBeNull();
         expect(

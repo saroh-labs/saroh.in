@@ -15,7 +15,7 @@ describe("offlinePayHint (#835)", () => {
         expect(hint.text).toContain("comes with a paid plan");
         expect(hint.text).not.toContain("Connect");
         expect(hint.fix).toEqual({
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
             label: "See plans",
         });
     });

@@ -64,7 +64,7 @@ describe("no email provider on Home", () => {
         );
         expect(action).toMatchObject({
             code: NO_EMAIL_PLAN_CODE,
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
             tag: "Paid plans",
         });
         const { needs } = flattenNeeds([action as HomeAction], "Asia/Kolkata");

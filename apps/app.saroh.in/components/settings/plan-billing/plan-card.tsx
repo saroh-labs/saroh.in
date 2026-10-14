@@ -114,6 +114,8 @@ export function PlanCard({
                         type="button"
                         variant={cta.primary ? "default" : "outline"}
                         className={WIDE}
+                        // A plan's name is Saroh's own word, not a record's.
+                        data-ph-unmask=""
                         onClick={onPick}
                     >
                         {/* One run of words: the button lays its
@@ -132,6 +134,7 @@ export function PlanCard({
                         type="button"
                         variant="outline"
                         className={WIDE}
+                        data-ph-unmask=""
                         disabled
                     >
                         <span>

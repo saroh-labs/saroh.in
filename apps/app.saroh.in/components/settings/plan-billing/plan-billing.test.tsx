@@ -73,7 +73,6 @@ const chooser = (
             yearly={{ on: false }}
             initialCycle="month"
             canChange
-            addons={null}
             currentPlan="Plan B"
             {...over}
         />,
@@ -259,7 +258,6 @@ describe("PlanChooser", () => {
                 yearly={{ on: false }}
                 initialCycle="month"
                 canChange
-                addons={null}
                 currentPlan="Plan B"
             />,
         );
@@ -329,7 +327,7 @@ describe("Your plan: one status line", () => {
             notes: [FIRST_MONTH, TERM],
         });
         expect(words(html)).toContain(
-            "You're on Plan B · First month until 31 Dec 2027 · then ₹111 + GST a month",
+            "You're on Plan B\u00a0· First month until 31 Dec 2027\u00a0· then ₹111 + GST a month",
         );
         // Background facts are not messages: nothing is stacked under it.
         expect(notices(html)).toHaveLength(0);
@@ -344,9 +342,11 @@ describe("Your plan: one status line", () => {
                     next: { kind: "charge", iso: END, amount: "₹111 + GST" },
                 }),
             ),
-        ).toContain("You're on Plan B · Next charge ₹111 + GST on 31 Dec 2027");
+        ).toContain(
+            "You're on Plan B\u00a0· Next charge ₹111 + GST on 31 Dec 2027",
+        );
         expect(words(yourPlan({ name: "Plan A", price: "₹0" }))).toContain(
-            "You're on Plan A · Nothing to pay",
+            "You're on Plan A\u00a0· Nothing to pay",
         );
     });
 });
@@ -424,7 +424,7 @@ describe("How billing works", () => {
                 />,
             );
         expect(draw(true)).toMatch(
-            /href="\/settings\/billing\?plan=b&amp;cycle=month#change-plan"[^>]*>Renew/,
+            /href="\/settings\/billing\/plans\?plan=b&amp;cycle=month"[^>]*>Renew/,
         );
         expect(draw(false)).not.toContain("Renew");
         expect(draw(true)).toContain("yearly is one payment");

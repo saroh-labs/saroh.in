@@ -114,7 +114,7 @@ describe("reviewEmailNote (D11)", () => {
         ).toEqual({
             text: "Review invitations go from your own email, and connecting your own email needs a paid plan.",
             action: {
-                href: "/settings/billing#change-plan",
+                href: "/settings/billing/plans",
                 label: "See plans",
             },
         });

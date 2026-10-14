@@ -5,13 +5,13 @@ import { Fragment } from "react";
 
 import { ChangePaymentMethod } from "@/components/settings/change-payment-method";
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { FACT_DOT } from "@/lib/format/join";
 import type { NextCharge } from "@/lib/saroh-billing/plan";
 import type { StatusPart } from "@/lib/saroh-billing/plan-status";
 import { nextParts, planMessage } from "@/lib/saroh-billing/plan-status";
 import type { PendingCheckout, PlanNote } from "@/lib/saroh-billing/plan-view";
 
 import { CheckoutPending } from "./checkout-pending";
+import { PLANS_HREF } from "./styles";
 
 /** The section's shape, from the catalogue (`yourPlan`) or a legacy row (`planSummary`). */
 export interface YourPlanProps {
@@ -36,9 +36,9 @@ export interface YourPlanProps {
     canChange?: boolean;
 }
 
-/** Where a note's action goes: the picker, with its plan's change open. */
+/** Where a note's action goes: Change plan, with its plan's change open. */
 export function changeHref(planId: string, cycle: string) {
-    return `/settings/billing?${new URLSearchParams({ plan: planId, cycle }).toString()}#change-plan`;
+    return `${PLANS_HREF}?${new URLSearchParams({ plan: planId, cycle }).toString()}`;
 }
 
 /** A note's words, around its one date. */
@@ -76,16 +76,26 @@ export function YourPlan(props: YourPlanProps) {
         <section aria-label="Your plan" className="grid gap-3">
             <div className="grid gap-1.5">
                 <h2 className="label">Your plan</h2>
-                <p className="text-pretty text-[15px] leading-normal text-foreground/80">
-                    <span className="font-display text-[19px] font-semibold tracking-[-0.01em] text-foreground">
+                {/* One line where there is room for it. Each fact is kept
+                    whole: a line breaks after a dot, never inside "then
+                    ‹amount› a month". On a phone the plan is one line and
+                    each fact its own, by design. */}
+                <p className="text-[15px] leading-normal text-foreground/80">
+                    <span className="font-display text-[19px] font-semibold tracking-[-0.01em] text-foreground max-desk:block">
                         You&apos;re on {props.name}
                     </span>
                     {status.map((part) => (
                         <Fragment key={`${part.lead}${part.iso ?? ""}`}>
-                            {FACT_DOT}
-                            {part.lead}
-                            {part.iso ? <ViewerDate iso={part.iso} /> : null}
-                            {part.tail}
+                            <span className="max-desk:hidden">
+                                {"\u00a0· "}
+                            </span>
+                            <span className="inline-block max-desk:block">
+                                {part.lead}
+                                {part.iso ? (
+                                    <ViewerDate iso={part.iso} />
+                                ) : null}
+                                {part.tail}
+                            </span>
                         </Fragment>
                     ))}
                 </p>

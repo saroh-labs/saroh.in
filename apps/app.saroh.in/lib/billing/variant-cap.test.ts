@@ -29,7 +29,7 @@ describe("variantCapOf (DEC-158)", () => {
             plan: "Plan A",
             upgradeTo: "Plan B",
             uncapped: false,
-            href: "/settings/billing?plan=b#change-plan",
+            href: "/settings/billing/plans?plan=b",
         });
     });
 
@@ -71,7 +71,7 @@ describe("variantCapNote (DEC-158)", () => {
         expect(variantCapNote(cap, 22)).toEqual({
             text: "You can have up to 22 variants a product on Plan A. No more can be added to this one. Plan B allows more.",
             cta: "See Plan B",
-            href: "/settings/billing?plan=b#change-plan",
+            href: "/settings/billing/plans?plan=b",
         });
     });
 
@@ -86,7 +86,7 @@ describe("variantCapNote (DEC-158)", () => {
         expect(variantCapNote(top, 22)).toEqual({
             text: "You can have up to 22 variants a product on Plan A. No more can be added to this one. Talk to us if you need more.",
             cta: "See plans",
-            href: "/settings/billing#change-plan",
+            href: "/settings/billing/plans",
         });
     });
 

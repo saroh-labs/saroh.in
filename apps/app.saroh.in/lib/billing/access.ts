@@ -83,8 +83,8 @@ export interface BillingAccessView {
 /** Where every "Upgrade" goes: the plan picker, with the plan to look at. */
 export function upgradeHref(planId?: string | null): string {
     return planId
-        ? `/settings/billing?plan=${encodeURIComponent(planId)}#change-plan`
-        : "/settings/billing#change-plan";
+        ? `/settings/billing/plans?plan=${encodeURIComponent(planId)}`
+        : "/settings/billing/plans";
 }
 
 export function accessRow(
