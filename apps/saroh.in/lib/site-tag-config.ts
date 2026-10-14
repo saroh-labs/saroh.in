@@ -22,6 +22,7 @@ export function siteTagConfig(): TagConfig {
     const recording = siteRecordingOn({
         key: env.NEXT_PUBLIC_POSTHOG_KEY,
         replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
+        analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
     });
     return recording ? { ...config, recording: true } : config;
 }

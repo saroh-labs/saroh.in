@@ -67,6 +67,12 @@ export const env = createEnv({
             .optional(),
         NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
         NEXT_PUBLIC_POSTHOG_REPLAY: z.enum(["on", "off"]).optional(),
+        /**
+         * Page visits (DEC-160): which screens are opened and for how
+         * long, off unless "on". The same people as replay, and the same
+         * choice: someone who shares usage and has been told.
+         */
+        NEXT_PUBLIC_POSTHOG_ANALYTICS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE: z
             .string()
             .regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/)
@@ -94,6 +100,8 @@ export const env = createEnv({
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,
+        NEXT_PUBLIC_POSTHOG_ANALYTICS:
+            process.env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
         NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE:
             process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
         NEXT_PUBLIC_PLANS: process.env.NEXT_PUBLIC_PLANS,

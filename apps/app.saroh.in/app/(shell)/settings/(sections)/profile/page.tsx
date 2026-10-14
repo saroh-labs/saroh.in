@@ -40,6 +40,7 @@ export default async function ProfilePage() {
     const recordingOn = replaySwitchedOn({
         key: env.NEXT_PUBLIC_POSTHOG_KEY,
         replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
+        analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
     });
     const [alerts, org, usageSharing] = await Promise.all([
         getAlertPreferences(),

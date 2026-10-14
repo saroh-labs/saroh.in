@@ -40,6 +40,8 @@ const spies = vi.hoisted(() => ({
     loadRecorder: vi.fn(),
     start: vi.fn(),
     stop: vi.fn(),
+    /** Each `$pageview` the tracker asked the SDK for. */
+    capture: vi.fn(),
     /** What the recorder was made with: once per page, so kept across tests. */
     config: undefined as Record<string, unknown> | undefined,
     /** The page's address when the recorder was fetched, and when it began. */
@@ -60,6 +62,7 @@ vi.mock("@/lib/error-tracking-browser", async () => {
                     spies.start();
                 },
                 stopSessionRecording: spies.stop,
+                capture: spies.capture,
             };
         },
     };
@@ -78,6 +81,7 @@ vi.mock("@/lib/error-tracking-browser", async () => {
                 return Promise.resolve({});
             },
             replay: "on",
+            analytics: "on",
         }),
     };
 });
@@ -153,7 +157,13 @@ beforeEach(() => {
     writeConsent(null);
     document.cookie =
         "saroh_team=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-    for (const spy of [spies.load, spies.loadRecorder, spies.start, spies.stop])
+    for (const spy of [
+        spies.load,
+        spies.loadRecorder,
+        spies.start,
+        spies.stop,
+        spies.capture,
+    ])
         spy.mockClear();
     spies.addressAtLoad = "";
     spies.addressAtStart = "";
@@ -639,6 +649,130 @@ describe("one notice for visit counts, recording and advertising", () => {
  * stops when that is taken back, and never starts for the team, a browser
  * that asks not to be tracked, or a page that is never recorded.
  */
+/**
+ * Page visits (DEC-160) wait for the same answer as the recorder. What a
+ * visit says is what the tracker's own gate (`before_send`) lets out.
+ */
+describe("page visits behind the cookie notice", () => {
+    type Gate = (event: {
+        event: string;
+        properties: Record<string, unknown>;
+    }) => { properties: Record<string, unknown> } | null;
+    /** What the SDK would send for the page on screen. */
+    const sent = (event = "$pageview") =>
+        (spies.config?.before_send as Gate)({
+            event,
+            properties: {
+                $current_url: window.location.href,
+                $pathname: window.location.pathname,
+                title: document.title,
+                $referrer: "https://mail.example.com/",
+            },
+        });
+
+    it("sends none before the visitor answers, or after a refusal", async () => {
+        render(<SiteTags config={RECORDED} />);
+        await settle();
+        expect(spies.capture).not.toHaveBeenCalled();
+        press("Refuse");
+        await settle();
+        expect(spies.capture).not.toHaveBeenCalled();
+        nothingRecorded();
+    });
+
+    it("sends the page once they accept, with its address cut back", async () => {
+        window.history.replaceState(
+            null,
+            "",
+            "/waitlist?ref=someone&email=a%40example.com&utm_source=mail#top",
+        );
+        pathname.current = "/waitlist";
+        render(<SiteTags config={RECORDED_ONLY} />);
+        await settle();
+        press("Accept");
+        await settle();
+        expect(spies.capture.mock.calls).toEqual([["$pageview"]]);
+        expect(spies.config?.capture_pageleave).toBe(true);
+        const properties = sent()?.properties ?? {};
+        expect(properties.$current_url).toBe(
+            `${window.location.origin}/waitlist?utm_source=mail`,
+        );
+        expect(properties.$pathname).toBe("/waitlist");
+        expect(properties).not.toHaveProperty("title");
+        expect(properties).not.toHaveProperty("$referrer");
+        expect(JSON.stringify(properties)).not.toMatch(/someone|example/);
+    });
+
+    it("sends each later page once, and says which came before", async () => {
+        acceptRecording();
+        const page = render(<SiteTags config={RECORDED} />);
+        await settle();
+        expect(spies.capture).toHaveBeenCalledTimes(1);
+        page.rerender(<SiteTags config={RECORDED} />);
+        await settle();
+        expect(spies.capture).toHaveBeenCalledTimes(1);
+
+        window.history.pushState(null, "", "/pricing?ref=someone");
+        pathname.current = "/pricing";
+        page.rerender(<SiteTags config={RECORDED} />);
+        await settle();
+        expect(spies.capture).toHaveBeenCalledTimes(2);
+        expect(sent()?.properties).toMatchObject({
+            $current_url: `${window.location.origin}/pricing`,
+            $prev_pageview_pathname: "/",
+        });
+        // Leaving says the page that was on screen.
+        expect(sent("$pageleave")?.properties).toMatchObject({
+            $pathname: "/pricing",
+            $prev_pageview_pathname: "/pricing",
+        });
+        // Nothing else the SDK could send gets out.
+        expect(sent("$autocapture")).toBeNull();
+        expect(sent("$identify")).toBeNull();
+    });
+
+    it("stops with the answer: nothing leaves after Cookie choices forgets it", async () => {
+        acceptRecording();
+        render(<SiteTags config={RECORDED} />);
+        await settle();
+        act(() => writeConsent(null));
+        await settle();
+        expect(sent()).toBeNull();
+        expect(sent("$pageleave")).toBeNull();
+    });
+
+    it("never sends one in a Saroh team browser", async () => {
+        document.cookie = "saroh_team=1; path=/";
+        acceptRecording();
+        render(<SiteTags config={RECORDED} />);
+        await settle();
+        expect(spies.capture).not.toHaveBeenCalled();
+        nothingRecorded();
+    });
+
+    it.each([
+        ["Do Not Track", { doNotTrack: "1" }],
+        ["Global Privacy Control", { globalPrivacyControl: true }],
+    ])("never sends one with %s set", async (_name, signal) => {
+        vi.stubGlobal("navigator", signal);
+        acceptRecording();
+        render(<SiteTags config={RECORDED} />);
+        await settle();
+        expect(spies.capture).not.toHaveBeenCalled();
+    });
+
+    it.each(["/pricing/draft", "/welcome"])(
+        "never sends one for %s",
+        async (path) => {
+            pathname.current = path;
+            acceptRecording();
+            render(<SiteTags config={RECORDED} />);
+            await settle();
+            expect(spies.capture).not.toHaveBeenCalled();
+        },
+    );
+});
+
 describe("the recorder behind the cookie notice", () => {
     it("loads nothing before the visitor answers", async () => {
         render(<SiteTags config={RECORDED} />);

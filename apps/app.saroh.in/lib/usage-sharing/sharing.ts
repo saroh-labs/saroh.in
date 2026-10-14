@@ -1,6 +1,7 @@
 /**
- * "Help improve Saroh" (DEC-125): the rules for the workspace's session
- * recordings that are this app's to decide. The recorder's own rules
+ * "Help improve Saroh" (DEC-125, DEC-160): the rules for the workspace's
+ * session recordings and page visits that are this app's to decide. One
+ * choice covers both. The recorder's own rules
  * (who may be recorded at all, and what a recording can hold) are in
  * `@saroh/error-tracking/browser`; the person's choice is kept by the API on
  * their user row, the same on every device.
@@ -11,7 +12,7 @@
 /** What a person is asked, word for word, in Settings › Your profile. */
 export const USAGE_SHARING_LABEL = "Help improve Saroh";
 export const USAGE_SHARING_HELP =
-    "Share how I use Saroh (your customers' details and anything you type are hidden).";
+    "Share how I use Saroh and which pages I open (your customers' details and anything you type are hidden).";
 
 /**
  * The one-time notice (owner, 10 Oct). The app is "Saroh" in what a
@@ -21,7 +22,7 @@ export const USAGE_SHARING_HELP =
  * until they dismiss it; nothing is recorded before it has been shown.
  */
 export const USAGE_NOTICE = {
-    body: "We record how Saroh is used to make it easier. Your customers' details and anything you type are hidden.",
+    body: "We record how Saroh is used and which pages are opened, to make it easier. Your customers' details and anything you type are hidden.",
     turnOff: "Turn it off in",
     settings: "Settings › Your profile",
     href: "/settings/profile",
@@ -57,15 +58,21 @@ export function usageNoticeShown(
 }
 
 /**
- * Whether recording is switched on for this environment at all: a PostHog
- * key and `NEXT_PUBLIC_POSTHOG_REPLAY` exactly "on". Off, the choice is not
- * even shown: a switch that does nothing would not be true.
+ * Whether anything about how Saroh is used is switched on for this
+ * environment at all: a PostHog key, and `NEXT_PUBLIC_POSTHOG_REPLAY`
+ * (recordings) or `NEXT_PUBLIC_POSTHOG_ANALYTICS` (page visits, DEC-160)
+ * exactly "on". Off, the choice is not even shown: a switch that does
+ * nothing would not be true.
  */
 export function replaySwitchedOn(settings: {
     key: string | undefined;
     replay: string | undefined;
+    analytics?: string | undefined;
 }): boolean {
-    return Boolean(settings.key) && settings.replay === "on";
+    return (
+        Boolean(settings.key) &&
+        (settings.replay === "on" || settings.analytics === "on")
+    );
 }
 
 /**

@@ -12,6 +12,45 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Session replay — every recording played back as a blank black screen
+
+**Symptom**: 14 Oct 2026, four days after session replay went on in
+production. PostHog held three recordings and every one played as an empty
+black screen. Watching the production workspace for ten seconds showed one
+request to PostHog (the project's settings) and no recording being sent at
+all, with nothing in the console.
+**Cause**: one line, and two things that only looked like faults.
+
+- _The blank screen._ `session_recording.maskCapturedNetworkRequestFn` was
+  `() => null`, written to mean "never record a request the page makes".
+  posthog-js asks the same function about the page's **own address**
+  (`{ name: url }`) before it keeps rrweb's "meta" event, and drops the
+  event when the answer is empty. The meta event is where a player learns
+  the page's width and height: without it the player builds the whole page
+  and never shows it. The full snapshot, its styles (inlined, 370 KB of
+  them) and the theme's class were all in the recording.
+- _"Sends nothing."_ The SDK holds a new recording until the person first
+  touches the page (a click or a key: "no interaction since
+  recording started"), so a tab nobody uses is never billed. And it sends
+  nothing at all, errors included, from a browser driven by automation
+  (`navigator.webdriver`). A ten-second look without a click, or any look
+  through a test browser, sees no request.
+
+**Fix**: `replayAddressOnly` (`packages/error-tracking/src/browser.ts`)
+answers the page's address without its query string or fragment, and null
+for anything that carries more than a `name` (a request). Nothing else
+changed: no request, header or body is recorded.
+**Check**: `replay-playback.workspace.test.ts` and
+`replay-playback.site.test.ts` run the **real** SDK and recorder in a page
+against a fake PostHog, and fail when what is sent has no meta event or no
+full snapshot, when a business's words are readable, or when anything but
+a recording leaves. The older replay tests hand in a fake SDK: they prove
+what Saroh asks for, and nothing about what the SDK does with it.
+**Rule**: a setting handed to a third party's SDK is checked against what
+the SDK then sends, not against the setting. And to look at replay by hand:
+a real browser, a click, and then two seconds.
+`docs/architecture/ERROR_TRACKING_AND_UPTIME.md` → Checking it by hand.
+
 ## Deletion — a deleted business lost its files on day one, while the law needs 180 days and the policy said 30
 
 **Symptom**: none reported. Found 10 Oct 2026 when the Terms and Privacy
@@ -4571,6 +4610,7 @@ for the client. "Live" and "the newest published" are different while a
 version waits, and an editor starts from the newest. A page restored from
 the back/forward cache is loaded again, not refreshed.
 **Category**: admin · pricing · `docs/patterns/frontend-data-and-state.md`
+
 ## A business in its first month moved between paid plans for nothing, and used the dearest one for the first month's amount
 
 **Symptom**: found 13 Oct 2026 in a test payment on the dev environment,
@@ -4600,3 +4640,21 @@ asserts the plan kept, the dates and what the provider is told.
 business once. A state like `TRIALING` says where a business is, never what
 its next change costs: ask `change-timing.ts`.
 **Category**: backend · `docs/patterns/backend-billing-and-classes.md`
+
+## The Privacy page's date moved, and the footer's copy of it didn't
+
+**Symptom**: a later pull request failed CI on
+`packages/ui/src/lib/saroh-links.test.ts`: "privacy is the marketing site's
+own publishOn", expected 10 Oct, received 13 Oct. The change that moved the
+date had passed the gate and CI the day before.
+**Cause**: the day a legal page publishes is written twice: in the marketing
+site's table (`content/resources.ts`) and in `@saroh/ui` (`PUBLISHED_ON`),
+which the other apps' footers read. The test that holds them together lives
+in the package, and the gate and CI run only the tests of what a change
+touches. A change to the site's table alone never ran it.
+**Fix**: the package's date follows the site's.
+**Check**: the marketing site's own `content/resources.test.ts` now compares
+the two as well, so moving either date runs a test that sees both.
+**Rule**: a test that ties two files together sits where a change to either
+one runs it, or it is written on both sides.
+**Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`
