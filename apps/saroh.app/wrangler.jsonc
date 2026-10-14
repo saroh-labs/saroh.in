@@ -144,6 +144,10 @@
                 "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.app",
                 "SITE_PAGE_CACHE": "off",
                 "SITE_PAGE_CACHE_TTL": "300",
+                // Customers sign in on a merchant's site (Sign in, My account,
+                // /account). On since 14 Oct 2026; the api's own switch was
+                // turned on first, as it must be.
+                "SITE_ACCOUNT_AREA": "on",
             },
         },
     },
