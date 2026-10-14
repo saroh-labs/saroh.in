@@ -133,3 +133,76 @@ describe("ChangePlanDialog: add-ons that end with the change", () => {
         expect(notes(dialog)).toEqual([]);
     });
 });
+
+describe("ChangePlanDialog: when the change starts (DEC-159)", () => {
+    const description = (dialog: Element) =>
+        dialog.querySelector("p")?.textContent ?? "";
+
+    it("a dearer plan chosen during the first month: starts today, the amount now, and the month ends", async () => {
+        const dialog = await open(
+            quote({
+                kind: "NEW",
+                firstMonth: "NOW",
+                chargeNowPaise: 0,
+                chargeNowGstPaise: 0,
+                chargeNowTotalPaise: 0,
+                startAt: null,
+                payNowTotalPaise: 39_294,
+            }),
+        );
+        expect(dialog.textContent).toContain("Upgrade to Plan C");
+        const rows = Array.from(dialog.querySelectorAll("dl > div"), (r) => [
+            r.querySelector("dt")?.textContent,
+            r.querySelector("dd")?.textContent,
+        ]);
+        expect(rows[0]).toEqual(["Starts today", "₹392.94 now (incl. GST)"]);
+        expect(description(dialog)).toContain(
+            "your first month on Plan B ends now",
+        );
+        expect(description(dialog)).toContain("isn't refunded");
+        expect(description(dialog)).not.toMatch(/^From /);
+        expect(dialog.textContent).toContain("Continue to payment");
+    });
+
+    it("a cheaper plan: from the date, with the plan kept until then", async () => {
+        const dialog = await open(
+            quote({
+                kind: "SCHEDULED",
+                firstMonth: "AT_END",
+                plan: { id: "a2", name: "Plan A2", version: 3 },
+                chargeNowPaise: 0,
+                chargeNowGstPaise: 0,
+                chargeNowTotalPaise: 0,
+                startAt: "2099-03-21T00:00:00.000Z",
+                effectiveAt: "2099-03-21T00:00:00.000Z",
+                payNowTotalPaise: 0,
+                mandateCheck: "REFUNDED",
+            }),
+        );
+        expect(description(dialog)).toMatch(
+            /^From .*2099: you keep Plan B until then\. Your first month runs to its end first, and nothing more is charged for Plan B\./,
+        );
+        expect(dialog.textContent).toContain("Continue to payment");
+    });
+
+    it("Free: from the date, the plan kept, nothing more charged, and no payment", async () => {
+        const dialog = await open(
+            quote({
+                kind: "TO_FREE",
+                plan: { id: "a", name: "Plan A", version: 3 },
+                chargeNowPaise: 0,
+                chargeNowGstPaise: 0,
+                chargeNowTotalPaise: 0,
+                startAt: null,
+                effectiveAt: "2099-03-21T00:00:00.000Z",
+                payNowTotalPaise: 0,
+                mandateCheck: "NONE",
+            }),
+        );
+        expect(description(dialog)).toMatch(
+            /^From .*2099: you keep Plan B until then\. Nothing more is charged\./,
+        );
+        expect(dialog.textContent).toContain("Move to Plan A");
+        expect(dialog.textContent).not.toContain("Continue to payment");
+    });
+});

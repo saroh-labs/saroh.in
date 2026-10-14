@@ -51,7 +51,9 @@ export async function catalogueOfVersion(
 /**
  * A business may have one free trial: never again once a trial checkout of
  * its own was completed, whatever happened after (KTD-18's "the client
- * names a plan, the server decides").
+ * names a plan, the server decides"). It is the offer of the plan the
+ * business first started with one (DEC-159): a plan with no offer starts
+ * at its full price and uses nothing up.
  */
 export async function hadTrial(
     db: Pick<Tx, "billingCheckout">,
@@ -68,7 +70,7 @@ export async function hadTrial(
  * Whether the business's trial was DEC-093's nominal first month: its
  * trial checkout (one per business, `hadTrial`) took a charge as it was
  * authorised. A trial that cost nothing is a free trial, worded as one.
- * Another plan chosen during it keeps the first checkout's month, so any
+ * One checkout starts it and no other plan continues it (DEC-159), so any
  * completed trial checkout with a charge counts.
  */
 export async function paidFirstMonth(

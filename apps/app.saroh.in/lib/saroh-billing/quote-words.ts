@@ -16,6 +16,9 @@ import type { ChangeQuote, Cycle } from "./plan-view";
  *   first month, a first charge, an upgrade's difference) it says so and
  *   that it isn't refunded; when nothing is owed, it says Razorpay takes a
  *   small amount to check the mandate and refunds it.
+ * - When it starts is said first (DEC-159): a dearer plan "Starts today"
+ *   with what is paid now, and any other change "From ‹date›", with the
+ *   plan kept until then. Nothing paid is refunded, so nothing is cut short.
  */
 
 /** A line of a quote: what, and how much or when. */
@@ -27,6 +30,11 @@ export interface QuoteLine {
 
 export interface QuoteSummary {
     title: string;
+    /**
+     * A change that waits for the end of what is paid: "From ‹date›: you
+     * keep ‹plan› until then.", said before the lead. Null when it doesn't.
+     */
+    from: { iso: string; keep: string } | null;
     lead: string;
     lines: QuoteLine[];
     /** The confirm button; null when there is nothing to do. */
@@ -73,10 +81,14 @@ export function endingAddonsNote(
 /** A change's quote in words, from the plan the business is on now. */
 export function quoteSummary(
     q: ChangeQuote,
-    opts: { currentPlan?: string | null } = {},
+    opts: { currentPlan?: string | null; now?: Date } = {},
 ): QuoteSummary {
     const plan = q.plan.name;
     const current = opts.currentPlan ?? "your current plan";
+    const now = opts.now ?? new Date();
+    /** The date a change waits for, while it is still ahead. */
+    const waitsFor = (iso: string | null) =>
+        iso && new Date(iso) > now ? { iso, keep: current } : null;
     const stay = `If it doesn't go through, you stay on ${current}.`;
     const oneTime = q.payment === "ONE_TIME";
     const recurring: QuoteLine = {
@@ -114,21 +126,38 @@ export function quoteSummary(
         label,
         value: withGst(q.payNowTotalPaise),
     });
-    const toPayment = { confirm: "Continue to payment", toPayment: true };
+    const toPayment = {
+        from: null,
+        confirm: "Continue to payment",
+        toPayment: true,
+    };
+    const startsToday: QuoteLine = {
+        label: "Starts today",
+        value: `${formatInr(q.payNowTotalPaise)} now (incl. GST)`,
+    };
 
     switch (q.kind) {
         case "NONE":
             return {
                 title: `You're on ${plan} already`,
+                from: null,
                 lead: "Nothing changes.",
                 lines: [],
                 confirm: null,
                 toPayment: false,
             };
-        case "TO_FREE":
+        case "TO_FREE": {
+            const from = waitsFor(q.effectiveAt);
+            const over =
+                "anything over Free's limits stays readable, but you can't add more.";
             return {
                 title: `Move to ${plan}`,
-                lead: "Everything stays until then. Anything over Free's limits stays readable, but you can't add more.",
+                from,
+                lead: !from
+                    ? `From today, ${over}`
+                    : q.firstMonth === "AT_END"
+                      ? `Your first month runs to its end and nothing more is charged. After that, ${over}`
+                      : `Nothing more is charged. After that, ${over}`,
                 lines: [
                     {
                         label: "From",
@@ -139,6 +168,7 @@ export function quoteSummary(
                 confirm: `Move to ${plan}`,
                 toPayment: false,
             };
+        }
         case "TRIAL":
             // DEC-093's nominal first month, or free first days.
             if (q.chargeNowPaise > 0) {
@@ -199,28 +229,35 @@ export function quoteSummary(
                       ],
                       ...toPayment,
                   };
-        case "SCHEDULED":
+        case "SCHEDULED": {
+            const firstMonth =
+                q.firstMonth === "AT_END"
+                    ? `Your first month runs to its end first, and nothing more is charged for ${current}. `
+                    : "";
             return oneTime
                 ? {
                       title: `Move to ${plan}`,
-                      lead: "You pay for the year today. It starts on the date below, and everything stays as it is until then.",
+                      lead: `${firstMonth}You pay for the year today. It starts on the date below, and everything stays as it is until then.`,
                       lines: [
                           today("Today, for 12 months"),
                           { label: "Starts", value: "", iso: q.startAt },
                           term,
                       ],
                       ...toPayment,
+                      from: waitsFor(q.startAt),
                   }
                 : {
                       title: `Move to ${plan}`,
-                      lead: `${REFUNDED} Nothing changes until it starts.`,
+                      lead: `${firstMonth}${REFUNDED} Nothing changes until it starts.`,
                       lines: [
                           { label: "Starts", value: "", iso: q.startAt },
                           recurring,
                           term,
                       ],
                       ...toPayment,
+                      from: waitsFor(q.startAt),
                   };
+        }
         case "RENEW":
             return oneTime
                 ? {
@@ -243,6 +280,19 @@ export function quoteSummary(
                       ...toPayment,
                   };
         default:
+            // A dearer plan chosen during the first month (DEC-159): the
+            // month ends, and the plan starts today at its full price.
+            if (q.firstMonth === "NOW") {
+                const ends = `${plan} starts today at its full price, so your first month on ${current} ends now. What you paid for it isn't refunded.`;
+                return {
+                    title: `Upgrade to ${plan}`,
+                    lead: oneTime
+                        ? `${ends} One payment for 12 months, no autopay. ${stay}`
+                        : `${ends} You pay ${plan}'s first month today as you set up UPI Autopay or a card for it. ${stay}`,
+                    lines: [startsToday, recurring, ...coupon, term],
+                    ...toPayment,
+                };
+            }
             return oneTime
                 ? {
                       title: `Start ${plan}`,

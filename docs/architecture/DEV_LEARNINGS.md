@@ -4571,3 +4571,32 @@ for the client. "Live" and "the newest published" are different while a
 version waits, and an editor starts from the newest. A page restored from
 the back/forward cache is loaded again, not refreshed.
 **Category**: admin · pricing · `docs/patterns/frontend-data-and-state.md`
+## A business in its first month moved between paid plans for nothing, and used the dearest one for the first month's amount
+
+**Symptom**: found 13 Oct 2026 in a test payment on the dev environment,
+with the first-month offer on both paid plans. A business on Free started
+the dearest plan with its first month, a minute later switched to the
+cheaper one, and two minutes later switched back. Each switch was a new
+checkout with nothing charged and the same first-charge date, and each took
+effect at once.
+**Cause**: the quote read "the business is `TRIALING`" as "another paid
+plan is still a trial, to the same end". It never looked at which plan the
+offer was on or which way the business was moving, so the first month
+followed the business from plan to plan. Free during a first month took
+effect at once for the mirror-image reason: "a trial paid nothing ahead",
+which stopped being true when the first month began to cost something
+(DEC-093).
+**Fix**: DEC-159. When a change takes effect is one rule
+(`billing/change-timing.ts`) that the quote, the change and the webhook all
+read: a dearer plan starts today at its full price, and anything else waits
+until what was paid for has run out, a first month included. The first
+month's provider subscription is cancelled at once when the business leaves
+it, because it has no cycle to end with and would otherwise take the full
+charge at the month's end.
+**Check**: `checkout-quote.spec.ts` fails if any target plan quotes a
+`TRIAL` while one runs. `checkout.db.spec.ts` replays the three steps and
+asserts the plan kept, the dates and what the provider is told.
+**Rule**: an offer belongs to the thing it is set on, and is spent by the
+business once. A state like `TRIALING` says where a business is, never what
+its next change costs: ask `change-timing.ts`.
+**Category**: backend · `docs/patterns/backend-billing-and-classes.md`

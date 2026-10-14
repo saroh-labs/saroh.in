@@ -90,6 +90,13 @@ export interface ChangeQuote {
     startAt: string | null;
     effectiveAt: string | null;
     trialEndsAt: string | null;
+    /**
+     * A change made during the first month (DEC-159): `NOW` — a dearer
+     * plan, which ends the month and starts today at its full price;
+     * `AT_END` — it waits for the month to end. Null outside a first
+     * month, and absent from an API not yet on that release.
+     */
+    firstMonth?: "NOW" | "AT_END" | null;
     coupon: { code: string; discountPaise: number; charges: number } | null;
     firstChargePaise: number;
     firstChargeGstPaise: number;
@@ -430,7 +437,9 @@ export function yourPlan(input: {
 
     // The term (DEC-093, #803): when it ends, and the one-tap renewal in its
     // last days. Left alone, the plan runs to the end and then it's Free.
-    if (term && !given && !renewed) {
+    // A plan the business is leaving has no charges left to run (DEC-159).
+    const leaving = Boolean(sub?.cancelAtPeriodEnd) && !term?.renewOpen;
+    if (term && !given && !renewed && !leaving) {
         const year = term.payment === "ONE_TIME";
         notes.push(
             term.renewOpen
@@ -490,8 +499,49 @@ export interface PickerRow {
     /** The catalogue card's lead ("Everything in Plan A, plus:") and its first lines. */
     lead: string;
     lines: string[];
-    /** Where the business stands with it under a plan given for a while. */
-    note: { lead: string; iso: string | null } | null;
+    /**
+     * Where the business stands with it: under a plan given for a while,
+     * or when a change to it would start (DEC-159). Words around one date.
+     */
+    note: { lead: string; iso: string | null; tail?: string } | null;
+}
+
+/** What `GET …/billing/change-plan` said of one plan, as a row needs it. */
+export type RowQuote = Pick<
+    ChangeQuote,
+    "kind" | "effectiveAt" | "firstMonth" | "payNowTotalPaise"
+>;
+
+/** A change already made that waits for its date: the plan, and from when. */
+export interface WaitingMove {
+    planId: string;
+    iso: string;
+    /** The cycle it was authorised on; null: a free plan, which has none. */
+    cycle: Cycle | null;
+}
+
+/**
+ * The change that waits for the end of what is paid (DEC-159): the plan
+ * the business authorised for that date, else the move its plan is on
+ * course for (Free it chose, a cheaper plan). Null when nothing waits, or
+ * only its own plan's renewal or next version does.
+ */
+export function waitingMove(input: {
+    access: Pick<BillingAccessView, "plan" | "pendingMove">;
+    checkouts: CheckoutsView | null;
+}): WaitingMove | null {
+    const onId = input.access.plan?.id ?? null;
+    const scheduled = input.checkouts?.scheduled ?? null;
+    if (scheduled?.startAt && scheduled.plan.id !== onId) {
+        return {
+            planId: scheduled.plan.id,
+            iso: scheduled.startAt,
+            cycle: scheduled.cycle === "year" ? "year" : "month",
+        };
+    }
+    const move = input.access.pendingMove;
+    if (!move || move.planId === move.fromPlanId || move.waiting) return null;
+    return { planId: move.planId, iso: move.from, cycle: null };
 }
 
 /** How many of a plan card's lines the picker shows. */
@@ -504,6 +554,11 @@ export const PICKER_LINES = 4;
  * (`trials`: plan ids the API quoted as a TRIAL). Each says what it unlocks,
  * from the catalogue's own card lines (UX-045).
  *
+ * When a change would start is the API's (`quotes`, DEC-159): a dearer plan
+ * "Starts today" with what is paid now, and any other "From ‹date›", the
+ * end of what is paid, with the plan kept until then. A change that already
+ * waits (`waiting`) says so on its row, with no button to make it twice.
+ *
  * Under a plan given for a while (a launch offer, UX-044), that plan is the
  * one it's on — "You're on this until …", no trial on it — and the plan it's
  * billed for is what comes "After …".
@@ -515,6 +570,12 @@ export function pickerRows(input: {
     trials: ReadonlySet<string>;
     /** A plan given for a while, and until when (null: until changed). */
     given?: { planId: string; until: string | null } | null;
+    /** The API's quote for each plan on this cycle; none: no timing said. */
+    quotes?: ReadonlyMap<string, RowQuote>;
+    /** A change already made that waits for its date. */
+    waiting?: WaitingMove | null;
+    /** The clock, for "is that date still ahead". */
+    now?: Date;
 }): PickerRow[] {
     const { catalog, cycle } = input;
     const plans = offeredPlans(catalog);
@@ -526,6 +587,9 @@ export function pickerRows(input: {
     const onId = givenId ?? billedId;
     const onAt = plans.findIndex((p) => p.id === onId);
     const onCycle = billedCycle(input.subscription);
+    const onName = plans[onAt]?.name ?? "your plan";
+    const now = input.now ?? new Date();
+    const keep = `: you keep ${onName} until then.`;
     return plans.map((p, i) => {
         const up = i > onAt;
         const held = p.id === givenId;
@@ -546,6 +610,39 @@ export function pickerRows(input: {
         const current =
             held || (samePlan && !givenId && (free || cycle === onCycle));
         const card = cardLines(catalog, p.id);
+        // This plan, on this cycle, is where a change already made lands.
+        const awaited =
+            input.waiting?.planId === p.id &&
+            (input.waiting.cycle === null || input.waiting.cycle === cycle)
+                ? input.waiting
+                : null;
+        const quoted = current ? undefined : input.quotes?.get(p.id);
+        const later =
+            quoted &&
+            (quoted.kind === "SCHEDULED" || quoted.kind === "TO_FREE") &&
+            quoted.effectiveAt &&
+            new Date(quoted.effectiveAt) > now
+                ? quoted.effectiveAt
+                : null;
+        const today =
+            quoted &&
+            (quoted.kind === "UPGRADE" || quoted.firstMonth === "NOW") &&
+            quoted.payNowTotalPaise > 0
+                ? `Starts today: ${formatInr(quoted.payNowTotalPaise)} now (incl. GST)`
+                : null;
+        const timing = awaited
+            ? { lead: "From ", iso: awaited.iso, tail: keep }
+            : later
+              ? { lead: "From ", iso: later, tail: keep }
+              : today
+                ? {
+                      lead:
+                          quoted?.firstMonth === "NOW"
+                              ? `${today}. Your first month on ${onName} ends.`
+                              : today,
+                      iso: null,
+                  }
+                : null;
         const note = held
             ? {
                   lead: input.given?.until
@@ -557,7 +654,9 @@ export function pickerRows(input: {
               ? input.given?.until
                   ? { lead: "After ", iso: input.given.until }
                   : null
-              : null;
+              : givenId
+                ? null
+                : timing;
         return {
             planId: p.id,
             name: p.name,
@@ -574,7 +673,7 @@ export function pickerRows(input: {
             current,
             cta: held
                 ? `Keep ${p.name}`
-                : current || (givenId && samePlan)
+                : current || (givenId && samePlan) || (awaited && !givenId)
                   ? null
                   : firstPaise > 0
                     ? "Start with the first month"

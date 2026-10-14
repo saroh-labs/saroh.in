@@ -48,8 +48,8 @@ import { termEndingOf } from "./term-ending";
  * | ---------------------------------------------------- | ----------------------------------------- | ------------------------------------ |
  * | A plan given until a date ends (#805)                 | `plan-ending` notice, 30/7/1 days ahead   | the end                              |
  * | A 12-month term not paid for again (DEC-100)          | `term-ending` notice, 30/7/1 days ahead   | the end                              |
- * | Free or a cheaper plan chosen, or cancelled, for the period's end | this, 30/7/1 days ahead       | the period's end                     |
- * | Anything at once: a payment that failed for good, a cancel now, a trial dropped to Free, a limit or add-on taken away | this, within the hour | 7 days after the notice |
+ * | Free or a cheaper plan chosen, or cancelled, for the period's end, or the first month's (DEC-159) | this, 30/7/1 days ahead | the period's end      |
+ * | Anything at once: a payment that failed for good, a cancel now, a limit or add-on taken away | this, within the hour | 7 days after the notice |
  *
  * Whichever notice first lists what pauses writes the grace claim (one per
  * set of limits); nothing pauses until 7 days after it, so a move told
