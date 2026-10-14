@@ -117,6 +117,13 @@ export interface ChangeQuote {
      * from before it sends none, which reads as none ending.
      */
     addonsEnding?: EndingAddon[];
+    /**
+     * Whether the business has its registered address on its profile.
+     * False: the dialog asks for it, required with a GSTIN (Saroh's invoice
+     * to a registered buyer carries their address, CGST Rule 46(e)). An API
+     * from before it sends none, which asks nothing.
+     */
+    registeredAddress?: boolean;
 }
 
 /** An add-on that ends with a plan change, and how many are held. */

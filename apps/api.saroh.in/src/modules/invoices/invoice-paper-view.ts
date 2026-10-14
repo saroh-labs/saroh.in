@@ -86,6 +86,12 @@ export interface PaperView {
         lines: string[];
         /** "GSTIN … · Karnataka (29)", or "Not registered for GST". */
         tax: string;
+        /**
+         * One small line under the tax line: the product the seller sells
+         * under ("Saroh is a product of …"). Only Saroh's own invoices to
+         * businesses set it.
+         */
+        product?: string | null;
     };
     billedTo: {
         name: string;
@@ -115,6 +121,12 @@ export interface PaperView {
      * it or the business set none; absent from Saroh's own invoices.
      */
     howToPay?: string[] | null;
+    /**
+     * Who signs it (CGST Rule 46(q)): "For ‹legal name›", "Authorised
+     * signatory" and the note that it is computer-generated, one quiet
+     * block under the total. Only Saroh's own invoices to businesses set it.
+     */
+    signature?: { for: string; role: string; note: string } | null;
 }
 
 const MONTHS = [

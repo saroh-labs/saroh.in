@@ -6,14 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ChangeQuote } from "@/lib/saroh-billing/plan-view";
 
-import { ChangePlanDialog } from "./change-plan-dialog";
+import { addressProblems, ChangePlanDialog } from "./change-plan-dialog";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
 }));
 const quoteChangeAction = vi.fn();
+const changePlanAction = vi.fn();
 vi.mock("@/lib/saroh-billing/billing-actions", () => ({
-    changePlanAction: vi.fn(),
+    changePlanAction: (...args: unknown[]) =>
+        changePlanAction(...args) as unknown,
     confirmCheckoutAction: vi.fn(),
     quoteChangeAction: (...args: unknown[]) =>
         quoteChangeAction(...args) as unknown,
@@ -61,6 +63,7 @@ beforeEach(() => {
     document.body.appendChild(host);
     root = createRoot(host);
     quoteChangeAction.mockReset();
+    changePlanAction.mockReset();
 });
 
 afterEach(() => {
@@ -204,5 +207,134 @@ describe("ChangePlanDialog: when the change starts (DEC-159)", () => {
         );
         expect(dialog.textContent).toContain("Move to Plan A");
         expect(dialog.textContent).not.toContain("Continue to payment");
+    });
+});
+
+/** Type into a controlled input as a person would. */
+function type(input: HTMLInputElement, value: string) {
+    act(() => {
+        // The prototype's own setter, so React sees the change.
+        Reflect.set(HTMLInputElement.prototype, "value", value, input);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+}
+
+const field = (dialog: Element, id: string) => {
+    const el = dialog.querySelector<HTMLInputElement>(`#${id}`);
+    if (!el) throw new Error(`no #${id}`);
+    return el;
+};
+
+async function press(dialog: Element, label: string) {
+    const button = Array.from(dialog.querySelectorAll("button")).find(
+        (b) => b.textContent === label,
+    );
+    if (!button) throw new Error(`no ${label} button`);
+    await act(async () => {
+        button.click();
+        await Promise.resolve();
+    });
+}
+
+describe("ChangePlanDialog: the registered address for Saroh's invoice (Rule 46(e))", () => {
+    const newPlan = (over: Partial<ChangeQuote> = {}) =>
+        quote({ kind: "NEW", startAt: null, ...over });
+
+    it("asks nothing when the business already has its registered address", async () => {
+        const dialog = await open(newPlan({ registeredAddress: true }));
+        expect(dialog.querySelector("#bill-address-line1")).toBeNull();
+        expect(dialog.textContent).toContain(
+            "Details for Saroh's invoice (optional)",
+        );
+    });
+
+    it("asks for it when there is none: optional without a GSTIN", async () => {
+        const dialog = await open(newPlan({ registeredAddress: false }));
+        expect(dialog.textContent).toContain("Registered address");
+        expect(dialog.querySelector("summary")?.textContent).toBe(
+            "Details for Saroh's invoice",
+        );
+        const label = dialog.querySelector('label[for="bill-address-line1"]');
+        expect(label?.textContent).toBe("Address line 1 (optional)");
+    });
+
+    it("needs it with a GSTIN: says so on the field and sends nothing", async () => {
+        const dialog = await open(newPlan({ registeredAddress: false }));
+        type(field(dialog, "bill-gstin"), "29AABCI1234A1Z7");
+        expect(
+            dialog.querySelector('label[for="bill-address-line1"]')
+                ?.textContent,
+        ).toBe("Address line 1");
+        await press(dialog, "Continue to payment");
+        expect(changePlanAction).not.toHaveBeenCalled();
+        const line1 = field(dialog, "bill-address-line1");
+        expect(line1.getAttribute("aria-invalid")).toBe("true");
+        expect(dialog.textContent).toContain(
+            "Add the registered address: it prints on Saroh's invoice with your GSTIN.",
+        );
+    });
+
+    it("sends the address it was given with the GSTIN", async () => {
+        changePlanAction.mockResolvedValue({ ok: false, error: "stop" });
+        const dialog = await open(newPlan({ registeredAddress: false }));
+        type(field(dialog, "bill-gstin"), "29AABCI1234A1Z7");
+        type(field(dialog, "bill-address-line1"), "4 Mill Road");
+        type(field(dialog, "bill-city"), "Pune");
+        type(field(dialog, "bill-pin"), "411001");
+        await press(dialog, "Continue to payment");
+        expect(changePlanAction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                gstin: "29AABCI1234A1Z7",
+                registeredAddress: {
+                    line1: "4 Mill Road",
+                    line2: "",
+                    city: "Pune",
+                    postalCode: "411001",
+                },
+            }),
+        );
+    });
+});
+
+describe("addressProblems", () => {
+    const none = {
+        addressLine1: "",
+        addressLine2: "",
+        city: "",
+        postalCode: "",
+    };
+
+    it("is nothing for no address without a GSTIN", () => {
+        expect(addressProblems(none, false)).toEqual({});
+    });
+
+    it("names each missing part, and a PIN that isn't six digits", () => {
+        expect(Object.keys(addressProblems(none, true))).toEqual([
+            "addressLine1",
+            "city",
+            "postalCode",
+        ]);
+        expect(
+            addressProblems(
+                {
+                    ...none,
+                    addressLine1: "4 Mill Road",
+                    city: "Pune",
+                    postalCode: "4110",
+                },
+                false,
+            ),
+        ).toEqual({ postalCode: "A PIN code is six digits, like 560038." });
+        expect(
+            addressProblems(
+                {
+                    ...none,
+                    addressLine1: "4 Mill Road",
+                    city: "Pune",
+                    postalCode: "411 001",
+                },
+                true,
+            ),
+        ).toEqual({});
     });
 });

@@ -1,4 +1,4 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
     IsBoolean,
     IsIn,
@@ -10,8 +10,10 @@ import {
     MaxLength,
     Min,
     MinLength,
+    ValidateNested,
 } from "class-validator";
 
+import { RegisteredAddressDto } from "../organizations/dto";
 import { MAX_ADDON_QUANTITY } from "./offers";
 import { SUPPORTED_BILLING_PROVIDERS } from "./providers/billing-provider.port";
 
@@ -88,6 +90,17 @@ export class ChangePlanDto {
     @IsString()
     @Matches(/^[0-9A-Z]{15}$/, { message: "A GSTIN is 15 characters." })
     gstin?: string;
+
+    /**
+     * The business's registered address, asked for when its profile has
+     * none (Rule 46(e): a registered buyer's invoice carries its address).
+     * Required with a GSTIN, optional otherwise; saved to the business's
+     * own registered address, never over one it already has.
+     */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => RegisteredAddressDto)
+    registeredAddress?: RegisteredAddressDto;
 
     /**
      * A coupon code (U16), upper-cased. Checked on the server against the

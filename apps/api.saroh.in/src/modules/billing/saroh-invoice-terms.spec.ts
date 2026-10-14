@@ -6,8 +6,10 @@
  */
 import { gstPaise } from "@saroh/pricing-catalog";
 
+import { periodWords } from "./billing-email.job";
 import { invoiceEmail, paymentFailedEmail } from "./billing-emails";
-import { sarohInvoicePaper } from "./saroh-invoice-paper";
+import { checkoutAddress } from "./checkout.service";
+import { sarohInvoicePaper, sarohTaxRows } from "./saroh-invoice-paper";
 import {
     MAX_INVOICE_NUMBER_LENGTH,
     paiseToRupees,
@@ -307,12 +309,60 @@ describe("sarohInvoicePaper", () => {
             "Before discount",
             "Discount",
             "Taxable value",
-            "CGST",
-            "SGST",
+            "CGST 9%",
+            "SGST 9%",
         ]);
-        expect(view.lines[0]!.sub).toContain("less ₹111 discount");
+        expect(view.lines[0]!.sub).toContain("less ₹111.00 discount");
         expect(view.total).toBe("₹130.98");
         expect(view.footer).toContain("section 31");
+    });
+
+    it("writes every amount with its paise", () => {
+        const view = sarohInvoicePaper(base);
+        expect(view.sums).toEqual([
+            ["Before discount", "₹222.00"],
+            ["Discount", "−₹111.00"],
+            ["Taxable value", "₹111.00"],
+            ["CGST 9%", "₹9.99"],
+            ["SGST 9%", "₹9.99"],
+        ]);
+        expect(view.lines[0]!.amount).toBe("₹111.00");
+    });
+
+    it("leads with the seller's legal name, and names Saroh as its product", () => {
+        const view = sarohInvoicePaper(base);
+        expect(view.seller.name).toBe("Example Labs Pvt Ltd");
+        expect(view.seller.lines).toEqual(["1 Test Road"]);
+        expect(view.seller.tax).toBe("GSTIN 29AAAAA0000A1Z5 · Karnataka (29)");
+        expect(view.seller.product).toBe(
+            "Saroh is a product of Example Labs Pvt Ltd",
+        );
+    });
+
+    it("is signed for the seller, and says it is computer-generated (Rule 46(q))", () => {
+        expect(sarohInvoicePaper(base).signature).toEqual({
+            for: "For Example Labs Pvt Ltd",
+            role: "Authorised signatory",
+            note: "This is a computer-generated invoice and needs no physical signature.",
+        });
+        const unnamed = sarohInvoicePaper({ ...base, sellerLegalName: null });
+        expect(unnamed.seller.name).toBe("Saroh");
+        expect(unnamed.seller.product).toBeNull();
+        expect(unnamed.signature).toBeNull();
+    });
+
+    it("gives the buyer's state from the place of supply, under their address", () => {
+        expect(sarohInvoicePaper(base).billedTo.detail).toBe(
+            "2 Shop Lane\nKarnataka (29)",
+        );
+        // A profile in another state can't print a second state.
+        const elsewhere = sarohInvoicePaper({
+            ...base,
+            billToState: "27",
+            placeOfSupply: "06",
+        });
+        expect(elsewhere.billedTo.detail).toBe("2 Shop Lane\nHaryana (06)");
+        expect(elsewhere.placeOfSupply).toBe("Haryana (06) — CGST + SGST");
     });
 
     it("is IGST across states, and only an invoice without Saroh's GSTIN", () => {
@@ -329,7 +379,29 @@ describe("sarohInvoicePaper", () => {
         });
         expect(view.title).toBe("Invoice");
         expect(view.placeOfSupply).toBe("Maharashtra (27) — IGST");
-        expect(view.sums.map(([k]) => k)).toEqual(["Taxable value", "IGST"]);
+        expect(view.sums.map(([k]) => k)).toEqual([
+            "Taxable value",
+            "IGST 18%",
+        ]);
+    });
+
+    it("shows a tax row per rate, each from its lines' own rate", () => {
+        const line = base.lines[0]!;
+        expect(
+            sarohTaxRows(
+                [
+                    { ...line, gstRateBps: 1800, cgstPaise: 90, sgstPaise: 90 },
+                    { ...line, gstRateBps: 500, cgstPaise: 25, sgstPaise: 25 },
+                    { ...line, gstRateBps: 1800, cgstPaise: 9, sgstPaise: 9 },
+                ],
+                true,
+            ),
+        ).toEqual([
+            ["CGST 9%", 99],
+            ["SGST 9%", 99],
+            ["CGST 2.5%", 25],
+            ["SGST 2.5%", 25],
+        ]);
     });
 });
 
@@ -344,6 +416,31 @@ describe("billing emails", () => {
         });
         expect(e.html).not.toContain("<b>Shop</b>");
         expect(e.html).toContain("&lt;b&gt;Shop&lt;/b&gt;");
+    });
+
+    it("says a first month's charge is the first month's, and where to find it", () => {
+        const first = invoiceEmail({
+            businessName: "Shop",
+            number: "SA/26/10/0001",
+            planName: "Plan B",
+            total: "₹1.18",
+            period: "14 Oct to 13 Nov 2026",
+            firstMonth: true,
+        });
+        expect(first.html).toContain(
+            "We&#39;ve charged ₹1.18 for the first month of Shop&#39;s Plan B plan, 14 Oct to 13 Nov 2026.",
+        );
+        expect(first.html).toContain("Settings › Plan and billing.");
+        const renewal = invoiceEmail({
+            businessName: "Shop",
+            number: "SA/26/11/0001",
+            planName: "Plan B",
+            total: "₹1,768.82",
+            period: "13 Nov to 13 Dec 2026",
+        });
+        expect(renewal.html).toContain(
+            "We&#39;ve charged ₹1,768.82 for Shop&#39;s Plan B plan, 13 Nov to 13 Dec 2026.",
+        );
     });
 
     it("says what happens next when a payment fails", () => {
@@ -361,5 +458,83 @@ describe("billing emails", () => {
                 final: true,
             }).subject,
         ).toBe("Shop is now on the Free plan");
+    });
+});
+
+describe("the invoice email's period", () => {
+    it("names the year once when both ends share it", () => {
+        expect(
+            periodWords(
+                new Date("2026-10-14T08:00:00Z"),
+                new Date("2026-11-13T08:00:00Z"),
+            ),
+        ).toBe("14 Oct to 13 Nov 2026");
+        expect(
+            periodWords(
+                new Date("2026-12-20T08:00:00Z"),
+                new Date("2027-01-19T08:00:00Z"),
+            ),
+        ).toBe("20 Dec 2026 to 19 Jan 2027");
+    });
+});
+
+describe("checkoutAddress (Rule 46(e))", () => {
+    const field = (fn: () => unknown) => {
+        try {
+            fn();
+        } catch (e) {
+            return (
+                (
+                    e as {
+                        getResponse?: () => { details?: { field?: string } };
+                    }
+                ).getResponse?.()?.details?.field ?? "none"
+            );
+        }
+        return null;
+    };
+
+    it("needs the address when a GSTIN is given, and not otherwise", () => {
+        expect(field(() => checkoutAddress(undefined, true))).toBe(
+            "addressLine1",
+        );
+        expect(checkoutAddress(undefined, false)).toBeNull();
+        expect(checkoutAddress({ line1: " ", city: "" }, false)).toBeNull();
+    });
+
+    it("takes a whole address, with a six-digit PIN written bare", () => {
+        expect(
+            checkoutAddress(
+                { line1: "2 Shop Lane", city: "Pune", postalCode: "411 001" },
+                true,
+            ),
+        ).toEqual({
+            addressLine1: "2 Shop Lane",
+            addressLine2: null,
+            city: "Pune",
+            postalCode: "411001",
+        });
+    });
+
+    it("names the part that is missing or wrong", () => {
+        expect(field(() => checkoutAddress({ city: "Pune" }, false))).toBe(
+            "addressLine1",
+        );
+        expect(
+            field(() =>
+                checkoutAddress(
+                    { line1: "2 Shop Lane", postalCode: "411001" },
+                    false,
+                ),
+            ),
+        ).toBe("city");
+        expect(
+            field(() =>
+                checkoutAddress(
+                    { line1: "2 Shop Lane", city: "Pune", postalCode: "41100" },
+                    false,
+                ),
+            ),
+        ).toBe("postalCode");
     });
 });

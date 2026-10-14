@@ -192,6 +192,12 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
         doc.text(line, left, ly, { width: leftW, lineGap: 1.5 });
         ly = doc.y;
     }
+    if (view.seller.product) {
+        doc.fontSize(8.5).text(view.seller.product, left, ly + 3, {
+            width: leftW,
+        });
+        ly = doc.y;
+    }
 
     let ry = y + 2;
     doc.font("Bold")
@@ -345,11 +351,13 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
     // ── The sums, the total and the law it is issued under ──────────────
     doc.font("Regular").fontSize(8.5);
     const footerH = doc.heightOfString(view.footer, { width });
+    const signatureH = view.signature ? 52 : 0;
     const needed =
         10 +
         view.sums.length * 15 +
         34 +
         (view.inclusive ? 14 : 0) +
+        signatureH +
         20 +
         footerH;
     if (y + needed > bottom()) y = continued();
@@ -379,6 +387,23 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
             .fontSize(8.5)
             .fillColor(MUTED)
             .text(view.inclusive, sx, y, { width: sumW });
+        y = doc.y;
+    }
+
+    // ── Who signs it (CGST Rule 46(q)), on Saroh's own invoices ─────────
+    if (view.signature) {
+        y += 16;
+        doc.font("Bold")
+            .fontSize(9)
+            .fillColor(INK)
+            .text(view.signature.for, left, y, { width, align: "right" });
+        y = doc.y + 1;
+        doc.font("Regular")
+            .fontSize(8.5)
+            .fillColor(MUTED)
+            .text(view.signature.role, left, y, { width, align: "right" });
+        y = doc.y + 1;
+        doc.text(view.signature.note, left, y, { width, align: "right" });
         y = doc.y;
     }
 

@@ -553,14 +553,28 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   is asked (a 400 for a state that isn't one, a GSTIN that doesn't check out
   or isn't in the state given), and keeps them on the `BillingCheckout`.
   Renewals read them from the checkout that made the provider subscription.
+- **The paper** (CGST Rule 46): the seller's legal name heads it, then
+  the registered address, contact and GSTIN · state, and a small "Saroh is
+  a product of ‹legal name›" (all from the seller settings). Lines name the
+  plan ("Saroh Grow plan: first month"). The sums carry each tax's rate,
+  from the lines' own GST rate ("CGST 9%", "SGST 9%", "IGST 18%"), every
+  amount with its paise, and under the total "For ‹legal name› ·
+  Authorised signatory" with the note that it is computer-generated. The
+  bill-to prints the buyer's address and the state of the place of supply,
+  so the two never disagree.
+- **The buyer's address** (Rule 46(e)): the quote says whether the
+  business has its registered address (`registeredAddress`); without one
+  the change-plan dialog asks for it, required with a GSTIN and optional
+  otherwise, and `POST …/billing/change-plan` takes `registeredAddress`
+  (line1, line2, city, PIN), checked before the provider is asked and saved
+  to the business's own registered address, never over one it has.
 - **After money, nothing is refused** (DEC-068): a business with no address
   still gets its invoice; missing seller details are logged
   (`saroh_invoice_seller_incomplete`) and the paper says "Invoice", not
   "Tax invoice".
 - **Reading.** `GET …/billing/invoices` (newest first) and
   `GET …/billing/invoices/:id/pdf` (drawn on request, never stored), both
-  `billing:read`. The Settings › Plan list and download wait for U14's
-  designs.
+  `billing:read`.
 - **Mail.** `billing.email` (`backend-jobs.md`) sends the invoice with its
   PDF, a failed payment (retrying, or now on Free), a trial ending (U16
   queues it) and, 3 days before each autopay charge, the renewal reminder

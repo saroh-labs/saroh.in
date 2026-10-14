@@ -249,7 +249,15 @@ async function emailJobs() {
 async function onPaidPlan(
     ctx: OrganizationContext,
     plan = "b",
-    billTo: { billingState?: string; gstin?: string } = {},
+    billTo: {
+        billingState?: string;
+        gstin?: string;
+        registeredAddress?: {
+            line1?: string;
+            city?: string;
+            postalCode?: string;
+        };
+    } = {},
 ) {
     const r = await checkout.changePlan(ctx, {
         plan,
@@ -291,7 +299,7 @@ describe("a plan's charges", () => {
         expect(first.cgstPaise + first.sgstPaise).toBe(gstPaise(b.priceCents));
         expect(first.lines).toEqual([
             expect.objectContaining({
-                description: "Plan B plan, monthly",
+                description: "Saroh Plan B plan, monthly",
                 sac: "999999",
                 unitPaise: b.priceCents,
                 amountPaise: withGstPaise(b.priceCents),
@@ -412,6 +420,41 @@ describe("a plan's charges", () => {
         expect(fake.createCalls).toHaveLength(0);
     });
 
+    it("asks a business with a GSTIN and no address for its registered address, keeps it, and prints it (Rule 46(e))", async () => {
+        const ctx = await business();
+        const theirs = gstin("27");
+        await expect(
+            checkout.changePlan(ctx, {
+                plan: "b",
+                cycle: "month",
+                gstin: theirs,
+            }),
+        ).rejects.toMatchObject({ status: 400 });
+        expect(fake.createCalls).toHaveLength(0);
+
+        await onPaidPlan(ctx, "b", {
+            gstin: theirs,
+            registeredAddress: {
+                line1: "4 Mill Road",
+                city: "Pune",
+                postalCode: "411 001",
+            },
+        });
+        const profile = await prisma.businessProfile.findUniqueOrThrow({
+            where: { organizationId: ctx.organizationId },
+        });
+        expect(profile).toMatchObject({
+            addressLine1: "4 Mill Road",
+            city: "Pune",
+            postalCode: "411001",
+        });
+        const [invoice] = await invoicesOf(ctx.organizationId);
+        expect(invoice).toMatchObject({
+            billToAddress: "4 Mill Road, Pune 411001",
+            placeOfSupply: "27",
+        });
+    });
+
     it("an upgrade's difference is invoiced once authorised; the new plan's first charge later is a renewal", async () => {
         const ctx = await business({ gstState: "29" });
         const { periodEnd } = await onPaidPlan(ctx, "b");
@@ -431,7 +474,7 @@ describe("a plan's charges", () => {
             totalPaise: r.quote.chargeNowTotalPaise,
         });
         expect(rows[1]!.lines[0]!.description).toBe(
-            "Plan C: the rest of this period, up from Plan B",
+            "Saroh Plan C plan: the rest of this period, up from Plan B",
         );
 
         // Its own first charge, when the paid period ends.

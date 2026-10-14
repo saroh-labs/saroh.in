@@ -245,7 +245,9 @@ describe("monthly: autopay for a 12-charge term", () => {
             taxablePaise: FIRST,
             chargeKey: `first-month:${r.checkout.id}`,
         });
-        expect(invoice.lines[0]?.description).toBe("Plan B: first month");
+        expect(invoice.lines[0]?.description).toBe(
+            "Saroh Plan B plan: first month",
+        );
 
         // The first full charge, at the month's end, is still the plan's first.
         const ends = (await sub(ctx.organizationId)).currentPeriodEnd!;
