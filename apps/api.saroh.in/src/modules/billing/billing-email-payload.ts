@@ -50,13 +50,27 @@ export type BillingEmailPayload =
           kind: "TERM_ENDING";
           organizationId: string;
           subscriptionId: string;
-          /** The term's end, ISO: one email per end and stage. */
+          /** Where the autopay (or year paid) ends, ISO: one email per end and stage. */
           endsAt: string;
           stage: PlanEndingStage;
           /** What pauses on Free (#801), as the sweep told it. */
           pauses?: PausesWords | null;
           /** The business's own domain, when this end stops it (DEC-139). */
           domain?: DomainWords | null;
+      }
+    | {
+          /**
+           * A price change ahead (DEC-161): a "move them" to a version where
+           * the plan costs another amount, told at least 30 days ahead.
+           * Re-read when sent: a move cancelled, replaced or approved since
+           * says nothing.
+           */
+          kind: "PRICE_CHANGE";
+          organizationId: string;
+          subscriptionId: string;
+          pendingPlanId: string;
+          /** The move's date, ISO: one email per move. */
+          pendingFrom: string;
       }
     | {
           kind: "MOVE_DOWN";
@@ -184,6 +198,14 @@ export function parseBillingEmailPayload(
             pauses: pausesOf(p),
             domain: domainOf(p),
         } as never;
+    }
+    if (
+        p.kind === "PRICE_CHANGE" &&
+        typeof p.subscriptionId === "string" &&
+        typeof p.pendingPlanId === "string" &&
+        typeof p.pendingFrom === "string"
+    ) {
+        return p as unknown as BillingEmailPayload;
     }
     if (
         p.kind === "MOVE_DOWN" &&

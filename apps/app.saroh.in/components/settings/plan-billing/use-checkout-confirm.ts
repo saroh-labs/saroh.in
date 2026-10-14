@@ -44,8 +44,8 @@ export function useCheckoutConfirm(planName: string) {
                             const zone = viewerTimeZone();
                             showSuccess(
                                 res.data.startAt
-                                    ? `${name} starts on ${formatDate(res.data.startAt, zone)}, as you authorised.`
-                                    : `${name} is set up, as you authorised.`,
+                                    ? `${name} starts on ${formatDate(res.data.startAt, zone)}, as you approved.`
+                                    : `${name} is set up, as you approved.`,
                             );
                         } else if (state === "failed") {
                             showError(

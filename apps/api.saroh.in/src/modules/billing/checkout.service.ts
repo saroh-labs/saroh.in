@@ -19,7 +19,11 @@ import type {
 } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { BillingCycle, Catalog } from "@saroh/pricing-catalog";
-import { catalogPlanIdForKey, withGstPaise } from "@saroh/pricing-catalog";
+import {
+    autopayCharges,
+    catalogPlanIdForKey,
+    withGstPaise,
+} from "@saroh/pricing-catalog";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -36,7 +40,13 @@ import { clearAddonsInTx } from "./addon-charges";
 import type { EndingAddon } from "./addons-ending";
 import { addonsEndingWith } from "./addons-ending";
 import type { Term } from "./billing-term";
-import { isOneTime, ONE_TIME_PAYMENT, termOf } from "./billing-term";
+import {
+    isOneTime,
+    ONE_TIME_PAYMENT,
+    TERM_CHECKOUT_SELECT,
+    termCheckoutOf,
+    termOf,
+} from "./billing-term";
 import {
     assertBillingMayStart,
     dropLiveCheckoutsInTx,
@@ -49,12 +59,7 @@ import type {
     MandateCheck,
     PaymentKind,
 } from "./checkout-quote";
-import {
-    billedByProvider,
-    COUPON_KINDS,
-    quoteChange,
-    TERM_CHARGES,
-} from "./checkout-quote";
+import { billedByProvider, COUPON_KINDS, quoteChange } from "./checkout-quote";
 import {
     catalogueOfVersion,
     hadTrial,
@@ -202,10 +207,17 @@ export interface CheckoutsView {
     open: (CheckoutView & { handoff: CheckoutHandoff | null }) | null;
     scheduled: CheckoutView | null;
     /**
-     * The 12-month term of the plan it's on (DEC-093, #803), when it has
-     * one: its end, how it's paid, and whether the one-tap renewal is open.
+     * What the plan it's on was approved for (DEC-093, DEC-161, #803), when
+     * it has an end: when the autopay runs out (or the year paid ends), how
+     * it's paid, whether the request to approve the next is open, and how
+     * many monthly charges the autopay covers (1 for a year paid once).
      */
-    term: { endsAt: string; payment: PaymentKind; renewOpen: boolean } | null;
+    term: {
+        endsAt: string;
+        payment: PaymentKind;
+        renewOpen: boolean;
+        charges: number;
+    } | null;
 }
 
 const SUB_SELECT = {
@@ -335,6 +347,7 @@ export class CheckoutService {
                       endsAt: term.endsAt.toISOString(),
                       payment: term.payment,
                       renewOpen: term.renewOpen,
+                      charges: term.charges,
                   }
                 : null,
         };
@@ -367,15 +380,9 @@ export class CheckoutService {
                     providerSubscriptionId: sub.providerSubscriptionId,
                 },
             },
-            select: {
-                providerPlanId: true,
-                cycle: true,
-                startAt: true,
-                completedAt: true,
-                createdAt: true,
-            },
+            select: TERM_CHECKOUT_SELECT,
         });
-        return termOf(sub, checkout, now);
+        return termOf(sub, await termCheckoutOf(prisma, checkout), now);
     }
 
     /**
@@ -555,6 +562,8 @@ export class CheckoutService {
             trialFirstPaise,
             termEndsAt,
             targetMonthlyPaise,
+            // The target version's (DEC-161): what the new autopay is made for.
+            autopayCharges: autopayCharges(catalog),
         };
         let coupon: PricingCoupon | null = null;
         const code = input.coupon?.trim();
@@ -829,8 +838,10 @@ export class CheckoutService {
                     organizationId: ctx.organizationId,
                     providerPlanId: providerPlan.providerPlanId,
                     startAt: quote.startAt,
-                    // A 12-month term, then a one-tap renewal (DEC-093).
-                    totalCount: TERM_CHARGES,
+                    // The charges one autopay approval covers on the
+                    // target's version (DEC-161, 12 today); the business
+                    // is asked to approve the next one before it runs out.
+                    totalCount: quote.termCharges,
                     upfront:
                         quote.chargeNowTotalPaise > 0
                             ? {

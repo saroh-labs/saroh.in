@@ -140,4 +140,18 @@ describe("the Terms and the Refund and Cancellation Policy", () => {
             expect(body).not.toMatch(/₹|Rs\.?\s?\d|INR|\d+\s?%/);
         }
     });
+
+    it("says the autopay and a new price in the owner's words, with no term and no price lock (DEC-161)", () => {
+        expect(TERMS.body).toContain(
+            "- A paid plan is paid monthly by UPI Autopay or card. Each autopay you approve covers 12 monthly charges; before it runs out we ask you to approve the next one, and if you don't, your plan moves to Free.",
+        );
+        expect(TERMS.body).toContain(
+            "- We'll give you at least 30 days' notice by email before a price you pay goes up, and ask you to approve the new amount. Until you do, you keep paying the price you have.",
+        );
+        for (const body of [TERMS.body, REFUNDS.body]) {
+            expect(body).not.toMatch(
+                /\bterm of 12|your term|next term|price doesn't change|only from your next/i,
+            );
+        }
+    });
 });

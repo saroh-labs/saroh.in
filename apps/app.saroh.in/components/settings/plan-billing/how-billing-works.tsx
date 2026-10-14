@@ -8,20 +8,25 @@ import { NoteWords, changeHref } from "./your-plan";
 /**
  * "How billing works", closed until asked for, under the plans: what is
  * true of this business's plan and asks nothing of it now (its first
- * month's small print, the 12-month term and its end, a plan given for a
- * while, and any note the page's one message left unsaid), then how every
- * plan is paid. The change dialog says the same of the one change it
- * quotes; this is where the page keeps it without a stack of notes.
+ * month's small print, how many charges its autopay covers and when it
+ * runs out, a plan given for a while, and any note the page's one message
+ * left unsaid), then how every plan is paid: an autopay covers so many
+ * monthly charges, prices can change with 30 days' notice and approval
+ * (DEC-161). The change dialog says the same of the one change it quotes;
+ * this is where the page keeps it without a stack of notes.
  */
 export function HowBillingWorks({
     notes,
     yearly,
+    charges = 12,
     canChange,
 }: {
     /** Every note that isn't the page's one message (`planMessage`'s `rest`). */
     notes: readonly PlanNote[];
     /** Whether the catalogue offers yearly billing. */
     yearly: boolean;
+    /** Monthly charges one autopay covers on the live catalogue (DEC-161). */
+    charges?: number;
     canChange: boolean;
 }) {
     return (
@@ -48,7 +53,7 @@ export function HowBillingWorks({
                         ) : null}
                     </li>
                 ))}
-                {billingRules(yearly).map((rule) => (
+                {billingRules(yearly, charges).map((rule) => (
                     <li key={rule}>{rule}</li>
                 ))}
             </ul>

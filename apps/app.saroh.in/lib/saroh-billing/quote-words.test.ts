@@ -45,14 +45,14 @@ describe("quoteSummary (DEC-093)", () => {
         });
     });
 
-    it("monthly: today's payment is the first month and isn't refunded; 12 charges, then one tap", () => {
+    it("monthly: today's payment is the first month and isn't refunded; the autopay covers 12 charges, then we ask (DEC-161)", () => {
         const s = quoteSummary(quote(), { currentPlan: "Plan A" });
         expect(s.lead).toMatch(/isn't refunded/);
         expect(s.lead).toMatch(/you stay on Plan A\.$/);
         expect(values(quote())).toEqual(
             expect.arrayContaining([
                 "₹261.96 (incl. GST)",
-                "12 monthly charges, then we ask you to pay for the next 12",
+                "Covers 12 monthly charges. Before it runs out, we ask you to approve the next one",
             ]),
         );
     });
@@ -135,7 +135,7 @@ describe("quoteSummary (DEC-093)", () => {
         });
     });
 
-    it("a renewal starts the day the term ends, at today's price", () => {
+    it("the next autopay starts the day this one runs out, at today's price", () => {
         const s = quoteSummary(
             quote({
                 kind: "RENEW",
@@ -144,12 +144,60 @@ describe("quoteSummary (DEC-093)", () => {
                 mandateCheck: "REFUNDED",
             }),
         );
-        expect(s.title).toBe("Renew Plan C");
-        expect(s.lead).toMatch(/at today's price/);
+        expect(s.title).toBe("Approve your next Plan C autopay");
+        expect(s.lead).toMatch(
+            /^Your next autopay starts the day this one runs out, at today's price\./,
+        );
         expect(s.lines[0]).toMatchObject({
             label: "From",
             iso: "2027-10-01T00:00:00.000Z",
         });
+    });
+
+    it("says how many charges the autopay covers, and never a term or a price promise (DEC-161)", () => {
+        const s = quoteSummary(quote({ termCharges: 60 }), {
+            currentPlan: "Plan A",
+        });
+        expect(s.lines.at(-1)).toEqual({
+            label: "Autopay",
+            value: "Covers 60 monthly charges. Before it runs out, we ask you to approve the next one",
+        });
+        for (const kind of ["NEW", "RENEW", "SCHEDULED", "UPGRADE"] as const) {
+            const said = quoteSummary(
+                quote({ kind, startAt: "2027-10-01T00:00:00.000Z" }),
+                { currentPlan: "Plan A" },
+            );
+            expect(
+                [
+                    said.title,
+                    said.lead,
+                    ...said.lines.map((l) => `${l.label} ${l.value}`),
+                ].join(" "),
+            ).not.toMatch(/\bterm\b|price doesn't change|pay for the next 12/i);
+        }
+    });
+
+    it("the plan it's on at a new price: approve it, and keep the price until it starts (DEC-161)", () => {
+        const s = quoteSummary(
+            quote({
+                kind: "SCHEDULED",
+                startAt: "2026-12-01T00:00:00.000Z",
+                effectiveAt: "2026-12-01T00:00:00.000Z",
+                payNowTotalPaise: 0,
+                mandateCheck: "REFUNDED",
+            }),
+            { currentPlan: "Plan C", now: new Date("2026-10-20T00:00:00Z") },
+        );
+        expect(s.title).toBe("Approve Plan C's new price");
+        expect(s.lead).toMatch(
+            /You keep paying your current price until it starts\.$/,
+        );
+        expect(s.from).toBeNull();
+        expect(s.lines.map((l) => l.label)).toEqual([
+            "Starts",
+            "Plan C, monthly",
+            "Autopay",
+        ]);
     });
 
     it("says a coupon's discount and the first charge after it", () => {
@@ -193,11 +241,11 @@ describe("quoteSummary: when a change starts (DEC-159)", () => {
         expect(s.lead).toBe(
             "Plan C starts today at its full price, so your first month on Plan B ends now. What you paid for it isn't refunded. You pay Plan C's first month today as you set up UPI Autopay or a card for it. If it doesn't go through, you stay on Plan B.",
         );
-        // The plan's own price and term, never a first-month amount.
+        // The plan's own price and its autopay, never a first-month amount.
         expect(s.lines.map((l) => l.label)).toEqual([
             "Starts today",
             "Plan C, monthly",
-            "Term",
+            "Autopay",
         ]);
         expect(s).toMatchObject({
             confirm: "Continue to payment",

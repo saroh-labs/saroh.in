@@ -34,7 +34,8 @@ import {
  * revision it was saved as is the one published.
  *
  * "Move them" is per subscription, at each business's first renewal at least
- * seven days after go-live (design deviation D-6), not one date for all.
+ * seven days after go-live (design deviation D-6), not one date for all;
+ * 30 days when the price it pays changes, which it then approves (DEC-161).
  */
 export function PublishPanel({
     nextV,
@@ -146,9 +147,11 @@ export function PublishPanel({
                         </span>
                         <span className="text-[12px] leading-[1.45] text-muted-foreground">
                             Each business moves on its first billing date at
-                            least 7 days after this goes live, and is told 7
-                            days before. Anything over a new limit stays,
-                            read-only.
+                            least 7 days after this goes live (30 when its price
+                            changes), and is told that far ahead. A new price
+                            waits for the business to approve it; until then it
+                            keeps paying what it pays. Anything over a new limit
+                            stays, read-only.
                         </span>
                     </span>
                 </Choice>
@@ -189,7 +192,7 @@ export function PublishPanel({
                                 ? `It goes live on ${formatDate(goLive)}, and the pricing page changes then.`
                                 : "It goes live now, and the pricing page changes with it."}{" "}
                             {policy === "move"
-                                ? "Businesses already on a plan move at their next renewal at least 7 days after it goes live, and are told 7 days before."
+                                ? "Businesses already on a plan move at their next renewal at least 7 days after it goes live, or 30 when their price changes, and are told that far ahead. A new price waits for each business to approve it; until then it keeps paying what it pays."
                                 : "Businesses already on a plan keep their current terms."}
                         </p>
                         {changes.length > 0 && (

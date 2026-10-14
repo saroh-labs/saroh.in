@@ -112,6 +112,42 @@ describe("the Offers tab", () => {
         expect(sent.catalog.yearly).toEqual({ on: true, paid: 10 });
     });
 
+    it("sets how many charges one autopay covers as a draft change (DEC-161)", async () => {
+        vi.useFakeTimers();
+        draw();
+        const card = screen.getByRole("region", { name: "Autopay" });
+        const field = within(card).getByLabelText(
+            "Monthly charges one autopay covers",
+        ) as HTMLInputElement;
+        expect(field.value).toBe("12");
+        fireEvent.focus(field);
+        fireEvent.change(field, { target: { value: "60" } });
+        fireEvent.blur(field);
+        expect(
+            screen.getByText("One autopay covers 12 → 60 monthly charges"),
+        ).toBeTruthy();
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        const sent = actions.savePricingDraftAction.mock.calls[0]?.[0] as {
+            catalog: { autopay: unknown };
+        };
+        expect(sent.catalog.autopay).toEqual({ charges: 60 });
+    });
+
+    it("keeps the autopay count within what Razorpay takes", () => {
+        draw();
+        const field = screen.getByLabelText(
+            "Monthly charges one autopay covers",
+        ) as HTMLInputElement;
+        fireEvent.focus(field);
+        fireEvent.change(field, { target: { value: "5000" } });
+        fireEvent.blur(field);
+        expect(field.value).toBe("1200");
+        fireEvent.focus(field);
+        fireEvent.change(field, { target: { value: "1" } });
+        fireEvent.blur(field);
+        expect(field.value).toBe("2");
+    });
+
     it("puts a yearly count over 12 back to 12 on leaving the field", () => {
         draw();
         const field = screen.getByLabelText("Months paid");

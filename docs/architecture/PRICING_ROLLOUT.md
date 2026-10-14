@@ -309,7 +309,7 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   subscription billed at the provider: the nominal first month, or free
   first days.
     - **A plan that costs more a month** is a `NEW` checkout: its full
-      first charge now, its 12-month term from now, no offer of its own.
+      first charge now, its autopay from now, no offer of its own.
       Paid → on it, `ACTIVE`; the first month's provider subscription is
       cancelled at once. What the first month cost is not refunded or set
       against it. Yearly of a dearer plan is the same, as one payment.
@@ -459,16 +459,25 @@ read as REFUSED, the same 409), and how the Offer's discount shows on the
 `subscription.charged` amount. Check both with a test payment before the
 first real coupon.
 
-## Checkout and term (DEC-093)
+## Checkout and term (DEC-093, DEC-161)
 
-Code: `checkout-quote.ts` (the rule, with `TERM_CHARGES` and
-`RENEW_WINDOW_DAYS`), `billing-term.ts`, `term-end.ts`,
+Code: `checkout-quote.ts` (the rule, with `RENEW_WINDOW_DAYS`),
+`billing-term.ts` (`termOf`, `termCheckoutOf`), `term-end.ts`,
 `checkout-confirm.service.ts`, `billing-webhook.service.ts`
 (`reconcileCheckout`), the sweep's `endPaidYears`. Migration
 `20261029160000_billing_first_month` lets a TRIAL checkout charge now.
+"Term" is the code's word only: a business reads "autopay", and it is not
+a price promise (DEC-161).
 
-- **Monthly** is a provider subscription made for 12 charges, never
-  open-ended. **Yearly** is one payment for the year: a provider order for
+- **Monthly** is a provider subscription made for the charges one autopay
+  approval covers, never open-ended: the catalogue's `autopay.charges`
+  (DEC-161; 12 today; 2 to 1,200, Razorpay's tested `total_count`), set in
+  Admin › Plans › Offers and published like any change. It is read from the
+  version of the target plan (`quoteChange`'s `autopayCharges`, the quote's
+  `termCharges`, the provider's `totalCount`), and later from the version of
+  the checkout's plan (`termCheckoutOf`), so an autopay keeps the count it
+  was made with when a later version changes it. No column stores it: a
+  published version never changes. **Yearly** is one payment for the year: a provider order for
   exactly what the quote says is due (`payNowTotalPaise`, a coupon already
   off), no mandate and no Offer; the checkout keeps `providerPlanId`
   `"one-time"`. A yearly plan never has a trial; yearly during a first
@@ -494,18 +503,50 @@ Code: `checkout-quote.ts` (the rule, with `TERM_CHARGES` and
   a checkout waiting for its payment as "checking" and offers "Check again"
   and "Continue payment" (the same subscription or order) — never "Start
   again", which made a second mandate.
-- **The term's end.** Monthly ends 12 months after its charges start;
-  yearly with the year. Inside the last 30 days the same plan quotes as
-  `RENEW`: a SCHEDULED checkout (stored as SCHEDULED for the same plan)
-  from the term's end, at the live price, that cancels nothing — the
-  running term's last charges are still owed. A term nobody renews keeps
+- **Where the autopay runs out.** Monthly runs out as many months after
+  its charges start as it covers; yearly ends with the year. Inside the
+  last 30 days the same plan quotes as `RENEW` ("Approve your next ‹Plan›
+  autopay"): a SCHEDULED checkout (stored as SCHEDULED for the same plan)
+  from that day, at the live price, that cancels nothing — the running
+  autopay's last charges are still owed. The business is asked 30, 7 and
+  1 days ahead (`term-ending.ts`); a pending "move them" doesn't count as
+  arranged, since it rides on the same autopay. One nobody approves keeps
   the plan to the end of what was paid, then Free: a monthly subscription's
   `completed` with its period still running sets the move to Free on the
-  period's end instead of cancelling at once; for a year paid once, which no
-  provider event ends, the hourly sweep sets it (`endPaidYears`).
-  **Assumed (the safest reading of DEC-093):** no grace period after the
-  end; R15's 30-day price notice and 7-day move-down notice are not built
-  here (they belong with #800–#802).
+  period's end instead of cancelling at once — replacing a "move them"
+  still waiting for approval, which nothing would bill; for a year paid
+  once, which no provider event ends, the hourly sweep sets it
+  (`endPaidYears`). **Assumed (the safest reading of DEC-093):** no grace
+  period after the end. The 30-day price notice is below ("Price changes").
+
+## Price changes (DEC-161)
+
+There is no price lock. Code: `packages/pricing-catalog/src/moves.ts`
+(`PRICE_NOTICE_DAYS`, `moveNoticeDays`), `pricing/moves.service.ts`,
+`pricing/move-notice.handler.ts`, `billing/price-change.ts`,
+`billing/plan-moves.ts` (`moveReadiness`), the email kind `PRICE_CHANGE`.
+
+1. **Publish with "move them".** A business whose plan costs another amount
+   on the new version gets a pending move at its first billing date at
+   least 30 days after go-live (7 for a move at the same price, as before).
+   "Keep" moves nobody.
+2. **Told 30 days ahead** (`pricing.move.notice` at the move's date less 30
+   days): an inbox notice and an email to its billing people with the new
+   amount and the one it pays now, asking it to approve the new amount.
+   Settings › Plan and billing says the same from the publish, as the
+   page's one message, with Approve once the version is live.
+3. **Approving** is the "move them authorised again" SCHEDULED checkout: a
+   new autopay for the new amount from the move's date, made for the
+   version's autopay count. The move applies on the date.
+4. **Not approved by the date**, the move waits (`needs-authorisation`, the
+   access read's `waiting: "authorise"`): the old autopay keeps charging the
+   old amount, nothing is cancelled, and the screen asks again ("Until you
+   do, you keep paying ‹current›."). When that autopay runs out, the usual
+   request to approve the next one applies (at the live price), else Free
+   at the end of what was paid.
+5. **Admin's "move to live at renewal"** uses the same notice: 30 days when
+   the price changes.
+
 - **Unverified in Razorpay test mode:** that a subscription with an upfront
   item and a later `start_at` charges that item as the authorisation payment
   (spike row 2 says so for upgrades); the subscription status read
@@ -627,8 +668,8 @@ correct the adapter and this list.
    can resume.
 6. **`total_count`.** Required by Razorpay; sent as 120 monthly / 10 yearly
    charges so a plan runs until cancelled. Unverified: the maximum allowed.
-   Since DEC-093 the checkout sends 12 (a monthly term) and yearly is an
-   order; 120/10 is only the adapter's fallback.
+   Since DEC-093 the checkout sends the catalogue's autopay count (12,
+   DEC-161) and yearly is an order; 120/10 is only the adapter's fallback.
 
 ## The merchant app (U14)
 
@@ -667,9 +708,11 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
       business (`planMessage`), most pressing first: a checkout waiting
       for its payment (it checks with the provider as it is drawn, and is
       what stops a second payment), a payment that failed, a change that
-      is due and waits to be authorised, a plan change on its way with its
-      date, the term's renewal in its last days, then a legacy plan's
-      warning. Never two.
+      is due and waits to be approved, a new price to approve (DEC-161:
+      "‹Plan›'s price changes to ‹new› on ‹date›. Approve the new amount
+      before then. Until you do, you keep paying ‹current›.") or a plan
+      change on its way with its date, the request to approve the next
+      autopay in its last days, then a legacy plan's warning. Never two.
     - **The plan it is on, and only that one**, as one card
       (`current-plan-card.tsx`): its name with "Current plan", its price,
       who it is for, every line it includes, and for whoever may change
@@ -680,10 +723,13 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
       there is no button, and a quiet link, "See Saroh's plans", opens the
       next screen to read.
     - **"How billing works"**, closed until asked for
-      (`how-billing-works.tsx`): the first month's small print, the
-      12-month term and its end, a plan given for a while, any note the
-      one message left unsaid (with its way on), and how every plan is
-      paid (`billingRules`). The change dialog says the same of the one
+      (`how-billing-works.tsx`): the first month's small print, how many
+      monthly charges its autopay covers and when it runs out, a plan
+      given for a while, any note the one message left unsaid (with its
+      way on), and how every plan is paid (`billingRules`: the autopay
+      covers the live catalogue's count of charges and the next is
+      approved before it runs out; prices can change with at least 30
+      days' notice and approval, and the price is kept until then). The change dialog says the same of the one
       change it quotes.
     - Then add-ons, and Saroh's invoices with their PDF
       (`/api/saroh-invoices/:id/pdf`, a proxy).

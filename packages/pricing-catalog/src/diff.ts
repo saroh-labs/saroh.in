@@ -1,6 +1,6 @@
 import { formatInr } from "./price";
 import type { Catalog } from "./schema";
-import { addonPlanNames, cellOf } from "./schema";
+import { addonPlanNames, autopayCharges, cellOf } from "./schema";
 
 const PRICING_WORDS = {
     show: "shown",
@@ -128,6 +128,11 @@ function offersDiff(a: Catalog, b: Catalog): string[] {
         );
     } else if (yb.on && ya.paid !== yb.paid) {
         out.push(`Yearly billing: pay for ${ya.paid} → ${yb.paid} months`);
+    }
+    const ca = autopayCharges(a);
+    const cb = autopayCharges(b);
+    if (ca !== cb) {
+        out.push(`One autopay covers ${ca} → ${cb} monthly charges`);
     }
     if (a.gst.show !== b.gst.show) {
         out.push(

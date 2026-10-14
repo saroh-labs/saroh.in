@@ -3,6 +3,8 @@ import {
     CATALOG_PLAN_KEY_PREFIX,
     MOVE_NOTICE_DAYS,
     moveDateFor,
+    moveNoticeDays,
+    PRICE_NOTICE_DAYS,
 } from "@saroh/pricing-catalog";
 
 /**
@@ -10,11 +12,15 @@ import {
  * is published with policy `move`, every subscription on an older catalogue
  * version gets a pending move to the same plan and cycle on the new version,
  * at its first billing date at least {@link MOVE_NOTICE_DAYS} days after the
- * version goes live. The renewal path applies it (U15); it is never applied
- * while the version's paid plans aren't at the billing provider.
+ * version goes live — {@link PRICE_NOTICE_DAYS} when the price it pays
+ * changes (DEC-161: no price lock, at least 30 days' notice). The renewal
+ * path applies it (U15); it is never applied while the version's paid plans
+ * aren't at the billing provider, nor at a new amount the business hasn't
+ * approved (`moveReadiness`): until it approves, it keeps paying the price
+ * it has.
  *
- * A business whose plan actually changes hears about it
- * {@link MOVE_NOTICE_DAYS} days ahead (`pricing.move.notice`); one whose
+ * A business whose plan actually changes hears about it that many days
+ * ahead (`pricing.move.notice`; a price change by email too); one whose
  * plan reads the same on the new version is moved without a notice, since
  * there is nothing to tell it.
  */
@@ -44,17 +50,27 @@ const MOVABLE_STATUSES = ["ACTIVE", "TRIALING", "PAST_DUE"];
 /**
  * When one subscription moves: its first renewal at least the notice period
  * after go-live, or — with no renewal date (a free plan bills nothing) —
- * exactly the notice period after go-live.
+ * exactly the notice period after go-live. The notice period is
+ * `moveNoticeDays`: 30 days when the price changes, else 7.
  */
 export function pendingFromFor(
     currentPeriodEnd: Date | null,
     goLiveAt: Date,
     cycle: "month" | "year",
+    noticeDays: number = MOVE_NOTICE_DAYS,
 ): Date {
     if (!currentPeriodEnd) {
-        return new Date(goLiveAt.getTime() + MOVE_NOTICE_DAYS * DAY_MS);
+        return new Date(goLiveAt.getTime() + noticeDays * DAY_MS);
     }
-    return moveDateFor(currentPeriodEnd, goLiveAt, cycle);
+    return moveDateFor(currentPeriodEnd, goLiveAt, cycle, noticeDays);
+}
+
+/** How far ahead a move between two `Plan` rows is told (DEC-161). */
+export function noticeDaysFor(
+    from: { priceCents: number },
+    to: { priceCents: number },
+): number {
+    return moveNoticeDays(from.priceCents, to.priceCents);
 }
 
 /** Whether two `Plan` rows read the same to a business: nothing to tell it. */
@@ -161,10 +177,12 @@ export async function scheduleMoves(
         const target = targetOf.get(`${sub.plan.key}|${sub.plan.interval}`);
         if (!target) continue;
         const cycle = sub.plan.interval === "year" ? "year" : "month";
+        const noticeDays = noticeDaysFor(sub.plan, target);
         const pendingFrom = pendingFromFor(
             sub.currentPeriodEnd,
             input.goLiveAt,
             cycle,
+            noticeDays,
         );
         await tx.subscription.update({
             where: { id: sub.id },
@@ -175,9 +193,9 @@ export async function scheduleMoves(
             notices += 1;
             jobs.push({
                 organizationId: sub.organizationId,
-                runAt: new Date(
-                    pendingFrom.getTime() - MOVE_NOTICE_DAYS * DAY_MS,
-                ),
+                // At least `noticeDays` ahead, and never before go-live:
+                // `pendingFrom` is that far after go-live at the earliest.
+                runAt: new Date(pendingFrom.getTime() - noticeDays * DAY_MS),
                 payload: {
                     subscriptionId: sub.id,
                     pendingPlanId: target.id,

@@ -5,7 +5,12 @@ import { businessTimezone } from "../bookings/staff-availability";
 import type { RenderedEmail } from "./billing-emails";
 import { renewalReminderEmail } from "./billing-emails";
 import type { TermCheckout } from "./billing-term";
-import { isOneTime, termOf } from "./billing-term";
+import {
+    isOneTime,
+    TERM_CHECKOUT_SELECT,
+    termCheckoutOf,
+    termOf,
+} from "./billing-term";
 import type { SarohLineInput } from "./saroh-invoice-terms";
 import {
     FIRST_MONTH_KEY,
@@ -32,14 +37,15 @@ type Tx = Prisma.TransactionClient;
  *   its own email 3 days ahead (`TRIAL_ENDING`), which names the charge;
  * - it is PAST_DUE (a failed charge has its own email) or CANCELLED;
  * - it ends at the period's end (`cancelAtPeriodEnd`: a cancel, Free
- *   chosen, or a term run out) — the move-down notices tell that;
+ *   chosen, or an autopay run out) — the move-down notices tell that;
  * - a move is due by then (`pendingFrom`): the next charge may be another
  *   amount, or a new provider subscription's, and the move is told;
- * - another plan, or the next term, is authorised to start by then (a
+ * - another plan, or the next autopay, is authorised to start by then (a
  *   SCHEDULED checkout): that checkout named its own charge;
  * - the plan was paid once for the year (DEC-093): it never renews by
- *   itself; or the period end is the 12-month term's end (DEC-100) — no
- *   charge then, the term-ending notices ask for the next term instead.
+ *   itself; or the period end is where the autopay runs out (DEC-100,
+ *   DEC-161) — no charge then, the term-ending notices ask the business
+ *   to approve the next autopay instead.
  */
 
 /** How many days before a renewal its reminder goes. */
@@ -51,8 +57,8 @@ export const RENEWAL_REMINDER_NOTICE_KIND = "RENEWAL_REMINDER";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * A period end this close to the term's end is the term's end, not a
- * charge: a monthly term's last charge is a whole month before it.
+ * A period end this close to where the autopay runs out is that end, not a
+ * charge: an autopay's last charge is a whole month before it.
  */
 const TERM_END_MARGIN_MS = 7 * DAY_MS;
 
@@ -178,23 +184,21 @@ export async function renewalReminderOf(
     const provider = sub.provider;
     const providerSubscriptionId = sub.providerSubscriptionId;
     const [checkout, scheduled] = await Promise.all([
-        db.billingCheckout.findUnique({
-            where: {
-                provider_providerSubscriptionId: {
-                    provider,
-                    providerSubscriptionId,
+        db.billingCheckout
+            .findUnique({
+                where: {
+                    provider_providerSubscriptionId: {
+                        provider,
+                        providerSubscriptionId,
+                    },
                 },
-            },
-            select: {
-                providerPlanId: true,
-                cycle: true,
-                startAt: true,
-                completedAt: true,
-                createdAt: true,
-                discountPaise: true,
-                discountCharges: true,
-            },
-        }),
+                select: {
+                    ...TERM_CHECKOUT_SELECT,
+                    discountPaise: true,
+                    discountCharges: true,
+                },
+            })
+            .then((row) => termCheckoutOf(db, row)),
         db.billingCheckout.findFirst({
             where: { organizationId: sub.organizationId, status: "SCHEDULED" },
             select: { startAt: true },

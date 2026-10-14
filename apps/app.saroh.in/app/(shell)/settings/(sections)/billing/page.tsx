@@ -1,5 +1,5 @@
 import { PartialRead } from "@/components/shared/failed-read";
-import { formatInr } from "@saroh/pricing-catalog";
+import { autopayCharges, formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { NOTHING_CHANGED, planLabel } from "@saroh/ui/lib/state-copy";
@@ -207,6 +207,7 @@ export default async function PlanBillingPage({
                 <HowBillingWorks
                     notes={rest}
                     yearly={cards.yearly.on}
+                    charges={autopayCharges(catalog)}
                     canChange={canChange}
                 />
                 {addonList.length > 0 ? (

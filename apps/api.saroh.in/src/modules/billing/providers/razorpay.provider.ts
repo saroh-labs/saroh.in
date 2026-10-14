@@ -34,9 +34,10 @@ const CALL_TIMEOUT_MS = 15_000;
 
 /**
  * How many charges a subscription is made for when the caller names none.
- * Razorpay asks for a count (`total_count`). The checkout names its term
- * (DEC-093: 12 monthly charges); this open-ended fallback is what U15 made
- * before there was a term. Confirmed accepted in test mode (OQ-6).
+ * Razorpay asks for a count (`total_count`). The checkout names what one
+ * autopay approval covers (DEC-161: the catalogue's `autopay.charges`, 12
+ * today, at most 1,200); this open-ended fallback is what U15 made before
+ * there was a count. Confirmed accepted in test mode (OQ-6).
  */
 const TOTAL_COUNT: Record<string, number> = { month: 120, year: 10 };
 

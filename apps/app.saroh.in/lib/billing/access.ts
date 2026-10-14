@@ -76,6 +76,12 @@ export interface BillingAccessView {
         version: number;
         from: string;
         waiting: "held" | "authorise" | null;
+        /**
+         * What the plan it moves to costs before GST, per its cycle
+         * (DEC-161): a price change ahead when it isn't what it pays now.
+         * Absent from an API before DEC-161: no price change is said.
+         */
+        pricePaise?: number;
     } | null;
     modules: ModuleAccessView[];
 }

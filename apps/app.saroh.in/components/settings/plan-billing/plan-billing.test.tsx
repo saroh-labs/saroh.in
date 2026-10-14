@@ -283,9 +283,9 @@ const FIRST_MONTH = note({
 });
 const TERM = note({
     kind: "term",
-    lead: "Your 12 monthly charges run to ",
+    lead: "Your autopay covers 12 monthly charges, to ",
     iso: END,
-    tail: ". In its last 30 days we ask you to pay for the next term, and paying starts it.",
+    tail: ". Before it runs out, we ask you to approve the next one.",
 });
 const MOVE = note({
     kind: "move",
@@ -395,11 +395,15 @@ describe("How billing works", () => {
             "Your first month runs to 31 Dec 2027, when the first full charge is taken. If it doesn't go through, you're back on Free.",
         );
         expect(said).toContain(
-            "Your 12 monthly charges run to 31 Dec 2027. In its last 30 days we ask you to pay for the next term, and paying starts it.",
+            "Your autopay covers 12 monthly charges, to 31 Dec 2027. Before it runs out, we ask you to approve the next one.",
         );
         expect(said).toContain(
-            "Plans are paid monthly by autopay, for 12 months. Before that ends, we ask you to pay for the next term.",
+            "Plans are paid monthly by autopay. Each autopay you approve covers 12 monthly charges; before it runs out, we ask you to approve the next one.",
         );
+        expect(said).toContain(
+            "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount; until you do, you keep paying the price you have.",
+        );
+        expect(said).not.toMatch(/\bterm\b|price doesn't change/i);
         expect(said).toContain(
             "Upgrades start today. A cheaper plan or Free starts when what you've paid for ends.",
         );
@@ -410,10 +414,10 @@ describe("How billing works", () => {
         const renew = note({
             kind: "renew",
             tone: "attention",
-            lead: "Your 12 months of Plan B end on ",
+            lead: "Your autopay for Plan B runs out on ",
             iso: END,
             tail: ".",
-            action: { label: "Renew", planId: "b", cycle: "month" },
+            action: { label: "Approve", planId: "b", cycle: "month" },
         });
         const draw = (canChange: boolean) =>
             renderToStaticMarkup(
@@ -424,10 +428,47 @@ describe("How billing works", () => {
                 />,
             );
         expect(draw(true)).toMatch(
-            /href="\/settings\/billing\/plans\?plan=b&amp;cycle=month"[^>]*>Renew/,
+            /href="\/settings\/billing\/plans\?plan=b&amp;cycle=month"[^>]*>Approve/,
         );
-        expect(draw(false)).not.toContain("Renew");
-        expect(draw(true)).toContain("yearly is one payment");
+        expect(draw(false)).not.toContain(">Approve");
+        expect(draw(true)).toContain("Yearly is one payment for the year");
+    });
+
+    it("says the live catalogue's count of charges (DEC-161)", () => {
+        const said = words(
+            renderToStaticMarkup(
+                <HowBillingWorks
+                    notes={[]}
+                    yearly={false}
+                    charges={60}
+                    canChange
+                />,
+            ),
+        );
+        expect(said).toContain(
+            "Each autopay you approve covers 60 monthly charges",
+        );
+    });
+});
+
+describe("a new price to approve (DEC-161)", () => {
+    const PRICE = note({
+        kind: "priceChange",
+        tone: "attention",
+        lead: "Plan B's price changes to ₹133 a month + GST on ",
+        iso: END,
+        tail: ". Approve the new amount before then. Until you do, you keep paying ₹111 a month + GST.",
+        action: { label: "Approve", planId: "b", cycle: "month" },
+    });
+
+    it("is the one message, over the autopay's own notes", () => {
+        const html = yourPlan({ notes: [TERM, PRICE] });
+        expect(notices(html)).toHaveLength(1);
+        const said = words(html);
+        expect(said).toContain(
+            "Plan B's price changes to ₹133 a month + GST on 31 Dec 2027. Approve the new amount before then. Until you do, you keep paying ₹111 a month + GST.",
+        );
+        expect(said).not.toContain("Your autopay covers");
     });
 });
 
