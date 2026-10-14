@@ -85,7 +85,8 @@ release time.
    `SAROH_INVOICE_PREFIX`; `ENVIRONMENT.md`) set **before the first real
    charge**: each invoice copies them when it is written and is never
    rewritten. The series restarts every financial year
-   (`SRH/26-27/00001`).
+   (`SA/26-27/0001`: prefix, financial year, then a count of at least four
+   digits that runs the whole year, DEC-162).
 
 ## How a plan override reads (U5)
 
@@ -579,8 +580,10 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   within half a cycle is not invoiced again — Razorpay's `activated` and
   `charged` for one payment make one invoice. An event with no period end
   is not invoiced.
-- **Numbers** are Saroh's own series, `<prefix>/<financial year>/<5 digits>`
-  (`SRH/26-27/00001`), counted in `SarohInvoiceSequence` inside the
+- **Numbers** are Saroh's own series, `<prefix>/<financial year>/<count>`
+  (`SA/26-27/0001`: a count of at least four digits that runs the whole
+  financial year, never past 16 characters, DEC-162), counted in
+  `SarohInvoiceSequence` inside the
   invoice's transaction, so a rolled-back charge leaves no gap. The
   financial year is India's (April–March, `Asia/Kolkata`).
 - **GST** is 18% on the line's amount after any discount, rounded half-up to
@@ -594,14 +597,41 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   is asked (a 400 for a state that isn't one, a GSTIN that doesn't check out
   or isn't in the state given), and keeps them on the `BillingCheckout`.
   Renewals read them from the checkout that made the provider subscription.
+- **The paper** (CGST Rule 46, the owner's layout of 14 Oct 2026):
+  on the left the seller's legal name, registered address, contact email,
+  "GSTIN … · Haryana (06)" and "Saroh is a product of ‹legal name›"; on
+  the right TAX INVOICE, the number, "Issue date: …", "Subscription
+  period: … – …" and "Payment status: Paid". Then Billed to (name, address,
+  "State: ‹name› (‹code›)", GSTIN when registered) beside Place of supply
+  (the same state), the lines (ITEM · SAC · QTY · RATE · TAXABLE VALUE;
+  "Saroh Grow Plan — First Month Subscription", "— Monthly SaaS
+  Subscription", "— Annual SaaS Subscription"; add-ons by kind, such as
+  "Additional Team Member — Monthly Seat"), the sums with each tax's rate
+  ("CGST @ 9%", "SGST @ 9%", "IGST @ 18%", from the lines' rate) and every
+  amount with its paise, then "For ‹legal name›", "Electronically
+  generated tax invoice", "This invoice is electronically generated and
+  does not require a physical signature.", and the footer "Tax invoice
+  issued under Section 31 of the CGST Act.", "Reverse charge: No" (no
+  Saroh supply is under reverse charge), "Payment status: …". The status
+  is read from how the invoice was written (`sarohPaymentStatus`): every
+  source today writes it with a charge the provider reported taken, so
+  Paid; a source that bills before payment would read Due. Each invoice
+  keeps the base amount, discount, taxable value, each tax and the total
+  apart, on the invoice and on each line. Saroh issues no refunds and has
+  no credit note.
+- **The buyer's address** (Rule 46(e)): the quote says whether the
+  business has its registered address (`registeredAddress`); without one
+  the change-plan dialog asks for it, required with a GSTIN and optional
+  otherwise, and `POST …/billing/change-plan` takes `registeredAddress`
+  (line1, line2, city, PIN), checked before the provider is asked and saved
+  to the business's own registered address, never over one it has.
 - **After money, nothing is refused** (DEC-068): a business with no address
   still gets its invoice; missing seller details are logged
   (`saroh_invoice_seller_incomplete`) and the paper says "Invoice", not
   "Tax invoice".
 - **Reading.** `GET …/billing/invoices` (newest first) and
   `GET …/billing/invoices/:id/pdf` (drawn on request, never stored), both
-  `billing:read`. The Settings › Plan list and download wait for U14's
-  designs.
+  `billing:read`.
 - **Mail.** `billing.email` (`backend-jobs.md`) sends the invoice with its
   PDF, a failed payment (retrying, or now on Free), a trial ending (U16
   queues it) and, 3 days before each autopay charge, the renewal reminder

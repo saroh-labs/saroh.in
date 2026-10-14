@@ -16,7 +16,8 @@ import type {
 /**
  * Settings › Plan and billing's writes (plans catalogue U15–U17): quote a
  * change, make it, hold add-ons. Only keys go to the API — a plan id, a
- * cycle, a coupon code, the bill-to state and GSTIN, an add-on and how many;
+ * cycle, a coupon code, the bill-to state, GSTIN and registered address, an
+ * add-on and how many;
  * every amount is the server's (KTD-18). Actions take any input, so each
  * is checked again here.
  */
@@ -33,20 +34,48 @@ const CHANGE_FAILED =
 const ADDON_FAILED =
     "The add-on couldn't be changed. Nothing was charged. Try again.";
 
+/** The registered address asked for at checkout (Rule 46(e)). */
+export interface AddressInput {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    postalCode?: string;
+}
+
 export interface ChangeInput {
     plan: string;
     cycle: Cycle;
     coupon?: string;
     billingState?: string;
     gstin?: string;
+    registeredAddress?: AddressInput;
+}
+
+const ADDRESS_LIMITS: Record<keyof AddressInput, number> = {
+    line1: 120,
+    line2: 120,
+    city: 60,
+    postalCode: 12,
+};
+
+/** The address's typed lines, trimmed; none typed is no address. */
+function cleanAddress(value: unknown): AddressInput | undefined {
+    if (!value || typeof value !== "object") return undefined;
+    const raw = value as Record<string, unknown>;
+    const out: AddressInput = {};
+    for (const key of Object.keys(ADDRESS_LIMITS) as (keyof AddressInput)[]) {
+        const v = raw[key];
+        if (typeof v === "string" && v.trim()) {
+            out[key] = v.trim().slice(0, ADDRESS_LIMITS[key]);
+        }
+    }
+    return Object.keys(out).length ? out : undefined;
 }
 
 function clean(input: unknown): ChangeInput | null {
     if (!input || typeof input !== "object") return null;
-    const { plan, cycle, coupon, billingState, gstin } = input as Record<
-        string,
-        unknown
-    >;
+    const { plan, cycle, coupon, billingState, gstin, registeredAddress } =
+        input as Record<string, unknown>;
     if (typeof plan !== "string" || !PLAN_ID.test(plan)) return null;
     if (cycle !== "month" && cycle !== "year") return null;
     const out: ChangeInput = { plan, cycle };
@@ -59,6 +88,8 @@ function clean(input: unknown): ChangeInput | null {
     if (typeof gstin === "string" && gstin.trim()) {
         out.gstin = gstin.trim().toUpperCase();
     }
+    const address = cleanAddress(registeredAddress);
+    if (address) out.registeredAddress = address;
     return out;
 }
 

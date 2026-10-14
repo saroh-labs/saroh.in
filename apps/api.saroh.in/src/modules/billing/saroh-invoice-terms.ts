@@ -145,14 +145,32 @@ export function sarohSupply(input: {
     return { placeOfSupply: pos, taxType: taxTypeFor(pos, input.sellerState) };
 }
 
-/** The series a number at `at` counts in: prefix and financial year. */
+/**
+ * The series a number at `at` counts in: prefix and India's financial year
+ * (April–March, `Asia/Kolkata`), so the count runs the whole year and never
+ * starts again inside it (DEC-162). "SA/26-27" is April 2026 to March 2027.
+ */
 export function sarohSeries(prefix: string, at: Date): string {
     return `${prefix}/${financialYear(at, SAROH_TIMEZONE)}`;
 }
 
-/** SRH/26-27 and 1 → "SRH/26-27/00001"; the counter grows past five digits. */
+/** The longest invoice number GST allows (CGST Rule 46(b)). */
+export const MAX_INVOICE_NUMBER_LENGTH = 16;
+
+/**
+ * SA/26-27 and 1 → "SA/26-27/0001". The counter has at least four digits
+ * and grows past them; with a prefix of up to three characters a year has
+ * room for 999,999 numbers (9,999,999 with two) before one would pass the
+ * limit, and none is ever written that does.
+ */
 export function sarohInvoiceNumber(series: string, n: number): string {
-    return `${series}/${String(n).padStart(5, "0")}`;
+    const number = `${series}/${String(n).padStart(4, "0")}`;
+    if (number.length > MAX_INVOICE_NUMBER_LENGTH) {
+        throw new Error(
+            `Saroh invoice number ${number} is longer than ${MAX_INVOICE_NUMBER_LENGTH} characters`,
+        );
+    }
+    return number;
 }
 
 /** The charge key of a nominal first month (DEC-093), before its checkout. */

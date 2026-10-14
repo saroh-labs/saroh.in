@@ -117,19 +117,26 @@ export function domainSentence(
     return p.length ? ` ${p.join(" ")}` : "";
 }
 
-/** The invoice for a charge, with its PDF attached. */
+/**
+ * The invoice for a charge, with its PDF attached. A first month's charge
+ * says so: the amount is the first month's, not the plan's price.
+ */
 export function invoiceEmail(input: {
     businessName: string;
     number: string;
     planName: string;
     total: string;
     period: string | null;
+    firstMonth?: boolean;
 }): RenderedEmail {
+    const what = input.firstMonth
+        ? `the first month of ${input.businessName}'s ${input.planName} plan`
+        : `${input.businessName}'s ${input.planName} plan`;
     return {
         subject: `Your Saroh invoice ${input.number}`,
         html: wrap(`Invoice ${input.number}`, [
-            `We've charged ${input.total} for ${input.businessName}'s ${input.planName} plan${input.period ? `, ${input.period}` : ""}.`,
-            "Your invoice is attached. You'll also find it in Settings › Plan.",
+            `We've charged ${input.total} for ${what}${input.period ? `, ${input.period}` : ""}.`,
+            "Your invoice is attached. You'll also find it in Settings › Plan and billing.",
         ]),
     };
 }

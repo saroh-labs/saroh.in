@@ -146,6 +146,12 @@ export interface ChangePlanQuoteView {
      * none does.
      */
     addonsEnding: EndingAddon[];
+    /**
+     * Whether the business has its registered address on its profile.
+     * Without one the dialog asks for it: Saroh's invoice to a registered
+     * buyer carries their address (CGST Rule 46(e)).
+     */
+    registeredAddress: boolean;
 }
 
 /** A checkout as the business sees it; never the provider's link. */
@@ -306,7 +312,12 @@ export class CheckoutService {
             input,
             now,
         );
-        return this.quoteView(target, quote, coupon, addonsEnding);
+        return {
+            ...this.quoteView(target, quote, coupon, addonsEnding),
+            registeredAddress: Boolean(
+                (await profileAddress(ctx.organizationId))?.addressLine1,
+            ),
+        };
     }
 
     async current(
@@ -447,6 +458,7 @@ export class CheckoutService {
             billingState?: string | null;
             gstin?: string | null;
             coupon?: string | null;
+            registeredAddress?: AddressSent | null;
         },
         now: Date = new Date(),
         client: CheckoutClient = {},
@@ -456,7 +468,13 @@ export class CheckoutService {
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, subscription, coupon, addonsEnding } =
             await this.resolve(ctx.organizationId, input, now);
-        const view = this.quoteView(target, quote, coupon, addonsEnding);
+        const hasAddress = Boolean(
+            (await profileAddress(ctx.organizationId))?.addressLine1,
+        );
+        const view = {
+            ...this.quoteView(target, quote, coupon, addonsEnding),
+            registeredAddress: hasAddress,
+        };
         if (quote.kind === "NONE") {
             throw new ConflictException(`You're already on ${target.name}.`);
         }
@@ -482,7 +500,44 @@ export class CheckoutService {
                 effectiveAt: at.toISOString(),
             };
         }
+        // Asked for before anything is made at the provider, and kept as
+        // the business's own registered address (never over one it has).
+        if (!hasAddress) {
+            const address = checkoutAddress(
+                input.registeredAddress,
+                Boolean(billTo.billToGstin),
+            );
+            if (address) {
+                await this.saveRegisteredAddress(ctx, address);
+                view.registeredAddress = true;
+            }
+        }
         return this.checkout(ctx, target, quote, view, now, billTo, coupon);
+    }
+
+    /** The address given at checkout, as the business's registered address. */
+    private async saveRegisteredAddress(
+        ctx: OrganizationContext,
+        address: CheckoutAddress,
+    ): Promise<void> {
+        await prisma.businessProfile.upsert({
+            where: { organizationId: ctx.organizationId },
+            create: { organizationId: ctx.organizationId, ...address },
+            update: address,
+        });
+        await this.audit?.record({
+            action: AuditAction.ProfileUpdate,
+            actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
+            organizationId: ctx.organizationId,
+            targetType: "organization",
+            targetId: ctx.organizationId,
+            outcome: AuditOutcome.Success,
+            metadata: {
+                fields: Object.keys(address),
+                via: "checkout",
+            },
+        });
     }
 
     // ── Steps ───────────────────────────────────────────────────────────
@@ -635,7 +690,7 @@ export class CheckoutService {
         quote: ChangeQuote,
         coupon: PricingCoupon | null = null,
         addonsEnding: EndingAddon[] = [],
-    ): ChangePlanQuoteView {
+    ): Omit<ChangePlanQuoteView, "registeredAddress"> {
         return {
             plan: {
                 id: catalogPlanIdForKey(target.key) ?? target.key,
@@ -983,6 +1038,70 @@ export class CheckoutService {
 function nonEmpty(value: string | null | undefined): string | null {
     const t = value?.trim();
     return t === undefined || t === "" ? null : t;
+}
+
+/** What a checkout sent of the registered address (`RegisteredAddressDto`). */
+export interface AddressSent {
+    line1?: string | null;
+    line2?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+}
+
+/** The registered address a checkout saves to the business's profile. */
+export interface CheckoutAddress {
+    addressLine1: string;
+    addressLine2: string | null;
+    city: string;
+    postalCode: string;
+}
+
+/** An Indian PIN code: six digits, never starting with 0. */
+const PIN = /^[1-9][0-9]{5}$/;
+
+function addressError(message: string, field: string): never {
+    throw new BadRequestException({ message, details: { field } });
+}
+
+/**
+ * The registered address given at checkout, checked before the provider is
+ * asked: none at all is fine unless a GSTIN was given (a registered buyer's
+ * invoice carries their address, CGST Rule 46(e)); any part given needs
+ * the first line, the city and a six-digit PIN, as Settings › Business
+ * asks.
+ */
+export function checkoutAddress(
+    sent: AddressSent | null | undefined,
+    gstinGiven: boolean,
+): CheckoutAddress | null {
+    const line1 = nonEmpty(sent?.line1);
+    const line2 = nonEmpty(sent?.line2);
+    const city = nonEmpty(sent?.city);
+    const pin = nonEmpty(sent?.postalCode)?.replace(/\s+/g, "") ?? null;
+    if (!line1 && !line2 && !city && !pin) {
+        if (gstinGiven) {
+            addressError(
+                "Add the business's registered address: it prints on Saroh's invoice with your GSTIN.",
+                "addressLine1",
+            );
+        }
+        return null;
+    }
+    if (!line1) addressError("Add the address's first line.", "addressLine1");
+    if (!city) addressError("Add the city.", "city");
+    if (!pin) addressError("Add the PIN code.", "postalCode");
+    if (!PIN.test(pin)) {
+        addressError("A PIN code is six digits, like 560038.", "postalCode");
+    }
+    return { addressLine1: line1, addressLine2: line2, city, postalCode: pin };
+}
+
+/** The business's registered address as its profile holds it, or null. */
+async function profileAddress(organizationId: string) {
+    return prisma.businessProfile.findUnique({
+        where: { organizationId },
+        select: { addressLine1: true },
+    });
 }
 
 /** Who Saroh's invoice for a checkout is billed to (U17). */

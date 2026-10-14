@@ -29,7 +29,7 @@ import { MOVE_DOWN_CLAIM_KIND } from "./over-limit";
 import { priceChangeOf, priceWords } from "./price-change";
 import { composeRenewalReminder } from "./renewal-reminder";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
-import { SAROH_TIMEZONE } from "./saroh-invoice-terms";
+import { FIRST_MONTH_KEY, SAROH_TIMEZONE } from "./saroh-invoice-terms";
 import { sarohSeller } from "./saroh-seller";
 import { termEndingOf } from "./term-ending";
 
@@ -121,6 +121,17 @@ export async function billingRecipients(
 
 const money = (paise: number) => moneyWordsMinor(paise, "INR");
 const day = (d: Date) => dayWords(d, SAROH_TIMEZONE, { year: true });
+/** The year in India's zone: the end of "14 Oct 2026". */
+const year = (d: Date) => day(d).slice(-4);
+
+/** "14 Oct to 13 Nov 2026"; the year on both ends only when they differ. */
+export function periodWords(start: Date, end: Date): string {
+    const from =
+        year(start) === year(end)
+            ? dayWords(start, SAROH_TIMEZONE, { year: false })
+            : day(start);
+    return `${from} to ${day(end)}`;
+}
 
 @Injectable()
 export class BillingEmailHandler {
@@ -183,8 +194,9 @@ export class BillingEmailHandler {
             total: money(invoice.totalPaise),
             period:
                 invoice.periodStart && invoice.periodEnd
-                    ? `${day(invoice.periodStart)} to ${day(invoice.periodEnd)}`
+                    ? periodWords(invoice.periodStart, invoice.periodEnd)
                     : null,
+            firstMonth: invoice.chargeKey.startsWith(FIRST_MONTH_KEY),
         });
         const { file, fileName } = await renderSarohInvoicePdf(invoice);
         const sent = await this.deliver(job, p.organizationId, words, [
