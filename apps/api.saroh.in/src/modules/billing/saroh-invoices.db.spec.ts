@@ -280,7 +280,7 @@ describe("a plan's charges", () => {
         let rows = await invoicesOf(ctx.organizationId);
         expect(rows).toHaveLength(1);
         const first = rows[0]!;
-        expect(first.number).toMatch(/^TST\/\d{2}-\d{2}\/00001$/);
+        expect(first.number).toMatch(/^TST\/\d{2}-\d{2}\/0001$/);
         expect(first).toMatchObject({
             source: "NEW",
             planName: "Plan B",
@@ -299,7 +299,7 @@ describe("a plan's charges", () => {
         expect(first.cgstPaise + first.sgstPaise).toBe(gstPaise(b.priceCents));
         expect(first.lines).toEqual([
             expect.objectContaining({
-                description: "Saroh Plan B plan, monthly",
+                description: "Saroh Plan B Plan — Monthly SaaS Subscription",
                 sac: "999999",
                 unitPaise: b.priceCents,
                 amountPaise: withGstPaise(b.priceCents),
@@ -327,7 +327,7 @@ describe("a plan's charges", () => {
             providerPaymentId: "pay_second",
             totalPaise: withGstPaise(b.priceCents),
         });
-        expect(rows[1]!.number).toMatch(/\/00002$/);
+        expect(rows[1]!.number).toMatch(/\/0002$/);
         // One email job per invoice.
         const jobs = await emailJobs();
         expect(jobs.map((j) => j.payload)).toEqual([
@@ -367,8 +367,8 @@ describe("a plan's charges", () => {
         await onPaidPlan(other);
         const [mine] = await invoicesOf(ctx.organizationId);
         const [theirs] = await invoicesOf(other.organizationId);
-        expect(mine!.number.endsWith("/00001")).toBe(true);
-        expect(theirs!.number.endsWith("/00002")).toBe(true);
+        expect(mine!.number.endsWith("/0001")).toBe(true);
+        expect(theirs!.number.endsWith("/0002")).toBe(true);
     });
 
     it("IGST for a business in another state, with the GSTIN given at checkout", async () => {
@@ -474,7 +474,7 @@ describe("a plan's charges", () => {
             totalPaise: r.quote.chargeNowTotalPaise,
         });
         expect(rows[1]!.lines[0]!.description).toBe(
-            "Saroh Plan C plan: the rest of this period, up from Plan B",
+            "Saroh Plan C Plan — Upgrade from Plan B, rest of this period",
         );
 
         // Its own first charge, when the paid period ends.
@@ -627,7 +627,7 @@ describe("reading them", () => {
 
         const { file, fileName } = await invoices.pdf(ctx, list[0]!.id);
         expect(file.subarray(0, 4).toString()).toBe("%PDF");
-        expect(fileName).toMatch(/^TST-\d{2}-\d{2}-00001\.pdf$/);
+        expect(fileName).toMatch(/^TST-\d{2}-\d{2}-0001\.pdf$/);
 
         const other = await business();
         await expect(invoices.pdf(other, list[0]!.id)).rejects.toMatchObject({

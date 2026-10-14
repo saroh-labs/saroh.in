@@ -156,8 +156,8 @@ export class SarohInvoicesService {
                 lines: [
                     {
                         description: input.fromPlanName
-                            ? `${seller.name} ${planName} plan: the rest of this period, up from ${input.fromPlanName}`
-                            : `${seller.name} ${planName} plan: the rest of this period`,
+                            ? `${seller.name} ${planName} Plan — Upgrade from ${input.fromPlanName}, rest of this period`
+                            : `${seller.name} ${planName} Plan — Rest of this period`,
                         sac: seller.sac,
                         unitPaise: checkout.chargeNowPaise,
                     },
@@ -249,7 +249,7 @@ export class SarohInvoicesService {
             periodEnd: checkout.startAt,
             lines: [
                 {
-                    description: `${this.sellerNow().name} ${planName} plan: first month`,
+                    description: `${this.sellerNow().name} ${planName} Plan — First Month Subscription`,
                     sac: this.sellerNow().sac,
                     unitPaise: checkout.chargeNowPaise,
                 },
@@ -629,7 +629,7 @@ function planLine(
     seller: SarohSeller,
 ): SarohLineInput {
     return {
-        description: `${seller.name} ${planName} plan, ${cycle === "year" ? "yearly" : "monthly"}`,
+        description: `${seller.name} ${planName} Plan — ${cycle === "year" ? "Annual" : "Monthly"} SaaS Subscription`,
         sac: seller.sac,
         unitPaise: pricePaise,
     };

@@ -2,14 +2,20 @@
  * The pure rules of Saroh's own invoices (pricing catalogue U17): GST per
  * line, the CGST + SGST / IGST split, the place of supply, numbering, when a
  * renewal is a new period, the seller from configuration and the paper.
- * Every amount is made up (111, 222, 999); no plan's real price is here.
+ * Every amount is made up (111, 222, 999), or the owner's worked GST
+ * examples (₹1.00 across states, ₹1,500.00 within Haryana); no plan's price.
  */
 import { gstPaise } from "@saroh/pricing-catalog";
 
 import { periodWords } from "./billing-email.job";
 import { invoiceEmail, paymentFailedEmail } from "./billing-emails";
 import { checkoutAddress } from "./checkout.service";
-import { sarohInvoicePaper, sarohTaxRows } from "./saroh-invoice-paper";
+import { addonInvoiceName } from "./offers";
+import {
+    sarohInvoicePaper,
+    sarohPaymentStatus,
+    sarohTaxRows,
+} from "./saroh-invoice-paper";
 import {
     MAX_INVOICE_NUMBER_LENGTH,
     paiseToRupees,
@@ -146,25 +152,28 @@ describe("sarohSupply", () => {
 });
 
 describe("numbering", () => {
-    it("counts per prefix, year and month, in India's zone", () => {
+    it("counts per prefix and financial year, in India's zone, never starting again inside it", () => {
         expect(sarohSeries("SA", new Date("2026-10-14T12:00:00Z"))).toBe(
-            "SA/26/10",
+            "SA/26-27",
         );
-        // 31 October 2026, 20:00 UTC is 1 November in India: the next month.
-        expect(sarohSeries("SA", new Date("2026-10-31T20:00:00Z"))).toBe(
-            "SA/26/11",
+        // November and next March are the same series as October.
+        expect(sarohSeries("SA", new Date("2026-11-01T12:00:00Z"))).toBe(
+            "SA/26-27",
         );
-        // January is the same financial year as the October before it, and
-        // reads as its own calendar year and month.
-        expect(sarohSeries("SA", new Date("2027-01-05T12:00:00Z"))).toBe(
-            "SA/27/01",
+        expect(sarohSeries("SA", new Date("2027-03-31T12:00:00Z"))).toBe(
+            "SA/26-27",
         );
-        expect(sarohInvoiceNumber("SA/26/10", 1)).toBe("SA/26/10/0001");
-        expect(sarohInvoiceNumber("SA/26/10", 12345)).toBe("SA/26/10/12345");
+        // 31 March 2027, 19:00 UTC is 1 April in India: the next year.
+        expect(sarohSeries("SA", new Date("2027-03-31T19:00:00Z"))).toBe(
+            "SA/27-28",
+        );
+        expect(sarohInvoiceNumber("SA/26-27", 1)).toBe("SA/26-27/0001");
+        expect(sarohInvoiceNumber("SA/26-27", 12345)).toBe("SA/26-27/12345");
     });
 
     it("never writes a number GST would refuse for its length", () => {
         const longest = sarohSeries("SRH", new Date("2026-12-14T12:00:00Z"));
+        expect(longest).toBe("SRH/26-27");
         expect(sarohInvoiceNumber(longest, 999_999)).toHaveLength(
             MAX_INVOICE_NUMBER_LENGTH,
         );
@@ -240,8 +249,8 @@ describe("sarohInvoicePaper", () => {
     const base = {
         id: "inv_1",
         organizationId: "org_1",
-        number: "SA/26/10/0007",
-        series: "SA/26/10",
+        number: "SA/26-27/0007",
+        series: "SA/26-27",
         chargeKey: "k",
         source: "RENEWAL",
         provider: "RAZORPAY",
@@ -301,88 +310,151 @@ describe("sarohInvoicePaper", () => {
         ],
     };
 
-    it("is a tax invoice with CGST + SGST, and shows a discount", () => {
+    /** A paper built the way the service builds one: lines taxed, then summed. */
+    function paper(
+        inputs: {
+            unitPaise: number;
+            discountPaise?: number;
+            quantity?: number;
+        }[],
+        taxType: "INTRA" | "INTER",
+        over: Partial<typeof base> = {},
+    ) {
+        const { lines, totals } = taxSarohLines(
+            inputs.map((l, i) => ({
+                description: `Line ${i + 1}`,
+                sac: "998315",
+                ...l,
+            })),
+            taxType,
+        );
+        return sarohInvoicePaper({
+            ...base,
+            taxType,
+            placeOfSupply: taxType === "INTRA" ? "06" : "27",
+            sellerState: "06",
+            ...totals,
+            ...over,
+            lines: lines.map((l, position) => ({
+                ...l,
+                id: `l${position}`,
+                invoiceId: "inv_1",
+                organizationId: "org_1",
+                position,
+            })),
+        });
+    }
+
+    it("lays the header out as the owner set it: seller, product, then what it is", () => {
         const view = sarohInvoicePaper(base);
         expect(view.title).toBe("Tax invoice");
-        expect(view.placeOfSupply).toBe("Karnataka (29) — CGST + SGST");
-        expect(view.sums.map(([k]) => k)).toEqual([
-            "Before discount",
-            "Discount",
-            "Taxable value",
-            "CGST 9%",
-            "SGST 9%",
-        ]);
-        expect(view.lines[0]!.sub).toContain("less ₹111.00 discount");
-        expect(view.total).toBe("₹130.98");
-        expect(view.footer).toContain("section 31");
+        expect(view.number).toBe("SA/26-27/0007");
+        expect(view.dates).toBe("Issue date: 1 Sep 2026");
+        expect(view.related).toBe(
+            "Subscription period:\n1 Sep 2026 – 1 Oct 2026",
+        );
+        expect(view.status).toBe("Payment status: Paid");
+        expect(view.seller).toEqual({
+            name: "Example Labs Pvt Ltd",
+            lines: ["1 Test Road"],
+            tax: "GSTIN 29AAAAA0000A1Z5 · Karnataka (29)",
+            product: "Saroh is a product of Example Labs Pvt Ltd",
+        });
     });
 
-    it("writes every amount with its paise", () => {
+    it("bills the buyer with their address, state and code, and the place of supply on its own", () => {
+        const view = sarohInvoicePaper({
+            ...base,
+            billToGstin: "27AABCA1234A1ZJ",
+            billToState: "27",
+            placeOfSupply: "27",
+            taxType: "INTER",
+        });
+        expect(view.billedTo).toEqual({
+            name: "Test Bakery",
+            detail: "2 Shop Lane\nState: Maharashtra (27)",
+            gstin: "27AABCA1234A1ZJ",
+        });
+        expect(view.placeOfSupply).toBe("Maharashtra (27)");
+        // A profile in another state can't print a second state: the
+        // place of supply's is the one shown.
+        const elsewhere = sarohInvoicePaper({ ...base, billToState: "27" });
+        expect(elsewhere.billedTo.detail).toBe(
+            "2 Shop Lane\nState: Karnataka (29)",
+        );
+    });
+
+    it("an unregistered buyer is billed without a GSTIN", () => {
+        expect(sarohInvoicePaper(base).billedTo.gstin).toBeNull();
+    });
+
+    it("names the SAC column and prints the code whole, with the rate and the taxable value", () => {
         const view = sarohInvoicePaper(base);
+        expect(view.table).toEqual({
+            code: "SAC",
+            rate: true,
+            amount: "TAXABLE VALUE",
+        });
+        expect(view.lines[0]).toMatchObject({
+            description: "Plan B plan, monthly",
+            hsn: "999999",
+            quantity: "1",
+            rate: "₹222.00",
+            amount: "₹111.00",
+        });
+        expect(view.lines[0]!.sub).toBe("GST @ 18% · less ₹111.00 discount");
+    });
+
+    it("interstate: ₹1.00 → IGST @ 18% ₹0.18 → total ₹1.18 (the owner's example)", () => {
+        const view = paper([{ unitPaise: 100 }], "INTER");
+        expect(view.sums).toEqual([
+            ["Taxable value", "₹1.00"],
+            ["IGST @ 18%", "₹0.18"],
+        ]);
+        expect(view.total).toBe("₹1.18");
+    });
+
+    it("within Haryana: ₹1,500.00 → CGST @ 9% ₹135.00 + SGST @ 9% ₹135.00 → ₹1,770.00 (the owner's example)", () => {
+        const view = paper([{ unitPaise: 150_000 }], "INTRA");
+        expect(view.sums).toEqual([
+            ["Taxable value", "₹1,500.00"],
+            ["CGST @ 9%", "₹135.00"],
+            ["SGST @ 9%", "₹135.00"],
+        ]);
+        expect(view.total).toBe("₹1,770.00");
+    });
+
+    it("rounds GST once per line, half up, the odd paisa to CGST; the invoice adds the lines", () => {
+        // 25 paise at 18% is 4.5 paise: 5, split 3 + 2.
+        const half = paper([{ unitPaise: 25 }], "INTRA");
+        expect(half.sums).toEqual([
+            ["Taxable value", "₹0.25"],
+            ["CGST @ 9%", "₹0.03"],
+            ["SGST @ 9%", "₹0.02"],
+        ]);
+        expect(half.total).toBe("₹0.30");
+        // Two such lines: 5 + 5 paise, not 18% of 50 (9) worked out again.
+        const two = paper([{ unitPaise: 25 }, { unitPaise: 25 }], "INTER");
+        expect(two.sums).toEqual([
+            ["Taxable value", "₹0.50"],
+            ["IGST @ 18%", "₹0.10"],
+        ]);
+        expect(two.total).toBe("₹0.60");
+    });
+
+    it("takes a coupon off before GST, and keeps base, discount, taxable, tax and total apart", () => {
+        const view = paper(
+            [{ unitPaise: 22_200, discountPaise: 11_100 }],
+            "INTRA",
+        );
         expect(view.sums).toEqual([
             ["Before discount", "₹222.00"],
             ["Discount", "−₹111.00"],
             ["Taxable value", "₹111.00"],
-            ["CGST 9%", "₹9.99"],
-            ["SGST 9%", "₹9.99"],
+            ["CGST @ 9%", "₹9.99"],
+            ["SGST @ 9%", "₹9.99"],
         ]);
-        expect(view.lines[0]!.amount).toBe("₹111.00");
-    });
-
-    it("leads with the seller's legal name, and names Saroh as its product", () => {
-        const view = sarohInvoicePaper(base);
-        expect(view.seller.name).toBe("Example Labs Pvt Ltd");
-        expect(view.seller.lines).toEqual(["1 Test Road"]);
-        expect(view.seller.tax).toBe("GSTIN 29AAAAA0000A1Z5 · Karnataka (29)");
-        expect(view.seller.product).toBe(
-            "Saroh is a product of Example Labs Pvt Ltd",
-        );
-    });
-
-    it("is signed for the seller, and says it is computer-generated (Rule 46(q))", () => {
-        expect(sarohInvoicePaper(base).signature).toEqual({
-            for: "For Example Labs Pvt Ltd",
-            role: "Authorised signatory",
-            note: "This is a computer-generated invoice and needs no physical signature.",
-        });
-        const unnamed = sarohInvoicePaper({ ...base, sellerLegalName: null });
-        expect(unnamed.seller.name).toBe("Saroh");
-        expect(unnamed.seller.product).toBeNull();
-        expect(unnamed.signature).toBeNull();
-    });
-
-    it("gives the buyer's state from the place of supply, under their address", () => {
-        expect(sarohInvoicePaper(base).billedTo.detail).toBe(
-            "2 Shop Lane\nKarnataka (29)",
-        );
-        // A profile in another state can't print a second state.
-        const elsewhere = sarohInvoicePaper({
-            ...base,
-            billToState: "27",
-            placeOfSupply: "06",
-        });
-        expect(elsewhere.billedTo.detail).toBe("2 Shop Lane\nHaryana (06)");
-        expect(elsewhere.placeOfSupply).toBe("Haryana (06) — CGST + SGST");
-    });
-
-    it("is IGST across states, and only an invoice without Saroh's GSTIN", () => {
-        const view = sarohInvoicePaper({
-            ...base,
-            sellerGstin: null,
-            taxType: "INTER",
-            placeOfSupply: "27",
-            cgstPaise: 0,
-            sgstPaise: 0,
-            igstPaise: 1998,
-            discountPaise: 0,
-            subtotalPaise: 11100,
-        });
-        expect(view.title).toBe("Invoice");
-        expect(view.placeOfSupply).toBe("Maharashtra (27) — IGST");
-        expect(view.sums.map(([k]) => k)).toEqual([
-            "Taxable value",
-            "IGST 18%",
-        ]);
+        expect(view.total).toBe("₹130.98");
     });
 
     it("shows a tax row per rate, each from its lines' own rate", () => {
@@ -397,11 +469,63 @@ describe("sarohInvoicePaper", () => {
                 true,
             ),
         ).toEqual([
-            ["CGST 9%", 99],
-            ["SGST 9%", 99],
-            ["CGST 2.5%", 25],
-            ["SGST 2.5%", 25],
+            ["CGST @ 9%", 99],
+            ["SGST @ 9%", 99],
+            ["CGST @ 2.5%", 25],
+            ["SGST @ 2.5%", 25],
         ]);
+    });
+
+    it("ends with who issues it, the law, reverse charge and the payment status", () => {
+        const view = sarohInvoicePaper(base);
+        expect(view.signature).toEqual({
+            for: "For Example Labs Pvt Ltd",
+            role: "Electronically generated tax invoice",
+            note: "This invoice is electronically generated and does not require a physical signature.",
+        });
+        expect(view.footer).toBe(
+            "Tax invoice issued under Section 31 of the CGST Act.\nReverse charge: No\nPayment status: Paid",
+        );
+        expect(view.footer).not.toContain("Paid in full");
+    });
+
+    it("reads Due for a source that isn't paid when written", () => {
+        expect(sarohPaymentStatus({ source: "RENEWAL" })).toBe("Paid");
+        expect(sarohPaymentStatus({ source: "NEW" })).toBe("Paid");
+        expect(sarohPaymentStatus({ source: "SOMETHING_UNPAID" })).toBe("Due");
+    });
+
+    it("is only an invoice, unsigned and without the law's line, without Saroh's GSTIN", () => {
+        const view = sarohInvoicePaper({
+            ...base,
+            sellerGstin: null,
+            sellerLegalName: null,
+        });
+        expect(view.title).toBe("Invoice");
+        expect(view.seller.name).toBe("Saroh");
+        expect(view.seller.product).toBeNull();
+        expect(view.signature).toBeNull();
+        expect(view.footer).toBe("Reverse charge: No\nPayment status: Paid");
+    });
+});
+
+describe("invoice lines' names", () => {
+    it("names add-ons by their kind, a module by its own name", () => {
+        const named = (kind: string, cycle: "month" | "year" = "month") =>
+            addonInvoiceName(
+                { kind, name: "Catalogue name" } as Parameters<
+                    typeof addonInvoiceName
+                >[0],
+                cycle,
+            );
+        expect(named("members")).toBe("Additional Team Member — Monthly Seat");
+        expect(named("members", "year")).toBe(
+            "Additional Team Member — Annual Seat",
+        );
+        expect(named("products")).toBe("Additional Product Capacity");
+        expect(named("orders")).toBe("Additional Order Capacity");
+        expect(named("bookings")).toBe("Additional Booking Capacity");
+        expect(named("module")).toBe("Catalogue name");
     });
 });
 
@@ -409,7 +533,7 @@ describe("billing emails", () => {
     it("escapes what a business typed", () => {
         const e = invoiceEmail({
             businessName: "<b>Shop</b>",
-            number: "SA/26/10/0001",
+            number: "SA/26-27/0001",
             planName: "Plan B",
             total: "₹1",
             period: null,
@@ -421,7 +545,7 @@ describe("billing emails", () => {
     it("says a first month's charge is the first month's, and where to find it", () => {
         const first = invoiceEmail({
             businessName: "Shop",
-            number: "SA/26/10/0001",
+            number: "SA/26-27/0001",
             planName: "Plan B",
             total: "₹1.18",
             period: "14 Oct to 13 Nov 2026",
@@ -433,7 +557,7 @@ describe("billing emails", () => {
         expect(first.html).toContain("Settings › Plan and billing.");
         const renewal = invoiceEmail({
             businessName: "Shop",
-            number: "SA/26/11/0001",
+            number: "SA/26-27/0002",
             planName: "Plan B",
             total: "₹1,768.82",
             period: "13 Nov to 13 Dec 2026",

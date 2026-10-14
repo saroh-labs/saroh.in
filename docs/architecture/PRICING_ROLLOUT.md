@@ -85,7 +85,8 @@ release time.
    `SAROH_INVOICE_PREFIX`; `ENVIRONMENT.md`) set **before the first real
    charge**: each invoice copies them when it is written and is never
    rewritten. The series restarts every financial year
-   (`SA/26/10/0001`: prefix, year, month, then a count that starts again each month, DEC-162).
+   (`SA/26-27/0001`: prefix, financial year, then a count of at least four
+   digits that runs the whole year, DEC-162).
 
 ## How a plan override reads (U5)
 
@@ -538,8 +539,10 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   within half a cycle is not invoiced again — Razorpay's `activated` and
   `charged` for one payment make one invoice. An event with no period end
   is not invoiced.
-- **Numbers** are Saroh's own series, `<prefix>/<financial year>/<5 digits>`
-  (`SA/26/10/0001`: prefix, year, month, then a count that starts again each month, DEC-162), counted in `SarohInvoiceSequence` inside the
+- **Numbers** are Saroh's own series, `<prefix>/<financial year>/<count>`
+  (`SA/26-27/0001`: a count of at least four digits that runs the whole
+  financial year, never past 16 characters, DEC-162), counted in
+  `SarohInvoiceSequence` inside the
   invoice's transaction, so a rolled-back charge leaves no gap. The
   financial year is India's (April–March, `Asia/Kolkata`).
 - **GST** is 18% on the line's amount after any discount, rounded half-up to
@@ -553,15 +556,28 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   is asked (a 400 for a state that isn't one, a GSTIN that doesn't check out
   or isn't in the state given), and keeps them on the `BillingCheckout`.
   Renewals read them from the checkout that made the provider subscription.
-- **The paper** (CGST Rule 46): the seller's legal name heads it, then
-  the registered address, contact and GSTIN · state, and a small "Saroh is
-  a product of ‹legal name›" (all from the seller settings). Lines name the
-  plan ("Saroh Grow plan: first month"). The sums carry each tax's rate,
-  from the lines' own GST rate ("CGST 9%", "SGST 9%", "IGST 18%"), every
-  amount with its paise, and under the total "For ‹legal name› ·
-  Authorised signatory" with the note that it is computer-generated. The
-  bill-to prints the buyer's address and the state of the place of supply,
-  so the two never disagree.
+- **The paper** (CGST Rule 46, the owner's layout of 14 Oct 2026):
+  on the left the seller's legal name, registered address, contact email,
+  "GSTIN … · Haryana (06)" and "Saroh is a product of ‹legal name›"; on
+  the right TAX INVOICE, the number, "Issue date: …", "Subscription
+  period: … – …" and "Payment status: Paid". Then Billed to (name, address,
+  "State: ‹name› (‹code›)", GSTIN when registered) beside Place of supply
+  (the same state), the lines (ITEM · SAC · QTY · RATE · TAXABLE VALUE;
+  "Saroh Grow Plan — First Month Subscription", "— Monthly SaaS
+  Subscription", "— Annual SaaS Subscription"; add-ons by kind, such as
+  "Additional Team Member — Monthly Seat"), the sums with each tax's rate
+  ("CGST @ 9%", "SGST @ 9%", "IGST @ 18%", from the lines' rate) and every
+  amount with its paise, then "For ‹legal name›", "Electronically
+  generated tax invoice", "This invoice is electronically generated and
+  does not require a physical signature.", and the footer "Tax invoice
+  issued under Section 31 of the CGST Act.", "Reverse charge: No" (no
+  Saroh supply is under reverse charge), "Payment status: …". The status
+  is read from how the invoice was written (`sarohPaymentStatus`): every
+  source today writes it with a charge the provider reported taken, so
+  Paid; a source that bills before payment would read Due. Each invoice
+  keeps the base amount, discount, taxable value, each tax and the total
+  apart, on the invoice and on each line. Saroh issues no refunds and has
+  no credit note.
 - **The buyer's address** (Rule 46(e)): the quote says whether the
   business has its registered address (`registeredAddress`); without one
   the change-plan dialog asks for it, required with a GSTIN and optional

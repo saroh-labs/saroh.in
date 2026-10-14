@@ -3,7 +3,7 @@ import { GST_PERCENT, gstPaise } from "@saroh/pricing-catalog";
 import type { TaxType } from "../invoices/gst";
 import { placeOfSupply, taxTypeFor } from "../invoices/gst";
 import { stateCode } from "../invoices/gst-states";
-import { DEFAULT_TIMEZONE } from "../invoices/numbering";
+import { DEFAULT_TIMEZONE, financialYear } from "../invoices/numbering";
 
 /**
  * The pure rules of Saroh's own invoices (pricing catalogue U17): what each
@@ -146,30 +146,22 @@ export function sarohSupply(input: {
 }
 
 /**
- * The series a number at `at` counts in: prefix, year and month in India's
- * zone, so each month counts from 1 again (DEC-162). "SA/26/10" is October
- * 2026. A month in the series keeps every number unique within the
- * financial year, and each month's numbers are one range in that month's
- * GST return.
+ * The series a number at `at` counts in: prefix and India's financial year
+ * (April–March, `Asia/Kolkata`), so the count runs the whole year and never
+ * starts again inside it (DEC-162). "SA/26-27" is April 2026 to March 2027.
  */
 export function sarohSeries(prefix: string, at: Date): string {
-    const parts = new Intl.DateTimeFormat("en-IN", {
-        timeZone: SAROH_TIMEZONE,
-        year: "2-digit",
-        month: "2-digit",
-    }).formatToParts(at);
-    const part = (type: "year" | "month") =>
-        parts.find((p) => p.type === type)?.value ?? "";
-    return `${prefix}/${part("year")}/${part("month")}`;
+    return `${prefix}/${financialYear(at, SAROH_TIMEZONE)}`;
 }
 
 /** The longest invoice number GST allows (CGST Rule 46(b)). */
 export const MAX_INVOICE_NUMBER_LENGTH = 16;
 
 /**
- * SA/26/10 and 1 → "SA/26/10/0001". The counter grows past four digits; with
- * a prefix of up to three characters a month has room for 999,999 numbers
- * before one would pass the limit, and none is ever written that does.
+ * SA/26-27 and 1 → "SA/26-27/0001". The counter has at least four digits
+ * and grows past them; with a prefix of up to three characters a year has
+ * room for 999,999 numbers (9,999,999 with two) before one would pass the
+ * limit, and none is ever written that does.
  */
 export function sarohInvoiceNumber(series: string, n: number): string {
     const number = `${series}/${String(n).padStart(4, "0")}`;

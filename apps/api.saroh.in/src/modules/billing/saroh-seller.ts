@@ -20,7 +20,7 @@ export interface SarohSeller {
     address: string | null;
     email: string | null;
     sac: string | null;
-    /** The series prefix: SA → SA/26/10/0001 (DEC-162). */
+    /** The series prefix: SA → SA/26-27/0001 (DEC-162). */
     prefix: string;
 }
 

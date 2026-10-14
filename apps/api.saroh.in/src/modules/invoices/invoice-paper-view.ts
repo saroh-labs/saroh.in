@@ -70,6 +70,8 @@ export interface PaperLine {
     /** "9993", spaced like the screen; empty on an unregistered paper. */
     hsn: string;
     quantity: string;
+    /** The price of one, on a paper whose table has a rate column. */
+    rate?: string;
     amount: string;
 }
 
@@ -80,6 +82,11 @@ export interface PaperView {
     dates: string;
     /** "Against KD/26-27/0001" on a credit note; "Supplementary to …". */
     related: string | null;
+    /**
+     * One more line under the dates on the right ("Payment status: Paid").
+     * Only Saroh's own invoices to businesses set it.
+     */
+    status?: string | null;
     seller: {
         name: string;
         /** Legal name, registered address, contact email: those it has. */
@@ -103,6 +110,12 @@ export interface PaperView {
     placeOfSupply: string | null;
     /** Whether the HSN / SAC column has a heading (a registered paper). */
     hsnColumn: boolean;
+    /**
+     * The table's own headings where they differ from a business's paper:
+     * the code column's ("SAC"), a rate column, and the amount column's
+     * ("TAXABLE VALUE"). Only Saroh's own invoices to businesses set it.
+     */
+    table?: { code: string; rate: boolean; amount: string } | null;
     lines: PaperLine[];
     /** Taxable value and its CGST + SGST or IGST, or a typed tax. */
     sums: [string, string][];

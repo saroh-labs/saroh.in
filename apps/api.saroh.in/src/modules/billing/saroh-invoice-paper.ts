@@ -23,16 +23,9 @@ function stateLabel(code: string | null): string | null {
     return name ? `${name} (${code})` : `State ${code}`;
 }
 
-/** "9983 14": an SAC reads in groups, as on a business's paper. */
-function spaced(code: string | null): string {
-    if (!code) return "";
-    const c = code.replace(/\s+/g, "");
-    return [c.slice(0, 4), c.slice(4, 6), c.slice(6)].filter(Boolean).join(" ");
-}
-
-/** "₹1.00": Saroh's paper always shows the paise (KTD-18's amounts). */
+/** "₹1.00": Saroh's paper always shows the paise. */
 function money2(paise: number, currency: string): string {
-    return new Intl.NumberFormat("en-GB", {
+    return new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency,
         minimumFractionDigits: 2,
@@ -49,9 +42,10 @@ type TaxRow = [label: string, paise: number];
 
 /**
  * The tax rows with their rates (CGST Rule 46(j)): each line's GST rate,
- * half each for CGST and SGST within the state, the whole as IGST across
- * states. Lines at the same rate share a row; a paper with lines at two
- * rates shows a row per rate. Never a typed rate: always the line's own.
+ * half each for CGST and SGST within the state ("CGST @ 9%"), the whole as
+ * IGST across states ("IGST @ 18%"). Lines at the same rate share a row; a
+ * paper with lines at two rates shows a row per rate. Never a typed rate:
+ * always the line's own. The amounts are the lines' stored tax, summed.
  */
 export function sarohTaxRows(
     lines: Pick<
@@ -71,18 +65,45 @@ export function sarohTaxRows(
     const rows: TaxRow[] = [];
     for (const [bps, r] of [...byRate].sort(([a], [b]) => b - a)) {
         if (intra) {
-            rows.push([`CGST ${percent(bps / 2)}`, r.c]);
-            rows.push([`SGST ${percent(bps / 2)}`, r.s]);
+            rows.push([`CGST @ ${percent(bps / 2)}`, r.c]);
+            rows.push([`SGST @ ${percent(bps / 2)}`, r.s]);
         } else {
-            rows.push([`IGST ${percent(bps)}`, r.i]);
+            rows.push([`IGST @ ${percent(bps)}`, r.i]);
         }
     }
     return rows;
 }
 
-/** The words under the total that say who issued it (Rule 46(q)). */
-export const COMPUTER_GENERATED =
-    "This is a computer-generated invoice and needs no physical signature.";
+export type SarohPaymentStatus = "Paid" | "Due";
+
+/**
+ * Every source writes its invoice with a charge the provider reported
+ * taken (the webhook, or the business's return checked with the
+ * provider): a failed charge writes none (`paymentFailedInTx`). So each
+ * of today's sources is paid when written. A source that bills before it
+ * is paid must not be added here, and then reads "Due".
+ */
+const PAID_WHEN_WRITTEN = new Set(["NEW", "UPGRADE", "SCHEDULED", "RENEWAL"]);
+
+/** Whether the invoice's payment has been received, from how it was written. */
+export function sarohPaymentStatus(
+    invoice: Pick<SarohInvoice, "source">,
+): SarohPaymentStatus {
+    return PAID_WHEN_WRITTEN.has(invoice.source) ? "Paid" : "Due";
+}
+
+/**
+ * None of Saroh's supplies is under reverse charge: Saroh charges and pays
+ * the GST on every plan, add-on and first month itself. The model keeps no
+ * reverse-charge flag because no Saroh charge can be one.
+ */
+const REVERSE_CHARGE = "No";
+
+/** The words under the total (Rule 46(q); see `PRICING_ROLLOUT.md`). */
+export const ELECTRONIC_INVOICE = {
+    role: "Electronically generated tax invoice",
+    note: "This invoice is electronically generated and does not require a physical signature.",
+} as const;
 
 export function sarohInvoicePaper(
     invoice: SarohInvoice & { lines: SarohInvoiceLine[] },
@@ -92,18 +113,20 @@ export function sarohInvoicePaper(
     const taxInvoice = Boolean(invoice.sellerGstin);
     const intra = invoice.taxType === "INTRA";
     const pos = stateLabel(invoice.placeOfSupply);
-    const period =
-        invoice.periodStart && invoice.periodEnd
-            ? `For ${day(invoice.periodStart)} – ${day(invoice.periodEnd)}`
-            : null;
     const legal = invoice.sellerLegalName;
     const lines = [...invoice.lines].sort((a, b) => a.position - b.position);
+    const status = `Payment status: ${sarohPaymentStatus(invoice)}`;
 
     return {
         title: taxInvoice ? "Tax invoice" : "Invoice",
         number: invoice.number,
-        dates: `Issued ${day(invoice.issuedAt)}`,
-        related: period,
+        dates: `Issue date: ${day(invoice.issuedAt)}`,
+        related:
+            invoice.periodStart && invoice.periodEnd
+                ? // Two lines: the dates never break inside the header's width.
+                  `Subscription period:\n${day(invoice.periodStart)} – ${day(invoice.periodEnd)}`
+                : null,
+        status,
         // The supplier is the legal entity; Saroh is what it sells.
         seller: {
             name: legal ?? invoice.sellerName,
@@ -126,17 +149,20 @@ export function sarohInvoicePaper(
         billedTo: {
             name: invoice.billToName,
             detail:
-                [invoice.billToAddress ?? invoice.billToEmail, pos]
+                [
+                    invoice.billToAddress ?? invoice.billToEmail,
+                    pos ? `State: ${pos}` : null,
+                ]
                     .filter((x): x is string => Boolean(x))
                     .join("\n") || null,
             gstin: invoice.billToGstin,
         },
-        placeOfSupply: `${pos ?? "—"}${intra ? " — CGST + SGST" : " — IGST"}`,
+        placeOfSupply: pos ?? "—",
         hsnColumn: true,
+        table: { code: "SAC", rate: true, amount: "TAXABLE VALUE" },
         lines: lines.map((l) => {
             const sub = [
-                `GST ${percent(l.gstRateBps)}`,
-                l.quantity > 1 ? `${money(l.unitPaise)} each` : null,
+                `GST @ ${percent(l.gstRateBps)}`,
                 l.discountPaise > 0
                     ? `less ${money(l.discountPaise)} discount`
                     : null,
@@ -144,8 +170,9 @@ export function sarohInvoicePaper(
             return {
                 description: l.description,
                 sub: sub.join(" · "),
-                hsn: spaced(l.sac),
+                hsn: l.sac ?? "",
                 quantity: String(l.quantity),
+                rate: money(l.unitPaise),
                 amount: money(l.taxablePaise),
             };
         }),
@@ -167,13 +194,19 @@ export function sarohInvoicePaper(
         signature: legal
             ? {
                   for: `For ${legal}`,
-                  role: "Authorised signatory",
-                  note: COMPUTER_GENERATED,
+                  role: ELECTRONIC_INVOICE.role,
+                  note: ELECTRONIC_INVOICE.note,
               }
             : null,
-        footer: taxInvoice
-            ? "Tax invoice under section 31, CGST Act. Reverse charge does not apply. Paid in full."
-            : "Paid in full.",
+        footer: [
+            taxInvoice
+                ? "Tax invoice issued under Section 31 of the CGST Act."
+                : null,
+            `Reverse charge: ${REVERSE_CHARGE}`,
+            status,
+        ]
+            .filter(Boolean)
+            .join("\n"),
     };
 }
 
