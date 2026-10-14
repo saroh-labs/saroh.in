@@ -8,6 +8,9 @@ import {
     addonMaxQuantity,
     addonOfferedOn,
     addonPlanNames,
+    AUTOPAY_CHARGES_DEFAULT,
+    AUTOPAY_CHARGES_MAX,
+    autopayCharges,
     catalogSchema,
     cellOf,
     MAX_ADDON_QUANTITY,
@@ -160,6 +163,38 @@ describe("the catalogue schema", () => {
         expect(errorsOf(input).length).toBeGreaterThan(0);
         input.yearly = { on: true, paid: 13 };
         expect(errorsOf(input).length).toBeGreaterThan(0);
+    });
+
+    describe("how many monthly charges one autopay covers (DEC-161)", () => {
+        it("is 12 for a version published before the setting", () => {
+            const input = fixtureInput() as Record<string, unknown>;
+            delete input.autopay;
+            const c = parseCatalog(input);
+            expect(c.autopay).toEqual({ charges: 12 });
+            expect(AUTOPAY_CHARGES_DEFAULT).toBe(12);
+            expect(autopayCharges(c)).toBe(12);
+        });
+
+        it("takes another count the provider accepts", () => {
+            const input = fixtureInput();
+            input.autopay = { charges: 60 };
+            expect(autopayCharges(parseCatalog(input))).toBe(60);
+            input.autopay = { charges: AUTOPAY_CHARGES_MAX };
+            expect(errorsOf(input)).toEqual([]);
+        });
+
+        it("refuses one charge, a part charge, or more than Razorpay takes", () => {
+            for (const charges of [0, 1, 12.5, AUTOPAY_CHARGES_MAX + 1]) {
+                const input = fixtureInput();
+                input.autopay = { charges };
+                expect(errorsOf(input).length).toBeGreaterThan(0);
+            }
+        });
+
+        it("reads a draft or snapshot without it as 12", () => {
+            expect(autopayCharges({})).toBe(12);
+            expect(autopayCharges(null)).toBe(12);
+        });
     });
 
     it("rejects a limit that isn't a positive whole number", () => {

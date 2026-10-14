@@ -104,7 +104,8 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         // aligned with India's DPDP Act (rev 55): until that day only the
         // Refunds page shows. Privacy's moved again to 13 Oct with the
         // referral code cookie (DEC-156), and to 14 Oct with page visits
-        // (DEC-160).
+        // (DEC-160). The Terms' moved to 14 Oct too, with no term and no
+        // price lock (DEC-161).
         const termsBefore = at("2026-10-08T18:31:00Z");
         const privacyAfter = at("2026-10-13T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);

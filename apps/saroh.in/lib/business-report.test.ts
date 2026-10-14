@@ -162,9 +162,11 @@ describe("the Terms' 9 Oct additions (rev 46)", () => {
         }
     });
 
-    it("moves the page's Last updated to 10 Oct", () => {
+    it("moved the page's Last updated to 10 Oct, and DEC-161 to 14 Oct", () => {
+        // 10 Oct for these additions (and the DPDP alignment); 14 Oct for
+        // the autopay and price-change sentences (DEC-161).
         expect(LEGAL_PAGES.find((p) => p.id === "terms")?.publishOn).toBe(
-            "2026-10-10",
+            "2026-10-14",
         );
     });
 });

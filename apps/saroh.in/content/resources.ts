@@ -125,8 +125,10 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         // 7 Oct: the term ends with a request to pay (DEC-100). 8 Oct:
         // merchants' own trackers (DEC-108). 9 Oct: the business is
         // responsible for its sales, suspending at once, fair use (rev 46).
-        // 10 Oct: aligned with India's DPDP Act (rev 55).
-        publishOn: "2026-10-10",
+        // 10 Oct: aligned with India's DPDP Act (rev 55). 14 Oct: no term
+        // and no price lock; each autopay covers 12 monthly charges, and a
+        // new price is told 30 days ahead and approved (DEC-161).
+        publishOn: "2026-10-14",
     },
     {
         id: "refunds",

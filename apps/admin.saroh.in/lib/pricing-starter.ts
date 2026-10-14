@@ -1,5 +1,5 @@
 import type { Catalog } from "@saroh/pricing-catalog";
-import { limitWithin } from "@saroh/pricing-catalog";
+import { AUTOPAY_CHARGES_DEFAULT, limitWithin } from "@saroh/pricing-catalog";
 import { SEED_CATALOG } from "@saroh/pricing-catalog/seed";
 
 /**
@@ -58,6 +58,7 @@ export function blankCatalog(): Catalog {
         modules: [],
         yearly: { on: false, paid: 10 },
         gst: { show: "excl" },
+        autopay: { charges: AUTOPAY_CHARGES_DEFAULT },
         addons: [],
     };
 }

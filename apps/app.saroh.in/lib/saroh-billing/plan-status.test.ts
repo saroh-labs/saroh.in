@@ -133,10 +133,43 @@ describe("planMessage: one message at a time", () => {
 describe("billingRules", () => {
     it("says nothing of yearly when the catalogue has no yearly billing", () => {
         expect(billingRules(false)).toEqual([
-            "Plans are paid monthly by autopay, for 12 months. Before that ends, we ask you to pay for the next term.",
+            "Plans are paid monthly by autopay. Each autopay you approve covers 12 monthly charges. Before it runs out, we ask you to approve the next one.",
+            "Prices can change. We tell you at least 30 days ahead and ask you to approve the new amount. Until you do, you keep paying the price you have.",
             "Upgrades start today. A cheaper plan or Free starts when what you've paid for ends.",
         ]);
         expect(billingRules(false).join(" ")).not.toMatch(/yearly/i);
-        expect(billingRules(true)[0]).toContain("yearly is one payment");
+        expect(billingRules(true)[0]).toContain(
+            "Yearly is one payment for the year",
+        );
+    });
+
+    it("says how many charges an autopay covers, and never promises a price (DEC-161)", () => {
+        expect(billingRules(false, 60)[0]).toContain(
+            "covers 60 monthly charges",
+        );
+        for (const yearly of [false, true]) {
+            const said = billingRules(yearly).join(" ");
+            expect(said).not.toMatch(
+                /\bterm\b|12-month|price doesn't change|pay for the next/i,
+            );
+            expect(said).toContain("at least 30 days ahead");
+        }
+    });
+});
+
+describe("a new price to approve (DEC-161)", () => {
+    it("is the page's one message over the autopay's renewal", () => {
+        const price = note("priceChange", { tone: "attention" });
+        const { message } = planMessage({
+            notes: [note("renew", { tone: "attention" }), price, note("term")],
+        });
+        expect(message).toBe(price);
+    });
+
+    it("waits behind a failed payment and a due approval", () => {
+        const { message } = planMessage({
+            notes: [note("priceChange"), note("authorise")],
+        });
+        expect((message as PlanNote).kind).toBe("authorise");
     });
 });

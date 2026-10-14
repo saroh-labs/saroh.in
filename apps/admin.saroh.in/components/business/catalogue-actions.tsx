@@ -244,7 +244,7 @@ export function CatalogueActions({
                 <OperatorDialog
                     trigger={`Move to version ${catalogue.liveVersion}`}
                     title={`Move it to version ${catalogue.liveVersion}`}
-                    effect={`It stays on the same plan, on the live version's terms. At its next renewal, it is told seven days ahead if anything changes for it. Now applies at once, and is refused while a billing provider manages its subscription.`}
+                    effect={`It stays on the same plan, on the live version's terms. At its next renewal, it is told seven days ahead if anything changes for it, or 30 days ahead if its price changes; a new price waits for the business to approve it, and until then it keeps paying what it pays. Now applies at once, and is refused while a billing provider manages its subscription.`}
                     fields={
                         <fieldset className="grid gap-2">
                             <legend className="mb-1 text-sm font-medium">

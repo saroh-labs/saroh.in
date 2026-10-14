@@ -405,8 +405,11 @@ transaction as its row and ignores one older than the last applied
 
 **DEC-093 adds** (`checkout.service.ts`, `checkout-confirm.service.ts`):
 
-- **Terms.** A monthly subscription is made with `totalCount` 12 (the
-  adapter's open-ended 120 is only a fallback). A yearly plan is a one-time
+- **How many charges.** A monthly subscription is made with `totalCount`
+  set to the catalogue's `autopay.charges` for the plan's version (DEC-161;
+  12 today, at most 1,200, the most Razorpay accepted in test mode; the
+  adapter's open-ended 120 is only a fallback). An amount is never changed
+  in place: a new price is a new subscription the business authorises. A yearly plan is a one-time
   Razorpay **order** (`orders` capability, `POST /orders`), stored where a
   subscription id would be, with `providerPlanId` `"one-time"`; its
   `order.paid` webhook reads as the charge. **Saroh's Razorpay webhook must

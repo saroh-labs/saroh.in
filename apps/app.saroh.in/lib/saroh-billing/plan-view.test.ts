@@ -212,7 +212,7 @@ describe("yourPlan", () => {
             },
         });
         expect(authorise.notes.map((n) => n.action?.label)).toEqual([
-            "Authorise",
+            "Approve",
         ]);
         expect(authorise.notes.every((n) => n.tone === "attention")).toBe(true);
         // A checkout waiting for its payment is confirmed, never started
@@ -292,7 +292,129 @@ describe("yourPlan", () => {
         expect(authorise.notes).toHaveLength(1);
         expect(authorise.notes[0]).toMatchObject({
             lead: "Plan B's new price was due to start on ",
-            action: { label: "Authorise", planId: "b" },
+            tail: ". Approve the new amount to move to it. Until you do, you keep paying ₹111 a month + GST.",
+            action: { label: "Approve", planId: "b" },
+        });
+    });
+
+    describe("a new price for the plan it pays for (DEC-161)", () => {
+        const pricedMove = (
+            over: {
+                waiting?: "held" | "authorise" | null;
+                version?: number;
+            } = {},
+        ) =>
+            access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+                pendingMove: {
+                    planId: "b",
+                    fromPlanId: "b",
+                    version: over.version ?? 4,
+                    from: "2026-12-01T00:00:00.000Z",
+                    waiting: over.waiting ?? null,
+                    pricePaise: 13_300,
+                },
+            });
+        const base = {
+            subscription: sub(),
+            catalog: CATALOG,
+            liveVersion: 4,
+            checkouts: null,
+            addonsHeld: false,
+        };
+
+        it("says the new amount and the date ahead, asks to approve it, and keeps the price until then", () => {
+            const v = yourPlan({ ...base, access: pricedMove() });
+            expect(v.notes).toHaveLength(1);
+            expect(v.notes[0]).toEqual({
+                kind: "priceChange",
+                tone: "attention",
+                lead: "Plan B's price changes to ₹133 a month + GST on ",
+                iso: "2026-12-01T00:00:00.000Z",
+                tail: ". Approve the new amount before then. Until you do, you keep paying ₹111 a month + GST.",
+                action: { label: "Approve", planId: "b", cycle: "month" },
+            });
+        });
+
+        it("names the new amount once it is due, and still keeps the price", () => {
+            const v = yourPlan({
+                ...base,
+                access: pricedMove({ waiting: "authorise" }),
+            });
+            expect(v.notes[0]).toMatchObject({
+                kind: "authorise",
+                lead: "Plan B's new price, ₹133 a month + GST, was due to start on ",
+                tail: ". Approve the new amount to move to it. Until you do, you keep paying ₹111 a month + GST.",
+            });
+        });
+
+        it("offers no approval before its version is live", () => {
+            const v = yourPlan({
+                ...base,
+                liveVersion: 3,
+                access: pricedMove(),
+            });
+            expect(v.notes[0]).toMatchObject({
+                kind: "priceChange",
+                tail: ". We'll ask you to approve the new amount. Until you do, you keep paying ₹111 a month + GST.",
+                action: null,
+            });
+        });
+
+        it("asks nothing once the new amount is approved", () => {
+            const v = yourPlan({
+                ...base,
+                access: pricedMove(),
+                checkouts: {
+                    open: null,
+                    scheduled: {
+                        id: "co",
+                        kind: "SCHEDULED",
+                        status: "SCHEDULED",
+                        plan: { id: "b", name: "Plan B", version: 4 },
+                        cycle: "month",
+                        pricePaise: 13_300,
+                        startAt: "2026-12-01T00:00:00.000Z",
+                        expiresAt: "2026-10-05T00:00:00.000Z",
+                        createdAt: "2026-10-04T00:00:00.000Z",
+                        payment: "AUTOPAY",
+                    },
+                },
+            });
+            expect(v.notes.map((n) => n.kind)).toEqual(["renewed"]);
+            expect(v.notes[0]).toMatchObject({
+                lead: "Your next autopay for Plan B starts on ",
+                tail: ", as you approved.",
+            });
+        });
+
+        it("says nothing at the same price, or from an API that sends no price", () => {
+            const same = access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+                pendingMove: {
+                    planId: "b",
+                    fromPlanId: "b",
+                    version: 4,
+                    from: "2026-12-01T00:00:00.000Z",
+                    waiting: null,
+                    pricePaise: 11_100,
+                },
+            });
+            expect(yourPlan({ ...base, access: same }).notes).toEqual([]);
+            const old = access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+                pendingMove: {
+                    planId: "b",
+                    fromPlanId: "b",
+                    version: 4,
+                    from: "2026-12-01T00:00:00.000Z",
+                    waiting: null,
+                },
+            });
+            expect(yourPlan({ ...base, access: old }).notes).toEqual([]);
         });
     });
 
@@ -387,7 +509,7 @@ describe("yourPlan", () => {
         ]);
     });
 
-    it("says the 12-month term, and offers the one-tap renewal in its last days", () => {
+    it("says how many charges the autopay covers, and asks to approve the next one in its last days (DEC-161)", () => {
         const base = {
             access: access({
                 plan: { id: "b", name: "Plan B" },
@@ -412,8 +534,9 @@ describe("yourPlan", () => {
         });
         expect(running.notes.at(-1)).toMatchObject({
             tone: "info",
-            lead: "Your 12 monthly charges run to ",
+            lead: "Your autopay covers 12 monthly charges, to ",
             iso: "2027-09-01T00:00:00.000Z",
+            tail: ". Before it runs out, we ask you to approve the next one.",
             action: null,
         });
         const ending = yourPlan({
@@ -430,8 +553,9 @@ describe("yourPlan", () => {
         });
         expect(ending.notes.at(-1)).toMatchObject({
             tone: "attention",
-            lead: "Your 12 months of Plan B end on ",
-            action: { label: "Renew", planId: "b", cycle: "month" },
+            lead: "Your autopay for Plan B runs out on ",
+            tail: ". Approve the next one to keep Plan B from that day, at today's price. Otherwise you move to Free then.",
+            action: { label: "Approve", planId: "b", cycle: "month" },
         });
         // Renewed: said once, and no renewal offered again.
         const renewed = yourPlan({
@@ -457,8 +581,32 @@ describe("yourPlan", () => {
             },
         });
         expect(renewed.notes.map((n) => n.lead)).toEqual([
-            "Your next 12 months of Plan B start on ",
+            "Your next autopay for Plan B starts on ",
         ]);
+        // An autopay made for another count says it.
+        const sixty = yourPlan({
+            ...base,
+            checkouts: {
+                open: null,
+                scheduled: null,
+                term: {
+                    endsAt: "2030-09-01T00:00:00.000Z",
+                    payment: "AUTOPAY",
+                    renewOpen: false,
+                    charges: 60,
+                },
+            },
+        });
+        expect(sixty.notes.at(-1)?.lead).toBe(
+            "Your autopay covers 60 monthly charges, to ",
+        );
+        for (const v of [running, ending, renewed, sixty]) {
+            for (const n of v.notes) {
+                expect(`${n.lead} ${n.tail}`).not.toMatch(
+                    /\bterm\b|price doesn't change|pay for the next term/i,
+                );
+            }
+        }
     });
 
     it("a year paid once has no next charge: it's paid to its end", () => {

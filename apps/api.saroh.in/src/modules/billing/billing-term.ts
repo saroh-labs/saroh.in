@@ -1,23 +1,28 @@
-import { addMonthsUtc } from "@saroh/pricing-catalog";
+import type { Prisma } from "@saroh/database";
+import { addMonthsUtc, autopayCharges } from "@saroh/pricing-catalog";
 
 import type { PaymentKind } from "./checkout-quote";
-import { renewOpen, TERM_CHARGES } from "./checkout-quote";
+import { renewOpen } from "./checkout-quote";
+import { catalogueOfVersion } from "./offers";
 
 /**
- * A paid plan's term (DEC-093, R15, #803), as one pure rule the quote, the
- * plan page and the hourly sweep share.
+ * How long what a business approved runs (DEC-093, DEC-161, #803), as one
+ * pure rule the quote, the plan page and the hourly sweep share. The code
+ * calls it the "term"; a business never reads that word, and it is not a
+ * price promise (DEC-161: prices can change, with notice and approval).
  *
- * - **Monthly** is a provider subscription made for `TERM_CHARGES` charges:
- *   the term ends that many months after its charges start (the checkout's
- *   `startAt`, or, for a plan whose first charge was taken as it was
- *   authorised, when the checkout completed).
- * - **Yearly** is one payment for the year (`ONE_TIME_PAYMENT`): the term
- *   is the year paid for, so it ends with the period.
+ * - **Monthly** is a provider subscription made for the number of charges
+ *   one autopay approval covers (`autopayCharges` of the catalogue version
+ *   its checkout was made on: 12 today). It runs out that many months after
+ *   its charges start (the checkout's `startAt`, or, for a plan whose first
+ *   charge was taken as it was authorised, when the checkout completed).
+ * - **Yearly** is one payment for the year (`ONE_TIME_PAYMENT`): it ends
+ *   with the year paid for.
  *
  * Inside the last `RENEW_WINDOW_DAYS` the same plan quotes as `RENEW`: one
- * tap authorises a new term from the day this one ends. A term nobody
- * renews runs to its end and the business is then on Free (the safest
- * reading of DEC-093: nothing paid for is cut short, nothing unpaid
+ * confirmation approves the next autopay from the day this one runs out.
+ * One nobody renews runs to its end and the business is then on Free (the
+ * safest reading of DEC-093: nothing paid for is cut short, nothing unpaid
  * continues).
  */
 
@@ -34,6 +39,11 @@ export interface TermCheckout {
     startAt: Date | null;
     completedAt: Date | null;
     createdAt: Date;
+    /**
+     * Monthly charges its autopay was made for (DEC-161): its plan's
+     * catalogue version's `autopay.charges` (`termCheckoutOf`).
+     */
+    autopayCharges: number;
 }
 
 export interface Term {
@@ -41,6 +51,47 @@ export interface Term {
     endsAt: Date;
     /** Inside the renewal window: the same plan quotes as `RENEW`. */
     renewOpen: boolean;
+    /** Monthly charges the autopay covers; 1 for a year paid once. */
+    charges: number;
+}
+
+/** What to read of a checkout for {@link termCheckoutOf}. */
+export const TERM_CHECKOUT_SELECT = {
+    providerPlanId: true,
+    cycle: true,
+    startAt: true,
+    completedAt: true,
+    createdAt: true,
+    plan: { select: { version: true } },
+} as const;
+
+type Db = Pick<Prisma.TransactionClient, "pricingCatalogVersion">;
+
+/**
+ * Monthly charges one autopay approval covers on a catalogue version
+ * (DEC-161). A published version never changes, so the count a checkout
+ * was made with is always its plan's version's. A plan from before the
+ * catalogue, or a version that can't be read, is the 12 every autopay had
+ * before the setting.
+ */
+export async function autopayChargesOfVersion(
+    db: Db,
+    version: number,
+): Promise<number> {
+    return autopayCharges(await catalogueOfVersion(db, version));
+}
+
+/** A checkout row read with {@link TERM_CHECKOUT_SELECT}, as the rule's. */
+export async function termCheckoutOf<
+    T extends Omit<TermCheckout, "autopayCharges"> & {
+        plan: { version: number };
+    },
+>(db: Db, row: T | null): Promise<(T & TermCheckout) | null> {
+    if (!row) return null;
+    return {
+        ...row,
+        autopayCharges: await autopayChargesOfVersion(db, row.plan.version),
+    };
 }
 
 /** Whether a checkout is paid once rather than on autopay. */
@@ -65,12 +116,14 @@ export function termOf(
     } else if (checkout.cycle === "month") {
         const start =
             checkout.startAt ?? checkout.completedAt ?? checkout.createdAt;
-        endsAt = addMonthsUtc(start, TERM_CHARGES);
+        endsAt = addMonthsUtc(start, checkout.autopayCharges);
     }
     if (!endsAt) return null;
+    const oneTime = isOneTime(checkout);
     return {
-        payment: isOneTime(checkout) ? "ONE_TIME" : "AUTOPAY",
+        payment: oneTime ? "ONE_TIME" : "AUTOPAY",
         endsAt,
         renewOpen: renewOpen(endsAt, now),
+        charges: oneTime ? 1 : checkout.autopayCharges,
     };
 }

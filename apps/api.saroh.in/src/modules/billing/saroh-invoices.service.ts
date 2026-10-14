@@ -9,7 +9,7 @@ import type { BillingCheckout, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { stateCode, stateName } from "../invoices/gst-states";
+import { stateCode } from "../invoices/gst-states";
 import { formatSellerAddress } from "../invoices/order-invoice";
 import { authorize } from "../organizations/organization-policy";
 import { chargedAddonRowsInTx } from "./addon-charges";
@@ -156,8 +156,8 @@ export class SarohInvoicesService {
                 lines: [
                     {
                         description: input.fromPlanName
-                            ? `${planName}: the rest of this period, up from ${input.fromPlanName}`
-                            : `${planName}: the rest of this period`,
+                            ? `${seller.name} ${planName} Plan — Upgrade from ${input.fromPlanName}, rest of this period`
+                            : `${seller.name} ${planName} Plan — Rest of this period`,
                         sac: seller.sac,
                         unitPaise: checkout.chargeNowPaise,
                     },
@@ -249,7 +249,7 @@ export class SarohInvoicesService {
             periodEnd: checkout.startAt,
             lines: [
                 {
-                    description: `${planName}: first month`,
+                    description: `${this.sellerNow().name} ${planName} Plan — First Month Subscription`,
                     sac: this.sellerNow().sac,
                     unitPaise: checkout.chargeNowPaise,
                 },
@@ -521,11 +521,10 @@ export class SarohInvoicesService {
                 sellerEmail: seller.email,
                 billToName: buyerName(profile?.legalName, org?.name),
                 billToEmail: null,
+                // The address only: the paper adds the state from the
+                // place of supply, so the two never disagree (Rule 46(e)).
                 billToAddress: profile
-                    ? formatSellerAddress({
-                          ...profile,
-                          stateName: stateName(profile.gstState),
-                      })
+                    ? formatSellerAddress({ ...profile, stateName: null })
                     : null,
                 billToState:
                     stateCode(billToState) ??
@@ -630,7 +629,7 @@ function planLine(
     seller: SarohSeller,
 ): SarohLineInput {
     return {
-        description: `${planName} plan, ${cycle === "year" ? "yearly" : "monthly"}`,
+        description: `${seller.name} ${planName} Plan — ${cycle === "year" ? "Annual" : "Monthly"} SaaS Subscription`,
         sac: seller.sac,
         unitPaise: pricePaise,
     };

@@ -32,6 +32,9 @@ module.exports = {
     testPathIgnorePatterns: ["/node_modules/", "\\.db\\.spec\\.ts$"],
     testMatch: [
         "<rootDir>/src/common/**/*.spec.ts",
+        // Command-line tools' arguments, guards and output, with a stand-in
+        // service: catalogue-import's publish is in a pricing *.db.spec.ts.
+        "<rootDir>/src/cli/**/*.spec.ts",
         "<rootDir>/src/modules/organizations/**/*.spec.ts",
         // S1-010 projects: project-role precedence + ProjectAccessService
         // acceptance specs, pure unit tests with a jest-mocked Prisma.

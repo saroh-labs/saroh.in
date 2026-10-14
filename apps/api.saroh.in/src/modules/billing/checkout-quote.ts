@@ -1,6 +1,7 @@
 import type { BillingCycle } from "@saroh/pricing-catalog";
 import {
     addMonthsUtc,
+    AUTOPAY_CHARGES_DEFAULT,
     CATALOG_PLAN_KEY_PREFIX,
     gstPaise,
     withGstPaise,
@@ -43,15 +44,17 @@ export { billedByProvider };
  *   catalogue's nominal first month (DEC-093) that month's charge is taken
  *   at authorisation. Never another plan while one runs (DEC-159): the offer
  *   is the plan's it was started on.
- * - `RENEW` (DEC-093, #803): the plan it's on, again, once its 12-month
- *   term is about to end (`RENEW_WINDOW_DAYS`). A checkout authorised now
- *   for a new term starting when this one ends, at the live price.
+ * - `RENEW` (DEC-093, DEC-161, #803): the plan it's on, again, once the
+ *   autopay it approved is about to run out (`RENEW_WINDOW_DAYS`). A
+ *   checkout authorised now for the next autopay, starting when this one
+ *   runs out, at the live price.
  *
  * When a change takes effect is `change-timing.ts`'s (DEC-159): a dearer
  * plan today, anything else once what was paid for has run out.
  *
- * How it's paid (DEC-093): monthly on autopay for `TERM_CHARGES` charges,
- * then a one-tap renewal; yearly as one payment for the year, taken when
+ * How it's paid (DEC-093, DEC-161): monthly on autopay for the charges one
+ * approval covers (the catalogue's `autopay.charges`, 12 today), then one
+ * confirmation for the next; yearly as one payment for the year, taken when
  * the business pays, with no autopay at all. So a yearly plan never has a
  * trial, and the set-up check autopay needs (`mandateCheck`) is named for
  * what it is: a charge that pays for something, or a small amount the
@@ -64,10 +67,7 @@ export { billedByProvider };
 export type ChangeKind =
     "NONE" | "TO_FREE" | "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL" | "RENEW";
 
-/** How many monthly charges one autopay term runs for (DEC-093, R15). */
-export const TERM_CHARGES = 12;
-
-/** How long before a term ends its one-tap renewal opens. */
+/** How long before an autopay runs out the request to approve the next opens. */
 export const RENEW_WINDOW_DAYS = 30;
 
 /**
@@ -157,7 +157,11 @@ export interface ChangeQuote {
     discountTotalPaise: number;
     /** Monthly autopay, or yearly's one payment (DEC-093). */
     payment: PaymentKind;
-    /** Charges the change commits to: 12 monthly, 1 yearly; 0 for none. */
+    /**
+     * Charges the change's approval covers: the autopay's monthly charges
+     * (`autopayCharges`, 12 today), 1 yearly; 0 for none. Named before
+     * DEC-161; it is not a price promise.
+     */
     termCharges: number;
     /**
      * Exactly what the business pays when it authorises, GST included: a
@@ -262,7 +266,11 @@ export function quoteChange(input: QuoteInput): ChangeQuote {
         firstChargeTotalPaise: firstTotal,
         discountTotalPaise: withGstPaise(price) - firstTotal,
         payment,
-        termCharges: nothing ? 0 : payment === "ONE_TIME" ? 1 : TERM_CHARGES,
+        termCharges: nothing
+            ? 0
+            : payment === "ONE_TIME"
+              ? 1
+              : (input.autopayCharges ?? AUTOPAY_CHARGES_DEFAULT),
         payNowTotalPaise,
         mandateCheck:
             nothing || payment === "ONE_TIME"
@@ -290,10 +298,16 @@ export interface QuoteInput {
      */
     trialFirstPaise?: number;
     /**
-     * When the 12-month term of the plan it's on ends (`billing-term.ts`),
-     * when it has one: the same plan is then a renewal from that date.
+     * When the autopay (or the year paid) of the plan it's on runs out
+     * (`billing-term.ts`), when it has one: the same plan is then a renewal
+     * from that date.
      */
     termEndsAt?: Date | null;
+    /**
+     * Monthly charges one autopay approval covers on the target's catalogue
+     * version (DEC-161); unset, `AUTOPAY_CHARGES_DEFAULT`.
+     */
+    autopayCharges?: number;
     /**
      * What the target's plan costs a month before GST, when the target is
      * its yearly row: a change in the first month is a move up by what the

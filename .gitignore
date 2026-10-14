@@ -32,6 +32,10 @@ yarn-error.log*
 .env.production.local
 !.env.example
 
+# copies of another environment's data for this machine only, such as the
+# dev environment's pricing catalogue (real prices: LOCAL_DEV.md)
+.local/
+
 # turbo
 .turbo
 

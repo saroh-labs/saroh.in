@@ -176,8 +176,8 @@ async function runMail() {
     return jobs;
 }
 
-describe("a 12-month term that ends", () => {
-    it("monthly: asked to pay for the next term 30, 7 and 1 days ahead, once each", async () => {
+describe("an autopay that runs out (DEC-100, DEC-161)", () => {
+    it("monthly: asked to approve the next autopay 30, 7 and 1 days ahead, once each", async () => {
         const b = await business();
         const now = new Date();
         const start = addMonthsUtc(new Date(now.getTime() + 20 * DAY), -12);
@@ -194,7 +194,7 @@ describe("a 12-month term that ends", () => {
                 type: PLAN_ENDING_NOTIFICATION_TYPE,
             },
         });
-        expect(notice?.title).toMatch(/^Your Plan B term ends on /);
+        expect(notice?.title).toMatch(/^Your Plan B autopay runs out on /);
         const jobs = await runMail();
         expect(jobs[0]!.payload).toMatchObject({
             kind: "TERM_ENDING",
@@ -205,9 +205,13 @@ describe("a 12-month term that ends", () => {
         expect(sent).toHaveLength(1);
         expect(sent[0]!.to).toEqual([b.ownerEmail]);
         expect(sent[0]!.subject).toMatch(
-            /^Pay for Term \d+'s next Plan B term by /,
+            /^Approve Term \d+'s next Plan B autopay by /,
         );
-        expect(sent[0]!.html).toContain("12 monthly payments");
+        expect(sent[0]!.html).toContain("covers 12 monthly charges");
+        // The business is called "Term N" here; the words never say term.
+        expect(`${sent[0]!.subject} ${sent[0]!.html}`).not.toMatch(
+            /next term|term ends|12-month/i,
+        );
         expect(sent[0]!.html).toContain("/settings/billing#change-plan");
         // The live price, from the catalogue: Plan B's 222.
         expect(sent[0]!.html).toContain("222");
@@ -304,6 +308,46 @@ describe("a 12-month term that ends", () => {
             await remindEndingTerms(new Date(now.getTime() + 14 * DAY), logger),
         ).toBe(0);
     });
+
+    it("a new price waiting for approval is not an arrangement: the autopay running out is still asked about (DEC-161)", async () => {
+        const b = await business();
+        const now = new Date();
+        const start = addMonthsUtc(new Date(now.getTime() + 20 * DAY), -12);
+        await onPlanB(b.organizationId, { cycle: "month", startAt: start });
+        // A "move them" to a pricier row, due 10 days ago and not approved.
+        const catalog = fakeCatalog((c) => {
+            c.plans[1]!.pricePaise = 33_300;
+        });
+        const { planIds } = await writeCatalogueVersion(prisma, {
+            version: 2,
+            catalog,
+            goLiveAt: new Date(now.getTime() - 40 * DAY),
+            policy: "move",
+            planRows: planRows(catalog, 2),
+        });
+        const v2 = await prisma.plan.findFirstOrThrow({
+            where: {
+                id: { in: planIds },
+                key: "catalog.b",
+                interval: "month",
+            },
+        });
+        await prisma.subscription.update({
+            where: { organizationId: b.organizationId },
+            data: {
+                pendingPlanId: v2.id,
+                pendingFrom: new Date(now.getTime() - 10 * DAY),
+            },
+        });
+        expect(await remindEndingTerms(now, logger)).toBe(1);
+        const [notice] = await prisma.notification.findMany({
+            where: {
+                organizationId: b.organizationId,
+                type: PLAN_ENDING_NOTIFICATION_TYPE,
+            },
+        });
+        expect(notice?.title).toMatch(/^Your Plan B autopay runs out on /);
+    });
 });
 
 describe("a term whose owner chose Free (DEC-100)", () => {
@@ -361,9 +405,9 @@ describe("a term whose owner chose Free (DEC-100)", () => {
         );
         expect(await remindEndingTerms(now, logger)).toBe(1);
         const [notice] = await noticesOf(b.organizationId);
-        expect(notice?.title).toMatch(/^Your Plan B term ends on /);
+        expect(notice?.title).toMatch(/^Your Plan B year ends on /);
         await runMail();
-        expect(sent[0]!.subject).toMatch(/^Pay for /);
+        expect(sent[0]!.subject).toMatch(/^Pay for .* year by /);
     });
 });
 

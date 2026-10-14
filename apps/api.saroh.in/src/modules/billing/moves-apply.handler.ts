@@ -53,9 +53,10 @@ import { remindEndingTerms } from "./term-ending-notice";
  *    the business to a cheaper plan is told 30, 7 and 1 days ahead
  *    (`plan-ending.ts`): an inbox notice and an email to its billing
  *    people, each claimed once as a `CustomerNotice`.
- * 4. **Terms that end** (DEC-100). A 12-month term in its last 30 days is
- *    asked to pay for the next term, 30, 7 and 1 days ahead, the same way
- *    (`term-ending.ts`, `term-ending-notice.ts`).
+ * 4. **Autopays that run out** (DEC-100, DEC-161). An autopay (or a paid
+ *    year) in its last 30 days is asked to approve the next one, 30, 7
+ *    and 1 days ahead, the same way (`term-ending.ts`,
+ *    `term-ending-notice.ts`).
  * 5. **Moves to a lower plan** (#800, #801). Steps 3 and 4 list what the
  *    move pauses; a move the business chose for its period's end, or one
  *    that already happened, is told here (`move-down-notice.ts`). Each

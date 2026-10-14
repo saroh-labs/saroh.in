@@ -53,6 +53,24 @@ export const TRIAL_DAYS_MAX = 60;
 export const YEARLY_PAID_MIN = 1;
 export const YEARLY_PAID_MAX = 12;
 
+/**
+ * How many monthly charges one autopay approval covers (DEC-161). Before
+ * it runs out the business is asked to approve the next one; it is not a
+ * price promise. Today's value; the owner may raise it (60, 120) by
+ * publishing a version. A subscription keeps the count of the version it
+ * was made on, so a change reaches only autopays approved after it.
+ */
+export const AUTOPAY_CHARGES_DEFAULT = 12;
+/** One charge is a single payment, not autopay. */
+export const AUTOPAY_CHARGES_MIN = 2;
+/**
+ * The most Razorpay was seen to accept for a monthly subscription's
+ * `total_count` (test mode, 3 Oct 2026: 1,200; `PRICING_ROLLOUT.md` →
+ * Razorpay test-mode spike). A UPI Autopay mandate's own longest validity
+ * was not checked; try a new count with a test payment before publishing it.
+ */
+export const AUTOPAY_CHARGES_MAX = 1200;
+
 export const includedCellSchema = z.object({
     inc: z.literal(true),
     /** The comparison table's words. */
@@ -128,6 +146,21 @@ export const yearlySchema = z.object({
 
 export const gstSchema = z.object({ show: z.enum(GST_SHOW) });
 
+export const autopaySchema = z.object({
+    /** Monthly charges one autopay approval covers (DEC-161). */
+    charges: z
+        .number()
+        .int()
+        .min(
+            AUTOPAY_CHARGES_MIN,
+            `An autopay covers at least ${AUTOPAY_CHARGES_MIN} monthly charges`,
+        )
+        .max(
+            AUTOPAY_CHARGES_MAX,
+            `An autopay covers at most ${AUTOPAY_CHARGES_MAX} monthly charges (Razorpay's limit)`,
+        ),
+});
+
 export const addonSchema = z.object({
     id,
     kind: z.enum(ADDON_KINDS),
@@ -162,6 +195,8 @@ const catalogShape = z.object({
         .transform((rows) => rows.filter((m) => !RETIRED_MODULE_IDS.has(m.id))),
     yearly: yearlySchema,
     gst: gstSchema,
+    /** Absent from a version published before DEC-161: 12, as it was then. */
+    autopay: autopaySchema.default({ charges: AUTOPAY_CHARGES_DEFAULT }),
     addons: z
         .array(addonSchema)
         .default([])
@@ -318,6 +353,7 @@ export type ExcludedCell = z.infer<typeof excludedCellSchema>;
 export type Addon = z.infer<typeof addonSchema>;
 export type Yearly = z.infer<typeof yearlySchema>;
 export type Trial = z.infer<typeof trialSchema>;
+export type Autopay = z.infer<typeof autopaySchema>;
 
 /** A cell the snapshot leaves out reads as excluded and locked. */
 export const MISSING_CELL: ExcludedCell = { inc: false, off: "locked" };
@@ -329,6 +365,17 @@ export const MISSING_CELL: ExcludedCell = { inc: false, off: "locked" };
  */
 export function trialFirstPaise(plan: Pick<Plan, "trial">): number {
     return plan.trial?.on ? (plan.trial.firstPaise ?? 0) : 0;
+}
+
+/**
+ * How many monthly charges one autopay approval covers on this catalogue
+ * (DEC-161). Tolerates a snapshot or draft read without the schema (no
+ * `autopay`): that is the count every version before it had.
+ */
+export function autopayCharges(
+    catalog: { autopay?: { charges?: number } } | null | undefined,
+): number {
+    return catalog?.autopay?.charges ?? AUTOPAY_CHARGES_DEFAULT;
 }
 
 /** Whether an add-on is offered on a plan: every plan unless it names some. */

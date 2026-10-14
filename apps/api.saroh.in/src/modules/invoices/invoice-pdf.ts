@@ -52,7 +52,7 @@ const MARGIN = 48;
 /** Room kept under the content for the page number. */
 const FOOT = 40;
 
-const COL = { hsn: 70, qty: 40, amount: 84, gap: 10 } as const;
+const COL = { hsn: 70, qty: 40, rate: 70, amount: 84, gap: 10 } as const;
 
 /**
  * The paper's logo is 40px, rounded 8px, 8px above its 20px name; here the
@@ -192,6 +192,12 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
         doc.text(line, left, ly, { width: leftW, lineGap: 1.5 });
         ly = doc.y;
     }
+    if (view.seller.product) {
+        doc.fontSize(8.5).text(view.seller.product, left, ly + 3, {
+            width: leftW,
+        });
+        ly = doc.y;
+    }
 
     let ry = y + 2;
     doc.font("Bold")
@@ -213,6 +219,13 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
         if (!line) continue;
         doc.text(line, rx, ry, { width: rightW, align: "right" });
         ry = doc.y;
+    }
+    if (view.status) {
+        doc.font("Bold")
+            .fillColor(INK)
+            .text(view.status, rx, ry + 2, { width: rightW, align: "right" });
+        ry = doc.y;
+        doc.font("Regular").fillColor(MUTED);
     }
 
     y = Math.max(ly, ry) + 12;
@@ -270,10 +283,13 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
     y = Math.max(by, py) + 14;
 
     // ── The lines ──────────────────────────────────────────────────────
-    const itemW = width - COL.hsn - COL.qty - COL.amount - COL.gap * 3;
+    // A rate column only where the paper asks for one (Saroh's own).
+    const rateW = view.table?.rate ? COL.rate + COL.gap : 0;
+    const itemW = width - COL.hsn - COL.qty - COL.amount - COL.gap * 3 - rateW;
     const hsnX = left + itemW + COL.gap;
     const qtyX = hsnX + COL.hsn + COL.gap;
-    const amountX = qtyX + COL.qty + COL.gap;
+    const rateX = qtyX + COL.qty + COL.gap;
+    const amountX = qtyX + COL.qty + COL.gap + rateW;
 
     const tableHead = (at: number): number => {
         rule(at, 0.75, RULE);
@@ -282,10 +298,20 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
         const head = { characterSpacing: 0.5 };
         doc.text("ITEM", left, hy, { ...head, width: itemW });
         if (view.hsnColumn) {
-            doc.text("HSN / SAC", hsnX, hy, { ...head, width: COL.hsn });
+            doc.text(view.table?.code ?? "HSN / SAC", hsnX, hy, {
+                ...head,
+                width: COL.hsn,
+            });
         }
         doc.text("QTY", qtyX, hy, { ...head, width: COL.qty, align: "right" });
-        doc.text("AMOUNT", amountX, hy, {
+        if (rateW) {
+            doc.text("RATE", rateX, hy, {
+                ...head,
+                width: COL.rate,
+                align: "right",
+            });
+        }
+        doc.text(view.table?.amount ?? "AMOUNT", amountX, hy, {
             ...head,
             width: COL.amount,
             align: "right",
@@ -334,6 +360,9 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
         doc.fontSize(10)
             .fillColor(INK)
             .text(line.quantity, qtyX, ty, { width: COL.qty, align: "right" });
+        if (rateW && line.rate) {
+            doc.text(line.rate, rateX, ty, { width: COL.rate, align: "right" });
+        }
         doc.font("Bold").text(line.amount, amountX, ty, {
             width: COL.amount,
             align: "right",
@@ -345,11 +374,13 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
     // ── The sums, the total and the law it is issued under ──────────────
     doc.font("Regular").fontSize(8.5);
     const footerH = doc.heightOfString(view.footer, { width });
+    const signatureH = view.signature ? 52 : 0;
     const needed =
         10 +
         view.sums.length * 15 +
         34 +
         (view.inclusive ? 14 : 0) +
+        signatureH +
         20 +
         footerH;
     if (y + needed > bottom()) y = continued();
@@ -379,6 +410,23 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
             .fontSize(8.5)
             .fillColor(MUTED)
             .text(view.inclusive, sx, y, { width: sumW });
+        y = doc.y;
+    }
+
+    // ── Who signs it (CGST Rule 46(q)), on Saroh's own invoices ─────────
+    if (view.signature) {
+        y += 16;
+        doc.font("Bold")
+            .fontSize(9)
+            .fillColor(INK)
+            .text(view.signature.for, left, y, { width, align: "right" });
+        y = doc.y + 1;
+        doc.font("Regular")
+            .fontSize(8.5)
+            .fillColor(MUTED)
+            .text(view.signature.role, left, y, { width, align: "right" });
+        y = doc.y + 1;
+        doc.text(view.signature.note, left, y, { width, align: "right" });
         y = doc.y;
     }
 

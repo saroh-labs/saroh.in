@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
 import { OperatorDialog } from "@/components/operator-dialog";
@@ -13,6 +14,7 @@ import type { AdminVersion } from "@/lib/pricing-types";
 import { useDraft } from "../draft-store";
 import { useFlash } from "../toast";
 import {
+    catalogueFile,
     changesShown,
     onItLine,
     policyLine,
@@ -23,6 +25,21 @@ import {
 } from "./versions";
 
 const ACTION = "h-[30px] rounded-[8px] px-3 text-[12.5px]";
+
+/** Save the live version's snapshot as JSON (`catalogueFile`). */
+function downloadCatalogue(v: AdminVersion): void {
+    const file = catalogueFile(v);
+    const url = URL.createObjectURL(
+        new Blob([file.text], { type: "application/json" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
 
 /** One version in the history, with Cancel schedule or Roll back to this. */
 export function VersionCard({
@@ -42,6 +59,9 @@ export function VersionCard({
     const sync = syncLine(v);
     const canRoll = canPublish && v.status === "earlier";
     const canCancel = canPublish && v.status === "scheduled";
+    // Anyone who can read Plans can take the live catalogue away, for a
+    // developer's own database (`catalogue:import`); it changes nothing.
+    const canDownload = v.status === "live";
 
     return (
         <article
@@ -63,8 +83,18 @@ export function VersionCard({
                 <span className="text-[12px] text-muted-foreground">
                     {policyLine(v)}
                 </span>
-                {(canRoll || canCancel) && (
+                {(canRoll || canCancel || canDownload) && (
                     <span className="ml-auto flex gap-1.5">
+                        {canDownload && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className={cn(ACTION, "text-muted-foreground")}
+                                onClick={() => downloadCatalogue(v)}
+                            >
+                                Download catalogue (JSON)
+                            </Button>
+                        )}
                         {canRoll && (
                             <OperatorDialog
                                 trigger="Roll back to this"

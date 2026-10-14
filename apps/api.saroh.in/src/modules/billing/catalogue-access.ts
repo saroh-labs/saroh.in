@@ -300,6 +300,12 @@ export interface BillingAccessView {
          * the business must authorise the new amount (OQ-6). Null otherwise.
          */
         waiting: "held" | "authorise" | null;
+        /**
+         * What the plan it moves to costs before GST, per its cycle
+         * (DEC-161): with the price the business pays now, a price change
+         * ahead, told 30 days before and approved by the business.
+         */
+        pricePaise: number;
     } | null;
     modules: ModuleAccessView[];
 }

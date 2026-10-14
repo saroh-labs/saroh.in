@@ -114,8 +114,8 @@ export function listAddons(): Promise<Read<AddonsView | null>> {
 }
 
 /**
- * A checkout waiting to be paid, one scheduled (U15), and the plan's
- * 12-month term (DEC-093).
+ * A checkout waiting to be paid, one scheduled (U15), and when the plan's
+ * autopay runs out and how many charges it covers (DEC-093, DEC-161).
  */
 export async function getCheckouts(): Promise<Read<CheckoutsView>> {
     const read = await orgRead<CheckoutsView>("/billing/checkout", {

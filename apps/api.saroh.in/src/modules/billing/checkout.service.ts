@@ -19,7 +19,11 @@ import type {
 } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { BillingCycle, Catalog } from "@saroh/pricing-catalog";
-import { catalogPlanIdForKey, withGstPaise } from "@saroh/pricing-catalog";
+import {
+    autopayCharges,
+    catalogPlanIdForKey,
+    withGstPaise,
+} from "@saroh/pricing-catalog";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -36,7 +40,13 @@ import { clearAddonsInTx } from "./addon-charges";
 import type { EndingAddon } from "./addons-ending";
 import { addonsEndingWith } from "./addons-ending";
 import type { Term } from "./billing-term";
-import { isOneTime, ONE_TIME_PAYMENT, termOf } from "./billing-term";
+import {
+    isOneTime,
+    ONE_TIME_PAYMENT,
+    TERM_CHECKOUT_SELECT,
+    termCheckoutOf,
+    termOf,
+} from "./billing-term";
 import {
     assertBillingMayStart,
     dropLiveCheckoutsInTx,
@@ -49,12 +59,7 @@ import type {
     MandateCheck,
     PaymentKind,
 } from "./checkout-quote";
-import {
-    billedByProvider,
-    COUPON_KINDS,
-    quoteChange,
-    TERM_CHARGES,
-} from "./checkout-quote";
+import { billedByProvider, COUPON_KINDS, quoteChange } from "./checkout-quote";
 import {
     catalogueOfVersion,
     hadTrial,
@@ -141,6 +146,12 @@ export interface ChangePlanQuoteView {
      * none does.
      */
     addonsEnding: EndingAddon[];
+    /**
+     * Whether the business has its registered address on its profile.
+     * Without one the dialog asks for it: Saroh's invoice to a registered
+     * buyer carries their address (CGST Rule 46(e)).
+     */
+    registeredAddress: boolean;
 }
 
 /** A checkout as the business sees it; never the provider's link. */
@@ -202,10 +213,17 @@ export interface CheckoutsView {
     open: (CheckoutView & { handoff: CheckoutHandoff | null }) | null;
     scheduled: CheckoutView | null;
     /**
-     * The 12-month term of the plan it's on (DEC-093, #803), when it has
-     * one: its end, how it's paid, and whether the one-tap renewal is open.
+     * What the plan it's on was approved for (DEC-093, DEC-161, #803), when
+     * it has an end: when the autopay runs out (or the year paid ends), how
+     * it's paid, whether the request to approve the next is open, and how
+     * many monthly charges the autopay covers (1 for a year paid once).
      */
-    term: { endsAt: string; payment: PaymentKind; renewOpen: boolean } | null;
+    term: {
+        endsAt: string;
+        payment: PaymentKind;
+        renewOpen: boolean;
+        charges: number;
+    } | null;
 }
 
 const SUB_SELECT = {
@@ -294,7 +312,12 @@ export class CheckoutService {
             input,
             now,
         );
-        return this.quoteView(target, quote, coupon, addonsEnding);
+        return {
+            ...this.quoteView(target, quote, coupon, addonsEnding),
+            registeredAddress: Boolean(
+                (await profileAddress(ctx.organizationId))?.addressLine1,
+            ),
+        };
     }
 
     async current(
@@ -335,6 +358,7 @@ export class CheckoutService {
                       endsAt: term.endsAt.toISOString(),
                       payment: term.payment,
                       renewOpen: term.renewOpen,
+                      charges: term.charges,
                   }
                 : null,
         };
@@ -367,15 +391,9 @@ export class CheckoutService {
                     providerSubscriptionId: sub.providerSubscriptionId,
                 },
             },
-            select: {
-                providerPlanId: true,
-                cycle: true,
-                startAt: true,
-                completedAt: true,
-                createdAt: true,
-            },
+            select: TERM_CHECKOUT_SELECT,
         });
-        return termOf(sub, checkout, now);
+        return termOf(sub, await termCheckoutOf(prisma, checkout), now);
     }
 
     /**
@@ -440,6 +458,7 @@ export class CheckoutService {
             billingState?: string | null;
             gstin?: string | null;
             coupon?: string | null;
+            registeredAddress?: AddressSent | null;
         },
         now: Date = new Date(),
         client: CheckoutClient = {},
@@ -449,7 +468,13 @@ export class CheckoutService {
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, subscription, coupon, addonsEnding } =
             await this.resolve(ctx.organizationId, input, now);
-        const view = this.quoteView(target, quote, coupon, addonsEnding);
+        const hasAddress = Boolean(
+            (await profileAddress(ctx.organizationId))?.addressLine1,
+        );
+        const view = {
+            ...this.quoteView(target, quote, coupon, addonsEnding),
+            registeredAddress: hasAddress,
+        };
         if (quote.kind === "NONE") {
             throw new ConflictException(`You're already on ${target.name}.`);
         }
@@ -475,7 +500,44 @@ export class CheckoutService {
                 effectiveAt: at.toISOString(),
             };
         }
+        // Asked for before anything is made at the provider, and kept as
+        // the business's own registered address (never over one it has).
+        if (!hasAddress) {
+            const address = checkoutAddress(
+                input.registeredAddress,
+                Boolean(billTo.billToGstin),
+            );
+            if (address) {
+                await this.saveRegisteredAddress(ctx, address);
+                view.registeredAddress = true;
+            }
+        }
         return this.checkout(ctx, target, quote, view, now, billTo, coupon);
+    }
+
+    /** The address given at checkout, as the business's registered address. */
+    private async saveRegisteredAddress(
+        ctx: OrganizationContext,
+        address: CheckoutAddress,
+    ): Promise<void> {
+        await prisma.businessProfile.upsert({
+            where: { organizationId: ctx.organizationId },
+            create: { organizationId: ctx.organizationId, ...address },
+            update: address,
+        });
+        await this.audit?.record({
+            action: AuditAction.ProfileUpdate,
+            actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
+            organizationId: ctx.organizationId,
+            targetType: "organization",
+            targetId: ctx.organizationId,
+            outcome: AuditOutcome.Success,
+            metadata: {
+                fields: Object.keys(address),
+                via: "checkout",
+            },
+        });
     }
 
     // ── Steps ───────────────────────────────────────────────────────────
@@ -555,6 +617,8 @@ export class CheckoutService {
             trialFirstPaise,
             termEndsAt,
             targetMonthlyPaise,
+            // The target version's (DEC-161): what the new autopay is made for.
+            autopayCharges: autopayCharges(catalog),
         };
         let coupon: PricingCoupon | null = null;
         const code = input.coupon?.trim();
@@ -626,7 +690,7 @@ export class CheckoutService {
         quote: ChangeQuote,
         coupon: PricingCoupon | null = null,
         addonsEnding: EndingAddon[] = [],
-    ): ChangePlanQuoteView {
+    ): Omit<ChangePlanQuoteView, "registeredAddress"> {
         return {
             plan: {
                 id: catalogPlanIdForKey(target.key) ?? target.key,
@@ -829,8 +893,10 @@ export class CheckoutService {
                     organizationId: ctx.organizationId,
                     providerPlanId: providerPlan.providerPlanId,
                     startAt: quote.startAt,
-                    // A 12-month term, then a one-tap renewal (DEC-093).
-                    totalCount: TERM_CHARGES,
+                    // The charges one autopay approval covers on the
+                    // target's version (DEC-161, 12 today); the business
+                    // is asked to approve the next one before it runs out.
+                    totalCount: quote.termCharges,
                     upfront:
                         quote.chargeNowTotalPaise > 0
                             ? {
@@ -972,6 +1038,70 @@ export class CheckoutService {
 function nonEmpty(value: string | null | undefined): string | null {
     const t = value?.trim();
     return t === undefined || t === "" ? null : t;
+}
+
+/** What a checkout sent of the registered address (`RegisteredAddressDto`). */
+export interface AddressSent {
+    line1?: string | null;
+    line2?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+}
+
+/** The registered address a checkout saves to the business's profile. */
+export interface CheckoutAddress {
+    addressLine1: string;
+    addressLine2: string | null;
+    city: string;
+    postalCode: string;
+}
+
+/** An Indian PIN code: six digits, never starting with 0. */
+const PIN = /^[1-9][0-9]{5}$/;
+
+function addressError(message: string, field: string): never {
+    throw new BadRequestException({ message, details: { field } });
+}
+
+/**
+ * The registered address given at checkout, checked before the provider is
+ * asked: none at all is fine unless a GSTIN was given (a registered buyer's
+ * invoice carries their address, CGST Rule 46(e)); any part given needs
+ * the first line, the city and a six-digit PIN, as Settings › Business
+ * asks.
+ */
+export function checkoutAddress(
+    sent: AddressSent | null | undefined,
+    gstinGiven: boolean,
+): CheckoutAddress | null {
+    const line1 = nonEmpty(sent?.line1);
+    const line2 = nonEmpty(sent?.line2);
+    const city = nonEmpty(sent?.city);
+    const pin = nonEmpty(sent?.postalCode)?.replace(/\s+/g, "") ?? null;
+    if (!line1 && !line2 && !city && !pin) {
+        if (gstinGiven) {
+            addressError(
+                "Add the business's registered address: it prints on Saroh's invoice with your GSTIN.",
+                "addressLine1",
+            );
+        }
+        return null;
+    }
+    if (!line1) addressError("Add the address's first line.", "addressLine1");
+    if (!city) addressError("Add the city.", "city");
+    if (!pin) addressError("Add the PIN code.", "postalCode");
+    if (!PIN.test(pin)) {
+        addressError("A PIN code is six digits, like 560038.", "postalCode");
+    }
+    return { addressLine1: line1, addressLine2: line2, city, postalCode: pin };
+}
+
+/** The business's registered address as its profile holds it, or null. */
+async function profileAddress(organizationId: string) {
+    return prisma.businessProfile.findUnique({
+        where: { organizationId },
+        select: { addressLine1: true },
+    });
 }
 
 /** Who Saroh's invoice for a checkout is billed to (U17). */

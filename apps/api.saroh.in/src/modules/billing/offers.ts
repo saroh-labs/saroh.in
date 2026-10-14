@@ -181,6 +181,29 @@ export interface AddonChargeLine {
     periodEnd: Date;
 }
 
+/**
+ * An add-on as Saroh's invoice names it, from its kind (the owner's words,
+ * 14 Oct 2026): a seat, or more capacity of a limit. A module or
+ * integration add-on is named by its catalogue name.
+ */
+export function addonInvoiceName(
+    addon: Pick<Addon, "kind" | "name">,
+    cycle: BillingCycle,
+): string {
+    switch (addon.kind) {
+        case "members":
+            return `Additional Team Member — ${cycle === "year" ? "Annual" : "Monthly"} Seat`;
+        case "products":
+            return "Additional Product Capacity";
+        case "orders":
+            return "Additional Order Capacity";
+        case "bookings":
+            return "Additional Booking Capacity";
+        default:
+            return addon.name;
+    }
+}
+
 /** A whole period of an add-on held at its start. */
 export function addonPeriodLine(
     addon: Addon,
@@ -191,7 +214,7 @@ export function addonPeriodLine(
 ): AddonChargeLine {
     return {
         addonId: addon.id,
-        description: `${addon.name} (add-on)`,
+        description: addonInvoiceName(addon, cycle),
         quantity,
         unitPaise: addonPeriodUnitPaise(addon, cycle),
         periodStart,
@@ -225,7 +248,7 @@ export function addonProratedLine(input: {
     if (amount <= 0 || input.now >= input.periodEnd) return null;
     return {
         addonId: input.addon.id,
-        description: `${input.addon.name} (add-on) × ${input.added}, from the day it was bought`,
+        description: `${addonInvoiceName(input.addon, input.cycle)} × ${input.added}, from the day it was bought`,
         quantity: 1,
         unitPaise: amount,
         periodStart: input.now,
