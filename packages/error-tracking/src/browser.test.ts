@@ -10,6 +10,7 @@ import {
     maskWorkspaceText,
     REPLAY_BLOCK_SELECTOR,
     REPLAY_SAMPLE_RATE,
+    replayAddressOnly,
     replayBeforeSend,
     replayConfig,
     replayDecision,
@@ -349,9 +350,26 @@ describe("replay", () => {
         const recording = config.session_recording as {
             maskCapturedNetworkRequestFn: (r: unknown) => unknown;
         };
+        // A request the page made is never recorded...
         expect(
             recording.maskCapturedNetworkRequestFn({ url: "/x" }),
         ).toBeNull();
+        expect(
+            recording.maskCapturedNetworkRequestFn({
+                name: "https://api.saroh.in/orders?q=asha",
+                entryType: "resource",
+                initiatorType: "fetch",
+                startTime: 12,
+            }),
+        ).toBeNull();
+        // ...but the page's own address is answered, without its query:
+        // the SDK drops the recording's "meta" event when this is null,
+        // and the recording then plays back blank.
+        expect(
+            recording.maskCapturedNetworkRequestFn({
+                name: "https://app.saroh.in/commerce/orders?q=asha#top",
+            }),
+        ).toEqual({ name: "https://app.saroh.in/commerce/orders" });
         expect(config.before_send).toBe(replayBeforeSend);
     });
 
@@ -484,6 +502,38 @@ function under(...marks: string[]) {
             marks.some((mark) => selector === `[${mark}]`) ? {} : null,
     };
 }
+
+describe("the recorder's question about an address", () => {
+    it("answers the page's own address and nothing about a request", () => {
+        expect(replayAddressOnly({ name: "https://saroh.in/pricing" })).toEqual(
+            { name: "https://saroh.in/pricing" },
+        );
+        expect(
+            replayAddressOnly({ name: "https://saroh.in/?ref=abc#faq" }),
+        ).toEqual({ name: "https://saroh.in/" });
+        for (const request of [
+            null,
+            undefined,
+            {},
+            { name: 5 },
+            { url: "https://saroh.in/" },
+            { name: "https://saroh.in/", method: "GET" },
+            { name: "https://saroh.in/", isInitial: true, startTime: 0 },
+        ])
+            expect(replayAddressOnly(request)).toBeNull();
+    });
+
+    it("is what both recorders are given", () => {
+        for (const config of [
+            replayConfig("https://eu.i.posthog.com", "user_1"),
+            siteReplayConfig("https://eu.i.posthog.com"),
+        ])
+            expect(
+                (config.session_recording as Record<string, unknown>)
+                    .maskCapturedNetworkRequestFn,
+            ).toBe(replayAddressOnly);
+    });
+});
 
 describe("what a workspace recording can read (DEC-125, 10 Oct)", () => {
     it("masks every character unless the words are marked as Saroh's own", () => {
@@ -704,9 +754,26 @@ describe("saroh.in's replay", () => {
             maskCapturedNetworkRequestFn: (r: unknown) => unknown;
         };
         expect(recording.maskTextFn).toBeUndefined();
+        // A request the page made is never recorded...
         expect(
             recording.maskCapturedNetworkRequestFn({ url: "/x" }),
         ).toBeNull();
+        expect(
+            recording.maskCapturedNetworkRequestFn({
+                name: "https://api.saroh.in/orders?q=asha",
+                entryType: "resource",
+                initiatorType: "fetch",
+                startTime: 12,
+            }),
+        ).toBeNull();
+        // ...but the page's own address is answered, without its query:
+        // the SDK drops the recording's "meta" event when this is null,
+        // and the recording then plays back blank.
+        expect(
+            recording.maskCapturedNetworkRequestFn({
+                name: "https://app.saroh.in/commerce/orders?q=asha#top",
+            }),
+        ).toEqual({ name: "https://app.saroh.in/commerce/orders" });
         // Only the recording leaves: no pageview, no click, no identify.
         expect(config.before_send).toBe(replayBeforeSend);
     });

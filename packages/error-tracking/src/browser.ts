@@ -544,6 +544,28 @@ export function errorsConfig(host: string): Record<string, unknown> {
     } satisfies Partial<PostHogConfig>;
 }
 
+/**
+ * The recorder's `maskCapturedNetworkRequestFn`, which posthog-js asks about
+ * two different things:
+ *
+ * - **the page's own address**, as `{ name: url }` and nothing else, for
+ *   rrweb's "meta" event (the address, the width and the height). A
+ *   recording whose meta event is missing plays back as a blank black
+ *   screen: the player never learns the page's size, so it never shows it.
+ *   Answering null here drops that event (DEV_LEARNINGS, 14 Oct 2026). So
+ *   the address is answered, without its query string or fragment.
+ * - **a request the page made**, with its timing and more beside the
+ *   `name`. Never recorded: null.
+ */
+export function replayAddressOnly(
+    request: { name?: unknown } | null | undefined,
+): { name: string } | null {
+    if (!request || typeof request.name !== "string") return null;
+    const keys = Object.keys(request);
+    if (keys.length !== 1 || keys[0] !== "name") return null;
+    return { name: request.name.split(/[?#]/u)[0] ?? "" };
+}
+
 /** What both recorders share: inputs masked, no network, no console. */
 function recorderBasics(sampleRate: number) {
     return {
@@ -554,7 +576,7 @@ function recorderBasics(sampleRate: number) {
         // No request or response of the page's own is ever recorded.
         recordHeaders: false,
         recordBody: false,
-        maskCapturedNetworkRequestFn: () => null,
+        maskCapturedNetworkRequestFn: replayAddressOnly as never,
         recordCrossOriginIframes: false,
         collectFonts: false,
         captureCanvas: { recordCanvas: false },

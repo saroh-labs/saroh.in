@@ -47,6 +47,7 @@
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tsconfig": "workspace:*",
         "@types/node": "catalog:",
+        "jsdom": "^25.0.1",
         "posthog-js": "1.435.9",
         "rimraf": "^6.0.1",
         "tsup": "^8.5.0",
