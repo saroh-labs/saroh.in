@@ -121,6 +121,12 @@ export const env = createEnv({
             .optional(),
         NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
         NEXT_PUBLIC_POSTHOG_REPLAY: z.enum(["on", "off"]).optional(),
+        /**
+         * Page visits (DEC-160): which pages are opened and for how long,
+         * off unless "on". Behind the same answer to the cookie notice as
+         * the recording, and never for the team.
+         */
+        NEXT_PUBLIC_POSTHOG_ANALYTICS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE: z
             .string()
             .regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/)
@@ -168,6 +174,8 @@ export const env = createEnv({
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,
+        NEXT_PUBLIC_POSTHOG_ANALYTICS:
+            process.env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
         NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE:
             process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,

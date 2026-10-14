@@ -28,7 +28,7 @@ export interface RrwebItem {
 }
 export interface Sent {
     path: string;
-    events: { event: string; properties: Record<string, unknown> }[];
+    events: { event: string; properties?: Record<string, unknown> }[];
 }
 
 /** PostHog as the SDK sees it: the project's settings, and an inbox. */
@@ -68,10 +68,17 @@ export function fakePostHog() {
             if (bytes[0] === 0x1f && bytes[1] === 0x8b)
                 bytes = gunzipSync(bytes);
             const parsed = JSON.parse(bytes.toString("utf8")) as
-                Sent["events"] | Sent["events"][number];
+                | Sent["events"]
+                | Sent["events"][number]
+                | { batch: Sent["events"] };
             sent.push({
                 path: url.pathname,
-                events: Array.isArray(parsed) ? parsed : [parsed],
+                // One event, a list of them, or a batch: the SDK uses all three.
+                events: Array.isArray(parsed)
+                    ? parsed
+                    : "batch" in parsed
+                      ? parsed.batch
+                      : [parsed],
             });
         }
         return new Response(JSON.stringify({ status: 1 }), { status: 200 });
@@ -80,7 +87,7 @@ export function fakePostHog() {
         sent.flatMap((request) =>
             request.events.flatMap(
                 (event) =>
-                    (event.properties.$snapshot_data as
+                    (event.properties?.$snapshot_data as
                         RrwebItem[] | undefined) ?? [],
             ),
         );
@@ -108,7 +115,10 @@ export async function until(done: () => boolean, ms = 8_000): Promise<void> {
         await new Promise((r) => setTimeout(r, 50));
 }
 
-export function tracker(app: "application" | "web") {
+export function tracker(
+    app: "application" | "web",
+    analytics: "on" | "off" = "off",
+) {
     return createBrowserTracking({
         key: "phc_test",
         host: HOST,
@@ -117,6 +127,7 @@ export function tracker(app: "application" | "web") {
         load: () => import("posthog-js/dist/module.no-external"),
         loadRecorder: () => import("posthog-js/dist/posthog-recorder"),
         replay: "on",
+        analytics,
     });
 }
 

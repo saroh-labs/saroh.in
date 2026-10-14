@@ -9,11 +9,15 @@ import {
     usageNoticeDue,
 } from "@/lib/usage-sharing/sharing";
 
-/** Whether session recording is switched on for this environment at all. */
+/**
+ * Whether recordings or page visits (DEC-160) are switched on for this
+ * environment at all.
+ */
 export function recordingSwitchedOn(): boolean {
     return replaySwitchedOn({
         key: env.NEXT_PUBLIC_POSTHOG_KEY,
         replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
+        analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
     });
 }
 

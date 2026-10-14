@@ -8,6 +8,7 @@ import {
     hideFigures,
     maskWorkspaceAttribute,
     maskWorkspaceText,
+    pageBeforeSend,
     REPLAY_BLOCK_SELECTOR,
     REPLAY_SAMPLE_RATE,
     replayAddressOnly,
@@ -30,6 +31,7 @@ function fakeSdk() {
             captureException: ReturnType<typeof vi.fn>;
             startSessionRecording: ReturnType<typeof vi.fn>;
             stopSessionRecording: ReturnType<typeof vi.fn>;
+            capture: ReturnType<typeof vi.fn>;
         };
     }[] = [];
     const sdk: BrowserSdk = {
@@ -38,6 +40,7 @@ function fakeSdk() {
                 captureException: vi.fn(),
                 startSessionRecording: vi.fn(),
                 stopSessionRecording: vi.fn(),
+                capture: vi.fn(),
             };
             instances.push({ name, config, instance });
             return instance;
@@ -51,6 +54,12 @@ function fakeSdk() {
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
+
+/** The usage instance's `before_send`. */
+type Gate = (event: {
+    event: string;
+    properties?: Record<string, unknown>;
+}) => { event: string; properties?: Record<string, unknown> } | null;
 
 /** The item, or a failed test: no `!` on a possibly missing value. */
 function must<T>(value: T | null | undefined): T {
@@ -370,7 +379,15 @@ describe("replay", () => {
                 name: "https://app.saroh.in/commerce/orders?q=asha#top",
             }),
         ).toEqual({ name: "https://app.saroh.in/commerce/orders" });
-        expect(config.before_send).toBe(replayBeforeSend);
+        // Only the recording leaves: page visits have their own switch,
+        // and it is off here.
+        const gate = config.before_send as Gate;
+        expect(gate({ event: "$snapshot", properties: {} })).not.toBeNull();
+        for (const event of ["$pageview", "$pageleave", "$autocapture"])
+            expect(gate({ event, properties: {} })).toBeNull();
+        expect(config.capture_pageleave).toBe(false);
+        tracking.pageview("/commerce/orders");
+        expect(instance.capture).not.toHaveBeenCalled();
     });
 
     it("blocks pictures, media, drawings, frames and marked elements", () => {
@@ -775,7 +792,12 @@ describe("saroh.in's replay", () => {
             }),
         ).toEqual({ name: "https://app.saroh.in/commerce/orders" });
         // Only the recording leaves: no pageview, no click, no identify.
-        expect(config.before_send).toBe(replayBeforeSend);
+        const gate = config.before_send as Gate;
+        expect(gate({ event: "$snapshot", properties: {} })).not.toBeNull();
+        for (const event of ["$pageview", "$pageleave", "$identify"])
+            expect(gate({ event, properties: {} })).toBeNull();
+        tracking.pageview("/pricing");
+        expect(instance.capture).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -841,5 +863,235 @@ describe("saroh.in's replay", () => {
         expect(parts).not.toContain("img");
         const config = siteReplayConfig("https://eu.i.posthog.com");
         expect(config.disable_session_recording).toBe(true);
+    });
+});
+
+describe("page visits (DEC-160)", () => {
+    const WORKSPACE = {
+        userId: "user_1",
+        organizationId: "org_1",
+        sharesUsage: true,
+        inWorkspaceShell: true,
+        noticeShown: true,
+        doNotTrack: null,
+        globalPrivacyControl: false,
+    };
+    function tracker(overrides: Record<string, unknown> = {}) {
+        const fake = fakeSdk();
+        const loadRecorder = vi.fn(() => Promise.resolve({}));
+        const tracking = must(
+            createBrowserTracking({
+                key: "phc_test",
+                app: "application",
+                environment: "production",
+                load: fake.load,
+                loadRecorder,
+                replay: "on",
+                analytics: "on",
+                ...overrides,
+            }),
+        );
+        return { ...fake, loadRecorder, tracking };
+    }
+    const SDK_PAGEVIEW = {
+        event: "$pageview",
+        properties: {
+            $current_url:
+                "https://app.saroh.in/commerce/orders/seed_order_7?tab=notes#x",
+            $pathname: "/commerce/orders/seed_order_7",
+            $prev_pageview_pathname: "/commerce/customers/asha-rao",
+            $prev_pageview_duration: 12.5,
+            $prev_pageview_max_scroll: 900,
+            $session_entry_url: "https://app.saroh.in/open/seed_org",
+            $initial_referrer: "https://mail.example.com/",
+            $referrer: "https://mail.example.com/",
+            title: "Order ORD-007 \u00b7 Northwind Supply \u00b7 Saroh",
+            $session_id: "s1",
+        },
+        $set: { name: "Asha" },
+        $set_once: { $initial_current_url: "https://app.saroh.in/open/x" },
+    };
+
+    it("says only the page the app named: no id, no title, no referrer, no person", () => {
+        const sent = must(
+            pageBeforeSend(SDK_PAGEVIEW, {
+                now: "/commerce/orders/[orderId]",
+                previous: "/commerce/customers/[customerId]",
+            }),
+        );
+        expect(sent.properties).toEqual({
+            $current_url: "https://app.saroh.in/commerce/orders/[orderId]",
+            $pathname: "/commerce/orders/[orderId]",
+            $prev_pageview_pathname: "/commerce/customers/[customerId]",
+            $prev_pageview_duration: 12.5,
+            $session_id: "s1",
+        });
+        expect(sent).not.toHaveProperty("$set");
+        expect(sent).not.toHaveProperty("$set_once");
+        expect(JSON.stringify(sent)).not.toMatch(
+            /seed_order_7|asha|Northwind|mail\.example|tab=notes/u,
+        );
+    });
+
+    it("a leave is from the page on screen", () => {
+        const sent = must(
+            pageBeforeSend(
+                { ...SDK_PAGEVIEW, event: "$pageleave" },
+                { now: "/pricing?utm_source=x", previous: "/" },
+            ),
+        );
+        expect(sent.properties).toMatchObject({
+            $current_url: "https://app.saroh.in/pricing?utm_source=x",
+            $pathname: "/pricing",
+            $prev_pageview_pathname: "/pricing",
+            $prev_pageview_duration: 12.5,
+        });
+    });
+
+    it("sends nothing the app has not named, and no other event", () => {
+        expect(pageBeforeSend(SDK_PAGEVIEW, {})).toBeNull();
+        for (const event of ["$autocapture", "$identify", "$snapshot", "x"])
+            expect(
+                pageBeforeSend({ event, properties: {} }, { now: "/" }),
+            ).toBeNull();
+        expect(pageBeforeSend(null, { now: "/" })).toBeNull();
+    });
+
+    it("the workspace: a view per page named, once the rules hold", async () => {
+        const { tracking, instances } = tracker();
+        // Named before anything is allowed: kept, not sent.
+        tracking.pageview("/commerce/orders");
+        expect(instances).toHaveLength(0);
+        expect(await tracking.startReplay(WORKSPACE)).toBe(true);
+        const { config, instance } = instances[0];
+        expect(config).toMatchObject({
+            capture_pageview: false,
+            capture_pageleave: true,
+            autocapture: false,
+            capture_heatmaps: false,
+            capture_dead_clicks: false,
+            disable_surveys: true,
+            advanced_disable_feature_flags: true,
+            persistence: "memory",
+        });
+        expect(instance.capture.mock.calls).toEqual([["$pageview"]]);
+        // The same page again is not another visit.
+        tracking.pageview("/commerce/orders");
+        tracking.pageview("/commerce/orders/[orderId]");
+        expect(instance.capture).toHaveBeenCalledTimes(2);
+
+        const gate = config.before_send as Gate;
+        expect(
+            must(
+                gate({
+                    event: "$pageview",
+                    properties: {
+                        $current_url: "https://app.saroh.in/commerce/orders/7",
+                    },
+                }),
+            ).properties,
+        ).toMatchObject({
+            $current_url: "https://app.saroh.in/commerce/orders/[orderId]",
+            $prev_pageview_pathname: "/commerce/orders",
+        });
+        expect(gate({ event: "$snapshot", properties: {} })).not.toBeNull();
+        expect(gate({ event: "$autocapture", properties: {} })).toBeNull();
+
+        // Opted out: nothing more leaves, a leave at tab close included.
+        tracking.stopReplay();
+        for (const event of ["$pageview", "$pageleave", "$snapshot"])
+            expect(gate({ event, properties: {} })).toBeNull();
+        tracking.pageview("/settings/profile");
+        expect(instance.capture).toHaveBeenCalledTimes(2);
+    });
+
+    it("counts visits without the recorder where only visits are switched on", async () => {
+        const { tracking, instances, loadRecorder } = tracker({
+            replay: "off",
+        });
+        expect(await tracking.startReplay(WORKSPACE)).toBe(true);
+        expect(loadRecorder).not.toHaveBeenCalled();
+        const { config, instance } = instances[0];
+        expect(instance.startSessionRecording).not.toHaveBeenCalled();
+        // Nothing to ask the project about: no request at start-up.
+        expect(config.advanced_disable_flags).toBe(true);
+        const gate = config.before_send as Gate;
+        expect(gate({ event: "$snapshot", properties: {} })).toBeNull();
+        tracking.pageview("/");
+        expect(instance.capture.mock.calls).toEqual([["$pageview"]]);
+    });
+
+    it.each([
+        ["opted out", { sharesUsage: false }],
+        ["not told yet", { noticeShown: false }],
+        ["outside the shell", { inWorkspaceShell: false }],
+        ["Do Not Track", { doNotTrack: "1" }],
+        ["Global Privacy Control", { globalPrivacyControl: true }],
+    ])("the workspace sends no visit when %s", async (_why, change) => {
+        const { tracking, instances, load } = tracker();
+        tracking.pageview("/commerce/orders");
+        expect(await tracking.startReplay({ ...WORKSPACE, ...change })).toBe(
+            false,
+        );
+        expect(load).not.toHaveBeenCalled();
+        expect(instances).toHaveLength(0);
+    });
+
+    it.each([
+        ["before an answer", { consent: null }],
+        ["after a refusal", { consent: "refused" as const }],
+        ["in a team browser", { teamBrowser: true }],
+        ["with Do Not Track", { doNotTrack: "1" }],
+        ["with Global Privacy Control", { globalPrivacyControl: true }],
+    ])("saroh.in sends no visit %s", async (_why, change) => {
+        const { tracking, instances, load } = tracker({ app: "web" });
+        tracking.pageview("/pricing");
+        expect(
+            await tracking.startSiteReplay({
+                consent: "granted",
+                teamBrowser: false,
+                doNotTrack: null,
+                globalPrivacyControl: false,
+                ...change,
+            }),
+        ).toBe(false);
+        expect(load).not.toHaveBeenCalled();
+        expect(instances).toHaveLength(0);
+    });
+
+    it("saroh.in: a view after consent, about nobody", async () => {
+        const { tracking, instances } = tracker({ app: "web" });
+        tracking.pageview("/pricing");
+        expect(
+            await tracking.startSiteReplay({
+                consent: "granted",
+                teamBrowser: false,
+                doNotTrack: null,
+                globalPrivacyControl: false,
+            }),
+        ).toBe(true);
+        const { config, instance } = instances[0];
+        expect(config.bootstrap).toBeUndefined();
+        expect(config).toMatchObject({
+            person_profiles: "never",
+            persistence: "memory",
+            capture_pageleave: true,
+        });
+        expect(instance.capture.mock.calls).toEqual([["$pageview"]]);
+    });
+
+    it("accounts and the admin console never count a visit", async () => {
+        for (const app of ["auth", "admin", "sites"] as const) {
+            const { tracking, instances } = tracker({ app });
+            tracking.pageview("/login");
+            expect(await tracking.startReplay(WORKSPACE)).toBe(false);
+            expect(
+                await tracking.startSiteReplay({
+                    consent: "granted",
+                    teamBrowser: false,
+                }),
+            ).toBe(false);
+            expect(instances).toHaveLength(0);
+        }
     });
 });

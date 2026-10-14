@@ -1,5 +1,6 @@
 "use client";
 
+import { useParams, usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 
 import { browserTracking } from "@/lib/error-tracking-browser";
@@ -7,6 +8,7 @@ import {
     subscribeUsageNotice,
     usageNoticeOnScreen,
 } from "@/lib/usage-sharing/notice-on-screen";
+import { routeShape } from "@/lib/usage-sharing/route-shape";
 
 /**
  * The signed-in workspace's part in PostHog (DEC-125). Draws nothing, and
@@ -23,6 +25,10 @@ import {
  *   rule holds too (`replayDecision`: the workspace app, a signed-in user,
  *   no Do Not Track or Global Privacy Control). It stops when this goes
  *   away, and at once when `sharesUsage` turns false.
+ * - **Page visits** (DEC-160), under the same rules and the same choice:
+ *   which screen is open and for how long. What is sent is the route's
+ *   shape (`/commerce/orders/[orderId]`, `routeShape`), never the address:
+ *   no record's id, no token, no business name, and not the tab's title.
  *
  * Mounted by `UsageRecording` only, which the signed-in shell and the
  * goal picker after setup draw: the first setup step (no business yet),
@@ -46,6 +52,7 @@ export function WorkspaceTracking({
         () => false,
     );
     const noticeShown = noticeSeen || onScreen;
+    const route = routeShape(usePathname(), useParams());
 
     useEffect(() => {
         const tracking = browserTracking;
@@ -62,6 +69,12 @@ export function WorkspaceTracking({
             tracking.stopReplay();
         };
     }, [userId, organizationId, sharesUsage, noticeShown]);
+
+    // After the effect above: the tracker sends a page only once it may,
+    // and keeps the last one named until then.
+    useEffect(() => {
+        browserTracking?.pageview(route);
+    }, [route]);
 
     return null;
 }

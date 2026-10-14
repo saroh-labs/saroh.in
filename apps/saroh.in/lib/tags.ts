@@ -278,8 +278,19 @@ export interface SiteRecorder {
 }
 
 /**
- * Starts recording how the site is used (DEC-125), and returns what stops
- * it. The one way the recorder starts on saroh.in.
+ * The page on screen as it may be sent (DEC-160): its public path, and of
+ * its query only what the allow-list keeps (`lib/page-address.ts`). No
+ * `ref`, `invite`, `email` or `token`, and no fragment.
+ */
+export function pageRoute(win: Window = window): string {
+    const url = new URL(cleanUrl(win.location.href));
+    return `${url.pathname}${url.search}`;
+}
+
+/**
+ * Starts recording how the site is used (DEC-125), and counting which
+ * pages are opened (DEC-160), and returns what stops both. The one way
+ * either starts on saroh.in.
  *
  * It starts only where this browser allows it right now: the visitor
  * accepted a notice that said it records, and it is not the team's browser

@@ -21,4 +21,6 @@ export const browserTracking = createBrowserTracking({
     // Every allowed session unless this says a smaller share.
     replaySample: env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
     loadRecorder: () => import("posthog-js/dist/posthog-recorder"),
+    // Page visits (DEC-160): off unless this is "on"; the same rules.
+    analytics: env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
 });
