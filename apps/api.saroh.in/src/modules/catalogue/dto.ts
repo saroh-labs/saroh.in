@@ -102,8 +102,8 @@ export class DefaultsEntryInput {
     @IsOptional()
     @ValidateIf((_o, v) => v !== null)
     @Type(() => Number)
-    @IsInt({ message: "Warn at must be a whole number, zero or more." })
-    @Min(0, { message: "Warn at must be a whole number, zero or more." })
+    @IsInt({ message: "Low stock at must be a whole number, zero or more." })
+    @Min(0, { message: "Low stock at must be a whole number, zero or more." })
     lowStockAlert?: number | null;
 
     @IsOptional()

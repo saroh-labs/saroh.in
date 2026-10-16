@@ -155,7 +155,7 @@ export function SheetSizeRow({
                                 htmlFor={`${id}-warn`}
                                 className={PHONE_LABEL}
                             >
-                                Warn at
+                                Low stock at
                             </Label>
                             <Input
                                 id={`${id}-warn`}

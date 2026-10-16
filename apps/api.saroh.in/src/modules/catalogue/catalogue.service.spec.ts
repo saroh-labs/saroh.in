@@ -445,7 +445,7 @@ describe("Catalogue settings (DB)", () => {
                 catalogue.saveDefaults(orgId, {
                     entries: [{ key: "all", lowStockAlert: null }],
                 }),
-            ).rejects.toThrow(/Warn at/);
+            ).rejects.toThrow(/low stock level/);
             await expect(
                 catalogue.saveDefaults(orgId, {
                     entries: [{ key: dresses, returnsMode: "OWN" }],

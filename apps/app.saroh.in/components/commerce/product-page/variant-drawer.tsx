@@ -168,7 +168,7 @@ export function VariantDrawer({
                                                 value={openLine.canSell}
                                             />
                                             <Tile
-                                                label="Warn at"
+                                                label="Low stock at"
                                                 value={openLine.warnAt}
                                             />
                                         </div>

@@ -158,6 +158,29 @@ function listen() {
     );
 }
 
+/**
+ * When a mouse, pen or finger last pressed anywhere on the page. Focus that
+ * arrives within a moment of a press came from that press (or from a sheet
+ * it opened), not from the keyboard, so it shows no hint.
+ */
+let lastPressAt = 0;
+let watchingPresses = false;
+const PRESS_FOCUS_MS = 1000;
+function watchPresses() {
+    if (watchingPresses || typeof window === "undefined") return;
+    watchingPresses = true;
+    window.addEventListener(
+        "pointerdown",
+        () => {
+            lastPressAt = Date.now();
+        },
+        true,
+    );
+}
+function pressedJustNow(): boolean {
+    return Date.now() - lastPressAt < PRESS_FOCUS_MS;
+}
+
 function Hint({
     label,
     children,
@@ -190,9 +213,10 @@ function Hint({
     // first control as it opens, so the quick look's Previous showed its
     // hint the moment the sheet appeared, under no pointer (owner, 16 Oct).
     // A hint opens for a pointer over the control, or for focus the
-    // keyboard brought (`:focus-visible`); focus a click left behind
-    // shows nothing.
+    // keyboard brought; focus that lands just after a press (a click that
+    // opened a sheet, which then focused its first control) shows nothing.
     const hovered = React.useRef(false);
+    React.useEffect(watchPresses, []);
     React.useEffect(
         () => () => {
             window.clearTimeout(gone.current);
@@ -221,14 +245,8 @@ function Hint({
             <Tooltip
                 open={open}
                 onOpenChange={(next) => {
-                    if (next && !hovered.current) {
-                        const focused = document.activeElement;
-                        if (
-                            !(focused instanceof Element) ||
-                            !focused.matches(":focus-visible")
-                        ) {
-                            return;
-                        }
+                    if (next && !hovered.current && pressedJustNow()) {
+                        return;
                     }
                     if (next) {
                         setDropped(false);

@@ -279,7 +279,7 @@ export function StockSheet({
                     {counts ? (
                         <>
                             <span>On hand</span>
-                            <span>Warn at</span>
+                            <span>Low stock at</span>
                         </>
                     ) : null}
                 </div>

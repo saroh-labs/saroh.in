@@ -52,7 +52,7 @@ describe("SheetSizeRow on a phone", () => {
         for (const [text, spoken] of [
             ["Price", "800g price, blank for the product&#x27;s"],
             ["On hand", "800g on hand"],
-            ["Warn at", "800g warn when on hand reaches"],
+            ["Low stock at", "800g warn when on hand reaches"],
         ]) {
             const label = new RegExp(
                 `<label[^>]* for="([^"]+)"[^>]*>${text}</label>`,

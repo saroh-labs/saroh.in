@@ -192,7 +192,7 @@ export class CatalogueService {
             (all.lowStockAlert === null || all.lowStockAlert === undefined)
         ) {
             throw new BadRequestException({
-                message: "All products needs a Warn at level.",
+                message: "All products needs a low stock level.",
                 field: "lowStockAlert",
             });
         }

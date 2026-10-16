@@ -63,7 +63,7 @@ export function WholeStock({
                     />
                 </Field>
                 <Field
-                    label="Warn at"
+                    label="Low stock at"
                     className="min-w-[92px] flex-[0_1_112px]"
                 >
                     <Input
@@ -155,7 +155,7 @@ export function VariantStockTable({
             >
                 <span className="capitalize">{opt}</span>
                 <span>On hand</span>
-                <span>Warn at</span>
+                <span>Low stock at</span>
                 <span className="text-right">Promised</span>
             </div>
             <div className="flex flex-col gap-1.5">

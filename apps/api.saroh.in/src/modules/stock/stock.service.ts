@@ -692,7 +692,7 @@ export async function setWarnings(
     for (const w of warnings) {
         if (!Number.isInteger(w.lowStockAlert) || w.lowStockAlert < 0) {
             throw new BadRequestException({
-                message: "Warn at a whole number, 0 or more.",
+                message: "Low stock at a whole number, 0 or more.",
                 field: "lowStockAlert",
             });
         }
