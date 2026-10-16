@@ -68,11 +68,15 @@ import {
     staffEmail,
     TIMEZONE,
 } from "./data";
+import { seedDiaryShop } from "./diary-shop";
+import { checkDiaryShop } from "./diary-shop-check";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
+import { MOTION } from "./physio-data";
 import type { PulseCounts } from "./pulse";
 import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
 import { createRng } from "./random";
+import { NOOR } from "./salon-data";
 
 /**
  * Lay the showcase over the base seed.
@@ -208,6 +212,26 @@ export async function seedShowcase(
             deskUserId: await ensureTeamMember(ctx, KAVI_DESK),
         }),
     );
+    // A salon and bridal studio in Jaipur and a physio clinic in
+    // Indiranagar: diaries with several people, packs, memberships the desk
+    // books, a counter, and a journal (`diary-shop*.ts`).
+    const diaryShops = [NOOR, MOTION];
+    for (const biz of diaryShops) {
+        businesses.push(
+            await seedDiaryShop(
+                {
+                    prisma,
+                    now,
+                    demoUserId: ctx.demoUserId,
+                    deskUserId: await ensureTeamMember(ctx, {
+                        ...biz.desk,
+                        role: "MEMBER",
+                    }),
+                },
+                biz,
+            ),
+        );
+    }
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -246,6 +270,13 @@ export async function seedShowcase(
         : null;
     const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
     const kaviCounts: KaviCounts = await checkKavi(prisma, KAVI.orgId, now);
+    const diaryShopCounts = [];
+    for (const biz of diaryShops) {
+        diaryShopCounts.push({
+            name: biz.name,
+            counts: await checkDiaryShop(prisma, biz, now),
+        });
+    }
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -261,6 +292,10 @@ export async function seedShowcase(
     console.table(ryeCounts);
     console.log("[showcase] Kavi Dental, as its films need it:");
     console.table(kaviCounts);
+    for (const { name, counts } of diaryShopCounts) {
+        console.log(`[showcase] ${name}, as its demos need it:`);
+        console.table(counts);
+    }
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +

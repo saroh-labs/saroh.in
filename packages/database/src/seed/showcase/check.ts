@@ -223,7 +223,11 @@ export async function checkShowcase(
                         AND i."bookingId" IS NULL
                     WHEN 'BOOKING' THEN bk."organizationId" = i."organizationId"
                         AND bk."contactId" = i."contactId"
-                        AND i.total * 100 = (bk.snapshot->'service'->>'priceCents')::numeric
+                        -- Its price, or only the deposit when that is what
+                        -- was paid online (E8, the snapshot's deposit).
+                        AND i.total * 100 = COALESCE(
+                            (bk.snapshot->'deposit'->>'cents')::numeric,
+                            (bk.snapshot->'service'->>'priceCents')::numeric)
                         AND i."orderId" IS NULL AND i."subscriptionId" IS NULL
                         AND i."courseEnrollmentId" IS NULL AND i."packPurchaseId" IS NULL
                     WHEN 'ORDER' THEN o."organizationId" = i."organizationId"
@@ -236,7 +240,10 @@ export async function checkShowcase(
     );
 
     // Capacity: at every confirmed booking's time, the confirmed bookings on
-    // that service plus the seats open courses still hold there fit.
+    // that service plus the seats open courses still hold there fit. A
+    // one-to-one somebody takes is booked per person (U3, `booking-slots.ts`
+    // `perPerson`): its capacity is each person's, so two stylists can each
+    // cut hair at ten — "people booked in two places at once" holds that.
     fail(
         "bookings over their service's capacity",
         await prisma.$queryRaw<Row[]>`
@@ -258,6 +265,9 @@ export async function checkShowcase(
                        AND h."startAt" < b."endAt" AND h."endAt" > b."startAt") AS held
                 FROM "Booking" b JOIN "Service" s ON s.id = b."serviceId"
                 WHERE b."organizationId" = ANY(${orgs}) AND b.status = 'CONFIRMED'
+                  AND NOT (s.capacity = 1 AND b."staffId" IS NOT NULL
+                       AND EXISTS (SELECT 1 FROM "StaffService" x
+                           WHERE x."serviceId" = s.id))
             )
             SELECT id, capacity, confirmed::int, held::int FROM load
             WHERE confirmed + held > capacity`,
@@ -409,10 +419,11 @@ export async function checkShowcase(
     fail(
         "class sessions with more than one instructor",
         await prisma.$queryRaw<Row[]>`
-            SELECT "serviceId", "startAt" FROM "Booking"
-            WHERE "organizationId" = ANY(${orgs})
-            GROUP BY "serviceId", "startAt"
-            HAVING COUNT(DISTINCT COALESCE("staffId", '')) > 1`,
+            SELECT b."serviceId", b."startAt" FROM "Booking" b
+            JOIN "Service" s ON s.id = b."serviceId"
+            WHERE b."organizationId" = ANY(${orgs}) AND s.capacity > 1
+            GROUP BY b."serviceId", b."startAt"
+            HAVING COUNT(DISTINCT COALESCE(b."staffId", '')) > 1`,
     );
     fail(
         "weekly hours that end before they start or overlap",

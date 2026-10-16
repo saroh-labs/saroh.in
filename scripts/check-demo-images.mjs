@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Every photo the Leela & Loom and Rye & Co. showcases seed must load (#471, #522).
+ * Every photo the Leela & Loom, Rye & Co., Noor Salon & Bridal and Motion
+ * Physio showcases seed must load (#471, #522).
  *
  * The boutique's photos are free-licence Unsplash images hot-linked by
  * address, because local storage does not persist uploads. A photo that stops
@@ -12,21 +13,92 @@
  *
  * It needs the network; the seed itself never does.
  */
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const read = (file) =>
-    readFileSync(new URL(`../packages/database/src/seed/showcase/${file}`, import.meta.url), "utf8");
+    readFileSync(
+        new URL(
+            `../packages/database/src/seed/showcase/${file}`,
+            import.meta.url,
+        ),
+        "utf8",
+    );
 const boutique = read("boutique-catalog.ts");
+// Noor Salon & Bridal and Motion Physio: catalogues and journals.
+const diaryShops = [
+    "salon-catalog.ts",
+    "salon-posts.ts",
+    "physio-catalog.ts",
+    "physio-posts.ts",
+].map(read);
 // Rye & Co.'s photos (#522) are written as unsplash("photo-…").
 const bakery = read("bakery-product-page.ts");
 const urls = [
     ...new Set([
-        ...[...boutique.matchAll(/"url":\s*"([^"]+)"|url:\s*"([^"]+)"/g)].map((m) => m[1] ?? m[2]),
+        ...[...boutique.matchAll(/"url":\s*"([^"]+)"|url:\s*"([^"]+)"/g)].map(
+            (m) => m[1] ?? m[2],
+        ),
+        ...diaryShops.flatMap((src) =>
+            [...src.matchAll(/url:\s*"([^"]+)"/g)].map((m) => m[1]),
+        ),
         ...[...bakery.matchAll(/unsplash\("([^"]+)"\)/g)].map(
-            (m) => `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
+            (m) =>
+                `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
         ),
     ]),
 ];
+
+// Generated images (shade cards, band and tape colours) are files in the
+// workspace's public folder, served at https://app.saroh.localhost/demo/…
+// (`diary-shop-types.ts`): checked on disk, so this needs no running stack.
+const demoFiles = [
+    ...new Set(
+        diaryShops.flatMap((src) =>
+            [...src.matchAll(/demoAsset\(\s*"([^"]+)"/g)].map((m) => m[1]),
+        ),
+    ),
+];
+const swatchList = JSON.parse(
+    execFileSync(
+        "pnpm",
+        [
+            "--silent",
+            "--filter",
+            "@saroh/database",
+            "exec",
+            "tsx",
+            "../../scripts/demo-swatches/export.ts",
+        ],
+        {
+            cwd: fileURLToPath(new URL("..", import.meta.url)),
+            encoding: "utf8",
+        },
+    ),
+);
+const generated = [
+    ...new Set([
+        ...demoFiles,
+        ...swatchList.flatMap((g) => g.swatches.map((s) => s.file)),
+    ]),
+];
+let missing = 0;
+for (const file of generated) {
+    if (
+        !existsSync(
+            new URL(
+                `../apps/app.saroh.in/public/demo/${file}`,
+                import.meta.url,
+            ),
+        )
+    ) {
+        missing += 1;
+        console.error(
+            `✗ missing generated image apps/app.saroh.in/public/demo/${file} (run scripts/demo-swatches)`,
+        );
+    }
+}
 
 let failed = 0;
 const queue = [...urls];
@@ -47,5 +119,8 @@ async function worker() {
     }
 }
 await Promise.all(Array.from({ length: 8 }, worker));
-console.log(`check-demo-images: ${urls.length - failed} of ${urls.length} photos load.`);
-process.exit(failed > 0 ? 1 : 0);
+console.log(
+    `check-demo-images: ${urls.length - failed} of ${urls.length} photos load; ` +
+        `${generated.length - missing} of ${generated.length} generated images are on disk.`,
+);
+process.exit(failed + missing > 0 ? 1 : 0);
