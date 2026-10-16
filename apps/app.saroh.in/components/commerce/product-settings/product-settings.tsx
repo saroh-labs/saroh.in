@@ -111,7 +111,7 @@ export function ProductSettings({
                 <TabStrip
                     label="Product settings"
                     idPrefix="settings-tab"
-                    value={loading && pressed ? pressed : tab}
+                    value={pressed ?? tab}
                     tabs={tabs.map(({ key, count }) => ({
                         value: key,
                         label: LABEL[key],

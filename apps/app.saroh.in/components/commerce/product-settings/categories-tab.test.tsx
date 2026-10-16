@@ -83,6 +83,18 @@ beforeEach(() => {
 });
 afterEach(() => s.unmount());
 
+describe("links and marks", () => {
+    it("links each count to the products, and collections to Collections", () => {
+        render();
+        const hrefs = Array.from(document.querySelectorAll("a")).map((a) =>
+            a.getAttribute("href"),
+        );
+        expect(hrefs).toContain("/commerce/products?category=c1");
+        expect(hrefs).toContain("/commerce/products?tab=collections");
+        expect(s.text()).toContain("Products with no category. Always here.");
+    });
+});
+
 describe("the list", () => {
     it("shows every category with nothing open", () => {
         render();
@@ -271,16 +283,18 @@ describe("Merge", () => {
             s.sheet()?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
         ).find((r) => r.textContent === name);
 
-    it("opens a sheet that asks where the products go", () => {
+    it("opens a sheet that asks where the products go", async () => {
         open();
         expect(s.title(s.sheet())).toBe("Merge Serums");
         expect(radio("Lip care")).toBeDefined();
         expect(radio("Uncategorized")).toBeDefined();
         expect(radio("Serums")).toBeUndefined();
-        expect(s.sheet()?.textContent).toContain(
-            "Pick where its products should go.",
-        );
-        expect(s.button("Merge category", s.sheet())?.disabled).toBe(true);
+        // Merge stays on; pressed with nothing picked, it says so.
+        expect(s.button("Merge category", s.sheet())?.disabled).toBe(false);
+        expect(s.sheet()?.textContent).not.toContain("Pick where");
+        await s.submit(s.sheet());
+        expect(s.sheet()?.textContent).toContain("Pick where its products go.");
+        expect(actions.mergeCategory).not.toHaveBeenCalled();
         // The row is still a row behind it.
         expect(s.button("Rename Serums")).toBeDefined();
     });

@@ -5,6 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { NameDialog } from "@/components/shared/name-dialog";
 import type { CatalogueView, CategoryRemoval } from "@/lib/products/settings";
@@ -41,6 +42,11 @@ type Category = CatalogueView["categories"][number];
 export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
     const router = useRouter();
     const { categories, uncategorizedCount, canWrite } = catalogue;
+    const [justAdded, setJustAdded] = useState<string | null>(null);
+    const addedRow = useRef<HTMLLIElement>(null);
+    useEffect(() => {
+        addedRow.current?.scrollIntoView({ block: "nearest" });
+    }, [justAdded, categories.length]);
     /** The stored name a typed one clashes with, or "" when it is free. */
     const exists = (name: string, except?: string): string =>
         name.trim().toLowerCase() === "uncategorized"
@@ -67,6 +73,8 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
             showError(res.error);
             return false;
         }
+        // It lands in alphabetical order: marked, and brought into view.
+        setJustAdded(res.data.id);
         router.refresh();
         showUndo(`${name} added.`, () => undone(removeCategory(res.data.id)));
         return true;
@@ -174,9 +182,12 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 {categories.map((c) => (
                     <li
                         key={c.id}
+                        ref={c.id === justAdded ? addedRow : undefined}
+                        data-just-added={c.id === justAdded ? "" : undefined}
                         className={cn(
                             "flex flex-wrap items-center gap-2.5",
                             listTable.rowStill,
+                            c.id === justAdded && "bg-muted/60",
                         )}
                     >
                         <div className="min-w-0 flex-[1_1_200px]">
@@ -265,7 +276,17 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                             Uncategorized
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            {count(uncategorizedCount, "product")}
+                            {uncategorizedCount > 0 ? (
+                                <TextLink
+                                    href={categoryProductsHref("none")}
+                                    className="text-[12px]"
+                                    aria-label={`${count(uncategorizedCount, "product")} with no category`}
+                                >
+                                    {count(uncategorizedCount, "product")}
+                                </TextLink>
+                            ) : (
+                                "No products"
+                            )}
                         </p>
                     </div>
                     <span className="text-[12px] text-muted-foreground">

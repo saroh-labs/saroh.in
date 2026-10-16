@@ -176,10 +176,11 @@ export function suggestionLine(
     names: Partial<Record<string, string>>,
     allLow: string,
 ): string {
-    const [first] = suggestions;
-    if (!first) return "";
-    if (suggestions.length === 1)
+    if (suggestions.length === 0) return "";
+    if (suggestions.length === 1) {
+        const [first] = suggestions as [DefaultsSuggestion];
         return suggestionText(first, names[first.key] ?? "products");
+    }
     const keys = new Set(suggestions.map((x) => x.key)).size;
     const one = keys === 1;
     const cats = `${keys} ${one ? "category" : "categories"} usually`;

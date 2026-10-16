@@ -9,10 +9,13 @@ import { FormSheet } from "@/components/shared/form-sheet";
 import type { CatalogueView } from "@/lib/products/settings";
 import { Notice } from "@saroh/ui/notice";
 
+import { PROBLEM } from "./product-settings";
+
 type Category = CatalogueView["categories"][number];
 /**
  * Merge a category into another: pick where its products go, read what
  * will move and how many, then Merge. Uncategorized is always a choice.
+ * Merge stays pressable: pressed with nothing picked, it says so.
  * Nothing moves until the button; a refusal keeps the sheet open with the
  * choice made.
  */
@@ -33,6 +36,8 @@ export function CategoryMergeSheet({
     // "" is Uncategorized; null is nothing picked yet.
     const [to, setTo] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    // Merge pressed with nothing picked: said, not a button turned off.
+    const [tried, setTried] = useState(false);
     const targets = [
         ...others.map((x) => ({ id: x.id, name: x.name })),
         { id: "", name: "Uncategorized" },
@@ -46,6 +51,7 @@ export function CategoryMergeSheet({
             open={open}
             onOpen={() => {
                 setTo(null);
+                setTried(false);
                 setOpen(true);
             }}
             onClose={() => setOpen(false)}
@@ -55,9 +61,9 @@ export function CategoryMergeSheet({
             pending={busy}
             saveLabel="Merge category"
             savingLabel="Merging…"
-            saveOff={to === null}
             onSubmit={(e) => {
                 e.preventDefault();
+                setTried(true);
                 if (to === null || into === null) return;
                 setBusy(true);
                 void onMerge(to === "" ? null : to, into).then((ok) => {
@@ -81,11 +87,15 @@ export function CategoryMergeSheet({
                     }))}
                 />
             </div>
-            <Notice role="status">
-                {into === null
-                    ? "Pick where its products should go."
-                    : `The ${count(category.productCount, "product")} in ${category.name} move to ${into}, and ${category.name} goes away.`}
-            </Notice>
+            {into !== null ? (
+                <Notice role="status">
+                    {`The ${count(category.productCount, "product")} in ${category.name} move to ${into}, and ${category.name} goes away.`}
+                </Notice>
+            ) : tried ? (
+                <p role="alert" className={PROBLEM}>
+                    Pick where its products go.
+                </p>
+            ) : null}
         </FormSheet>
     );
 }

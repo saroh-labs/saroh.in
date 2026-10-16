@@ -69,11 +69,11 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
     const all = rows.find((r) => r.key === "all") ?? fresh[0];
     const allBase = base.find((r) => r.key === "all") ?? fresh[0];
     // Only All products is edited in place; a category saves from its sheet.
-    const changed = all && allBase ? changes([all], [allBase]) : [];
+    const changed = changes([all], [allBase]);
     const dirty = changed.length > 0;
     const saveBar = useRef<HTMLDivElement>(null);
     useBottomBarInset(saveBar, dirty && catalogue.canWrite);
-    const problem = all && tried ? lowProblem(all) : "";
+    const problem = tried ? lowProblem(all) : "";
     const names = Object.fromEntries(rows.map((r) => [r.key, r.name]));
     const hit = affected(changed, catalogue.defaults.stillOnDefault, names);
     const counts = catalogue.defaults.productCounts;
@@ -89,7 +89,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
         );
     });
     const line =
-        catalogue.canWrite && !putAway && all
+        catalogue.canWrite && !putAway
             ? suggestionLine(open, names, all.low)
             : "";
 
@@ -126,7 +126,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
 
     /** All products' card. The leave guard's Save and leave too. */
     async function persist(): Promise<boolean> {
-        if (!dirty || !all) return true;
+        if (!dirty) return true;
         setTried(true);
         if (lowProblem(all)) return false;
         const ok = await saveRows(
@@ -189,69 +189,63 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
             </TabIntro>
             {catalogue.canWrite ? null : <SettingsReadOnly />}
 
-            {all ? (
-                <div className="rounded-[12px] border border-border bg-muted/50 px-4 py-3.5">
-                    <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
-                        <h3 className="text-[14px] font-semibold">
-                            All products
-                        </h3>
-                        <span className="text-[12px] text-muted-foreground">
-                            {count(counts.all ?? 0, "product")}
-                        </span>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                        <Field
-                            label="Low stock at"
-                            hint={problem ? undefined : LOW_HINT}
-                            error={problem || undefined}
-                            className="flex-[1_1_200px] space-y-[5px]"
-                        >
-                            <Input
-                                dense
-                                type="number"
-                                min={0}
-                                inputMode="numeric"
-                                value={all.low}
-                                disabled={!catalogue.canWrite}
-                                onChange={(e) =>
-                                    setAll({ low: e.target.value })
-                                }
-                                className="w-full min-w-0"
-                            />
-                        </Field>
-                        <Field
-                            label="How to use or care for it"
-                            className="flex-[2_1_260px] space-y-[5px]"
-                        >
-                            <Input
-                                dense
-                                value={all.howToUse}
-                                disabled={!catalogue.canWrite}
-                                onChange={(e) =>
-                                    setAll({ howToUse: e.target.value })
-                                }
-                                placeholder="Nothing. Each product says"
-                                className="w-full min-w-0"
-                            />
-                        </Field>
-                        <div className="min-w-0 flex-[1_1_100%]">
-                            <p className="mb-1.5 text-[12px] font-medium">
-                                Returns
-                            </p>
-                            <ChipGroup
-                                label="All products: returns"
-                                value={all.returns}
-                                onChange={(returns) => setAll({ returns })}
-                                disabled={!catalogue.canWrite}
-                                choices={RETURN_RULES.map((o) => ({
-                                    value: o.choice,
-                                    label: o.label,
-                                }))}
-                            />
-                        </div>
+            <div className="rounded-[12px] border border-border bg-muted/50 px-4 py-3.5">
+                <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
+                    <h3 className="text-[14px] font-semibold">All products</h3>
+                    <span className="text-[12px] text-muted-foreground">
+                        {count(counts.all ?? 0, "product")}
+                    </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                    <Field
+                        label="Low stock at"
+                        hint={problem ? undefined : LOW_HINT}
+                        error={problem || undefined}
+                        className="flex-[1_1_200px] space-y-[5px]"
+                    >
+                        <Input
+                            dense
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            value={all.low}
+                            disabled={!catalogue.canWrite}
+                            onChange={(e) => setAll({ low: e.target.value })}
+                            className="w-full min-w-0"
+                        />
+                    </Field>
+                    <Field
+                        label="How to use or care for it"
+                        className="flex-[2_1_260px] space-y-[5px]"
+                    >
+                        <Input
+                            dense
+                            value={all.howToUse}
+                            disabled={!catalogue.canWrite}
+                            onChange={(e) =>
+                                setAll({ howToUse: e.target.value })
+                            }
+                            placeholder="Nothing. Each product says"
+                            className="w-full min-w-0"
+                        />
+                    </Field>
+                    <div className="min-w-0 flex-[1_1_100%]">
+                        <p className="mb-1.5 text-[12px] font-medium">
+                            Returns
+                        </p>
+                        <ChipGroup
+                            label="All products: returns"
+                            value={all.returns}
+                            onChange={(returns) => setAll({ returns })}
+                            disabled={!catalogue.canWrite}
+                            choices={RETURN_RULES.map((o) => ({
+                                value: o.choice,
+                                label: o.label,
+                            }))}
+                        />
                     </div>
                 </div>
-            ) : null}
+            </div>
 
             {dirty && catalogue.canWrite ? (
                 <div
@@ -384,7 +378,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                         ? own.join(" · ")
                                         : "Same as All products"}
                                 </p>
-                                {catalogue.canWrite && all ? (
+                                {catalogue.canWrite ? (
                                     <CategoryDefaultsSheet
                                         trigger={
                                             <Button
@@ -397,7 +391,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                             </Button>
                                         }
                                         row={r}
-                                        all={allBase ?? all}
+                                        all={allBase}
                                         suggestions={open.filter(
                                             (s) => s.key === r.key,
                                         )}

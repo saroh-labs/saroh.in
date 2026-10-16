@@ -169,8 +169,7 @@ export function OptionSheet({
             const from = rs.findIndex((r) => r.key === key);
             if (from < 0 || to < 0 || to >= rs.length || from === to) return rs;
             const next = [...rs];
-            const [row] = next.splice(from, 1);
-            if (row) next.splice(to, 0, row);
+            next.splice(to, 0, ...next.splice(from, 1));
             return next;
         });
     }
