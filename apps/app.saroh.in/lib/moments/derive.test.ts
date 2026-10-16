@@ -212,6 +212,7 @@ const home = (over: Partial<HomeModel> = {}): HomeModel => ({
     unavailable: [],
     needs: [],
     needsTotal: 0,
+    ordersInProgress: 0,
     today: null,
     lastDay: {
         zone: "Asia/Kolkata",

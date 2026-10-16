@@ -1990,6 +1990,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - "Keep" (they keep their current terms) remains a publish policy: such businesses stay on their version and its price until they change plan or their autopay runs out and they approve the next one at the live price.
     - Businesses already subscribed keep their 12-charge autopays; only the words they read change.
 - Rules: `packages/pricing-catalog/src/schema.ts` (`autopay`, `autopayCharges`, `AUTOPAY_CHARGES_*`) and `moves.ts` (`PRICE_NOTICE_DAYS`, `moveNoticeDays`); `apps/api.saroh.in/src/modules/billing/billing-term.ts` (`termCheckoutOf`, `autopayChargesOfVersion`), `price-change.ts`, `pricing/moves.service.ts`, `pricing/move-notice.handler.ts`, `billing-webhook.service.ts` (`completed`); `apps/app.saroh.in/lib/saroh-billing/plan-view.ts`, `plan-status.ts`, `quote-words.ts`; `apps/admin.saroh.in/components/plans/offers/offer-autopay.tsx`. `PRICING_ROLLOUT.md` › "Checkout and term (DEC-093)" and "Price changes (DEC-161)".
+
 ## DEC-162 Saroh's own invoice numbers run by the financial year
 
 - Status: Accepted (owner, 14 Oct 2026; the monthly form first agreed that morning was replaced the same day)
@@ -1998,3 +1999,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Replaced the same day: `‹prefix›/‹YY›/‹MM›/‹count›` (`SA/26/10/0001`), a count that started again each month. It never reached production; the local test numbers made in it (`SA/26/10/0001`…) stay as issued.
 - Not changed: the numbering of the invoices a business issues to its own customers (`invoices/numbering.ts`), which follows that business's own settings.
 - Supersedes: the yearly `SRH/26-27/00001` series (a five-digit count). Numbers already issued in it stay as they are.
+
+## DEC-163 Home lists an open order only when it is late or due by tomorrow
+
+- Status: Accepted (owner, 16 Oct 2026), built
+- Context: Needs you listed every open order as a task, so a busy made-to-order kitchen (the demo Ammi Ki Barni, some 40 orders in progress, every one within its promised days) read "Needs you 50".
+- Decision: Needs you lists an open order only when it is **late**, or **due today or tomorrow**: "due" is the moment it would turn late, by its storefront's own thresholds (B17, DEC-045), and "tomorrow" is the business's calendar day in its time zone. In SQL, the order is late at the start of the day after tomorrow (`lateSql(soonCutoff(now, zone))`). Orders due later, and orders that never turn late (on their way), stay off the list and in Orders; Home says so once beside the count, as a quiet link to the Open tab: "15 things · and 17 more in progress" (or "17 orders in progress" when nothing else needs you) — one line, not a second note. The rail's Orders badge counts the same soon orders.
+- Unchanged: the problem cases with rows of their own — not collected, not delivered and unpaid (R34), refunds that failed, renewals not paid.
+- Rules: `apps/api.saroh.in/src/modules/home/home-open-orders.ts` (`soonCutoff`, `readOpenOrders` → `count`, `later`), `home.service.ts` (`ordersInProgress`); `apps/app.saroh.in/lib/home/needs.ts` (`inProgressLabel`), `components/home/needs-you.tsx`. The demo kitchen keeps about twenty in progress with a few due by tomorrow (`packages/database/src/seed/showcase/achaar.ts`, `dueOrders` in `demo-shop.ts`).

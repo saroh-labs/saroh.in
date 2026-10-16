@@ -51,6 +51,21 @@ export function thingsLabel(n: number): string {
     return count(n, "thing");
 }
 
+/** Where "N more in progress" goes: the Orders list's Open tab. */
+export const IN_PROGRESS_HREF = "/commerce/orders?tab=open";
+
+/**
+ * The open orders Needs you leaves to Orders because they are due after
+ * tomorrow (DEC-163), said once beside the count: "and 31 more in progress"
+ * after a list, "31 orders in progress" when nothing else needs you, and
+ * nothing for none.
+ */
+export function inProgressLabel(n: number, needsTotal: number): string {
+    if (n <= 0) return "";
+    if (needsTotal > 0) return `and ${n} more in progress`;
+    return `${count(n, "order")} in progress`;
+}
+
 /** The rows to draw: the first twelve, or every one once asked for. */
 export function shownNeeds(
     needs: readonly HomeNeed[],

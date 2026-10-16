@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     NEEDS_SHOWN,
     formatList,
+    inProgressLabel,
     needLine,
     needTitle,
     needsState,
@@ -200,5 +201,20 @@ describe("nextLine", () => {
             "Enjoy the quiet.",
         );
         expect(nextLine([], NOW)).toBe("Enjoy the quiet.");
+    });
+});
+
+describe("inProgressLabel (DEC-163)", () => {
+    it("says how many more orders are in progress after a list", () => {
+        expect(inProgressLabel(31, 8)).toBe("and 31 more in progress");
+    });
+
+    it("names them as orders when nothing else needs you", () => {
+        expect(inProgressLabel(1, 0)).toBe("1 order in progress");
+        expect(inProgressLabel(12, 0)).toBe("12 orders in progress");
+    });
+
+    it("says nothing when every open order is on the list", () => {
+        expect(inProgressLabel(0, 5)).toBe("");
     });
 });
