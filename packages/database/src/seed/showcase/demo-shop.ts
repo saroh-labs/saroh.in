@@ -294,10 +294,6 @@ const digits = (rng: Rng, n: number) =>
 const later = (...dates: Date[]) =>
     new Date(Math.max(...dates.map((d) => d.getTime())));
 
-/** Kolkata day offset of an instant from `now`'s day. */
-const dayOf = (now: Date, at: Date) =>
-    Math.round((istAt(at, 0, 0).getTime() - istAt(now, 0, 0).getTime()) / DAY);
-
 /** Minute of the Kolkata day. */
 const minuteOfDay = (at: Date) => {
     const local = new Date(at.getTime() + 330 * 60_000);

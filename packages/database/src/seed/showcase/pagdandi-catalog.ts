@@ -1871,7 +1871,7 @@ const STATIONERY: DemoProduct[] = [
         tracked: true,
         stock: 0,
         lowStockAlert: 3,
-        images: [notebookPhotos[2] as DemoPhoto],
+        images: [notebookPhotos[2]],
         variants: [
             v("Ruled", "PGD-FNR-R", "199", 11),
             v("Plain", "PGD-FNR-P", "199", 7),

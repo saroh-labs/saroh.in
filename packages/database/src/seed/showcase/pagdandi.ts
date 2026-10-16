@@ -63,8 +63,10 @@ const topIds = (
 const section = (type: string, content: Record<string, unknown>) =>
     ({ type, content }) as unknown as SeedSection;
 const photoOf = (pred: (p: DemoProduct) => boolean) => {
-    const img = published(pred).sort((a, b) => b.demand - a.demand)[0]
-        ?.images[0];
+    const img = published(pred)
+        .sort((a, b) => b.demand - a.demand)
+        .at(0)
+        ?.images.at(0);
     if (!img) throw new Error("Pagdandi Books: no photo for the site");
     return { src: img.url, alt: img.alt, width: img.width, height: img.height };
 };

@@ -39,7 +39,7 @@ export const ACHAAR_ORG_ID = sid("org");
 
 const madeToOrder = (p: DemoProduct) => !p.tracked;
 const isHamper = (p: DemoProduct) =>
-    p.category === "hampers" || /hamper/.test(p.slug);
+    p.category === "hampers" || p.slug.includes("hamper");
 /** Pickles that need days in the sun before they are ready. */
 const sunPickle = (p: DemoProduct) => /chunda|bharwa|stuffed/.test(p.slug);
 
@@ -60,23 +60,25 @@ const section = (type: string, content: Record<string, unknown>) =>
 
 /** A product's cover photo, for the site's own pictures. */
 const coverOf = (pred: (p: DemoProduct) => boolean) => {
-    const p = bySlug(pred).sort((a, b) => b.demand - a.demand)[0];
-    const img = p?.images[0];
+    const p = bySlug(pred)
+        .sort((a, b) => b.demand - a.demand)
+        .at(0);
+    const img = p?.images.at(0);
     if (!img) throw new Error("Ammi's Achaar: no product photo for the site");
     return { src: img.url, alt: img.alt, width: img.width, height: img.height };
 };
 
 const diwaliHamper = () => {
     const p =
-        bySlug((x) => isHamper(x) && /diwali/.test(x.slug))[0] ??
-        bySlug(isHamper)[0];
+        bySlug((x) => isHamper(x) && x.slug.includes("diwali")).at(0) ??
+        bySlug(isHamper).at(0);
     if (!p) throw new Error("Ammi's Achaar has no hamper");
     return p;
 };
 const mangoJar = () => {
     const p = bySlug(
         (x) => /aam|mango/.test(x.slug) && madeToOrder(x) && !sunPickle(x),
-    )[0];
+    ).at(0);
     if (!p) throw new Error("Ammi's Achaar has no mango pickle");
     return p;
 };
@@ -127,7 +129,7 @@ const CONFIG: DemoShopConfig = {
     salesWindow: (p) => {
         if (p.seasonal === "winter") return null; // made from November
         if (p.seasonal === "festive" || isHamper(p)) {
-            return /eid/.test(p.slug) ? null : { from: 24, to: 0 };
+            return p.slug.includes("eid") ? null : { from: 24, to: 0 };
         }
         return { from: 999, to: 0 };
     },
