@@ -114,7 +114,7 @@ export function untrackedLine(places: readonly SoldOutPlace[]): string {
  * marked sold out, and what turning tracking back on does.
  */
 export const UNTRACKED_NOTE =
-    "Not tracked. This product has no count and sells unless you mark it sold out. Use it for things made to order. Turning tracking back on starts from a count of 0, so count it first.";
+    "Not tracked. This product has no count and sells unless you mark it sold out. Use it for things made to order. Turning tracking on starts from 0, so count it first.";
 
 /** The one-line note elsewhere (the variant drawer, the checklist). */
 export function untrackedShort(places: readonly SoldOutPlace[]): string {

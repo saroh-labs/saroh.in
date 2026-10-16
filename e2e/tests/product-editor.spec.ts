@@ -61,8 +61,14 @@ test.describe("product editor", () => {
             await expect(
                 page.getByText("Add a name and a price to create it."),
             ).toBeVisible();
+            // Never off for "not filled in yet": pressed, it marks what is
+            // missing and takes the keyboard to the name.
             const create = page.getByRole("button", { name: "Create draft" });
-            await expect(create).toBeDisabled();
+            await expect(create).toBeEnabled();
+            await create.click();
+            await expect(page.getByText("Add a name.")).toBeVisible();
+            await expect(page.getByText("Add a price.")).toBeVisible();
+            await expect(page.locator("#pe-name")).toBeFocused();
 
             // 2. Name, price, category. No MRP: the larger sizes sell above
             // 649, and a variant can't sell for more than the MRP.
@@ -337,13 +343,19 @@ test.describe("product editor", () => {
                 variants.getByRole("button", { name: "Add to list" }),
             ).toBeDisabled();
 
-            // 3. An address another product has: only the API knows, and
-            // the card says what it said.
+            // 3. A path another product has: only the API knows, and the
+            // card names who has it and offers a free one.
             const basics = page.getByRole("region", { name: "Basics" });
             await page.locator("#pe-slug").fill(takenSlug);
             await basics.getByRole("button", { name: "Save basics" }).click();
             await expect(
-                basics.getByText("That slug is already taken"),
+                basics.getByText(
+                    new RegExp(`^${taken} already uses this path\\. Try `),
+                ),
+            ).toBeVisible();
+            await expect(basics.getByText(/slug/i)).toHaveCount(0);
+            await expect(
+                basics.getByRole("button", { name: /^Use / }),
             ).toBeVisible();
             await expect(
                 page.getByText("That didn't go through. Try again."),

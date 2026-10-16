@@ -16,6 +16,7 @@ import type { ProductScope } from "./product-access";
 import { assertMrpAtOrAbovePrice, moneyToCents } from "./product-rules";
 import { ProductsService } from "./products.service";
 import { serializeVariant } from "./serialize";
+import { assertSkuFreeInBusiness } from "./sku-holder";
 import { lockProduct, lockProductStock } from "./stock-levels";
 import { assertVariantRoom, variantCap } from "./variant-cap";
 import type {
@@ -32,7 +33,8 @@ const SKU_TAKEN = {
 /**
  * Product variants (SKUs). Scoped to a product within a store; authorization
  * and product-existence are delegated to ProductsService. SKU is unique per
- * product (@@unique([productId, sku])).
+ * product (@@unique([productId, sku])) and, checked here, across the
+ * business's products (`sku-holder.ts`).
  *
  * Products v2 (#462): a variant can carry its value of the product's option,
  * one of the product's photos, its own MRP and a position. Once the product
@@ -107,6 +109,7 @@ export class VariantsService {
             productId,
             dto,
         );
+        await assertSkuFreeInBusiness(organizationId, productId, dto.sku);
 
         // The plan's cap on one product's variants (DEC-158); null caps
         // nothing, and nothing is counted then.
@@ -215,11 +218,19 @@ export class VariantsService {
     ) {
         const variant = await prisma.productVariant.findFirst({
             where: { id: variantId, productId },
-            select: { id: true, price: true, mrp: true },
+            select: { id: true, sku: true, price: true, mrp: true },
         });
         if (!variant) {
             throw new NotFoundException("Variant not found");
         }
+        // Only a changed SKU is judged: one saved before the rule keeps
+        // saving with the rest of its row.
+        if (dto.sku !== variant.sku)
+            await assertSkuFreeInBusiness(
+                scope.organizationId,
+                productId,
+                dto.sku,
+            );
         const product = await this.assertCoherent(
             scope.organizationId,
             productId,
