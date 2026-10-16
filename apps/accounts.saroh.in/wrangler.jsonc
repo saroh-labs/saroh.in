@@ -97,8 +97,8 @@
                 "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "PRELAUNCH_GATE": "on",
-                // 17 Oct 2026, 4:00 pm in India (10:30 UTC).
-                "LAUNCH_AT": "2026-10-17T16:00:00+05:30",
+                // 17 Oct 2026, 8:00 am in India (02:30 UTC).
+                "LAUNCH_AT": "2026-10-17T08:00:00+05:30",
                 "DEV_REDIRECT_ORIGIN": "https://www.saroh.in",
                 "DEV_REDIRECT_PATH": "/waitlist",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
