@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Every photo the Leela & Loom and Rye & Co. showcases seed must load (#471, #522).
+ * Every photo the showcase seeds must load: Leela & Loom's and Rye & Co.'s products
+ * (#471, #522), Pulse's counter and Rye's cakes, and the four journals.
  *
  * The boutique's photos are free-licence Unsplash images hot-linked by
  * address, because local storage does not persist uploads. A photo that stops
@@ -17,12 +18,20 @@ import { readFileSync } from "node:fs";
 const read = (file) =>
     readFileSync(new URL(`../packages/database/src/seed/showcase/${file}`, import.meta.url), "utf8");
 const boutique = read("boutique-catalog.ts");
-// Rye & Co.'s photos (#522) are written as unsplash("photo-…").
-const bakery = read("bakery-product-page.ts");
+// Rye & Co.'s photos (#522), and Pulse's counter and Rye's cakes, are
+// written as unsplash("photo-…").
+const unsplashed = ["bakery-product-page.ts", "catalog-photos.ts"].map(read).join("\n");
+// The journals' photos, cover and inline, are written as photo("photo-…", …).
+const journals = ["leela-posts.ts", "rye-posts.ts", "pulse-posts.ts", "carepoint-posts.ts"]
+    .map(read)
+    .join("\n");
 const urls = [
     ...new Set([
         ...[...boutique.matchAll(/"url":\s*"([^"]+)"|url:\s*"([^"]+)"/g)].map((m) => m[1] ?? m[2]),
-        ...[...bakery.matchAll(/unsplash\("([^"]+)"\)/g)].map(
+        ...[...unsplashed.matchAll(/unsplash\("([^"]+)"\)/g)].map(
+            (m) => `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
+        ),
+        ...[...journals.matchAll(/photo\(\s*"(photo-[^"]+)"/g)].map(
             (m) => `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
         ),
     ]),

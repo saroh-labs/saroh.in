@@ -103,8 +103,14 @@ pnpm --filter @saroh/database db:seed:reset      # removes both
 This runs the base seed first, then adds more to Northwind (about 50 products,
 500 customers, 500 orders, 120 contacts and 40 leads) and adds seven more
 businesses — Pulse, Prana, CarePoint, Lumen and Kavi Dental each with one
-published site at `<slug>.saroh.app.localhost`, Rye & Co. with its own, and
-the boutique without one:
+published site at `<slug>.saroh.app.localhost`, and Rye & Co. and the
+boutique with their own. Pulse, CarePoint, Rye & Co. and Leela & Loom each
+have a journal at `/blog` (24–30 posts in Help, News and Articles, photos
+inside the posts; `journal.ts`, `<business>-posts.ts`) linked from the menu,
+and Pulse, CarePoint and Leela & Loom 90 days of Insights traffic that
+counts their paid orders and enquiries and follows the festival calendar
+(`traffic.ts`; the product records no traffic source, so neither does the
+seed):
 
 - **Pulse Fitness** (a gym): personal training, assessments, classes and a
   free trial, about 490 bookings. Four people on the diary (`pulse.ts`): the
@@ -123,12 +129,33 @@ the boutique without one:
   classes" (₹999): about 30 sold, one about to run out, one run out unused. One
   open course, a few invoices written by hand, notes on three people. About
   770 invoices. `checkPulse` stops the run if any of these states is missing.
+  Commerce is on (the gym sells at its counter, `pulse-shop.ts`): a "Front
+  desk" storefront with 30 products — house-labelled supplements by flavour
+  or size (whey 1 kg and 2 kg, isolate, plant protein, creatine, pre-workout,
+  BCAA, electrolytes, protein bars single or by the box, peanut butter,
+  multivitamin, omega-3), gear (shakers and bottles by colour, gloves and
+  belts by size, wraps, bands, rope, roller, mat, towel, bag) and Pulse
+  T-shirts (S–XXL) and tanks (S–XL) in four and two colours — photographed,
+  with MRP and GST by HSN, counted per variant (two sold out, some low), and
+  about 140 counter orders a month for 90 days from about 100 members (by
+  their contact's email, so their page shows them), two open today holding
+  stock, one in a hundred returned. With Commerce on, a member's page reads
+  as a shop with a diary: Orders beside Bookings, "Subscriptions" rather
+  than "Membership". `checkPulseShop` checks it.
 - **Prana Yoga** (a studio): studio classes, and live online classes whose
   bookings carry a meeting link. Four courses — one running, one online
   starting soon, one finished, one draft — with 30 enrolments; three class
   packs (one retired) with 45 sold and the classes spent on real bookings.
-- **CarePoint Clinic**: doctors' appointments (one of them by video) and 260
-  patients, about 340 bookings. No Payments, so no billing.
+- **CarePoint Clinic** (5th Cross, Malleshwaram): doctors' appointments
+  (one of them by video) and 260 patients, about 620 bookings from 90 days
+  back to 3 weeks ahead. Payments is on with the stand-in Razorpay
+  (`carepoint-billing.ts`): a third of visits, and every teleconsultation,
+  paid online at booking (the booking's own invoice, marked paid); the rest
+  billed at the desk after the visit, mostly paid there by UPI, cash or card,
+  a few due or overdue — about 150 paid consultations a month, exempt, in
+  INV-0001…, each naming the patient's contact so their account on the site
+  shows their visits and bills (nothing medical is stored).
+  `checkCarePoint` checks it.
 - **Lumen Studio** (a design studio): 30 leads and 3 posts.
 - **Leela & Loom** (a beauty and dresses boutique, owned by `demo@saroh.dev`;
   #471): the store the products screens are filmed in. Thirty products —
@@ -138,8 +165,17 @@ the boutique without one:
   variant (one sold out, a few low, eight open orders holding stock), and 81
   verified-purchase reviews behind delivered orders — some replied to, one
   hidden. Its catalogue is fixed; its orders and reviews are rewritten each
-  run and checked (`checkBoutique`). Before filming, run
-  `node scripts/check-demo-images.mjs` to confirm every photo still loads.
+  run and checked (`checkBoutique`). Behind them, three months of trade
+  (`boutique-history.ts`): about 150 orders a month from about 100 paying
+  customers, delivered by courier with tracking or collected on Commercial
+  Street, a few cancelled and refunded, WELCOME100, MONSOON20 and GLOW15
+  redeemed in their windows, numbered LL-1001… in the order they were placed.
+  Its site, `leela-and-loom.saroh.app.localhost` (`boutique-site.ts`): home
+  (new in, testimonials, the journal), four collections, about and visit us,
+  the shop at `/shop` selling from its storefront (now a shop with an address,
+  hours, collection and ₹79 delivery free over ₹1,499; `SITE_SHOP` is on for
+  it). Before filming, run `node scripts/check-demo-images.mjs` to confirm
+  every photo still loads.
 - **Rye & Co.** (an artisan bakery on Hill Road, Bengaluru, owned by
   `demo@saroh.dev`; Nisha Kulkarni works the counter as a Member; `bakery.ts`):
   the business the invoices, orders, subscriptions and customer screens are
@@ -177,8 +213,16 @@ the boutique without one:
   multigrain loaf (untracked) is marked Sold out by hand at Hill Road. Four
   collections: Bread (automatic, from Breads), Weekend bakes, Gifts and New
   this week. The stock log and resolved checks are rewritten whole each run,
-  so a take is undone by re-seeding. `checkRye` stops the run if any of these
-  states is missing.
+  so a take is undone by re-seeding. Custom cakes (`bakery-cakes.ts`):
+  eight cakes made after the order with 48 hours' notice — chocolate truffle,
+  red velvet, black forest, rasmalai (always eggless), lemon & blueberry,
+  coffee walnut, vanilla & seasonal fruit and a theme cake — by size with an
+  eggless twin where the recipe allows, never counted, and candles, number
+  candles, a topper and a message plaque; five cake orders placed this
+  morning for delivery two to five days out, paid, the day, theme and message
+  in the order's note (an order has no due date). They take order numbers in
+  the order placed; the films' orders keep their ids. `checkRye` stops the
+  run if any of these states is missing.
 
 - **Kavi Dental** (a dental clinic on 12th Main, Indiranagar, owned by
   `demo@saroh.dev`; Divya Kamath works the desk as a Member; `clinic.ts`,

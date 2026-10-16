@@ -14,6 +14,9 @@ const SITE: SeedSite = {
     subdomain: "rye-and-co",
     published: true,
     createdDaysAgo: 120,
+    // Its journal (`rye-posts.ts`) in the menu.
+    navigationExtra: [{ label: "Journal", href: "/blog" }],
+    revision: "journal",
     pages: [
         {
             path: "/",

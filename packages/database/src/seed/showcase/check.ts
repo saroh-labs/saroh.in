@@ -967,6 +967,24 @@ export async function checkRye(
         "exactly one possible match": counts.possibleMatches === 1,
         "an order today whose line holds an allergen on the customer's Needs attention":
             counts.allergyOrders >= 1,
+        // The custom cakes (bakery-cakes.ts): made to order, never counted.
+        "eight custom cakes, made to order and not counted": await has(
+            prisma.$queryRaw<Row[]>`
+                SELECT CASE WHEN COUNT(*) >= 8 THEN 1 ELSE 0 END AS n
+                FROM "Product" p JOIN "Category" c ON c.id = p."categoryId"
+                WHERE p."organizationId" = ${orgId} AND c.slug = 'cakes'
+                  AND NOT p."stockTracked" AND p.image IS NOT NULL`,
+        ),
+        "custom-cake orders to come, paid, with the day and words in a note":
+            await has(prisma.$queryRaw<Row[]>`
+                SELECT CASE WHEN COUNT(*) >= 4 THEN 1 ELSE 0 END AS n
+                FROM "Order" WHERE "organizationId" = ${orgId}
+                  AND id LIKE 'seed_sc_rc_order_cake%' AND stage IN ('NEW', 'PREPARING')
+                  AND "paymentStatus" = 'PAID' AND notes IS NOT NULL`),
+        "a journal of 24 or more posts": await has(prisma.$queryRaw<Row[]>`
+            SELECT CASE WHEN COUNT(*) >= 24 THEN 1 ELSE 0 END AS n
+            FROM "Post" p JOIN "Site" s ON s.id = p."siteId"
+            WHERE s."organizationId" = ${orgId} AND p."currentPublicationId" IS NOT NULL`),
     }).flatMap(([what, ok]) => (ok ? [] : [what]));
     if (missing.length > 0) failures.push(`missing: ${missing.join("; ")}`);
     // The stock films' shelves, log, checks and collections (#526).

@@ -148,10 +148,19 @@ test.describe("customer detail", () => {
     test("a gym member: classes left and what is booked", async ({ page }) => {
         await signIn(page, PULSE);
         await page.goto(`/customers/${await memberWithClassesToCome(page)}`);
-        await expect(page.getByText("Member", { exact: true })).toBeVisible();
-        for (const name of [/^Bookings/, /^Membership/, /^Invoices/])
+        // Pulse also sells at its front desk (Commerce on, the showcase's
+        // gym story), so the page reads as a shop with a diary: Orders
+        // beside Bookings, memberships under Subscriptions, and the tag by
+        // the name counts orders rather than saying Member (`kindOf`,
+        // `tagFor` in lib/customer-workspace/view.ts).
+        for (const name of [
+            /^Orders/,
+            /^Bookings/,
+            /^Subscriptions/,
+            /^Invoices/,
+        ])
             await expect(tab(page, name)).toBeVisible();
-        await expect(tab(page, /^Orders/)).toHaveCount(0);
+        await expect(tab(page, /^Membership/)).toHaveCount(0);
         const classes = page.getByRole("region", { name: "Classes left" });
         await expect(classes).toContainText(/membership/i);
         await expect(

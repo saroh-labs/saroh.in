@@ -12,8 +12,16 @@ import {
     BOUTIQUE_OPTIONS,
     BOUTIQUE_PRODUCTS,
 } from "./boutique-catalog";
+import type { Redemption } from "./boutique-history";
+import { addressFor, planBoutiqueHistory, rupeesOf } from "./boutique-history";
+import { writeLeelaSite } from "./boutique-site";
 import type { ModuleKey } from "./data";
-import { SHOWCASE_KEY, TIMEZONE } from "./data";
+import { CITIES, SHOWCASE_KEY, SHOWCASE_SEED, TIMEZONE } from "./data";
+import { seedJournal } from "./journal";
+import { LEELA_POSTS } from "./leela-posts";
+import { hashKey } from "./people";
+import { createRng } from "./random";
+import { writeTraffic } from "./traffic";
 
 /**
  * Leela & Loom (#471): the boutique the products screens are filmed in.
@@ -316,11 +324,54 @@ export async function seedBoutique(
         });
     }
 
-    // --- customers, orders, invitations and reviews
-    await writeOrdersAndReviews(prisma, { storeId, orgId, now, placed });
+    // --- customers, orders, invitations and reviews, and three months of
+    // trade behind them
+    const redemptions = await writeOrdersAndReviews(prisma, {
+        storeId,
+        orgId,
+        now,
+        placed,
+    });
 
     // --- discount codes: one on a category, one on everything, one ended
     await writeDiscounts(prisma, { storeId, orgId, now, categoryId });
+    await writeRedemptions(prisma, { orgId, redemptions });
+
+    // --- its website, with the shop, the journal and the traffic it gets
+    const siteId = await writeLeelaSite(prisma, {
+        orgId,
+        storeId,
+        userId: demoUserId,
+        now,
+        productId: (slug) => placed[slug].productId,
+    });
+    await seedJournal(prisma, {
+        siteId,
+        orgId,
+        authorId: demoUserId,
+        now,
+        posts: LEELA_POSTS,
+        id: (...parts) => sid(...parts),
+    });
+    await writeTraffic(prisma, {
+        orgId,
+        now,
+        kind: "boutique",
+        paths: [
+            { path: "/", weight: 0.3 },
+            { path: "/shop", weight: 0.32 },
+            { path: "/collections", weight: 0.12 },
+            { path: "/blog", weight: 0.14 },
+            { path: "/about", weight: 0.05 },
+            { path: "/visit", weight: 0.07 },
+        ],
+        trendBase: 300,
+        trendSlope: 0.9,
+        weekendFactor: 1.15,
+        idFor: (iso, k) => sid("agg", iso, k),
+        idPrefix: sid("agg", ""),
+        noiseOffset: hashKey(KEY) % 1000,
+    });
 
     // --- custom fields (#482): two on the shop, one for the team
     await writeFields(prisma, { orgId, categoryId, placed });
@@ -543,6 +594,25 @@ async function writeOrdersAndReviews(
             updatedAt: at(now, -100 + (n % 60), 12),
         });
     };
+    const addressRng = createRng(
+        (SHOWCASE_SEED ^ hashKey(KEY, "addresses")) >>> 0,
+    );
+    /** A delivered order's address and courier, in its customer's city. */
+    const deliveredTo = (customerId: string) => {
+        const c = customerRows.find((x) => x.id === customerId);
+        const city =
+            CITIES.find((x) => x.city === c?.city) ??
+            ({
+                city: c?.city ?? "Bengaluru",
+                state: "Karnataka",
+                zip: "560001",
+            } as const);
+        return addressFor(
+            addressRng,
+            { first: c?.firstName ?? "", last: c?.lastName ?? "" },
+            city,
+        );
+    };
 
     for (const p of BOUTIQUE_PRODUCTS)
         for (const r of p.reviews) addCustomer(r.displayName);
@@ -589,6 +659,11 @@ async function writeOrdersAndReviews(
                 currency: "INR",
                 status: "DELIVERED",
                 paymentStatus: "PAID",
+                stage: "DELIVERED",
+                fulfilment: "SHIPPING",
+                ...deliveredTo(customerId),
+                placedOnline: true,
+                paidAt: new Date(placedAt.getTime() + 60_000),
                 createdAt: placedAt,
                 updatedAt: at(now, -(r.daysAgo + 2), 16),
             });
@@ -678,6 +753,13 @@ async function writeOrdersAndReviews(
             currency: "INR",
             status: open % 3 === 0 ? "PROCESSING" : "PENDING",
             paymentStatus: "PAID",
+            stage: open % 3 === 0 ? "PREPARING" : "NEW",
+            fulfilment: "SHIPPING",
+            ...deliveredTo(
+                customerFor(openWho[open % openWho.length] ?? "Ananya R."),
+            ),
+            placedOnline: true,
+            paidAt: at(now, -(open % 3), 10 + open),
             createdAt: at(now, -(open % 3), 10 + open),
             updatedAt: at(now, -(open % 3), 10 + open),
         });
@@ -700,6 +782,34 @@ async function writeOrdersAndReviews(
         open += 1;
     }
 
+    // Three months of trade, from the same customers and new ones.
+    const history = planBoutiqueHistory({
+        now,
+        storeId,
+        orgId,
+        placed,
+        known: customerRows.map((c) => ({
+            id: c.id ?? "",
+            firstName: c.firstName ?? "",
+            lastName: c.lastName ?? "",
+            email: c.email,
+            city: c.city ?? "Bengaluru",
+        })),
+    });
+    await prisma.customer.createMany({ data: history.customers });
+    orders.push(...history.orders);
+    items.push(...history.items);
+    // One series, numbered in the order they were placed.
+    orders.sort(
+        (x, y) =>
+            new Date(x.createdAt ?? 0).getTime() -
+                new Date(y.createdAt ?? 0).getTime() ||
+            String(x.id).localeCompare(String(y.id)),
+    );
+    orders.forEach((o, k) => {
+        o.orderId = `LL-${1001 + k}`;
+    });
+
     await prisma.order.createMany({ data: orders });
     await prisma.orderItem.createMany({ data: items });
     await prisma.reviewInvitation.createMany({ data: invitations });
@@ -711,6 +821,46 @@ async function writeOrdersAndReviews(
             data: { promised: qty },
         });
     }
+    return history.redemptions;
+}
+
+/** The codes those orders used, as checkout records a redemption. */
+async function writeRedemptions(
+    prisma: Db,
+    a: { orgId: string; redemptions: readonly Redemption[] },
+) {
+    const rule = {
+        welcome100: {
+            code: "WELCOME100",
+            kind: "FIXED_AMOUNT",
+            percentBps: null,
+            ruleAmount: "100",
+        },
+        monsoon20: {
+            code: "MONSOON20",
+            kind: "PERCENTAGE",
+            percentBps: 2000,
+            ruleAmount: null,
+        },
+        glow15: {
+            code: "GLOW15",
+            kind: "PERCENTAGE",
+            percentBps: 1500,
+            ruleAmount: null,
+        },
+    } as const;
+    await prisma.discountRedemption.createMany({
+        data: a.redemptions.map((r) => ({
+            id: sid("redemption", r.orderId.slice(sid("").length)),
+            organizationId: a.orgId,
+            discountId: sid("discount", r.discountKey),
+            orderId: r.orderId,
+            amount: rupeesOf(r.amountPaise),
+            currency: "INR",
+            ...rule[r.discountKey],
+            createdAt: r.createdAt,
+        })),
+    });
 }
 
 /**
@@ -892,6 +1042,7 @@ async function writeFields(
 /** This business's volume, children first. Its catalogue stays. */
 async function clearVolume(prisma: Db) {
     const where = { id: { startsWith: sid("") } };
+    await prisma.discountRedemption.deleteMany({ where });
     await prisma.productReview.deleteMany({ where });
     await prisma.reviewInvitation.deleteMany({ where });
     await prisma.orderItem.deleteMany({ where });
@@ -989,6 +1140,41 @@ export async function checkBoutique(prisma: Db): Promise<void> {
               AND NOT EXISTS (SELECT 1 FROM "Contact" k WHERE k."organizationId" = ${orgId}
                               AND lower(k.email) = lower(c.email))`,
     );
+    // Three months of trade (boutique-history.ts), its site and journal.
+    const trade = await prisma.$queryRaw<
+        { month: bigint; payers: bigint; numbered: bigint; total: bigint }[]
+    >`
+        SELECT COUNT(*) FILTER (WHERE "createdAt" >= now() - interval '30 days' AND "paymentStatus" = 'PAID') AS month,
+               COUNT(DISTINCT "customerId") FILTER (WHERE "paymentStatus" = 'PAID') AS payers,
+               COUNT(DISTINCT "orderId") AS numbered, COUNT(*) AS total
+        FROM "Order" WHERE "organizationId" = ${orgId}`;
+    const tr = trade.at(0);
+    if (
+        !tr ||
+        Number(tr.month) < 110 ||
+        Number(tr.payers) < 90 ||
+        Number(tr.numbered) !== Number(tr.total)
+    ) {
+        failures.push(
+            `about 150 orders a month from about 100 paying customers, each numbered once: ${json(tr)}`,
+        );
+    }
+    const site = await prisma.site.findFirst({
+        where: { organizationId: orgId, currentPublicationId: { not: null } },
+        select: {
+            storefrontId: true,
+            _count: {
+                select: {
+                    posts: { where: { currentPublicationId: { not: null } } },
+                },
+            },
+        },
+    });
+    if (site?.storefrontId !== BOUTIQUE.storeId || site._count.posts < 24) {
+        failures.push(
+            `a published site selling from the boutique, with 24 or more posts: ${json(site)}`,
+        );
+    }
     if (failures.length > 0) {
         throw new Error(
             `Leela & Loom failed its checks:\n- ${failures.join("\n- ")}`,
