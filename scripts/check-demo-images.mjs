@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Every photo the Leela & Loom and Rye & Co. showcases seed must load (#471, #522).
+ * Every photo the Leela & Loom, Rye & Co., Frame & Vow and Pixel & Chai showcases seed must load (#471, #522).
  *
  * The boutique's photos are free-licence Unsplash images hot-linked by
  * address, because local storage does not persist uploads. A photo that stops
@@ -15,15 +15,34 @@
 import { readFileSync } from "node:fs";
 
 const read = (file) =>
-    readFileSync(new URL(`../packages/database/src/seed/showcase/${file}`, import.meta.url), "utf8");
+    readFileSync(
+        new URL(
+            `../packages/database/src/seed/showcase/${file}`,
+            import.meta.url,
+        ),
+        "utf8",
+    );
 const boutique = read("boutique-catalog.ts");
 // Rye & Co.'s photos (#522) are written as unsplash("photo-…").
 const bakery = read("bakery-product-page.ts");
+// Frame & Vow's and Pixel & Chai's photos are tables of Unsplash ids in their
+// writing; their sites and catalogues pick from the same tables
+// (`studio-photos.ts`). Their drawn pictures are data URIs and need no network.
+const studios = ["frame-vow-posts.ts", "pixel-chai-posts.ts"]
+    .map(read)
+    .join("\n");
 const urls = [
     ...new Set([
-        ...[...boutique.matchAll(/"url":\s*"([^"]+)"|url:\s*"([^"]+)"/g)].map((m) => m[1] ?? m[2]),
+        ...[...studios.matchAll(/"(photo-\d+-[0-9a-f]+)"/g)].map(
+            (m) =>
+                `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
+        ),
+        ...[...boutique.matchAll(/"url":\s*"([^"]+)"|url:\s*"([^"]+)"/g)].map(
+            (m) => m[1] ?? m[2],
+        ),
         ...[...bakery.matchAll(/unsplash\("([^"]+)"\)/g)].map(
-            (m) => `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
+            (m) =>
+                `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
         ),
     ]),
 ];
@@ -47,5 +66,7 @@ async function worker() {
     }
 }
 await Promise.all(Array.from({ length: 8 }, worker));
-console.log(`check-demo-images: ${urls.length - failed} of ${urls.length} photos load.`);
+console.log(
+    `check-demo-images: ${urls.length - failed} of ${urls.length} photos load.`,
+);
 process.exit(failed > 0 ? 1 : 0);
