@@ -3,6 +3,12 @@
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Sheet,
@@ -11,7 +17,15 @@ import {
     SheetDescription,
     SheetTitle,
 } from "@saroh/ui/sheet";
-import { ArrowRight, ChevronDown, ChevronUp, X } from "lucide-react";
+import {
+    Archive,
+    ArrowRight,
+    Check,
+    ChevronDown,
+    ChevronUp,
+    MoreHorizontal,
+    X,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -199,33 +213,31 @@ export function QuickLook({
                                 </Line>
                             </dl>
                         </div>
-                        <div className="flex flex-col gap-3 border-t border-muted px-[18px] py-3.5">
-                            {/* The two ways onward share one row; Edit, the
-                                usual next step, is the strong one. */}
-                            <div className="flex gap-[9px]">
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="flex-1"
-                                >
-                                    <Link href={pageHref}>
-                                        Open product page
+                        {/* One row: the way to the page, Edit as the strong
+                            next step, and selling on or off in the menu. */}
+                        <div className="flex items-center gap-2 border-t border-muted px-[18px] py-3.5">
+                            <Button
+                                asChild
+                                variant="outline"
+                                className={
+                                    canWrite || canStock ? undefined : "flex-1"
+                                }
+                            >
+                                <Link href={pageHref}>Open product page</Link>
+                            </Button>
+                            {canWrite || canStock ? (
+                                <Button asChild className="flex-1">
+                                    <Link href={editHref}>
+                                        Edit
+                                        <ArrowRight className="ml-1.5 size-3.5" />
                                     </Link>
                                 </Button>
-                                {canWrite || canStock ? (
-                                    <Button asChild className="flex-1">
-                                        <Link href={editHref}>
-                                            Edit
-                                            <ArrowRight className="ml-1.5 size-3.5" />
-                                        </Link>
-                                    </Button>
-                                ) : null}
-                            </div>
+                            ) : null}
                             {canWrite &&
                             // Paused (#800): only taking it off sale is
                             // open, as in the Editor; never Publish.
                             (!row.paused || row.status === "PUBLISHED") ? (
-                                <SellToggle row={row} onStatus={onStatus} />
+                                <SellMenu row={row} onStatus={onStatus} />
                             ) : null}
                         </div>
                     </>
@@ -235,8 +247,12 @@ export function QuickLook({
     );
 }
 
-/** Stop selling (archive) · Sell again (publish) · Publish a draft. */
-function SellToggle({
+/**
+ * Stop selling (archive) · Sell again (publish) · Publish a draft, in the
+ * footer's menu. Each says what it does in one true line: archiving deletes
+ * nothing and the toast offers Undo.
+ */
+function SellMenu({
     row,
     onStatus,
 }: {
@@ -249,31 +265,36 @@ function SellToggle({
         : row.status === "ARCHIVED"
           ? "Sell again"
           : "Publish";
-    // What the click does, in one true line: archiving deletes nothing and
-    // the toast offers Undo, so the stop is safe to try.
     const what = selling
         ? "Takes it off your shop. Nothing is deleted."
         : "Puts it on your shop for customers.";
     return (
-        <div className="flex items-center gap-3">
-            <Button
-                variant="ghost"
-                className={cn(
-                    "-ml-3 shrink-0",
-                    selling
-                        ? "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
-                        : "text-foreground",
-                )}
-                onClick={() =>
-                    onStatus(row, selling ? "ARCHIVED" : "PUBLISHED")
-                }
-            >
-                {label}
-            </Button>
-            <span className="min-w-0 text-pretty text-[12px] leading-[1.4] text-muted-foreground">
-                {what}
-            </span>
-        </div>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <IconButton
+                    label="More actions"
+                    icon={<MoreHorizontal />}
+                    variant="outline"
+                    size="md"
+                />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="w-64">
+                <DropdownMenuItem
+                    className="items-start"
+                    onSelect={() =>
+                        onStatus(row, selling ? "ARCHIVED" : "PUBLISHED")
+                    }
+                >
+                    {selling ? <Archive /> : <Check />}
+                    <span className="flex flex-col gap-0.5">
+                        <span>{label}</span>
+                        <span className="text-pretty text-[12px] leading-[1.4] text-muted-foreground">
+                            {what}
+                        </span>
+                    </span>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 

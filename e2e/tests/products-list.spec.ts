@@ -74,7 +74,9 @@ test.describe("Products list", () => {
             await expect(look.getByText("1 of 1")).toBeVisible();
 
             // Stop selling archives it, and Undo puts it back on sale.
-            await look.getByRole("button", { name: "Stop selling" }).click();
+            // It sits in the footer's menu, beside Edit.
+            await look.getByRole("button", { name: "More actions" }).click();
+            await page.getByRole("menuitem", { name: /Stop selling/ }).click();
             await expect(page.getByText(/Stopped selling/)).toBeVisible();
             await expect(look.getByText("Archived")).toBeVisible();
             await page.getByRole("button", { name: "Undo" }).click();
