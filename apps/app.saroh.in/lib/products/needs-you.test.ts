@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { needsShown, needsSummary, needWords } from "./needs-you";
+import { needsShown, needsSummary, needWords, optionWord } from "./needs-you";
 import type { CatalogueNeed } from "./service";
 
 const need = (
@@ -19,11 +19,11 @@ const need = (
 describe("Needs you (#519)", () => {
     it("says the design's notes", () => {
         expect(needWords(need("Rye", "out"))).toMatchObject({
-            what: "out of stock, customers can't buy it",
+            what: "Out of stock",
             tone: "danger",
         });
         expect(needWords(need("Jam", "low", { canSell: 3 }))).toMatchObject({
-            what: "only 3 left",
+            what: "Only 3 left",
             tone: "warn",
         });
     });
@@ -31,12 +31,12 @@ describe("Needs you (#519)", () => {
     it("names the shelves when only some need someone", () => {
         expect(
             needWords(need("Loaf", "out", { where: ["Small at Online"] })),
-        ).toMatchObject({ what: "out of stock (Small at Online)" });
+        ).toMatchObject({ what: "Out: Small at Online" });
         expect(
             needWords(need("Jam", "low", { canSell: 2, where: ["Online"] })),
-        ).toMatchObject({ what: "only 2 left (Online)", tone: "warn" });
+        ).toMatchObject({ what: "Low: Online (2 left)", tone: "warn" });
         expect(needWords(need("Rye", "out", { where: null }))).toMatchObject({
-            what: "out of stock, customers can't buy it",
+            what: "Out of stock",
         });
     });
 
@@ -54,17 +54,26 @@ describe("Needs you (#519)", () => {
                 need("b", "out"),
                 need("c", "low", { canSell: 2 }),
             ]),
-        ).toBe("2 out of stock · 1 running low");
+        ).toBe("2 out · 1 low");
         expect(needsSummary([need("a", "short", { short: 1 })])).toBe(
-            "1 short for orders",
+            "1 short",
         );
         expect(needsSummary([])).toBe("");
     });
 
-    it("shows five and leaves the rest to Show only these", () => {
+    it("folds to the worst two, and opens to every one", () => {
         const many = Array.from({ length: 8 }, (_, i) => need(`p${i}`, "out"));
-        const { lines, more } = needsShown(many);
-        expect(lines).toHaveLength(5);
-        expect(more).toBe(3);
+        expect(needsShown(many, false).map((l) => l.name)).toEqual([
+            "p0",
+            "p1",
+        ]);
+        expect(needsShown(many, true)).toHaveLength(8);
+    });
+
+    it("says the option's own word", () => {
+        expect(optionWord("Shade", 1)).toBe("shade");
+        expect(optionWord("Shade", 3)).toBe("shades");
+        expect(optionWord("Box", 2)).toBe("boxes");
+        expect(optionWord(null, 2)).toBe("variants");
     });
 });

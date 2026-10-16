@@ -494,3 +494,47 @@ describe("DataView — pages", () => {
         );
     });
 });
+
+describe("DataView — selection names and the bulk bar", () => {
+    beforeEach(() => window.localStorage.clear());
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("names each checkbox by its row, and words the bar for what is selected", () => {
+        setWidth(true);
+        const run = vi.fn();
+        render(
+            <DataView
+                viewId="bulk-words"
+                rows={rows}
+                columns={columns}
+                rowKey={(r) => r.id}
+                noun={{ one: "customer", other: "customers" }}
+                selectable
+                rowLabel={(r) => r.name}
+                bulkActions={[
+                    {
+                        id: "hide",
+                        label: "Never shown",
+                        hidden: () => true,
+                        run,
+                    },
+                    {
+                        id: "remove",
+                        label: (sel) => `Remove ${sel.length}`,
+                        tone: "destructive-outline",
+                        run,
+                    },
+                ]}
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole("checkbox", { name: "Select Asha Rao" }),
+        );
+        expect(
+            screen.getByRole("button", { name: "Remove 1" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "Never shown" }),
+        ).toBeNull();
+    });
+});

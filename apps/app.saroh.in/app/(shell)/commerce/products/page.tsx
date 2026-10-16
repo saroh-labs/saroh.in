@@ -35,6 +35,7 @@ import { listCataloguePage, listCategories } from "@/lib/products/service";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getStockTracking } from "@/lib/stock/service";
+import { readSiteSelling } from "@/lib/stores/location-selling";
 import { listBusinessStores } from "@/lib/stores/service";
 import { listStorefronts } from "@/lib/stores/storefronts";
 import { isSince, sinceParam } from "@/lib/views/since";
@@ -100,28 +101,37 @@ export default async function CataloguePage({
         query.storefront = null;
     }
 
-    const [page, reviews, tracking, categories, collections, access, paused] =
-        await Promise.all([
-            stores.length > 0
-                ? listCataloguePage(
-                      // The Reviews view still counts the chips: one row will do.
-                      onReviews ? { limit: 1 } : catalogueFilter(query),
-                  ).then((p) => p ?? NO_PAGE)
-                : NO_PAGE,
-            canReadReviews
-                ? listReviews().catch(() => null)
-                : Promise.resolve([]),
-            getStockTracking().catch(() => null),
-            // The Filter's choices and the Collections chip's cards (#524).
-            // Either failing leaves its part out, said, never the list.
-            listCategories().catch(() => null),
-            listCollections().catch(() => null),
-            // The plan's product limit, shown before the work (UX-036);
-            // unread, nothing is shown and the API still refuses.
-            billingAccessOrNull(),
-            // What a lower plan paused (#800): the rows' tags and why.
-            pausedOrNull(),
-        ]);
+    const [
+        page,
+        reviews,
+        tracking,
+        categories,
+        collections,
+        access,
+        paused,
+        selling,
+    ] = await Promise.all([
+        stores.length > 0
+            ? listCataloguePage(
+                  // The Reviews view still counts the chips: one row will do.
+                  onReviews ? { limit: 1 } : catalogueFilter(query),
+              ).then((p) => p ?? NO_PAGE)
+            : NO_PAGE,
+        canReadReviews ? listReviews().catch(() => null) : Promise.resolve([]),
+        getStockTracking().catch(() => null),
+        // The Filter's choices and the Collections chip's cards (#524).
+        // Either failing leaves its part out, said, never the list.
+        listCategories().catch(() => null),
+        listCollections().catch(() => null),
+        // The plan's product limit, shown before the work (UX-036);
+        // unread, nothing is shown and the API still refuses.
+        billingAccessOrNull(),
+        // What a lower plan paused (#800): the rows' tags and why.
+        pausedOrNull(),
+        // Whether the online shop is live: Archive's line says "your
+        // website" only then. Unread, it claims neither.
+        readSiteSelling(),
+    ]);
     // A page past the end (the list has since got shorter, or the address
     // was typed): start again at the first page rather than show an empty
     // one.
@@ -255,6 +265,13 @@ export default async function CataloguePage({
                     rowNotice(access, "products").on || pausedCut !== null
                 }
                 pausedCut={pausedCut}
+                sellsOnline={
+                    selling.known
+                        ? Boolean(
+                              selling.site?.sellsFrom && selling.site.origin,
+                          )
+                        : null
+                }
                 canStock={canStockProducts(organization)}
                 collectionCount={collections ? collections.length : null}
                 collectionsPanel={
