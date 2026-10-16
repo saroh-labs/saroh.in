@@ -1845,7 +1845,7 @@ export async function writeTraffic(
         paidOrders: byDay(paid),
         enquiries: byDay(entries),
         noiseOffset: hashKey(b.sid("")) % 1000,
-        dayFactor: (i) => o.dayWeight(i - (o.days - 1)),
+        dayBoost: (i) => o.dayWeight(i - (o.days - 1)),
     });
     await createInChunks(rows, (data) =>
         prisma.analyticsDailyAggregate.createMany({

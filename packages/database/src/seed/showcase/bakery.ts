@@ -36,11 +36,14 @@ import {
     writeVariantsAndListings,
 } from "./bakery-stock";
 import { SHOWCASE_SEED, TIMEZONE } from "./data";
+import { seedJournal } from "./journal";
 import { addMinutes, earliest, hashKey, istAt, istWeekday } from "./people";
+
 import type { Period } from "./periods";
 import { boundary, periodLabel } from "./periods";
 import type { Rng } from "./random";
 import { createRng } from "./random";
+import { RYE_POSTS } from "./rye-posts";
 
 /**
  * Rye & Co. (U9, ADR-008): the GST bakery the invoices, orders, subscriptions
@@ -804,7 +807,20 @@ export async function seedBakery(
         at: todayClock(now)(10 * 60 + 15),
         by: ctx.counterUserId,
     });
-    await writeRyeSite(prisma, { orgId, userId: demoUserId, now });
+    const siteId = await writeRyeSite(prisma, {
+        orgId,
+        userId: demoUserId,
+        now,
+    });
+    // Its journal: cakes, the subscription, and how the bakery bakes.
+    await seedJournal(prisma, {
+        siteId,
+        orgId,
+        authorId: demoUserId,
+        now,
+        posts: RYE_POSTS,
+        id: (...parts) => sid(...parts),
+    });
 
     return { id: orgId, name: NAME, prefix: RYE.prefix };
 }
@@ -999,6 +1015,11 @@ interface OrderLine {
 }
 
 interface OrderPlan {
+    /**
+     * Its rows' key when not its place in the list (the custom-cake orders):
+     * the films' orders keep the ids they had before cakes were sold.
+     */
+    key?: string;
     shopper: number;
     placedAt: Date;
     /** The storefront it was placed at; default Hill Road. */
@@ -1540,11 +1561,116 @@ function planOrders(input: PlanInput): OrderPlan[] {
         }
     }
 
+    orders.push(...planCakeOrders(input, t));
+
     return orders.sort(
         (a, b) =>
             a.placedAt.getTime() - b.placedAt.getTime() ||
             a.shopper - b.shopper,
     );
+}
+
+/** "Sat 18 Oct", a day `days` from today, on the Kolkata calendar. */
+function dayLabel(now: Date, days: number): string {
+    return new Intl.DateTimeFormat("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        timeZone: TIMEZONE,
+    })
+        .format(istAt(now, days, 12 * 60))
+        .replace(",", "");
+}
+
+/**
+ * The custom cakes on order (the owner's birthday story): placed this
+ * morning, paid online, for delivery in Bengaluru two to five days out —
+ * the day, the theme and the words on the cake in the order's note, since
+ * an order has no due date of its own. Delivered by the bakery's rider, so
+ * none reads as late before it is due a day's wait (`LOCAL_DELIVERY`).
+ * Keyed `cake-<n>`, so the films' orders keep their ids.
+ */
+function planCakeOrders(
+    input: PlanInput,
+    t: (minute: number) => Date,
+): OrderPlan[] {
+    const { now, counterUserId: nisha } = input;
+    const line = (slug: string, value: string, qty = 1): OrderLine => {
+        const product = P[slug];
+        const variant = (PRODUCTS[product].variants ?? []).findIndex(
+            (v) => v.value === value,
+        );
+        return variant >= 0 ? { product, variant, qty } : { product, qty };
+    };
+    const plan = (
+        key: string,
+        shopper: number,
+        minute: number,
+        lines: OrderLine[],
+        notes: string,
+        preparingAt?: number,
+    ): OrderPlan => ({
+        key,
+        shopper,
+        placedAt: t(minute),
+        fulfilment: "LOCAL_DELIVERY",
+        lines,
+        pay: "ONLINE",
+        notes,
+        moves:
+            preparingAt === undefined
+                ? []
+                : [{ to: "PREPARING", at: t(preparingAt), by: nisha }],
+    });
+    return [
+        plan(
+            "cake_0",
+            SHOPPER.kavya,
+            6 * 60 + 40,
+            [
+                line("theme-cake", "1.5 kg, eggless"),
+                line("number-candle", "7"),
+                line("cake-topper", "Gold"),
+            ],
+            `For ${dayLabel(now, 3)}, 4–6pm. Theme: a jungle safari — a lion, a giraffe and palm trees in fondant. Chocolate truffle inside. Message: "Happy 7th, Aarav!" (reference photo sent on WhatsApp)`,
+        ),
+        plan(
+            "cake_1",
+            SHOPPER.meera,
+            7 * 60 + 25,
+            [line("red-velvet-cake", "1 kg"), line("birthday-candles", "")],
+            `Anniversary cake for ${dayLabel(now, 2)} evening, after 7pm. Message: "25 years, Amma & Appa". White and gold piping, no fondant please.`,
+            10 * 60 + 30,
+        ),
+        plan(
+            "cake_2",
+            SHOPPER.arjun,
+            8 * 60 + 5,
+            [
+                line("rasmalai-cake", "2 kg, eggless"),
+                line("message-plaque", ""),
+            ],
+            `Diwali office party, ${dayLabel(now, 4)} — deliver to Prestige Tech Park, Tower B reception, by 3pm. Plaque: "Shubh Deepavali". Pure veg, eggless.`,
+        ),
+        plan(
+            "cake_3",
+            SHOPPER.tara,
+            9 * 60 + 30,
+            [
+                line("chocolate-truffle-cake", "1 kg"),
+                line("number-candle", "3"),
+                line("number-candle", "0"),
+            ],
+            `Surprise for my husband's 30th on ${dayLabel(now, 2)}. Deliver 11pm–midnight if you can, else 9pm. Message: "Thirty, flirty & thriving, Rahul". Please don't call him — call me.`,
+        ),
+        plan(
+            "cake_4",
+            SHOPPER.vikram,
+            10 * 60 + 15,
+            [line("lemon-blueberry-cake", "500 g")],
+            `For ${dayLabel(now, 5)}, lunchtime. Small get-together for my mother's 60th. Message: "Happy 60th, Ma". Less sweet if possible.`,
+        ),
+    ];
 }
 
 /** An order's last touch: its latest step, edit payment or refund. */
@@ -1685,9 +1811,13 @@ export function planWorld(input: PlanInput): World {
     const payRng = rngFor("payments");
     const firstOrder = new Map<number, Date>();
     const firstOnline = new Map<number, Date>();
-    planned.forEach((o, n) => {
+    // Ids by place among the films' orders, as before the cakes; numbers by
+    // place among them all, in the order they were placed.
+    let plain = 0;
+    planned.forEach((o, rank) => {
+        const n: number | string = o.key ?? plain++;
         const orderId = sid("order", n);
-        const number = String(1001 + n);
+        const number = String(1001 + rank);
         const shopper = SHOPPERS[o.shopper];
         const store = o.store ?? "H";
         const firsts = store === "H" ? firstOrder : firstOnline;

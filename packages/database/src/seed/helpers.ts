@@ -260,13 +260,18 @@ export async function writeSite(
         -Math.max(1, Math.round(fixture.createdDaysAgo / 6)),
         16,
     );
+    // A Publication is immutable: a fixture that changed what its site
+    // shows says so with a revision, and is published again under it.
+    const publicationId = fixture.revision
+        ? `${ids.publication}_${fixture.revision}`
+        : ids.publication;
     const publication = await prisma.publication.upsert({
-        where: { id: ids.publication },
+        where: { id: publicationId },
         // A Publication is immutable and append-only — republishing inserts a
         // new row. So a re-run must not rewrite this one.
         update: {},
         create: {
-            id: ids.publication,
+            id: publicationId,
             siteId: site.id,
             organizationId: orgId,
             snapshot: {
@@ -299,12 +304,18 @@ export async function writeSite(
                      * not built one — and what `SiteHeader` is designed
                      * around: with no menu it centres the site name.
                      */
+                    // Links beyond the pages (the journal, the shop) follow
+                    // them, as a merchant adds them in the menu editor.
                     navigation:
-                        snapshotPages.length > 1
-                            ? snapshotPages.map((page) => ({
-                                  label: page.title,
-                                  href: page.path,
-                              }))
+                        snapshotPages.length > 1 ||
+                        (fixture.navigationExtra ?? []).length > 0
+                            ? [
+                                  ...snapshotPages.map((page) => ({
+                                      label: page.title,
+                                      href: page.path,
+                                  })),
+                                  ...(fixture.navigationExtra ?? []),
+                              ]
                             : [],
                 },
                 pages: [...snapshotPages].sort((a, b) =>
@@ -425,7 +436,12 @@ export interface AnalyticsShape {
      * Extra views on day `i` (0 = the oldest), as a share added to the
      * trend: a results day, an admissions fortnight. Absent: none.
      */
-    dayFactor?: (i: number) => number;
+    dayBoost?: (i: number) => number;
+    /**
+     * A day's traffic against an ordinary day's (1), by UTC ISO date: a
+     * festival week's bump or a closure's dip. Absent: every day is ordinary.
+     */
+    dayFactor?: (iso: string) => number;
 }
 
 /**
@@ -451,12 +467,13 @@ export function buildAnalyticsRows(shape: AnalyticsShape): AnalyticsRow[] {
 
         const trend =
             (shape.trendBase + Math.round(i * shape.trendSlope)) *
-            (1 + (shape.dayFactor ? shape.dayFactor(i) : 0));
+            (1 + (shape.dayBoost ? shape.dayBoost(i) : 0));
         const views = Math.max(
             11,
             Math.round(
                 trend *
                     (weekend ? shape.weekendFactor : 1) *
+                    (shape.dayFactor?.(iso) ?? 1) *
                     (0.82 + noise(i + o) * 0.36),
             ),
         );

@@ -1,4 +1,5 @@
 import { id } from "../helpers";
+import { CAKES } from "./bakery-cakes";
 import { SHOWCASE_KEY } from "./data";
 
 /**
@@ -34,14 +35,16 @@ export const CATEGORIES = [
     { key: "breads", name: "Breads" },
     { key: "pastry", name: "Pastry" },
     { key: "coffee", name: "Coffee" },
+    { key: "cakes", name: "Celebration cakes" },
 ] as const;
 export type CategoryKey = (typeof CATEGORIES)[number]["key"];
 
-/** Bread nil-rated (HSN 1905 90 10), pastry 18% (1905 90 20), coffee 5% (SAC 996331). */
+/** Bread nil-rated (HSN 1905 90 10), pastry and cakes 18% (1905 90 20), coffee 5% (SAC 996331). */
 export const RATES: Record<CategoryKey, { bps: number; code: string }> = {
     breads: { bps: 0, code: "19059010" },
     pastry: { bps: 1800, code: "19059020" },
     coffee: { bps: 500, code: "996331" },
+    cakes: { bps: 1800, code: "19059020" },
 };
 
 /** The business's options; a product's variants pick one option's values. */
@@ -53,6 +56,30 @@ export const OPTIONS = [
         values: ["Whole bean", "Espresso", "Filter"],
     },
     { key: "pack", name: "Pack", values: ["Single", "Six-pack", "Box of 4"] },
+    // The custom cakes' sizes, each with its eggless twin: a product's
+    // variants pick one option's values, so size and eggless share one.
+    {
+        key: "cake",
+        name: "Cake size",
+        values: [
+            "500 g",
+            "1 kg",
+            "1.5 kg",
+            "2 kg",
+            "3 kg",
+            "500 g, eggless",
+            "1 kg, eggless",
+            "1.5 kg, eggless",
+            "2 kg, eggless",
+            "3 kg, eggless",
+        ],
+    },
+    {
+        key: "number",
+        name: "Number",
+        values: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    },
+    { key: "finish", name: "Finish", values: ["Gold", "Silver", "Rose gold"] },
 ] as const;
 export type OptionKey = (typeof OPTIONS)[number]["key"];
 
@@ -304,6 +331,9 @@ export const PRODUCTS: readonly BakeryProduct[] = [
         variants: [{ sku: "HB-100", value: "Whole bean" }],
         stores: ["O"],
     },
+    // --- custom cakes, made to order with 48 hours' notice, and the extras
+    // that go with them (`bakery-cakes.ts`)
+    ...CAKES,
 ];
 
 /** A product's index by slug. */

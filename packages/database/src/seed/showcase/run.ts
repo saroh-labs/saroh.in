@@ -41,6 +41,8 @@ import {
     planSubscriptions,
 } from "./billing";
 import { checkBoutique, seedBoutique } from "./boutique";
+import { checkCarePoint, seedCarePointBilling } from "./carepoint-billing";
+import { CAREPOINT_POSTS } from "./carepoint-posts";
 import type { RyeCounts } from "./check";
 import { checkRye, checkShowcase } from "./check";
 import type { KaviCounts } from "./clinic";
@@ -52,6 +54,7 @@ import type { LeadSpec } from "./crm";
 import { planLeads, upsertPipeline } from "./crm";
 import type { ModuleKey, OrgRole, ShowcaseBusiness, TeamMember } from "./data";
 import {
+    CAREPOINT,
     LEAD_TIMELINE,
     LUMEN_POSTS,
     NORTHWIND,
@@ -72,15 +75,21 @@ import {
 import type { Desk42Counts } from "./desk42";
 import { checkDesk42, seedDesk42 } from "./desk42";
 import { checkFrameVow, seedFrameVow } from "./frame-vow";
+import type { JournalPost } from "./journal";
+import { seedJournal } from "./journal";
 import { checkPagdandi, seedPagdandi } from "./pagdandi";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
 import { checkPixelChai, seedPixelChai } from "./pixel-chai";
 import type { PulseCounts } from "./pulse";
 import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
+import { PULSE_POSTS } from "./pulse-posts";
+import { checkPulseShop, seedPulseShop } from "./pulse-shop";
 import { createRng } from "./random";
 import type { ShikshaCounts } from "./shiksha";
 import { checkShiksha, seedShiksha } from "./shiksha";
+import type { TrafficKind } from "./traffic";
+import { writeTraffic } from "./traffic";
 
 /**
  * Lay the showcase over the base seed.
@@ -288,8 +297,10 @@ export async function seedShowcase(
         pixelChai.id,
     ]);
     for (const business of SHOWCASE_BUSINESSES) {
+        const orgId = await seedBusiness(ctx, business, roleUsers);
+        await seedExtras(ctx, business, orgId);
         businesses.push({
-            id: await seedBusiness(ctx, business, roleUsers),
+            id: orgId,
             name: business.name,
             prefix: sid(business.key, ""),
         });
@@ -341,6 +352,13 @@ export async function seedShowcase(
         desk42.id,
         now,
     );
+    const pulseShop = pulse
+        ? await checkPulseShop(prisma, pulse.id, now)
+        : null;
+    const carepoint = businesses.find((b) => b.name === CAREPOINT.name);
+    const carepointCounts = carepoint
+        ? await checkCarePoint(prisma, carepoint.id, now)
+        : null;
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -366,6 +384,14 @@ export async function seedShowcase(
     console.table(shikshaCounts);
     console.log("[showcase] Desk 42, as its demo needs it:");
     console.table(desk42Counts);
+    if (pulseShop) {
+        console.log("[showcase] Pulse Fitness's front desk:");
+        console.table(pulseShop);
+    }
+    if (carepointCounts) {
+        console.log("[showcase] CarePoint Clinic's bills and journal:");
+        console.table(carepointCounts);
+    }
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +
@@ -1305,7 +1331,7 @@ async function seedBusiness(
               now,
               services: biz.services,
               target: biz.bookings,
-              fromDay: -60,
+              fromDay: biz.diaryFromDay ?? -60,
               toDay: 21,
               contacts: people.length,
               prospects: leadContactIndexes,
@@ -1661,6 +1687,87 @@ function findEnquiryForm(
         }
     }
     return null;
+}
+
+// --- What some businesses have beyond the shared shape ----------------------
+
+/** A business's journal on its site, and the season its traffic follows. */
+const EXTRAS: Readonly<
+    Record<string, { posts: readonly JournalPost[]; kind: TrafficKind }>
+> = {
+    pulse: { posts: PULSE_POSTS, kind: "gym" },
+    carepoint: { posts: CAREPOINT_POSTS, kind: "clinic" },
+};
+
+/**
+ * Pulse's front desk (`pulse-shop.ts`) and CarePoint's bills
+ * (`carepoint-billing.ts`), once the business's diary and invoices exist;
+ * then each one's journal, and its traffic written again to count the
+ * orders and follow the season.
+ */
+async function seedExtras(
+    ctx: Context,
+    biz: ShowcaseBusiness,
+    orgId: string,
+): Promise<void> {
+    const extras = EXTRAS[biz.key] as (typeof EXTRAS)[string] | undefined;
+    if (!extras) return;
+    const { prisma, now } = ctx;
+    if (biz.key === PULSE.key) {
+        await seedPulseShop(prisma, {
+            orgId,
+            now,
+            ownerUserId: ctx.demoUserId,
+        });
+    }
+    if (biz.key === CAREPOINT.key) {
+        const desk = await prisma.membership.findMany({
+            where: { organizationId: orgId, role: { in: ["OWNER", "ADMIN"] } },
+            select: { userId: true },
+            orderBy: { id: "asc" },
+        });
+        await seedCarePointBilling(prisma, {
+            orgId,
+            now,
+            sellerName: biz.name,
+            sellerAddress: printedAddress(biz.registeredAddress),
+            deskUserIds: desk.map((m) => m.userId),
+        });
+    }
+    const site = await prisma.site.findUniqueOrThrow({
+        where: {
+            organizationId_slug: { organizationId: orgId, slug: biz.site.slug },
+        },
+        select: { id: true },
+    });
+    const author = biz.owner
+        ? (
+              await prisma.user.findUniqueOrThrow({
+                  where: { email: staffEmail(biz.owner) },
+                  select: { id: true },
+              })
+          ).id
+        : ctx.demoUserId;
+    await seedJournal(prisma, {
+        siteId: site.id,
+        orgId,
+        authorId: author,
+        now,
+        posts: extras.posts,
+        id: (...parts) => sid(biz.key, ...parts),
+    });
+    await writeTraffic(prisma, {
+        orgId,
+        now,
+        kind: extras.kind,
+        paths: biz.analytics.paths,
+        trendBase: biz.analytics.trendBase,
+        trendSlope: 0.25,
+        weekendFactor: biz.analytics.weekendFactor,
+        idFor: (iso, k) => sid(biz.key, "agg", iso, k),
+        idPrefix: sid(biz.key, "agg", ""),
+        noiseOffset: hashKey(biz.key) % 1000,
+    });
 }
 
 // --- Lumen's posts ----------------------------------------------------------

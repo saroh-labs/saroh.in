@@ -1021,6 +1021,8 @@ export interface ShowcaseBusiness {
     companies?: readonly string[];
     services: readonly ShowcaseService[];
     bookings: number;
+    /** The diary's first day, relative to today; default 60 days back. */
+    diaryFromDay?: number;
     /** Extra weight for a weekday in the diary, Sunday first. */
     weekdayWeights?: readonly number[];
     /**
@@ -1124,6 +1126,10 @@ export const PULSE: ShowcaseBusiness = {
         "COURSES",
         // Sells packs, so Class packs is on (E12).
         "CLASS_PACKS",
+        // Supplements, gear and training wear at the front desk
+        // (`pulse-shop.ts`), and the site's traffic.
+        "COMMERCE",
+        "INSIGHTS",
     ],
     demoRole: "OWNER",
     owner: null,
@@ -1407,6 +1413,9 @@ export const PULSE: ShowcaseBusiness = {
         subdomain: "pulse-fitness",
         published: true,
         createdDaysAgo: 146,
+        // Its journal (`pulse-posts.ts`) in the menu.
+        navigationExtra: [{ label: "Journal", href: "/blog" }],
+        revision: "journal",
         pages: [
             {
                 path: "/",
@@ -1607,12 +1616,13 @@ export const PULSE: ShowcaseBusiness = {
     ],
     analytics: {
         paths: [
-            { path: "/", weight: 0.42 },
-            { path: "/classes", weight: 0.2 },
-            { path: "/book-a-trial", weight: 0.22 },
-            { path: "/join", weight: 0.16 },
+            { path: "/", weight: 0.38 },
+            { path: "/classes", weight: 0.19 },
+            { path: "/book-a-trial", weight: 0.2 },
+            { path: "/join", weight: 0.14 },
+            { path: "/blog", weight: 0.09 },
         ],
-        trendBase: 58,
+        trendBase: 120,
         weekendFactor: 0.7,
         enquiryRate: 0.02,
     },
@@ -2105,12 +2115,14 @@ export const CAREPOINT: ShowcaseBusiness = {
     slug: "carepoint-clinic",
     name: "CarePoint Clinic",
     registeredAddress: {
-        addressLine1: "22 MG Road",
+        addressLine1: "18, 5th Cross, Malleshwaram",
         city: "Bengaluru",
-        postalCode: "560001",
+        postalCode: "560003",
         gstState: "29",
     },
-    modules: ["APPOINTMENTS", "CRM", "WEBSITE"],
+    // Bills its visits (`carepoint-billing.ts`) and reads its Insights.
+    modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS", "INSIGHTS"],
+    paymentProvider: "RAZORPAY",
     // A Member, on purpose: the film shows what a Member may and may not see.
     demoRole: "MEMBER",
     owner: { first: "Meera", last: "Nair", role: "OWNER" },
@@ -2197,7 +2209,9 @@ export const CAREPOINT: ShowcaseBusiness = {
             weight: 3,
         },
     ],
-    bookings: 340,
+    // Three months back, about 150 paid visits a month.
+    bookings: 620,
+    diaryFromDay: -90,
     weekdayWeights: [0, 1.3, 1.1, 1, 1.05, 1, 1.2],
     footer: "CarePoint Clinic · 5th Cross, Malleshwaram, Bengaluru · Mon–Sat 7:30am–8pm · For an emergency, call 108",
     site: {
@@ -2206,6 +2220,9 @@ export const CAREPOINT: ShowcaseBusiness = {
         subdomain: "carepoint-clinic",
         published: true,
         createdDaysAgo: 240,
+        // Its journal (`carepoint-posts.ts`) in the menu.
+        navigationExtra: [{ label: "Journal", href: "/blog" }],
+        revision: "journal",
         pages: [
             {
                 path: "/",
@@ -2340,12 +2357,13 @@ export const CAREPOINT: ShowcaseBusiness = {
     ],
     analytics: {
         paths: [
-            { path: "/", weight: 0.4 },
-            { path: "/book", weight: 0.32 },
-            { path: "/doctors", weight: 0.18 },
-            { path: "/contact", weight: 0.1 },
+            { path: "/", weight: 0.34 },
+            { path: "/book", weight: 0.3 },
+            { path: "/doctors", weight: 0.14 },
+            { path: "/contact", weight: 0.08 },
+            { path: "/blog", weight: 0.14 },
         ],
-        trendBase: 70,
+        trendBase: 150,
         weekendFactor: 0.6,
         enquiryRate: 0.006,
     },

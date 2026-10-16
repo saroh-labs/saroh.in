@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Every photo the Leela & Loom, Rye & Co., Frame & Vow, Pixel & Chai, Ammi's
- * Achaar and Pagdandi Books showcases seed must load (#471, #522).
+ * Every photo the showcase seeds must load: Leela & Loom's and Rye & Co.'s products
+ * (#471, #522), Pulse's counter and Rye's cakes, the journals, and the vertical
+ * demos (Frame & Vow, Pixel & Chai, Ammi's Achaar, Pagdandi Books, Shiksha
+ * Academy, Desk 42).
  *
  * The boutique's photos are free-licence Unsplash images hot-linked by
  * address, because local storage does not persist uploads. A photo that stops
@@ -30,12 +32,23 @@ const boutique = read("boutique-catalog.ts");
 const studios = ["frame-vow-posts.ts", "pixel-chai-posts.ts"]
     .map(read)
     .join("\n");
-// Rye & Co.'s photos (#522) are written as unsplash("photo-…").
+// Rye & Co.'s photos (#522), Pulse's counter and Rye's cakes are written as
+// unsplash("photo-…").
 const bakery = [
     "bakery-product-page.ts",
+    "catalog-photos.ts",
     // Shiksha Academy and Desk 42 (unit 4): photos as unsplash("photo-…").
     "shiksha-photos.ts",
     "desk42-photos.ts",
+]
+    .map(read)
+    .join("\n");
+// The journals' photos, cover and inline, are written as photo("photo-…", …).
+const journals = [
+    "leela-posts.ts",
+    "rye-posts.ts",
+    "pulse-posts.ts",
+    "carepoint-posts.ts",
 ]
     .map(read)
     .join("\n");
@@ -49,6 +62,10 @@ const urls = [
             (m) => m[1] ?? m[2],
         ),
         ...[...bakery.matchAll(/unsplash\("([^"]+)"\)/g)].map(
+            (m) =>
+                `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
+        ),
+        ...[...journals.matchAll(/photo\(\s*"(photo-[^"]+)"/g)].map(
             (m) =>
                 `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
         ),

@@ -897,6 +897,13 @@ export interface SeedSite {
         isHome?: boolean;
         sections: readonly SeedSection[];
     }[];
+    /** Menu links after the pages: the journal (`/blog`), the shop. */
+    navigationExtra?: readonly { label: string; href: string }[];
+    /**
+     * Bumped when what the published site shows changes, so a database
+     * seeded before gets a new Publication (one is never rewritten).
+     */
+    revision?: string;
 }
 
 /**
