@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CatalogueView, FieldView } from "@/lib/products/settings";
 
-import { FieldsTab } from "./fields-tab";
+import { FieldsTab, fieldsExample } from "./fields-tab";
 import { stage } from "./test-kit";
 
 const actions = {
@@ -106,6 +106,24 @@ beforeEach(() => {
 });
 afterEach(() => s.unmount());
 
+describe("a list that couldn't be read", () => {
+    it("says so with Try again, never none yet", () => {
+        s.render(<FieldsTab catalogue={CATALOGUE} fields={null} />);
+        expect(s.text()).toContain("Couldn't load custom fields");
+        expect(s.button("Try again")).toBeDefined();
+        expect(s.text()).not.toContain("No custom fields yet");
+        expect(s.button("New field")).toBeUndefined();
+    });
+
+    it("gives the empty state's example from the business's own categories", () => {
+        render([]);
+        expect(s.text()).toContain(
+            "Add one to record something extra for Serums or Dresses",
+        );
+        expect(fieldsExample([])).toMatch(/about a product/);
+    });
+});
+
 describe("the list", () => {
     it("reads each field with nothing open and nothing to toggle", () => {
         render();
@@ -121,15 +139,15 @@ describe("the list", () => {
         expect(s.sheet()).toBe(null);
         expect(document.querySelector('[role="radio"]')).toBe(null);
         expect(document.querySelector("[aria-pressed]")).toBe(null);
-        expect(s.button("Add field")).toBeDefined();
+        expect(s.button("New field")).toBeDefined();
         expect(s.button("Edit Skin type")).toBeDefined();
         expect(s.button("Delete Skin type")).toBeDefined();
     });
 
     it("has no actions for a role that can only read", () => {
         render([SKIN], false);
-        expect(s.text()).toContain("Your role can read these settings");
-        expect(s.button("Add field")).toBeUndefined();
+        expect(s.text()).toContain("You can see these but not change them");
+        expect(s.button("New field")).toBeUndefined();
         expect(s.button("Edit Skin type")).toBeUndefined();
         expect(s.button("Delete Skin type")).toBeUndefined();
     });
@@ -139,7 +157,7 @@ describe("the list", () => {
         expect(s.text()).toContain("No custom fields yet");
         expect(
             Array.from(document.querySelectorAll("button")).filter(
-                (b) => b.textContent.trim() === "Add field",
+                (b) => b.textContent.trim() === "New field",
             ),
         ).toHaveLength(1);
     });
@@ -159,7 +177,7 @@ describe("the list", () => {
 describe("Add field", () => {
     function open() {
         render();
-        s.press("Add field");
+        s.press("New field");
         return s.inputs(s.sheet())[0];
     }
 
@@ -238,10 +256,9 @@ describe("Add field", () => {
         await s.submit(s.sheet());
         expect(s.sheet()?.textContent).toContain("A field needs a name.");
         s.type(input, "skin type");
-        expect(s.sheet()?.textContent).toContain(
-            "There is already a field called skin type.",
-        );
+        expect(s.sheet()?.textContent).toContain("Skin type already exists.");
         s.type(input, "x".repeat(41));
+        await s.submit(s.sheet());
         expect(s.sheet()?.textContent).toContain(
             "Keep it under 40 characters.",
         );

@@ -104,7 +104,7 @@ describe("the list", () => {
     it("has no actions for a role that can only read", () => {
         render(catalogue({ canWrite: false }));
         expect(s.text()).toContain("Serums");
-        expect(s.text()).toContain("Your role can read these settings");
+        expect(s.text()).toContain("You can see these but not change them");
         expect(s.button("New category")).toBeUndefined();
         for (const verb of ["Rename", "Merge", "Delete"])
             expect(s.button(`${verb} Serums`)).toBeUndefined();
@@ -180,11 +180,11 @@ describe("New category", () => {
         await s.submit(s.dialog());
         expect(s.dialog()?.textContent).toContain("A category needs a name.");
         s.type(input, "serums");
-        expect(s.dialog()?.textContent).toContain(
-            "There is already a category called serums.",
-        );
+        expect(s.dialog()?.textContent).toContain("Serums already exists.");
         s.type(input, "Uncategorized");
-        expect(s.dialog()?.textContent).toContain("There is already");
+        expect(s.dialog()?.textContent).toContain(
+            "Uncategorized already exists.",
+        );
         s.type(input, "x".repeat(41));
         expect(s.dialog()?.textContent).toContain(
             "Keep it under 40 characters.",

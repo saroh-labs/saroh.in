@@ -299,10 +299,11 @@ export function SkuTab({
                             problem ? "text-destructive" : "text-foreground/75",
                         )}
                     >
-                        {problem ||
-                            (suggest
-                                ? `New products get SKUs like ${rows[0]?.next ?? "…"}.`
-                                : "The editor stops suggesting SKUs.")}
+                        {problem
+                            ? "The pattern above needs a fix."
+                            : suggest
+                              ? `New products get SKUs like ${rows[0]?.next ?? "…"}.`
+                              : "The editor stops suggesting SKUs."}
                     </span>
                     <Button
                         variant="outline"
