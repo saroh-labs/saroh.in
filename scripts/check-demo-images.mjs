@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Every photo the Leela & Loom and Rye & Co. showcases seed must load (#471, #522).
+ * Every photo the Leela & Loom, Rye & Co., Ammi's Achaar and Pagdandi Books
+ * showcases seed must load (#471, #522).
  *
  * The boutique's photos are free-licence Unsplash images hot-linked by
  * address, because local storage does not persist uploads. A photo that stops
@@ -28,7 +29,35 @@ const urls = [
     ]),
 ];
 
+// Ammi's Achaar and Pagdandi Books (catalogue and journal) name Unsplash
+// photos by id, often through a helper, so every id in their files counts.
+const demoShops = [
+    "achaar-catalog.ts",
+    "achaar-posts.ts",
+    "pagdandi-catalog.ts",
+    "pagdandi-posts.ts",
+].map(read);
+for (const text of demoShops) {
+    for (const m of text.matchAll(/\b(\d{10,13}-[0-9a-f]{12})\b/g)) {
+        urls.push(`https://images.unsplash.com/photo-${m[1]}?w=1600&q=80&auto=format&fit=crop`);
+    }
+}
+// Generated images (Pagdandi's book covers) are data: URIs, checked offline.
 let failed = 0;
+let generated = 0;
+for (const text of [...demoShops, read("pagdandi-covers.ts")]) {
+    for (const m of text.matchAll(/data:image\/svg\+xml;base64,([A-Za-z0-9+/=]+)/g)) {
+        generated += 1;
+        const svg = Buffer.from(m[1], "base64").toString("utf8");
+        if (!svg.trimStart().startsWith("<svg") || !svg.trimEnd().endsWith("</svg>")) {
+            failed += 1;
+            console.error(`✗ a generated image is not a whole SVG: ${svg.slice(0, 60)}`);
+        }
+    }
+}
+const unique = [...new Set(urls)];
+urls.length = 0;
+urls.push(...unique);
 const queue = [...urls];
 async function worker() {
     for (let url = queue.shift(); url; url = queue.shift()) {
@@ -47,5 +76,7 @@ async function worker() {
     }
 }
 await Promise.all(Array.from({ length: 8 }, worker));
-console.log(`check-demo-images: ${urls.length - failed} of ${urls.length} photos load.`);
+console.log(
+    `check-demo-images: ${urls.length + generated - failed} of ${urls.length + generated} images load (${generated} generated).`,
+);
 process.exit(failed > 0 ? 1 : 0);

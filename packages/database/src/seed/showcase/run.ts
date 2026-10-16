@@ -29,6 +29,7 @@ import {
 import { seedPlanId } from "../pricing";
 import { deleteSeeded } from "../run";
 import { seedStandInPaymentProvider } from "../stand-in-providers";
+import { checkAchaar, seedAchaar } from "./achaar";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
 import { RYE, seedBakery } from "./bakery";
 import type { BillingContext, InvoiceRows, InvoiceSpec, Seen } from "./billing";
@@ -68,6 +69,7 @@ import {
     staffEmail,
     TIMEZONE,
 } from "./data";
+import { checkPagdandi, seedPagdandi } from "./pagdandi";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
 import type { PulseCounts } from "./pulse";
@@ -208,6 +210,33 @@ export async function seedShowcase(
             deskUserId: await ensureTeamMember(ctx, KAVI_DESK),
         }),
     );
+    // Two demo shops: Ammi's Achaar, a home pickle kitchen in Lucknow
+    // (Faizan Khan takes the orders as an Admin), and Pagdandi Books, a
+    // bookshop with a café corner in Pune (Siddharth Kale, a Member).
+    businesses.push(
+        await seedAchaar({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            staffUserId: await ensureTeamMember(ctx, {
+                first: "Faizan",
+                last: "Khan",
+                role: "ADMIN",
+            }),
+            staffRole: "ADMIN",
+        }),
+        await seedPagdandi({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            staffUserId: await ensureTeamMember(ctx, {
+                first: "Siddharth",
+                last: "Kale",
+                role: "MEMBER",
+            }),
+            staffRole: "MEMBER",
+        }),
+    );
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -246,6 +275,10 @@ export async function seedShowcase(
         : null;
     const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
     const kaviCounts: KaviCounts = await checkKavi(prisma, KAVI.orgId, now);
+    const demoShopCounts = [
+        await checkAchaar(prisma, now),
+        await checkPagdandi(prisma, now),
+    ];
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -261,6 +294,8 @@ export async function seedShowcase(
     console.table(ryeCounts);
     console.log("[showcase] Kavi Dental, as its films need it:");
     console.table(kaviCounts);
+    console.log("[showcase] Ammi's Achaar and Pagdandi Books:");
+    console.table(demoShopCounts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +
