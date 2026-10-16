@@ -204,6 +204,7 @@ export function rowNeedsYou(
 }
 
 const ARCHIVED = "ARCHIVED";
+const DRAFT = "DRAFT";
 
 /** Where a search looks: the product's name and its variants' SKUs. */
 function searchWhere(q: string | undefined): Prisma.ProductWhereInput {
@@ -342,9 +343,12 @@ export async function readLevels(
             shelves,
             everyStorefront.map((s) => s.id),
             {
-                // An archived product isn't counted, so never paused.
+                // An archived product isn't counted, so never paused. A
+                // draft sells to nobody yet: as on Products' Needs you, only
+                // orders already placed and waiting make it need someone.
                 paused:
-                    product.status !== ARCHIVED && pausedByCut(product, cut),
+                    product.status === DRAFT ||
+                    (product.status !== ARCHIVED && pausedByCut(product, cut)),
             },
         );
         const rows: StockLevelRow[] = [];

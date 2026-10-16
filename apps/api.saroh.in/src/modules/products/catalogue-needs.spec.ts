@@ -68,8 +68,68 @@ describe("needsFrom", () => {
                 short: 0,
                 canSell: 0,
                 where: ["Online"],
+                option: null,
+                variants: { worst: 0, of: 0 },
+                places: ["Online"],
             },
         ]);
+    });
+
+    it("leaves out drafts and archived products, unless orders wait on a draft", () => {
+        // Nobody can buy a draft: "out of stock, customers can't buy it"
+        // would be untrue. Orders already placed still wait on it.
+        const as = (p: NeedProduct, status: string): NeedProduct => ({
+            ...p,
+            status,
+        });
+        const needs = needsFrom(
+            [
+                as(whole("ink", [shelf("hill", 0)]), "DRAFT"),
+                as(whole("notebook", [shelf("hill", 2)]), "DRAFT"),
+                as(whole("pens", [shelf("hill", 1, 3)]), "DRAFT"),
+                as(whole("old", [shelf("hill", 0, 4)]), "ARCHIVED"),
+                as(whole("tape", [shelf("hill", 0)]), "PUBLISHED"),
+            ],
+            [HILL],
+        );
+        expect(needs.map((n) => [n.productId, n.kind])).toEqual([
+            ["pens", "short"],
+            ["tape", "out"],
+        ]);
+    });
+
+    it("counts the variants that need someone, by the product's option", () => {
+        const shades = Array.from({ length: 28 }, (_, i) => ({
+            id: `v${i}`,
+            title: `Shade ${i}`,
+        }));
+        const [colour] = needsFrom(
+            [
+                {
+                    id: "colour",
+                    name: "colour",
+                    option: { name: "Shade" },
+                    variants: shades,
+                    listings: [
+                        {
+                            storeId: "hill",
+                            variants: shades.map((v) => ({ variantId: v.id })),
+                        },
+                    ],
+                    shelves: shades.map((v, i) =>
+                        shelf("hill", i === 25 ? 0 : 6, 0, 2, v.id),
+                    ),
+                },
+            ],
+            [HILL],
+        );
+        expect(colour).toMatchObject({
+            kind: "out",
+            option: "Shade",
+            variants: { worst: 1, of: 28 },
+            places: [],
+            where: ["Shade 25"],
+        });
     });
 
     it("takes the worst shelf's reason, and names no place when all are", () => {

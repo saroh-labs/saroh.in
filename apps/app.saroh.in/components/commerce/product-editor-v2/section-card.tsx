@@ -11,7 +11,7 @@ import { useEditor } from "./editor-state";
 
 /** What each section's bar says it will save, when nothing needs a fix. */
 const SAVES: Record<SectionKey, string> = {
-    basics: "Saves the name, address, price and category.",
+    basics: "Saves the name, path, price and category.",
     description: "Saves the description and key points.",
     details: "Saves how to use it, what it is made of and how it's fulfilled.",
     madeby: "Saves who makes it, the warranty and the returns rule.",

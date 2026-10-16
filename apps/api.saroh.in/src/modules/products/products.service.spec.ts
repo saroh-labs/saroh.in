@@ -216,4 +216,84 @@ describe("Products catalog (dev DB)", () => {
         });
         expect(orphanVariants).toBe(0);
     });
+
+    // Products audit, 16 Oct 2026: a name another product has gets the
+    // first free path rather than a refusal; a typed path names who has it.
+    it("makes a taken name's path unique, and names who has a typed one", async () => {
+        const second = await products.create(storeId, ownerId, {
+            name: "T-Shirt",
+            price: "5.00",
+        });
+        const third = await products.create(storeId, ownerId, {
+            name: "T-Shirt",
+            price: "5.00",
+        });
+        const read = async (id: string) =>
+            (await products.get(storeId, id, ownerId)).slug;
+        expect(await read(second.id)).toBe("t-shirt-2");
+        expect(await read(third.id)).toBe("t-shirt-3");
+        await expect(products.suggestPath(orgId, "T-Shirt")).resolves.toEqual({
+            path: "t-shirt-4",
+            holder: "T-Shirt",
+        });
+        await expect(products.suggestPath(orgId, "Socks")).resolves.toEqual({
+            path: "socks",
+            holder: null,
+        });
+        await expect(
+            products.patch(storeId, second.id, ownerId, { slug: "t-shirt" }),
+        ).rejects.toMatchObject({
+            response: {
+                field: "slug",
+                message: "T-Shirt already uses this path. Try t-shirt-4.",
+            },
+        });
+        await products.remove(storeId, second.id, ownerId);
+        await products.remove(storeId, third.id, ownerId);
+    });
+
+    it("refuses a SKU another product's variant has, naming it", async () => {
+        const tape = await products.create(storeId, ownerId, {
+            name: "Packing Tape",
+            price: "99",
+        });
+        await variants.create(storeId, tape.id, ownerId, {
+            sku: "PT-BRN",
+            title: "Brown",
+        });
+        const other = await products.create(storeId, ownerId, {
+            name: "Audit Tape",
+            price: "99",
+        });
+        await expect(
+            variants.create(storeId, other.id, ownerId, {
+                sku: "pt-brn",
+                title: "Clear",
+            }),
+        ).rejects.toMatchObject({
+            response: {
+                field: "sku",
+                message: "pt-brn is already Packing Tape · Brown.",
+            },
+        });
+        const own = await variants.create(storeId, other.id, ownerId, {
+            sku: "AT-CLR",
+            title: "Clear",
+        });
+        await expect(
+            variants.update(storeId, other.id, own.id, ownerId, {
+                sku: "PT-BRN",
+                title: "Clear",
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        // Its own SKU, unchanged, still saves with the rest of the row.
+        await expect(
+            variants.update(storeId, other.id, own.id, ownerId, {
+                sku: "AT-CLR",
+                title: "Clear tape",
+            }),
+        ).resolves.toEqual({ id: own.id });
+        await products.remove(storeId, other.id, ownerId);
+        await products.remove(storeId, tape.id, ownerId);
+    });
 });

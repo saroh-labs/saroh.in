@@ -10,7 +10,10 @@ import { movable, NEED_RANK, shortBy } from "../stock/stock-words";
  * is sold does, and why is its worst shelf's reason. A product a lower
  * plan paused (#800) needs someone only when it is short for orders
  * already placed (`productLines`): it is hidden from the site, so it is
- * never "out" or "low" here.
+ * never "out" or "low" here. A draft is the same: no customer can buy it
+ * yet, so "out of stock, customers can't buy it" would be untrue — only
+ * orders already waiting on it count. An archived product never needs
+ * anyone.
  */
 
 /** A product someone should restock, and why. */
@@ -28,6 +31,21 @@ export interface CatalogueNeed {
      * when not every shelf where it is sold is; null when they all are.
      */
     where: string[] | null;
+    /**
+     * The product's own option word ("Shade", "Size"), so the list can say
+     * "1 shade out"; null when it has none.
+     */
+    option: string | null;
+    /**
+     * How many of its variants are `kind` somewhere, and of how many sold:
+     * "1 of 28 shades out". 0 of 0 while it is counted as a whole.
+     */
+    variants: { worst: number; of: number };
+    /**
+     * The storefronts where it is `kind` — "Online" — when not every one
+     * that sells it is; empty when they all are (or one sells it).
+     */
+    places: string[];
 }
 
 export interface NeedProduct {
@@ -41,6 +59,10 @@ export interface NeedProduct {
     shelves: readonly LineShelf[];
     /** Past the plan's products limit (#800): only short counts. */
     paused?: boolean;
+    /** DRAFT · PUBLISHED · ARCHIVED; a draft counts only short. */
+    status?: string;
+    /** The one option its variants are chosen by. */
+    option?: { name: string } | null;
 }
 
 const EMPTY = { onHand: 0, promised: 0 };
@@ -56,11 +78,14 @@ export function needsFrom(
     const storeName = new Map(storefronts.map((s) => [s.id, s.name]));
     const out: CatalogueNeed[] = [];
     for (const p of products) {
+        if (p.status === "ARCHIVED") continue;
         const lines = productLines(
             p,
             p.shelves,
             storefronts.map((s) => s.id),
-            { paused: p.paused },
+            // A draft sells to nobody yet: like a paused one, only orders
+            // already placed and waiting make it need someone.
+            { paused: p.paused === true || p.status === "DRAFT" },
         );
         const sold = lines.flatMap((l) =>
             l.cells
@@ -84,6 +109,21 @@ export function needsFrom(
             ]
                 .filter(Boolean)
                 .join(" at ");
+        const variantsSold = new Set(
+            sold.flatMap((c) => (c.variantId ? [c.variantId] : [])),
+        );
+        const variantsWorst = new Set(
+            worst.flatMap((c) => (c.variantId ? [c.variantId] : [])),
+        );
+        const storesSold = new Set(sold.map((c) => c.storeId));
+        const storesWorst = new Set(worst.map((c) => c.storeId));
+        const places =
+            storesWorst.size < storesSold.size
+                ? Array.from(storesWorst).flatMap((id) => {
+                      const n = storeName.get(id);
+                      return n ? [n] : [];
+                  })
+                : [];
         const where =
             worst.length < sold.length
                 ? Array.from(new Set(worst.map(label))).filter(Boolean)
@@ -95,6 +135,9 @@ export function needsFrom(
             short: sold.reduce((n, c) => n + shortBy(c.shelf ?? EMPTY), 0),
             canSell: worst.reduce((n, c) => n + movable(c.shelf ?? EMPTY), 0),
             where: where.length > 0 ? where : null,
+            option: p.option?.name ?? null,
+            variants: { worst: variantsWorst.size, of: variantsSold.size },
+            places,
         });
     }
     return out.sort(

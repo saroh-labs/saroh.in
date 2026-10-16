@@ -35,6 +35,12 @@ export interface VariantSave {
     /** Said as a toast (a refused option change). */
     toast?: string;
     /**
+     * Refusals about one row's SKU (another product's variant has it), by
+     * the row's key, with the SKU they were about: said under that row's
+     * SKU box, not on the section's bar (16 Oct 2026).
+     */
+    rowErrors: Record<string, { sku: string; message: string }>;
+    /**
      * The plan refused a new variant (its cap on one product's variants,
      * DEC-158): shown as the plan's notice, with its way to more.
      */
@@ -62,6 +68,14 @@ export async function saveVariantList(input: {
     const { product, storeId, rows, base, optionId, titleOf, listings } = input;
     let why: string | null = null;
     let plan: PlanRefusal | undefined;
+    const rowErrors: VariantSave["rowErrors"] = {};
+    // A refusal about a row's SKU goes on the row; anything else is `why`.
+    const refused = (r: VariantRow, res: { error: string; field?: string }) => {
+        if (res.field === "sku")
+            rowErrors[r.key] = { sku: r.sku, message: res.error };
+        else why ??= res.error;
+    };
+    const stopped = () => !!why || Object.keys(rowErrors).length > 0;
     let next = rows;
     let saved = base;
     const replace = (key: string, patch: Partial<VariantRow>) => {
@@ -82,7 +96,7 @@ export async function saveVariantList(input: {
         }
         // A refused removal says why; changing option would only be refused
         // next for the variant still there.
-        if (why) return { next: rows, saved, why, failed: why };
+        if (why) return { next: rows, saved, why, failed: why, rowErrors };
         if (optionId !== (product.optionId ?? "")) {
             const res = await patchProduct(storeId, product.id, {
                 optionId: optionId || null,
@@ -94,6 +108,7 @@ export async function saveVariantList(input: {
                     why: res.error,
                     failed: null,
                     toast: res.error,
+                    rowErrors,
                 };
         }
         for (const r of rows) {
@@ -110,7 +125,7 @@ export async function saveVariantList(input: {
             if (!r.id) {
                 const res = await createVariant(product.id, body);
                 if (!res.ok) {
-                    why ??= res.error;
+                    refused(r, res);
                     plan ??= res.plan;
                     continue;
                 }
@@ -133,7 +148,7 @@ export async function saveVariantList(input: {
                     saved = saved.map((b) =>
                         b.id === r.id ? { ...r, stores: b.stores } : b,
                     );
-                else why ??= res.error;
+                else refused(r, res);
             }
         }
         const ids = next.map((r) => r.id).filter((id): id is string => !!id);
@@ -141,7 +156,7 @@ export async function saveVariantList(input: {
             .map((b) => b.id)
             .filter((id): id is string => !!id);
         if (
-            !why &&
+            !stopped() &&
             ids.length > 1 &&
             JSON.stringify(ids) !==
                 JSON.stringify(savedOrder.filter((id) => ids.includes(id)))
@@ -149,7 +164,7 @@ export async function saveVariantList(input: {
             const res = await reorderVariants(storeId, product.id, ids);
             if (!res.ok) why ??= res.error;
         }
-        if (!why && listings && input.sellAt.length > 0) {
+        if (!stopped() && listings && input.sellAt.length > 0) {
             why = await saveListings(
                 product.id,
                 listings,
@@ -161,7 +176,14 @@ export async function saveVariantList(input: {
     } catch {
         why ??= DROPPED;
     }
-    return { next, saved, why, failed: why, ...(plan ? { plan } : {}) };
+    return {
+        next,
+        saved,
+        why,
+        failed: why,
+        rowErrors,
+        ...(plan ? { plan } : {}),
+    };
 }
 
 /** "Sell it at": one call per storefront that changes; the first refusal. */

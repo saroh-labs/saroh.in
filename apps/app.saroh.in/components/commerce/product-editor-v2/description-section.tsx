@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Textarea } from "@saroh/ui/textarea";
-import { showError } from "@saroh/ui/toast";
 import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 
@@ -52,7 +51,7 @@ export function DescriptionSection({
     product: ProductDetail | null;
     storeId: string;
 }) {
-    const { canWrite } = useEditor();
+    const { canWrite, sayError } = useEditor();
     const baseline = product ? descriptionFrom(product) : EMPTY;
     const form = useForm<DescriptionValues>({
         resolver: zodResolver(descriptionSchema),
@@ -82,7 +81,7 @@ export function DescriptionSection({
                         res.field === "keyPoints"
                     )
                         form.setError(res.field, { message: res.error });
-                    else showError(res.error);
+                    else sayError("description", res.error);
                     return false;
                 }
                 form.reset(values);
@@ -144,9 +143,7 @@ export function DescriptionSection({
                     {...form.register("keyPoints")}
                     rows={4}
                     disabled={ro}
-                    placeholder={
-                        "10% vitamin C, stable in the bottle\nFades dark spots in 6 to 8 weeks"
-                    }
+                    placeholder={"e.g. What it is for\nWhat makes it different"}
                     className="resize-y"
                 />
                 <FieldHelp

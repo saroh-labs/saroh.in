@@ -100,6 +100,25 @@ export class OrganizationProductsController {
         );
     }
 
+    /**
+     * The path a product with this name would get (16 Oct 2026): its own,
+     * or the first free number on it with the product that has it.
+     * Declared before `:productId` so "path" is never read as an id.
+     */
+    @Get("path")
+    suggestPath(
+        @OrgContext() ctx: OrganizationContext,
+        @Query("name") name = "",
+        @Query("except") except?: string,
+    ) {
+        const { organizationId } = this.access.business(ctx);
+        return this.products.suggestPath(
+            organizationId,
+            name.slice(0, 300),
+            except,
+        );
+    }
+
     @Get(":productId")
     async get(
         @OrgContext() ctx: OrganizationContext,

@@ -37,7 +37,10 @@ export type RowOutcome = "CREATE" | "UPDATE" | "SKIP" | "ERROR";
 
 /** A problem with one row, named precisely enough to fix in a spreadsheet. */
 export interface RowIssue {
-    /** 1-based line number as the merchant sees it, header excluded. */
+    /**
+     * The row number the merchant's spreadsheet shows: the headings are row
+     * 1, so the first product is row 2. 0 for a problem with the file.
+     */
     row: number;
     /** The mapped field, when the problem belongs to one. */
     field?: string;
@@ -53,12 +56,21 @@ export interface PlannedRow {
     issues: RowIssue[];
 }
 
+/** One problem and every row that has it ("Price isn't a number" · rows 4, 5). */
+export interface IssueGroup {
+    field?: string;
+    message: string;
+    rows: number[];
+}
+
 export interface ImportPlan {
     totalRows: number;
     counts: Record<RowOutcome, number>;
     rows: PlannedRow[];
     /** Problems that belong to the file rather than to any single row. */
     fileIssues: RowIssue[];
+    /** Every row's problems, grouped by problem, in the order first met. */
+    issueGroups: IssueGroup[];
 }
 
 export interface PlanInput {
@@ -79,6 +91,13 @@ export interface PlanInput {
     keyOf: (values: ImportValues) => string | null;
     /** Domain validation, normally the create DTO's own class-validator rules. */
     validateRow: (values: ImportValues) => Omit<RowIssue, "row">[];
+    /**
+     * Forgive how a spreadsheet writes a value before it is judged ("draft"
+     * for DRAFT, "₹1,299" for 1299). What it returns is what is written.
+     */
+    normalize?: (values: ImportValues) => ImportValues;
+    /** Each field in words, for the messages ("Price", not `price`). */
+    fieldLabels?: Readonly<Record<string, string>>;
 }
 
 const EMPTY_COUNTS = (): Record<RowOutcome, number> => ({
@@ -125,16 +144,20 @@ export function buildImportPlan(input: PlanInput): ImportPlan {
         validateRow,
     } = input;
 
+    const label = (field: string) => input.fieldLabels?.[field] ?? field;
     const fileIssues: RowIssue[] = [];
     const mappedFields = new Set(Object.values(mapping));
-    for (const field of requiredFields) {
-        if (!mappedFields.has(field)) {
-            fileIssues.push({
-                row: 0,
-                field,
-                message: `No column is mapped to the required field "${field}"`,
-            });
-        }
+    // A required field no column feeds is the file's problem, said once —
+    // not once per row.
+    const unmapped = new Set(
+        requiredFields.filter((field) => !mappedFields.has(field)),
+    );
+    for (const field of unmapped) {
+        fileIssues.push({
+            row: 0,
+            field,
+            message: `No column is matched to ${label(field)}. Pick it above.`,
+        });
     }
 
     const rows: PlannedRow[] = [];
@@ -143,30 +166,40 @@ export function buildImportPlan(input: PlanInput): ImportPlan {
     const seenInFile = new Map<string, number>();
 
     records.forEach((record, index) => {
-        const row = index + 1;
-        const values = applyMapping(record, mapping);
+        // The headings are row 1 in the merchant's spreadsheet.
+        const row = index + 2;
+        const mapped = applyMapping(record, mapping);
+        const values = input.normalize ? input.normalize(mapped) : mapped;
         const issues: RowIssue[] = [];
 
         for (const field of requiredFields) {
+            if (unmapped.has(field)) continue;
             if (values[field] === undefined) {
-                issues.push({ row, field, message: `"${field}" is required` });
+                issues.push({
+                    row,
+                    field,
+                    message: `${label(field)} is empty.`,
+                });
             }
         }
+        // With a required column unmatched no row can come in; the file's
+        // own line says why, so the rows add nothing to it.
+        const blocked = unmapped.size > 0;
 
-        if (issues.length === 0) {
+        if (issues.length === 0 && !blocked) {
             for (const issue of validateRow(values)) {
                 issues.push({ ...issue, row });
             }
         }
 
-        const key = issues.length === 0 ? keyOf(values) : null;
+        const key = issues.length === 0 && !blocked ? keyOf(values) : null;
 
         if (key !== null) {
             const earlier = seenInFile.get(key);
             if (earlier !== undefined) {
                 issues.push({
                     row,
-                    message: `Duplicate of row ${earlier} in this file (both resolve to "${key}")`,
+                    message: `Repeats row ${earlier}.`,
                 });
             } else {
                 seenInFile.set(key, row);
@@ -174,7 +207,7 @@ export function buildImportPlan(input: PlanInput): ImportPlan {
         }
 
         let outcome: RowOutcome;
-        if (issues.length > 0) {
+        if (issues.length > 0 || blocked) {
             outcome = "ERROR";
         } else if (key !== null && existingKeys.has(key)) {
             outcome = policy === "UPDATE" ? "UPDATE" : "SKIP";
@@ -186,7 +219,38 @@ export function buildImportPlan(input: PlanInput): ImportPlan {
         rows.push({ row, outcome, key, values, issues });
     });
 
-    return { totalRows: records.length, counts, rows, fileIssues };
+    return {
+        totalRows: records.length,
+        counts,
+        rows,
+        fileIssues,
+        issueGroups: groupIssues(rows),
+    };
+}
+
+/**
+ * Every row's problems grouped by problem (same field, same words), in the
+ * order first met: "Price isn't a number · rows 4 and 5" reads as one thing
+ * to fix, where a line per row reads as a wall.
+ */
+export function groupIssues(rows: readonly PlannedRow[]): IssueGroup[] {
+    const groups = new Map<string, IssueGroup>();
+    for (const r of rows) {
+        for (const issue of r.issues) {
+            const id = `${issue.field ?? ""}\u0000${issue.message}`;
+            const group = groups.get(id);
+            if (group) {
+                if (!group.rows.includes(issue.row)) group.rows.push(issue.row);
+            } else {
+                groups.set(id, {
+                    ...(issue.field ? { field: issue.field } : {}),
+                    message: issue.message,
+                    rows: [issue.row],
+                });
+            }
+        }
+    }
+    return [...groups.values()];
 }
 
 /**

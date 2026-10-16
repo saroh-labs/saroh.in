@@ -31,11 +31,20 @@ export interface PlannedRow {
     issues: RowIssue[];
 }
 
+/** One problem and every row that has it (rows as the spreadsheet numbers them). */
+export interface IssueGroup {
+    field?: string;
+    message: string;
+    rows: number[];
+}
+
 export interface ImportPlan {
     totalRows: number;
     counts: Record<RowOutcome, number>;
     rows: PlannedRow[];
     fileIssues: RowIssue[];
+    /** Every row's problems, grouped by problem; absent from an older API. */
+    issueGroups?: IssueGroup[];
 }
 
 export interface PreviewResult {
@@ -61,6 +70,10 @@ export interface ImportDescriptor {
     /** Each field in words (UX-065); absent from an older API. */
     fieldLabels?: Record<string, string>;
     keyLabel: string;
+    /** A file to start from: headings, then example rows; absent from an older API. */
+    sample?: string[][];
+    /** What the business sells in, for the preview's amounts. */
+    currency?: string | null;
 }
 
 export type Result<T> =

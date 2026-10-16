@@ -3,13 +3,19 @@ import { describe, expect, it } from "vitest";
 import { catalogueRows } from "./catalogue";
 import { catalogueProduct } from "./catalogue.fixture";
 import {
+    foldShelves,
+    HEALTHY_SHOWN,
+    orderShelves,
     position,
     quickStock,
     readAdd,
+    sellLine,
     shelfLine,
     shelfTone,
     showShelves,
+    statusToast,
     step,
+    stockHeadline,
     stockLine,
     storefrontsLine,
 } from "./quick-look";
@@ -116,6 +122,9 @@ describe("quickStock (#520)", () => {
             warnAt: 5,
         });
         expect(showShelves(stock)).toBe(false);
+        // Someone who counts stock always gets its Add row: Restock lands
+        // here, and must be able to add.
+        expect(showShelves(stock, true)).toBe(true);
     });
 
     it("is untracked when nothing counts stock", () => {
@@ -192,5 +201,101 @@ describe("readAdd", () => {
         expect(readAdd("0")).toBeNull();
         expect(readAdd("1.5")).toBeNull();
         expect(readAdd("")).toBeNull();
+    });
+});
+
+describe("the drawer's shelves, needing first (Products audit)", () => {
+    const shelf = (
+        title: string,
+        onHand: number,
+        promised = 0,
+        warnAt = 2,
+    ) => ({
+        variantId: title,
+        title,
+        onHand,
+        promised,
+        canSell: Math.max(0, onHand - promised),
+        short: Math.max(0, promised - onHand),
+        warnAt,
+        storeIds: ["hill"],
+    });
+
+    it("puts short, then out, then low before the rest, in order", () => {
+        const ordered = orderShelves([
+            shelf("a", 9),
+            shelf("low", 1),
+            shelf("b", 9),
+            shelf("out", 0),
+            shelf("short", 1, 3),
+        ]);
+        expect(ordered.map((s) => s.title)).toEqual([
+            "short",
+            "out",
+            "low",
+            "a",
+            "b",
+        ]);
+    });
+
+    it("folds past six healthy shelves, never folding one that needs someone", () => {
+        const shades = Array.from({ length: 28 }, (_, i) =>
+            shelf(`s${i}`, i === 25 ? 0 : 6),
+        );
+        const ordered = orderShelves(shades);
+        const folded = foldShelves(ordered, false);
+        expect(folded.shown[0]?.title).toBe("s25");
+        expect(folded.shown).toHaveLength(1 + HEALTHY_SHOWN);
+        expect(folded.hidden).toBe(27 - HEALTHY_SHOWN);
+        expect(foldShelves(ordered, true).shown).toHaveLength(28);
+        // Few enough: nothing folds.
+        expect(foldShelves(ordered.slice(0, 7), false).hidden).toBe(0);
+    });
+
+    it("says the exception in the headline", () => {
+        const total = { canSell: 167, onHand: 167, promised: 0, short: 0 };
+        expect(
+            stockHeadline(total, {
+                productId: "p",
+                name: "p",
+                kind: "out",
+                short: 0,
+                canSell: 0,
+                where: ["7.44"],
+                option: "Shade",
+                variants: { worst: 1, of: 28 },
+                places: [],
+            }),
+        ).toBe("167 can sell · 1 of 28 shades out");
+        expect(stockHeadline(total, null)).toBe("167 can sell · 167 on hand");
+    });
+});
+
+describe("the words for selling on and off", () => {
+    it("claims the website only when the online shop is live", () => {
+        expect(sellLine(true, true)).toBe(
+            "Hides it from your website and the counter. Nothing is deleted.",
+        );
+        expect(sellLine(true, false)).toBe(
+            "Takes it off sale at the counter. Nothing is deleted.",
+        );
+        expect(sellLine(true, null)).toBe(
+            "Takes it off sale. Nothing is deleted.",
+        );
+        expect(sellLine(false, true)).toBe(
+            "Shows it on your website and at the counter.",
+        );
+        expect(sellLine(false, false)).toBe("Puts it on sale at the counter.");
+    });
+
+    it("echoes the state in the toast", () => {
+        expect(statusToast("ARCHIVED", ["Jar"])).toBe("Archived Jar.");
+        expect(statusToast("PUBLISHED", ["Jar"])).toBe("Jar is live.");
+        expect(statusToast("PUBLISHED", ["a", "b"])).toBe(
+            "2 products are live.",
+        );
+        expect(statusToast("ARCHIVED", ["a", "b"])).toBe(
+            "Archived 2 products.",
+        );
     });
 });

@@ -8,7 +8,6 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError } from "@saroh/ui/toast";
 import { Check, ChevronDown, Clock } from "lucide-react";
 import { useState } from "react";
 
@@ -25,7 +24,7 @@ const STATUSES: { value: ProductStatus; label: string; note: string }[] = [
     {
         value: "ARCHIVED",
         label: "Archived",
-        note: "Was sold, and is not any more.",
+        note: "No longer sold. Its orders keep their record.",
     },
 ];
 
@@ -41,8 +40,8 @@ const label = (s: ProductStatus) =>
 /**
  * Who can see it. The header's pill is a fact about what customers see, so
  * it follows the saved status; this shows the one chosen, and until it is
- * saved the bar says what saving will do — publish, take it off the shop,
- * archive — on a button named for exactly that.
+ * saved the bar says what saving will do — Publish, Archive, Sell again
+ * (or back to a draft) — on a button named for exactly that.
  */
 export function VisibilitySection({
     product,
@@ -56,7 +55,7 @@ export function VisibilitySection({
     value?: ProductStatus;
     onChange?: (status: ProductStatus) => void;
 }) {
-    const { mode, canWrite } = useEditor();
+    const { mode, canWrite, sayError } = useEditor();
     const creating = mode === "create";
     const saved: ProductStatus = product?.status ?? "DRAFT";
     const [own, setOwn] = useState<ProductStatus>(saved);
@@ -69,18 +68,20 @@ export function VisibilitySection({
     const status = creating ? (value ?? "DRAFT") : own;
     const set = creating ? (s: ProductStatus) => onChange?.(s) : setOwn;
     const dirty = !creating && status !== saved;
-    // Archived was on sale once; a draft may never have been.
-    const everLive = saved !== "DRAFT";
+    // An archived product comes back with Sell again; a draft is published.
+    const archived = saved === "ARCHIVED";
+    const named = product?.name.trim() ?? "";
+    const name = named === "" ? "It" : named;
 
     const pending = creating
-        ? "Creating it as Published puts it on the shop straight away. Draft keeps it to the team."
+        ? "Live puts it on sale as soon as it's created. Draft keeps it to the team."
         : status === "PUBLISHED"
-          ? everLive
-              ? "Saving puts this back on the shop. Until then customers still cannot see it."
-              : "Saving publishes it for the first time. Nobody outside the team has seen it yet."
+          ? archived
+              ? "Saving sells it again. Until then customers can't buy it."
+              : "Saving publishes it, so customers can buy it."
           : status === "DRAFT"
-            ? "Saving takes it off the shop. Anyone who had the link finds nothing there."
-            : "Saving archives it. It stops being sold, and its address stops resolving.";
+            ? "Saving makes it a draft. Customers can't see it, and its link finds nothing."
+            : "Saving archives it. It stops being sold, and its link stops opening.";
 
     useSection(
         "visibility",
@@ -88,23 +89,22 @@ export function VisibilitySection({
             dirty,
             problem: "",
             note: pending,
+            // Publish · Archive · Sell again, as everywhere else.
             saveLabel:
                 status === "PUBLISHED"
-                    ? everLive
-                        ? "Put back on the shop"
+                    ? archived
+                        ? "Sell again"
                         : "Publish"
                     : status === "DRAFT"
-                      ? "Take off the shop"
+                      ? "Make it a draft"
                       : "Archive",
             discardLabel: `Keep it ${label(saved).toLowerCase()}`,
             savedMessage:
                 status === "PUBLISHED"
-                    ? everLive
-                        ? "Back on the shop."
-                        : "Published. Customers can buy it now."
+                    ? `${name} is live.`
                     : status === "DRAFT"
-                      ? "Taken off the shop. Only the team can see it."
-                      : "Archived. It is no longer sold.",
+                      ? `${name} is a draft. Only the team can see it.`
+                      : `Archived ${named === "" ? "it" : named}.`,
         },
         {
             save: async () => {
@@ -113,7 +113,7 @@ export function VisibilitySection({
                     status,
                 });
                 if (!res.ok) {
-                    showError(res.error);
+                    sayError("visibility", res.error);
                     return false;
                 }
                 return true;
@@ -129,10 +129,10 @@ export function VisibilitySection({
                 {creating
                     ? "Choose who can see it once it is created."
                     : saved === "PUBLISHED"
-                      ? "On the shop now. Customers can buy it."
+                      ? "Live. Customers can buy it."
                       : saved === "DRAFT"
-                        ? "A draft. Only the team can see it."
-                        : "Archived. It is not sold, and its address does not open."}
+                        ? "Draft. Only the team can see it."
+                        : "Archived. It isn't sold, and its link doesn't open."}
             </p>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild disabled={!canWrite}>

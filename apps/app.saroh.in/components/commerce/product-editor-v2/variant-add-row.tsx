@@ -66,7 +66,7 @@ export function VariantAddRow({
 }) {
     return (
         <div className="rounded-[10px] bg-muted/50 px-[13px] py-3">
-            <p className="mb-2 text-[12px] font-semibold">Add a variant</p>
+            <p className="mb-2 text-[12px] font-semibold">Add a {opt}</p>
             <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-1.5">
                 <OptionSelect
                     size="sm"
