@@ -16,6 +16,7 @@ import type {
 } from "./demo-shop";
 import {
     checkDemoShop,
+    lateOrders,
     onlyDesignedLatePickups,
     seedDemoShop,
     shortDay,
@@ -148,11 +149,15 @@ const CONFIG: DemoShopConfig = {
         return istAt(placedAt, days, 16 * 60 + 30);
     },
     // Late only past what the kitchen promises: three or four days to make,
-    // five for sun pickles, then a day to collect or for Faizan to bring it.
+    // five for sun pickles, then a day to collect (156 hours), Faizan's
+    // round the day it is ready, or up to a day to hand a made-to-order
+    // hamper to the courier (132 hours). Tight enough that the few orders
+    // near their day show on Home as due today or tomorrow (DEC-163);
+    // never so tight that one is late on the kitchen's usual pace.
     lateAfterMinutes: {
-        PICKUP: 7 * 24 * 60,
-        LOCAL_DELIVERY: 6 * 24 * 60,
-        SHIPPING: 3 * 24 * 60,
+        PICKUP: 156 * 60,
+        LOCAL_DELIVERY: 132 * 60,
+        SHIPPING: 132 * 60,
     },
     openNote: ({ fulfilment, readyAt }) =>
         fulfilment === "PICKUP"
@@ -274,16 +279,22 @@ const CONFIG: DemoShopConfig = {
         // Site orders pay by UPI at checkout: a jar takes days to make.
         onlinePaysAhead: true,
         weekday: [1.3, 0.9, 1, 1, 1, 0.7, 1.25],
-        // Diwali gifting lifts the last three weeks; closed 2–5 October for
-        // a family wedding; Raksha Bandhan (9 August) lifts a few days.
+        // Diwali gifting lifted the fortnight before last; this week Faizan
+        // takes only what Ammi can cook — about five orders a day, each
+        // three or four days in the making — so some twenty are in progress
+        // at once and Home lists only the few due by tomorrow (DEC-163).
+        // Closed 2–5 October for a family wedding; Raksha Bandhan
+        // (9 August) lifts a few days.
         bump: (daysAgo) =>
-            daysAgo >= 10 && daysAgo <= 13
-                ? 0.05
-                : daysAgo <= 20
-                  ? 1 + (20 - daysAgo) * 0.035
-                  : daysAgo >= 64 && daysAgo <= 70
-                    ? 1.25
-                    : 1,
+            daysAgo <= 6
+                ? 0.7
+                : daysAgo >= 10 && daysAgo <= 13
+                  ? 0.05
+                  : daysAgo <= 20
+                    ? 1 + (20 - daysAgo) * 0.025
+                    : daysAgo >= 64 && daysAgo <= 70
+                      ? 1.25
+                      : 1,
         lines: [55, 28, 12, 5],
         openMinute: 8 * 60 + 30,
         closeMinute: 22 * 60,
@@ -303,6 +314,9 @@ const CONFIG: DemoShopConfig = {
         // The designed problems: one jar ready and not collected, and a few
         // delivered and not paid for yet.
         latePickups: 1,
+        // Ready, not yet collected or out with Faizan: Home's "due today
+        // or tomorrow" (DEC-163).
+        dueOrders: 4,
         unpaidDelivered: 3,
     },
     bulkOrders: [
@@ -919,6 +933,28 @@ const CHECKS: DemoShopCheck[] = [
                 return age >= 0 && age <= 2;
             });
             return due.length >= 5 ? [] : [{ makingNow: due.length }];
+        },
+    },
+    {
+        // DEC-163: a kitchen that cooks what it can, and a Home that lists
+        // only the few due by tomorrow (late by the start of the day after,
+        // in Lucknow) — not every jar in the oil.
+        what: "open orders not about twenty, or not a few due by tomorrow",
+        rows: async (prisma, orgId, now) => {
+            const [open, late, byTomorrow] = await Promise.all([
+                prisma.order.count({
+                    where: {
+                        organizationId: orgId,
+                        status: { in: ["PENDING", "PROCESSING"] },
+                    },
+                }),
+                lateOrders(prisma, orgId, now),
+                lateOrders(prisma, orgId, istAt(now, 2, 0)),
+            ]);
+            const due = byTomorrow.length - late.length;
+            return open >= 15 && open <= 26 && due >= 2 && due <= 8
+                ? []
+                : [{ open, dueByTomorrow: due }];
         },
     },
     {

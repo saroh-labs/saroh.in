@@ -224,6 +224,13 @@ export interface DemoShopConfig {
         refundReasons: readonly string[];
         cancelReasons: readonly string[];
         latePickups: number;
+        /**
+         * Pick-ups and local deliveries ready and not handed over yet,
+         * placed long enough ago that they turn late today or tomorrow but
+         * not yet (DEC-163): the few open orders Home lists as due. Absent:
+         * none designed.
+         */
+        dueOrders?: number;
         unpaidDelivered: number;
     };
     bulkOrders: readonly DemoBulkOrder[];
@@ -1548,6 +1555,13 @@ function planVolume(a: {
         lines: Line[];
     }[] = [];
     let readyForLate = 0;
+    let readyForDue = 0;
+    const lateMs = {
+        PICKUP: (cfg.lateAfterMinutes?.PICKUP ?? 120) * 60_000,
+        LOCAL_DELIVERY: (cfg.lateAfterMinutes?.LOCAL_DELIVERY ?? 1440) * 60_000,
+    };
+    // Home's "due by tomorrow": the start of the day after, in Kolkata.
+    const dueBy = istAt(now, 2, 0).getTime();
     let unpaidLeft = V.unpaidDelivered;
 
     planned.forEach((o, n) => {
@@ -1638,6 +1652,25 @@ function planVolume(a: {
             readyForLate++;
             lateIdx.add(n);
             moves.splice(moves.findIndex((m) => m.to === "COLLECTED"));
+        } else if (
+            fate === "OK" &&
+            (o.fulfilment === "PICKUP" || o.fulfilment === "LOCAL_DELIVERY") &&
+            !o.walkIn &&
+            readyForDue < (V.dueOrders ?? 0) &&
+            readyAt < addMinutes(now, -60)
+        ) {
+            // Turns late at least 2 hours from now and before the day after
+            // tomorrow begins: due today or tomorrow. Ready, and still here.
+            const dueAt = o.placedAt.getTime() + lateMs[o.fulfilment];
+            if (dueAt >= now.getTime() + 2 * 3_600_000 && dueAt < dueBy) {
+                readyForDue++;
+                moves.splice(
+                    moves.findIndex(
+                        (m) =>
+                            m.to === "COLLECTED" || m.to === "OUT_FOR_DELIVERY",
+                    ),
+                );
+            }
         }
         let steps = moves.filter((m) => m.at <= addMinutes(now, -5));
         if (fate === "CANCELLED") steps = [];
