@@ -9,7 +9,7 @@ import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
 /**
  * The Products list and its quick look (#519, #520): search reaches the
  * whole catalogue and says when it finds nothing, a row opens the quick
- * look, Stop selling offers Undo, J at the last product stays put, and
+ * look, Archive offers Undo, J at the last product stays put, and
  * Duplicate opens a draft copy in the Editor.
  *
  * It runs on Northwind Supply, the base seed — Rye & Co., Pulse Fitness and
@@ -41,7 +41,7 @@ test.describe("Products list", () => {
         ).toHaveCount(0);
     });
 
-    test("quick look, Stop selling with Undo, and Duplicate", async ({
+    test("quick look, Archive with Undo, and Duplicate", async ({
         page,
     }, testInfo) => {
         test.setTimeout(120_000);
@@ -73,11 +73,13 @@ test.describe("Products list", () => {
             await page.keyboard.press("j");
             await expect(look.getByText("1 of 1")).toBeVisible();
 
-            // Stop selling archives it, and Undo puts it back on sale.
+            // Archive takes it off sale, and Undo puts it back.
             // It sits in the footer's menu, beside Edit.
             await look.getByRole("button", { name: "More actions" }).click();
-            await page.getByRole("menuitem", { name: /Stop selling/ }).click();
-            await expect(page.getByText(/Stopped selling/)).toBeVisible();
+            await page.getByRole("menuitem", { name: /Archive/ }).click();
+            await expect(
+                page.getByText(/^Archived E2E List Jar/),
+            ).toBeVisible();
             await expect(look.getByText("Archived")).toBeVisible();
             await page.getByRole("button", { name: "Undo" }).click();
             await expect(look.getByText("Live", { exact: true })).toBeVisible();

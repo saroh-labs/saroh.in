@@ -46,12 +46,12 @@ import { STATUS_LABEL, STATUS_VARIANT } from "./tones";
  * The list's quick look (#520, the design's drawer): status, where it is in
  * the list ("3 of 12", J/K and the arrows), price, stock — can sell, on
  * hand, promised, short — per variant with "+N · Add", where it sells, and
- * the way out to the product page and the Editor. Stop selling archives it
+ * the way out to the product page and the Editor. Archive takes it off sale
  * and Sell again publishes it (DEC-032), each with Undo.
  *
  * Deliberate additions beyond the list design: the per-storefront line
  * ("Sold out at Online · 4 at Hill Road", from Product Detail), and Undo on
- * Stop selling. With more than one storefront in view, Add asks where.
+ * Archive. With more than one storefront in view, Add asks where.
  */
 export function QuickLook({
     row,
@@ -70,7 +70,7 @@ export function QuickLook({
     total: number;
     /** The storefront filter, or null for every storefront. */
     storeId: string | null;
-    /** `store:write`: Stop selling, Sell again, Edit. */
+    /** `store:write`: Archive, Sell again, Edit. */
     canWrite: boolean;
     /** Count and move stock: "+N · Add". */
     canStock: boolean;
@@ -248,7 +248,7 @@ export function QuickLook({
 }
 
 /**
- * Stop selling (archive) · Sell again (publish) · Publish a draft, in the
+ * Archive · Sell again (publish) · Publish a draft, in the
  * footer's menu. Each says what it does in one true line: archiving deletes
  * nothing and the toast offers Undo.
  */
@@ -261,7 +261,7 @@ function SellMenu({
 }) {
     const selling = row.status === "PUBLISHED";
     const label = selling
-        ? "Stop selling"
+        ? "Archive"
         : row.status === "ARCHIVED"
           ? "Sell again"
           : "Publish";

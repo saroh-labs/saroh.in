@@ -209,7 +209,7 @@ export function CatalogueScreen({
         const said =
             status === "ARCHIVED"
                 ? one
-                    ? `Stopped selling ${one.name}. It's hidden from ${many ? "every location" : "your location"} until you sell it again.`
+                    ? `Archived ${one.name}. It's hidden from ${many ? "every location" : "your location"} until you sell it again.`
                     : `${targets.length} products archived.`
                 : one
                   ? `${one.name} is on sale.`
