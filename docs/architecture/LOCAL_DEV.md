@@ -213,6 +213,48 @@ the boutique without one:
   every half hour's `now` over months and across Diwali, month, year and
   financial-year boundaries to prove it works on any day.
 
+- **Frame & Vow** (a wedding photography and planning studio on Lake Palace
+  Road, Udaipur, with a Jaipur desk; owned by `demo@saroh.dev`, Meher Bhati
+  plans as a Member; `frame-vow.ts`, `frame-vow-data.ts`, the engine in
+  `studio.ts`): GST-registered in Rajasthan (prefix FV, prices include 18%:
+  SAC 998385 photography, 998386 prints and albums, 998596 planning). Four
+  people on the diary (Kabir Shekhawat, Ishaan Mathur, Meher, Tanvi Purohit)
+  and ten services: a free planning call (studio or video), engagement,
+  pre-wedding, haldi & mehendi and wedding day (25% deposit), maternity,
+  newborn, family and couple sessions paid in full online, corporate half
+  days billed after. Fifteen couples' jobs — a 25% advance invoice holds each
+  date, the 75% balance is invoiced once the edit is delivered (paid, or for
+  Sanya & Vivek overdue and being chased), planning invoices itemise décor and
+  catering by the plate on the final count — plus three quotes as draft
+  invoices, about 330 bookings (weddings booked months ahead), 16 products
+  (a 27-variant album by size · cover · pages, canvas, cotton-rag prints,
+  sheesham frames, edit packs; décor, catering per plate, DJ and mehendi as
+  quoted-only products) with about 175 print and album orders and 20 reviews,
+  33 enquiries across New enquiry → Call done → Quote sent → Advance paid →
+  Booked → Delivered (15 from the site's form), notes, 30 posts (Help, News,
+  Articles) and 90 days of Insights. Site at
+  `frame-and-vow.saroh.app.localhost`: home, portfolio, packages, planning,
+  enquire, about, journal. `checkFrameVow` stops the run if a designed state
+  is missing.
+- **Pixel & Chai** (a five-person social-media and local-marketing agency at
+  Shekhar Central, Palasia, Indore; owned by `demo@saroh.dev`, Nikita Rathi
+  as a Member; `pixel-chai.ts`, `pixel-chai-data.ts`): GST-registered in
+  Madhya Pradesh (prefix PC, SAC 998361, shoots 998385, print 998912). Monthly
+  retainers as plans — Listing care ₹2,999, Starter ₹14,999, Growth ₹27,999,
+  Pro ₹44,999 — with about 100 subscriptions over 18 months: 51 running (two
+  paused, one whose renewal failed), 50 ended (some moved up a plan), every
+  period invoiced. A free 20-minute audit call, a strategy workshop and a
+  Google profile clean-up paid online, reel shoot days billed after; brand
+  kits and festive packs billed by hand and a proposal as a draft; standees,
+  table tents and print packs ordered online; 26 leads (13 from the site),
+  notes, 30 posts and 90 days of Insights. Site at
+  `pixel-and-chai.saroh.app.localhost`: home, work, plans, audit, contact,
+  journal. `checkPixelChai` stops the run if a designed state is missing.
+  Their photos are Unsplash images every one of which was looked at
+  (`studio-photos.ts`, checked by `node scripts/check-demo-images.mjs`);
+  album covers, a catering card, standees and a sample report are drawn by
+  `scripts/demo-art/studio-art.mjs` and carried as `data:` URIs.
+
 Every business keeps time in Asia/Kolkata (`BusinessProfile.timezone`). The
 showcase code is in `packages/database/src/seed/showcase/`. It uses a seeded
 random generator and dates relative to now, rounded down to the half hour:

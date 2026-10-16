@@ -45,8 +45,6 @@ import { checkRye, checkShowcase } from "./check";
 import type { KaviCounts } from "./clinic";
 import { checkKavi, KAVI, seedClinic } from "./clinic";
 import { KAVI_DESK } from "./clinic-data";
-import { checkFrameVow, seedFrameVow } from "./frame-vow";
-import { checkPixelChai, seedPixelChai } from "./pixel-chai";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
 import type { LeadSpec } from "./crm";
@@ -70,8 +68,10 @@ import {
     staffEmail,
     TIMEZONE,
 } from "./data";
+import { checkFrameVow, seedFrameVow } from "./frame-vow";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
+import { checkPixelChai, seedPixelChai } from "./pixel-chai";
 import type { PulseCounts } from "./pulse";
 import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
 import { createRng } from "./random";
@@ -217,14 +217,22 @@ export async function seedShowcase(
         prisma,
         now,
         demoUserId: ctx.demoUserId,
-        memberUserId: await ensureTeamMember(ctx, { first: "Meher", last: "Bhati", role: "MEMBER" }),
+        memberUserId: await ensureTeamMember(ctx, {
+            first: "Meher",
+            last: "Bhati",
+            role: "MEMBER",
+        }),
     });
     businesses.push(frameVow);
     const pixelChai = await seedPixelChai({
         prisma,
         now,
         demoUserId: ctx.demoUserId,
-        memberUserId: await ensureTeamMember(ctx, { first: "Nikita", last: "Rathi", role: "MEMBER" }),
+        memberUserId: await ensureTeamMember(ctx, {
+            first: "Nikita",
+            last: "Rathi",
+            role: "MEMBER",
+        }),
     });
     businesses.push(pixelChai);
     for (const business of SHOWCASE_BUSINESSES) {
@@ -290,7 +298,9 @@ export async function seedShowcase(
     console.table(ryeCounts);
     console.log("[showcase] Kavi Dental, as its films need it:");
     console.table(kaviCounts);
-    console.log("[showcase] Frame & Vow and Pixel & Chai, as their demos need them:");
+    console.log(
+        "[showcase] Frame & Vow and Pixel & Chai, as their demos need them:",
+    );
     console.table(studioCounts);
 
     console.log(

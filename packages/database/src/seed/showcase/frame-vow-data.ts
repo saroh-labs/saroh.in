@@ -1,7 +1,5 @@
 import type { SeedSite } from "../data";
 import { FV_POSTS } from "./frame-vow-posts";
-import { STUDIO_ART } from "./studio-art";
-import { FV_PHOTOS } from "./studio-photos";
 import type {
     StudioProduct,
     StudioService,
@@ -9,6 +7,8 @@ import type {
     StudioVariant,
 } from "./studio";
 import { blockImage, section } from "./studio";
+import { STUDIO_ART } from "./studio-art";
+import { FV_PHOTOS } from "./studio-photos";
 
 /**
  * Frame & Vow's fixed facts: a wedding photography and planning studio on
@@ -237,7 +237,12 @@ const ALBUM_VARIANTS: StudioVariant[] = SIZES.flatMap((s) =>
     ),
 );
 
-const v = (title: string, sku: string, rupees: number, image?: number): StudioVariant => ({
+const v = (
+    title: string,
+    sku: string,
+    rupees: number,
+    image?: number,
+): StudioVariant => ({
     title,
     sku,
     pricePaise: rupees * 100,
@@ -258,8 +263,15 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
             "Designed by us, proof before print",
             "Three weeks from approved proof",
         ],
-        materials: "Archival lustre photo paper; linen, leather or acrylic cover; boxed",
-        images: [A.albumLinen, A.albumLeather, A.albumAcrylic, A.albumSizes, P.albumOpen],
+        materials:
+            "Archival lustre photo paper; linen, leather or acrylic cover; boxed",
+        images: [
+            A.albumLinen,
+            A.albumLeather,
+            A.albumAcrylic,
+            A.albumSizes,
+            P.albumOpen,
+        ],
         option: { name: "Size · cover · pages", variants: ALBUM_VARIANTS },
         fulfilment: "SHIPPING",
         demand: 7,
@@ -277,7 +289,10 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         images: [P.albumStack, A.albumLinen],
         option: {
             name: "Parent album cover",
-            variants: [v("Linen", "FV-PAR-LIN", 9_500, 1), v("Leather", "FV-PAR-LEA", 11_500)],
+            variants: [
+                v("Linen", "FV-PAR-LIN", 9_500, 1),
+                v("Leather", "FV-PAR-LEA", 11_500),
+            ],
         },
         fulfilment: "SHIPPING",
         demand: 9,
@@ -290,7 +305,11 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
             "Your photograph on cotton canvas, stretched over a 38 mm pine frame and wrapped round the edges, ready to hang. Colour-checked by us before it goes to print. Includes GST.",
         pricePaise: 4_800_00,
         hsn: "998386",
-        keyPoints: ["Ready to hang", "38 mm frame", "Colour-checked before print"],
+        keyPoints: [
+            "Ready to hang",
+            "38 mm frame",
+            "Colour-checked before print",
+        ],
         materials: "Cotton canvas, pine stretcher bars",
         images: [A.canvasWall, P.wedding8b],
         option: {
@@ -313,7 +332,11 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
             "Printed on 308 gsm cotton rag with archival pigment inks — matte for black and white, pearl for colour that holds its depth. Shipped flat between boards. Includes GST.",
         pricePaise: 2_400_00,
         hsn: "998386",
-        keyPoints: ["308 gsm cotton rag", "Archival pigment inks", "Shipped flat"],
+        keyPoints: [
+            "308 gsm cotton rag",
+            "Archival pigment inks",
+            "Shipped flat",
+        ],
         materials: "Cotton rag paper",
         images: [P.fineArtPrint],
         option: {
@@ -338,7 +361,11 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
             "A solid sheesham frame made by a workshop in Jodhpur, with your print behind glass and a soft white mount. Stands on a table or hangs. Includes GST.",
         pricePaise: 3_200_00,
         hsn: "998386",
-        keyPoints: ["Solid sheesham", "Glass and white mount", "Stands or hangs"],
+        keyPoints: [
+            "Solid sheesham",
+            "Glass and white mount",
+            "Stands or hangs",
+        ],
         materials: "Sheesham wood, glass, acid-free mount",
         images: [A.frameDesk],
         option: {
@@ -360,7 +387,10 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
             "More of your wedding, edited the way your gallery was: pick them from the full proof set and they land in your gallery within ten days. Includes GST.",
         pricePaise: 6_000_00,
         hsn: "998386",
-        keyPoints: ["You choose from the proofs", "In your gallery within ten days"],
+        keyPoints: [
+            "You choose from the proofs",
+            "In your gallery within ten days",
+        ],
         materials: null,
         images: [P.wedding3c, P.haldi],
         option: {
@@ -438,7 +468,11 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
             "Tanvi's mandap: rajnigandha, roses and marigold on a carved frame, draped and lit, built the night before and struck after the vidaai. Priced by size; the flowers follow the season. Includes GST.",
         pricePaise: 1_85_000_00,
         hsn: "998596",
-        keyPoints: ["Built the night before", "Seasonal flowers", "Lighting included"],
+        keyPoints: [
+            "Built the night before",
+            "Seasonal flowers",
+            "Lighting included",
+        ],
         materials: "Fresh flowers, carved wooden frame, fabric drapes",
         images: [P.decorMandap],
         option: {
@@ -480,7 +514,11 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
             "A raised stage, a dance floor, warm lights and a backdrop that photographs well. With an LED wall for the family's videos if you want one. Includes GST.",
         pricePaise: 1_40_000_00,
         hsn: "998596",
-        keyPoints: ["Stage and dance floor", "Warm lighting", "LED wall optional"],
+        keyPoints: [
+            "Stage and dance floor",
+            "Warm lighting",
+            "LED wall optional",
+        ],
         materials: null,
         images: [P.decorSangeet],
         option: {
@@ -501,7 +539,11 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
             "From our partner kitchen in Udaipur, served by their own staff. Four menus, priced per plate; tasting for the couple before you confirm. Minimum 100 plates. You give us an estimate; the final count is billed after the event. Includes GST.",
         pricePaise: 1_450_00,
         hsn: "998596",
-        keyPoints: ["Minimum 100 plates", "Tasting before you confirm", "Billed on the final count"],
+        keyPoints: [
+            "Minimum 100 plates",
+            "Tasting before you confirm",
+            "Billed on the final count",
+        ],
         materials: null,
         images: [A.cateringMenu, P.cateringThali, P.cateringBuffet],
         option: {
@@ -543,7 +585,10 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         images: [P.mehendiArtist],
         option: {
             name: "Mehendi",
-            variants: [v("Bridal", "FV-MEH-BRIDE", 21_000), v("Guests, per hand", "FV-MEH-HAND", 350)],
+            variants: [
+                v("Bridal", "FV-MEH-BRIDE", 21_000),
+                v("Guests, per hand", "FV-MEH-HAND", 350),
+            ],
         },
         fulfilment: "PICKUP",
         demand: 0,
@@ -554,14 +599,70 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
 
 /** The portfolio: eight weddings, each with its story where the journal has one. */
 export const FV_WEDDINGS = [
-    { title: "Aditi & Karan", where: "A lake palace, Udaipur", when: "April", photo: P.wedding1a, summary: "Two days on Lake Pichola: everyone arrived by boat, the pheras were at sunset, and the whole family finally fitted into one photograph." },
-    { title: "Riya & Arjun", where: "The walled city, Jaipur", when: "January", photo: P.wedding2a, summary: "Amer at dawn the day before, a sangeet in her Dadi's courtyard, and a baraat past the Hawa Mahal." },
-    { title: "Neha & Siddharth", where: "A haveli near Gangaur Ghat, Udaipur", when: "June", photo: P.wedding3a, summary: "Sixty guests, no stage, no DJ — and a grandmother two metres from the fire for the pheras." },
-    { title: "Pooja & Nikhil", where: "Amer road, Jaipur", when: "May", photo: P.wedding4a, summary: "A morning wedding planned around the heat, with the mandap under old neem trees." },
-    { title: "Meera & Rohan", where: "Fateh Sagar, Udaipur", when: "May", photo: P.wedding5a, summary: "A Tamil-Rajasthani wedding with two ceremonies on one day and both grandmothers in charge." },
-    { title: "Sanya & Vivek", where: "Bagore ki Haveli lanes, Udaipur", when: "August", photo: P.wedding6a, summary: "Ninety guests on a monsoon afternoon, and the rain stopping exactly for the varmala." },
-    { title: "Tanya & Kunal", where: "Sajjangarh hills, Udaipur", when: "Pre-wedding", photo: P.wedding7a, summary: "Their pre-wedding on the Monsoon Palace road at sunset. The wedding is in November." },
-    { title: "Kavya & Ritvik", where: "Old city, Udaipur", when: "Engagement", photo: P.wedding8a, summary: "A small roka at home, and then the whole family on the ghats for portraits." },
+    {
+        title: "Aditi & Karan",
+        where: "A lake palace, Udaipur",
+        when: "April",
+        photo: P.wedding1a,
+        summary:
+            "Two days on Lake Pichola: everyone arrived by boat, the pheras were at sunset, and the whole family finally fitted into one photograph.",
+    },
+    {
+        title: "Riya & Arjun",
+        where: "The walled city, Jaipur",
+        when: "January",
+        photo: P.wedding2a,
+        summary:
+            "Amer at dawn the day before, a sangeet in her Dadi's courtyard, and a baraat past the Hawa Mahal.",
+    },
+    {
+        title: "Neha & Siddharth",
+        where: "A haveli near Gangaur Ghat, Udaipur",
+        when: "June",
+        photo: P.wedding3a,
+        summary:
+            "Sixty guests, no stage, no DJ — and a grandmother two metres from the fire for the pheras.",
+    },
+    {
+        title: "Pooja & Nikhil",
+        where: "Amer road, Jaipur",
+        when: "May",
+        photo: P.wedding4a,
+        summary:
+            "A morning wedding planned around the heat, with the mandap under old neem trees.",
+    },
+    {
+        title: "Meera & Rohan",
+        where: "Fateh Sagar, Udaipur",
+        when: "May",
+        photo: P.wedding5a,
+        summary:
+            "A Tamil-Rajasthani wedding with two ceremonies on one day and both grandmothers in charge.",
+    },
+    {
+        title: "Sanya & Vivek",
+        where: "Bagore ki Haveli lanes, Udaipur",
+        when: "August",
+        photo: P.wedding6a,
+        summary:
+            "Ninety guests on a monsoon afternoon, and the rain stopping exactly for the varmala.",
+    },
+    {
+        title: "Tanya & Kunal",
+        where: "Sajjangarh hills, Udaipur",
+        when: "Pre-wedding",
+        photo: P.wedding7a,
+        summary:
+            "Their pre-wedding on the Monsoon Palace road at sunset. The wedding is in November.",
+    },
+    {
+        title: "Kavya & Ritvik",
+        where: "Old city, Udaipur",
+        when: "Engagement",
+        photo: P.wedding8a,
+        summary:
+            "A small roka at home, and then the whole family on the ghats for portraits.",
+    },
 ] as const;
 
 /** Where the journal tells a wedding's story. */
@@ -578,7 +679,12 @@ const FORM_FIELDS = [
     { name: "date", label: "Wedding date (or month)", type: "text" },
     { name: "venue", label: "City or venue", type: "text" },
     { name: "guests", label: "Roughly how many guests", type: "text" },
-    { name: "message", label: "Tell us about it", type: "textarea", required: true },
+    {
+        name: "message",
+        label: "Tell us about it",
+        type: "textarea",
+        required: true,
+    },
 ] as const;
 
 export function fvSite(): SeedSite {
@@ -597,20 +703,37 @@ export function fvSite(): SeedSite {
                 sections: [
                     section("hero", {
                         variant: "fullBleed",
-                        heading: "Weddings in Udaipur and Jaipur, photographed and planned by one team.",
+                        heading:
+                            "Weddings in Udaipur and Jaipur, photographed and planned by one team.",
                         subheading:
                             "Frame & Vow is Kabir, Ishaan, Meher and Tanvi: photographs and films, the planning and the décor, from the first call to the album on your shelf.",
-                        cta: { label: "Book a free planning call", href: "/book", style: "primary" },
+                        cta: {
+                            label: "Book a free planning call",
+                            href: "/book",
+                            style: "primary",
+                        },
                         image: blockImage(P.heroMandap),
                     }),
                     section("features", {
                         variant: "steps",
                         heading: "How a wedding with us works",
                         items: [
-                            { title: "A free call", body: "Thirty minutes about dates, venues and guests. You leave with an estimate." },
-                            { title: "A 25% advance holds the date", body: "We don't hold dates on a promise: the advance invoice confirms it." },
-                            { title: "The days themselves", body: "Pre-wedding, haldi and mehendi, the wedding. Two photographers and a filmmaker." },
-                            { title: "Gallery, album, balance", body: "Sneak peek in 72 hours, gallery in 4–6 weeks; the balance is due before the album goes to print." },
+                            {
+                                title: "A free call",
+                                body: "Thirty minutes about dates, venues and guests. You leave with an estimate.",
+                            },
+                            {
+                                title: "A 25% advance holds the date",
+                                body: "We don't hold dates on a promise: the advance invoice confirms it.",
+                            },
+                            {
+                                title: "The days themselves",
+                                body: "Pre-wedding, haldi and mehendi, the wedding. Two photographers and a filmmaker.",
+                            },
+                            {
+                                title: "Gallery, album, balance",
+                                body: "Sneak peek in 72 hours, gallery in 4–6 weeks; the balance is due before the album goes to print.",
+                            },
                         ],
                     }),
                     section("projects", {
@@ -621,13 +744,23 @@ export function fvSite(): SeedSite {
                             title: w.title,
                             summary: w.summary,
                             caption: `${w.where} · ${w.when}`,
-                            ...(storyLinks[w.title] ? { link: storyLinks[w.title] } : {}),
+                            ...(storyLinks[w.title]
+                                ? { link: storyLinks[w.title] }
+                                : {}),
                         })),
                     }),
-                    section("journal", { variant: "default", title: "From the journal", count: 3 }),
+                    section("journal", {
+                        variant: "default",
+                        title: "From the journal",
+                        count: 3,
+                    }),
                     {
                         type: "cta",
-                        content: { label: "Tell us about your wedding", href: "/enquire", style: "primary" },
+                        content: {
+                            label: "Tell us about your wedding",
+                            href: "/enquire",
+                            style: "primary",
+                        },
                     },
                 ],
             },
@@ -644,15 +777,26 @@ export function fvSite(): SeedSite {
                             title: w.title,
                             summary: w.summary,
                             caption: `${w.where} · ${w.when}`,
-                            ...(storyLinks[w.title] ? { link: storyLinks[w.title] } : {}),
+                            ...(storyLinks[w.title]
+                                ? { link: storyLinks[w.title] }
+                                : {}),
                         })),
                     }),
                     section("gallery", {
                         layout: "masonry",
                         images: [
-                            P.wedding1b, P.wedding1c, P.wedding2b, P.wedding3b, P.wedding3c,
-                            P.wedding4b, P.wedding5c, P.wedding6b, P.wedding7b, P.wedding8b,
-                            P.haldi, P.mehendi,
+                            P.wedding1b,
+                            P.wedding1c,
+                            P.wedding2b,
+                            P.wedding3b,
+                            P.wedding3c,
+                            P.wedding4b,
+                            P.wedding5c,
+                            P.wedding6b,
+                            P.wedding7b,
+                            P.wedding8b,
+                            P.haldi,
+                            P.mehendi,
                         ].map(blockImage),
                     }),
                 ],
@@ -675,10 +819,23 @@ export function fvSite(): SeedSite {
                         content: {
                             heading: "Before you book",
                             items: [
-                                { question: "How does the advance work?", answer: "25% of your package, invoiced when you say yes. It holds the date; we turn other couples away for it. The 75% balance is invoiced after your edited gallery is delivered and is due before the album goes to print." },
-                                { question: "Do you travel outside Udaipur and Jaipur?", answer: "Yes, anywhere in Rajasthan and Gujarat, and further for a destination wedding. Travel and stay are billed at cost." },
-                                { question: "When do we get the photographs?", answer: "A sneak peek in 72 hours, the full edited gallery in four to six weeks, the album three weeks after you approve its proof." },
-                                { question: "Can we change our date?", answer: "Once, free, if we're free on the new date. The advance moves with you." },
+                                {
+                                    question: "How does the advance work?",
+                                    answer: "25% of your package, invoiced when you say yes. It holds the date; we turn other couples away for it. The 75% balance is invoiced after your edited gallery is delivered and is due before the album goes to print.",
+                                },
+                                {
+                                    question:
+                                        "Do you travel outside Udaipur and Jaipur?",
+                                    answer: "Yes, anywhere in Rajasthan and Gujarat, and further for a destination wedding. Travel and stay are billed at cost.",
+                                },
+                                {
+                                    question: "When do we get the photographs?",
+                                    answer: "A sneak peek in 72 hours, the full edited gallery in four to six weeks, the album three weeks after you approve its proof.",
+                                },
+                                {
+                                    question: "Can we change our date?",
+                                    answer: "Once, free, if we're free on the new date. The advance moves with you.",
+                                },
                             ],
                         },
                     },
@@ -689,19 +846,29 @@ export function fvSite(): SeedSite {
                 title: "Planning",
                 sections: [
                     section("richText", {
-                            format: "html",
-                            value:
-                                "<h2>Planning and décor, by the same team</h2><p>Meher plans; Tanvi builds. We quote the décor, catering, music and mehendi together with your photography, so one team answers for the day. Catering is from our partner kitchen and billed per plate on the final count after the event.</p><table><thead><tr><th>What</th><th>From, incl. GST</th></tr></thead><tbody><tr><td>Floral mandap</td><td>₹1,85,000</td></tr><tr><td>Marigold &amp; mogra haldi setup</td><td>₹65,000</td></tr><tr><td>Sangeet stage &amp; lights</td><td>₹1,40,000</td></tr><tr><td>Catering, veg classic</td><td>₹1,450 a plate</td></tr><tr><td>Catering, veg royal Rajasthani</td><td>₹2,100 a plate</td></tr><tr><td>Catering, non-veg classic</td><td>₹1,850 a plate</td></tr><tr><td>Catering, non-veg royal</td><td>₹2,600 a plate</td></tr><tr><td>DJ &amp; sound night</td><td>₹75,000</td></tr><tr><td>Bridal mehendi</td><td>₹21,000</td></tr><tr><td>Guest mehendi</td><td>₹350 a hand</td></tr></tbody></table>",
-                            image: blockImage(P.decorMandap),
-                            imageSide: "right",
-                        }),
+                        format: "html",
+                        value: "<h2>Planning and décor, by the same team</h2><p>Meher plans; Tanvi builds. We quote the décor, catering, music and mehendi together with your photography, so one team answers for the day. Catering is from our partner kitchen and billed per plate on the final count after the event.</p><table><thead><tr><th>What</th><th>From, incl. GST</th></tr></thead><tbody><tr><td>Floral mandap</td><td>₹1,85,000</td></tr><tr><td>Marigold &amp; mogra haldi setup</td><td>₹65,000</td></tr><tr><td>Sangeet stage &amp; lights</td><td>₹1,40,000</td></tr><tr><td>Catering, veg classic</td><td>₹1,450 a plate</td></tr><tr><td>Catering, veg royal Rajasthani</td><td>₹2,100 a plate</td></tr><tr><td>Catering, non-veg classic</td><td>₹1,850 a plate</td></tr><tr><td>Catering, non-veg royal</td><td>₹2,600 a plate</td></tr><tr><td>DJ &amp; sound night</td><td>₹75,000</td></tr><tr><td>Bridal mehendi</td><td>₹21,000</td></tr><tr><td>Guest mehendi</td><td>₹350 a hand</td></tr></tbody></table>",
+                        image: blockImage(P.decorMandap),
+                        imageSide: "right",
+                    }),
                     section("gallery", {
                         layout: "grid",
-                        images: [P.decorHaldi, P.decorSangeet, P.cateringThali, P.mehendiArtist, P.djNight, P.cateringBuffet].map(blockImage),
+                        images: [
+                            P.decorHaldi,
+                            P.decorSangeet,
+                            P.cateringThali,
+                            P.mehendiArtist,
+                            P.djNight,
+                            P.cateringBuffet,
+                        ].map(blockImage),
                     }),
                     {
                         type: "cta",
-                        content: { label: "Ask for a planning estimate", href: "/enquire", style: "primary" },
+                        content: {
+                            label: "Ask for a planning estimate",
+                            href: "/enquire",
+                            style: "primary",
+                        },
                     },
                 ],
             },
@@ -714,9 +881,11 @@ export function fvSite(): SeedSite {
                         form: { name: "Wedding enquiry", fields: FORM_FIELDS },
                         content: {
                             title: "Tell us about your wedding",
-                            description: "Dates, places, how many people. Meher replies within a day, usually on WhatsApp.",
+                            description:
+                                "Dates, places, how many people. Meher replies within a day, usually on WhatsApp.",
                             submitLabel: "Send enquiry",
-                            successMessage: "Thank you — Meher will be in touch within a day.",
+                            successMessage:
+                                "Thank you — Meher will be in touch within a day.",
                         },
                     },
                 ],
@@ -733,24 +902,42 @@ export function fvSite(): SeedSite {
                         bio: "Kabir started Frame & Vow in 2017 after six years assisting wedding photographers across Rajasthan. He still shoots every wedding we take.",
                         image: blockImage(P.studioCamera),
                         people: [
-                            { name: "Ishaan Mathur", role: "Second shooter and films", bio: "Cuts the highlight films. Will climb anything for the angle." },
-                            { name: "Meher Bhati", role: "Wedding planner", bio: "Runs the calendar, the vendors and the run-sheets. Answers WhatsApp faster than anyone." },
-                            { name: "Tanvi Purohit", role: "Décor lead", bio: "Designs and builds the mandaps, haldi corners and sangeet stages." },
+                            {
+                                name: "Ishaan Mathur",
+                                role: "Second shooter and films",
+                                bio: "Cuts the highlight films. Will climb anything for the angle.",
+                            },
+                            {
+                                name: "Meher Bhati",
+                                role: "Wedding planner",
+                                bio: "Runs the calendar, the vendors and the run-sheets. Answers WhatsApp faster than anyone.",
+                            },
+                            {
+                                name: "Tanvi Purohit",
+                                role: "Décor lead",
+                                bio: "Designs and builds the mandaps, haldi corners and sangeet stages.",
+                            },
                         ],
                     }),
                     section("richText", {
-                            format: "html",
-                            value:
-                                "<h2>The studio</h2><p>2nd floor, 14 Lake Palace Road, Udaipur 313001. Our Jaipur desk in C-Scheme is open on Tuesdays and Fridays by appointment.</p><p>Call or WhatsApp +91 98290 41760.</p>",
-                            image: blockImage(P.udaipurLake),
-                            imageSide: "left",
-                        }),
+                        format: "html",
+                        value: "<h2>The studio</h2><p>2nd floor, 14 Lake Palace Road, Udaipur 313001. Our Jaipur desk in C-Scheme is open on Tuesdays and Fridays by appointment.</p><p>Call or WhatsApp +91 98290 41760.</p>",
+                        image: blockImage(P.udaipurLake),
+                        imageSide: "left",
+                    }),
                 ],
             },
             {
                 path: "/journal",
                 title: "Journal",
-                sections: [section("journal", { variant: "archive", title: "Journal", groupByYear: false, showTotal: true })],
+                sections: [
+                    section("journal", {
+                        variant: "archive",
+                        title: "Journal",
+                        groupByYear: false,
+                        showTotal: true,
+                    }),
+                ],
             },
         ],
     };
@@ -764,7 +951,12 @@ export function fvSpec(): StudioSpec {
         legalName: "Frame and Vow Studio LLP",
         contactEmail: "frameandvow@example.com",
         phone: "+919829041760",
-        gst: { state: "08", stateName: "Rajasthan", pan: "AAJFF4821K", prefix: "FV" },
+        gst: {
+            state: "08",
+            stateName: "Rajasthan",
+            pan: "AAJFF4821K",
+            prefix: "FV",
+        },
         address: {
             addressLine1: "2nd floor, 14 Lake Palace Road",
             addressLine2: "Near Chandpole",
@@ -772,7 +964,14 @@ export function fvSpec(): StudioSpec {
             postalCode: "313001",
         },
         createdDaysAgo: 260,
-        modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS", "COMMERCE", "INSIGHTS"],
+        modules: [
+            "APPOINTMENTS",
+            "CRM",
+            "WEBSITE",
+            "PAYMENTS",
+            "COMMERCE",
+            "INSIGHTS",
+        ],
         store: {
             description: "Prints, albums and frames from Frame & Vow, Udaipur.",
             openingHours: [
@@ -790,15 +989,38 @@ export function fvSpec(): StudioSpec {
                 key: "kabir",
                 name: "Kabir Shekhawat",
                 title: "Lead photographer",
-                services: ["consult", "engagement", "prewedding", "haldi", "wedding", "maternity", "newborn", "family", "couple", "corporate"],
+                services: [
+                    "consult",
+                    "engagement",
+                    "prewedding",
+                    "haldi",
+                    "wedding",
+                    "maternity",
+                    "newborn",
+                    "family",
+                    "couple",
+                    "corporate",
+                ],
                 hours: [{ days: EVERY_DAY, from: "08:00", to: "21:00" }],
             },
             {
                 key: "ishaan",
                 name: "Ishaan Mathur",
                 title: "Second shooter and films",
-                services: ["engagement", "prewedding", "haldi", "wedding", "maternity", "newborn", "family", "couple", "corporate"],
-                hours: [{ days: [0, 2, 3, 4, 5, 6], from: "08:00", to: "21:00" }],
+                services: [
+                    "engagement",
+                    "prewedding",
+                    "haldi",
+                    "wedding",
+                    "maternity",
+                    "newborn",
+                    "family",
+                    "couple",
+                    "corporate",
+                ],
+                hours: [
+                    { days: [0, 2, 3, 4, 5, 6], from: "08:00", to: "21:00" },
+                ],
             },
             {
                 key: "meher",
@@ -816,7 +1038,11 @@ export function fvSpec(): StudioSpec {
                 hours: [{ days: [1, 2, 3, 4, 5], from: "11:00", to: "19:00" }],
             },
         ],
-        rules: { bookAheadDays: 365, latestBookingMinutes: 24 * 60, freeCancelHours: 72 },
+        rules: {
+            bookAheadDays: 365,
+            latestBookingMinutes: 24 * 60,
+            freeCancelHours: 72,
+        },
         services: FV_SERVICES,
         categories: [
             { key: "albums", name: "Albums" },
@@ -829,7 +1055,14 @@ export function fvSpec(): StudioSpec {
         plans: [],
         pipeline: {
             name: "Wedding enquiries",
-            stages: ["New enquiry", "Call done", "Quote sent", "Advance paid", "Booked", "Delivered"],
+            stages: [
+                "New enquiry",
+                "Call done",
+                "Quote sent",
+                "Advance paid",
+                "Booked",
+                "Delivered",
+            ],
         },
         site: fvSite(),
         footer: "Frame & Vow · 2nd floor, 14 Lake Palace Road, Udaipur 313001 · +91 98290 41760",

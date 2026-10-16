@@ -5,68 +5,437 @@ import type { StudioImage, StudioPost } from "./studio-types";
  * width and height, and the photographer as Unsplash names them.
  */
 const PHOTOS = {
-    cafeWindow: ["photo-1579018183467-a60b8dc9dd78", 4640, 3480, "Praveen Gupta", "praveeeeeeeen"],
-    cafePendant: ["photo-1676188043163-9f16eac1f2ac", 3024, 4032, "Sagar Chauhan", "sagar_b_chauhan"],
-    cafeEvening: ["photo-1714328864042-1d23671ab8d5", 6000, 4000, "Akshat Jhingran", "akshat_jhingran"],
-    chaiPour: ["photo-1693302050215-66ae33076745", 1969, 4029, "Dhruval Upadhyay", "dhruval47"],
-    kulhadRows: ["photo-1619581073186-5b4ae1b0caad", 4000, 6000, "Harsh Pandey", "harsh_clicks__"],
-    kulhadTop: ["photo-1625033405953-f20401c7d848", 4000, 6000, "Shubham Dangi", "shubham_dangi"],
-    chaiArt: ["photo-1561336526-2914f13ceb36", 5472, 3648, "René Porter", "reneporter"],
-    chaiRusk: ["photo-1683533699004-7f6b9e5a073f", 5737, 3830, "Ananthan Chithiraikani", "ananthan8110"],
-    chaiStrain: ["photo-1611312410928-bdcb480e6239", 3315, 5184, "Ayaneshu Bhardwaj", "ayaneshu"],
-    samosaChai: ["photo-1732519970445-8f2d6998961f", 5472, 3648, "prajakta bagade", "coraljasmine"],
-    phoneShoot: ["photo-1543525469-65b61cc2bc06", 3648, 5472, "charlesdeluvio", "charlesdeluvio"],
-    phoneSunset: ["photo-1578417618193-3726d6f2fef6", 6720, 4480, "Joey Huang", "onice"],
-    phoneTripod: ["photo-1658837721890-fc4b47a6f0e2", 3648, 2432, "DIEU", "quangdieu195"],
-    editing: ["photo-1627244714766-94dab62ed964", 3933, 4916, "Nubelson Fernandes", "nublson"],
-    kitchenShoot: ["photo-1695408247109-3bf125ad0538", 6000, 4000, "Wesley Tingey", "wesleyphotography"],
-    videographer: ["photo-1611784728558-6c7d9b409cdf", 2792, 1861, "Kyle Loftus", "kyleloftusstudios"],
-    handsPhone: ["photo-1488509082528-cefbba5ad692", 5472, 3648, "Priscilla Du Preez", "priscilladupreez"],
-    twoLaptop: ["photo-1653503425441-9d975e51ce91", 3000, 4000, "Yash Parashar", "lookforyash"],
-    laptopMug: ["photo-1637999052989-4d7cf96bb805", 4885, 3236, "Kishore V", "imkishorein"],
-    deskMan: ["photo-1731657021987-65b55c98568d", 4608, 3456, "Pritimohan Shit", "pritimohan"],
-    salonWash: ["photo-1634449571010-02389ed0f9b0", 5760, 3840, "Lindsay Cash", "lindsayrc81"],
-    salonBlow: ["photo-1580618672591-eb180b1a973f", 6016, 4016, "Adam Winger", "awcreativeut"],
-    salonChairs: ["photo-1521590832167-7bcbfaa6381f", 4038, 2692, "Guilherme Petri", "guipetri"],
-    dentalRoom: ["photo-1629909613654-28e377c37b09", 5472, 3658, "Benyamin Bohlouli", "benyamin_bohlouli"],
-    dentalChair: ["photo-1598256989800-fe5f95da9787", 5568, 3712, "Atikah Akhtar", "atikahakhtar"],
-    dentalExam: ["photo-1606811971618-4486d14f3f99", 5355, 4016, "Caroline LM", "carocaro1987"],
-    halwa: ["photo-1517244683847-7456b63c5969", 4000, 5990, "Nisha Ramesh", "nisharamesh"],
-    sweetsPlatter: ["photo-1695568181363-af5c78f4d059", 3883, 5824, "Gaurav Kumar", "countingframez"],
-    katli: ["photo-1695568181558-034b7d3e49eb", 4000, 6000, "Gaurav Kumar", "countingframez"],
-    gymRack: ["photo-1534438327276-14e5300c3a48", 4272, 2848, "Danielle Cerullo", "dncerullo"],
-    gymMono: ["photo-1571902943202-507ec2618e8f", 3836, 2874, "Risen Wang", "risennnnn"],
-    gymHall: ["photo-1623874514711-0f321325f318", 6000, 4000, "Samuel Girven", "samuelgirven"],
-    groupTable: ["photo-1682962232755-f1d051ddb638", 6000, 4000, "Sanket Mishra", "sanketgraphy"],
-    samosas: ["photo-1601050690597-df0568f70950", 6000, 4000, "kabir cheema", "kabircheema"],
-    thaliTop: ["photo-1589778655375-3e622a9fc91c", 4028, 2814, "Barun Ghosh", "barunghosh"],
-    curry: ["photo-1585937421612-70a008356fbe", 2597, 3462, "Andy Hay", "eastcoastkitchen"],
-    puri: ["photo-1717587052948-fb9825de50f8", 4000, 4293, "Jainica Dhingra", "jainica"],
-    ringLightWoman: ["photo-1718874380569-7a44071f01c3", 5184, 3456, "siddharth vyas", "siddharth_vyas1"],
-    ringLight: ["photo-1673196649671-eb09066ad6c1", 4672, 7008, "Maria", "lyumotech"],
-    ringHand: ["photo-1694173966355-6a8048f91769", 4400, 4400, "Ramin Turne", "raminturne"],
-    mapPhone: ["photo-1604357209793-fca5dca89f97", 4024, 5030, "Tamas Tuzes-Katai", "tamas_tuzeskatai"],
-    mandu: ["photo-1535280783-cd33989a9522", 3147, 3932, "Bhaumik Shrivastava", "iambhaumik"],
-    chhatri: ["photo-1699953792735-f684145f1e39", 6000, 4000, "Abhishek Singh", "abhi_7477"],
-    handloom: ["photo-1616986491129-3e37cb654c82", 3888, 2592, "soumya parthasarathy", "iamsoumya"],
-    saree: ["photo-1610189012906-4c0aa9b9781e", 4958, 3292, "Bulbul Ahmed", "bulbul252"],
-    diyaTray: ["photo-1577083753695-e010191bacb5", 6000, 4000, "Udayaditya Barua", "nookscribe"],
-    diyas: ["photo-1718476971217-677d43112daa", 4752, 3168, "Rahul Saraf", "rahul_saraf"],
-    classroom: ["photo-1719159381962-4170890ada4e", 7728, 5152, "Haseeb Modi", "haseebm"],
-    lecture: ["photo-1722573783625-eceb04251036", 3476, 1955, "Adhitya Sibikumar", "adhitya_2505"],
-    workshop: ["photo-1524178232363-1fb2b075b655", 5101, 3401, "Quilia", "heyquilia"],
-    planner: ["photo-1632772998001-cc9bf6f7c852", 3576, 2384, "2H Media", "2hmedia"],
-    notebookHand: ["photo-1513128034602-7814ccaddd4e", 3024, 4032, "Marissa Grootes", "marissacristina"],
-    notebookBlank: ["photo-1612367980327-7454a7276aa7", 5568, 3712, "Kelly Sikkema", "kellysikkema"],
-    friendsPhone: ["photo-1625463006115-09f08489f591", 4592, 3064, "Karthik Balakrishnan", "karthikb351"],
-    womanPhone: ["photo-1645538165779-81d7f49baa6f", 5091, 3347, "SUSHMITA NAG", "susnag"],
-    sareePhone: ["photo-1704088030734-96769c4593a2", 3632, 5456, "Rosario Fernandes", "rioferns62"],
-    dashboard: ["photo-1551288049-bebda4e38f71", 4810, 3207, "Luke Chesser", "lukechesser"],
-    laptopChart: ["photo-1460925895917-afdab827c52f", 2426, 1728, "Carlos Muza", "kmuza"],
-    reportPaper: ["photo-1711097383282-28097ae16b1d", 3000, 2001, "Jakub Żerdzicki", "jakubzerdzicki"],
-    laptopCup: ["photo-1745847768367-893e989d3a98", 6000, 4000, "dlxmedia.hu", "dlxmedia"],
-    thali: ["photo-1542367592-8849eb950fd8", 6000, 3376, "Lior Shapira", "shapira"],
-} as const satisfies Record<string, readonly [string, number, number, string, string]>;
+    cafeWindow: [
+        "photo-1579018183467-a60b8dc9dd78",
+        4640,
+        3480,
+        "Praveen Gupta",
+        "praveeeeeeeen",
+    ],
+    cafePendant: [
+        "photo-1676188043163-9f16eac1f2ac",
+        3024,
+        4032,
+        "Sagar Chauhan",
+        "sagar_b_chauhan",
+    ],
+    cafeEvening: [
+        "photo-1714328864042-1d23671ab8d5",
+        6000,
+        4000,
+        "Akshat Jhingran",
+        "akshat_jhingran",
+    ],
+    chaiPour: [
+        "photo-1693302050215-66ae33076745",
+        1969,
+        4029,
+        "Dhruval Upadhyay",
+        "dhruval47",
+    ],
+    kulhadRows: [
+        "photo-1619581073186-5b4ae1b0caad",
+        4000,
+        6000,
+        "Harsh Pandey",
+        "harsh_clicks__",
+    ],
+    kulhadTop: [
+        "photo-1625033405953-f20401c7d848",
+        4000,
+        6000,
+        "Shubham Dangi",
+        "shubham_dangi",
+    ],
+    chaiArt: [
+        "photo-1561336526-2914f13ceb36",
+        5472,
+        3648,
+        "René Porter",
+        "reneporter",
+    ],
+    chaiRusk: [
+        "photo-1683533699004-7f6b9e5a073f",
+        5737,
+        3830,
+        "Ananthan Chithiraikani",
+        "ananthan8110",
+    ],
+    chaiStrain: [
+        "photo-1611312410928-bdcb480e6239",
+        3315,
+        5184,
+        "Ayaneshu Bhardwaj",
+        "ayaneshu",
+    ],
+    samosaChai: [
+        "photo-1732519970445-8f2d6998961f",
+        5472,
+        3648,
+        "prajakta bagade",
+        "coraljasmine",
+    ],
+    phoneShoot: [
+        "photo-1543525469-65b61cc2bc06",
+        3648,
+        5472,
+        "charlesdeluvio",
+        "charlesdeluvio",
+    ],
+    phoneSunset: [
+        "photo-1578417618193-3726d6f2fef6",
+        6720,
+        4480,
+        "Joey Huang",
+        "onice",
+    ],
+    phoneTripod: [
+        "photo-1658837721890-fc4b47a6f0e2",
+        3648,
+        2432,
+        "DIEU",
+        "quangdieu195",
+    ],
+    editing: [
+        "photo-1627244714766-94dab62ed964",
+        3933,
+        4916,
+        "Nubelson Fernandes",
+        "nublson",
+    ],
+    kitchenShoot: [
+        "photo-1695408247109-3bf125ad0538",
+        6000,
+        4000,
+        "Wesley Tingey",
+        "wesleyphotography",
+    ],
+    videographer: [
+        "photo-1611784728558-6c7d9b409cdf",
+        2792,
+        1861,
+        "Kyle Loftus",
+        "kyleloftusstudios",
+    ],
+    handsPhone: [
+        "photo-1488509082528-cefbba5ad692",
+        5472,
+        3648,
+        "Priscilla Du Preez",
+        "priscilladupreez",
+    ],
+    twoLaptop: [
+        "photo-1653503425441-9d975e51ce91",
+        3000,
+        4000,
+        "Yash Parashar",
+        "lookforyash",
+    ],
+    laptopMug: [
+        "photo-1637999052989-4d7cf96bb805",
+        4885,
+        3236,
+        "Kishore V",
+        "imkishorein",
+    ],
+    deskMan: [
+        "photo-1731657021987-65b55c98568d",
+        4608,
+        3456,
+        "Pritimohan Shit",
+        "pritimohan",
+    ],
+    salonWash: [
+        "photo-1634449571010-02389ed0f9b0",
+        5760,
+        3840,
+        "Lindsay Cash",
+        "lindsayrc81",
+    ],
+    salonBlow: [
+        "photo-1580618672591-eb180b1a973f",
+        6016,
+        4016,
+        "Adam Winger",
+        "awcreativeut",
+    ],
+    salonChairs: [
+        "photo-1521590832167-7bcbfaa6381f",
+        4038,
+        2692,
+        "Guilherme Petri",
+        "guipetri",
+    ],
+    dentalRoom: [
+        "photo-1629909613654-28e377c37b09",
+        5472,
+        3658,
+        "Benyamin Bohlouli",
+        "benyamin_bohlouli",
+    ],
+    dentalChair: [
+        "photo-1598256989800-fe5f95da9787",
+        5568,
+        3712,
+        "Atikah Akhtar",
+        "atikahakhtar",
+    ],
+    dentalExam: [
+        "photo-1606811971618-4486d14f3f99",
+        5355,
+        4016,
+        "Caroline LM",
+        "carocaro1987",
+    ],
+    halwa: [
+        "photo-1517244683847-7456b63c5969",
+        4000,
+        5990,
+        "Nisha Ramesh",
+        "nisharamesh",
+    ],
+    sweetsPlatter: [
+        "photo-1695568181363-af5c78f4d059",
+        3883,
+        5824,
+        "Gaurav Kumar",
+        "countingframez",
+    ],
+    katli: [
+        "photo-1695568181558-034b7d3e49eb",
+        4000,
+        6000,
+        "Gaurav Kumar",
+        "countingframez",
+    ],
+    gymRack: [
+        "photo-1534438327276-14e5300c3a48",
+        4272,
+        2848,
+        "Danielle Cerullo",
+        "dncerullo",
+    ],
+    gymMono: [
+        "photo-1571902943202-507ec2618e8f",
+        3836,
+        2874,
+        "Risen Wang",
+        "risennnnn",
+    ],
+    gymHall: [
+        "photo-1623874514711-0f321325f318",
+        6000,
+        4000,
+        "Samuel Girven",
+        "samuelgirven",
+    ],
+    groupTable: [
+        "photo-1682962232755-f1d051ddb638",
+        6000,
+        4000,
+        "Sanket Mishra",
+        "sanketgraphy",
+    ],
+    samosas: [
+        "photo-1601050690597-df0568f70950",
+        6000,
+        4000,
+        "kabir cheema",
+        "kabircheema",
+    ],
+    thaliTop: [
+        "photo-1589778655375-3e622a9fc91c",
+        4028,
+        2814,
+        "Barun Ghosh",
+        "barunghosh",
+    ],
+    curry: [
+        "photo-1585937421612-70a008356fbe",
+        2597,
+        3462,
+        "Andy Hay",
+        "eastcoastkitchen",
+    ],
+    puri: [
+        "photo-1717587052948-fb9825de50f8",
+        4000,
+        4293,
+        "Jainica Dhingra",
+        "jainica",
+    ],
+    ringLightWoman: [
+        "photo-1718874380569-7a44071f01c3",
+        5184,
+        3456,
+        "siddharth vyas",
+        "siddharth_vyas1",
+    ],
+    ringLight: [
+        "photo-1673196649671-eb09066ad6c1",
+        4672,
+        7008,
+        "Maria",
+        "lyumotech",
+    ],
+    ringHand: [
+        "photo-1694173966355-6a8048f91769",
+        4400,
+        4400,
+        "Ramin Turne",
+        "raminturne",
+    ],
+    mapPhone: [
+        "photo-1604357209793-fca5dca89f97",
+        4024,
+        5030,
+        "Tamas Tuzes-Katai",
+        "tamas_tuzeskatai",
+    ],
+    mandu: [
+        "photo-1535280783-cd33989a9522",
+        3147,
+        3932,
+        "Bhaumik Shrivastava",
+        "iambhaumik",
+    ],
+    chhatri: [
+        "photo-1699953792735-f684145f1e39",
+        6000,
+        4000,
+        "Abhishek Singh",
+        "abhi_7477",
+    ],
+    handloom: [
+        "photo-1616986491129-3e37cb654c82",
+        3888,
+        2592,
+        "soumya parthasarathy",
+        "iamsoumya",
+    ],
+    saree: [
+        "photo-1610189012906-4c0aa9b9781e",
+        4958,
+        3292,
+        "Bulbul Ahmed",
+        "bulbul252",
+    ],
+    diyaTray: [
+        "photo-1577083753695-e010191bacb5",
+        6000,
+        4000,
+        "Udayaditya Barua",
+        "nookscribe",
+    ],
+    diyas: [
+        "photo-1718476971217-677d43112daa",
+        4752,
+        3168,
+        "Rahul Saraf",
+        "rahul_saraf",
+    ],
+    classroom: [
+        "photo-1719159381962-4170890ada4e",
+        7728,
+        5152,
+        "Haseeb Modi",
+        "haseebm",
+    ],
+    lecture: [
+        "photo-1722573783625-eceb04251036",
+        3476,
+        1955,
+        "Adhitya Sibikumar",
+        "adhitya_2505",
+    ],
+    workshop: [
+        "photo-1524178232363-1fb2b075b655",
+        5101,
+        3401,
+        "Quilia",
+        "heyquilia",
+    ],
+    planner: [
+        "photo-1632772998001-cc9bf6f7c852",
+        3576,
+        2384,
+        "2H Media",
+        "2hmedia",
+    ],
+    notebookHand: [
+        "photo-1513128034602-7814ccaddd4e",
+        3024,
+        4032,
+        "Marissa Grootes",
+        "marissacristina",
+    ],
+    notebookBlank: [
+        "photo-1612367980327-7454a7276aa7",
+        5568,
+        3712,
+        "Kelly Sikkema",
+        "kellysikkema",
+    ],
+    friendsPhone: [
+        "photo-1625463006115-09f08489f591",
+        4592,
+        3064,
+        "Karthik Balakrishnan",
+        "karthikb351",
+    ],
+    womanPhone: [
+        "photo-1645538165779-81d7f49baa6f",
+        5091,
+        3347,
+        "SUSHMITA NAG",
+        "susnag",
+    ],
+    sareePhone: [
+        "photo-1704088030734-96769c4593a2",
+        3632,
+        5456,
+        "Rosario Fernandes",
+        "rioferns62",
+    ],
+    dashboard: [
+        "photo-1551288049-bebda4e38f71",
+        4810,
+        3207,
+        "Luke Chesser",
+        "lukechesser",
+    ],
+    laptopChart: [
+        "photo-1460925895917-afdab827c52f",
+        2426,
+        1728,
+        "Carlos Muza",
+        "kmuza",
+    ],
+    reportPaper: [
+        "photo-1711097383282-28097ae16b1d",
+        3000,
+        2001,
+        "Jakub Żerdzicki",
+        "jakubzerdzicki",
+    ],
+    laptopCup: [
+        "photo-1745847768367-893e989d3a98",
+        6000,
+        4000,
+        "dlxmedia.hu",
+        "dlxmedia",
+    ],
+    thali: [
+        "photo-1542367592-8849eb950fd8",
+        6000,
+        3376,
+        "Lior Shapira",
+        "shapira",
+    ],
+} as const satisfies Record<
+    string,
+    readonly [string, number, number, string, string]
+>;
 
 type PhotoKey = keyof typeof PHOTOS;
 
@@ -113,7 +482,10 @@ export const PC_POSTS: readonly StudioPost[] = [
             "Twenty minutes on video, no slides and no pitch deck. What we look at, what you need to keep open, and what you get afterwards.",
         category: "help",
         daysAgo: 152,
-        cover: cover("laptopMug", "A laptop on a desk with a coffee mug in warm evening light"),
+        cover: cover(
+            "laptopMug",
+            "A laptop on a desk with a coffee mug in warm evening light",
+        ),
         body: `<p>Most owners who book the audit call want to know one thing: is it worth paying someone to do this, or can we keep doing it ourselves? The call is built to answer that honestly, in twenty minutes.</p>
 <h2>Before the call</h2>
 <p>Book a slot from the <a href="/audit">audit page</a>. You will get a video link on WhatsApp and email. Send us your Instagram handle and the name your business uses on Google Maps. That is all we need; there is no form to fill.</p>
@@ -135,7 +507,10 @@ ${figure("twoLaptop", "Two people talking across a table with a laptop open betw
             "Listing care, Starter, Growth and Pro, side by side. Every price includes 18% GST.",
         category: "help",
         daysAgo: 121,
-        cover: cover("planner", "A monthly planner page with two pens lying across it"),
+        cover: cover(
+            "planner",
+            "A monthly planner page with two pens lying across it",
+        ),
         body: `<p>We have four monthly plans. Every price below includes 18% GST, so the figure you see is the figure you pay. All plans run for a minimum of three months, then month to month.</p>
 <h2>Listing care: ₹2,999 a month</h2>
 <p>For businesses where most customers find you on Google Maps. We look after your Google Business Profile: four posts a month, replies to every review within 48 hours, fresh photos, and a monthly report of calls and direction requests.</p>
@@ -163,7 +538,10 @@ ${figure("notebookHand", "A hand writing in a spiral notebook beside a keyboard"
             "The access we need, the brand questionnaire, and how the first content calendar comes together in five working days.",
         category: "help",
         daysAgo: 96,
-        cover: cover("notebookBlank", "A blank spiral notebook and a pen on a wooden table"),
+        cover: cover(
+            "notebookBlank",
+            "A blank spiral notebook and a pen on a wooden table",
+        ),
         body: `<p>The first week decides how the next three months go, so we keep it structured. Here is what happens, day by day.</p>
 <h2>Day 1: access</h2>
 <p>Nikita sends a checklist on WhatsApp. We need:</p>
@@ -189,7 +567,10 @@ ${figure("deskMan", "A man working at a desk with a lamp and a monitor", "Faizan
             "One group, one weekly batch, three ways to reply. And what happens if you don't reply at all.",
         category: "help",
         daysAgo: 71,
-        cover: cover("womanPhone", "A woman in a dupatta looking down at her phone outdoors"),
+        cover: cover(
+            "womanPhone",
+            "A woman in a dupatta looking down at her phone outdoors",
+        ),
         body: `<p>Owners are busy, so approvals have to fit into the gaps of a working day. We do them on WhatsApp because that is where you already are.</p>
 <h2>The group</h2>
 <p>When you join, we make one WhatsApp group with you, anyone you want from your team, and the three of us who work on your account. Nothing about your account goes anywhere else.</p>
@@ -213,7 +594,10 @@ ${figure("handsPhone", "Two hands holding a phone close up", "Most clients appro
             "Your plan says 12 posts or 6 reels. Here is exactly how we count them, including carousels and stories.",
         category: "help",
         daysAgo: 108,
-        cover: cover("phoneTripod", "A phone mounted on a small tripod against a sunset sky"),
+        cover: cover(
+            "phoneTripod",
+            "A phone mounted on a small tripod against a sunset sky",
+        ),
         body: `<p>Plans are counted in posts and reels, so it helps to be clear about what each one is.</p>
 <h2>A post</h2>
 <p>One item in your feed: a single image, or a carousel of up to 8 slides. It is published on Instagram and Facebook at the same time and counts once, not twice. Captions in English and Hindi go in the same post.</p>
@@ -236,7 +620,10 @@ ${figure("phoneShoot", "Two hands holding a phone up to film a room", "A reel sh
             "On Pro you pay us for managing ads and pay Meta and Google directly for the ads themselves. Here's why, and how to set it up.",
         category: "help",
         daysAgo: 84,
-        cover: cover("laptopChart", "A laptop on a glass table showing charts on screen"),
+        cover: cover(
+            "laptopChart",
+            "A laptop on a glass table showing charts on screen",
+        ),
         body: `<p>On the Pro plan we manage your Meta and Google ads. Clients often ask why the ad money doesn't come to us. The short answer: it is cleaner and safer for you.</p>
 <h2>How it works</h2>
 <ul>
@@ -260,7 +647,10 @@ ${figure("dashboard", "A laptop screen showing analytics charts in the dark", "Y
             "Three months minimum, then 30 days' notice. One pause of up to a month each year.",
         category: "help",
         daysAgo: 58,
-        cover: cover("cafeWindow", "An empty cafe with round tables beside tall windows"),
+        cover: cover(
+            "cafeWindow",
+            "An empty cafe with round tables beside tall windows",
+        ),
         body: `<p>Plans run for a minimum of three months. After that they continue month to month until you tell us to stop.</p>
 <h2>Cancelling</h2>
 <p>Send a message in your WhatsApp group or email Nikita. Notice is 30 days from the day you tell us. During that month we keep posting as planned, send your final report, and hand over everything we made for you: Canva templates, raw shoot footage, and caption files.</p>
@@ -279,7 +669,10 @@ ${figure("cafePendant", "A cafe interior with pendant lamps over a long table", 
             "Invoices go out on the 1st and are due in 7 days. Our prices include GST, shown split on the tax invoice.",
         category: "help",
         daysAgo: 44,
-        cover: cover("reportPaper", "A person holding a printed sheet of charts over a laptop"),
+        cover: cover(
+            "reportPaper",
+            "A person holding a printed sheet of charts over a laptop",
+        ),
         body: `<p>We keep billing simple, because nobody should spend time chasing a marketing invoice.</p>
 <h2>When</h2>
 <p>Retainer invoices go out on the 1st of every month by email and WhatsApp, and are due within 7 days. One-off work, such as a shoot day or a brand kit, is invoiced half when you book and half on delivery.</p>
@@ -303,7 +696,10 @@ ${figure("laptopCup", "A person holding a cup next to a laptop showing a chart",
             "Eight hours, up to six edited reels, and a shot list agreed before we arrive. How to get the most from the day.",
         category: "help",
         daysAgo: 133,
-        cover: cover("videographer", "A videographer checking a camera monitor in moody red light"),
+        cover: cover(
+            "videographer",
+            "A videographer checking a camera monitor in moody red light",
+        ),
         body: `<p>A shoot day is ₹18,000, GST included: eight hours at your premises anywhere in Indore city, and up to six reels edited and delivered within ten working days.</p>
 <h2>A week before</h2>
 <p>Sneha sends a shot list: the six reel ideas, what each needs, and who should be on camera. You tell us what is realistic. A kitchen at lunch rush is not a film set, and we plan around that.</p>
@@ -331,7 +727,10 @@ ${figure("kitchenShoot", "A woman filming another person cooking in a bright kit
             "Every review gets a reply within 48 hours. What we write, what we never write, and when we call you first.",
         category: "help",
         daysAgo: 23,
-        cover: cover("sareePhone", "A woman in a pink sari reading something on her phone"),
+        cover: cover(
+            "sareePhone",
+            "A woman in a pink sari reading something on her phone",
+        ),
         body: `<p>Reviews are the first thing many people read about you, and your replies are read almost as often. On Listing care, and any plan with Listing care added, we reply to every review within 48 hours.</p>
 <h2>Good reviews</h2>
 <p>We thank the person by name, mention the specific thing they liked, and keep it to two lines. We never paste the same reply twice; people notice.</p>
@@ -361,7 +760,10 @@ ${figure("dentalRoom", "A clean, bright dental treatment room with a chair and c
             "New address, same chai. We're now on the third floor at 302, Shekhar Central, AB Road, Palasia.",
         category: "news",
         daysAgo: 171,
-        cover: cover("chhatri", "Old stone chhatris in a green garden in Indore"),
+        cover: cover(
+            "chhatri",
+            "Old stone chhatris in a green garden in Indore",
+        ),
         body: `<p>After three years in a two-room office above a printing shop in Saket, we have moved. Our new address is <strong>302, Shekhar Central, AB Road, Palasia, Indore 452001</strong>.</p>
 <p>The new space has room for the five of us, a small corner for product shoots with a north-facing window, and a meeting table that seats six. There is parking in the basement and the building has a lift, which the clients who visited the old office will appreciate.</p>
 ${figure("deskMan", "A man working at a desk under a lamp", "Faizan's desk, now with an actual window behind it.")}
@@ -374,7 +776,10 @@ ${figure("deskMan", "A man working at a desk under a lamp", "Faizan's desk, now 
             "For businesses whose customers find them on Google Maps. Four posts, review replies within 48 hours, and a monthly calls report.",
         category: "news",
         daysAgo: 56,
-        cover: cover("mapPhone", "A hand holding a phone showing a map route on a road through trees"),
+        cover: cover(
+            "mapPhone",
+            "A hand holding a phone showing a map route on a road through trees",
+        ),
         body: `<p>For a lot of local businesses, the Google profile does more work than Instagram does. A clinic, a sweet shop or a coaching centre is often found when someone searches "near me", taps call, and never looks at a feed at all.</p>
 <p>So we have launched <strong>Listing care</strong>, a plan just for your Google Business Profile, at ₹2,999 a month including GST:</p>
 <ul>
@@ -393,7 +798,10 @@ ${figure("dentalChair", "An orange dental chair in a bright clinic room", "Smile
             "We plan festive content six weeks out. Eleven slots left for the season's shoots and calendars.",
         category: "news",
         daysAgo: 47,
-        cover: cover("diyaTray", "Lit clay diyas on a tray surrounded by flower petals"),
+        cover: cover(
+            "diyaTray",
+            "Lit clay diyas on a tray surrounded by flower petals",
+        ),
         body: `<p>Festive content works best when it is planned early. Last year, the clients who signed off their Diwali calendar by the end of September saw their festive posts saved roughly twice as often as the ones who came to us in the last week.</p>
 <p>This season we are taking on festive calendars for existing clients and a few new ones. Each includes:</p>
 <ul>
@@ -411,7 +819,10 @@ ${figure("katli", "Kaju katli and cashews on a tray with red cloth behind", "Swe
             "Nikita joins us to look after client success and Google listings. She's the person you'll hear from first.",
         category: "news",
         daysAgo: 37,
-        cover: cover("friendsPhone", "Two friends laughing while looking at a phone together"),
+        cover: cover(
+            "friendsPhone",
+            "Two friends laughing while looking at a phone together",
+        ),
         body: `<p>We are happy to welcome <strong>Nikita Rathi</strong> to Pixel &amp; Chai. Nikita looks after client success and Google listings, which means two things for you.</p>
 <p>First, she is now the person who runs your onboarding week, sends your monthly report, and answers the "quick question" messages that used to wait until Riya was free. Second, she leads our new Listing care plan, so every review reply and Google post goes past her.</p>
 ${figure("groupTable", "A group of colleagues laughing together around a table", "Nikita's first week: four onboarding calls and a team lunch at Saffron Table.")}
@@ -424,7 +835,10 @@ ${figure("groupTable", "A group of colleagues laughing together around a table",
             "Our work with Kulhad & Co. was runner-up in the local marketing category. A small award, and we're pleased.",
         category: "news",
         daysAgo: 21,
-        cover: cover("cafeEvening", "A warmly lit cafe counter with hanging pendant lights"),
+        cover: cover(
+            "cafeEvening",
+            "A warmly lit cafe counter with hanging pendant lights",
+        ),
         body: `<p>Last Saturday, our reels campaign for Kulhad &amp; Co. in Vijay Nagar was named runner-up in the local marketing category at the Malwa Small Business Awards, run by a group of Indore trader associations.</p>
 <p>There were 34 entries in the category. The winner was a family-run hardware store in Dewas whose WhatsApp catalogue we would happily have hired ourselves.</p>
 ${figure("kulhadRows", "Rows of clay kulhad cups filled with chai", "The entry was the 30 days of reels we shot at the Kulhad counter.")}
@@ -437,7 +851,10 @@ ${figure("kulhadRows", "Rows of clay kulhad cups filled with chai", "The entry w
             "Two hours on reels, Google reviews and festive offers. 25 seats, at our office in Palasia.",
         category: "news",
         daysAgo: 12,
-        cover: cover("workshop", "A small group seated in a room listening to a speaker beside a screen"),
+        cover: cover(
+            "workshop",
+            "A small group seated in a room listening to a speaker beside a screen",
+        ),
         body: `<p>We are running a free two-hour workshop for café and tea-stall owners in Indore, at our office in Palasia, on the last Sunday of this month, from 11 am to 1 pm.</p>
 <h2>What we will cover</h2>
 <ul>
@@ -492,7 +909,10 @@ ${figure("sweetsPlatter", "A brass platter of assorted Indian sweets with rose p
             "We'll now travel to Ujjain and Dewas for reel shoot days, for a flat travel charge.",
         category: "news",
         daysAgo: 2,
-        cover: cover("mandu", "A domed stone pavilion seen through an arched doorway"),
+        cover: cover(
+            "mandu",
+            "A domed stone pavilion seen through an arched doorway",
+        ),
         body: `<p>Several clients have branches outside the city, and we have been turning down shoots in Ujjain and Dewas because the travel ate into the day. Not any more.</p>
 <p>From this month, reel shoot days are available in <strong>Ujjain and Dewas</strong>. The shoot day is the same ₹18,000, including GST, with a flat ₹2,500 travel charge per day for the car and an early start. You still get the full eight hours on site and up to six edited reels.</p>
 ${figure("phoneSunset", "Hands holding a phone up to film a sunset over water", "Early starts mean we often catch the best light of the day on the drive.")}
@@ -507,7 +927,10 @@ ${figure("phoneSunset", "Hands holding a phone up to film a sunset over water", 
             "Kulhad & Co. in Vijay Nagar had a full weekend and empty weekday mornings. One reel a day for a month changed the second part.",
         category: "articles",
         daysAgo: 142,
-        cover: cover("chaiStrain", "Chai being strained into a cup over a steaming stove"),
+        cover: cover(
+            "chaiStrain",
+            "Chai being strained into a cup over a steaming stove",
+        ),
         body: `<p>Kulhad &amp; Co. is a twelve-table café in Vijay Nagar. On Saturday and Sunday evenings there is a queue on the pavement. On a Tuesday at 10 am there might be two tables taken. When the owner, Pratik, came to us, he did not want more weekend customers. He wanted weekday mornings to pay their way.</p>
 <h2>The plan</h2>
 <p>We agreed on one reel a day, every day, for 30 days, all shot between 7 and 9 am when the café was quiet and the light came straight through the front window. No dancing, no trending audio for its own sake. Every reel would show one thing a person could only get in the morning.</p>
@@ -620,7 +1043,10 @@ ${figure("lecture", "Students seated in a lecture hall facing a projector screen
             "Real numbers from three months of Meta and Google ads for Glow Theory Salon in Palasia: what we spent, what came in, and what we stopped.",
         category: "articles",
         daysAgo: 89,
-        cover: cover("salonBlow", "A stylist blow-drying a client's hair with a round brush"),
+        cover: cover(
+            "salonBlow",
+            "A stylist blow-drying a client's hair with a round brush",
+        ),
         body: `<p>Owners often ask what a small ad budget can actually do. Not a brand campaign, just enough to fill some chairs. So here are the real numbers from Glow Theory Salon in Palasia, which spent ₹15,000 a month on ads for three months. Ad spend was paid directly to Meta and Google from the salon's own accounts.</p>
 <h2>The split</h2>
 <ul>
@@ -661,7 +1087,10 @@ ${figure("salonWash", "A stylist washing a client's hair at a basin", "Hair spa 
             "You don't need a camera. You need a window, a steady hand and a plan for 15 seconds. Our in-house guide, written for owners.",
         category: "articles",
         daysAgo: 162,
-        cover: cover("ringLightWoman", "A woman filming herself on a phone in front of a soft light"),
+        cover: cover(
+            "ringLightWoman",
+            "A woman filming herself on a phone in front of a soft light",
+        ),
         body: `<p>Most of the reels that work for our clients were shot on a phone. A camera helps, but it isn't what makes a reel good. This is the guide we give owners who want to shoot their own between our visits.</p>
 <h2>1. Plan 15 seconds, not a minute</h2>
 <p>Write three lines before you press record: what the person sees first, what happens, and how it ends. For example: a full tray of jalebi, a hand picking one up, the crunch. That is a reel.</p>
@@ -700,7 +1129,10 @@ ${figure("ringHand", "A hand holding a phone inside a ring light", "A ring light
             "A three-part reply that works in either language, with real examples from a dental clinic and a sweet shop.",
         category: "articles",
         daysAgo: 64,
-        cover: cover("dentalChair", "An orange dental chair in a bright treatment room"),
+        cover: cover(
+            "dentalChair",
+            "An orange dental chair in a bright treatment room",
+        ),
         body: `<p>Every business gets bad reviews. What people judge is not the review but the reply, because the reply is written for everyone who reads it afterwards. Here is how we write them.</p>
 <h2>The three parts</h2>
 <ol>
@@ -739,7 +1171,10 @@ ${figure("halwa", "A brass bowl of carrot halwa topped with nuts", "Annapurna no
             "A window, a white sheet and twenty minutes before lunch service. How Saffron Table shoots its own menu photos now.",
         category: "articles",
         daysAgo: 118,
-        cover: cover("thaliTop", "A steel thali with small bowls of curries and rotis on a red cloth"),
+        cover: cover(
+            "thaliTop",
+            "A steel thali with small bowls of curries and rotis on a red cloth",
+        ),
         body: `<p>Saffron Table in South Tukoganj used to photograph new dishes under the kitchen's tube lights, at 10 pm, after service. The curries looked brown and the rice looked grey. Now their sous-chef, Imran, shoots them himself in twenty minutes before lunch. This is what we taught him.</p>
 <h2>Find your window</h2>
 <p>Choose a window that doesn't get direct sun at the time you shoot. North-facing is ideal. Put a table right beside it, so the light falls across the plate from the side. Side light shows texture: the layers of a paratha, the oil on a tadka.</p>
@@ -778,7 +1213,10 @@ ${figure("puri", "Puffed puris with chole and chutneys on a wooden table", "Shot
             "Sometimes, for ₹500. Usually not. When the Boost button helps a local business, and when a proper ad does more.",
         category: "articles",
         daysAgo: 33,
-        cover: cover("sareePhone", "A woman in a pink sari looking at her phone"),
+        cover: cover(
+            "sareePhone",
+            "A woman in a pink sari looking at her phone",
+        ),
         body: `<p>The blue "Boost post" button is the first ad most owners ever run. It's quick, it's cheap and it's right there. So is it worth it? Our honest answer is: sometimes, for small amounts, for one specific kind of post.</p>
 <h2>What boosting actually does</h2>
 <p>Boosting shows an existing post to more people, for a budget and number of days you choose. It's a simplified version of a real ad, with fewer choices about who sees it and what you want them to do.</p>
@@ -851,7 +1289,10 @@ ${figure("gymHall", "A large industrial gym with benches and racks under skyligh
             "150 characters to say what you sell, where you are and how to reach you. A before-and-after with Leaf & Loom.",
         category: "articles",
         daysAgo: 178,
-        cover: cover("saree", "A woman in a blue and gold sari seated against a red backdrop"),
+        cover: cover(
+            "saree",
+            "A woman in a blue and gold sari seated against a red backdrop",
+        ),
         body: `<p>Your Instagram bio is the second thing people read after your name, and for a local business it has one job: help a stranger decide whether to visit or message you. You have 150 characters. Most bios we see use them on a slogan.</p>
 <h2>The four lines</h2>
 <p>We write nearly every client bio in four short lines:</p>
@@ -894,7 +1335,10 @@ ${figure("womanPhone", "A woman looking down at her phone outdoors", "Most peopl
             "A sixty-year-old sweet shop near Rajwada, a crowded counter and a simple catalogue. What changed in one festive season.",
         category: "articles",
         daysAgo: 168,
-        cover: cover("sweetsPlatter", "A brass platter of assorted Indian sweets with rose petals"),
+        cover: cover(
+            "sweetsPlatter",
+            "A brass platter of assorted Indian sweets with rose petals",
+        ),
         body: `<p>Annapurna Mithai Ghar has been selling sweets near Rajwada for three generations. Every Diwali the counter is five deep, the phone rings constantly, and orders for corporate gift boxes get written on the back of receipts. Last festive season, Rakesh Agrawal, who runs the shop with his son, asked us to help with one thing: fewer missed orders.</p>
 <h2>The problem</h2>
 <p>In the two weeks before Diwali the year before, Rakesh estimated the shop missed 40 to 60 phone orders because nobody could pick up. Customers who did get through often asked the same three questions: which boxes are available, how much, and when can I collect.</p>

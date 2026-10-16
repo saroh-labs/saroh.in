@@ -13,7 +13,7 @@
  * policy, and a URI renders the same on every host without a file being
  * served from any app's public folder.
  *
- *   node scripts/demo-art/studio-art.mjs
+ *   node scripts/demo-art/studio-art.mjs && npx prettier --write packages/database/src/seed/showcase/studio-art.ts
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 
@@ -166,7 +166,9 @@ const ART = {
                 for (let x = 0; x < 21; x++) {
                     s = (s * 1103515245 + 12345) % 2147483648;
                     const finder =
-                        (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
+                        (x < 7 && y < 7) ||
+                        (x > 13 && y < 7) ||
+                        (x < 7 && y > 13);
                     if (finder) continue;
                     if (s % 3 === 0)
                         qr += `<rect x="${640 + x * 15}" y="${520 + y * 15}" width="15" height="15"/>`;

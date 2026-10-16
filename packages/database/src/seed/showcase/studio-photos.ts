@@ -52,18 +52,57 @@ export const FV_PHOTOS = {
 } as const satisfies Record<string, StudioImage>;
 
 export const PC_PHOTOS = {
-    heroWorkspace: pcPhoto("phoneShoot", "Two hands holding a phone up to frame a shot of a room"),
-    designDesk: pcPhoto("laptopMug", "A laptop on a desk with a coffee mug in warm evening light"),
-    printPack: pcPhoto("notebookBlank", "A blank spiral notebook and a pen on a wooden table"),
-    standee: pcPhoto("cafeEvening", "A warmly lit café counter with hanging pendant lights"),
-    tableTent: pcPhoto("cafeWindow", "An empty café with round tables beside tall windows"),
+    heroWorkspace: pcPhoto(
+        "phoneShoot",
+        "Two hands holding a phone up to frame a shot of a room",
+    ),
+    designDesk: pcPhoto(
+        "laptopMug",
+        "A laptop on a desk with a coffee mug in warm evening light",
+    ),
+    printPack: pcPhoto(
+        "notebookBlank",
+        "A blank spiral notebook and a pen on a wooden table",
+    ),
+    standee: pcPhoto(
+        "cafeEvening",
+        "A warmly lit café counter with hanging pendant lights",
+    ),
+    tableTent: pcPhoto(
+        "cafeWindow",
+        "An empty café with round tables beside tall windows",
+    ),
     cafe: pcPhoto("kulhadRows", "Rows of clay kulhad cups filled with chai"),
-    salon: pcPhoto("salonChairs", "Three salon chairs facing a long mirror in a bright room"),
-    dental: pcPhoto("dentalRoom", "A bright dental clinic room with a chair and cabinets"),
-    sweets: pcPhoto("katli", "Kaju katli and cashews on a tray with red cloth behind"),
-    gym: pcPhoto("gymHall", "A large gym with benches and racks under skylights"),
-    coaching: pcPhoto("workshop", "A small group seated in a room listening to a speaker beside a screen"),
-    restaurant: pcPhoto("thaliTop", "Two thalis from above with many small bowls"),
-    handloom: pcPhoto("handloom", "Folded handloom fabric with woven motifs and a striped border"),
-    indore: pcPhoto("chhatri", "Old stone chhatris in a green garden in Indore"),
+    salon: pcPhoto(
+        "salonChairs",
+        "Three salon chairs facing a long mirror in a bright room",
+    ),
+    dental: pcPhoto(
+        "dentalRoom",
+        "A bright dental clinic room with a chair and cabinets",
+    ),
+    sweets: pcPhoto(
+        "katli",
+        "Kaju katli and cashews on a tray with red cloth behind",
+    ),
+    gym: pcPhoto(
+        "gymHall",
+        "A large gym with benches and racks under skylights",
+    ),
+    coaching: pcPhoto(
+        "workshop",
+        "A small group seated in a room listening to a speaker beside a screen",
+    ),
+    restaurant: pcPhoto(
+        "thaliTop",
+        "Two thalis from above with many small bowls",
+    ),
+    handloom: pcPhoto(
+        "handloom",
+        "Folded handloom fabric with woven motifs and a striped border",
+    ),
+    indore: pcPhoto(
+        "chhatri",
+        "Old stone chhatris in a green garden in Indore",
+    ),
 } as const satisfies Record<string, StudioImage>;

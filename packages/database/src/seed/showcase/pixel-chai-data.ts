@@ -1,6 +1,11 @@
 import type { SeedSite } from "../data";
 import { PC_POSTS } from "./pixel-chai-posts";
-import type { StudioPlan, StudioProduct, StudioService, StudioSpec } from "./studio";
+import type {
+    StudioPlan,
+    StudioProduct,
+    StudioService,
+    StudioSpec,
+} from "./studio";
 import { blockImage, section } from "./studio";
 import { STUDIO_ART } from "./studio-art";
 import { PC_PHOTOS } from "./studio-photos";
@@ -104,7 +109,8 @@ export const PC_SERVICES: readonly StudioService[] = [
     {
         key: "onboarding",
         name: "Onboarding call",
-        description: "The first call with a new retainer client: access, brand questions, the first month's calendar. Booked by us.",
+        description:
+            "The first call with a new retainer client: access, brand questions, the first month's calendar. Booked by us.",
         minutes: 60,
         pricePaise: 0,
         sac: "998361",
@@ -162,7 +168,11 @@ export const PC_PRODUCTS: readonly StudioProduct[] = [
             "A printed counter standee with your own QR code that opens your Google review form. Sturdy 3 mm board, matte laminated. Ships in Indore in two days. Includes GST.",
         pricePaise: 1_200_00,
         hsn: "998912",
-        keyPoints: ["Your own review QR", "3 mm board, matte laminate", "Two days in Indore"],
+        keyPoints: [
+            "Your own review QR",
+            "3 mm board, matte laminate",
+            "Two days in Indore",
+        ],
         materials: "Sunboard with matte lamination",
         images: [A.standee, P.standee],
         option: {
@@ -183,7 +193,11 @@ export const PC_PRODUCTS: readonly StudioProduct[] = [
             "Folded cards for café and restaurant tables: your handle, an offer for tagging you, and your review QR. Designed by Faizan to match your brand. Includes GST.",
         pricePaise: 900_00,
         hsn: "998912",
-        keyPoints: ["Pack of 10", "Designed to your brand", "Review QR on the back"],
+        keyPoints: [
+            "Pack of 10",
+            "Designed to your brand",
+            "Review QR on the back",
+        ],
         materials: "350 gsm card, folded",
         images: [A.tableTent, P.tableTent],
         fulfilment: "SHIPPING",
@@ -211,7 +225,11 @@ export const PC_PRODUCTS: readonly StudioProduct[] = [
             "A logo clean-up, a palette, two typefaces and 20 Canva templates for posts, stories and offers, so what you post looks like you. Two rounds of changes. Delivered as files in about three weeks. Includes GST.",
         pricePaise: 35_000_00,
         hsn: "998361",
-        keyPoints: ["Logo, palette, type", "20 Canva templates", "Two rounds of changes"],
+        keyPoints: [
+            "Logo, palette, type",
+            "20 Canva templates",
+            "Two rounds of changes",
+        ],
         materials: null,
         images: [A.brandKit, P.designDesk],
         fulfilment: "DIGITAL",
@@ -220,14 +238,62 @@ export const PC_PRODUCTS: readonly StudioProduct[] = [
 ];
 
 export const PC_CLIENTS = [
-    { company: "Kulhad & Co.", kind: "Café", area: "Vijay Nagar", photo: P.cafe, result: "Reels three times a week for a month: saves up from 120 to 610, and Saturday footfall the owner can feel." },
-    { company: "Glow Theory Salon", kind: "Salon", area: "Palasia", photo: P.salon, result: "Bridal-season ads at ₹15,000 a month: 64 enquiries, 19 bookings, cost per enquiry ₹234." },
-    { company: "Smile Square Dental", kind: "Dental clinic", area: "Sapna Sangeeta Road", photo: P.dental, result: "Google profile cleaned up and replied to: calls from Google up from 41 to 73 a month." },
-    { company: "Annapurna Mithai Ghar", kind: "Sweet shop", area: "near Rajwada", photo: P.sweets, result: "Diwali gift-box orders on WhatsApp from one pinned post and a broadcast list." },
-    { company: "Nest Fitness", kind: "Gym", area: "Bhawarkuan", photo: P.gym, result: "A 6 am batch that ran half-empty, full within five weeks of a trial-week campaign." },
-    { company: "Bright Minds Coaching", kind: "Coaching institute", area: "Bhawarkuan", photo: P.coaching, result: "Admission-season posts in Hindi and English; demo-class sign-ups doubled on last year." },
-    { company: "Saffron Table", kind: "Restaurant", area: "South Tukoganj", photo: P.restaurant, result: "Natural-light food photography and a menu highlight a week: weekday lunch covers up a fifth." },
-    { company: "Leaf & Loom", kind: "Handloom store", area: "56 Dukan area", photo: P.handloom, result: "A weaver story a month; the Maheshwari range sold out twice before Navratri." },
+    {
+        company: "Kulhad & Co.",
+        kind: "Café",
+        area: "Vijay Nagar",
+        photo: P.cafe,
+        result: "Reels three times a week for a month: saves up from 120 to 610, and Saturday footfall the owner can feel.",
+    },
+    {
+        company: "Glow Theory Salon",
+        kind: "Salon",
+        area: "Palasia",
+        photo: P.salon,
+        result: "Bridal-season ads at ₹15,000 a month: 64 enquiries, 19 bookings, cost per enquiry ₹234.",
+    },
+    {
+        company: "Smile Square Dental",
+        kind: "Dental clinic",
+        area: "Sapna Sangeeta Road",
+        photo: P.dental,
+        result: "Google profile cleaned up and replied to: calls from Google up from 41 to 73 a month.",
+    },
+    {
+        company: "Annapurna Mithai Ghar",
+        kind: "Sweet shop",
+        area: "near Rajwada",
+        photo: P.sweets,
+        result: "Diwali gift-box orders on WhatsApp from one pinned post and a broadcast list.",
+    },
+    {
+        company: "Nest Fitness",
+        kind: "Gym",
+        area: "Bhawarkuan",
+        photo: P.gym,
+        result: "A 6 am batch that ran half-empty, full within five weeks of a trial-week campaign.",
+    },
+    {
+        company: "Bright Minds Coaching",
+        kind: "Coaching institute",
+        area: "Bhawarkuan",
+        photo: P.coaching,
+        result: "Admission-season posts in Hindi and English; demo-class sign-ups doubled on last year.",
+    },
+    {
+        company: "Saffron Table",
+        kind: "Restaurant",
+        area: "South Tukoganj",
+        photo: P.restaurant,
+        result: "Natural-light food photography and a menu highlight a week: weekday lunch covers up a fifth.",
+    },
+    {
+        company: "Leaf & Loom",
+        kind: "Handloom store",
+        area: "56 Dukan area",
+        photo: P.handloom,
+        result: "A weaver story a month; the Maheshwari range sold out twice before Navratri.",
+    },
 ] as const;
 
 const FORM_FIELDS = [
@@ -235,11 +301,19 @@ const FORM_FIELDS = [
     { name: "company", label: "Business name", type: "text", required: true },
     { name: "email", label: "Email", type: "email", required: true },
     { name: "phone", label: "Phone or WhatsApp", type: "tel", required: true },
-    { name: "message", label: "What would you like help with?", type: "textarea", required: true },
+    {
+        name: "message",
+        label: "What would you like help with?",
+        type: "textarea",
+        required: true,
+    },
 ] as const;
 
 export function pcSite(): SeedSite {
-    const work = (variant: string, items: readonly (typeof PC_CLIENTS)[number][]) =>
+    const work = (
+        variant: string,
+        items: readonly (typeof PC_CLIENTS)[number][],
+    ) =>
         section("projects", {
             variant,
             title: "Work for Indore businesses",
@@ -271,25 +345,53 @@ export function pcSite(): SeedSite {
                 sections: [
                     section("hero", {
                         variant: "split",
-                        heading: "Social media and Google for Indore's local businesses.",
+                        heading:
+                            "Social media and Google for Indore's local businesses.",
                         subheading:
                             "We run Instagram, Facebook, Google Business Profiles and ads for salons, cafés, clinics and shops — on a monthly retainer, with a one-page report you'll actually read.",
-                        cta: { label: "Book a free 20-minute audit", href: "/audit", style: "primary" },
+                        cta: {
+                            label: "Book a free 20-minute audit",
+                            href: "/audit",
+                            style: "primary",
+                        },
                         image: blockImage(P.heroWorkspace),
                     }),
                     section("features", {
                         variant: "grid",
                         heading: "What we do",
                         items: [
-                            { title: "Posts and reels", body: "Planned a month ahead, approved on WhatsApp, posted on time." },
-                            { title: "Google Business Profile", body: "Photos, posts, hours and every review answered within two days." },
-                            { title: "Ads that are counted", body: "Meta and Google ads with a cost per enquiry, not just reach." },
-                            { title: "A report on one page", body: "First week of the month, with a twenty-minute call." },
+                            {
+                                title: "Posts and reels",
+                                body: "Planned a month ahead, approved on WhatsApp, posted on time.",
+                            },
+                            {
+                                title: "Google Business Profile",
+                                body: "Photos, posts, hours and every review answered within two days.",
+                            },
+                            {
+                                title: "Ads that are counted",
+                                body: "Meta and Google ads with a cost per enquiry, not just reach.",
+                            },
+                            {
+                                title: "A report on one page",
+                                body: "First week of the month, with a twenty-minute call.",
+                            },
                         ],
                     }),
                     work("rhythm", PC_CLIENTS.slice(0, 4)),
-                    section("journal", { variant: "default", title: "Notes for owners", count: 3 }),
-                    { type: "cta", content: { label: "See the plans", href: "/plans", style: "primary" } },
+                    section("journal", {
+                        variant: "default",
+                        title: "Notes for owners",
+                        count: 3,
+                    }),
+                    {
+                        type: "cta",
+                        content: {
+                            label: "See the plans",
+                            href: "/plans",
+                            style: "primary",
+                        },
+                    },
                 ],
             },
             {
@@ -298,11 +400,11 @@ export function pcSite(): SeedSite {
                 sections: [
                     work("cards", PC_CLIENTS),
                     section("richText", {
-                            format: "html",
-                            value: "<h2>How we report</h2><p>Every client gets one page in the first week of the month: reach, saves, profile visits, calls and direction requests from Google, enquiries, and — on Pro — ad spend and cost per enquiry. Then a twenty-minute call about what we'll change.</p>",
-                            image: blockImage(A.reportSample),
-                            imageSide: "right",
-                        }),
+                        format: "html",
+                        value: "<h2>How we report</h2><p>Every client gets one page in the first week of the month: reach, saves, profile visits, calls and direction requests from Google, enquiries, and — on Pro — ad spend and cost per enquiry. Then a twenty-minute call about what we'll change.</p>",
+                        image: blockImage(A.reportSample),
+                        imageSide: "right",
+                    }),
                 ],
             },
             {
@@ -319,17 +421,33 @@ export function pcSite(): SeedSite {
                     {
                         type: "servicesList",
                         services: [1, 2, 3],
-                        content: { heading: "One-offs", intro: "For businesses that want a hand once, not every month.", showPrices: true },
+                        content: {
+                            heading: "One-offs",
+                            intro: "For businesses that want a hand once, not every month.",
+                            showPrices: true,
+                        },
                     },
                     {
                         type: "faq",
                         content: {
                             heading: "Questions owners ask",
                             items: [
-                                { question: "Can I pause?", answer: "Once a year, for up to a month — for a renovation, a slow month or a family wedding. Tell us a week before the next invoice." },
-                                { question: "Who approves what goes out?", answer: "You do. The month's calendar comes on WhatsApp for a thumbs-up; anything urgent, we call." },
-                                { question: "When are we invoiced?", answer: "On the day your plan renews each month, due in seven days, by UPI or bank transfer. CGST and SGST are shown on every invoice." },
-                                { question: "Do you need our passwords?", answer: "No. You add us as a partner on Meta Business and as a manager on your Google profile, and you can remove us any time." },
+                                {
+                                    question: "Can I pause?",
+                                    answer: "Once a year, for up to a month — for a renovation, a slow month or a family wedding. Tell us a week before the next invoice.",
+                                },
+                                {
+                                    question: "Who approves what goes out?",
+                                    answer: "You do. The month's calendar comes on WhatsApp for a thumbs-up; anything urgent, we call.",
+                                },
+                                {
+                                    question: "When are we invoiced?",
+                                    answer: "On the day your plan renews each month, due in seven days, by UPI or bank transfer. CGST and SGST are shown on every invoice.",
+                                },
+                                {
+                                    question: "Do you need our passwords?",
+                                    answer: "No. You add us as a partner on Meta Business and as a manager on your Google profile, and you can remove us any time.",
+                                },
                             ],
                         },
                     },
@@ -344,9 +462,11 @@ export function pcSite(): SeedSite {
                         service: 0,
                         content: {
                             title: "Book a free 20-minute audit",
-                            description: "Send us your Instagram and Google profile links in the notes. We'll look before the call.",
+                            description:
+                                "Send us your Instagram and Google profile links in the notes. We'll look before the call.",
                             submitLabel: "Book the call",
-                            successMessage: "Booked — the video link is in your confirmation.",
+                            successMessage:
+                                "Booked — the video link is in your confirmation.",
                         },
                     },
                 ],
@@ -357,26 +477,37 @@ export function pcSite(): SeedSite {
                 sections: [
                     {
                         type: "enquiry",
-                        form: { name: "New business enquiry", fields: FORM_FIELDS },
+                        form: {
+                            name: "New business enquiry",
+                            fields: FORM_FIELDS,
+                        },
                         content: {
                             title: "Tell us about your business",
-                            description: "What you sell, where, and what isn't working. Riya replies within a working day.",
+                            description:
+                                "What you sell, where, and what isn't working. Riya replies within a working day.",
                             submitLabel: "Send",
-                            successMessage: "Thanks — we'll reply within a working day.",
+                            successMessage:
+                                "Thanks — we'll reply within a working day.",
                         },
                     },
                     section("richText", {
-                            format: "html",
-                            value: "<h2>The office</h2><p>302, Shekhar Central, AB Road, Palasia, Indore 452001. Monday to Saturday, 10 to 7. Chai is always on.</p><p>Call or WhatsApp +91 98260 33415.</p>",
-                            image: blockImage(P.indore),
-                            imageSide: "left",
-                        }),
+                        format: "html",
+                        value: "<h2>The office</h2><p>302, Shekhar Central, AB Road, Palasia, Indore 452001. Monday to Saturday, 10 to 7. Chai is always on.</p><p>Call or WhatsApp +91 98260 33415.</p>",
+                        image: blockImage(P.indore),
+                        imageSide: "left",
+                    }),
                 ],
             },
             {
                 path: "/journal",
                 title: "Journal",
-                sections: [section("journal", { variant: "archive", title: "Journal", showTotal: true })],
+                sections: [
+                    section("journal", {
+                        variant: "archive",
+                        title: "Journal",
+                        showTotal: true,
+                    }),
+                ],
             },
         ],
     };
@@ -390,7 +521,12 @@ export function pcSpec(): StudioSpec {
         legalName: "Pixel and Chai Media Private Limited",
         contactEmail: "pixelandchai@example.com",
         phone: "+919826033415",
-        gst: { state: "23", stateName: "Madhya Pradesh", pan: "AAKCP6614R", prefix: "PC" },
+        gst: {
+            state: "23",
+            stateName: "Madhya Pradesh",
+            pan: "AAKCP6614R",
+            prefix: "PC",
+        },
         address: {
             addressLine1: "302, Shekhar Central, AB Road",
             addressLine2: "Palasia",
@@ -398,9 +534,17 @@ export function pcSpec(): StudioSpec {
             postalCode: "452001",
         },
         createdDaysAgo: 560,
-        modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS", "COMMERCE", "INSIGHTS"],
+        modules: [
+            "APPOINTMENTS",
+            "CRM",
+            "WEBSITE",
+            "PAYMENTS",
+            "COMMERCE",
+            "INSIGHTS",
+        ],
         store: {
-            description: "Printed standees, table tents and brand kits from Pixel & Chai, Indore.",
+            description:
+                "Printed standees, table tents and brand kits from Pixel & Chai, Indore.",
             openingHours: [
                 { day: "MON", open: "10:00", close: "19:00", closed: false },
                 { day: "TUE", open: "10:00", close: "19:00", closed: false },
@@ -412,13 +556,48 @@ export function pcSpec(): StudioSpec {
             ],
         },
         staff: [
-            { key: "riya", name: "Riya Jain", title: "Founder, strategy", services: ["audit", "workshop", "onboarding"], hours: [{ days: MON_SAT, from: "10:00", to: "19:00" }] },
-            { key: "aman", name: "Aman Khandelwal", title: "Performance ads", services: ["audit", "onboarding"], hours: [{ days: [1, 2, 3, 4, 5], from: "10:00", to: "19:00" }] },
-            { key: "sneha", name: "Sneha Patidar", title: "Content and reels", services: ["shoot"], hours: [{ days: MON_SAT, from: "09:00", to: "19:00" }] },
-            { key: "faizan", name: "Faizan Qureshi", title: "Design", services: ["workshop"], hours: [{ days: [1, 2, 3, 4, 5], from: "11:00", to: "19:00" }] },
-            { key: "nikita", name: "Nikita Rathi", title: "Client success and listings", services: ["audit", "gbp", "onboarding"], hours: [{ days: MON_SAT, from: "10:00", to: "18:30" }], member: true },
+            {
+                key: "riya",
+                name: "Riya Jain",
+                title: "Founder, strategy",
+                services: ["audit", "workshop", "onboarding"],
+                hours: [{ days: MON_SAT, from: "10:00", to: "19:00" }],
+            },
+            {
+                key: "aman",
+                name: "Aman Khandelwal",
+                title: "Performance ads",
+                services: ["audit", "onboarding"],
+                hours: [{ days: [1, 2, 3, 4, 5], from: "10:00", to: "19:00" }],
+            },
+            {
+                key: "sneha",
+                name: "Sneha Patidar",
+                title: "Content and reels",
+                services: ["shoot"],
+                hours: [{ days: MON_SAT, from: "09:00", to: "19:00" }],
+            },
+            {
+                key: "faizan",
+                name: "Faizan Qureshi",
+                title: "Design",
+                services: ["workshop"],
+                hours: [{ days: [1, 2, 3, 4, 5], from: "11:00", to: "19:00" }],
+            },
+            {
+                key: "nikita",
+                name: "Nikita Rathi",
+                title: "Client success and listings",
+                services: ["audit", "gbp", "onboarding"],
+                hours: [{ days: MON_SAT, from: "10:00", to: "18:30" }],
+                member: true,
+            },
         ],
-        rules: { bookAheadDays: 30, latestBookingMinutes: 120, freeCancelHours: 12 },
+        rules: {
+            bookAheadDays: 30,
+            latestBookingMinutes: 120,
+            freeCancelHours: 12,
+        },
         services: PC_SERVICES,
         categories: [
             { key: "print", name: "Printed" },
@@ -428,7 +607,13 @@ export function pcSpec(): StudioSpec {
         plans: PC_PLANS,
         pipeline: {
             name: "New business",
-            stages: ["New lead", "Audit call booked", "Audit done", "Proposal sent", "Signed"],
+            stages: [
+                "New lead",
+                "Audit call booked",
+                "Audit done",
+                "Proposal sent",
+                "Signed",
+            ],
         },
         site: pcSite(),
         footer: "Pixel & Chai · 302, Shekhar Central, AB Road, Palasia, Indore 452001 · +91 98260 33415",
