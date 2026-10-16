@@ -1241,6 +1241,28 @@ function planVolume(a: {
     // Every customer orders once, then the regulars order again and again.
     const whoRng = rngFor("who");
     const firstOrders = shoppers.map((_, c) => c);
+    // How often each comes back: a third once only, most now and then, a
+    // fifth regularly and a few every week or two.
+    const loyalty = shoppers.map(
+        () =>
+            whoRng.weighted(
+                [
+                    { w: 35, x: 0 },
+                    { w: 40, x: 1 },
+                    { w: 20, x: 3 },
+                    { w: 5, x: 8 },
+                ],
+                (c) => c.w,
+            ).x,
+    );
+    const shopperIndexes = shoppers.map((_, c) => c);
+    const repeat = () => {
+        const seen = shopperIndexes.filter(
+            (c) => loyalty[c] > 0 && !firstOrders.includes(c),
+        );
+        if (seen.length === 0 || whoRng.chance(0.3)) return null;
+        return whoRng.weighted(seen, (c) => loyalty[c]);
+    };
     for (let n = 0; n < total; n++) {
         // The day, by weight.
         let r = orderRng.next() * weightSum;
@@ -1270,12 +1292,13 @@ function planVolume(a: {
               );
         const customer = walkIn
             ? null
-            : firstOrders.length > 0 && whoRng.chance(0.42)
-              ? (firstOrders.splice(
-                    whoRng.int(0, firstOrders.length - 1),
-                    1,
-                )[0] ?? 0)
-              : whoRng.skewed(shoppers.length, 2.1);
+            : (repeat() ??
+              (firstOrders.length > 0
+                  ? (firstOrders.splice(
+                        whoRng.int(0, firstOrders.length - 1),
+                        1,
+                    )[0] ?? 0)
+                  : whoRng.skewed(shoppers.length, 1.6)));
         const daysAgo = -d;
         const choices = products
             .map((p, i) => ({ p, i }))
@@ -1365,7 +1388,9 @@ function planVolume(a: {
                     throw new Error(`Bulk order ${k}: no product "${l.slug}"`);
                 const vi =
                     l.variant === null
-                        ? null
+                        ? products[pi].variants.length > 0
+                            ? 0
+                            : null
                         : products[pi].variants.findIndex(
                               (x) => x.title === l.variant,
                           );
@@ -1801,7 +1826,12 @@ function planVolume(a: {
                 createdAt: refundAt,
             });
         }
-        if (closed && fate === "OK" && paidAt && o.customer !== null) {
+        if (
+            STATUS_OF[stage] === "DELIVERED" &&
+            fate === "OK" &&
+            paidAt &&
+            o.customer !== null
+        ) {
             delivered.push({
                 order: n,
                 at: finalAt,
@@ -1917,24 +1947,27 @@ function planVolume(a: {
             usedItems.add(itemId);
             const shopper = shoppers[d.customer ?? 0];
             const orderId = sid("order", d.order);
-            const invitationId = sid("invitation", pi, ri);
+            // One invitation an order; each line it reviews hangs off it.
+            const invitationId = sid("invitation", d.order);
             const reviewedAt = earliest(
                 addMinutes(d.at, reviewRng.int(24 * 60, 6 * 24 * 60)),
                 addMinutes(now, -60),
             );
-            v.invitations.push({
-                id: invitationId,
-                organizationId: orgId,
-                orderId,
-                tokenHash: createHash("sha256")
-                    .update(invitationId)
-                    .digest("hex"),
-                toAddress: shopper.email,
-                expiresAt: addMinutes(d.at, 31 * 24 * 60),
-                completedAt: reviewedAt,
-                lastSentAt: addMinutes(d.at, 24 * 60),
-                createdAt: addMinutes(d.at, 24 * 60),
-            });
+            if (!v.invitations.some((x) => x.id === invitationId))
+                v.invitations.push({
+                    id: invitationId,
+                    organizationId: orgId,
+                    orderId,
+                    tokenHash: createHash("sha256")
+                        .update(invitationId)
+                        .digest("hex"),
+                    toAddress: shopper.email,
+                    expiresAt: addMinutes(d.at, 31 * 24 * 60),
+                    completedAt: reviewedAt,
+                    updatedAt: reviewedAt,
+                    lastSentAt: addMinutes(d.at, 24 * 60),
+                    createdAt: addMinutes(d.at, 24 * 60),
+                });
             v.reviews.push({
                 id: sid("review", pi, ri),
                 organizationId: orgId,
@@ -1957,7 +1990,10 @@ function planVolume(a: {
                       )
                     : null,
                 createdAt: reviewedAt,
+                updatedAt: reviewedAt,
             });
+            const last = v.reviews[v.reviews.length - 1];
+            if (last.repliedAt) last.updatedAt = last.repliedAt;
         });
     });
 
@@ -2451,6 +2487,7 @@ async function writeDiscounts(
                         ? null
                         : istAt(a.now, d.endsInDays, 23 * 60 + 59),
                 createdAt: istAt(a.now, -(d.startsDaysAgo ?? 60) - 2, 11 * 60),
+                updatedAt: istAt(a.now, -(d.startsDaysAgo ?? 60) - 2, 11 * 60),
             },
         });
     }

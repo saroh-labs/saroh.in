@@ -91,7 +91,7 @@ const CONFIG: DemoShopConfig = {
     profile: {
         legalName: null,
         type: "individual",
-        phone: "+91 94150 27318",
+        phone: "+919415027318",
         contactEmail: "ammisachaar@example.com",
         addressLine1: "B-14, Nishatganj Colony",
         addressLine2: "Near Papermill Colony crossing",

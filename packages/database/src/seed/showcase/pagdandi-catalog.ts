@@ -282,7 +282,7 @@ function book(b: BookInput): DemoProduct {
         hsnCode: "4901",
         tracked: b.tracked ?? true,
         stock: variants.length ? 0 : (b.stock ?? 0),
-        lowStockAlert: b.lowStockAlert ?? 2,
+        lowStockAlert: b.lowStockAlert ?? 1,
         images: [drawn(b.slug, `Cover of ${b.name} by ${b.author}`)],
         variants,
         demand: b.demand,
