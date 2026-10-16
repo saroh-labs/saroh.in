@@ -20,6 +20,7 @@ import {
 import {
     Archive,
     ArrowRight,
+    ArrowUpRight,
     Check,
     ChevronDown,
     ChevronUp,
@@ -174,7 +175,7 @@ export function QuickLook({
                                     image={row.image}
                                     size={52}
                                 />
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                     <SheetTitle className="text-pretty font-display text-[19px] font-semibold tracking-[-0.025em]">
                                         {row.name}
                                     </SheetTitle>
@@ -182,6 +183,14 @@ export function QuickLook({
                                         {row.sku ? `SKU ${row.sku}` : "No SKU"}
                                     </SheetDescription>
                                 </div>
+                                {/* The full page, one tap from the name. */}
+                                <IconButton
+                                    href={pageHref}
+                                    label="Open product page"
+                                    icon={<ArrowUpRight />}
+                                    variant="ghost"
+                                    className="self-start text-muted-foreground"
+                                />
                             </div>
                             <dl className="flex flex-col gap-[11px]">
                                 <Line label="Price" center>
@@ -213,18 +222,21 @@ export function QuickLook({
                                 </Line>
                             </dl>
                         </div>
-                        {/* One row: the way to the page, Edit as the strong
-                            next step, and selling on or off in the menu. */}
+                        {/* Edit as the strong next step, selling on or off
+                            in the menu. The page is the icon by the name; a
+                            role that can't edit gets it here, in words. */}
                         <div className="flex items-center gap-2 border-t border-muted px-[18px] py-3.5">
-                            <Button
-                                asChild
-                                variant="outline"
-                                className={
-                                    canWrite || canStock ? undefined : "flex-1"
-                                }
-                            >
-                                <Link href={pageHref}>Open product page</Link>
-                            </Button>
+                            {canWrite || canStock ? null : (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="flex-1"
+                                >
+                                    <Link href={pageHref}>
+                                        Open product page
+                                    </Link>
+                                </Button>
+                            )}
                             {canWrite || canStock ? (
                                 <Button asChild className="flex-1">
                                     <Link href={editHref}>
