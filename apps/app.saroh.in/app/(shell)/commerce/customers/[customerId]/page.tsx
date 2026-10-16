@@ -18,7 +18,7 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import type { OrderStanding } from "@/lib/orders/business-service";
 import { listAllOrderRows } from "@/lib/orders/business-service";
 import { requireSession } from "@/lib/session";
-import type { Store } from "@/lib/stores/service";
+import type { BusinessStore as Store } from "@/lib/stores/service";
 import { listBusinessStores } from "@/lib/stores/service";
 
 // "Customer", never their name: a tab's title shows in a screen share, in
