@@ -10,11 +10,10 @@ import { useTransition } from "react";
 import type { CatalogueView } from "@/lib/products/settings";
 import { addOption, removeOption } from "@/lib/products/settings-actions";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { Tip } from "@saroh/ui/tooltip";
 import { OptionSheet } from "./option-sheet";
-import { TabIntro } from "./product-settings";
+import { SettingsReadOnly, TabIntro } from "./product-settings";
 
 /**
  * The ways customers choose between variants — Volume, Shade, Size — and
@@ -61,7 +60,7 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                 The names your variants use, and the values you pick from.
                 Customers see the name: “Shade: Rose nude” rather than “Size”.
             </TabIntro>
-            {canWrite ? null : <ReadOnlyNote />}
+            {canWrite ? null : <SettingsReadOnly />}
 
             {options.length === 0 ? (
                 <EmptyState

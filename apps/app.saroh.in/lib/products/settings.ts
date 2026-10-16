@@ -160,8 +160,13 @@ export interface SkuPreview {
         next: string;
     }[];
     total: number;
-    /** The first thing wrong with the pattern, clash included; "" if none. */
+    /** What is wrong with the pattern itself; "" if nothing. */
     problem: string;
+    /**
+     * Two variants the pattern names alike, and the -2, -3 the editor adds;
+     * "" when every SKU differs. Advice, never a block.
+     */
+    advice?: string;
 }
 
 export async function getSkuSettings(

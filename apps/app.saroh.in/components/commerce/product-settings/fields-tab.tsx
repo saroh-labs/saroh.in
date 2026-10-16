@@ -4,18 +4,17 @@ import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import type { CatalogueView, FieldView } from "@/lib/products/settings";
 import { removeField, restoreField } from "@/lib/products/settings-actions";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { FailedRead } from "@/components/shared/failed-read";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { FIELD_TYPES, FieldSheet } from "./field-sheet";
-import { TabIntro } from "./product-settings";
+import { SettingsReadOnly, TabIntro } from "./product-settings";
 
 /**
  * Extra things a product records, for the categories picked — "Skin type"
@@ -25,6 +24,32 @@ import { TabIntro } from "./product-settings";
  * is saved. A delete keeps what was typed, with Undo.
  */
 export function FieldsTab({
+    catalogue,
+    fields,
+}: {
+    catalogue: CatalogueView;
+    /** null: the list couldn't be read, which is said, never "none yet". */
+    fields: FieldView[] | null;
+}) {
+    if (fields === null) {
+        return (
+            <section>
+                <TabIntro title="Custom fields">
+                    Extra things a product records, for the categories you
+                    pick.
+                </TabIntro>
+                <FailedRead
+                    size="panel"
+                    things="custom fields"
+                    reassurance="Products keep the values typed on them."
+                />
+            </section>
+        );
+    }
+    return <FieldsList catalogue={catalogue} fields={fields} />;
+}
+
+function FieldsList({
     catalogue,
     fields,
 }: {
@@ -50,8 +75,7 @@ export function FieldsTab({
         <FieldSheet
             trigger={
                 <Button type="button" className="shrink-0">
-                    <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
-                    Add field
+                    New field
                 </Button>
             }
             fields={fields}
@@ -70,13 +94,13 @@ export function FieldsTab({
                 Team only fields stay on the product page. Fields on the shop
                 show under the description.
             </TabIntro>
-            {canWrite ? null : <ReadOnlyNote />}
+            {canWrite ? null : <SettingsReadOnly />}
 
             {fields.length === 0 ? (
                 <EmptyState
                     size="panel"
                     title="No custom fields yet"
-                    description="Add one to record something extra, such as Skin type for serums or Fabric care for dresses."
+                    description={fieldsExample(categories)}
                     action={addOne}
                 />
             ) : (
@@ -196,4 +220,16 @@ export function FieldsTab({
             )}
         </section>
     );
+}
+
+/**
+ * The empty state's example, from the business's own categories rather
+ * than a beauty shop's: "Add one to record something extra for Pickles or
+ * Chutneys." With none, it says what a field is for.
+ */
+export function fieldsExample(categories: { name: string }[]): string {
+    const names = categories.slice(0, 2).map((c) => c.name);
+    if (names.length === 0)
+        return "Add one to record something extra about a product, such as a shelf life or a size guide.";
+    return `Add one to record something extra for ${names.join(" or ")}, such as a shelf life or a size guide.`;
 }

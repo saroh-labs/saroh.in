@@ -1,11 +1,14 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { createContext, useContext, useState } from "react";
+import type { MouseEvent, ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useState } from "react";
 
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
+import { count } from "@/lib/format/plural";
 import type { SettingsTab } from "@/lib/products/links";
 import { productSettingsHref } from "@/lib/products/links";
+import { cn } from "@saroh/ui/lib/utils";
+import { Notice } from "@saroh/ui/notice";
 import { TabStrip } from "@saroh/ui/tabs";
 
 const LABEL: Record<SettingsTab, string> = {
@@ -17,11 +20,19 @@ const LABEL: Record<SettingsTab, string> = {
     defaults: "Defaults",
 };
 
-interface Unsaved {
-    /** A tab with a save bar says whether it has changes. */
-    setDirty: (dirty: boolean) => void;
+/** "Your 1 change to Defaults will be lost." */
+export function lostLine(changes: number, tab: SettingsTab): string {
+    return `Your ${count(Math.max(1, changes), "change")} to ${LABEL[tab]} will be lost.`;
 }
-const UnsavedContext = createContext<Unsaved>({ setDirty: () => undefined });
+
+interface Unsaved {
+    /**
+     * A tab with a save bar says how many changes it holds (0 when none)
+     * and how to save them, for the leave guard's Save and leave.
+     */
+    report: (changes: number, save?: () => Promise<boolean>) => void;
+}
+const UnsavedContext = createContext<Unsaved>({ report: () => undefined });
 
 export function useUnsaved(): Unsaved {
     return useContext(UnsavedContext);
@@ -31,7 +42,12 @@ export function useUnsaved(): Unsaved {
  * Product settings' tabs and the one leave guard. The lists are read first:
  * a change is made in a dialog or a side sheet, saved there and offered Undo.
  * The defaults and the SKU pattern are forms with a save bar, and leaving
- * either with changes asks first.
+ * either with changes asks first, naming the tab and how many changes, with
+ * Save and leave.
+ *
+ * Each tab is an address the server reads. On a slow line the press would
+ * show nothing until the next page arrived, so the pressed tab takes the
+ * underline at once and the panel dims until it lands.
  */
 export function ProductSettings({
     tab,
@@ -39,33 +55,94 @@ export function ProductSettings({
     children,
 }: {
     tab: SettingsTab;
-    /** Each tab with its count, when it has one. */
-    tabs: { key: SettingsTab; count?: number }[];
+    /** Each tab with its count, when it has one (`null`: not known). */
+    tabs: { key: SettingsTab; count?: number | null }[];
     children: ReactNode;
 }) {
-    const [dirty, setDirty] = useState(false);
+    const [changes, setChanges] = useState(0);
+    const saveRef = useRef<(() => Promise<boolean>) | undefined>(undefined);
+    const report = useCallback(
+        (n: number, save?: () => Promise<boolean>) => {
+            saveRef.current = save;
+            setChanges(n);
+        },
+        [],
+    );
     // Another tab is another address, so the guard catches the tabs too.
     const guard = useLeaveGuard({
-        dirty,
-        lost: "Your changes to the defaults or the SKU pattern will be lost.",
+        dirty: changes > 0,
+        lost: lostLine(changes, tab),
+        save: () => saveRef.current?.() ?? Promise.resolve(true),
     });
 
+    // The tab pressed, until the server's page for it arrives.
+    const [pressed, setPressed] = useState<SettingsTab | null>(null);
+    const [shownTab, setShownTab] = useState(tab);
+    if (shownTab !== tab) {
+        setShownTab(tab);
+        setPressed(null);
+    }
+    const loading = pressed !== null && pressed !== tab;
+
+    function onPress(e: MouseEvent<HTMLDivElement>) {
+        // The leave guard asked first (it prevents the link), or the press
+        // opens a new tab: nothing moves here.
+        if (
+            e.defaultPrevented ||
+            e.button !== 0 ||
+            e.metaKey ||
+            e.ctrlKey ||
+            e.shiftKey ||
+            e.altKey
+        )
+            return;
+        const link = (e.target as HTMLElement).closest("a[href]");
+        const key = link?.id.split("-").pop();
+        const hit = tabs.find((t) => t.key === key);
+        if (hit && hit.key !== tab) setPressed(hit.key);
+    }
+
     return (
-        <UnsavedContext.Provider value={{ setDirty }}>
-            <TabStrip
-                label="Product settings"
-                value={tab}
-                tabs={tabs.map(({ key, count }) => ({
-                    value: key,
-                    label: LABEL[key],
-                    href: productSettingsHref(key),
-                    count,
-                }))}
-            />
-            <div className="pt-5">{children}</div>
+        <UnsavedContext.Provider value={{ report }}>
+            <div onClick={onPress}>
+                <TabStrip
+                    label="Product settings"
+                    idPrefix="settings-tab"
+                    value={loading && pressed ? pressed : tab}
+                    tabs={tabs.map(({ key, count }) => ({
+                        value: key,
+                        label: LABEL[key],
+                        href: productSettingsHref(key),
+                        count,
+                    }))}
+                />
+            </div>
+            <div
+                aria-busy={loading || undefined}
+                className={cn(
+                    "pt-5 transition-opacity duration-fast",
+                    loading && "pointer-events-none opacity-50",
+                )}
+            >
+                {children}
+            </div>
 
             {guard.dialog}
         </UnsavedContext.Provider>
+    );
+}
+
+/**
+ * The read-only line every tab shows a role that can read but not change:
+ * `ReadOnlyNote`'s look, with "your role" said, since "this" read as the
+ * setting rather than the role.
+ */
+export function SettingsReadOnly() {
+    return (
+        <Notice icon={false} data-ph-unmask="" className="mb-3.5">
+            You can see these but not change them. An owner or admin can change
+            your role in Settings › Team.
+        </Notice>
     );
 }
 

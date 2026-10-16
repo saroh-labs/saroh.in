@@ -24,11 +24,10 @@ import {
 
 import { CheckRow } from "@/components/shared/check-row";
 import { ChipGroup } from "@/components/shared/choice-group";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { Field } from "@saroh/ui/field";
-import { TabIntro, useUnsaved } from "./product-settings";
+import { SettingsReadOnly, TabIntro, useUnsaved } from "./product-settings";
 
 /**
  * What a new product starts with — how to use it, when to warn about stock,
@@ -112,7 +111,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                 wins. Leave it empty and the All products value is used. Saved
                 products keep their values unless you choose to update them.
             </TabIntro>
-            {catalogue.canWrite ? null : <ReadOnlyNote />}
+            {catalogue.canWrite ? null : <SettingsReadOnly />}
 
             <div className="flex flex-col gap-3">
                 {rows.map((r) => {
