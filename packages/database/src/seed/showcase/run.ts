@@ -45,6 +45,8 @@ import { checkRye, checkShowcase } from "./check";
 import type { KaviCounts } from "./clinic";
 import { checkKavi, KAVI, seedClinic } from "./clinic";
 import { KAVI_DESK } from "./clinic-data";
+import { checkFrameVow, seedFrameVow } from "./frame-vow";
+import { checkPixelChai, seedPixelChai } from "./pixel-chai";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
 import type { LeadSpec } from "./crm";
@@ -208,6 +210,23 @@ export async function seedShowcase(
             deskUserId: await ensureTeamMember(ctx, KAVI_DESK),
         }),
     );
+    // The service studios (vertical demos): a wedding photography and
+    // planning studio, and a social-media agency on retainers. Meher Bhati
+    // and Nikita Rathi work their diaries as Members.
+    const frameVow = await seedFrameVow({
+        prisma,
+        now,
+        demoUserId: ctx.demoUserId,
+        memberUserId: await ensureTeamMember(ctx, { first: "Meher", last: "Bhati", role: "MEMBER" }),
+    });
+    businesses.push(frameVow);
+    const pixelChai = await seedPixelChai({
+        prisma,
+        now,
+        demoUserId: ctx.demoUserId,
+        memberUserId: await ensureTeamMember(ctx, { first: "Nikita", last: "Rathi", role: "MEMBER" }),
+    });
+    businesses.push(pixelChai);
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -236,7 +255,13 @@ export async function seedShowcase(
         prisma,
         businesses
             .map((b) => b.id)
-            .filter((id) => id !== RYE.orgId && id !== KAVI.orgId),
+            .filter(
+                (id) =>
+                    id !== RYE.orgId &&
+                    id !== KAVI.orgId &&
+                    id !== frameVow.id &&
+                    id !== pixelChai.id,
+            ),
     );
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
@@ -246,6 +271,10 @@ export async function seedShowcase(
         : null;
     const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
     const kaviCounts: KaviCounts = await checkKavi(prisma, KAVI.orgId, now);
+    const studioCounts = {
+        "Frame & Vow": await checkFrameVow(prisma, frameVow.id, now),
+        "Pixel & Chai": await checkPixelChai(prisma, pixelChai.id, now),
+    };
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -261,6 +290,8 @@ export async function seedShowcase(
     console.table(ryeCounts);
     console.log("[showcase] Kavi Dental, as its films need it:");
     console.table(kaviCounts);
+    console.log("[showcase] Frame & Vow and Pixel & Chai, as their demos need them:");
+    console.table(studioCounts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +

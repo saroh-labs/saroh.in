@@ -1328,3 +1328,6 @@ ${figure("groomCarries", "The end of a long wedding night. This is why we tell f
 <p>Bring your function list to a consultation, and we'll mark where we'd put a camera and where we wouldn't. You might book less than you expected.</p>`,
     },
 ];
+
+/** A photograph from the table above, for the site and catalogue (`studio-photos.ts`). */
+export const fvPhoto = cover;

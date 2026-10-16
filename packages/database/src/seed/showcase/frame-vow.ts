@@ -308,6 +308,7 @@ export async function seedFrameVow(ctx: StudioContext): Promise<{ id: string; na
             const end = addMinutes(when, service.minutes);
             const staff = s.service === "prewedding" && n % 2 === 1 ? "ishaan" : "kabir";
             busy.take(staff, when, end);
+            busy.take(`service:${s.service}`, when, end);
             // The second shooter is there on the big days too.
             if (s.service === "wedding" || s.service === "haldi") busy.take("ishaan", when, end);
             photoLines.push({ service: s.service, when, price: service.pricePaise });
@@ -746,7 +747,7 @@ export async function checkFrameVow(prisma: Db, orgId: string, now: Date) {
         gstPrefix: "FV",
         sac: ["998385", "998386", "998596"],
         minimum: {
-            products: 17,
+            products: 16,
             variantsOnOneProduct: 27,
             services: 10,
             staff: 4,

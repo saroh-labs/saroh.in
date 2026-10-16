@@ -100,6 +100,43 @@ const ART = {
 <text x="800" y="960" text-anchor="middle" font-size="34" fill="#7a6b5a">30, 40 or 50 pages · linen, leather or acrylic</text>
 </g>`),
     },
+    canvasWall: {
+        alt: "A large gallery-wrapped canvas of a couple at sunset hanging above a sofa",
+        svg: svg(`
+<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3b36c"/><stop offset="0.6" stop-color="#d9684f"/><stop offset="1" stop-color="#4f2433"/></linearGradient></defs>
+<rect width="${W}" height="${H}" fill="#e9e1d4"/>
+<rect x="430" y="150" width="740" height="500" fill="#3a2a2a" opacity="0.25" transform="translate(14 14)"/>
+<rect x="430" y="150" width="740" height="500" fill="url(#sky)"/>
+<circle cx="900" cy="420" r="70" fill="#ffd9a0" opacity="0.9"/>
+<path d="M430 520 Q640 470 820 510 T1170 490 V650 H430Z" fill="#33192a"/>
+<path d="M760 520 q14-60 34-60 q18 0 26 60z M812 524 q12-52 30-52 q16 0 22 52z" fill="#1c0e16"/>
+<rect x="300" y="820" width="1000" height="200" rx="40" fill="#8a7a66"/>
+<rect x="260" y="760" width="1080" height="110" rx="40" fill="#9c8b75"/>
+<rect x="0" y="1020" width="${W}" height="180" fill="#cdbfa9"/>`),
+    },
+    frameDesk: {
+        alt: "A sheesham wood frame with a white mount holding a wedding photograph, standing on a desk",
+        svg: svg(`
+<rect width="${W}" height="${H}" fill="#efe8dd"/>
+<rect y="820" width="${W}" height="380" fill="#b98f62"/>
+<rect x="560" y="200" width="480" height="620" rx="6" fill="#6b4226"/>
+<rect x="600" y="240" width="400" height="540" fill="#fbf8f2"/>
+<rect x="660" y="300" width="280" height="400" fill="#c9a07a"/>
+<path d="M660 600 Q760 560 800 600 T940 590 V700 H660Z" fill="#7a3b2e"/>
+<circle cx="800" cy="440" r="60" fill="#f2d3a8"/>
+<ellipse cx="800" cy="830" rx="300" ry="18" fill="#000" opacity="0.15"/>`),
+    },
+    printBox: {
+        alt: "A linen keepsake box with a stack of printed wedding photographs beside it",
+        svg: svg(`
+<rect width="${W}" height="${H}" fill="#ece5da"/>
+<rect x="300" y="380" width="620" height="460" rx="12" fill="#cbbda3"/>
+<rect x="300" y="380" width="620" height="90" rx="12" fill="#b7a789"/>
+<text x="610" y="680" text-anchor="middle" font-family="${serif}" font-size="54" fill="#7a5a22" letter-spacing="6">N &amp; S</text>
+<g transform="rotate(6 1150 600)"><rect x="980" y="380" width="340" height="460" fill="#fff" stroke="#ddd3c4" stroke-width="3"/><rect x="1005" y="405" width="290" height="360" fill="#9c6b4e"/></g>
+<g transform="rotate(-3 1130 620)"><rect x="960" y="400" width="340" height="460" fill="#fff" stroke="#ddd3c4" stroke-width="3"/><rect x="985" y="425" width="290" height="360" fill="#d8a35f"/></g>
+<ellipse cx="800" cy="880" rx="560" ry="30" fill="#000" opacity="0.12"/>`),
+    },
     cateringMenu: {
         alt: "Frame & Vow's per-plate catering card: veg classic, veg royal Rajasthani, non-veg classic and non-veg royal, with prices",
         svg: svg(`

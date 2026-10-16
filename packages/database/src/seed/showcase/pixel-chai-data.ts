@@ -297,15 +297,12 @@ export function pcSite(): SeedSite {
                 title: "Work",
                 sections: [
                     work("cards", PC_CLIENTS),
-                    {
-                        type: "richText",
-                        content: {
+                    section("richText", {
                             format: "html",
                             value: "<h2>How we report</h2><p>Every client gets one page in the first week of the month: reach, saves, profile visits, calls and direction requests from Google, enquiries, and — on Pro — ad spend and cost per enquiry. Then a twenty-minute call about what we'll change.</p>",
                             image: blockImage(A.reportSample),
                             imageSide: "right",
-                        },
-                    },
+                        }),
                 ],
             },
             {
@@ -368,15 +365,12 @@ export function pcSite(): SeedSite {
                             successMessage: "Thanks — we'll reply within a working day.",
                         },
                     },
-                    {
-                        type: "richText",
-                        content: {
+                    section("richText", {
                             format: "html",
                             value: "<h2>The office</h2><p>302, Shekhar Central, AB Road, Palasia, Indore 452001. Monday to Saturday, 10 to 7. Chai is always on.</p><p>Call or WhatsApp +91 98260 33415.</p>",
                             image: blockImage(P.indore),
                             imageSide: "left",
-                        },
-                    },
+                        }),
                 ],
             },
             {

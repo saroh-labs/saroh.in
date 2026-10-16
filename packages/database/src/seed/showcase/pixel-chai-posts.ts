@@ -923,3 +923,6 @@ ${figure("diyaTray", "Lit diyas on a tray among flower petals", "The festive pos
 <p>None of this was clever. It was the shop's own products, photographed well, made easy to order in the app every customer already used. For a business with loyal customers and a crowded counter, that is often all marketing needs to do.</p>`,
     },
 ];
+
+/** A photograph from the table above, for the site and catalogue (`studio-photos.ts`). */
+export const pcPhoto = cover;

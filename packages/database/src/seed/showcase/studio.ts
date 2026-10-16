@@ -1029,8 +1029,12 @@ export function planDiary(
             if (slots.length === 0) continue;
             const startAt = rng.pick(slots);
             const endAt = addMinutes(startAt, service.minutes);
-            if (!o.busy.free(staff.key, startAt, endAt)) continue;
+            // Capacity is the service's, not the person's: one booking of a
+            // service at a time, whoever takes it.
+            const lane = `service:${service.key}`;
+            if (!o.busy.free(staff.key, startAt, endAt) || !o.busy.free(lane, startAt, endAt)) continue;
             o.busy.take(staff.key, startAt, endAt);
+            o.busy.take(lane, startAt, endAt);
             placed += 1;
 
             const contact = o.contactFor(service, rng);

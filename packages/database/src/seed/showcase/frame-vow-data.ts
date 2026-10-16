@@ -292,7 +292,7 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         hsn: "998386",
         keyPoints: ["Ready to hang", "38 mm frame", "Colour-checked before print"],
         materials: "Cotton canvas, pine stretcher bars",
-        images: [P.canvasWall],
+        images: [A.canvasWall, P.wedding8b],
         option: {
             name: "Canvas size",
             variants: [
@@ -340,7 +340,7 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         hsn: "998386",
         keyPoints: ["Solid sheesham", "Glass and white mount", "Stands or hangs"],
         materials: "Sheesham wood, glass, acid-free mount",
-        images: [P.frameDesk],
+        images: [A.frameDesk],
         option: {
             name: "Frame size",
             variants: [
@@ -362,7 +362,7 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         hsn: "998386",
         keyPoints: ["You choose from the proofs", "In your gallery within ten days"],
         materials: null,
-        images: [P.photoBox],
+        images: [P.wedding3c, P.haldi],
         option: {
             name: "How many photographs",
             variants: [
@@ -384,7 +384,7 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         hsn: "998386",
         keyPoints: ["30 prints, 6×9", "Names on the lid"],
         materials: "Linen-covered box, lustre prints",
-        images: [P.photoBox],
+        images: [A.printBox],
         fulfilment: "SHIPPING",
         demand: 6,
     },
@@ -688,16 +688,13 @@ export function fvSite(): SeedSite {
                 path: "/planning",
                 title: "Planning",
                 sections: [
-                    {
-                        type: "richText",
-                        content: {
+                    section("richText", {
                             format: "html",
                             value:
                                 "<h2>Planning and décor, by the same team</h2><p>Meher plans; Tanvi builds. We quote the décor, catering, music and mehendi together with your photography, so one team answers for the day. Catering is from our partner kitchen and billed per plate on the final count after the event.</p><table><thead><tr><th>What</th><th>From, incl. GST</th></tr></thead><tbody><tr><td>Floral mandap</td><td>₹1,85,000</td></tr><tr><td>Marigold &amp; mogra haldi setup</td><td>₹65,000</td></tr><tr><td>Sangeet stage &amp; lights</td><td>₹1,40,000</td></tr><tr><td>Catering, veg classic</td><td>₹1,450 a plate</td></tr><tr><td>Catering, veg royal Rajasthani</td><td>₹2,100 a plate</td></tr><tr><td>Catering, non-veg classic</td><td>₹1,850 a plate</td></tr><tr><td>Catering, non-veg royal</td><td>₹2,600 a plate</td></tr><tr><td>DJ &amp; sound night</td><td>₹75,000</td></tr><tr><td>Bridal mehendi</td><td>₹21,000</td></tr><tr><td>Guest mehendi</td><td>₹350 a hand</td></tr></tbody></table>",
                             image: blockImage(P.decorMandap),
                             imageSide: "right",
-                        },
-                    },
+                        }),
                     section("gallery", {
                         layout: "grid",
                         images: [P.decorHaldi, P.decorSangeet, P.cateringThali, P.mehendiArtist, P.djNight, P.cateringBuffet].map(blockImage),
@@ -741,16 +738,13 @@ export function fvSite(): SeedSite {
                             { name: "Tanvi Purohit", role: "Décor lead", bio: "Designs and builds the mandaps, haldi corners and sangeet stages." },
                         ],
                     }),
-                    {
-                        type: "richText",
-                        content: {
+                    section("richText", {
                             format: "html",
                             value:
                                 "<h2>The studio</h2><p>2nd floor, 14 Lake Palace Road, Udaipur 313001. Our Jaipur desk in C-Scheme is open on Tuesdays and Fridays by appointment.</p><p>Call or WhatsApp +91 98290 41760.</p>",
                             image: blockImage(P.udaipurLake),
                             imageSide: "left",
-                        },
-                    },
+                        }),
                 ],
             },
             {
