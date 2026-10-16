@@ -4673,3 +4673,19 @@ sets `tooltip` itself.
 `<Tip>` around an `<IconButton>` that doesn't set `tooltip`.
 **Rule**: an icon button is its own tooltip; never wrap it in another.
 **Category**: frontend · `docs/patterns/frontend-design-system.md`
+
+## A hint opened by itself when a sheet opened
+
+**Symptom**: opening a product's quick look showed "Previous product (K)"
+straight away, with no pointer over it (owner, 16 Oct).
+**Cause**: a sheet moves focus to its first control as it opens, and Radix
+opens a tooltip on any focus, keyboard or not.
+**Fix**: `Tip`'s hint opens only for a pointer over the control or for focus
+the keyboard brought (`:focus-visible`). Focus left by a click, or moved by
+a sheet or dialog, shows nothing. Tab still shows it.
+**Check**: none automatic yet (jsdom has no real `:focus-visible`); checked
+by hand in the quick look. A browser spec for it belongs with the next
+quick-look spec change.
+**Rule**: a hint answers a hover or a keyboard visit, never a focus the app
+moved.
+**Category**: frontend · `docs/patterns/frontend-design-system.md`
