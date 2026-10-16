@@ -421,6 +421,11 @@ export interface AnalyticsShape {
     enquiries?: ReadonlyMap<string, number>;
     /** Shifts the noise so two businesses do not share one jagged line. */
     noiseOffset?: number;
+    /**
+     * Extra views on day `i` (0 = the oldest), as a share added to the
+     * trend: a results day, an admissions fortnight. Absent: none.
+     */
+    dayFactor?: (i: number) => number;
 }
 
 /**
@@ -444,7 +449,9 @@ export function buildAnalyticsRows(shape: AnalyticsShape): AnalyticsRow[] {
         const weekday = date.getUTCDay();
         const weekend = weekday === 0 || weekday === 6;
 
-        const trend = shape.trendBase + Math.round(i * shape.trendSlope);
+        const trend =
+            (shape.trendBase + Math.round(i * shape.trendSlope)) *
+            (1 + (shape.dayFactor ? shape.dayFactor(i) : 0));
         const views = Math.max(
             11,
             Math.round(
