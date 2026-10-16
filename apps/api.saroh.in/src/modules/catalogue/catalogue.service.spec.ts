@@ -81,7 +81,7 @@ describe("Catalogue settings (DB)", () => {
         it("refuses a name another category has, ignoring case", async () => {
             await expect(
                 categories.create(orgId, { name: "serums" }),
-            ).rejects.toThrow(/already a category called Serums/);
+            ).rejects.toThrow(/Serums already exists/);
             await expect(
                 categories.rename(orgId, faceCare, {
                     name: "SERUMS",

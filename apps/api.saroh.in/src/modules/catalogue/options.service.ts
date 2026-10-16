@@ -330,7 +330,7 @@ export class OptionsService {
         });
         if (clash) {
             throw new ConflictException({
-                message: `There is already an option called ${clash.name}.`,
+                message: `${clash.name} already exists.`,
                 field: "name",
             });
         }
