@@ -55,6 +55,8 @@ export interface CatalogueView {
         stillOnDefault: Partial<Record<string, Record<DefaultField, number>>>;
         productCounts: Partial<Record<string, number>>;
         suggestions: DefaultsSuggestion[];
+        /** "Not now" was answered for the business (absent from older APIs). */
+        suggestionsPutAway?: boolean;
     };
     canWrite: boolean;
 }
@@ -62,6 +64,16 @@ export interface CatalogueView {
 export async function getCatalogue(): Promise<CatalogueView | null> {
     const base = await catalogueBase();
     return base ? getJson<CatalogueView>(base) : null;
+}
+
+/** The business's options by name: the Products list's `?option=` filter. */
+export async function listOptionNames(): Promise<
+    { id: string; name: string }[] | null
+> {
+    const base = await catalogueBase();
+    return base
+        ? getJson<{ id: string; name: string }[]>(`${base}/options`)
+        : null;
 }
 
 /** What a category took with it when it went, for Undo. */

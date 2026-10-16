@@ -44,7 +44,7 @@ export function valueCode(value: string): string {
 export function skuFrom(
     pattern: string,
     parts: SkuParts,
-    taken?: Iterable<string>,
+    taken?: readonly string[],
 ): string {
     const base = pattern
         .replace(
@@ -131,7 +131,7 @@ export function clashAdvice(pattern: string, rows: SkuClashRow[]): string {
         const key = r.sku.toLowerCase();
         groups.set(key, [...(groups.get(key) ?? []), r]);
     }
-    const shared = [...groups.values()].find((g) => g.length > 1);
+    const shared = Array.from(groups.values()).find((g) => g.length > 1);
     if (!shared) return "";
     const [a, b] = shared as [SkuClashRow, SkuClashRow];
     const apart = "The editor will add -2, -3 to tell them apart";

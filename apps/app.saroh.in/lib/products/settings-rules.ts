@@ -90,12 +90,14 @@ export function toEntry(row: DefaultsRow): DefaultsEntry & { key: string } {
 
 const whole = (v: string) => /^\d+$/.test(v.trim());
 
-/** "Warn at must be …" when a row's number is not one; "" when all are. */
+const LOW_PROBLEM = "Low stock at is a whole number, zero or more.";
+
+/** "Low stock at is …" when a row's number is not one; "" when all are. */
 export function defaultsProblem(rows: DefaultsRow[]): string {
     const bad = rows.some((r) =>
         r.key === "all" ? !whole(r.low) : r.low.trim() !== "" && !whole(r.low),
     );
-    return bad ? "Warn at must be a whole number, zero or more." : "";
+    return bad ? LOW_PROBLEM : "";
 }
 
 export interface Change {
@@ -144,7 +146,11 @@ export function affected(
     };
 }
 
-/** "3 of your 4 Serums & treatments say “…” Make it the default?" */
+/**
+ * One suggestion, with its denominator said: "All 5 Pune writers that track
+ * stock warn at 1." — a warning level is only read from products that track
+ * stock, so the count is of those, never of the category's every product.
+ */
 export function suggestionText(
     s: DefaultsSuggestion,
     categoryName: string,
@@ -152,10 +158,58 @@ export function suggestionText(
     const where = s.key === "all" ? "products" : categoryName;
     if (s.field === "lowStockAlert") {
         return s.count === s.total
-            ? `All ${s.total} ${where} warn at ${s.value}. Make it the default?`
-            : `${s.count} of your ${s.total} ${where} warn at ${s.value}. Make it the default?`;
+            ? `All ${s.total} ${where} that track stock warn at ${s.value}.`
+            : `${s.count} of the ${s.total} ${where} that track stock warn at ${s.value}.`;
     }
     return s.count === s.total
-        ? `All ${s.total} ${where} say “${s.value}” Make it the default?`
-        : `${s.count} of your ${s.total} ${where} say “${s.value}” Make it the default?`;
+        ? `All ${s.total} ${where} say “${s.value}”`
+        : `${s.count} of your ${s.total} ${where} say “${s.value}”`;
+}
+
+/**
+ * The one line the Defaults tab shows for every suggestion at once (one
+ * message, not stacked notes): "6 categories usually warn lower than 10."
+ * A single suggestion is said in full. "" when there are none.
+ */
+export function suggestionLine(
+    suggestions: DefaultsSuggestion[],
+    names: Partial<Record<string, string>>,
+    allLow: string,
+): string {
+    const [first] = suggestions;
+    if (!first) return "";
+    if (suggestions.length === 1)
+        return suggestionText(first, names[first.key] ?? "products");
+    const keys = new Set(suggestions.map((x) => x.key)).size;
+    const one = keys === 1;
+    const cats = `${keys} ${one ? "category" : "categories"} usually`;
+    const warn = one ? "warns" : "warn";
+    const lows = suggestions.filter((x) => x.field === "lowStockAlert");
+    const low = Number(allLow);
+    if (lows.length === suggestions.length) {
+        if (whole(allLow) && lows.every((x) => Number(x.value) < low))
+            return `${cats} ${warn} lower than ${low}.`;
+        if (whole(allLow) && lows.every((x) => Number(x.value) > low))
+            return `${cats} ${warn} higher than ${low}.`;
+        return `${cats} ${warn} at a level of ${one ? "its" : "their"} own.`;
+    }
+    if (lows.length === 0)
+        return `${cats} ${one ? "says" : "say"} the same way to use ${one ? "it" : "them"}.`;
+    return `${cats} ${one ? "has" : "have"} values of ${one ? "its" : "their"} own.`;
+}
+
+/** What a category sets for itself, in a table cell's words; [] for none. */
+export function overrides(row: DefaultsRow): string[] {
+    const out: string[] = [];
+    if (row.low.trim()) out.push(`Low stock at ${row.low.trim()}`);
+    if (row.returns) out.push(`Returns: ${returnsLabel(row.returns)}`);
+    if (row.howToUse.trim()) out.push(`How to use: ${row.howToUse.trim()}`);
+    return out;
+}
+
+/** The problem with a row's own Low stock at, or "". */
+export function lowProblem(row: DefaultsRow): string {
+    const v = row.low.trim();
+    if (row.key === "all" ? whole(v) : v === "" || whole(v)) return "";
+    return LOW_PROBLEM;
 }

@@ -297,6 +297,45 @@ describe("Catalogue settings (DB)", () => {
             expect(removed.value).toBe("S");
         });
 
+        it("renames a value in use on every variant, and refuses another's name", async () => {
+            const [size] = await options.views(orgId);
+            const m = size.values.find((v) => v.value === "M");
+            const res = await options.renameValue(orgId, sizeId, m?.id ?? "", {
+                value: "Medium",
+            });
+            expect(res).toMatchObject({
+                value: "Medium",
+                previousValue: "M",
+                variantCount: 1,
+            });
+            const titles = await prisma.productVariant.findMany({
+                where: { optionValueId: m?.id },
+                select: { title: true },
+            });
+            expect(titles.map((t) => t.title)).toEqual(["Medium"]);
+            await expect(
+                options.renameValue(orgId, sizeId, m?.id ?? "", { value: "l" }),
+            ).rejects.toThrow(/L already exists/);
+            // A case-only change of itself is fine, and Undo is a rename back.
+            await options.renameValue(orgId, sizeId, m?.id ?? "", {
+                value: "M",
+            });
+        });
+
+        it("puts the values in a new order, and hands back the old one", async () => {
+            const [size] = await options.views(orgId);
+            const ids = size.values.map((v) => v.id);
+            const res = await options.reorderValues(orgId, sizeId, {
+                valueIds: [...ids].reverse(),
+            });
+            expect(res.previousValueIds).toEqual(ids);
+            const [after] = await options.views(orgId);
+            expect(after.values.map((v) => v.id)).toEqual([...ids].reverse());
+            await expect(
+                options.reorderValues(orgId, sizeId, { valueIds: [ids[0]] }),
+            ).rejects.toThrow(/changed while you were sorting/);
+        });
+
         it("hands back a deleted option's values for Undo", async () => {
             const shade = (
                 await options.create(orgId, {

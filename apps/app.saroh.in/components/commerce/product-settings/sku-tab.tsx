@@ -271,8 +271,8 @@ export function SkuTab({
                                 className={cn(
                                     "min-w-0 break-all font-mono text-[12px] font-medium",
                                     r.next === r.now
-                                          ? "text-muted-foreground"
-                                          : "text-foreground",
+                                        ? "text-muted-foreground"
+                                        : "text-foreground",
                                 )}
                             >
                                 {r.next || <AbsentValue says="None" />}

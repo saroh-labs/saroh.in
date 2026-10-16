@@ -35,8 +35,7 @@ export function FieldsTab({
         return (
             <section>
                 <TabIntro title="Custom fields">
-                    Extra things a product records, for the categories you
-                    pick.
+                    Extra things a product records, for the categories you pick.
                 </TabIntro>
                 <FailedRead
                     size="panel"

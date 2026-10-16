@@ -8,36 +8,47 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import type { CatalogueView } from "@/lib/products/settings";
+import { markMomentSeen } from "@/lib/moments/actions";
+import type {
+    CatalogueView,
+    DefaultsSuggestion,
+} from "@/lib/products/settings";
 import { saveDefaults, undoDefaults } from "@/lib/products/settings-actions";
-import type { DefaultsRow, ReturnsChoice } from "@/lib/products/settings-rules";
+import type { DefaultsRow } from "@/lib/products/settings-rules";
 import {
     affected,
     changes,
-    defaultsProblem,
+    lowProblem,
+    overrides,
     RETURN_RULES,
-    returnsLabel,
     rowsFrom,
-    suggestionText,
+    suggestionLine,
     toEntry,
 } from "@/lib/products/settings-rules";
 
 import { CheckRow } from "@/components/shared/check-row";
 import { ChipGroup } from "@/components/shared/choice-group";
+import { listTable } from "@/components/shared/list-toolbar";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { Field } from "@saroh/ui/field";
+import { CategoryDefaultsSheet, LOW_HINT } from "./category-defaults-sheet";
+import { DefaultsReviewSheet } from "./defaults-review-sheet";
 import { SettingsReadOnly, TabIntro, useUnsaved } from "./product-settings";
 
 /**
- * What a new product starts with — how to use it, when to warn about stock,
- * and its returns rule. A category's own value wins; left empty, the All
- * products value is used. Saved products keep theirs unless the merchant
+ * What a new product starts with — how to use it, when it is low on stock,
+ * and its returns rule. One All products card, a form with a save bar; then
+ * the categories as compact rows saying only what each sets for itself,
+ * with Edit opening the category's sheet. The suggestions read from the
+ * products already there are one line with Review, and "Not now" puts
+ * them away for the whole business (kept with its moments, so on every
+ * device). Products already saved keep their values unless the merchant
  * chooses to update the ones still on the old value.
  */
 export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
     const router = useRouter();
-    const { setDirty } = useUnsaved();
+    const { report } = useUnsaved();
     const [pending, start] = useTransition();
     const fresh = rowsFrom(catalogue);
     const freshKey = JSON.stringify(fresh);
@@ -45,8 +56,9 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
     const [rows, setRows] = useState(fresh);
     const [seen, setSeen] = useState(freshKey);
     const [applyExisting, setApplyExisting] = useState(false);
-    const [dismissed, setDismissed] = useState<Partial<Record<string, true>>>(
-        {},
+    const [tried, setTried] = useState(false);
+    const [putAway, setPutAway] = useState(
+        catalogue.defaults.suggestionsPutAway === true,
     );
     if (seen !== freshKey) {
         setSeen(freshKey);
@@ -54,237 +66,192 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
         setRows(fresh);
     }
 
-    const changed = changes(rows, base);
+    const all = rows.find((r) => r.key === "all") ?? fresh[0];
+    const allBase = base.find((r) => r.key === "all") ?? fresh[0];
+    // Only All products is edited in place; a category saves from its sheet.
+    const changed = all && allBase ? changes([all], [allBase]) : [];
     const dirty = changed.length > 0;
     const saveBar = useRef<HTMLDivElement>(null);
     useBottomBarInset(saveBar, dirty && catalogue.canWrite);
-    const problem = defaultsProblem(rows);
+    const problem = all && tried ? lowProblem(all) : "";
     const names = Object.fromEntries(rows.map((r) => [r.key, r.name]));
     const hit = affected(changed, catalogue.defaults.stillOnDefault, names);
-    const all = rows.find((r) => r.key === "all");
     const counts = catalogue.defaults.productCounts;
+    const categories = rows.filter((r) => r.key !== "all");
 
-    useEffect(() => {
-        setDirty(dirty);
-        return () => setDirty(false);
-    }, [dirty, setDirty]);
+    // Suggestions not already the category's own value.
+    const open = catalogue.defaults.suggestions.filter((s) => {
+        const r = rows.find((x) => x.key === s.key);
+        if (!r) return false;
+        return (
+            String(s.field === "howToUse" ? r.howToUse : r.low) !==
+            String(s.value)
+        );
+    });
+    const line =
+        catalogue.canWrite && !putAway && all
+            ? suggestionLine(open, names, all.low)
+            : "";
 
-    const set = (key: string, patch: Partial<DefaultsRow>) =>
-        setRows(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+    /** Saves `entries`; resolves true once saved, with Undo offered. */
+    async function saveRows(
+        entries: DefaultsRow[],
+        update: boolean,
+        said: (updated: number) => string,
+    ): Promise<boolean> {
+        const res = await runAction(() =>
+            saveDefaults(entries.map(toEntry), update),
+        );
+        if (!res) return false;
+        if (!res.ok) {
+            showError(res.error);
+            return false;
+        }
+        router.refresh();
+        showUndo(said(res.data.updatedCount), () =>
+            start(async () => {
+                const undo = await runAction(() => undoDefaults(res.data));
+                if (!undo) return;
+                if (!undo.ok) showError(undo.error);
+                router.refresh();
+            }),
+        );
+        return true;
+    }
 
-    function save() {
-        if (problem || !dirty) return;
-        start(async () => {
-            const res = await runAction(() =>
-                saveDefaults(rows.map(toEntry), applyExisting && hit.count > 0),
-            );
-            if (!res) return;
-            if (!res.ok) {
-                showError(res.error);
-                return;
-            }
+    const savedLine = (n: number) =>
+        n
+            ? `Defaults saved, and ${count(n, "product")} updated.`
+            : "Defaults saved. Products you already have keep theirs.";
+
+    /** All products' card. The leave guard's Save and leave too. */
+    async function persist(): Promise<boolean> {
+        if (!dirty || !all) return true;
+        setTried(true);
+        if (lowProblem(all)) return false;
+        const ok = await saveRows(
+            [all],
+            applyExisting && hit.count > 0,
+            savedLine,
+        );
+        if (ok) {
             setBase(rows);
             setApplyExisting(false);
-            router.refresh();
-            const n = res.data.updatedCount;
-            showUndo(
-                n
-                    ? `Defaults saved, and ${count(n, "product")} updated.`
-                    : "Defaults saved. Existing products keep their values.",
-                () =>
-                    start(async () => {
-                        const undo = await runAction(() =>
-                            undoDefaults(res.data),
-                        );
-                        if (!undo) return;
-                        if (!undo.ok) showError(undo.error);
-                        router.refresh();
-                    }),
-            );
+            setTried(false);
+        }
+        return ok;
+    }
+
+    const persistRef = useRef(persist);
+    useEffect(() => {
+        persistRef.current = persist;
+    });
+    useEffect(() => {
+        report(changed.length, () => persistRef.current());
+        return () => report(0);
+    }, [changed.length, report]);
+
+    const setAll = (patch: Partial<DefaultsRow>) =>
+        setRows(rows.map((r) => (r.key === "all" ? { ...r, ...patch } : r)));
+
+    function applySuggestions(chosen: DefaultsSuggestion[]) {
+        const next = new Map<string, DefaultsRow>();
+        for (const s of chosen) {
+            const r = next.get(s.key) ?? rows.find((x) => x.key === s.key);
+            if (!r) continue;
+            next.set(s.key, {
+                ...r,
+                ...(s.field === "howToUse"
+                    ? { howToUse: String(s.value) }
+                    : { low: String(s.value) }),
+            });
+        }
+        return saveRows(Array.from(next.values()), false, () =>
+            next.size === 1
+                ? "Saved. New products in it start with this."
+                : `Saved for ${count(next.size, "category", "categories")}.`,
+        );
+    }
+
+    function notNow() {
+        setPutAway(true);
+        // Remembered for the business; failing that, it is only gone here.
+        void runAction(() => markMomentSeen("defaults-suggestions"), {
+            quiet: true,
         });
     }
 
     return (
         <section>
             <TabIntro title="Defaults">
-                What a new product starts with. A category&apos;s own value
-                wins. Leave it empty and the All products value is used. Saved
-                products keep their values unless you choose to update them.
+                What a new product starts with. A category can set its own.
+                Products you already have keep theirs.
             </TabIntro>
             {catalogue.canWrite ? null : <SettingsReadOnly />}
 
-            <div className="flex flex-col gap-3">
-                {rows.map((r) => {
-                    const isAll = r.key === "all";
-                    const own = isAll
-                        ? 0
-                        : [r.howToUse.trim(), r.low.trim(), r.returns].filter(
-                              Boolean,
-                          ).length;
-                    const lowOk = isAll
-                        ? /^\d+$/.test(r.low.trim())
-                        : r.low.trim() === "" || /^\d+$/.test(r.low.trim());
-                    const n = counts[r.key] ?? 0;
-                    const choices: { choice: ReturnsChoice; label: string }[] =
-                        [
-                            ...(isAll
-                                ? []
-                                : [
-                                      {
-                                          choice: "" as const,
-                                          label: `Same as All products (${returnsLabel(all?.returns ?? "STOREFRONT")})`,
-                                      },
-                                  ]),
-                            ...RETURN_RULES,
-                            // A rule of its own, typed on a product once, stays
-                            // choosable rather than vanishing.
-                            ...(r.returns.startsWith("OWN:") &&
-                            !RETURN_RULES.some((x) => x.choice === r.returns)
-                                ? [
-                                      {
-                                          choice: r.returns,
-                                          label: returnsLabel(r.returns),
-                                      },
-                                  ]
-                                : []),
-                        ];
-                    const suggestions = catalogue.defaults.suggestions.filter(
-                        (s) =>
-                            s.key === r.key &&
-                            !dismissed[`${s.key}:${s.field}`] &&
-                            String(
-                                s.field === "howToUse" ? r.howToUse : r.low,
-                            ) !== String(s.value),
-                    );
-                    return (
-                        <div
-                            key={r.key}
-                            className={cn(
-                                "rounded-[12px] border border-border px-4 py-3.5",
-                                isAll ? "bg-muted/50" : "bg-card",
-                            )}
+            {all ? (
+                <div className="rounded-[12px] border border-border bg-muted/50 px-4 py-3.5">
+                    <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
+                        <h3 className="text-[14px] font-semibold">
+                            All products
+                        </h3>
+                        <span className="text-[12px] text-muted-foreground">
+                            {count(counts.all ?? 0, "product")}
+                        </span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                        <Field
+                            label="Low stock at"
+                            hint={problem ? undefined : LOW_HINT}
+                            error={problem || undefined}
+                            className="flex-[1_1_200px] space-y-[5px]"
                         >
-                            <div className="mb-2.5 flex flex-wrap items-baseline gap-2.5">
-                                <span className="text-[14px] font-semibold">
-                                    {r.name}
-                                </span>
-                                <span className="flex-[1_1_200px] text-[12px] text-muted-foreground">
-                                    {isAll
-                                        ? `Used by every category that leaves a field empty · ${count(n, "product")}`
-                                        : `${count(n, "product")} · ${
-                                              own
-                                                  ? `${own} of 3 fields set here, the rest from All products`
-                                                  : "everything from All products"
-                                          }`}
-                                </span>
-                            </div>
-                            <div className="flex flex-wrap gap-3">
-                                <Field
-                                    label="How to use or care for it"
-                                    className="flex-[2_1_260px] space-y-[5px]"
-                                >
-                                    <Input
-                                        dense
-                                        value={r.howToUse}
-                                        disabled={!catalogue.canWrite}
-                                        onChange={(e) =>
-                                            set(r.key, {
-                                                howToUse: e.target.value,
-                                            })
-                                        }
-                                        placeholder={
-                                            isAll || !all?.howToUse
-                                                ? "Nothing. Each product says"
-                                                : `All products: ${all.howToUse}`
-                                        }
-                                        className="w-full min-w-0"
-                                    />
-                                </Field>
-                                <Field
-                                    label="Warn at"
-                                    className="flex-[1_1_110px] space-y-[5px]"
-                                >
-                                    <Input
-                                        dense
-                                        type="number"
-                                        min={0}
-                                        inputMode="numeric"
-                                        value={r.low}
-                                        disabled={!catalogue.canWrite}
-                                        onChange={(e) =>
-                                            set(r.key, { low: e.target.value })
-                                        }
-                                        placeholder={
-                                            isAll
-                                                ? ""
-                                                : `All products: ${all?.low ?? ""}`
-                                        }
-                                        aria-invalid={!lowOk}
-                                        className="w-full min-w-0"
-                                    />
-                                </Field>
-                                <div className="min-w-0 flex-[1_1_100%]">
-                                    <p className="mb-1.5 text-[12px] font-medium">
-                                        Returns
-                                    </p>
-                                    <ChipGroup
-                                        label={`${r.name} returns`}
-                                        value={r.returns}
-                                        onChange={(returns) =>
-                                            set(r.key, { returns })
-                                        }
-                                        disabled={!catalogue.canWrite}
-                                        choices={choices.map((o) => ({
-                                            value: o.choice,
-                                            label: o.label,
-                                        }))}
-                                    />
-                                </div>
-                            </div>
-                            {catalogue.canWrite
-                                ? suggestions.map((s) => (
-                                      <div
-                                          key={`${s.key}:${s.field}`}
-                                          className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-[8px] bg-muted px-[11px] py-[9px]"
-                                      >
-                                          <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.45] text-foreground">
-                                              {suggestionText(s, r.name)}
-                                          </span>
-                                          <Button
-                                              size="sm"
-                                              type="button"
-                                              onClick={() =>
-                                                  set(r.key, {
-                                                      [s.field === "howToUse"
-                                                          ? "howToUse"
-                                                          : "low"]: String(
-                                                          s.value,
-                                                      ),
-                                                  })
-                                              }
-                                          >
-                                              Use it
-                                          </Button>
-                                          <Button
-                                              variant="outline"
-                                              size="sm"
-                                              type="button"
-                                              onClick={() =>
-                                                  setDismissed({
-                                                      ...dismissed,
-                                                      [`${s.key}:${s.field}`]: true,
-                                                  })
-                                              }
-                                          >
-                                              Not now
-                                          </Button>
-                                      </div>
-                                  ))
-                                : null}
+                            <Input
+                                dense
+                                type="number"
+                                min={0}
+                                inputMode="numeric"
+                                value={all.low}
+                                disabled={!catalogue.canWrite}
+                                onChange={(e) =>
+                                    setAll({ low: e.target.value })
+                                }
+                                className="w-full min-w-0"
+                            />
+                        </Field>
+                        <Field
+                            label="How to use or care for it"
+                            className="flex-[2_1_260px] space-y-[5px]"
+                        >
+                            <Input
+                                dense
+                                value={all.howToUse}
+                                disabled={!catalogue.canWrite}
+                                onChange={(e) =>
+                                    setAll({ howToUse: e.target.value })
+                                }
+                                placeholder="Nothing. Each product says"
+                                className="w-full min-w-0"
+                            />
+                        </Field>
+                        <div className="min-w-0 flex-[1_1_100%]">
+                            <p className="mb-1.5 text-[12px] font-medium">
+                                Returns
+                            </p>
+                            <ChipGroup
+                                label="All products: returns"
+                                value={all.returns}
+                                onChange={(returns) => setAll({ returns })}
+                                disabled={!catalogue.canWrite}
+                                choices={RETURN_RULES.map((o) => ({
+                                    value: o.choice,
+                                    label: o.label,
+                                }))}
+                            />
                         </div>
-                    );
-                })}
-            </div>
+                    </div>
+                </div>
+            ) : null}
 
             {dirty && catalogue.canWrite ? (
                 <div
@@ -312,6 +279,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                             onClick={() => {
                                 setRows(base);
                                 setApplyExisting(false);
+                                setTried(false);
                             }}
                         >
                             Discard
@@ -319,12 +287,15 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                         <Button
                             size="sm"
                             type="button"
-                            disabled={!!problem}
-                            onClick={save}
+                            onClick={() =>
+                                start(async () => {
+                                    await persist();
+                                })
+                            }
                             busy={pending}
                             busyLabel="Saving…"
                         >
-                            Save defaults
+                            Save
                         </Button>
                     </div>
                     {hit.count > 0 ? (
@@ -344,6 +315,114 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                     ) : null}
                 </div>
             ) : null}
+
+            <h3 className="mb-2 mt-[22px] text-[13.5px] font-semibold">
+                Categories
+            </h3>
+            {line ? (
+                <div
+                    role="status"
+                    className="mb-2.5 flex flex-wrap items-center gap-2.5 rounded-[8px] bg-muted px-[11px] py-[9px]"
+                >
+                    <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.45]">
+                        {line}
+                    </span>
+                    <DefaultsReviewSheet
+                        trigger={
+                            <Button size="sm" type="button">
+                                Review
+                            </Button>
+                        }
+                        suggestions={open}
+                        names={names}
+                        onUse={applySuggestions}
+                    />
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        onClick={notNow}
+                    >
+                        Not now
+                    </Button>
+                </div>
+            ) : null}
+            {categories.length === 0 ? (
+                <p className="text-[12.5px] text-muted-foreground">
+                    No categories yet. Each one you add can set its own.
+                </p>
+            ) : (
+                <ul data-list-table="" className={listTable.card}>
+                    {categories.map((r) => {
+                        const own = overrides(r);
+                        const n = counts[r.key] ?? 0;
+                        return (
+                            <li
+                                key={r.key}
+                                className={cn(
+                                    "flex flex-wrap items-center gap-x-3 gap-y-1",
+                                    listTable.rowStill,
+                                )}
+                            >
+                                <div className="min-w-0 flex-[1_1_160px]">
+                                    <p className="text-[13.5px] font-semibold [overflow-wrap:anywhere]">
+                                        {r.name}
+                                    </p>
+                                    <p className="text-[12px] text-muted-foreground">
+                                        {count(n, "product")}
+                                    </p>
+                                </div>
+                                <p
+                                    className={cn(
+                                        "min-w-0 flex-[2_1_220px] text-[12.5px] [overflow-wrap:anywhere]",
+                                        own.length
+                                            ? "text-foreground"
+                                            : "text-muted-foreground",
+                                    )}
+                                >
+                                    {own.length
+                                        ? own.join(" · ")
+                                        : "Same as All products"}
+                                </p>
+                                {catalogue.canWrite && all ? (
+                                    <CategoryDefaultsSheet
+                                        trigger={
+                                            <Button
+                                                variant="outline"
+                                                size="xs"
+                                                type="button"
+                                                aria-label={`Edit ${r.name} defaults`}
+                                            >
+                                                Edit
+                                            </Button>
+                                        }
+                                        row={r}
+                                        all={allBase ?? all}
+                                        suggestions={open.filter(
+                                            (s) => s.key === r.key,
+                                        )}
+                                        stillOnOld={(draft) =>
+                                            affected(
+                                                changes([draft], [r]),
+                                                catalogue.defaults
+                                                    .stillOnDefault,
+                                                names,
+                                            ).count
+                                        }
+                                        onSave={(draft, update) =>
+                                            saveRows([draft], update, (u) =>
+                                                u
+                                                    ? `${r.name} saved, and ${count(u, "product")} updated.`
+                                                    : `${r.name} saved. New products in it start with this.`,
+                                            )
+                                        }
+                                    />
+                                ) : null}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
         </section>
     );
 }

@@ -5,7 +5,10 @@ import {
     affected,
     changes,
     defaultsProblem,
+    lowProblem,
+    overrides,
     rowsFrom,
+    suggestionLine,
     suggestionText,
     toEntry,
 } from "./settings-rules";
@@ -132,7 +135,7 @@ describe("product settings: defaults", () => {
                 },
                 "Serums",
             ),
-        ).toBe("All 2 Serums warn at 6. Make it the default?");
+        ).toBe("All 2 Serums that track stock warn at 6.");
         expect(
             suggestionText(
                 {
@@ -144,6 +147,59 @@ describe("product settings: defaults", () => {
                 },
                 "Serums",
             ),
-        ).toBe("3 of your 4 Serums say “Two drops.” Make it the default?");
+        ).toBe("3 of your 4 Serums say “Two drops.”");
+    });
+
+    it("says every suggestion in one line, and one in full", () => {
+        const low = (key: string, value: number) => ({
+            key,
+            field: "lowStockAlert" as const,
+            value,
+            count: 3,
+            total: 4,
+        });
+        const names = { c1: "Poetry", c2: "Fiction", c3: "Pune writers" };
+        expect(suggestionLine([], names, "10")).toBe("");
+        expect(suggestionLine([low("c3", 1)], names, "10")).toBe(
+            "3 of the 4 Pune writers that track stock warn at 1.",
+        );
+        expect(
+            suggestionLine(
+                [low("c1", 1), low("c2", 2), low("c3", 1)],
+                names,
+                "10",
+            ),
+        ).toBe("3 categories usually warn lower than 10.");
+        expect(suggestionLine([low("c1", 1), low("c2", 20)], names, "10")).toBe(
+            "2 categories usually warn at a level of their own.",
+        );
+        expect(
+            suggestionLine(
+                [
+                    low("c1", 1),
+                    { ...low("c1", 0), field: "howToUse", value: "Keep dry." },
+                ],
+                names,
+                "10",
+            ),
+        ).toBe("1 category usually has values of its own.");
+    });
+
+    it("names what a category sets for itself, and checks its number", () => {
+        const row = {
+            key: "c1",
+            name: "Poetry",
+            howToUse: "",
+            low: "1",
+            returns: "OWN:Non-returnable" as const,
+        };
+        expect(overrides(row)).toEqual([
+            "Low stock at 1",
+            "Returns: Non-returnable",
+        ]);
+        expect(overrides({ ...row, low: "", returns: "" })).toEqual([]);
+        expect(lowProblem({ ...row, low: "1.5" })).toMatch(/whole number/);
+        expect(lowProblem({ ...row, low: "" })).toBe("");
+        expect(lowProblem({ ...row, key: "all", low: "" })).toMatch(/whole/);
     });
 });

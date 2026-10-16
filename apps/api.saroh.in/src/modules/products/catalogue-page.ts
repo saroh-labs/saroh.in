@@ -50,6 +50,9 @@ const DEFAULT_PAGE = 50;
 /** The sizes a list with numbered pages offers; any other is refused. */
 export const CATALOGUE_PAGE_SIZES = [10, 25, 50, 100] as const;
 
+/** `?category=none`: the products with no category (Uncategorized). */
+export const UNCATEGORIZED = "none";
+
 export class CatalogueQueryDto {
     @IsOptional()
     @IsIn(PRODUCT_STATUSES, { message: "Unknown status" })
@@ -70,10 +73,15 @@ export class CatalogueQueryDto {
     @IsIn(CATALOGUE_VIEWS, { message: "Unknown view" })
     view?: CatalogueView;
 
-    /** In this category or one inside it. */
+    /** In this category or one inside it; "none" is Uncategorized. */
     @IsOptional()
     @IsString()
     category?: string;
+
+    /** Choosing its variants by this option (Settings › Options' count). */
+    @IsOptional()
+    @IsString()
+    option?: string;
 
     /** Shown in this collection now. */
     @IsOptional()
@@ -244,12 +252,21 @@ export async function cataloguePage(
     if (query.view === "needs") {
         narrow.push({ id: { in: needs.map((n) => n.productId) } });
     }
-    if (query.category) {
+    if (query.category === UNCATEGORIZED) {
+        narrow.push({ categoryId: null });
+    } else if (query.category) {
         const found = await prisma.category.count({
             where: { id: query.category, organizationId },
         });
         if (found === 0) throw new NotFoundException("Category not found");
         narrow.push({ categoryId: { in: tree.within(query.category) } });
+    }
+    if (query.option) {
+        const found = await prisma.productOption.count({
+            where: { id: query.option, organizationId },
+        });
+        if (found === 0) throw new NotFoundException("Option not found");
+        narrow.push({ optionId: query.option });
     }
     if (query.collection) {
         const collection = collections.find((c) => c.id === query.collection);

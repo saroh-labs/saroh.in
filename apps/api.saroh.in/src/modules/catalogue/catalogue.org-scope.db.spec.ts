@@ -279,6 +279,7 @@ describe("Catalogue settings belong to the business (DB)", () => {
                 },
                 productCounts: { all: 1, "cat:Bakery": 0, "cat:Breads": 1 },
                 suggestions: [],
+                suggestionsPutAway: false,
             },
             canWrite: true,
         },

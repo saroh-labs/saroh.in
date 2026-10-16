@@ -1,7 +1,13 @@
 "use client";
 
 import type { MouseEvent, ReactNode } from "react";
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useRef,
+    useState,
+} from "react";
 
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { count } from "@/lib/format/plural";
@@ -61,13 +67,10 @@ export function ProductSettings({
 }) {
     const [changes, setChanges] = useState(0);
     const saveRef = useRef<(() => Promise<boolean>) | undefined>(undefined);
-    const report = useCallback(
-        (n: number, save?: () => Promise<boolean>) => {
-            saveRef.current = save;
-            setChanges(n);
-        },
-        [],
-    );
+    const report = useCallback((n: number, save?: () => Promise<boolean>) => {
+        saveRef.current = save;
+        setChanges(n);
+    }, []);
     // Another tab is another address, so the guard catches the tabs too.
     const guard = useLeaveGuard({
         dirty: changes > 0,

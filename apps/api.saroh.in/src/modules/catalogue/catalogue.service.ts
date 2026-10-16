@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { seenMoments } from "../organizations/moments";
 import type {
     DefaultField,
     DefaultsEntry,
@@ -41,6 +42,11 @@ export interface CatalogueView {
         stillOnDefault: Record<string, Record<DefaultField, number>>;
         productCounts: Record<string, number>;
         suggestions: Suggestion[];
+        /**
+         * Someone in the business answered the suggestions "Not now"
+         * (kept with the business's moments, so on every device).
+         */
+        suggestionsPutAway: boolean;
     };
     canWrite: boolean;
 }
@@ -81,23 +87,28 @@ export class CatalogueService {
         organizationId: string,
         canWrite: boolean,
     ): Promise<CatalogueView> {
-        const [categories, uncategorizedCount, options] = await Promise.all([
-            prisma.category.findMany({
-                where: { organizationId },
-                orderBy: { name: "asc" },
-                select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                    parentId: true,
-                    _count: { select: { products: true } },
-                },
-            }),
-            prisma.product.count({
-                where: { organizationId, categoryId: null },
-            }),
-            this.options.views(organizationId),
-        ]);
+        const [categories, uncategorizedCount, options, org] =
+            await Promise.all([
+                prisma.category.findMany({
+                    where: { organizationId },
+                    orderBy: { name: "asc" },
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        parentId: true,
+                        _count: { select: { products: true } },
+                    },
+                }),
+                prisma.product.count({
+                    where: { organizationId, categoryId: null },
+                }),
+                this.options.views(organizationId),
+                prisma.organization.findUnique({
+                    where: { id: organizationId },
+                    select: { momentsSeen: true },
+                }),
+            ]);
         const entries = await this.entries(organizationId);
         const products = await this.productDefaults(organizationId);
 
@@ -156,6 +167,9 @@ export class CatalogueService {
                 stillOnDefault: still,
                 productCounts,
                 suggestions,
+                suggestionsPutAway: Boolean(
+                    seenMoments(org?.momentsSeen)["defaults-suggestions"],
+                ),
             },
             canWrite,
         };

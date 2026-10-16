@@ -32,6 +32,7 @@ import {
 } from "@/lib/products/list-query";
 import type { CataloguePage } from "@/lib/products/service";
 import { listCataloguePage, listCategories } from "@/lib/products/service";
+import { listOptionNames } from "@/lib/products/settings";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getStockTracking } from "@/lib/stock/service";
@@ -138,7 +139,11 @@ export default async function CataloguePage({
     if (!onReviews && query.page > 1 && page.items.length === 0) {
         redirect(listHref(query, { page: 1 }));
     }
-    const choices = choicesFrom(categories, collections);
+    // Named only while the list is narrowed to one (Settings › Options' count).
+    const options = query.option
+        ? await listOptionNames().catch(() => null)
+        : undefined;
+    const choices = choicesFrom(categories, collections, options);
 
     const active: ProductsTab = onReviews
         ? "reviews"

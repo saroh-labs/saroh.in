@@ -1,14 +1,18 @@
 import {
+    BadRequestException,
     ConflictException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import type {
     AddOptionValueDto,
     CreateOptionDto,
     RenameOptionDto,
+    RenameOptionValueDto,
+    ReorderOptionValuesDto,
 } from "./dto";
 
 export interface OptionView {
@@ -25,7 +29,9 @@ export interface OptionView {
  * picks one option; its variants each pick a value. Names and values are
  * unique ignoring case. Anything in use says so rather than disappearing:
  * an option a product uses cannot be deleted, a value a variant uses cannot
- * be removed. Deletes hand back what they removed, for Undo.
+ * be removed — but it can be renamed (every variant that uses it changes
+ * with it) and put in another place. Deletes, renames and moves hand back
+ * what they changed, for Undo.
  */
 @Injectable()
 export class OptionsService {
@@ -191,6 +197,113 @@ export class OptionsService {
         }
         await prisma.productOptionValue.delete({ where: { id: valueId } });
         return { id: valueId, value: value.value };
+    }
+
+    /**
+     * A value's new name, on every variant that uses it: a variant's title
+     * is its value's words (`variant-rows.ts`), so the variants follow, and
+     * their products' pages are told (#863). A case-only change of itself is
+     * allowed; another value's name is refused.
+     */
+    async renameValue(
+        organizationId: string,
+        optionId: string,
+        valueId: string,
+        dto: RenameOptionValueDto,
+    ) {
+        await this.requireOption(organizationId, optionId);
+        const value = await prisma.productOptionValue.findFirst({
+            where: { id: valueId, optionId },
+            select: { id: true, value: true },
+        });
+        if (!value) throw new NotFoundException("Value not found");
+        const clash = await prisma.productOptionValue.findFirst({
+            where: {
+                optionId,
+                id: { not: valueId },
+                value: { equals: dto.value, mode: "insensitive" },
+            },
+            select: { value: true },
+        });
+        if (clash) {
+            throw new ConflictException({
+                message: `${clash.value} already exists.`,
+                field: "value",
+            });
+        }
+        const variants = await prisma.$transaction(async (tx) => {
+            await tx.productOptionValue.update({
+                where: { id: valueId },
+                data: { value: dto.value },
+            });
+            const used = await tx.productVariant.findMany({
+                where: { optionValueId: valueId },
+                select: { productId: true },
+            });
+            await tx.productVariant.updateMany({
+                where: { optionValueId: valueId },
+                data: { title: dto.value },
+            });
+            const productIds = [...new Set(used.map((v) => v.productId))];
+            if (productIds.length > 0) {
+                // Their titles show on the products' pages.
+                await enqueuePageRevalidation(tx, {
+                    cause: "product",
+                    productIds,
+                    organizationId,
+                });
+            }
+            return used.length;
+        });
+        return {
+            id: valueId,
+            value: dto.value,
+            previousValue: value.value,
+            variantCount: variants,
+        };
+    }
+
+    /**
+     * The order customers pick values in. `valueIds` is every value of the
+     * option, once; returns the order it had, for Undo.
+     */
+    async reorderValues(
+        organizationId: string,
+        optionId: string,
+        dto: ReorderOptionValuesDto,
+    ) {
+        await this.requireOption(organizationId, optionId);
+        const values = await prisma.productOptionValue.findMany({
+            where: { optionId },
+            orderBy: [{ position: "asc" }, { id: "asc" }],
+            select: { id: true },
+        });
+        const ids = new Set(values.map((v) => v.id));
+        const given = new Set(dto.valueIds);
+        if (
+            given.size !== dto.valueIds.length ||
+            given.size !== ids.size ||
+            dto.valueIds.some((id) => !ids.has(id))
+        ) {
+            throw new BadRequestException({
+                message:
+                    "The values changed while you were sorting. Open the option again.",
+                field: "valueIds",
+            });
+        }
+        await prisma.$transaction(
+            dto.valueIds.map((id, position) =>
+                prisma.productOptionValue.update({
+                    where: { id },
+                    data: { position },
+                }),
+            ),
+        );
+        return {
+            id: optionId,
+            valueIds: dto.valueIds,
+            previousValueIds: values.map((v) => v.id),
+        };
     }
 
     private async requireOption(organizationId: string, optionId: string) {

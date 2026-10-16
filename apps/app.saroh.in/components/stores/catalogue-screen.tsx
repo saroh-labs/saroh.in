@@ -491,6 +491,7 @@ export function CatalogueScreen({
                         query.q &&
                         !query.status &&
                         !query.category &&
+                        !query.option &&
                         !query.collection &&
                         !query.storefront
                             ? "Clear search"
@@ -503,6 +504,7 @@ export function CatalogueScreen({
                                       q: "",
                                       status: null,
                                       category: null,
+                                      option: null,
                                       collection: null,
                                       storefront: null,
                                   })
