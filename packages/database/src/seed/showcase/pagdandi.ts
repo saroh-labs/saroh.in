@@ -8,7 +8,12 @@ import type {
     DemoShopContext,
     DemoShopResult,
 } from "./demo-shop";
-import { checkDemoShop, seedDemoShop, shortDay } from "./demo-shop";
+import {
+    checkDemoShop,
+    onlyDesignedLatePickups,
+    seedDemoShop,
+    shortDay,
+} from "./demo-shop";
 import type { DemoProduct } from "./demo-shop-types";
 import {
     PAGDANDI_CATEGORIES,
@@ -137,10 +142,12 @@ const CONFIG: DemoShopConfig = {
     categories: PAGDANDI_CATEGORIES,
     options: PAGDANDI_OPTIONS,
     products: PAGDANDI_PRODUCTS,
-    fulfilmentTypes: (p) => (fresh(p) ? ["PICKUP"] : []),
-    // The pre-order opened four weeks ago; everything else sells all year.
+    // The pre-order only ships (on 1 Nov), so nothing waits at the counter.
+    fulfilmentTypes: (p) =>
+        fresh(p) ? ["PICKUP"] : p.slug === PRE_ORDER ? ["SHIPPING"] : [],
+    // The pre-order opened three weeks ago; everything else sells all year.
     salesWindow: (p) =>
-        p.slug === PRE_ORDER ? { from: 28, to: 0 } : { from: 999, to: 0 },
+        p.slug === PRE_ORDER ? { from: 21, to: 0 } : { from: 999, to: 0 },
     readyAt: (products, placedAt, now) => {
         if (products.some((p) => p.slug === PRE_ORDER)) {
             return new Date(
@@ -154,6 +161,14 @@ const CONFIG: DemoShopConfig = {
         // Off the shelf and wrapped within two hours; a Monday order the next day.
         const ready = new Date(placedAt.getTime() + 2 * 3_600_000);
         return ready.getUTCDay() === 1 ? istAt(ready, 1, 11 * 60) : ready;
+    },
+    // A book is kept at the counter three days and goes out across Pune in
+    // two; a courier order waits for its book, so the pre-orders shipping
+    // on 1 Nov are never late (30 days is the longest a storefront allows).
+    lateAfterMinutes: {
+        PICKUP: 3 * 24 * 60,
+        LOCAL_DELIVERY: 2 * 24 * 60,
+        SHIPPING: 30 * 24 * 60,
     },
     openNote: ({ fulfilment, readyAt }) =>
         readyAt.getTime() === RELEASE.getTime()
@@ -294,7 +309,8 @@ const CONFIG: DemoShopConfig = {
             "Wanted the Marathi edition instead — reordered",
             "Delivery address outside Pune, changed to courier on a new order",
         ],
-        latePickups: 2,
+        // The designed problem: one book kept at the counter, not collected.
+        latePickups: 1,
         unpaidDelivered: 2,
     },
     bulkOrders: [
@@ -313,6 +329,31 @@ const CONFIG: DemoShopConfig = {
             fulfilment: "PICKUP",
             note: "Diwali gifts for an architects' office — wrap each, no price",
             prepaid: false,
+        },
+        // Pre-orders of Kasba Peth Rains, paid ahead and shipping on 1 Nov.
+        {
+            daysAgo: 12,
+            minute: 11 * 60 + 5,
+            lines: [{ slug: PRE_ORDER, variant: null, qty: 5 }],
+            fulfilment: "SHIPPING",
+            note: "Reading group in Aundh — five copies, signed if Meghna can",
+            prepaid: true,
+        },
+        {
+            daysAgo: 8,
+            minute: 18 * 60 + 20,
+            lines: [{ slug: PRE_ORDER, variant: null, qty: 1 }],
+            fulfilment: "SHIPPING",
+            note: "Please send it the day it's out",
+            prepaid: true,
+        },
+        {
+            daysAgo: 2,
+            minute: 13 * 60 + 40,
+            lines: [{ slug: PRE_ORDER, variant: null, qty: 2 }],
+            fulfilment: "SHIPPING",
+            note: "One for me, one for my sister in Nashik",
+            prepaid: true,
         },
     ],
     orderNotes: [
@@ -792,6 +833,8 @@ export function seedPagdandi(ctx: DemoShopContext): Promise<DemoShopResult> {
 }
 
 const CHECKS: DemoShopCheck[] = [
+    // Home's Late tags are the designed problem, not the kitchen's queue.
+    onlyDesignedLatePickups(1),
     {
         what: "no paid pre-order waiting for its release",
         rows: async (prisma, orgId, now) => {

@@ -1775,7 +1775,14 @@ export function planDiaryShop(
                       o.placedAt - 2 * MINUTE,
                       o.treatment ? "BOOKING" : "PAYMENT",
                   );
-        const done = !o.open && !o.treatment;
+        // A treatment is fulfilled once every visit it sold is attended,
+        // as the API settles it (`orders/treatment-fulfil.ts`); one with a
+        // visit missed or still to come stays open.
+        const treated =
+            o.treatment !== null &&
+            o.treatment.visits.filter((p) => p.outcome === "ATTENDED").length >=
+                biz.services[o.treatment.service].visits;
+        const done = (!o.open && !o.treatment) || treated;
         orders.push({
             id: orderId,
             storeId: input.storeId,
@@ -1789,14 +1796,29 @@ export function planDiaryShop(
             total: rupees(total),
             currency: "INR",
             status: o.open ? "PROCESSING" : done ? "DELIVERED" : "PENDING",
-            stage: o.open ? "READY" : done ? "COLLECTED" : "NEW",
+            stage: o.open
+                ? "READY"
+                : treated
+                  ? "DELIVERED"
+                  : done
+                    ? "COLLECTED"
+                    : "NEW",
             fulfilment: o.treatment ? "APPOINTMENT_IN_PERSON" : "PICKUP",
             paymentStatus: o.paidAt === null ? "UNPAID" : "PAID",
             paidAt: o.paidAt === null ? null : new Date(o.paidAt),
             notes: o.open ? "Kept aside at the desk to collect." : null,
             createdAt: new Date(o.placedAt),
             updatedAt: new Date(
-                Math.min(t, (o.paidAt ?? o.placedAt) + 5 * MINUTE),
+                Math.max(
+                    Math.min(t, (o.paidAt ?? o.placedAt) + 5 * MINUTE),
+                    treated
+                        ? Math.max(
+                              ...(o.treatment?.visits ?? []).map(
+                                  (p) => p.outcomeAt ?? 0,
+                              ),
+                          )
+                        : 0,
+                ),
             ),
         });
         if (o.treatment) orderIdOf.set(o.treatment.n, orderId);

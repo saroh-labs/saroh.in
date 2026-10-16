@@ -984,6 +984,14 @@ export function fvSpec(): StudioSpec {
                 { day: "SAT", open: "10:30", close: "18:30", closed: false },
                 { day: "SUN", open: "10:30", close: "18:30", closed: true },
             ],
+            // Prints are ready in two days and kept at the studio a few
+            // more; an album is three weeks from its approved proof, so a
+            // courier order is late only past the longest a storefront allows.
+            lateAfterMinutes: {
+                PICKUP: 5 * 24 * 60,
+                LOCAL_DELIVERY: 24 * 60,
+                SHIPPING: 30 * 24 * 60,
+            },
         },
         staff: [
             {

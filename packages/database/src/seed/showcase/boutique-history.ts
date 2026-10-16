@@ -290,7 +290,8 @@ export function planBoutiqueHistory(a: {
             const failed = !cancelled && roll < 0.035;
             const courier = rng.pick(COURIERS);
             const tracking = `${courier.name === "Delhivery" ? "DL" : courier.name === "Blue Dart" ? "BD" : "DT"}${rng.int(1e9, 9e9)}`;
-            const withCourier = !collects && !cancelled && !failed && age < 5;
+            // Only the day before yesterday's are still with the courier.
+            const withCourier = !collects && !cancelled && !failed && age < 3;
             const stage =
                 cancelled || failed
                     ? "NEW"
@@ -312,7 +313,14 @@ export function planBoutiqueHistory(a: {
                   : "PAID";
             const doneAt = at(
                 now,
-                d + (collects ? 1 : withCourier ? 0 : rng.int(2, 4)),
+                d +
+                    (collects
+                        ? 1
+                        : withCourier
+                          ? 0
+                          : age < 5
+                            ? 2
+                            : rng.int(2, 4)),
                 17,
             );
             orders.push({

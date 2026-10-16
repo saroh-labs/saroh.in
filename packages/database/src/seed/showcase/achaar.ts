@@ -14,7 +14,13 @@ import type {
     DemoShopContext,
     DemoShopResult,
 } from "./demo-shop";
-import { checkDemoShop, seedDemoShop, shortDay, weekdayOf } from "./demo-shop";
+import {
+    checkDemoShop,
+    onlyDesignedLatePickups,
+    seedDemoShop,
+    shortDay,
+    weekdayOf,
+} from "./demo-shop";
 import type { DemoProduct } from "./demo-shop-types";
 import { istAt } from "./people";
 
@@ -141,6 +147,13 @@ const CONFIG: DemoShopConfig = {
         const days = sun ? 5 : 3 + (placedAt.getUTCMinutes() % 2);
         return istAt(placedAt, days, 16 * 60 + 30);
     },
+    // Late only past what the kitchen promises: three or four days to make,
+    // five for sun pickles, then a day to collect or for Faizan to bring it.
+    lateAfterMinutes: {
+        PICKUP: 7 * 24 * 60,
+        LOCAL_DELIVERY: 6 * 24 * 60,
+        SHIPPING: 3 * 24 * 60,
+    },
     openNote: ({ fulfilment, readyAt }) =>
         fulfilment === "PICKUP"
             ? `Pick-up ${shortDay(readyAt)}, after 5pm`
@@ -258,6 +271,8 @@ const CONFIG: DemoShopConfig = {
         fulfilment: { PICKUP: 55, LOCAL_DELIVERY: 40, SHIPPING: 5 },
         onlineShare: 0.3,
         prepaidShare: 0.35,
+        // Site orders pay by UPI at checkout: a jar takes days to make.
+        onlinePaysAhead: true,
         weekday: [1.3, 0.9, 1, 1, 1, 0.7, 1.25],
         // Diwali gifting lifts the last three weeks; closed 2–5 October for
         // a family wedding; Raksha Bandhan (9 August) lifts a few days.
@@ -285,7 +300,9 @@ const CONFIG: DemoShopConfig = {
             "Wanted it the same day — couldn't make it in time",
             "Changed their mind after the price",
         ],
-        latePickups: 2,
+        // The designed problems: one jar ready and not collected, and a few
+        // delivered and not paid for yet.
+        latePickups: 1,
         unpaidDelivered: 3,
     },
     bulkOrders: [
@@ -870,6 +887,8 @@ export function seedAchaar(ctx: DemoShopContext): Promise<DemoShopResult> {
 
 /** The states Ammi Ki Barni's demo and films rely on. */
 const CHECKS: DemoShopCheck[] = [
+    // Home's Late tags are the designed problem, not the kitchen's queue.
+    onlyDesignedLatePickups(1),
     {
         what: "fewer than 15 made-to-order products that count no stock",
         rows: async (prisma, orgId) => {

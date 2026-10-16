@@ -175,6 +175,17 @@ export interface DemoShopConfig {
     ) => Date;
     /** A line for an open order's notes ("Pick-up Sat 18 Oct"), or null. */
     openNote: (o: { fulfilment: string; readyAt: Date }) => string | null;
+    /**
+     * After how many minutes from placing an order its storefront calls it
+     * late (B17), per way it leaves — set to what this business promises,
+     * so Home's Late tags are only the problems the demo designs. Absent:
+     * the defaults (2 h, 24 h, 48 h).
+     */
+    lateAfterMinutes?: {
+        PICKUP: number;
+        LOCAL_DELIVERY: number;
+        SHIPPING: number;
+    };
     people: DemoPersonPool;
     volume: {
         days: number;
@@ -193,6 +204,12 @@ export interface DemoShopConfig {
         onlineShare: number;
         /** Of open orders, the share paid in advance by UPI. */
         prepaidShare: number;
+        /**
+         * Every order placed on the site is paid ahead (UPI at checkout), so
+         * nothing made to order waits days as "pay on collection" — which
+         * Home would call not collected while it is still being made.
+         */
+        onlinePaysAhead?: boolean;
         /** Weekday weights, Sunday first. */
         weekday: readonly number[];
         /** A festival or season's lift on a day, by days ago. */
@@ -473,6 +490,11 @@ export async function seedDemoShop(
         address: cfg.store.address,
         openingHours: cfg.store.openingHours.map((d) => ({ ...d })),
         collectionEnabled: true,
+        // Written every run, so a re-seed puts back the business's own.
+        pickupLateAfterMinutes: cfg.lateAfterMinutes?.PICKUP ?? 120,
+        localDeliveryLateAfterMinutes:
+            cfg.lateAfterMinutes?.LOCAL_DELIVERY ?? 1440,
+        shippingLateAfterMinutes: cfg.lateAfterMinutes?.SHIPPING ?? 2880,
         shippingEnabled: true,
         taxEnabled: false,
         freeShippingThreshold: rupees(cfg.store.freeDeliveryFromPaise),
@@ -1338,6 +1360,17 @@ function planVolume(a: {
                 qty: orderRng.chance(0.18) ? 2 : orderRng.chance(0.04) ? 3 : 1,
             });
         }
+        // A line that can't go this way (a pre-order that only ships) is
+        // left off; picked first, so every other order draws as before.
+        const goes = (l: Line) => {
+            const ways = cfg.fulfilmentTypes(products[l.product]);
+            return ways.length === 0 || ways.includes(fulfilment);
+        };
+        if (!lines.every(goes)) {
+            const kept = lines.filter(goes);
+            if (kept.length === 0) continue;
+            lines.splice(0, lines.length, ...kept);
+        }
         planned.push({
             placedAt,
             customer,
@@ -1406,6 +1439,9 @@ function planVolume(a: {
             prepaid: b.prepaid,
         });
     });
+    if (V.onlinePaysAhead) {
+        for (const o of planned) if (o.online) o.prepaid = true;
+    }
     planned.sort((x, y) => x.placedAt.getTime() - y.placedAt.getTime());
 
     // Who has a problem: late pick-ups, delivered and not paid, cancels, refunds.
@@ -1545,9 +1581,10 @@ function planVolume(a: {
                 at: later(addMinutes(o.placedAt, 40), readyAt),
             });
             if (o.fulfilment === "PICKUP") {
-                const daysToCollect = stepRng.weighted(
-                    [0, 1, 2, 3],
-                    (x) => [5, 4, 2, 1][x],
+                // Most the day it is ready, the rest the next: an open
+                // pick-up is one still being made or ready since yesterday.
+                const daysToCollect = stepRng.weighted([0, 1], (x) =>
+                    x === 0 ? 7 : 3,
                 );
                 const collect = istAt(
                     readyAt,
@@ -1573,7 +1610,7 @@ function planVolume(a: {
                 moves.push({ to: "HANDED_TO_COURIER", at: out });
                 moves.push({
                     to: "DELIVERED",
-                    at: addMinutes(out, stepRng.int(2 * 24 * 60, 5 * 24 * 60)),
+                    at: addMinutes(out, stepRng.int(24 * 60, 2 * 24 * 60)),
                 });
             }
         }
@@ -1595,7 +1632,7 @@ function planVolume(a: {
             o.fulfilment === "PICKUP" &&
             !o.walkIn &&
             readyForLate < V.latePickups &&
-            readyDaysAgo > 4 &&
+            readyDaysAgo > 5 &&
             readyDaysAgo < 9
         ) {
             readyForLate++;
@@ -2632,6 +2669,48 @@ export interface DemoShopCheck {
     what: string;
     /** Rows that break it; none is a pass. */
     rows: (prisma: Db, orgId: string, now: Date) => Promise<unknown[]>;
+}
+
+/**
+ * The open orders Home calls late at `now`: the API's rule (`lateSql`,
+ * DEC-045) against each storefront's own thresholds — open, not handed
+ * over, placed longer ago than its way's threshold. A demo designs these
+ * few, so a check can hold it to exactly them.
+ */
+export function lateOrders(
+    prisma: Db,
+    orgId: string,
+    now: Date,
+): Promise<{ orderId: string; stage: string; fulfilment: string }[]> {
+    return prisma.$queryRaw`
+        SELECT o."orderId", o.stage::text AS stage, o.fulfilment::text AS fulfilment
+        FROM "Order" o LEFT JOIN "StoreSettings" ss ON ss."storeId" = o."storeId"
+        WHERE o."organizationId" = ${orgId}
+          AND o.status IN ('PENDING', 'PROCESSING')
+          AND o."paymentStatus" <> 'REFUNDED'
+          AND o.stage IN ('NEW', 'PREPARING', 'READY')
+          AND o."createdAt" < ${now}::timestamp - make_interval(mins => CASE o.fulfilment::text
+                WHEN 'PICKUP' THEN COALESCE(ss."pickupLateAfterMinutes", 120)
+                WHEN 'LOCAL_DELIVERY' THEN COALESCE(ss."localDeliveryLateAfterMinutes", 1440)
+                WHEN 'SHIPPING' THEN COALESCE(ss."shippingLateAfterMinutes", 2880)
+              END)
+        ORDER BY o."createdAt"`;
+}
+
+/** A check that the only late orders are the `n` designed late pick-ups. */
+export function onlyDesignedLatePickups(n: number): DemoShopCheck {
+    return {
+        what: `late orders other than the ${n} designed late pick-up(s)`,
+        rows: async (prisma, orgId, now) => {
+            const late = await lateOrders(prisma, orgId, now);
+            const designed =
+                late.length === n &&
+                late.every(
+                    (o) => o.fulfilment === "PICKUP" && o.stage === "READY",
+                );
+            return designed ? [] : late.length ? late : [{ late: 0 }];
+        },
+    };
 }
 
 /**

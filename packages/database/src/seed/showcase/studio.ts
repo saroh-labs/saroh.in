@@ -172,6 +172,15 @@ export interface StudioSpec {
             close: string;
             closed: boolean;
         }[];
+        /**
+         * Minutes from placing an order until its storefront calls it late
+         * (B17), per way it leaves. Absent: the defaults (2 h, 24 h, 48 h).
+         */
+        lateAfterMinutes?: {
+            PICKUP: number;
+            LOCAL_DELIVERY: number;
+            SHIPPING: number;
+        };
     };
     staff: readonly StudioStaff[];
     rules: {
@@ -377,6 +386,10 @@ export async function writeStructure(
         openingHours: spec.store.openingHours.map((d) => ({ ...d })),
         collectionEnabled: true,
         taxEnabled: false,
+        pickupLateAfterMinutes: spec.store.lateAfterMinutes?.PICKUP ?? 120,
+        localDeliveryLateAfterMinutes:
+            spec.store.lateAfterMinutes?.LOCAL_DELIVERY ?? 1440,
+        shippingLateAfterMinutes: spec.store.lateAfterMinutes?.SHIPPING ?? 2880,
     };
     await prisma.storeSettings.upsert({
         where: { storeId },

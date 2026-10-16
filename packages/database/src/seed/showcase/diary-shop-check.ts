@@ -178,6 +178,30 @@ export async function checkDiaryShop(
             ) x`);
         c.stoppedAtThree = stopped;
         need(stopped > 0, "a treatment stopped after its third visit");
+        // Fulfilled once every visit is attended, as the API settles it;
+        // only the ones with visits to come, missed or stopped stay open.
+        const [unsettled, inProgress] = await Promise.all([
+            one(prisma.$queryRaw`
+                SELECT COUNT(*) AS n FROM "Order" o
+                JOIN "OrderItem" i ON i."orderId" = o.id
+                JOIN "Service" s ON s.id = i."serviceId"
+                WHERE o."organizationId" = ${orgId} AND s.visits > 1
+                  AND o.status <> 'CANCELLED'
+                  AND (o.status = 'DELIVERED') <> (s.visits <= (
+                      SELECT COUNT(DISTINCT b."visitNumber") FROM "Booking" b
+                      WHERE b."orderId" = o.id AND b.outcome = 'ATTENDED'))`),
+            one(prisma.$queryRaw`
+                SELECT COUNT(DISTINCT b."orderId") AS n FROM "Booking" b
+                JOIN "Order" o ON o.id = b."orderId"
+                WHERE b."organizationId" = ${orgId} AND o.status = 'PENDING'
+                  AND b.status = 'CONFIRMED' AND b."startAt" > ${at}::timestamp`),
+        ]);
+        c.treatmentsInProgress = inProgress;
+        need(
+            unsettled === 0,
+            `every treatment fulfilled once all its visits are attended, and only then (${unsettled} not)`,
+        );
+        need(inProgress > 0, "a treatment with visits still to come");
     }
     if (failures.length > 0) {
         throw new Error(

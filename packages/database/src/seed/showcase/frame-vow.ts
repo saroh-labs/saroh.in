@@ -1,5 +1,6 @@
 import type { Db } from "../helpers";
 import { SHOWCASE_SEED } from "./data";
+import { lateOrders } from "./demo-shop";
 import { FV_KEY, fvSpec } from "./frame-vow-data";
 import { addMinutes, earliest, hashKey, istAt, phoneNumber } from "./people";
 import type { Rng } from "./random";
@@ -1248,6 +1249,7 @@ function planOrders(
 ): StudioOrder[] {
     const orders: StudioOrder[] = [];
     const sellable = spec.products.filter((p) => p.demand > 0);
+    const lateLeft = { done: false };
     const reviewsLeft: Record<string, string[]> = Object.fromEntries(
         Object.entries(REVIEWS).map(([k, v]) => [k, [...v]]),
     );
@@ -1265,8 +1267,24 @@ function planOrders(
                 must(spec.products.find((p) => p.slug === l.product))
                     .fulfilment === "DIGITAL",
         );
-        const pickup = !digital && rng.chance(0.25);
-        const makeDays = product.slug.includes("album") ? 24 : 6;
+        const album = product.slug.includes("album");
+        // An album goes to the couple's door ("three weeks from approved
+        // proof to your door"); a print may be collected from the studio.
+        const pickup = !digital && rng.chance(0.25) && !album;
+        // Prints in two days; the courier or the studio shelf two more.
+        const makeDays = album ? 24 : 2;
+        const handDays = album ? 4 : 2;
+        // Reviewed a good while after it arrived: a print's after 16 days.
+        const reviewAfterDays = album ? 34 : 16;
+        // The one designed loose end: a print ready at the studio that
+        // nobody has come for (Home's only late order here).
+        const keptWaiting = () => {
+            if (!pickup || lateLeft.done || ageDays <= 6 || ageDays >= 12) {
+                return false;
+            }
+            lateLeft.done = true;
+            return true;
+        };
         const unpaid = ageDays < 1.5 && rng.chance(0.4);
         let status: StudioOrder["status"];
         let stage: StudioOrder["stage"];
@@ -1282,7 +1300,7 @@ function planOrders(
         } else if (ageDays < makeDays) {
             status = "PROCESSING";
             stage = "PREPARING";
-        } else if (ageDays < makeDays + 4) {
+        } else if (ageDays < makeDays + handDays || keptWaiting()) {
             status = pickup ? "PROCESSING" : "SHIPPED";
             stage = pickup ? "READY" : "HANDED_TO_COURIER";
         } else {
@@ -1312,7 +1330,7 @@ function planOrders(
         if (
             status === "DELIVERED" &&
             pool.length &&
-            ageDays > makeDays + 10 &&
+            ageDays > reviewAfterDays &&
             rng.chance(0.55)
         ) {
             const at = earliest(
@@ -1477,6 +1495,16 @@ export async function checkFrameVow(prisma: Db, orgId: string, now: Date) {
             });
             if (upcomingWedding < 4)
                 fail(`upcoming weddings in the diary: ${upcomingWedding}`);
+            // Home's one late order: the print nobody has collected.
+            const late = await lateOrders(prisma, orgId, now);
+            if (
+                late.length !== 1 ||
+                late[0].fulfilment !== "PICKUP" ||
+                late[0].stage !== "READY"
+            )
+                fail(
+                    `late orders other than the one uncollected print: ${JSON.stringify(late)}`,
+                );
         },
     });
 }
