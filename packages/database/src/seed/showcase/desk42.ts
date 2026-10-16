@@ -411,7 +411,7 @@ export async function seedDesk42(
         openMinute: 8 * 60 + 30,
         closeMinute: 19 * 60,
         lineWeights: [55, 35, 10],
-        orderPrefix: "D42-",
+        orderPrefix: "BC-",
         staff: team,
         qr: { ids: [qrIds[1]], share: 0.3 },
     });

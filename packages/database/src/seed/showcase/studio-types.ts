@@ -1,6 +1,6 @@
 /**
- * Shapes shared by the two service-studio showcases (Frame & Vow, Pixel &
- * Chai): their photos and their writing.
+ * Shapes shared by the two service-studio showcases (Golden Hour Weddings, Loop
+ * Local Media): their photos and their writing.
  */
 
 /** A free-licence Unsplash photograph, hot-linked and credited, or a generated image (`data:`). */

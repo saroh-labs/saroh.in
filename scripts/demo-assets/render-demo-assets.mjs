@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Draws the pictures the Shiksha Academy and Desk 42 showcases use that no
+ * Draws the pictures the Aarohan Academy and Baithak showcases use that no
  * photograph can be: study-material covers, the academy's T-shirts and lab
  * coat, timetables, a results card, a fee schedule, a floor plan, notices.
  *
@@ -37,7 +37,7 @@ html,body{width:${W}px;height:${H}px;overflow:hidden}
 body{font-family:"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 ${css}</style></head><body>${body}</body></html>`;
 
-// --- Shiksha Academy -------------------------------------------------------
+// --- Aarohan Academy -------------------------------------------------------
 
 const SA = {
     navy: "#1d3a6b",
@@ -52,7 +52,7 @@ const crest = (size = 120, fg = SA.navy, bg = "#fff") => `
   <circle cx="60" cy="60" r="56" fill="${bg}" stroke="${fg}" stroke-width="6"/>
   <path d="M30 70 L60 40 L90 70" fill="none" stroke="${SA.saffron}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M36 82 Q60 70 84 82" fill="none" stroke="${fg}" stroke-width="6" stroke-linecap="round"/>
-  <text x="60" y="104" font-size="15" font-weight="700" text-anchor="middle" fill="${fg}" font-family="Arial">SHIKSHA</text>
+  <text x="60" y="104" font-size="13" font-weight="700" text-anchor="middle" fill="${fg}" font-family="Arial">AAROHAN</text>
 </svg>`;
 
 const saCard = (title, kicker, inner, extraCss = "") =>
@@ -64,7 +64,7 @@ const saCard = (title, kicker, inner, extraCss = "") =>
          .foot{position:absolute;left:80px;right:80px;bottom:44px;display:flex;justify-content:space-between;font-size:20px;color:#6b6457;border-top:2px solid ${SA.line};padding-top:16px}
          ${extraCss}`,
         `<div class="top">${crest(96)}<div><div class="kicker">${kicker}</div><h1>${title}</h1></div></div>${inner}
-         <div class="foot"><span>Shiksha Academy · Gopalpura Bypass, Jaipur</span><span>+91 141 400 7720</span></div>`,
+         <div class="foot"><span>Aarohan Academy · Gopalpura Bypass, Jaipur</span><span>+91 00000 00110</span></div>`,
     );
 
 const timetable = () => {
@@ -221,7 +221,7 @@ const admissions = () =>
         "Admission in four steps",
         "Admissions 2027–28",
         steps([
-            ["Enquiry", "Fill the form on our site or call +91 141 400 7720."],
+            ["Enquiry", "Fill the form on our site or call +91 00000 00110."],
             [
                 "Counselling call",
                 "Kavita calls within a day: batch, fees, scholarship test.",
@@ -283,7 +283,7 @@ const bookCover = (kind, subject, medium) => {
          .band{position:absolute;left:0;right:0;bottom:170px;background:rgba(255,255,255,.14);padding:20px 48px;font-size:22px}
          .m{position:absolute;left:48px;bottom:60px;font-size:26px;font-weight:700;background:#fff;color:${c};padding:8px 18px;border-radius:30px}
          .c{position:absolute;right:40px;bottom:40px}`,
-        `<div class="book"><div class="k">Shiksha Academy · NEET / JEE</div><h1>${name}</h1><h2>${title}</h2>
+        `<div class="book"><div class="k">Aarohan Academy · NEET / JEE</div><h1>${name}</h1><h2>${title}</h2>
          <div class="band">${sub} · 2026–27</div><div class="m">${medium} medium</div><div class="c">${crest(96, "#fff", c)}</div></div>`,
     );
 };
@@ -361,12 +361,12 @@ const formulaBook = () =>
          .f{font-family:Georgia,serif;font-size:34px;color:${SA.saffron};line-height:1.7}
          .k{font-size:22px;letter-spacing:.16em;text-transform:uppercase;opacity:.8}
          .c{position:absolute;right:40px;bottom:40px}`,
-        `<div class="book"><div class="k">Shiksha Academy</div><h1>Physics &amp; Maths formula handbook</h1>
+        `<div class="book"><div class="k">Aarohan Academy</div><h1>Physics &amp; Maths formula handbook</h1>
          <div class="f">F = ma<br>v² = u² + 2as<br>∫ x dx = x²/2 + C<br>sin²θ + cos²θ = 1</div>
          <div class="c">${crest(90, "#fff", "#14213d")}</div></div>`,
     );
 
-// --- Desk 42 ----------------------------------------------------------------
+// --- Baithak Cowork ----------------------------------------------------------
 
 const DK = {
     teal: "#0f766e",
@@ -377,7 +377,7 @@ const DK = {
 };
 const dkMark = (size = 90, fg = "#fff", bg = DK.teal) => `
 <svg width="${size}" height="${size}" viewBox="0 0 90 90"><rect width="90" height="90" rx="18" fill="${bg}"/>
-<text x="45" y="60" text-anchor="middle" font-family="Arial" font-weight="800" font-size="44" fill="${fg}">42</text></svg>`;
+<text x="45" y="60" text-anchor="middle" font-family="Arial" font-weight="800" font-size="44" fill="${fg}">B</text></svg>`;
 
 const dkCard = (title, kicker, inner, extraCss = "") =>
     page(
@@ -388,7 +388,7 @@ const dkCard = (title, kicker, inner, extraCss = "") =>
          .foot{position:absolute;left:80px;right:80px;bottom:44px;display:flex;justify-content:space-between;font-size:20px;color:#6b6457;border-top:2px solid ${DK.line};padding-top:16px}
          ${extraCss}`,
         `<div class="top">${dkMark(88)}<div><div class="kicker">${kicker}</div><h1>${title}</h1></div></div>${inner}
-         <div class="foot"><span>Desk 42 · 4th floor, Sai Capital, Baner Road, Pune</span><span>Mon–Fri 8–9 · Sat 9–6</span></div>`,
+         <div class="foot"><span>Baithak Cowork · 4th floor, Sai Capital, Baner Road, Pune</span><span>Mon–Fri 8–9 · Sat 9–6</span></div>`,
     );
 
 const floorPlan = () =>
@@ -469,7 +469,7 @@ const diwali = () =>
          table{width:100%;font-size:38px;border-collapse:collapse} td{padding:18px 0;border-bottom:2px solid rgba(255,255,255,.18)} td:last-child{text-align:right;color:#f5b041;font-weight:700}
          .f{display:flex;justify-content:space-between;align-items:center;font-size:24px;color:#d8cde6}
          .lamp{font-size:24px}`,
-        `<div><div class="k">DESK 42 · DIWALI 2026</div><h1>Diwali hours</h1></div>
+        `<div><div class="k">BAITHAK · DIWALI 2026</div><h1>Diwali hours</h1></div>
          <table><tr><td>Saturday 7 November</td><td>10 am – 6 pm</td></tr><tr><td>Sunday 8 November · Diwali</td><td>Closed</td></tr>
          <tr><td>Monday 9 November</td><td>Closed</td></tr><tr><td>Tuesday 10 November</td><td>10 am – 6 pm</td></tr><tr><td>From Wednesday 11 November</td><td>Usual hours</td></tr></table>
          <div class="f"><span>Dedicated desks keep 24×7 access · Potluck on Thursday 5 November, 6 pm</span>${dkMark(90, "#2a1a3a", "#f5b041")}</div>`,
@@ -479,7 +479,7 @@ const wifiPrinting = () =>
     dkCard(
         "Wi-Fi and printing",
         "At the desk",
-        `<div class="cols"><div class="box"><h2>Wi-Fi</h2><p><b>Desk42-Members</b> — your own login, on all day</p><p><b>Desk42-Guest</b> — password changes every Monday; it's on the board at the front desk</p><p>300 Mbps fibre, with a second provider as backup</p></div>
+        `<div class="cols"><div class="box"><h2>Wi-Fi</h2><p><b>Baithak-Members</b> — your own login, on all day</p><p><b>Baithak-Guest</b> — password changes every Monday; it's on the board at the front desk</p><p>300 Mbps fibre, with a second provider as backup</p></div>
          <div class="box"><h2>Printing</h2><p>Black &amp; white <b>₹3</b> a page · colour <b>₹12</b></p><p>Credit packs: 100 black &amp; white ₹300 · 50 colour ₹600</p><p>Scan to email is free · credits carry over</p></div></div>`,
         `.cols{display:grid;grid-template-columns:1fr 1fr;gap:30px}.box{background:#fff;border-radius:18px;padding:36px;border:2px solid ${DK.line};min-height:520px}
          h2{font-size:40px;color:${DK.teal};margin-bottom:20px} p{font-size:28px;line-height:1.45;margin-bottom:18px}`,
@@ -506,7 +506,7 @@ const roomBooking = () =>
 
 const events = () =>
     dkCard(
-        "Coming up at Desk 42",
+        "Coming up at Baithak",
         "Events · October to December",
         `<div class="list">${[
             [
@@ -536,7 +536,7 @@ const events = () =>
 const dkTshirt = () =>
     productBg(
         tshirtSvg("#2b2f33", "#fff", dkMark(110, "#2b2f33", "#e7e2d8")),
-        "Desk 42 T-shirt · charcoal",
+        "Baithak T-shirt · charcoal",
     );
 
 // --- Render -----------------------------------------------------------------
@@ -544,7 +544,7 @@ const dkTshirt = () =>
 const SUBJECTS = ["Physics", "Chemistry", "Biology", "Mathematics"];
 const MEDIUMS = ["English", "Hindi"];
 const cards = {
-    "shiksha-academy": {
+    "aarohan-academy": {
         "timetable-neet-11.png": timetable(),
         "results-2026.png": results(),
         "fee-instalments.png": fees(),
@@ -571,7 +571,7 @@ const cards = {
             ),
         ),
     },
-    "desk-42": {
+    "baithak-cowork": {
         "floor-plan.png": floorPlan(),
         "plans-card.png": plansCard(),
         "diwali-hours.png": diwali(),

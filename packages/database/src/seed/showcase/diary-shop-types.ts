@@ -1,5 +1,5 @@
 /**
- * The shape of a "diary and counter" business (Noor Salon & Bridal, Motion
+ * The shape of a "diary and counter" business (Gulmohar Salon & Bridal, Stride
  * Physio): people on a diary taking one-to-one appointments, packs and
  * multi-visit treatments, and a counter selling retail products. Each
  * business is data in its own files (`salon-*.ts`, `physio-*.ts`); the

@@ -31,8 +31,8 @@ const NOWS = [
 ];
 
 describe.each([
-    ["Noor Salon & Bridal", NOOR],
-    ["Motion Physio", MOTION],
+    ["Gulmohar Salon & Bridal", NOOR],
+    ["Stride Physio", MOTION],
 ])("%s", (_name, biz) => {
     it.each(NOWS)("plans a sound diary at %s", (iso) => {
         const now = new Date(iso);

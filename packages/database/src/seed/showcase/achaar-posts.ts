@@ -1,7 +1,7 @@
 import type { DemoPost } from "./demo-shop-types";
 
 /**
- * Ammi's Achaar's website journal: help pages, kitchen news and Ammi's own
+ * Ammi Ki Barni's website journal: help pages, kitchen news and Ammi's own
  * articles. Every photo is a vetted, free Unsplash photo; captions describe
  * what the photo shows and never claim it is this kitchen or its people.
  */

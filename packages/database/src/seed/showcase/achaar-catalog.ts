@@ -1,5 +1,5 @@
 /**
- * Ammi's Achaar — the showcase's home pickle kitchen in Nishatganj, Lucknow.
+ * Ammi Ki Barni — the showcase's home pickle kitchen in Nishatganj, Lucknow.
  *
  * Shabana Khan ("Ammi") makes the achaar; her son Faizan takes orders on
  * WhatsApp and Instagram and does the deliveries. Most jars are made after
@@ -456,7 +456,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.aamBarni, IMG.aamBasket, IMG.kairiPile],
-        variants: madeToOrder("AA-AAM", [
+        variants: madeToOrder("AKB-AAM", [
             ["250 g · mustard oil", "250M", "220.00"],
             ["250 g · sesame oil", "250T", "270.00"],
             ["500 g · mustard oil", "500M", "420.00"],
@@ -525,7 +525,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.launjiPan, IMG.kairiChopped],
-        variants: madeToOrder("AA-LAU", [
+        variants: madeToOrder("AKB-LAU", [
             ["250 g", "250", "240.00"],
             ["500 g", "500", "450.00"],
         ]),
@@ -576,7 +576,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.chundaSpoon, IMG.kairiChopped],
-        variants: madeToOrder("AA-CHU", [
+        variants: madeToOrder("AKB-CHU", [
             ["250 g", "250", "260.00"],
             ["500 g", "500", "480.00"],
             ["1 kg", "1K", "900.00"],
@@ -628,7 +628,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.spicedMango, IMG.barnisSpread],
-        variants: madeToOrder("AA-GUD", [
+        variants: madeToOrder("AKB-GUD", [
             ["250 g", "250", "240.00"],
             ["500 g", "500", "450.00"],
             ["1 kg", "1K", "850.00"],
@@ -673,7 +673,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.kairiCloseUp, IMG.greenChilliFresh],
-        variants: madeToOrder("AA-AHM", [
+        variants: madeToOrder("AKB-AHM", [
             ["250 g", "250", "220.00"],
             ["500 g", "500", "410.00"],
             ["1 kg", "1K", "780.00"],
@@ -718,7 +718,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.barnisSpread, IMG.kairiPile],
-        variants: madeToOrder("AA-ACM", [
+        variants: madeToOrder("AKB-ACM", [
             ["250 g", "250", "230.00"],
             ["500 g", "500", "430.00"],
             ["1 kg", "1K", "820.00"],
@@ -757,7 +757,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.lemonJar, IMG.lemonsPlate],
-        variants: madeToOrder("AA-NKH", [
+        variants: madeToOrder("AKB-NKH", [
             ["250 g", "250", "200.00"],
             ["500 g", "500", "360.00"],
             ["1 kg", "1K", "680.00"],
@@ -816,7 +816,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.darkJars, IMG.lemonsPlate],
-        variants: madeToOrder("AA-NME", [
+        variants: madeToOrder("AKB-NME", [
             ["250 g", "250", "230.00"],
             ["500 g", "500", "420.00"],
             ["1 kg", "1K", "800.00"],
@@ -868,7 +868,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.limesBowl, IMG.greenChilliHeap],
-        variants: madeToOrder("AA-NMI", [
+        variants: madeToOrder("AKB-NMI", [
             ["250 g", "250", "210.00"],
             ["500 g", "500", "380.00"],
             ["1 kg", "1K", "720.00"],
@@ -912,7 +912,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.lemonsPlate],
-        variants: madeToOrder("AA-NVR", [
+        variants: madeToOrder("AKB-NVR", [
             ["250 g", "250", "220.00"],
             ["500 g", "500", "400.00"],
         ]),
@@ -950,7 +950,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.redChilliJar, IMG.redChilliFresh, IMG.redChilliDried],
-        variants: madeToOrder("AA-BLM", [
+        variants: madeToOrder("AKB-BLM", [
             ["250 g · mustard oil", "250M", "300.00"],
             ["250 g · sesame oil", "250T", "360.00"],
             ["500 g · mustard oil", "500M", "560.00"],
@@ -1012,7 +1012,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.greenChilliPickled, IMG.greenChilliHeap],
-        variants: madeToOrder("AA-HMI", [
+        variants: madeToOrder("AKB-HMI", [
             ["250 g", "250", "190.00"],
             ["500 g", "500", "350.00"],
             ["1 kg", "1K", "660.00"],
@@ -1064,7 +1064,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.garlicJars, IMG.garlicCloves],
-        variants: madeToOrder("AA-LEH", [
+        variants: madeToOrder("AKB-LEH", [
             ["250 g · mustard oil", "250M", "260.00"],
             ["250 g · sesame oil", "250T", "310.00"],
             ["500 g · mustard oil", "500M", "480.00"],
@@ -1118,7 +1118,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.gingerSliced, IMG.gingerRoots],
-        variants: madeToOrder("AA-ADR", [
+        variants: madeToOrder("AKB-ADR", [
             ["250 g", "250", "210.00"],
             ["500 g", "500", "390.00"],
             ["1 kg", "1K", "740.00"],
@@ -1196,7 +1196,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.mixedJar, IMG.parathaPickle, IMG.barnisSpread],
-        variants: madeToOrder("AA-MIX", [
+        variants: madeToOrder("AKB-MIX", [
             ["250 g · mustard oil", "250M", "230.00"],
             ["250 g · sesame oil", "250T", "280.00"],
             ["500 g · mustard oil", "500M", "430.00"],
@@ -1257,7 +1257,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.jackfruitTree],
-        variants: madeToOrder("AA-KAT", [
+        variants: madeToOrder("AKB-KAT", [
             ["250 g", "250", "250.00"],
             ["500 g", "500", "460.00"],
             ["1 kg", "1K", "870.00"],
@@ -1294,7 +1294,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.darkJars, IMG.spicesGinger],
-        variants: madeToOrder("AA-SAU", [
+        variants: madeToOrder("AKB-SAU", [
             ["250 g", "250", "180.00"],
             ["500 g", "500", "340.00"],
         ]),
@@ -1379,7 +1379,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.carrotPickle, IMG.winterVeg, IMG.carrotGingerBowl],
-        variants: madeToOrder("AA-GGS", [
+        variants: madeToOrder("AKB-GGS", [
             ["250 g", "250", "220.00"],
             ["500 g", "500", "400.00"],
             ["1 kg", "1K", "760.00"],
@@ -1430,7 +1430,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.amlaPile, IMG.amlaTub],
-        variants: madeToOrder("AA-AML", [
+        variants: madeToOrder("AKB-AML", [
             ["250 g", "250", "230.00"],
             ["500 g", "500", "430.00"],
             ["1 kg", "1K", "820.00"],
@@ -1475,7 +1475,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.winterVeg, IMG.carrotGingerBowl],
-        variants: madeToOrder("AA-MOO", [
+        variants: madeToOrder("AKB-MOO", [
             ["250 g", "250", "180.00"],
             ["500 g", "500", "340.00"],
         ]),
@@ -1511,7 +1511,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.spicesSpread, IMG.gingerRoots],
-        variants: madeToOrder("AA-HAL", [
+        variants: madeToOrder("AKB-HAL", [
             ["250 g", "250", "290.00"],
             ["500 g", "500", "540.00"],
         ]),
@@ -1546,7 +1546,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         stock: 0,
         lowStockAlert: 0,
         images: [IMG.karondaBranch],
-        variants: madeToOrder("AA-KAR", [
+        variants: madeToOrder("AKB-KAR", [
             ["250 g", "250", "280.00"],
             ["500 g", "500", "520.00"],
         ]),
@@ -1595,7 +1595,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "100 g",
-                sku: "AA-GRM-100",
+                sku: "AKB-GRM-100",
                 price: "160.00",
                 mrp: null,
                 stock: 3,
@@ -1603,7 +1603,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "200 g",
-                sku: "AA-GRM-200",
+                sku: "AKB-GRM-200",
                 price: "300.00",
                 mrp: null,
                 stock: 14,
@@ -1660,7 +1660,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "100 g",
-                sku: "AA-ACM-100",
+                sku: "AKB-ACM-100",
                 price: "120.00",
                 mrp: null,
                 stock: 22,
@@ -1668,7 +1668,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "200 g",
-                sku: "AA-ACM-200",
+                sku: "AKB-ACM-200",
                 price: "220.00",
                 mrp: null,
                 stock: 11,
@@ -1717,7 +1717,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "100 g",
-                sku: "AA-CHM-100",
+                sku: "AKB-CHM-100",
                 price: "90.00",
                 mrp: null,
                 stock: 18,
@@ -1725,7 +1725,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "200 g",
-                sku: "AA-CHM-200",
+                sku: "AKB-CHM-200",
                 price: "170.00",
                 mrp: null,
                 stock: 0,
@@ -1772,7 +1772,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "100 g",
-                sku: "AA-LMP-100",
+                sku: "AKB-LMP-100",
                 price: "110.00",
                 mrp: null,
                 stock: 16,
@@ -1780,7 +1780,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "200 g",
-                sku: "AA-LMP-200",
+                sku: "AKB-LMP-200",
                 price: "200.00",
                 mrp: null,
                 stock: 9,
@@ -1822,7 +1822,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "200 g",
-                sku: "AA-PAP-200",
+                sku: "AKB-PAP-200",
                 price: "130.00",
                 mrp: null,
                 stock: 24,
@@ -1830,7 +1830,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "400 g",
-                sku: "AA-PAP-400",
+                sku: "AKB-PAP-400",
                 price: "180.00",
                 mrp: null,
                 stock: 10,
@@ -1909,7 +1909,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "200 g",
-                sku: "AA-APP-200",
+                sku: "AKB-APP-200",
                 price: "160.00",
                 mrp: null,
                 stock: 12,
@@ -1917,7 +1917,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "400 g",
-                sku: "AA-APP-400",
+                sku: "AKB-APP-400",
                 price: "300.00",
                 mrp: null,
                 stock: 2,
@@ -1971,7 +1971,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "100 g",
-                sku: "AA-AMC-100",
+                sku: "AKB-AMC-100",
                 price: "110.00",
                 mrp: null,
                 stock: 20,
@@ -1979,7 +1979,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "200 g",
-                sku: "AA-AMC-200",
+                sku: "AKB-AMC-200",
                 price: "200.00",
                 mrp: null,
                 stock: 8,
@@ -2024,7 +2024,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "Small box · 3 jars",
-                sku: "AA-HDW-S",
+                sku: "AKB-HDW-S",
                 price: "1099.00",
                 mrp: "1210.00",
                 stock: 0,
@@ -2032,7 +2032,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "Large box · 6 jars",
-                sku: "AA-HDW-L",
+                sku: "AKB-HDW-L",
                 price: "2399.00",
                 mrp: "2730.00",
                 stock: 0,
@@ -2089,7 +2089,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "Small box · 3 jars",
-                sku: "AA-HEI-S",
+                sku: "AKB-HEI-S",
                 price: "1199.00",
                 mrp: "1330.00",
                 stock: 0,
@@ -2097,7 +2097,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "Large box · 6 jars",
-                sku: "AA-HEI-L",
+                sku: "AKB-HEI-L",
                 price: "2199.00",
                 mrp: "2500.00",
                 stock: 0,
@@ -2145,7 +2145,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
         variants: [
             {
                 title: "Small box · 3 jars",
-                sku: "AA-BOX-S",
+                sku: "AKB-BOX-S",
                 price: "1149.00",
                 mrp: null,
                 stock: 0,
@@ -2153,7 +2153,7 @@ export const ACHAAR_PRODUCTS: DemoProduct[] = [
             },
             {
                 title: "Large box · 6 jars",
-                sku: "AA-BOX-L",
+                sku: "AKB-BOX-L",
                 price: "2249.00",
                 mrp: null,
                 stock: 0,

@@ -17,7 +17,7 @@ import {
 import { MOTION_POSTS } from "./physio-posts";
 
 /**
- * Motion Physio: a physiotherapy clinic on CMH Road, Indiranagar, owned by
+ * Stride Physio: a physiotherapy clinic on CMH Road, Indiranagar, owned by
  * `demo@saroh.dev` (as Dr. Ananya Krishnan, on the diary) with Dr. Rohit
  * Menon and Shruti Gowda on the desk as a Member. Healthcare is exempt and
  * the clinic is not GST-registered: plain receipts, INV-0001….
@@ -120,7 +120,7 @@ export const MOTION_SERVICES: readonly DsService[] = [
         pricePaise: 70_000,
         depositMode: "NONE",
         locationType: "ONLINE",
-        meetingUrl: "https://meet.jit.si/motion-physio-follow-up",
+        meetingUrl: "https://meet.jit.si/stride-physio-follow-up",
         weight: 1.5,
     }),
     svc({
@@ -210,7 +210,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "vikram",
         first: "Vikram",
         last: "Shetty",
-        phone: "+91 98450 31726",
+        phone: "+91 00000 00066",
         gender: "m",
         attention: [
             {
@@ -228,7 +228,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "lakshmi",
         first: "Lakshmi",
         last: "Iyengar",
-        phone: "+91 94480 17733",
+        phone: "+91 00000 00024",
         gender: "f",
         attention: [
             {
@@ -246,7 +246,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "george",
         first: "George",
         last: "Mathew",
-        phone: "+91 98860 44120",
+        phone: "+91 00000 00081",
         gender: "m",
         attention: [
             {
@@ -262,7 +262,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "priya",
         first: "Priya",
         last: "Hegde",
-        phone: "+91 99000 52817",
+        phone: "+91 00000 00091",
         gender: "f",
         attention: [],
         notes: [
@@ -273,7 +273,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "arjun",
         first: "Arjun",
         last: "Kamath",
-        phone: "+91 97411 20943",
+        phone: "+91 00000 00040",
         gender: "m",
         attention: [],
         notes: [
@@ -284,13 +284,13 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "sushila",
         first: "Sushila",
         last: "Rao",
-        phone: "+91 98451 66027",
+        phone: "+91 00000 00070",
         gender: "f",
         attention: [
             {
                 kind: "ACCESS",
                 label: "Home visits: 3rd floor, no lift",
-                detail: "Flat 3B, Jeevan Bima Nagar. Ring her son first on +91 98451 66028; parking inside the gate.",
+                detail: "Flat 3B, Jeevan Bima Nagar. Ring her son first on +91 00000 00071; parking inside the gate.",
                 sensitive: false,
             },
             {
@@ -308,7 +308,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "farhan",
         first: "Farhan",
         last: "Ahmed",
-        phone: "+91 90080 33561",
+        phone: "+91 00000 00014",
         gender: "m",
         attention: [],
         notes: [
@@ -319,7 +319,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "neha",
         first: "Neha",
         last: "Varma",
-        phone: "+91 99860 70432",
+        phone: "+91 00000 00109",
         gender: "f",
         attention: [],
         notes: [],
@@ -328,7 +328,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "anil",
         first: "Anil",
         last: "Reddy",
-        phone: "+91 98804 21376",
+        phone: "+91 00000 00077",
         gender: "m",
         attention: [],
         notes: [
@@ -339,7 +339,7 @@ export const MOTION_CLIENTS: readonly DsClient[] = [
         key: "meera",
         first: "Meera",
         last: "Nair",
-        phone: "+91 97400 58219",
+        phone: "+91 00000 00035",
         gender: "f",
         attention: [
             {
@@ -587,7 +587,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         84,
         "Ramesh",
         "Prasad",
-        "+91 98451 10276",
+        "+91 00000 00067",
         "Domlur",
         "My father (78) had a fall and fractured his wrist. Plaster comes off next week. Can someone come home for the rehab?",
     ),
@@ -595,7 +595,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         79,
         "Divya",
         "Srinivasan",
-        "+91 99001 64218",
+        "+91 00000 00095",
         "Indiranagar",
         "Training for my first half marathon and my right knee hurts on the outside after 12 km. Should I book an assessment or rest first?",
     ),
@@ -603,7 +603,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         71,
         "Sudeep",
         "Gowda",
-        "+91 97390 22814",
+        "+91 00000 00033",
         "HAL 2nd Stage",
         "Do you treat sciatica? Pain down my left leg for three weeks, worse sitting.",
     ),
@@ -611,7 +611,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         66,
         "Maria",
         "D'Souza",
-        "+91 98860 51177",
+        "+91 00000 00082",
         "CV Raman Nagar",
         "Knee replacement scheduled for 2 October. Can I start prehab with you before the surgery?",
     ),
@@ -619,7 +619,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         60,
         "Kiran",
         "Naidu",
-        "+91 90350 42286",
+        "+91 00000 00019",
         "Old Airport Road",
         "Is your clinic accessible by wheelchair? My mother uses one.",
     ),
@@ -627,7 +627,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         55,
         "Shreya",
         "Menon",
-        "+91 99456 30915",
+        "+91 00000 00103",
         "Indiranagar",
         "I work on a laptop all day and have constant neck pain and headaches. Can you help with posture?",
     ),
@@ -635,7 +635,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         49,
         "Naveen",
         "Patil",
-        "+91 98440 72318",
+        "+91 00000 00062",
         "Jeevan Bima Nagar",
         "Do you give receipts I can submit to my company's health reimbursement?",
     ),
@@ -643,7 +643,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         44,
         "Aisha",
         "Khan",
-        "+91 96111 23409",
+        "+91 00000 00028",
         "Domlur",
         "Frozen shoulder for 4 months. Does dry needling help? I'm a bit scared of needles.",
     ),
@@ -651,7 +651,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         38,
         "Rohan",
         "Joshi",
-        "+91 97409 81235",
+        "+91 00000 00038",
         "Indiranagar",
         "ACL surgery done at Manipal two weeks ago. Surgeon gave a protocol. When should I start physio?",
     ),
@@ -659,7 +659,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         33,
         "Varsha",
         "Kulkarni",
-        "+91 98458 66310",
+        "+91 00000 00075",
         "HAL 2nd Stage",
         "Can you do Saturday appointments for my son, 14, who has heel pain from football?",
     ),
@@ -667,7 +667,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         27,
         "Girish",
         "Bhat",
-        "+91 99459 17722",
+        "+91 00000 00104",
         "Whitefield",
         "Too far for regular visits. Do you do online follow-ups after one assessment in person?",
     ),
@@ -675,7 +675,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         22,
         "Pooja",
         "Reddy",
-        "+91 90089 45531",
+        "+91 00000 00018",
         "Indiranagar",
         "Pregnant (6 months) with pelvic girdle pain. Do you treat pregnant women?",
     ),
@@ -683,7 +683,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         18,
         "Siddharth",
         "Rao",
-        "+91 98864 20937",
+        "+91 00000 00085",
         "Domlur",
         "Cricket season starts next month. Do you do screening for fast bowlers?",
     ),
@@ -691,7 +691,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         13,
         "Fatima",
         "Sheikh",
-        "+91 97422 61804",
+        "+91 00000 00042",
         "CV Raman Nagar",
         "How much is a home visit and how soon can someone come? My mother had a hip fracture fixed.",
     ),
@@ -699,7 +699,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         9,
         "Abhishek",
         "Agarwal",
-        "+91 99805 30471",
+        "+91 00000 00108",
         "Indiranagar",
         "Lower back pain after deadlifts. Gym says rest; I'd rather get it checked. Free this week?",
     ),
@@ -707,7 +707,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         5,
         "Sindhu",
         "Murthy",
-        "+91 98454 77260",
+        "+91 00000 00073",
         "Old Airport Road",
         "Do you have packs of sessions? My physio plan is twice a week for a month.",
     ),
@@ -715,7 +715,7 @@ export const MOTION_ENQUIRIES: readonly DsEnquiry[] = [
         2,
         "Vivek",
         "Thomas",
-        "+91 90086 13358",
+        "+91 00000 00016",
         "Indiranagar",
         "Ankle sprain playing badminton yesterday. Swollen. Should I come in now or wait?",
     ),
@@ -850,7 +850,7 @@ function motionSeason(iso: string): number {
     return 1;
 }
 
-const PHONE = "+91 80 4128 5560";
+const PHONE = "+91 00000 00008";
 const ADDRESS = "2nd floor, 418 CMH Road, Indiranagar, Bengaluru 560038";
 const img = (p: {
     url: string;
@@ -866,11 +866,11 @@ const img = (p: {
 
 export const MOTION: DsBusiness = {
     key: "mp",
-    name: "Motion Physio",
-    slug: "motion-physio",
-    legalName: "Motion Physiotherapy LLP",
-    contactEmail: "motionphysio@example.com",
-    phoneE164: "+918041285560",
+    name: "Stride Physio",
+    slug: "stride-physio",
+    legalName: "Stride Physiotherapy LLP",
+    contactEmail: "stridephysio@example.com",
+    phoneE164: "+910000000008",
     phoneDisplay: PHONE,
     address: {
         addressLine1: "2nd floor, 418 CMH Road",
@@ -1008,7 +1008,7 @@ export const MOTION: DsBusiness = {
     enquiries: MOTION_ENQUIRIES,
     site: {
         createdDaysAgo: 320,
-        footer: `Motion Physio · ${ADDRESS} · Mon–Fri 7:30–1 and 4–8, Sat 8–2 · ${PHONE}`,
+        footer: `Stride Physio · ${ADDRESS} · Mon–Fri 7:30–1 and 4–8, Sat 8–2 · ${PHONE}`,
         pages: [
             {
                 path: "/",
@@ -1281,7 +1281,7 @@ export const MOTION: DsBusiness = {
                             hours: "Mon–Fri 7:30 am – 1 pm and 4 pm – 8 pm · Sat 8 am – 2 pm · Sun closed",
                             phone: PHONE,
                             whatsapp: PHONE,
-                            email: "motionphysio@example.com",
+                            email: "stridephysio@example.com",
                         },
                     },
                     {

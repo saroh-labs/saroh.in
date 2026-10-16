@@ -1,5 +1,5 @@
 /**
- * Noor Salon & Bridal — the counter's retail catalogue and the site's photos.
+ * Gulmohar Salon & Bridal — the counter's retail catalogue and the site's photos.
  *
  * What a Jaipur salon sells at its desk: professional shampoos, conditioners,
  * masks, serums and oils (several in a 250 ml home size and a 1 L refill), a
@@ -27,8 +27,8 @@ import type {
 } from "./diary-shop-types";
 import { demoAsset } from "./diary-shop-types";
 
-const SITE = "https://noor-salon.saroh.app";
-const BUSINESS = "Noor Salon & Bridal";
+const SITE = "https://gulmohar-salon.saroh.app";
+const BUSINESS = "Gulmohar Salon & Bridal";
 
 const KESAR = {
     maker: "Kesar Lab Cosmetics Pvt. Ltd.",
@@ -1647,7 +1647,7 @@ export const NOOR_PRODUCTS: DsProduct[] = [
                 5,
                 "Sunita S.",
                 29,
-                "I get my global colour at Noor and do roots at home in between with 4.0. Noor showed me exactly how much to mix. Matches perfectly.",
+                "I get my global colour at Gulmohar and do roots at home in between with 4.0. Noor showed me exactly how much to mix. Matches perfectly.",
                 "4.0 Medium Brown",
                 "Thank you, Sunita ji. Do keep up the patch test each time! — Noor",
             ),

@@ -188,7 +188,7 @@ export async function seedClinic(
         serviceId: serviceIdOf,
         footer: {
             format: "text",
-            value: "Kavi Dental · 12th Main, Indiranagar, Bengaluru · +91 80 4099 2210",
+            value: "Kavi Dental · 12th Main, Indiranagar, Bengaluru · +91 00000 00005",
         },
     });
     for (let i = 0; i < KAVI_SERVICES.length; i++) {

@@ -1,5 +1,5 @@
 /**
- * Pagdandi Books & Café — the showcase's independent bookshop with a café
+ * Margin Books & Café — the showcase's independent bookshop with a café
  * corner, at 14 Prabhat Road, Lane 3, Deccan Gymkhana, Pune 411004. Anagha
  * Joshi runs the shop; Siddharth Kale runs the café corner.
  *
@@ -1313,7 +1313,7 @@ const BOOKS: DemoProduct[] = [
     book({
         slug: "panchatantra-tales",
         name: "Panchatantra Tales",
-        author: "the Pagdandi story hour",
+        author: "the Margin story hour",
         category: "children",
         language: "English, Hindi or Marathi",
         pages: 160,
@@ -1339,7 +1339,7 @@ const BOOKS: DemoProduct[] = [
     book({
         slug: "jataka-tales",
         name: "Jataka Tales",
-        author: "the Pagdandi story hour",
+        author: "the Margin story hour",
         category: "children",
         language: "English",
         pages: 144,
@@ -1451,7 +1451,7 @@ const BOOKS: DemoProduct[] = [
         ],
         description:
             "Two old college friends miss the last bus down from Sinhagad fort in the rain and have to walk, talking through twenty years and one betrayal. Nikhil wrote most of it at the corner table by our window.\n\nThe hardcovers are signed. It has been on our staff-picks shelf since the day it came out.",
-        points: ["Hardcovers signed by the author", "A Pagdandi staff pick"],
+        points: ["Hardcovers signed by the author", "A Margin staff pick"],
         maker: TEKDI,
         demand: 1.4,
         reviews: [
@@ -1803,8 +1803,8 @@ function item(
 
 const STATIONERY: DemoProduct[] = [
     item({
-        slug: "pagdandi-field-notebook",
-        name: "Pagdandi field notebook",
+        slug: "margin-field-notebook",
+        name: "Margin field notebook",
         category: "stationery",
         option: "notebook",
         description:
@@ -2039,7 +2039,7 @@ const STATIONERY: DemoProduct[] = [
             rv(
                 4,
                 "Natasha R.",
-                "Jamun is gorgeous. Dries a little slowly on glossy paper, fine on the Pagdandi notebook.",
+                "Jamun is gorgeous. Dries a little slowly on glossy paper, fine on the Margin notebook.",
                 "Jamun",
             ),
         ],
@@ -2135,8 +2135,8 @@ const STATIONERY: DemoProduct[] = [
         reviews: [],
     }),
     item({
-        slug: "pagdandi-tote-bag",
-        name: "Pagdandi cotton tote",
+        slug: "margin-tote-bag",
+        name: "Margin cotton tote",
         category: "stationery",
         option: "colour",
         description:
@@ -2257,7 +2257,7 @@ const STATIONERY: DemoProduct[] = [
             "300 gsm cotton-rag handmade paper, watercolour, cotton thread.",
         howToUse: "Keep dry; watercolour lifts if wet.",
         maker: {
-            name: "Painted in Pune for Pagdandi",
+            name: "Painted in Pune for Margin",
             madeIn: "Pune, Maharashtra",
         },
         gstRate: "18",
@@ -2579,7 +2579,7 @@ const STATIONERY: DemoProduct[] = [
 const CAFE: DemoProduct[] = [
     item({
         slug: "filter-coffee",
-        name: "Pagdandi filter coffee",
+        name: "Margin filter coffee",
         category: "cafe",
         option: "pack",
         description:
@@ -2786,8 +2786,8 @@ const CAFE: DemoProduct[] = [
         ],
     }),
     item({
-        slug: "pagdandi-mug",
-        name: "Pagdandi stoneware mug",
+        slug: "margin-mug",
+        name: "Margin stoneware mug",
         category: "cafe",
         option: null,
         price: "399",

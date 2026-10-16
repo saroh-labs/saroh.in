@@ -11,7 +11,7 @@ import { STUDIO_ART } from "./studio-art";
 import { FV_PHOTOS } from "./studio-photos";
 
 /**
- * Frame & Vow's fixed facts: a wedding photography and planning studio on
+ * Golden Hour's fixed facts: a wedding photography and planning studio on
  * Lake Palace Road, Udaipur, with a Jaipur desk — Kabir Shekhawat (lead
  * photographer, the founder), Ishaan Mathur (second shooter and films),
  * Meher Bhati (planner, the one with a login) and Tanvi Purohit (décor).
@@ -55,7 +55,7 @@ export const FV_SERVICES: readonly StudioService[] = [
         sac: "998596",
         depositMode: "NONE",
         locationType: "EITHER",
-        meetingUrl: "https://meet.jit.si/frame-and-vow-consultation",
+        meetingUrl: "https://meet.jit.si/golden-hour-weddings-consultation",
         shown: true,
         pay: "free",
         perMonth: 24,
@@ -230,7 +230,7 @@ const ALBUM_VARIANTS: StudioVariant[] = SIZES.flatMap((s) =>
     COVERS.flatMap((c) =>
         PAGES.map((p) => ({
             title: `${s.title} · ${c.title} · ${p.title}`,
-            sku: `FV-ALB-${s.code}-${c.code}-${p.code}`,
+            sku: `GH-ALB-${s.code}-${c.code}-${p.code}`,
             pricePaise: s.paise + c.paise + p.paise,
             image: c.image,
         })),
@@ -290,8 +290,8 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Parent album cover",
             variants: [
-                v("Linen", "FV-PAR-LIN", 9_500, 1),
-                v("Leather", "FV-PAR-LEA", 11_500),
+                v("Linen", "GH-PAR-LIN", 9_500, 1),
+                v("Leather", "GH-PAR-LEA", 11_500),
             ],
         },
         fulfilment: "SHIPPING",
@@ -315,10 +315,10 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Canvas size",
             variants: [
-                v("12×18 in", "FV-CAN-1218", 4_800),
-                v("16×24 in", "FV-CAN-1624", 7_200),
-                v("20×30 in", "FV-CAN-2030", 10_500),
-                v("24×36 in", "FV-CAN-2436", 14_500),
+                v("12×18 in", "GH-CAN-1218", 4_800),
+                v("16×24 in", "GH-CAN-1624", 7_200),
+                v("20×30 in", "GH-CAN-2030", 10_500),
+                v("24×36 in", "GH-CAN-2436", 14_500),
             ],
         },
         fulfilment: "SHIPPING",
@@ -342,12 +342,12 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Print size and finish",
             variants: [
-                v("8×12 · Matte", "FV-FA-0812-M", 2_400),
-                v("8×12 · Pearl", "FV-FA-0812-P", 2_600),
-                v("12×18 · Matte", "FV-FA-1218-M", 4_200),
-                v("12×18 · Pearl", "FV-FA-1218-P", 4_500),
-                v("16×24 · Matte", "FV-FA-1624-M", 6_800),
-                v("16×24 · Pearl", "FV-FA-1624-P", 7_200),
+                v("8×12 · Matte", "GH-FA-0812-M", 2_400),
+                v("8×12 · Pearl", "GH-FA-0812-P", 2_600),
+                v("12×18 · Matte", "GH-FA-1218-M", 4_200),
+                v("12×18 · Pearl", "GH-FA-1218-P", 4_500),
+                v("16×24 · Matte", "GH-FA-1624-M", 6_800),
+                v("16×24 · Pearl", "GH-FA-1624-P", 7_200),
             ],
         },
         fulfilment: "SHIPPING",
@@ -371,9 +371,9 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Frame size",
             variants: [
-                v("8×10 in", "FV-FR-0810", 3_200),
-                v("12×15 in", "FV-FR-1215", 5_400),
-                v("16×20 in", "FV-FR-1620", 7_900),
+                v("8×10 in", "GH-FR-0810", 3_200),
+                v("12×15 in", "GH-FR-1215", 5_400),
+                v("16×20 in", "GH-FR-1620", 7_900),
             ],
         },
         fulfilment: "SHIPPING",
@@ -396,9 +396,9 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "How many photographs",
             variants: [
-                v("50 photographs", "FV-EDIT-50", 6_000),
-                v("100 photographs", "FV-EDIT-100", 10_000),
-                v("200 photographs", "FV-EDIT-200", 18_000),
+                v("50 photographs", "GH-EDIT-50", 6_000),
+                v("100 photographs", "GH-EDIT-100", 10_000),
+                v("200 photographs", "GH-EDIT-200", 18_000),
             ],
         },
         fulfilment: "DIGITAL",
@@ -478,8 +478,8 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Mandap size",
             variants: [
-                v("Intimate · up to 150 guests", "FV-MANDAP-S", 1_85_000),
-                v("Grand · up to 400 guests", "FV-MANDAP-L", 2_95_000),
+                v("Intimate · up to 150 guests", "GH-MANDAP-S", 1_85_000),
+                v("Grand · up to 400 guests", "GH-MANDAP-L", 2_95_000),
             ],
         },
         fulfilment: "PICKUP",
@@ -499,8 +499,8 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Haldi setup size",
             variants: [
-                v("Courtyard · up to 80 guests", "FV-HALDI-S", 65_000),
-                v("Lawn · up to 200 guests", "FV-HALDI-L", 95_000),
+                v("Courtyard · up to 80 guests", "GH-HALDI-S", 65_000),
+                v("Lawn · up to 200 guests", "GH-HALDI-L", 95_000),
             ],
         },
         fulfilment: "PICKUP",
@@ -524,8 +524,8 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Sangeet stage",
             variants: [
-                v("Stage and lights", "FV-SANGEET", 1_40_000),
-                v("With LED wall", "FV-SANGEET-LED", 2_10_000),
+                v("Stage and lights", "GH-SANGEET", 1_40_000),
+                v("With LED wall", "GH-SANGEET-LED", 2_10_000),
             ],
         },
         fulfilment: "PICKUP",
@@ -549,10 +549,10 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Menu",
             variants: [
-                v("Veg classic", "FV-CAT-VC", 1_450),
-                v("Veg royal Rajasthani", "FV-CAT-VR", 2_100),
-                v("Non-veg classic", "FV-CAT-NC", 1_850),
-                v("Non-veg royal", "FV-CAT-NR", 2_600),
+                v("Veg classic", "GH-CAT-VC", 1_450),
+                v("Veg royal Rajasthani", "GH-CAT-VR", 2_100),
+                v("Non-veg classic", "GH-CAT-NC", 1_850),
+                v("Non-veg royal", "GH-CAT-NR", 2_600),
             ],
         },
         fulfilment: "PICKUP",
@@ -586,8 +586,8 @@ export const FV_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Mehendi",
             variants: [
-                v("Bridal", "FV-MEH-BRIDE", 21_000),
-                v("Guests, per hand", "FV-MEH-HAND", 350),
+                v("Bridal", "GH-MEH-BRIDE", 21_000),
+                v("Guests, per hand", "GH-MEH-HAND", 350),
             ],
         },
         fulfilment: "PICKUP",
@@ -690,9 +690,9 @@ const FORM_FIELDS = [
 export function fvSite(): SeedSite {
     const storyLinks = FV_STORY_LINKS;
     return {
-        slug: "frame-and-vow",
-        name: "Frame & Vow",
-        subdomain: "frame-and-vow",
+        slug: "golden-hour-weddings",
+        name: "Golden Hour Weddings",
+        subdomain: "golden-hour-weddings",
         published: true,
         createdDaysAgo: 200,
         pages: [
@@ -706,7 +706,7 @@ export function fvSite(): SeedSite {
                         heading:
                             "Weddings in Udaipur and Jaipur, photographed and planned by one team.",
                         subheading:
-                            "Frame & Vow is Kabir, Ishaan, Meher and Tanvi: photographs and films, the planning and the décor, from the first call to the album on your shelf.",
+                            "Golden Hour Weddings is Kabir, Ishaan, Meher and Tanvi: photographs and films, the planning and the décor, from the first call to the album on your shelf.",
                         cta: {
                             label: "Book a free planning call",
                             href: "/book",
@@ -899,7 +899,7 @@ export function fvSite(): SeedSite {
                         title: "The four of us",
                         name: "Kabir Shekhawat",
                         role: "Lead photographer, founder",
-                        bio: "Kabir started Frame & Vow in 2017 after six years assisting wedding photographers across Rajasthan. He still shoots every wedding we take.",
+                        bio: "Kabir started Golden Hour Weddings in 2017 after six years assisting wedding photographers across Rajasthan. He still shoots every wedding we take.",
                         image: blockImage(P.studioCamera),
                         people: [
                             {
@@ -921,7 +921,7 @@ export function fvSite(): SeedSite {
                     }),
                     section("richText", {
                         format: "html",
-                        value: "<h2>The studio</h2><p>2nd floor, 14 Lake Palace Road, Udaipur 313001. Our Jaipur desk in C-Scheme is open on Tuesdays and Fridays by appointment.</p><p>Call or WhatsApp +91 98290 41760.</p>",
+                        value: "<h2>The studio</h2><p>2nd floor, 14 Lake Palace Road, Udaipur 313001. Our Jaipur desk in C-Scheme is open on Tuesdays and Fridays by appointment.</p><p>Call or WhatsApp +91 00000 00056.</p>",
                         image: blockImage(P.udaipurLake),
                         imageSide: "left",
                     }),
@@ -946,16 +946,16 @@ export function fvSite(): SeedSite {
 export function fvSpec(): StudioSpec {
     return {
         key: FV_KEY,
-        name: "Frame & Vow",
-        slug: "frame-and-vow",
-        legalName: "Frame and Vow Studio LLP",
-        contactEmail: "frameandvow@example.com",
-        phone: "+919829041760",
+        name: "Golden Hour Weddings",
+        slug: "golden-hour-weddings",
+        legalName: "Golden Hour Weddings LLP",
+        contactEmail: "goldenhourweddings@example.com",
+        phone: "+910000000056",
         gst: {
             state: "08",
             stateName: "Rajasthan",
-            pan: "AAJFF4821K",
-            prefix: "FV",
+            pan: "AAJFG4821K",
+            prefix: "GH",
         },
         address: {
             addressLine1: "2nd floor, 14 Lake Palace Road",
@@ -973,7 +973,8 @@ export function fvSpec(): StudioSpec {
             "INSIGHTS",
         ],
         store: {
-            description: "Prints, albums and frames from Frame & Vow, Udaipur.",
+            description:
+                "Prints, albums and frames from Golden Hour Weddings, Udaipur.",
             openingHours: [
                 { day: "MON", open: "10:30", close: "18:30", closed: false },
                 { day: "TUE", open: "10:30", close: "18:30", closed: false },
@@ -1065,7 +1066,7 @@ export function fvSpec(): StudioSpec {
             ],
         },
         site: fvSite(),
-        footer: "Frame & Vow · 2nd floor, 14 Lake Palace Road, Udaipur 313001 · +91 98290 41760",
+        footer: "Golden Hour Weddings · 2nd floor, 14 Lake Palace Road, Udaipur 313001 · +91 00000 00056",
         posts: FV_POSTS,
     };
 }

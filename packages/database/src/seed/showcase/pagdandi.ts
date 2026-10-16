@@ -19,7 +19,7 @@ import { PAGDANDI_POSTS } from "./pagdandi-posts";
 import { istAt } from "./people";
 
 /**
- * Pagdandi Books & Café — an independent bookshop with a café corner on
+ * Margin Books & Café — an independent bookshop with a café corner on
  * Prabhat Road, Pune. Anagha Joshi runs the shop; Siddharth Kale runs the
  * café corner and the till as a Member. It sells public-domain classics in
  * new and good used copies, books by (fictional) Pune writers, stationery
@@ -67,7 +67,7 @@ const photoOf = (pred: (p: DemoProduct) => boolean) => {
         .sort((a, b) => b.demand - a.demand)
         .at(0)
         ?.images.at(0);
-    if (!img) throw new Error("Pagdandi Books: no photo for the site");
+    if (!img) throw new Error("Margin Books: no photo for the site");
     return { src: img.url, alt: img.alt, width: img.width, height: img.height };
 };
 
@@ -92,8 +92,8 @@ const ENQUIRY_CONTENT = {
 
 const CONFIG: DemoShopConfig = {
     key: PAGDANDI_KEY,
-    name: "Pagdandi Books & Café",
-    slug: "pagdandi-books",
+    name: "Margin Books & Café",
+    slug: "margin-books",
     planKey: "pro",
     modules: [
         "COMMERCE",
@@ -105,10 +105,10 @@ const CONFIG: DemoShopConfig = {
     ],
     createdDaysAgo: 520,
     profile: {
-        legalName: "Pagdandi Books LLP",
+        legalName: "Margin Books LLP",
         type: "llp",
-        phone: "+912025674410",
-        contactEmail: "pagdandibooks@example.com",
+        phone: "+910000000002",
+        contactEmail: "marginbooks@example.com",
         addressLine1: "14 Prabhat Road, Lane 3",
         addressLine2: "Deccan Gymkhana",
         city: "Pune",
@@ -309,9 +309,7 @@ const CONFIG: DemoShopConfig = {
         {
             daysAgo: 3,
             minute: 16 * 60 + 40,
-            lines: [
-                { slug: "pagdandi-field-notebook", variant: null, qty: 20 },
-            ],
+            lines: [{ slug: "margin-field-notebook", variant: null, qty: 20 }],
             fulfilment: "PICKUP",
             note: "Diwali gifts for an architects' office — wrap each, no price",
             prepaid: false,
@@ -579,9 +577,9 @@ const CONFIG: DemoShopConfig = {
         },
     ],
     site: ({ productId, storeId, serviceIndex }) => ({
-        slug: "pagdandi-books",
-        name: "Pagdandi Books & Café",
-        subdomain: "pagdandi-books",
+        slug: "margin-books",
+        name: "Margin Books & Café",
+        subdomain: "margin-books",
         published: true,
         createdDaysAgo: 400,
         pages: [
@@ -751,8 +749,8 @@ const CONFIG: DemoShopConfig = {
                         address:
                             "14 Prabhat Road, Lane 3, Deccan Gymkhana, Pune 411004",
                         hours: "Tuesday to Sunday, 10am–9pm. Closed Mondays.",
-                        phone: "+91 20 2567 4410",
-                        email: "pagdandibooks@example.com",
+                        phone: "+91 00000 00002",
+                        email: "marginbooks@example.com",
                     }),
                     {
                         type: "enquiry",
@@ -763,7 +761,7 @@ const CONFIG: DemoShopConfig = {
             },
         ],
     }),
-    footer: "Pagdandi Books & Café · 14 Prabhat Road, Lane 3, Pune · Open Tue–Sun, 10am–9pm",
+    footer: "Margin Books & Café · 14 Prabhat Road, Lane 3, Pune · Open Tue–Sun, 10am–9pm",
     posts: PAGDANDI_POSTS,
     postAuthor: "Anagha Joshi",
     analytics: {

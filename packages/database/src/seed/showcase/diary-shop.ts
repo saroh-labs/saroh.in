@@ -26,7 +26,7 @@ import { istAt, minuteOf } from "./people";
 import { createRng } from "./random";
 
 /**
- * Write a diary-and-counter business (Noor Salon & Bridal, Motion Physio)
+ * Write a diary-and-counter business (Gulmohar Salon & Bridal, Stride Physio)
  * from its fixture: owned by `demo@saroh.dev`, with a desk login as a
  * Member, a published site with its journal, the services and who takes
  * them, packs and memberships, a counter's catalogue with photos and stock.
@@ -761,7 +761,7 @@ function taxLine(l: DocLine): TaxedLine {
 /**
  * Number every document in its series in the order it was issued, then write
  * the invoices, their lines and each series' counter. A registered business
- * issues tax invoices (NS/26-27/0001…); one that is not issues receipts on
+ * issues tax invoices (GS/26-27/0001…); one that is not issues receipts on
  * the plain series (INV-0001…). One issued by hand keeps its number; the seed
  * refuses rather than hand the same number out twice.
  */

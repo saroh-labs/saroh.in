@@ -1,6 +1,6 @@
 /**
- * Shapes shared by the coaching centre and the coworking space (Shiksha
- * Academy, Desk 42): their photographs, the pictures the seed draws itself,
+ * Shapes shared by the coaching centre and the coworking space (Aarohan
+ * Academy, Baithak): their photographs, the pictures the seed draws itself,
  * and the posts their sites carry.
  *
  * Photographs are free-licence Unsplash images, hot-linked by address and
@@ -33,7 +33,7 @@ export const unsplash = (photo: string) =>
 /** Where the local app serves the pictures the seed draws. */
 export const DEMO_ASSET_BASE = "https://app.saroh.localhost/demo";
 
-/** One drawn picture, e.g. `demoAsset("shiksha-academy", "results-2026.png")`. */
+/** One drawn picture, e.g. `demoAsset("aarohan-academy", "results-2026.png")`. */
 export const demoAsset = (business: string, file: string) =>
     `${DEMO_ASSET_BASE}/${business}/${file}`;
 

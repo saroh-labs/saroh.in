@@ -35,7 +35,7 @@ import { checkStudio } from "./studio-check";
 export { PC_KEY } from "./pixel-chai-data";
 
 /**
- * Pixel & Chai (`pixel-chai-data.ts` for who it is and what it sells): the
+ * Loop Local Media (`pixel-chai-data.ts` for who it is and what it sells): the
  * dated world — eighteen months of retainers (about fifty running, two
  * paused, one whose renewal failed, about fifty that ended, some because the
  * client moved up a plan), every month's renewal invoiced; audit calls,
@@ -231,7 +231,7 @@ export async function seedPixelChai(
             first,
             last,
             email,
-            phone: `+91 ${phoneNumber(rng)}`,
+            phone: phoneNumber(rng),
             company,
             city: n % 17 === 5 ? "Ujjain" : n % 23 === 7 ? "Dewas" : "Indore",
             state: "Madhya Pradesh",
@@ -767,7 +767,7 @@ function planRetainers(
     });
     if (!failed)
         throw new Error(
-            "Pixel & Chai: no retainer whose renewal could have failed",
+            "Loop Local Media: no retainer whose renewal could have failed",
         );
     const latest = must(
         docs.find(
@@ -989,11 +989,11 @@ function planLeads(
     return out;
 }
 
-/** What Pixel & Chai's films and walkthroughs need, checked in the database. */
+/** What Loop Local Media's films and walkthroughs need, checked in the database. */
 export async function checkPixelChai(prisma: Db, orgId: string, now: Date) {
     return checkStudio(prisma, orgId, now, {
-        name: "Pixel & Chai",
-        gstPrefix: "PC",
+        name: "Loop Local Media",
+        gstPrefix: "LL",
         sac: ["998361", "998385", "998912"],
         minimum: {
             products: 4,

@@ -19,7 +19,7 @@ import type { DemoProduct } from "./demo-shop-types";
 import { istAt } from "./people";
 
 /**
- * Ammi's Achaar — a home pickle kitchen in Nishatganj, Lucknow. Shabana Khan
+ * Ammi Ki Barni — a home pickle kitchen in Nishatganj, Lucknow. Shabana Khan
  * ("Ammi") cooks; her son Faizan takes the orders on WhatsApp and Instagram,
  * answers the phone and does the deliveries. Most of what it sells is made
  * only after the order comes in, so its open orders sit in Preparing for
@@ -64,7 +64,7 @@ const coverOf = (pred: (p: DemoProduct) => boolean) => {
         .sort((a, b) => b.demand - a.demand)
         .at(0);
     const img = p?.images.at(0);
-    if (!img) throw new Error("Ammi's Achaar: no product photo for the site");
+    if (!img) throw new Error("Ammi Ki Barni: no product photo for the site");
     return { src: img.url, alt: img.alt, width: img.width, height: img.height };
 };
 
@@ -72,29 +72,29 @@ const diwaliHamper = () => {
     const p =
         bySlug((x) => isHamper(x) && x.slug.includes("diwali")).at(0) ??
         bySlug(isHamper).at(0);
-    if (!p) throw new Error("Ammi's Achaar has no hamper");
+    if (!p) throw new Error("Ammi Ki Barni has no hamper");
     return p;
 };
 const mangoJar = () => {
     const p = bySlug(
         (x) => /aam|mango/.test(x.slug) && madeToOrder(x) && !sunPickle(x),
     ).at(0);
-    if (!p) throw new Error("Ammi's Achaar has no mango pickle");
+    if (!p) throw new Error("Ammi Ki Barni has no mango pickle");
     return p;
 };
 
 const CONFIG: DemoShopConfig = {
     key: ACHAAR_KEY,
-    name: "Ammi's Achaar",
-    slug: "ammis-achaar",
+    name: "Ammi Ki Barni",
+    slug: "ammi-ki-barni",
     planKey: "grow",
     modules: ["COMMERCE", "PAYMENTS", "CRM", "WEBSITE", "INSIGHTS"],
     createdDaysAgo: 400,
     profile: {
         legalName: null,
         type: "individual",
-        phone: "+919415027318",
-        contactEmail: "ammisachaar@example.com",
+        phone: "+910000000023",
+        contactEmail: "ammikibarni@example.com",
         addressLine1: "B-14, Nishatganj Colony",
         addressLine2: "Near Papermill Colony crossing",
         city: "Lucknow",
@@ -584,9 +584,9 @@ const CONFIG: DemoShopConfig = {
         },
     ],
     site: ({ productId }) => ({
-        slug: "ammis-achaar",
-        name: "Ammi's Achaar",
-        subdomain: "ammis-achaar",
+        slug: "ammi-ki-barni",
+        name: "Ammi Ki Barni",
+        subdomain: "ammi-ki-barni",
         published: true,
         createdDaysAgo: 300,
         pages: [
@@ -813,15 +813,15 @@ const CONFIG: DemoShopConfig = {
                         heading: "Find us",
                         address: "B-14, Nishatganj Colony, Lucknow 226006",
                         hours: "Pick-up 11am–7pm every day; Friday from 3pm",
-                        phone: "+91 94150 27318",
-                        whatsapp: "+91 94150 27318",
-                        email: "ammisachaar@example.com",
+                        phone: "+91 00000 00023",
+                        whatsapp: "+91 00000 00023",
+                        email: "ammikibarni@example.com",
                     }),
                 ],
             },
         ],
     }),
-    footer: "Ammi's Achaar · B-14, Nishatganj Colony, Lucknow · Made after you order",
+    footer: "Ammi Ki Barni · B-14, Nishatganj Colony, Lucknow · Made after you order",
     posts: ACHAAR_POSTS,
     postAuthor: "Shabana Khan",
     analytics: {
@@ -868,7 +868,7 @@ export function seedAchaar(ctx: DemoShopContext): Promise<DemoShopResult> {
     return seedDemoShop(ctx, CONFIG);
 }
 
-/** The states Ammi's Achaar's demo and films rely on. */
+/** The states Ammi Ki Barni's demo and films rely on. */
 const CHECKS: DemoShopCheck[] = [
     {
         what: "fewer than 15 made-to-order products that count no stock",

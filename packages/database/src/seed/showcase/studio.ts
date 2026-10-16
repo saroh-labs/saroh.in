@@ -24,8 +24,8 @@ import type { StudioImage, StudioPost } from "./studio-types";
 import { STUDIO_POST_CATEGORIES } from "./studio-types";
 
 /**
- * The engine behind the two service-studio showcases — Frame & Vow, a
- * wedding photography and planning studio, and Pixel & Chai, a small
+ * The engine behind the two service-studio showcases — Golden Hour Weddings, a
+ * wedding photography and planning studio, and Loop Local Media, a small
  * social-media agency. Both sell their own time (services in a diary, taken
  * by named people), a little catalogue, GST tax invoices written by hand,
  * and both run a pipeline of enquiries and a site with writing on it.

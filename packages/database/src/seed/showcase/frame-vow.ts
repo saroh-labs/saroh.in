@@ -34,7 +34,7 @@ import { checkStudio } from "./studio-check";
 export { FV_KEY } from "./frame-vow-data";
 
 /**
- * Frame & Vow (`frame-vow-data.ts` for who it is and what it sells): the
+ * Golden Hour Weddings (`frame-vow-data.ts` for who it is and what it sells): the
  * dated world — its couples' jobs (a 25% advance to hold the date, the 75%
  * balance once the edit is delivered, one balance still being chased),
  * quotes not yet sent as invoices, the everyday diary of portrait sessions
@@ -516,7 +516,7 @@ export async function seedFrameVow(
             first: j.bride,
             last: j.last,
             email: j.email,
-            phone: `+91 ${phoneNumber(rng)}`,
+            phone: phoneNumber(rng),
             company: null,
             city: c.city,
             state: c.state,
@@ -543,7 +543,7 @@ export async function seedFrameVow(
             first,
             last,
             email,
-            phone: `+91 ${phoneNumber(rng)}`,
+            phone: phoneNumber(rng),
             company: null,
             city: c.city,
             state: c.state,
@@ -1085,7 +1085,7 @@ function variantName(
     variant: number | null,
 ) {
     const p = spec.products.find((x) => x.slug === slug);
-    if (!p) throw new Error(`Frame & Vow has no product "${slug}"`);
+    if (!p) throw new Error(`Golden Hour Weddings has no product "${slug}"`);
     return variant === null
         ? p.name
         : `${p.name} · ${must(p.option).variants[variant].title}`;
@@ -1416,11 +1416,11 @@ function planOrders(
     return orders;
 }
 
-/** What Frame & Vow's films and walkthroughs need, checked in the database. */
+/** What Golden Hour's films and walkthroughs need, checked in the database. */
 export async function checkFrameVow(prisma: Db, orgId: string, now: Date) {
     return checkStudio(prisma, orgId, now, {
-        name: "Frame & Vow",
-        gstPrefix: "FV",
+        name: "Golden Hour Weddings",
+        gstPrefix: "GH",
         sac: ["998385", "998386", "998596"],
         minimum: {
             products: 16,

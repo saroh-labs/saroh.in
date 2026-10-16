@@ -23,8 +23,8 @@ const words = (html: string) =>
         .filter(Boolean).length;
 
 describe.each([
-    ["Noor Salon & Bridal", NOOR_POSTS],
-    ["Motion Physio", MOTION_POSTS],
+    ["Gulmohar Salon & Bridal", NOOR_POSTS],
+    ["Stride Physio", MOTION_POSTS],
 ])("%s's journal", (_name, posts) => {
     it("has 24–30 posts, 8+ per category, unique slugs", () => {
         expect(posts.length).toBeGreaterThanOrEqual(24);

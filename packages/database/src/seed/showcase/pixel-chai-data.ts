@@ -11,7 +11,7 @@ import { STUDIO_ART } from "./studio-art";
 import { PC_PHOTOS } from "./studio-photos";
 
 /**
- * Pixel & Chai's fixed facts: a five-person social-media and local-marketing
+ * Loop Local Media's fixed facts: a five-person social-media and local-marketing
  * agency at Shekhar Central, Palasia, Indore, that runs Instagram, Facebook,
  * Google Business Profiles and ads for the city's salons, cafés, clinics,
  * coaching classes and sweet shops. Riya Jain (founder, strategy), Aman
@@ -52,7 +52,7 @@ export const PC_SERVICES: readonly StudioService[] = [
         sac: "998361",
         depositMode: "NONE",
         locationType: "EITHER",
-        meetingUrl: "https://meet.jit.si/pixel-and-chai-audit",
+        meetingUrl: "https://meet.jit.si/loop-local-media-audit",
         shown: true,
         pay: "free",
         perMonth: 20,
@@ -68,7 +68,7 @@ export const PC_SERVICES: readonly StudioService[] = [
         sac: "998361",
         depositMode: "FULL",
         locationType: "EITHER",
-        meetingUrl: "https://meet.jit.si/pixel-and-chai-workshop",
+        meetingUrl: "https://meet.jit.si/loop-local-media-workshop",
         shown: true,
         pay: "online",
         perMonth: 3,
@@ -84,7 +84,7 @@ export const PC_SERVICES: readonly StudioService[] = [
         sac: "998361",
         depositMode: "FULL",
         locationType: "EITHER",
-        meetingUrl: "https://meet.jit.si/pixel-and-chai-gbp",
+        meetingUrl: "https://meet.jit.si/loop-local-media-gbp",
         shown: true,
         pay: "online",
         perMonth: 5,
@@ -116,7 +116,7 @@ export const PC_SERVICES: readonly StudioService[] = [
         sac: "998361",
         depositMode: "NONE",
         locationType: "EITHER",
-        meetingUrl: "https://meet.jit.si/pixel-and-chai-onboarding",
+        meetingUrl: "https://meet.jit.si/loop-local-media-onboarding",
         shown: false,
         pay: "free",
         perMonth: 3,
@@ -178,8 +178,8 @@ export const PC_PRODUCTS: readonly StudioProduct[] = [
         option: {
             name: "Standee size",
             variants: [
-                { title: "A5", sku: "PC-STD-A5", pricePaise: 1_200_00 },
-                { title: "A4", sku: "PC-STD-A4", pricePaise: 1_600_00 },
+                { title: "A5", sku: "LL-STD-A5", pricePaise: 1_200_00 },
+                { title: "A4", sku: "LL-STD-A4", pricePaise: 1_600_00 },
             ],
         },
         fulfilment: "SHIPPING",
@@ -332,9 +332,9 @@ export function pcSite(): SeedSite {
             })),
         });
     return {
-        slug: "pixel-and-chai",
-        name: "Pixel & Chai",
-        subdomain: "pixel-and-chai",
+        slug: "loop-local-media",
+        name: "Loop Local Media",
+        subdomain: "loop-local-media",
         published: true,
         createdDaysAgo: 400,
         pages: [
@@ -492,7 +492,7 @@ export function pcSite(): SeedSite {
                     },
                     section("richText", {
                         format: "html",
-                        value: "<h2>The office</h2><p>302, Shekhar Central, AB Road, Palasia, Indore 452001. Monday to Saturday, 10 to 7. Chai is always on.</p><p>Call or WhatsApp +91 98260 33415.</p>",
+                        value: "<h2>The office</h2><p>302, Shekhar Central, AB Road, Palasia, Indore 452001. Monday to Saturday, 10 to 7. Chai is always on.</p><p>Call or WhatsApp +91 00000 00049.</p>",
                         image: blockImage(P.indore),
                         imageSide: "left",
                     }),
@@ -516,16 +516,16 @@ export function pcSite(): SeedSite {
 export function pcSpec(): StudioSpec {
     return {
         key: PC_KEY,
-        name: "Pixel & Chai",
-        slug: "pixel-and-chai",
-        legalName: "Pixel and Chai Media Private Limited",
-        contactEmail: "pixelandchai@example.com",
-        phone: "+919826033415",
+        name: "Loop Local Media",
+        slug: "loop-local-media",
+        legalName: "Loop Local Media Private Limited",
+        contactEmail: "looplocalmedia@example.com",
+        phone: "+910000000049",
         gst: {
             state: "23",
             stateName: "Madhya Pradesh",
-            pan: "AAKCP6614R",
-            prefix: "PC",
+            pan: "AAKCL6614R",
+            prefix: "LL",
         },
         address: {
             addressLine1: "302, Shekhar Central, AB Road",
@@ -544,7 +544,7 @@ export function pcSpec(): StudioSpec {
         ],
         store: {
             description:
-                "Printed standees, table tents and brand kits from Pixel & Chai, Indore.",
+                "Printed standees, table tents and brand kits from Loop Local Media, Indore.",
             openingHours: [
                 { day: "MON", open: "10:00", close: "19:00", closed: false },
                 { day: "TUE", open: "10:00", close: "19:00", closed: false },
@@ -616,7 +616,7 @@ export function pcSpec(): StudioSpec {
             ],
         },
         site: pcSite(),
-        footer: "Pixel & Chai · 302, Shekhar Central, AB Road, Palasia, Indore 452001 · +91 98260 33415",
+        footer: "Loop Local Media · 302, Shekhar Central, AB Road, Palasia, Indore 452001 · +91 00000 00049",
         posts: PC_POSTS,
     };
 }

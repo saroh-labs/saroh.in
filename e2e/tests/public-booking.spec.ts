@@ -238,8 +238,8 @@ test.describe("the booking page", () => {
             header.getByText(/12th Main, Indiranagar, Bengaluru/),
         ).toBeVisible();
         await expect(
-            header.getByRole("link", { name: "+91 80409 92210" }),
-        ).toHaveAttribute("href", "tel:+918040992210");
+            header.getByRole("link", { name: "+91 00000 00005" }),
+        ).toHaveAttribute("href", "tel:+910000000005");
     });
 
     test("pay at the desk: signed in at the last step, booked, and in the team's calendar as paid at the desk", async ({

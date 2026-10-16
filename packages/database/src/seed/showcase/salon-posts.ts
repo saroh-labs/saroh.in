@@ -1,5 +1,5 @@
 /**
- * Noor Salon & Bridal's journal: help for clients, news from the salon and
+ * Gulmohar Salon & Bridal's journal: help for clients, news from the salon and
  * longer articles on hair, skin and bridal, written for a Jaipur salon and
  * agreeing with its fact sheet (prices, policies, team, hours). Photos are
  * free-licence Unsplash images, credited by photographer and hot-linked,
@@ -462,7 +462,7 @@ export const NOOR_POSTS: DsPost[] = [
         image: ph.H1c,
         body: `<p>The quickest way to get a time with us is the <a href="/book">booking page</a>. Pick the service, then either a stylist you know or "whoever is free", and you'll see every open slot for the next 90 days. Bridal clients often book that far ahead; for a cut or a blow-dry, the same week is usually fine.</p>
 <h2>Booking by phone or WhatsApp</h2>
-<p>If you'd rather talk to a person, message or call the desk on +91 141 400 7720. Kavya keeps the diary and replies through the day. Club members book this way, because their visits come out of the month's allowance rather than a payment.</p>
+<p>If you'd rather talk to a person, message or call the desk on +91 00000 00001. Kavya keeps the diary and replies through the day. Club members book this way, because their visits come out of the month's allowance rather than a payment.</p>
 ${fig(ph.H1i, "Tell us which stylist you saw last time and we'll try to keep you with them.")}
 <h2>Moving or cancelling</h2>
 <p>You can move or cancel for free up to 24 hours before your appointment, using the link in your confirmation email or by messaging us. Inside 24 hours, please still let us know: there is nearly always someone on the waiting list hoping for that chair.</p>
@@ -503,7 +503,7 @@ ${fig(ph.H2i, "The advance is paid by UPI or card on the booking page.")}
         excerpt:
             "A five-minute visit to the desk at least 48 hours before any colour. It's free, and it matters.",
         image: ph.H3c,
-        body: `<p>Every colour service at Noor — root touch-up, global colour, highlights — needs a patch test at least 48 hours before. This includes clients who have coloured their hair for years. Allergies to hair dye can develop after many uneventful colours.</p>
+        body: `<p>Every colour service at Gulmohar — root touch-up, global colour, highlights — needs a patch test at least 48 hours before. This includes clients who have coloured their hair for years. Allergies to hair dye can develop after many uneventful colours.</p>
 <h2>What happens</h2>
 <ol>
 <li>Drop in at the desk any time we're open. It takes about five minutes and costs nothing.</li>
@@ -573,7 +573,7 @@ ${fig(ph.H5i, "A facial a month through winter is what most of our facial-pack c
 <li><strong>Men's Grooming Club</strong> — ₹1,100 a month for three haircuts or beard trims with Imran.</li>
 </ul>
 <h2>How to book a club visit</h2>
-<p>Club visits are booked through the desk, by phone or WhatsApp on +91 141 400 7720, not on the booking page. Tell us you're a member and when you'd like to come; we book it against your month.</p>
+<p>Club visits are booked through the desk, by phone or WhatsApp on +91 00000 00001, not on the booking page. Tell us you're a member and when you'd like to come; we book it against your month.</p>
 ${fig(ph.H6i, "Most Blow-dry Club members come before work or on Saturday mornings.")}
 <h2>The small print, plainly</h2>
 <ul>
@@ -750,7 +750,7 @@ ${fig(ph.N6i, "Colour, then the spa: hair goes home soft as well as bright.")}
         body: `<p>The salon is closed on <strong>Sunday 8 November</strong> for Diwali and on <strong>Monday 9 November</strong>. We're open as usual on Saturday 7 November, 10:30 am to 8:30 pm, and back on Tuesday 10 November.</p>
 <p>Saturday the 7th is nearly full for blow-dries and makeup. If you need something done before the festival, book now or ask to join the waiting list.</p>
 ${fig(ph.N7i, "Wishing you and your family a happy Diwali.")}
-<p>Happy Diwali from all of us at Noor.</p>
+<p>Happy Diwali from all of us at Gulmohar.</p>
 <p>Online booking stays open while we're closed, so you can still book or move appointments for after the festival. Messages sent on the 8th and 9th will be answered on Tuesday morning.</p>`,
     },
     {

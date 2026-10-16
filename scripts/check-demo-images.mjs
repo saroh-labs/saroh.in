@@ -2,8 +2,8 @@
 /**
  * Every photo the showcase seeds must load: Leela & Loom's and Rye & Co.'s products
  * (#471, #522), Pulse's counter and Rye's cakes, the journals, and the vertical
- * demos (Frame & Vow, Pixel & Chai, Ammi's Achaar, Pagdandi Books, Shiksha
- * Academy, Desk 42, Noor Salon & Bridal, Motion Physio).
+ * demos (Golden Hour Weddings, Loop Local Media, Ammi Ki Barni, Margin Books, Aarohan
+ * Academy, Baithak, Gulmohar Salon & Bridal, Stride Physio).
  *
  * The boutique's photos are free-licence Unsplash images hot-linked by
  * address, because local storage does not persist uploads. A photo that stops
@@ -28,14 +28,14 @@ const read = (file) =>
         "utf8",
     );
 const boutique = read("boutique-catalog.ts");
-// Noor Salon & Bridal and Motion Physio: catalogues and journals.
+// Gulmohar Salon & Bridal and Stride Physio: catalogues and journals.
 const diaryShops = [
     "salon-catalog.ts",
     "salon-posts.ts",
     "physio-catalog.ts",
     "physio-posts.ts",
 ].map(read);
-// Frame & Vow's and Pixel & Chai's photos are tables of Unsplash ids in their
+// Golden Hour's and Loop Local Media's photos are tables of Unsplash ids in their
 // writing; their sites and catalogues pick from the same tables
 // (`studio-photos.ts`). Their drawn pictures are data URIs and need no network.
 const studios = ["frame-vow-posts.ts", "pixel-chai-posts.ts"]
@@ -46,7 +46,7 @@ const studios = ["frame-vow-posts.ts", "pixel-chai-posts.ts"]
 const bakery = [
     "bakery-product-page.ts",
     "catalog-photos.ts",
-    // Shiksha Academy and Desk 42 (unit 4): photos as unsplash("photo-…").
+    // Aarohan Academy and Baithak (unit 4): photos as unsplash("photo-…").
     "shiksha-photos.ts",
     "desk42-photos.ts",
 ]
@@ -84,7 +84,7 @@ const urls = [
     ]),
 ];
 
-// Ammi's Achaar and Pagdandi Books (catalogue and journal) name Unsplash
+// Ammi Ki Barni and Margin Books (catalogue and journal) name Unsplash
 // photos by id, often through a helper, so every id in their files counts.
 const demoShops = [
     "achaar-catalog.ts",
@@ -149,7 +149,7 @@ for (const file of swatchFiles) {
     }
 }
 
-// Generated images (Pagdandi's book covers) are data: URIs, checked offline.
+// Generated images (Margin's book covers) are data: URIs, checked offline.
 let failed = 0;
 let generated = 0;
 for (const text of [...demoShops, read("pagdandi-covers.ts")]) {

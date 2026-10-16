@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generates the book covers (and a few other drawn images) for the Pagdandi
+ * Generates the book covers (and a few other drawn images) for the Margin
  * Books & Café demo shop, as small typographic SVGs, and writes them to
  * `packages/database/src/seed/showcase/pagdandi-covers.ts` as base64
  * `data:image/svg+xml` addresses keyed by product slug.
@@ -91,8 +91,8 @@ export const BOOKS = [
     { slug: "leaves-of-grass", title: "Leaves of Grass", author: "Walt Whitman", genre: "poetry", motif: "leaf" },
     // Children
     { slug: "the-jungle-book", title: "The Jungle Book", author: "Rudyard Kipling", genre: "children", motif: "leaf" },
-    { slug: "panchatantra-tales", title: "Panchatantra Tales", sub: "retold for children", author: "Retold by the Pagdandi story hour", genre: "children", motif: "tree" },
-    { slug: "jataka-tales", title: "Jataka Tales", sub: "retold for children", author: "Retold by the Pagdandi story hour", genre: "children", motif: "sun" },
+    { slug: "panchatantra-tales", title: "Panchatantra Tales", sub: "retold for children", author: "Retold by the Margin story hour", genre: "children", motif: "tree" },
+    { slug: "jataka-tales", title: "Jataka Tales", sub: "retold for children", author: "Retold by the Margin story hour", genre: "children", motif: "sun" },
     { slug: "grimms-fairy-tales", title: "Grimms’ Fairy Tales", author: "Jacob and Wilhelm Grimm", genre: "children", motif: "moon" },
     { slug: "alices-adventures-in-wonderland", title: "Alice’s Adventures in Wonderland", author: "Lewis Carroll", genre: "children", motif: "circles" },
     { slug: "treasure-island", title: "Treasure Island", author: "Robert Louis Stevenson", genre: "children", motif: "waves" },
@@ -533,7 +533,7 @@ const ts = `/**
  * \`node scripts/demo-covers/generate-pagdandi-covers.mjs\` to rebuild.
  *
  * Book covers (keyed by product slug) and a few drawn product images for the
- * Pagdandi Books & Café demo shop: small typographic SVGs, drawn for this
+ * Margin Books & Café demo shop: small typographic SVGs, drawn for this
  * seed from title, author and a geometric motif, as base64 data addresses.
  */
 

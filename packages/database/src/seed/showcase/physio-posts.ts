@@ -1,5 +1,5 @@
 /**
- * Motion Physio's website journal: help pages, clinic news and longer
+ * Stride Physio's website journal: help pages, clinic news and longer
  * articles for the Indiranagar physiotherapy clinic in the showcase seed.
  * Every post agrees with the clinic's fact sheet (hours, prices, team,
  * home-visit area). Photos are free-licence Unsplash photos, credited by
@@ -485,7 +485,7 @@ export const MOTION_POSTS: DsPost[] = [
 </ul>
 ${fig(ph.H1i, "The front desk on the second floor, where Shruti looks after bookings.")}
 <h2>Moving or cancelling</h2>
-<p>Moving or cancelling is free up to 12 hours before your appointment. Use the link in your confirmation or the <a href="/account/bookings">bookings page in your account</a>, or call or WhatsApp us on +91 80 4128 5560.</p>
+<p>Moving or cancelling is free up to 12 hours before your appointment. Use the link in your confirmation or the <a href="/account/bookings">bookings page in your account</a>, or call or WhatsApp us on +91 00000 00008.</p>
 <p>Inside 12 hours, please still tell us. A message at 7 am saying you can't make the 9 am slot is far better than an empty room, because someone with a sore back is usually hoping for exactly that time.</p>
 <h2>Need to be seen today?</h2>
 <p>Online booking closes 3 hours before a slot. For anything sooner, call the desk; if a physio has a gap we will offer it to you.</p>
@@ -578,7 +578,7 @@ ${fig(ph.H4i, "Stairs are one of the everyday tasks we measure at the start and 
         image: ph.H5c,
         body: `<p>You can pay at the desk by UPI, card or cash, or online when you book. Packs, the knee programme and the Keep Moving plan are paid in advance; single sessions can be paid either way.</p>
 <h2>Why there is no GST on your receipt</h2>
-<p>Healthcare services such as physiotherapy are exempt from GST, so Motion Physio is not GST-registered. Your receipt is a plain receipt: our name and address, your name, the date, the service, the physio who saw you and the amount paid. There is no GST line and no GSTIN, and that is correct.</p>
+<p>Healthcare services such as physiotherapy are exempt from GST, so Stride Physio is not GST-registered. Your receipt is a plain receipt: our name and address, your name, the date, the service, the physio who saw you and the amount paid. There is no GST line and no GSTIN, and that is correct.</p>
 ${fig(ph.H5i, "A plain receipt for each payment, on paper or as a download.")}
 <h2>Getting a copy</h2>
 <ul>
@@ -597,12 +597,12 @@ ${fig(ph.H5i, "A plain receipt for each payment, on paper or as a download.")}
         excerpt:
             "We are on the second floor of 418 CMH Road, two minutes from Indiranagar metro. Where to park a scooter or a car, and what to do if stairs are hard.",
         image: ph.H6c,
-        body: `<p><strong>Motion Physio, 2nd floor, 418 CMH Road, Indiranagar, Bengaluru 560038.</strong></p>
+        body: `<p><strong>Stride Physio, 2nd floor, 418 CMH Road, Indiranagar, Bengaluru 560038.</strong></p>
 <h2>By metro</h2>
 <p>Indiranagar station on the Purple Line is about two minutes' walk away. Leave the station towards CMH Road and walk along it; our building is on the same side. If you are on crutches or in a knee brace, the metro and the walk are both manageable, and the station has lifts.</p>
 ${fig(ph.H6i, "Two-wheelers can park in the building's basement.")}
 <h2>By scooter or bike</h2>
-<p>There is two-wheeler parking in the basement of the building. Tell the security guard you are visiting Motion Physio.</p>
+<p>There is two-wheeler parking in the basement of the building. Tell the security guard you are visiting Stride Physio.</p>
 <h2>By car</h2>
 <p>There is no car parking in the building. Most people find a spot on the side streets off 12th Main, or use the pay-and-park near the metro station. In the evening rush, CMH Road can be slow, so give yourself ten extra minutes; if you are going to be late, call or WhatsApp us and we will tell the physio.</p>
 <h2>By auto or cab</h2>
@@ -629,7 +629,7 @@ ${fig(ph.H6i, "Two-wheelers can park in the building's basement.")}
 <p>We visit homes within about 4 km of the clinic: <strong>Indiranagar, Domlur, HAL 2nd Stage, Jeevan Bima Nagar, CV Raman Nagar and Old Airport Road</strong>. If you are just outside these areas, call and ask; if we can't come, we will say so plainly.</p>
 ${fig(ph.H7i, "We cover the neighbourhoods around Indiranagar, within about four kilometres.")}
 <h2>Booking</h2>
-<p>Home visits are booked through the desk rather than online, because Shruti plans them around the travel time between homes. Call or WhatsApp +91 80 4128 5560 with the address, the best time and a line about the problem. Pay by UPI or card after the visit, or online in advance.</p>
+<p>Home visits are booked through the desk rather than online, because Shruti plans them around the travel time between homes. Call or WhatsApp +91 00000 00008 with the address, the best time and a line about the problem. Pay by UPI or card after the visit, or online in advance.</p>
 <h2>Getting ready for the visit</h2>
 <ul>
 <li>Keep the reports, discharge summary and medicines list handy.</li>
@@ -705,7 +705,7 @@ ${fig(ph.H9i, "The consent form is explained and signed before the first session
 <p>It is not for a new injury: that needs a first assessment, so we can find out what is going on.</p>
 ${fig(ph.H10i, "Each check-in reviews how you have been and updates the exercises.")}
 <h2>Booking it</h2>
-<p>The plan is set up through the desk, not online. Talk to your physio at your next visit, or call or WhatsApp Shruti on +91 80 4128 5560. She will set up the plan, take the first month's payment and book your two sessions for the month with you, usually two weeks apart. The two sessions are meant for that month, so tell her early if a trip is coming up and she will help you fit them in.</p>
+<p>The plan is set up through the desk, not online. Talk to your physio at your next visit, or call or WhatsApp Shruti on +91 00000 00008. She will set up the plan, take the first month's payment and book your two sessions for the month with you, usually two weeks apart. The two sessions are meant for that month, so tell her early if a trip is coming up and she will help you fit them in.</p>
 <h2>Stopping</h2>
 <p>You can stop any time before the next month begins. Tell the desk and the next month won't be charged. No questions, no exit forms.</p>`,
     },
@@ -719,7 +719,7 @@ ${fig(ph.H10i, "Each check-in reviews how you have been and updates the exercise
         excerpt:
             "Rohit joins us from Monday 18 May, bringing orthopaedic rehab after surgery and back pain care to the clinic.",
         image: ph.N2c,
-        body: `<p>We are very glad to say that <strong>Dr. Rohit Menon (PT)</strong> joins Motion Physio from Monday 18 May.</p>
+        body: `<p>We are very glad to say that <strong>Dr. Rohit Menon (PT)</strong> joins Stride Physio from Monday 18 May.</p>
 <p>Rohit has a master's in orthopaedic physiotherapy and has spent his career in post-surgery rehab: knee and shoulder replacements, ACL reconstructions, and the long, careful months that follow. He also sees a lot of people with back pain, and is good at explaining what a scan report does and doesn't mean.</p>
 ${fig(ph.N2i, "Rohit's work is mostly rehab after knee and shoulder surgery.")}
 <p>With two physios on the diary, there will be more early-morning and evening slots through the week. Ananya will keep seeing runners, cricketers and desk workers; if you have had surgery, or are about to, Rohit is the person to ask for when you book.</p>
@@ -737,9 +737,9 @@ ${fig(ph.N2i, "Rohit's work is mostly rehab after knee and shoulder surgery.")}
         body: `<p>June and July bring Bengaluru's monsoon run season, and with it a familiar wave of sore shins and knees in the clinic. So before the training ramps up, Dr. Ananya Krishnan is holding a free running-form morning.</p>
 <ul>
 <li><strong>When:</strong> Saturday 30 May, 6:30 to 8 am, before the clinic opens.</li>
-<li><strong>Where:</strong> Motion Physio, 2nd floor, 418 CMH Road, and the quiet stretch outside.</li>
+<li><strong>Where:</strong> Stride Physio, 2nd floor, 418 CMH Road, and the quiet stretch outside.</li>
 <li><strong>What:</strong> a 10-minute slot each. Ananya films you running from the side and from behind on a phone, then talks you through two or three things worth working on.</li>
-<li><strong>Cost:</strong> free. There are 9 slots; register on WhatsApp at +91 80 4128 5560.</li>
+<li><strong>Cost:</strong> free. There are 9 slots; register on WhatsApp at +91 00000 00008.</li>
 </ul>
 ${fig(ph.N1i, "Bring the shoes you actually train in.")}
 <p>Come in the shoes you run in and something you can move in. This is a form check, not a medical assessment: if something is already hurting, a <a href="/book">first assessment</a> is the better place to start.</p>`,
@@ -755,7 +755,7 @@ ${fig(ph.N1i, "Bring the shoes you actually train in.")}
         body: `<p>Some of the people who most need physiotherapy find it hardest to reach us: someone a week out of a knee replacement, a grandparent who hasn't left the house since a fall. From <strong>Monday 22 June</strong>, we will come to them.</p>
 <p>Dr. Rohit Menon will make home visits within Indiranagar. Each visit is 60 minutes with Rohit and costs ₹2,200. He brings what the session needs and plans exercises around your own stairs, bed and chairs.</p>
 ${fig(ph.N3i, "Visits start within Indiranagar.")}
-<p>Home visits are booked through the desk so Shruti can plan the travel between homes. Call or WhatsApp +91 80 4128 5560 with your address and a good time.</p>
+<p>Home visits are booked through the desk so Shruti can plan the travel between homes. Call or WhatsApp +91 00000 00008 with your address and a good time.</p>
 <p>We are starting with Indiranagar only so we can keep to time. If it works well, we hope to cover the neighbouring areas later in the year.</p>`,
     },
     {
@@ -809,7 +809,7 @@ ${fig(ph.N5i, "Your physio watches your exercises and adjusts them on the call."
 <li>Old Airport Road</li>
 </ul>
 ${fig(ph.N6i, "Most home visits are with people recovering from surgery or a fall.")}
-<p>The visit is the same: 60 minutes with Rohit, ₹2,200, booked through the desk on +91 80 4128 5560. Mornings fill first, so if you are flexible, mention an afternoon window when you call. Our help page on how a home visit works explains how to get your home ready for one.</p>`,
+<p>The visit is the same: 60 minutes with Rohit, ₹2,200, booked through the desk on +91 00000 00008. Mornings fill first, so if you are flexible, mention an afternoon window when you call. Our help page on how a home visit works explains how to get your home ready for one.</p>`,
     },
     {
         slug: "new-knee-rehab-programme",
@@ -842,7 +842,7 @@ ${fig(ph.N7i, "Walking is part of the plan, built up gradually.")}
 <li>Hamstring and calf strength, and single-leg balance.</li>
 </ul>
 ${fig(ph.N8i, "Fast bowlers in particular benefit from a back and hip check before the season.")}
-<p>Each player gets 15 minutes and a short list of exercises to work on. Under-18s, please come with a parent. Register on WhatsApp at +91 80 4128 5560; there are 6 slots.</p>
+<p>Each player gets 15 minutes and a short list of exercises to work on. Under-18s, please come with a parent. Register on WhatsApp at +91 00000 00008; there are 6 slots.</p>
 <p>A screening is not a diagnosis. If something already hurts, <a href="/book">book a sports injury session</a> instead.</p>`,
     },
     {
@@ -909,7 +909,7 @@ ${fig(ph.A1i, "A raised screen and a separate keyboard keep your head over your 
         excerpt:
             "Rolled an ankle on a broken footpath or the badminton court? What usually helps in the first days, and why balance work matters later.",
         image: ph.A2c,
-        body: `<p>Bengaluru's footpaths give the ankle plenty of chances: a missing slab, a sudden kerb, a pothole hidden under rainwater. Add weekend badminton and football, and ankle sprains are one of the most common injuries we see at Motion Physio.</p>
+        body: `<p>Bengaluru's footpaths give the ankle plenty of chances: a missing slab, a sudden kerb, a pothole hidden under rainwater. Add weekend badminton and football, and ankle sprains are one of the most common injuries we see at Stride Physio.</p>
 <p>Most sprains involve stretching or tearing the ligaments on the outside of the ankle when the foot rolls inwards. Most recover well, but a sprain that is rushed, or simply ignored, has a habit of happening again.</p>
 <h2>First, is it more than a sprain?</h2>
 <p>See a doctor, or go to an emergency department, if:</p>
@@ -983,7 +983,7 @@ ${fig(ph.A3i, "Two short strength sessions a week support everything else.")}
         excerpt:
             'Bed rest, scans, bending and "a disc that slipped out": Dr. Rohit Menon on what we now know about everyday back pain.',
         image: ph.A4c,
-        body: `<p>Back pain comes with a lot of advice, much of it from family, colleagues and the internet, and much of it out of date. Dr. Rohit Menon sees people with back pain every day at Motion Physio. These are the beliefs he most often finds himself gently challenging.</p>
+        body: `<p>Back pain comes with a lot of advice, much of it from family, colleagues and the internet, and much of it out of date. Dr. Rohit Menon sees people with back pain every day at Stride Physio. These are the beliefs he most often finds himself gently challenging.</p>
 <h2>Myth 1: "Rest in bed until it goes away."</h2>
 <p>For most everyday back pain, staying in bed tends to slow recovery. Gentle movement, short walks and getting back to normal activities as you are able usually help more. You may need to do less for a few days, but less is not the same as nothing.</p>
 <h2>Myth 2: "I need an MRI to know what's wrong."</h2>

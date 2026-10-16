@@ -1,7 +1,7 @@
 import type { StudioImage, StudioPost } from "./studio-types";
 
 /**
- * The photographs Pixel & Chai's writing uses: Unsplash id, the original's
+ * The photographs Loop Local Media's writing uses: Unsplash id, the original's
  * width and height, and the photographer as Unsplash names them.
  */
 const PHOTOS = {
@@ -469,7 +469,7 @@ function figure(key: PhotoKey, alt: string, caption: string): string {
 }
 
 /**
- * Pixel & Chai's writing: help pages for clients (plans, onboarding, approvals,
+ * Loop Local Media's writing: help pages for clients (plans, onboarding, approvals,
  * invoices), studio news, and longer articles and case studies drawn from
  * work with Indore businesses.
  */
@@ -823,7 +823,7 @@ ${figure("katli", "Kaju katli and cashews on a tray with red cloth behind", "Swe
             "friendsPhone",
             "Two friends laughing while looking at a phone together",
         ),
-        body: `<p>We are happy to welcome <strong>Nikita Rathi</strong> to Pixel &amp; Chai. Nikita looks after client success and Google listings, which means two things for you.</p>
+        body: `<p>We are happy to welcome <strong>Nikita Rathi</strong> to Loop Local Media. Nikita looks after client success and Google listings, which means two things for you.</p>
 <p>First, she is now the person who runs your onboarding week, sends your monthly report, and answers the "quick question" messages that used to wait until Riya was free. Second, she leads our new Listing care plan, so every review reply and Google post goes past her.</p>
 ${figure("groupTable", "A group of colleagues laughing together around a table", "Nikita's first week: four onboarding calls and a team lunch at Saffron Table.")}
 <p>Nikita grew up in Indore and spent three years handling customer queries for a jewellery chain in Sarafa before joining us. She says the hardest part so far is choosing between the office's two chai orders. Say hello in your WhatsApp group.</p>`,
@@ -899,7 +899,7 @@ ${figure("editing", "A person editing video at a desk in a dark room", "Most of 
 <li><strong>Ads</strong> on Pro keep running within their daily caps. Aman checks them each morning, even on holiday.</li>
 <li><strong>Urgent changes</strong>, such as a sold-out offer, can still go in your WhatsApp group. Someone will see it within a few hours.</li>
 </ul>
-${figure("sweetsPlatter", "A brass platter of assorted Indian sweets with rose petals", "Happy Diwali from all of us at Pixel &amp; Chai.")}
+${figure("sweetsPlatter", "A brass platter of assorted Indian sweets with rose petals", "Happy Diwali from all of us at Loop Local Media.")}
 <p>Next month's invoices go out on the 1st as usual. Shubh Deepavali.</p>`,
     },
     {

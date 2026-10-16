@@ -1,5 +1,5 @@
 /**
- * Shiksha Academy's photographs: free-licence Unsplash images, hot-linked
+ * Aarohan Academy's photographs: free-licence Unsplash images, hot-linked
  * and credited to their photographers (see `demo-content.ts`). Each was
  * looked at before it was chosen; the alt text says what is in the frame.
  *

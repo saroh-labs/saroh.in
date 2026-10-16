@@ -36,7 +36,7 @@ import type { Rng } from "./random";
 import { createRng } from "./random";
 
 /**
- * The toolkit Shiksha Academy (`shiksha.ts`) and Desk 42 (`desk42.ts`) are
+ * The toolkit Aarohan Academy (`shiksha.ts`) and Baithak (`desk42.ts`) are
  * built with: two vertical demos — a coaching centre and a coworking space —
  * that show how a real Indian small business would use what Saroh has today.
  *
@@ -52,7 +52,7 @@ import { createRng } from "./random";
  * Indian service businesses do: an invoice's lines sum to its total, the
  * subtotal is the taxable value, and the tax is split CGST/SGST within the
  * state (`bakery.ts` works it the same way). Their tax invoices are numbered
- * per financial year: SA/26-27/0001…
+ * per financial year: AA/26-27/0001…
  */
 
 export const HOUR = 3_600_000;
@@ -1371,7 +1371,7 @@ export function asGst(
 
 /**
  * Number the issued invoices in the order they were issued, per financial
- * year (`SA/26-27/0001`), and write them with their lines and each series'
+ * year (`AA/26-27/0001`), and write them with their lines and each series'
  * counter. An invoice someone issued by hand here keeps its number; the seed
  * refuses rather than hand the same number out twice.
  */

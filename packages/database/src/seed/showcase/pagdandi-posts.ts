@@ -1,5 +1,5 @@
 /**
- * Pagdandi Books & Café's journal: the posts on the bookshop's own site.
+ * Margin Books & Café's journal: the posts on the bookshop's own site.
  * Help (how ordering, the club and events work), news (what's on, most of
  * it recent) and articles (Anagha's and Siddharth's own writing).
  *
@@ -57,7 +57,7 @@ ${figure("1517664121940-f819957bb072", 1200, "A fountain pen nib above a single 
         excerpt:
             "When we're open around Diwali, the last day for Pune deliveries, and three gift sets put together by Anagha.",
         image: photo("1577083753695-e010191bacb5"),
-        html: `<p>Diwali falls on Sunday 8 November this year. Here is how the week around it looks at Pagdandi.</p>
+        html: `<p>Diwali falls on Sunday 8 November this year. Here is how the week around it looks at Margin.</p>
 <h2>Opening hours</h2>
 <ul>
 <li><strong>Saturday 7 November:</strong> 10am–9pm as usual, with story hour at 11am</li>

@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import type { Db } from "../helpers";
+import { dummyPhone } from "../helpers";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
 import type { BillingContext } from "./billing";
 import { planCourses } from "./billing";
@@ -558,7 +559,7 @@ export async function seedShiksha(
         openMinute: 7 * 60 + 15,
         closeMinute: 20 * 60,
         lineWeights: [60, 28, 12],
-        orderPrefix: "SA-",
+        orderPrefix: "AA-",
         staff: team,
         qr: { ids: [qrIds[2]], share: 0.15 },
     });
@@ -728,7 +729,9 @@ function parentNotes(
     const notes: Prisma.ContactNoteCreateManyInput[] = students.map((i) => {
         const father = rng.chance(0.65);
         const parent = `${rng.pick(father ? SA_PARENT_NAMES.father : SA_PARENT_NAMES.mother)} ${people[i].last}`;
-        const phone = `+91 ${rng.pick(["94140", "98290", "99280", "97848", "88750"])} ${rng.int(10000, 99999)}`;
+        const phone = dummyPhone(
+            `${rng.pick(["94140", "98290", "99280", "97848", "88750"])} ${rng.int(10000, 99999)}`,
+        );
         const at = earliest(
             addMinutes(firstSeen[i], rng.int(20, 600)),
             addMinutes(now, -60),

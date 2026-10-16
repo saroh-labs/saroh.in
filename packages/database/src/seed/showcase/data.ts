@@ -1560,58 +1560,58 @@ export const PULSE: ShowcaseBusiness = {
         {
             message:
                 "Looking at the annual plan. I work late — are there evening PT slots after 7?",
-            phone: "98450 22817",
+            phone: "+91 00000 00065",
         },
         {
             message:
                 "Training for my first half marathon in December. Do your coaches do run-specific strength?",
-            phone: "99001 38264",
+            phone: "+91 00000 00092",
         },
         {
             message:
                 "Want to join with my wife. Is there a couple rate on the annual membership?",
-            phone: "98862 40193",
+            phone: "+91 00000 00084",
         },
         {
             message:
                 "Recovering from a knee injury, physio has cleared me. Can a coach take me through it slowly?",
-            phone: "97411 55026",
+            phone: "+91 00000 00041",
         },
         {
             message:
                 "Our office of 8 people nearby wants a corporate plan. Who do I speak to?",
-            phone: "98441 70358",
+            phone: "+91 00000 00063",
         },
         {
             message:
                 "Just moved to Indiranagar. What time is the quietest to use the gym floor?",
-            phone: "90085 16472",
+            phone: "+91 00000 00015",
         },
         {
             message:
                 "Interested in the yoga classes only. Is there a class-pack instead of a membership?",
-            phone: "96113 82650",
+            phone: "+91 00000 00029",
         },
         {
             message:
                 "Want to lose about 8 kg before a wedding in February. Is PT 3x a week enough?",
-            phone: "98804 91237",
+            phone: "+91 00000 00078",
         },
         {
             message: "Can I pause my membership for a month when I travel?",
-            phone: "99160 24785",
+            phone: "+91 00000 00098",
         },
         {
             message: "Do you have women-only batches or a female coach for PT?",
-            phone: "97402 63518",
+            phone: "+91 00000 00037",
         },
         {
             message: "My son is 16 — can he join with me?",
-            phone: "98455 07342",
+            phone: "+91 00000 00074",
         },
         {
             message: "Is the free trial really free? No card needed?",
-            phone: "90361 48829",
+            phone: "+91 00000 00020",
         },
     ],
     analytics: {
@@ -2765,3 +2765,22 @@ export const LEAD_TIMELINE: Readonly<
         ],
     },
 };
+
+/**
+ * Businesses renamed after a database may already hold them, by key, with the
+ * site address they have now. Ids come from the key, so a rename keeps every
+ * id; but posts, pages and publications are written once and never
+ * overwritten, so a business seeded under its old name would keep its old
+ * words. A seeded site at any other address is that old seeding: its
+ * `seed_sc_<key>_` rows are removed and written again under the new name.
+ */
+export const RENAMED_BUSINESSES: readonly { key: string; slug: string }[] = [
+    { key: "aa", slug: "ammi-ki-barni" },
+    { key: "pb", slug: "margin-books" },
+    { key: "fv", slug: "golden-hour-weddings" },
+    { key: "pc", slug: "loop-local-media" },
+    { key: "sa", slug: "aarohan-academy" },
+    { key: "dk", slug: "baithak-cowork" },
+    { key: "ns", slug: "gulmohar-salon" },
+    { key: "mp", slug: "stride-physio" },
+];

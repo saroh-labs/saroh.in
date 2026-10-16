@@ -1,7 +1,7 @@
 import type { StudioImage, StudioPost } from "./studio-types";
 
 /**
- * Frame & Vow's writing: help notes for couples who have booked or are about
+ * Golden Hour's writing: help notes for couples who have booked or are about
  * to, studio news through the 2026–27 season, and longer articles (real
  * weddings, planning guides, how the studio prices things). Photographs are
  * free-licence Unsplash images, hot-linked and credited on each cover.
@@ -591,7 +591,7 @@ export const FV_POSTS: readonly StudioPost[] = [
 <p>A written note within a day: which of our packages fit, which add-ons you might want, and the total. Every figure we quote includes 18% GST, so the number you see is the number you pay. If Meher is in the meeting, you'll also get a first rough budget for décor and catering.</p>
 ${figure("chhatriLake", "Most of our first meetings end with a walk to the lake. It helps to see the light we're talking about.")}
 <h2>What happens next</h2>
-<p>Nothing, until you decide. When you're ready, a 25% advance holds your date and we send the booking confirmation the same day. Call us on +91 98290 41760 or use the <a href="/enquire">enquiry form</a> to pick a slot.</p>`,
+<p>Nothing, until you decide. When you're ready, a 25% advance holds your date and we send the booking confirmation the same day. Call us on +91 00000 00056 or use the <a href="/enquire">enquiry form</a> to pick a slot.</p>`,
     },
     {
         slug: "what-the-advance-covers",
@@ -753,7 +753,7 @@ ${figure("brideSmile", "Some photographs are for the family group the same eveni
 <p>Highlight and ceremony films come with the gallery, as downloads in full HD, plus a version sized for phones.</p>
 <h2>How long it stays up</h2>
 <p>The gallery stays online for a year. Please download a copy and keep it in two places. We keep our own archive, but your copy should be in your hands.</p>
-<p>If anyone in the family can't open the link, call us on +91 98290 41760 and we'll walk them through it. It happens every week.</p>`,
+<p>If anyone in the family can't open the link, call us on +91 00000 00056 and we'll walk them through it. It happens every week.</p>`,
     },
     {
         slug: "weddings-outside-udaipur-and-jaipur",
@@ -834,7 +834,7 @@ ${figure("mehendiCone", "The finest lines take the longest. We schedule the brid
         slug: "meher-bhati-joins-as-wedding-planner",
         title: "Meher Bhati joins us as wedding planner",
         excerpt:
-            "Planning at Frame & Vow now has someone whose whole job it is. Say hello to Meher.",
+            "Planning at Golden Hour Weddings now has someone whose whole job it is. Say hello to Meher.",
         category: "news",
         daysAgo: 163,
         cover: cover("marigoldDoor"),
@@ -892,7 +892,7 @@ ${figure("stageRed", "Stages like this are booked a season ahead. Tanvi has alre
         body: `<p>Last season, nearly a third of our weddings were in Jaipur, and most of those families drove to Udaipur at least once just to meet us. That didn't seem right.</p>
 <p>From this month, we have a small desk in <strong>C-Scheme, Jaipur</strong>, open on <strong>Tuesdays and Fridays, by appointment</strong>. Kabir or Meher will be there each week with sample albums, cover swatches and the season calendar. Tanvi joins on Fridays in the run-up to the season, with décor drawings and flower samples for Jaipur weddings.</p>
 ${figure("jaipurCityPalace", "We've spent many evenings in Jaipur's old city. Now we have somewhere to sit down and talk afterwards.")}
-<p>You can book a free thirty-minute consultation there just as you would in Udaipur. Call +91 98290 41760 or use the <a href="/enquire">enquiry form</a> and pick "Jaipur desk". We'll send the exact address with your confirmation.</p>`,
+<p>You can book a free thirty-minute consultation there just as you would in Udaipur. Call +91 00000 00056 or use the <a href="/enquire">enquiry form</a> and pick "Jaipur desk". We'll send the exact address with your confirmation.</p>`,
     },
     {
         slug: "mogra-and-marigold-haldi",
@@ -947,7 +947,7 @@ ${figure("brideDark", "Portraits like this one, with a dark background and one s
         category: "news",
         daysAgo: 19,
         cover: cover("coupleLights"),
-        body: `<p><em>Mehfil & Mandap</em>, a small wedding quarterly published from Jodhpur, included Frame & Vow in its autumn round-up of Rajasthan wedding vendors, under "photographers who stay out of the way".</p>
+        body: `<p><em>Mehfil & Mandap</em>, a small wedding quarterly published from Jodhpur, included Golden Hour Weddings in its autumn round-up of Rajasthan wedding vendors, under "photographers who stay out of the way".</p>
 <p>The piece was a page and a half, with one of our photographs and a few lines from two couples we photographed last winter. It isn't a big magazine, but it's read by the families and planners who actually book weddings here, which matters more to us.</p>
 <p>We'll take that description. It's what we try to do: be close enough to catch the moment Papa's composure breaks during the kanyadaan, and far enough back that he doesn't notice we're there.</p>
 ${figure("coupleArchSmoke", "The photograph the magazine used, from a February wedding near Fateh Sagar. The smoke was the décor team's idea and the timing was luck.")}
@@ -965,11 +965,11 @@ ${figure("coupleArchSmoke", "The photograph the magazine used, from a February w
 <p>During those days:</p>
 <ul>
 <li>Enquiries are welcome; we'll reply from Wednesday.</li>
-<li>If your wedding is in November and something urgent comes up, call +91 98290 41760. Meher will have the phone.</li>
+<li>If your wedding is in November and something urgent comes up, call +91 00000 00056. Meher will have the phone.</li>
 <li>Galleries due that week will be delivered on Monday 16 November.</li>
 </ul>
 ${figure("diyaRow", "The studio steps on Diwali night last year. We light them every year before we leave.")}
-<p>Wedding dates pick up again after Dev Uthani Ekadashi, and from then until February we're out most days. So we'll spend these few days with our families first. Happy Diwali from all of us at Frame & Vow.</p>`,
+<p>Wedding dates pick up again after Dev Uthani Ekadashi, and from then until February we're out most days. So we'll spend these few days with our families first. Happy Diwali from all of us at Golden Hour Weddings.</p>`,
     },
 
     // ─────────────────────────── Articles ───────────────────────────
@@ -1108,7 +1108,7 @@ ${figure("foodClaypots", "Lunch on the terrace on the second day. The kitchen se
         daysAgo: 74,
         cover: cover("albumCover"),
         body: `<p>Album prices across the wedding industry are hard to compare, mostly because nobody publishes them. We'd rather you understood exactly what you're paying for, so here is our whole price card and the reasoning behind it. Every figure includes 18% GST.</p>
-<h2>What an album is, at Frame & Vow</h2>
+<h2>What an album is, at Golden Hour Weddings</h2>
 <p>All our albums are flush-mount: each photograph is printed on photographic paper and mounted onto a thick board, so the pages are rigid and the spreads lie completely flat, with no gutter splitting a face in half. They're made to be handled by every cousin at every Diwali for forty years.</p>
 <h2>Start with the size</h2>
 <p>The base price is for a linen cover and 30 pages:</p>

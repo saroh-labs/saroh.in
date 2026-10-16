@@ -1,8 +1,8 @@
 /**
- * Desk 42's photographs — free-licence Unsplash images, hot-linked and
+ * Baithak's photographs — free-licence Unsplash images, hot-linked and
  * credited to their photographers, each looked at before it was used.
  * Drawn pictures (floor plan, plans card, Diwali hours…) are not here;
- * they come from `demoAsset("desk-42", …)`.
+ * they come from `demoAsset("baithak-cowork", …)`.
  */
 
 import type { DemoImage } from "./demo-content";

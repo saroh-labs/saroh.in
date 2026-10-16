@@ -16,7 +16,7 @@ import {
 import { NOOR_POSTS } from "./salon-posts";
 
 /**
- * Noor Salon & Bridal: a unisex salon and bridal studio on Prithviraj Road,
+ * Gulmohar Salon & Bridal: a unisex salon and bridal studio on Prithviraj Road,
  * C-Scheme, Jaipur, owned by `demo@saroh.dev` (as Noor Siddiqui, on the
  * diary) with Kavya Rathore on the desk as a Member. GST-registered in
  * Rajasthan (prefix NS): services at 18%, SAC 999721, prices GST-inclusive.
@@ -376,7 +376,7 @@ export const NOOR_STAFF: readonly DsStaff[] = [
         key: "noor",
         name: "Noor Siddiqui",
         title: "Owner · bridal artist & colourist",
-        bio: "Fourteen years of bridal and colour work, trained in Delhi; opened Noor in 2019. Every bride's trial and wedding-day look is hers.",
+        bio: "Fourteen years of bridal and colour work, trained in Delhi; opened Gulmohar in 2019. Every bride's trial and wedding-day look is hers.",
         services: [
             "bridal-trial",
             "bridal-makeup",
@@ -482,7 +482,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "aarti",
         first: "Aarti",
         last: "Sharma",
-        phone: "+91 98290 41127",
+        phone: "+91 00000 00055",
         gender: "f",
         attention: [],
         notes: [
@@ -494,7 +494,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "nidhi",
         first: "Nidhi",
         last: "Agarwal",
-        phone: "+91 94140 22856",
+        phone: "+91 00000 00021",
         gender: "f",
         attention: [
             {
@@ -512,7 +512,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "megha",
         first: "Megha",
         last: "Jain",
-        phone: "+91 99288 61430",
+        phone: "+91 00000 00101",
         gender: "f",
         attention: [],
         notes: [],
@@ -521,7 +521,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "ritu",
         first: "Ritu",
         last: "Choudhary",
-        phone: "+91 98871 30544",
+        phone: "+91 00000 00088",
         gender: "f",
         attention: [
             {
@@ -537,7 +537,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "kabir",
         first: "Kabir",
         last: "Shekhawat",
-        phone: "+91 97830 11209",
+        phone: "+91 00000 00044",
         gender: "m",
         attention: [],
         notes: [
@@ -548,7 +548,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "sana",
         first: "Sana",
         last: "Khan",
-        phone: "+91 96490 77318",
+        phone: "+91 00000 00031",
         gender: "f",
         attention: [],
         notes: [
@@ -559,7 +559,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "vivek",
         first: "Vivek",
         last: "Gupta",
-        phone: "+91 98280 50391",
+        phone: "+91 00000 00050",
         gender: "m",
         attention: [
             {
@@ -575,7 +575,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "farida",
         first: "Farida",
         last: "Sheikh",
-        phone: "+91 94606 33187",
+        phone: "+91 00000 00025",
         gender: "f",
         attention: [
             {
@@ -591,7 +591,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "devika",
         first: "Devika",
         last: "Bhandari",
-        phone: "+91 99500 18842",
+        phone: "+91 00000 00105",
         gender: "f",
         attention: [
             {
@@ -607,7 +607,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "rohini",
         first: "Rohini",
         last: "Kapoor",
-        phone: "+91 98292 66014",
+        phone: "+91 00000 00059",
         gender: "f",
         attention: [],
         notes: [
@@ -618,7 +618,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "anjali",
         first: "Anjali",
         last: "Meena",
-        phone: "+91 90010 45573",
+        phone: "+91 00000 00012",
         gender: "f",
         attention: [],
         notes: [],
@@ -627,7 +627,7 @@ export const NOOR_CLIENTS: readonly DsClient[] = [
         key: "priyanka",
         first: "Priyanka",
         last: "Mathur",
-        phone: "+91 98290 99612",
+        phone: "+91 00000 00057",
         gender: "f",
         attention: [],
         notes: [],
@@ -836,7 +836,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         78,
         "Aarti",
         "Sharma",
-        "+91 98290 41127",
+        "+91 00000 00055",
         "22 Nov",
         "Hi, my wedding is on 22 November (evening pheras). Looking for bridal makeup with Noor and mehendi the day before. Can we do a trial in early November?",
         "aarti",
@@ -845,7 +845,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         86,
         "Shivani",
         "Bansal",
-        "+91 98870 22341",
+        "+91 00000 00087",
         "6 Dec",
         "Need makeup for me and my mother for the reception at a hotel on JLN Marg. Do you travel for two people?",
     ),
@@ -853,7 +853,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         81,
         "Heena",
         "Qureshi",
-        "+91 94143 70056",
+        "+91 00000 00022",
         "14 Dec",
         "Nikah on the 14th. I'd like a very light, dewy look and a simple hairstyle that works with a hijab-style dupatta. Is a trial possible on a Sunday?",
     ),
@@ -861,7 +861,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         74,
         "Kritika",
         "Maheshwari",
-        "+91 99293 11760",
+        "+91 00000 00102",
         "29 Nov",
         "Can you share the price for HD vs airbrush? Also how early should I book the trial?",
     ),
@@ -869,7 +869,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         69,
         "Sakshi",
         "Goyal",
-        "+91 98280 64412",
+        "+91 00000 00051",
         "18 Jan",
         "Destination-style wedding in Jaipur, guests from Delhi. Do you do makeup for bridesmaids (5 girls) on the same morning?",
     ),
@@ -877,7 +877,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         63,
         "Payal",
         "Kumawat",
-        "+91 97851 20093",
+        "+91 00000 00045",
         "3 Dec",
         "Want bridal mehendi only — feet and hands to the elbow. How long does Shabnam take?",
     ),
@@ -885,7 +885,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         57,
         "Ayesha",
         "Ansari",
-        "+91 96360 81124",
+        "+91 00000 00030",
         "10 Feb",
         "Is a keratin treatment safe two months before the wedding? I want my hair manageable for the functions.",
     ),
@@ -893,7 +893,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         52,
         "Simran",
         "Malhotra",
-        "+91 98292 30087",
+        "+91 00000 00058",
         "1 Dec",
         "My skin is oily and I sweat a lot. Which makeup lasts for a 6-hour day ceremony? Would like a trial.",
     ),
@@ -901,7 +901,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         46,
         "Nikita",
         "Saxena",
-        "+91 99503 66721",
+        "+91 00000 00106",
         "24 Nov",
         "Engagement on 2 Nov and wedding on 24 Nov. Is there a package for both?",
     ),
@@ -909,7 +909,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         41,
         "Rashmi",
         "Purohit",
-        "+91 98284 10972",
+        "+91 00000 00053",
         "13 Dec",
         "Looking for a pre-bridal skin plan from now till December — facials, clean-ups, waxing. Could you suggest a schedule?",
     ),
@@ -917,7 +917,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         37,
         "Tanya",
         "Sethi",
-        "+91 90015 44289",
+        "+91 00000 00013",
         "20 Dec",
         "Bridal trial for next weekend? Also do you have parking? My mother has a knee problem.",
     ),
@@ -925,7 +925,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         33,
         "Gunjan",
         "Pareek",
-        "+91 97721 58830",
+        "+91 00000 00043",
         "5 Jan",
         "Can the artist come to the venue near Chomu? It's about an hour out. Happy to pay travel.",
     ),
@@ -933,7 +933,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         29,
         "Zoya",
         "Sheikh",
-        "+91 95876 22105",
+        "+91 00000 00027",
         "12 Dec",
         "Do you do mehendi for the whole family on the sangeet day? Around 12 ladies.",
     ),
@@ -941,7 +941,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         24,
         "Mehak",
         "Kapoor",
-        "+91 98281 77650",
+        "+91 00000 00052",
         "8 Feb",
         "I have a PPD allergy. Can I still get my hair coloured before the wedding?",
     ),
@@ -949,7 +949,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         20,
         "Ruchi",
         "Vyas",
-        "+91 99280 31146",
+        "+91 00000 00100",
         "27 Nov",
         "Quick question — is the 50% advance refundable if our date changes? Families are still deciding.",
     ),
@@ -957,7 +957,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         16,
         "Prachi",
         "Bhargava",
-        "+91 98871 64209",
+        "+91 00000 00089",
         "16 Jan",
         "Want a soft, minimal bridal look with a low bun and fresh flowers. Please share some of your past work.",
     ),
@@ -965,7 +965,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         12,
         "Ishita",
         "Mittal",
-        "+91 98290 18363",
+        "+91 00000 00054",
         "30 Nov",
         "My sister's wedding: need party makeup for 3 people on 29 Nov evening. Is the afternoon free?",
     ),
@@ -973,7 +973,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         9,
         "Deepika",
         "Choudhary",
-        "+91 94610 92271",
+        "+91 00000 00026",
         "22 Jan",
         "Hi! Do you take a trial on weekdays after 6 pm? I work till 5.",
     ),
@@ -981,7 +981,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         6,
         "Swati",
         "Joshi",
-        "+91 97992 40018",
+        "+91 00000 00046",
         "15 Feb",
         "Booked trial with you last year for my cousin — loved it. Now it's my turn! What dates are open in February?",
     ),
@@ -989,7 +989,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         4,
         "Komal",
         "Singhal",
-        "+91 98293 75520",
+        "+91 00000 00060",
         "7 Dec",
         "Need airbrush for the wedding and HD for the reception the next day. Same artist please.",
     ),
@@ -997,7 +997,7 @@ export const NOOR_ENQUIRIES: readonly DsEnquiry[] = [
         2,
         "Muskan",
         "Soni",
-        "+91 96600 11483",
+        "+91 00000 00032",
         "19 Dec",
         "Hello, is Noor available on 19 Dec? Morning muhurat at 7 am, so makeup would start at 3 am. Is that possible?",
     ),
@@ -1163,7 +1163,7 @@ const hours = (open: string, close: string) =>
         closed: false,
     }));
 
-const NOOR_PHONE = "+91 141 400 7720";
+const NOOR_PHONE = "+91 00000 00001";
 const ADDRESS_LINE = "Plot 14, Prithviraj Road, C-Scheme, Jaipur 302001";
 
 const serviceKeys = (group: string) =>
@@ -1176,11 +1176,11 @@ const photo = (key: string) => {
 
 export const NOOR: DsBusiness = {
     key: "ns",
-    name: "Noor Salon & Bridal",
-    slug: "noor-salon",
-    legalName: "Noor Beauty Studio LLP",
-    contactEmail: "noorsalon@example.com",
-    phoneE164: "+911414007720",
+    name: "Gulmohar Salon & Bridal",
+    slug: "gulmohar-salon",
+    legalName: "Gulmohar Beauty Studio LLP",
+    contactEmail: "gulmoharsalon@example.com",
+    phoneE164: "+910000000001",
     phoneDisplay: NOOR_PHONE,
     address: {
         addressLine1: "Plot 14, Prithviraj Road",
@@ -1194,8 +1194,8 @@ export const NOOR: DsBusiness = {
     storeDescription: "Hair, skin, nails and bridal in C-Scheme, Jaipur.",
     gst: {
         state: "08",
-        pan: "AANFN4412K",
-        prefix: "NS",
+        pan: "AANFG4412K",
+        prefix: "GS",
         serviceRateBps: 1800,
         sac: "999721",
     },
@@ -1302,7 +1302,7 @@ export const NOOR: DsBusiness = {
     enquiries: NOOR_ENQUIRIES,
     site: {
         createdDaysAgo: 380,
-        footer: `Noor Salon & Bridal · ${ADDRESS_LINE} · Open every day 10:30–8:30 · ${NOOR_PHONE}`,
+        footer: `Gulmohar Salon & Bridal · ${ADDRESS_LINE} · Open every day 10:30–8:30 · ${NOOR_PHONE}`,
         pages: [
             {
                 path: "/",
@@ -1510,7 +1510,7 @@ export const NOOR: DsBusiness = {
                         type: "richText",
                         content: {
                             format: "html",
-                            value: "<h2>How bridal works at Noor</h2><ol><li><strong>Enquire</strong> with your dates and functions — we reply within a day with what's free.</li><li><strong>Trial</strong> (₹4,800) three to six weeks before. Bring outfit photos, your jewellery and any reference looks.</li><li><strong>Hold the date</strong> with a 50% advance online; the rest is paid on the day.</li><li><strong>Skin prep</strong>: a clean-up two to three weeks before and threading two days before.</li></ol><p>We work at the studio in C-Scheme. For a venue in or around Jaipur, ask us for a travel quote.</p>",
+                            value: "<h2>How bridal works at Gulmohar</h2><ol><li><strong>Enquire</strong> with your dates and functions — we reply within a day with what's free.</li><li><strong>Trial</strong> (₹4,800) three to six weeks before. Bring outfit photos, your jewellery and any reference looks.</li><li><strong>Hold the date</strong> with a 50% advance online; the rest is paid on the day.</li><li><strong>Skin prep</strong>: a clean-up two to three weeks before and threading two days before.</li></ol><p>We work at the studio in C-Scheme. For a venue in or around Jaipur, ask us for a travel quote.</p>",
                             image: photo("bridal-trial"),
                             imageSide: "right",
                         },
@@ -1651,7 +1651,7 @@ export const NOOR: DsBusiness = {
                             hours: "Every day 10:30 am – 8:30 pm · closed Diwali and the day after",
                             phone: NOOR_PHONE,
                             whatsapp: NOOR_PHONE,
-                            email: "noorsalon@example.com",
+                            email: "gulmoharsalon@example.com",
                         },
                     },
                     {

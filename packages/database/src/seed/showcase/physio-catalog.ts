@@ -1,5 +1,5 @@
 /**
- * Motion Physio — what the desk sells, and the site's photos.
+ * Stride Physio — what the desk sells, and the site's photos.
  *
  * A physio clinic's counter: supports in sizes and sides, resistance band
  * loops by strength, kinesiology tape by colour, foam rollers by length, and

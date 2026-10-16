@@ -50,6 +50,7 @@ import { checkKavi, KAVI, seedClinic } from "./clinic";
 import { KAVI_DESK } from "./clinic-data";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
+import { checkDummyContacts, scrubSeededPhones } from "./contact-check";
 import type { LeadSpec } from "./crm";
 import { planLeads, upsertPipeline } from "./crm";
 import type { ModuleKey, OrgRole, ShowcaseBusiness, TeamMember } from "./data";
@@ -64,6 +65,7 @@ import {
     NORTHWIND_NEW_CATEGORIES,
     NORTHWIND_NEW_PRODUCTS,
     PULSE,
+    RENAMED_BUSINESSES,
     RETIRED_BUSINESS_KEYS,
     ROLE_ACCOUNTS,
     SHOWCASE_BUSINESSES,
@@ -254,8 +256,8 @@ export async function seedShowcase(
         }),
     });
     businesses.push(pixelChai);
-    // Two demo shops: Ammi's Achaar, a home pickle kitchen in Lucknow
-    // (Faizan Khan takes the orders as an Admin), and Pagdandi Books, a
+    // Two demo shops: Ammi Ki Barni, a home pickle kitchen in Lucknow
+    // (Faizan Khan takes the orders as an Admin), and Margin Books, a
     // bookshop with a café corner in Pune (Siddharth Kale, a Member).
     businesses.push(
         await seedAchaar({
@@ -351,6 +353,11 @@ export async function seedShowcase(
         businesses.map((b) => b.id).filter((id) => !linksOwnPayers.has(id)),
     );
     const counts = await checkShowcase(prisma, now, businesses);
+    const scrubbed = await scrubSeededPhones(prisma);
+    if (scrubbed > 0) {
+        console.log(`[showcase] made ${scrubbed} stale phone numbers dummies`);
+    }
+    await checkDummyContacts(prisma);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);
     const pulseCounts: PulseCounts | null = pulse
@@ -359,8 +366,8 @@ export async function seedShowcase(
     const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
     const kaviCounts: KaviCounts = await checkKavi(prisma, KAVI.orgId, now);
     const studioCounts = {
-        "Frame & Vow": await checkFrameVow(prisma, frameVow.id, now),
-        "Pixel & Chai": await checkPixelChai(prisma, pixelChai.id, now),
+        "Golden Hour Weddings": await checkFrameVow(prisma, frameVow.id, now),
+        "Loop Local Media": await checkPixelChai(prisma, pixelChai.id, now),
     };
     const demoShopCounts = [
         await checkAchaar(prisma, now),
@@ -406,14 +413,14 @@ export async function seedShowcase(
     console.log("[showcase] Kavi Dental, as its films need it:");
     console.table(kaviCounts);
     console.log(
-        "[showcase] Frame & Vow and Pixel & Chai, as their demos need them:",
+        "[showcase] Golden Hour Weddings and Loop Local Media, as their demos need them:",
     );
     console.table(studioCounts);
-    console.log("[showcase] Ammi's Achaar and Pagdandi Books:");
+    console.log("[showcase] Ammi Ki Barni and Margin Books:");
     console.table(demoShopCounts);
-    console.log("[showcase] Shiksha Academy, as its demo needs it:");
+    console.log("[showcase] Aarohan Academy, as its demo needs it:");
     console.table(shikshaCounts);
-    console.log("[showcase] Desk 42, as its demo needs it:");
+    console.log("[showcase] Baithak Cowork, as its demo needs it:");
     console.table(desk42Counts);
     if (pulseShop) {
         console.log("[showcase] Pulse Fitness's front desk:");
@@ -448,6 +455,15 @@ async function retireBusinesses(ctx: Context) {
     let removed = 0;
     for (const key of RETIRED_BUSINESS_KEYS) {
         removed += await deleteSeeded(ctx.prisma, sid(key, ""));
+    }
+    for (const { key, slug } of RENAMED_BUSINESSES) {
+        const site = await ctx.prisma.site.findUnique({
+            where: { id: sid(key, "site") },
+            select: { slug: true },
+        });
+        if (site && site.slug !== slug) {
+            removed += await deleteSeeded(ctx.prisma, sid(key, ""));
+        }
     }
     const orphans = await ctx.prisma.user.findMany({
         where: {

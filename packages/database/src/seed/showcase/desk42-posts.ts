@@ -1,9 +1,9 @@
 /**
- * Desk 42's posts — Help, News and Articles for the coworking space's site.
+ * Baithak's posts — Help, News and Articles for the coworking space's site.
  * Written for this seed; every member named here is fictional. Dates are
  * relative to the seed's "today" (15 October 2026).
  *
- * Data only; the Desk 42 seed writes it.
+ * Data only; the Baithak seed writes it.
  */
 
 import type { DemoImage, DemoPost } from "./demo-content";
@@ -14,9 +14,9 @@ const RHEA = "Rhea Deshpande";
 const OMKAR = "Omkar Pawar";
 const SUNITA = "Sunita Gaikwad";
 
-/** A picture the seed draws for Desk 42 (1600×1000). */
+/** A picture the seed draws for Baithak (1600×1000). */
 const drawn = (file: string, alt: string): DemoImage => ({
-    url: demoAsset("desk-42", file),
+    url: demoAsset("baithak-cowork", file),
     alt,
     width: 1600,
     height: 1000,
@@ -26,11 +26,11 @@ const drawn = (file: string, alt: string): DemoImage => ({
 
 const FLOOR_PLAN = drawn(
     "floor-plan.png",
-    "Floor plan of Desk 42: hot desks in the open area, dedicated desks along the windows, the Sahyadri Room, the call booth, the café counter and the lockers",
+    "Floor plan of Baithak: hot desks in the open area, dedicated desks along the windows, the Sahyadri Room, the call booth, the café counter and the lockers",
 );
 const PLANS_CARD = drawn(
     "plans-card.png",
-    "The three Desk 42 memberships side by side: Hot desk ₹6,500, Dedicated desk ₹9,500 and Virtual office ₹1,999 a month",
+    "The three Baithak memberships side by side: Hot desk ₹6,500, Dedicated desk ₹9,500 and Virtual office ₹1,999 a month",
 );
 const DIWALI_HOURS = drawn(
     "diwali-hours.png",
@@ -38,7 +38,7 @@ const DIWALI_HOURS = drawn(
 );
 const WIFI_PRINTING = drawn(
     "wifi-printing.png",
-    "How-to card for Wi-Fi and printing: the Desk42-Members and Desk42-Guest networks, and page prices for black and white and colour",
+    "How-to card for Wi-Fi and printing: the Baithak-Members and Baithak-Guest networks, and page prices for black and white and colour",
 );
 const ROOM_BOOKING = drawn(
     "room-booking.png",
@@ -65,7 +65,7 @@ const help: DemoPost[] = [
 <h2>When you arrive</h2>
 <ol>
 <li>Come up to the 4th floor of Sai Capital and say hello at the front desk. Your booking is under your name and phone number.</li>
-<li>We give you the Desk42-Guest Wi-Fi password and show you the café counter, the lockers and the washrooms.</li>
+<li>We give you the Baithak-Guest Wi-Fi password and show you the café counter, the lockers and the washrooms.</li>
 <li>Pick any free hot desk. There are no reserved seats in the open area; the dedicated desks by the windows belong to members and are marked with a name card.</li>
 </ol>
 ${figure(FLOOR_PLAN, "The hot desks are in the open area in the middle; dedicated desks run along the windows.")}
@@ -147,15 +147,15 @@ ${figure(DK_PHOTOS.headphones, "Bring your own headphones; we keep a spare pair 
         body: `<h2>Wi-Fi</h2>
 <p>We have 300 Mbps fibre with a second internet provider as a backup. If the main line drops, the router moves everyone to the backup within a few seconds; a video call may freeze briefly but should not disconnect.</p>
 <ul>
-<li><strong>Desk42-Members</strong> is for members. Your password is personal and comes with your welcome email; please do not share it.</li>
-<li><strong>Desk42-Guest</strong> is for day passes, meeting-room guests and visitors. The password is on the card at the front desk and changes every Monday.</li>
+<li><strong>Baithak-Members</strong> is for members. Your password is personal and comes with your welcome email; please do not share it.</li>
+<li><strong>Baithak-Guest</strong> is for day passes, meeting-room guests and visitors. The password is on the card at the front desk and changes every Monday.</li>
 </ul>
 <p>Need a wired connection for a big upload? There are two network points under the hot desk nearest the café. Ask me for a cable.</p>
 <h2>Printing and scanning</h2>
 ${figure(DK_PHOTOS.printer, "The printer and scanner sit beside the front desk.")}
 <p>Printing works on credits. A black and white page uses ₹3 of credit and a colour page ₹12. Buy a pack of 100 credits at the desk or on the shop, and I add it to your account. Members' unused credits carry over month to month.</p>
 <ol>
-<li>Send your file to the printer from your laptop while you are on either Desk42 network.</li>
+<li>Send your file to the printer from your laptop while you are on either Baithak network.</li>
 <li>Walk to the printer and enter your four-digit code to release the job.</li>
 <li>For scanning, put the pages in the feeder, pick "Scan to email" and type your address.</li>
 </ol>
@@ -163,14 +163,14 @@ ${figure(DK_PHOTOS.printer, "The printer and scanner sit beside the front desk."
     },
     {
         slug: "bringing-guests",
-        title: "Bringing guests to Desk 42",
+        title: "Bringing guests to Baithak",
         category: "help",
         excerpt:
             "Members can bring one guest a day for up to two hours, free. Longer visits need a day pass; meeting-room guests sign in at the desk.",
         daysAgo: 75,
         author: RHEA,
         cover: DK_PHOTOS.lounge,
-        body: `<p>Desk 42 works because the people at the next desk are people you know. Guests are welcome, with a few simple rules so the space stays calm and the desks stay free for members.</p>
+        body: `<p>Baithak works because the people at the next desk are people you know. Guests are welcome, with a few simple rules so the space stays calm and the desks stay free for members.</p>
 <h2>The rules</h2>
 <ul>
 <li><strong>One guest a day, up to two hours, free.</strong> Good for a quick catch-up, a client who wants to see where you work, or a friend who is passing through Baner.</li>
@@ -225,7 +225,7 @@ ${figure(DK_PHOTOS.dedicatedDesk, "A dedicated desk is yours: leave your monitor
 <h2>Using the address for GST registration</h2>
 <p>To register a principal place of business, the GST portal asks for proof that you may use the premises. When you join, we give you:</p>
 <ul>
-<li>a signed no-objection certificate from Desk 42 naming your business;</li>
+<li>a signed no-objection certificate from Baithak naming your business;</li>
 <li>a copy of the latest electricity bill for the premises;</li>
 <li>a copy of your virtual office agreement.</li>
 </ul>
@@ -336,7 +336,7 @@ ${figure(DIWALI_HOURS, "Diwali week at a glance. Dedicated desks keep their 24×
 <li><strong>Friday 6 November</strong> — Ashwini Patil, the CA who works from desk 11, on "What I wish freelancers sent me before 31 March".</li>
 <li><strong>Friday 4 December</strong> — Ananya and Siddharth from Pixel and Paper Studio on pricing their first retainer.</li>
 </ul>
-${figure(EVENTS_NOVEMBER, "November at Desk 42: the Diwali potluck on Thursday 5th, Founders' Chai on Friday 6th.")}
+${figure(EVENTS_NOVEMBER, "November at Baithak: the Diwali potluck on Thursday 5th, Founders' Chai on Friday 6th.")}
 <p>The evening before, Thursday 5 November, is our Diwali potluck from 18:00. Bring one dish from home; we will do the chai, the lights and the rangoli.</p>
 <p>Members can bring one guest to either evening. Tell Omkar their name by the morning of the event so we have enough cups.</p>`,
     },
@@ -369,7 +369,7 @@ ${figure(DK_PHOTOS.chai, "Masala chai with ginger, cardamom and a little black p
         daysAgo: 17,
         author: RHEA,
         cover: DK_PHOTOS.smallTeam,
-        body: `<p>Ananya Kulkarni and Siddharth Joshi joined Desk 42 in March 2024 with one hot-desk membership between them. Today Pixel and Paper Studio has two dedicated desks by the window and clients in Pune, Mumbai and London.</p>
+        body: `<p>Ananya Kulkarni and Siddharth Joshi joined Baithak in March 2024 with one hot-desk membership between them. Today Pixel and Paper Studio has two dedicated desks by the window and clients in Pune, Mumbai and London.</p>
 <blockquote><p>"Working from home, we spent half our time deciding whose turn it was to make tea. Here, Sunita decides." — Siddharth</p></blockquote>
 <p>They design packaging and brand identities for food and wellness businesses, mostly small ones. Ananya draws; Siddharth does the type, the files and, as he puts it, "the polite emails about invoices".</p>
 ${figure(DK_PHOTOS.hotDesks, "They started at the hot desks, sharing one membership on alternate days.")}
@@ -381,7 +381,7 @@ ${figure(DK_PHOTOS.hotDesks, "They started at the hot desks, sharing one members
         title: "Workshop: GST and invoicing for freelancers, Saturday 24 October",
         category: "news",
         excerpt:
-            "Ashwini Patil, a CA and Desk 42 member, runs a free two-hour session on registration, invoices and quarterly returns.",
+            "Ashwini Patil, a CA and Baithak member, runs a free two-hour session on registration, invoices and quarterly returns.",
         daysAgo: 21,
         author: RHEA,
         cover: DK_PHOTOS.whiteboard,
@@ -409,7 +409,7 @@ ${figure(DK_PHOTOS.calculator, "Bring your questions and one of your own invoice
         body: `<p>On two afternoons in August, roadworks on Baner Road cut our fibre line, once for almost three hours. For a space where people take client calls all day, that is three hours too many.</p>
 <p>As of this week we have a <strong>second internet line from a different provider</strong>, coming into the building by a different route. Our router watches the main 300 Mbps fibre line and, if it drops, moves everyone to the backup within a few seconds.</p>
 <ul>
-<li>Nothing changes for you: same networks, Desk42-Members and Desk42-Guest, same passwords.</li>
+<li>Nothing changes for you: same networks, Baithak-Members and Baithak-Guest, same passwords.</li>
 <li>On the backup line, very large uploads will be slower. Video calls, email and normal work are fine.</li>
 <li>The router switches back to the fibre by itself once it returns.</li>
 </ul>
@@ -449,11 +449,11 @@ ${figure(DK_PHOTOS.dedicatedDesk, "Nikhil's desk: laptop on a stand, a plant he 
 </ul>
 ${figure(FLOOR_PLAN, "The booth sits between the café counter and the lockers.")}
 <p>The booth is ₹300 an hour and is bookable online, Monday to Friday 8:00–21:00 and Saturday 9:00–18:00. Short unbooked calls are fine when it is free.</p>
-<p>Thanks to Tanvi Rao, who records her interview podcast from Desk 42, for testing the setup and telling us — kindly — that the first ceiling fan was too loud. We changed it.</p>`,
+<p>Thanks to Tanvi Rao, who records her interview podcast from Baithak, for testing the setup and telling us — kindly — that the first ceiling fan was too loud. We changed it.</p>`,
     },
     {
-        slug: "monsoon-at-desk-42",
-        title: "Getting through the monsoon at Desk 42",
+        slug: "monsoon-at-baithak",
+        title: "Getting through the monsoon at Baithak",
         category: "news",
         excerpt:
             "Umbrella stand, shoe rack, power backup and an earlier café opening. A few changes for the rainy months.",
@@ -475,8 +475,8 @@ ${figure(DK_PHOTOS.chai, "Hot masala chai at the counter from 8:30 on rainy morn
 
 const articles: DemoPost[] = [
     {
-        slug: "a-day-at-desk-42",
-        title: "A day at Desk 42",
+        slug: "a-day-at-baithak",
+        title: "A day at Baithak",
         category: "articles",
         excerpt:
             "From the first key card at six to the last light off at nine: one ordinary Wednesday in a small Baner coworking space, hour by hour.",
@@ -497,7 +497,7 @@ ${figure(FLOOR_PLAN, "The floor: hot desks in the middle, dedicated desks along 
 <h2>12:00 — the Sahyadri Room</h2>
 <p>A founder from Aundh has booked the meeting room for two hours to interview candidates for her first hire. Omkar signs in each candidate at the desk, offers them water and walks them in. The 65-inch screen is used once, for a portfolio; the whiteboard not at all.</p>
 <h2>13:30 — lunch</h2>
-<p>Lunch happens at the long table near the café. Some bring tiffins, some order in, some buy Sunita's sandwiches. This is where most of the useful conversations at Desk 42 happen: who knows a good lawyer, whose client is late paying, whether anyone has tried the new place at Balewadi High Street.</p>
+<p>Lunch happens at the long table near the café. Some bring tiffins, some order in, some buy Sunita's sandwiches. This is where most of the useful conversations at Baithak happen: who knows a good lawyer, whose client is late paying, whether anyone has tried the new place at Balewadi High Street.</p>
 ${figure(DK_PHOTOS.cafe, "The café counter, the unofficial centre of the space.")}
 <h2>15:00 — the booth</h2>
 <p>Tanvi Rao has the call and podcast booth booked from three to five to record an interview. The booth's light goes red, and the café counter instinctively gets quieter.</p>
@@ -551,7 +551,7 @@ ${figure(DK_PHOTOS.officePark, "Office parks at dusk: the trip home is often lon
         author: RHEA,
         cover: DK_PHOTOS.notesAndLaptop,
         body: `<p>The first month of freelancing feels like a holiday. By the third month, most people we meet have the same complaint: the days blur, work spills into evenings, and Sunday feels like Tuesday. Freedom without structure turns into drift.</p>
-<p>About half of Desk 42's members are freelancers — designers, writers, developers, a CA, a podcaster. Here are the habits they say keep them steady.</p>
+<p>About half of Baithak's members are freelancers — designers, writers, developers, a CA, a podcaster. Here are the habits they say keep them steady.</p>
 <h2>1. A fixed start, even if the end moves</h2>
 <p>Nearly everyone said the same thing: decide when your day starts and protect it. The end can flex when a deadline demands it, but a fixed start stops the slow slide into noon.</p>
 <blockquote><p>"I'm at my desk by 9:30, five days a week, whether or not I have work. Some days I don't. I still come." — Ananya, designer</p></blockquote>
@@ -594,7 +594,7 @@ ${figure(DK_PHOTOS.lounge, "Low-key corners for a chat, away from the people who
 <h3>Pick the right hours</h3>
 <p>The space is quietest from 10:00 to 13:00 and after 18:00. If you have a choice, schedule your hardest work for then. Mondays are busier than Fridays.</p>
 <h3>Use headphones as a signal</h3>
-<p>The Desk 42 rule of thumb: headphones on means "not now". Even without music, they tell the person walking past that you are in the middle of something. It is the most effective thing in the space, and it is free.</p>
+<p>The Baithak rule of thumb: headphones on means "not now". Even without music, they tell the person walking past that you are in the middle of something. It is the most effective thing in the space, and it is free.</p>
 <h3>Choose the same desk</h3>
 <p>On a hot desk membership you can sit anywhere, but members who sit in the same place most days settle in faster. Your brain learns that this chair means work. If you want that guarantee, that is what dedicated desks are for.</p>
 <h3>Phone in the bag</h3>
@@ -613,11 +613,11 @@ ${figure(DK_PHOTOS.lounge, "Low-key corners for a chat, away from the people who
         title: "Hiring your first employee as a solo founder",
         category: "articles",
         excerpt:
-            "The jump from one to two is the hardest hire you will make. Lessons from Desk 42 founders who have made it, including the mistakes.",
+            "The jump from one to two is the hardest hire you will make. Lessons from Baithak founders who have made it, including the mistakes.",
         daysAgo: 82,
         author: RHEA,
         cover: DK_PHOTOS.smallTeam,
-        body: `<p>Going from one person to two changes a business more than going from two to twenty. Suddenly someone else depends on your cash flow, your clarity and your mood. Several Desk 42 members have made that jump in the last two years. Here is what they told us at Founders' Chai.</p>
+        body: `<p>Going from one person to two changes a business more than going from two to twenty. Suddenly someone else depends on your cash flow, your clarity and your mood. Several Baithak members have made that jump in the last two years. Here is what they told us at Founders' Chai.</p>
 <h2>Hire for the work you keep postponing</h2>
 <p>Founders often hire a copy of themselves. It feels safe but leaves the same gaps. Look at your to-do list from the last three months and find the work that keeps getting pushed: proposals, invoicing, social posts, testing. That is the job description.</p>
 <h2>Write down the first ninety days</h2>
@@ -727,7 +727,7 @@ ${figure(DK_PHOTOS.mail, "Number every invoice in sequence, and keep a copy of e
         daysAgo: 50,
         author: RHEA,
         cover: DK_PHOTOS.hotDesks,
-        body: `<p>When we opened Desk 42 in 2023, people asked when we would take the second floor. We still have not. Twenty hot desks, fourteen dedicated desks, one meeting room and one booth is the size we want to be. Here is why.</p>
+        body: `<p>When we opened Baithak in 2023, people asked when we would take the second floor. We still have not. Twenty hot desks, fourteen dedicated desks, one meeting room and one booth is the size we want to be. Here is why.</p>
 <h2>You know everyone</h2>
 <p>In a space with three hundred desks, you know the people from your floor, at best. With thirty-odd regulars, you know everyone's name by the end of your first month, and they know yours. Omkar knows how you take your coffee. Sunita knows when you skipped lunch.</p>
 <p>That matters more than it sounds. Most of the good things that have happened to our members — clients, hires, collaborators, a wedding — came from someone they met at the café counter.</p>

@@ -1,5 +1,5 @@
 /**
- * The shape of a per-vertical demo shop's content (Ammi's Achaar, Pagdandi
+ * The shape of a per-vertical demo shop's content (Ammi Ki Barni, Margin
  * Books): its catalogue, its reviews and its site's posts. Data files fill
  * these; `demo-shop.ts` writes them.
  *

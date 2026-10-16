@@ -7,7 +7,7 @@ import { NOOR_SWATCHES } from "../../packages/database/src/seed/showcase/salon-c
 
 console.log(
     JSON.stringify([
-        { brand: "Noor Salon & Bridal", swatches: NOOR_SWATCHES },
-        { brand: "Motion Physio", swatches: MOTION_SWATCHES },
+        { brand: "Gulmohar Salon & Bridal", swatches: NOOR_SWATCHES },
+        { brand: "Stride Physio", swatches: MOTION_SWATCHES },
     ]),
 );

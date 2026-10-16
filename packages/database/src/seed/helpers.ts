@@ -32,6 +32,47 @@ export const hashPassword = hashPasswordUntyped as (
 export const id = (...parts: (string | number)[]) =>
     `${SEED_PREFIX}${parts.join("_")}`;
 
+/**
+ * Every phone number the seeds write is a dummy: `+91 00000 NNNNN`. No Indian
+ * number starts with 0 after the country code, so none of them can ring a
+ * real person, yet each still reads as a phone and still matches on its
+ * digits (`normalisePhone` in the API's duplicates check).
+ *
+ * Fixed fixtures (a named customer, a business's own line) carry a literal
+ * from 00001 to 09999. Generated people get theirs from `dummyPhone(key)`,
+ * from 10000 to 99999 so the two never collide: the same key always gets the
+ * same number, and two keys never share one in a run, so a person keeps one
+ * number across their contact, customer, bookings and orders, and nobody is
+ * made a phone duplicate of a stranger. The key is whatever identifies the
+ * person to its generator; generators keep drawing from their random stream
+ * exactly as before, so nothing else they plan moves.
+ */
+export const DUMMY_PHONE = /^\+91 00000 \d{5}$/;
+/** The same, as E.164 — how `BusinessProfile.phone` is stored (DEC-053). */
+export const DUMMY_PHONE_E164 = /^\+9100000\d{5}$/;
+
+const dummyPhoneByKey = new Map<string, string>();
+const dummyPhoneTaken = new Set<string>();
+
+function dummyPhoneDigits(key: string): string {
+    const known = dummyPhoneByKey.get(key);
+    if (known) return known;
+    let h = 2166136261;
+    for (const ch of key) {
+        h ^= ch.charCodeAt(0);
+        h = Math.imul(h, 16777619);
+    }
+    let n = 10_000 + ((h >>> 0) % 90_000);
+    while (dummyPhoneTaken.has(String(n))) n = n === 99_999 ? 10_000 : n + 1;
+    const digits = String(n);
+    dummyPhoneTaken.add(digits);
+    dummyPhoneByKey.set(key, digits);
+    return digits;
+}
+
+/** A generated person's phone, `+91 00000 NNNNN`; see `DUMMY_PHONE`. */
+export const dummyPhone = (key: string) => `+91 00000 ${dummyPhoneDigits(key)}`;
+
 export const DAY_MS = 86_400_000;
 
 /** `dayOffset` days from `now`, at `hour` o'clock in the machine's zone. */

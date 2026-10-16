@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generated pictures for the Frame & Vow and Pixel & Chai showcases, where
+ * Generated pictures for the Golden Hour Weddings and Loop Local Media showcases, where
  * no free photograph can honestly show the thing: an album's cover
  * materials and sizes, a per-plate catering card, an agency's printed
  * standee, table tent, brand-kit pack and a sample monthly report.
@@ -138,13 +138,13 @@ const ART = {
 <ellipse cx="800" cy="880" rx="560" ry="30" fill="#000" opacity="0.12"/>`),
     },
     cateringMenu: {
-        alt: "Frame & Vow's per-plate catering card: veg classic, veg royal Rajasthani, non-veg classic and non-veg royal, with prices",
+        alt: "Golden Hour's per-plate catering card: veg classic, veg royal Rajasthani, non-veg classic and non-veg royal, with prices",
         svg: svg(`
 <rect width="${W}" height="${H}" fill="#7a1f1f"/>
 <rect x="120" y="90" width="1360" height="1020" rx="18" fill="#fbf4e6"/>
 <rect x="150" y="120" width="1300" height="960" rx="12" fill="none" stroke="#c9963b" stroke-width="3"/>
 <g font-family="${serif}" fill="#4a1a12" text-anchor="middle">
-<text x="800" y="240" font-size="40" letter-spacing="10" fill="#9c6b1e">FRAME &amp; VOW · CATERING</text>
+<text x="800" y="240" font-size="40" letter-spacing="10" fill="#9c6b1e">GOLDEN HOUR · CATERING</text>
 <text x="800" y="330" font-size="72">Per plate, includes GST</text>
 </g>
 <g font-family="${serif}" fill="#3b2418" font-size="50">
@@ -184,7 +184,7 @@ const ART = {
 <text x="800" y="380" text-anchor="middle" font-family="${sans}" font-size="40" fill="#3b2f25">Tell others on Google</text>
 <text x="800" y="440" text-anchor="middle" font-family="${sans}" font-size="30" fill="#7a6a58">Scan · tap a star · done</text>
 <g fill="#1f2937">${qr}</g>${finder(640, 520)}${finder(850, 520)}${finder(640, 730)}
-<text x="800" y="960" text-anchor="middle" font-family="${sans}" font-size="28" fill="#7a6a58">A5 standee · printed by Pixel &amp; Chai</text>`);
+<text x="800" y="960" text-anchor="middle" font-family="${sans}" font-size="28" fill="#7a6a58">A5 standee · printed by Loop Local Media</text>`);
         })(),
     },
     tableTent: {

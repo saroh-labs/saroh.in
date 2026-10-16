@@ -13,7 +13,7 @@ import type {
 import { block } from "./vertical";
 
 /**
- * Shiksha Academy — a NEET/JEE coaching centre on Gopalpura Bypass, Jaipur,
+ * Aarohan Academy — a NEET/JEE coaching centre on Gopalpura Bypass, Jaipur,
  * with a Class 9–10 foundation programme and Spoken English / IELTS. The
  * fixtures `shiksha.ts` turns into rows: the business, its faculty and their
  * hours, batches and classes, courses, monthly fee plans, the shop, the site.
@@ -33,8 +33,8 @@ import { block } from "./vertical";
  */
 
 export const SA_KEY = "sa";
-export const SA_SLUG = "shiksha-academy";
-export const SA_NAME = "Shiksha Academy";
+export const SA_SLUG = "aarohan-academy";
+export const SA_NAME = "Aarohan Academy";
 /** Commercial training and coaching (GST, 18%). */
 export const SA_SAC = "999293";
 
@@ -54,7 +54,7 @@ export const SA_DRAWN = {
     ),
     results: asset(
         "results-2026.png",
-        "Shiksha Academy results 2026: NEET and JEE Main toppers",
+        "Aarohan Academy results 2026: NEET and JEE Main toppers",
     ),
     fees: asset(
         "fee-instalments.png",
@@ -85,9 +85,9 @@ export const SA_SPEC: BusinessSpec = {
     key: SA_KEY,
     slug: SA_SLUG,
     name: SA_NAME,
-    legalName: "Shiksha Academy Education Services LLP",
+    legalName: "Aarohan Academy Education Services LLP",
     type: "llp",
-    gst: { state: "08", pan: "ADQFS4821K", prefix: "SA" },
+    gst: { state: "08", pan: "ADQFA4821K", prefix: "AA" },
     address: {
         line1: "3rd floor, Laxmi Complex, Gopalpura Bypass",
         city: "Jaipur",
@@ -95,8 +95,8 @@ export const SA_SPEC: BusinessSpec = {
     },
     printedAddress:
         "3rd floor, Laxmi Complex, Gopalpura Bypass, Jaipur 302018, Rajasthan",
-    phone: "+911414007720",
-    contactEmail: "shiksha.academy@example.com",
+    phone: "+910000000110",
+    contactEmail: "aarohan.academy@example.com",
     modules: [
         "APPOINTMENTS",
         "CRM",
@@ -113,7 +113,7 @@ export const SA_SPEC: BusinessSpec = {
     paymentProvider: "RAZORPAY",
     createdDaysAgo: 420,
     storefront: {
-        name: "Shiksha Academy front desk",
+        name: "Aarohan Academy front desk",
         description:
             "Study modules, test-series books, uniforms and lab coats, at the front desk.",
         address: "3rd floor, Laxmi Complex, Gopalpura Bypass, Jaipur 302018",
@@ -487,7 +487,7 @@ export const SA_PRODUCTS: readonly ProductSpec[] = [
         name: "Study module — one subject",
         category: "study-material",
         description:
-            "The printed theory and solved examples Shiksha's faculty teach from, one subject per module, in English or Hindi medium. Revised every April for the latest NCERT and NTA syllabus.\n\nEvery chapter ends with NCERT-level questions, previous-year NEET and JEE questions, and a self-check sheet. Enrolled students get the modules with their fees; this is for replacements and for students studying on their own.",
+            "The printed theory and solved examples Aarohan's faculty teach from, one subject per module, in English or Hindi medium. Revised every April for the latest NCERT and NTA syllabus.\n\nEvery chapter ends with NCERT-level questions, previous-year NEET and JEE questions, and a self-check sheet. Enrolled students get the modules with their fees; this is for replacements and for students studying on their own.",
         keyPoints: [
             "Theory, solved examples and previous-year questions, chapter by chapter",
             "Written and revised by our faculty for 2026–27",
@@ -543,7 +543,7 @@ export const SA_PRODUCTS: readonly ProductSpec[] = [
         hsn: "6109",
         gstRate: 5,
         images: [
-            asset("tshirt-navy.png", "Navy Shiksha Academy T-shirt, front"),
+            asset("tshirt-navy.png", "Navy Aarohan Academy T-shirt, front"),
         ],
         option: "Size",
         variants: sizes(
@@ -567,7 +567,7 @@ export const SA_PRODUCTS: readonly ProductSpec[] = [
         hsn: "6109",
         gstRate: 5,
         images: [
-            asset("tshirt-white.png", "White Shiksha Academy T-shirt, front"),
+            asset("tshirt-white.png", "White Aarohan Academy T-shirt, front"),
         ],
         option: "Size",
         variants: sizes(
@@ -957,7 +957,7 @@ const text = (
 ) => block("richText", { format: "html", value, image: img(image), imageSide });
 
 export const SA_FOOTER =
-    "Shiksha Academy · 3rd floor, Laxmi Complex, Gopalpura Bypass, Jaipur 302018 · +91 141 400 7720 · Mon–Sat 7 am to 8:30 pm";
+    "Aarohan Academy · 3rd floor, Laxmi Complex, Gopalpura Bypass, Jaipur 302018 · +91 00000 00110 · Mon–Sat 7 am to 8:30 pm";
 
 export const SA_SITE: SeedSite = {
     slug: SA_SLUG,
@@ -979,7 +979,7 @@ export const SA_SITE: SeedSite = {
                 ),
                 block("features", {
                     variant: "facts",
-                    heading: "Shiksha in numbers",
+                    heading: "Aarohan in numbers",
                     items: [
                         {
                             value: "40",
@@ -1184,10 +1184,10 @@ export const SA_SITE: SeedSite = {
             sections: [
                 block("person", {
                     variant: "team",
-                    title: "Who teaches at Shiksha",
+                    title: "Who teaches at Aarohan",
                     name: "Vikram Choudhary",
                     role: "Director · Physics",
-                    bio: "Taught Physics in Kota for nine years before starting Shiksha in Jaipur in 2014, so students would not have to leave home at sixteen.",
+                    bio: "Taught Physics in Kota for nine years before starting Aarohan in Jaipur in 2014, so students would not have to leave home at sixteen.",
                     image: img(SA_PHOTOS.whiteboard),
                     people: [
                         {
@@ -1234,7 +1234,7 @@ export const SA_SITE: SeedSite = {
                     SA_PHOTOS.parents,
                 ),
                 text(
-                    "<h2>How admission works</h2><ol><li>Send the enquiry below, or call +91 141 400 7720.</li><li>Kavita calls you back within a day for a 30-minute counselling call.</li><li>Sit in on a free demo class on Saturday or Sunday.</li><li>Admission: the form, Class 10 marksheet, two photos and the ₹2,000 registration fee.</li></ol>",
+                    "<h2>How admission works</h2><ol><li>Send the enquiry below, or call +91 00000 00110.</li><li>Kavita calls you back within a day for a 30-minute counselling call.</li><li>Sit in on a free demo class on Saturday or Sunday.</li><li>Admission: the form, Class 10 marksheet, two photos and the ₹2,000 registration fee.</li></ol>",
                     SA_DRAWN.admissions,
                     "right",
                 ),

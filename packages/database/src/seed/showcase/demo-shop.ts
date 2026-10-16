@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import type { SeedSite } from "../data";
 import type { Db } from "../helpers";
 import {
+    dummyPhone,
     id,
     listProductAt,
     setStockLevel,
@@ -33,7 +34,7 @@ import type { Rng } from "./random";
 import { createRng } from "./random";
 
 /**
- * A per-vertical demo shop (Ammi's Achaar, Pagdandi Books): one business
+ * A per-vertical demo shop (Ammi Ki Barni, Margin Books): one business
  * with a storefront, a catalogue with photos, variants and stock, three
  * months of orders walked through the kitchen stages, the customers and
  * contacts behind them, reviews behind delivered lines, a monthly plan with
@@ -1150,7 +1151,9 @@ function makeShoppers(
             first,
             last,
             email,
-            phone: `+91 ${rng.pick(["98", "99", "97", "96", "90", "88", "70", "63", "93", "80"])}${rng.int(100, 999)} ${rng.int(10000, 99999)}`,
+            phone: dummyPhone(
+                `${rng.pick(["98", "99", "97", "96", "90", "88", "70", "63", "93", "80"])}${rng.int(100, 999)} ${rng.int(10000, 99999)}`,
+            ),
             line1: rng
                 .pick(pool.streets)
                 .replace("{n}", String(rng.int(2, 148))),
@@ -1342,7 +1345,9 @@ function planVolume(a: {
                 ? {
                       name: `${orderRng.pick(cfg.people.first)} ${orderRng.pick(cfg.people.last).charAt(0)}.`,
                       phone: orderRng.chance(0.4)
-                          ? `+91 9${digits(orderRng, 4)} ${digits(orderRng, 5)}`
+                          ? dummyPhone(
+                                `9${digits(orderRng, 4)} ${digits(orderRng, 5)}`,
+                            )
                           : null,
                   }
                 : null,

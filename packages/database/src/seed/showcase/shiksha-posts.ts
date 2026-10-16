@@ -1,5 +1,5 @@
 /**
- * Shiksha Academy's posts: nine Help pages, nine News items and nine
+ * Aarohan Academy's posts: nine Help pages, nine News items and nine
  * Articles, written for this seed. Every fact (batches, fees, dates, results)
  * matches the academy's showcase data; student names are fictional.
  *
@@ -12,7 +12,7 @@ import { SA_PHOTOS } from "./shiksha-photos";
 
 /** A picture the seed draws, 1600 × 1000. */
 const drawn = (file: string, alt: string): DemoImage => ({
-    url: demoAsset("shiksha-academy", file),
+    url: demoAsset("aarohan-academy", file),
     alt,
     width: 1600,
     height: 1000,
@@ -27,7 +27,7 @@ const SA_DRAWN = {
     ),
     results: drawn(
         "results-2026.png",
-        "Shiksha Academy toppers 2026: NEET, JEE Main and IELTS scores",
+        "Aarohan Academy toppers 2026: NEET, JEE Main and IELTS scores",
     ),
     fees: drawn(
         "fee-instalments.png",
@@ -66,7 +66,7 @@ const HELP: DemoPost[] = [
         author: KAVITA,
         cover: SA_DRAWN.admissions,
         featured: true,
-        body: `<p>Most families reach us with the same question: <em>what do we actually have to do?</em> Admission at Shiksha Academy is four steps, and nobody is asked to pay anything until the last one.</p>
+        body: `<p>Most families reach us with the same question: <em>what do we actually have to do?</em> Admission at Aarohan Academy is four steps, and nobody is asked to pay anything until the last one.</p>
 <h2>1. Enquiry</h2>
 <p>Fill in the enquiry form on this site, call the front desk, or walk in to the 3rd floor of Laxmi Complex, Gopalpura Bypass. Tell us the student's class, board and the exam they are aiming for. That is enough to start.</p>
 <h2>2. Counselling call (30 minutes, free)</h2>
@@ -344,7 +344,7 @@ const NEWS: DemoPost[] = [
 ${figure(SA_PHOTOS.friends, "Rest well. Five days off is enough to recharge, not enough to forget.")}
 <p>A word to Class 12 students: take Diwali off, genuinely. Then, from 10 November, put in two hours a day on revision so that the first week back is not a shock. Your teachers will set a short revision sheet before the break.</p>
 <p>The new IELTS weekend batch starts after the break, on Saturday 14 November, as planned. Fee instalments are not affected.</p>
-<p>Happy Diwali to every family at Shiksha Academy.</p>`,
+<p>Happy Diwali to every family at Aarohan Academy.</p>`,
     },
     {
         slug: "parent-teacher-meeting-october-2026",
@@ -671,7 +671,7 @@ ${figure(SA_PHOTOS.equations, "Write the full working. Shortcuts come later, onc
         daysAgo: 62,
         author: VIKRAM,
         cover: SA_PHOTOS.hero,
-        body: `<p>I have taught the move from Class 11 to Class 12 for twelve years at Shiksha Academy, and it surprises students every time. The syllabus does not just get harder. The whole year changes shape.</p>
+        body: `<p>I have taught the move from Class 11 to Class 12 for twelve years at Aarohan Academy, and it surprises students every time. The syllabus does not just get harder. The whole year changes shape.</p>
 <h2>What changes</h2>
 <ul>
 <li><strong>Two exams at once.</strong> Your board exam is in February or March; NEET or JEE follows a few weeks later. You prepare for both from April.</li>

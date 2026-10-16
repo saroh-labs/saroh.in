@@ -13,7 +13,7 @@ import type {
 import { block } from "./vertical";
 
 /**
- * Desk 42 — a small coworking space on Baner Road, Pune, shown as a CONCEPT:
+ * Baithak — a small coworking space on Baner Road, Pune, shown as a CONCEPT:
  * what a coworking space can run on Saroh today, kept honest.
  *
  * - The DAY PASS is a class-style service with 20 places a weekday (the 20
@@ -30,8 +30,8 @@ import { block } from "./vertical";
  */
 
 export const DK_KEY = "dk";
-export const DK_SLUG = "desk-42";
-export const DK_NAME = "Desk 42";
+export const DK_SLUG = "baithak-cowork";
+export const DK_NAME = "Baithak Cowork";
 /** Business centre and coworking services (GST, 18%). */
 export const DK_SAC = "997212";
 
@@ -47,7 +47,7 @@ const asset = (file: string, alt: string): DemoImage => ({
 export const DK_DRAWN = {
     floorPlan: asset(
         "floor-plan.png",
-        "Desk 42 floor plan: hot desks, dedicated desks, the Sahyadri Room, the call booth, café and lockers",
+        "Baithak floor plan: hot desks, dedicated desks, the Sahyadri Room, the call booth, café and lockers",
     ),
     plans: asset(
         "plans-card.png",
@@ -57,16 +57,16 @@ export const DK_DRAWN = {
         "room-booking.png",
         "How to book the Sahyadri Room, in four steps",
     ),
-    tshirt: asset("tshirt.png", "Desk 42 T-shirt, charcoal, front"),
+    tshirt: asset("tshirt.png", "Baithak T-shirt, charcoal, front"),
 };
 
 export const DK_SPEC: BusinessSpec = {
     key: DK_KEY,
     slug: DK_SLUG,
     name: DK_NAME,
-    legalName: "Desk Forty Two Workspaces Private Limited",
+    legalName: "Baithak Cowork Private Limited",
     type: "pvt",
-    gst: { state: "27", pan: "AAKCD4242M", prefix: "DK" },
+    gst: { state: "27", pan: "AAKCB4242M", prefix: "BC" },
     address: {
         line1: "4th floor, Sai Capital, Baner Road, near Balewadi Phata",
         city: "Pune",
@@ -74,8 +74,8 @@ export const DK_SPEC: BusinessSpec = {
     },
     printedAddress:
         "4th floor, Sai Capital, Baner Road, near Balewadi Phata, Pune 411045, Maharashtra",
-    phone: "+912041424242",
-    contactEmail: "desk42@example.com",
+    phone: "+910000000003",
+    contactEmail: "baithakcowork@example.com",
     modules: [
         "APPOINTMENTS",
         "CRM",
@@ -92,9 +92,9 @@ export const DK_SPEC: BusinessSpec = {
     paymentProvider: "RAZORPAY",
     createdDaysAgo: 520,
     storefront: {
-        name: "Desk 42, Baner",
+        name: "Baithak Cowork, Baner",
         description:
-            "Café, lockers, printing and Desk 42 things, at the front desk.",
+            "Café, lockers, printing and Baithak things, at the front desk.",
         address: "4th floor, Sai Capital, Baner Road, Pune 411045",
         hours: [
             { day: "MON", open: "08:00", close: "21:00", closed: false },
@@ -252,7 +252,7 @@ export const DK_PLANS: readonly PlanSpec[] = [
 export const DK_CATEGORIES = [
     { key: "cafe", name: "Café" },
     { key: "desk-extras", name: "Lockers & printing" },
-    { key: "merch", name: "Desk 42 things" },
+    { key: "merch", name: "Baithak things" },
 ];
 
 const CAFE = { hsn: "996331", gstRate: 5, category: "cafe" } as const;
@@ -426,8 +426,8 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         qty: [1, 1],
     },
     {
-        slug: "desk-42-tote",
-        name: "Desk 42 tote bag",
+        slug: "baithak-tote",
+        name: "Baithak tote bag",
         category: "merch",
         description:
             "A heavy cotton tote that takes a 15-inch laptop and lunch.",
@@ -441,8 +441,8 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         qty: [1, 1],
     },
     {
-        slug: "desk-42-mug",
-        name: "Desk 42 mug",
+        slug: "baithak-mug",
+        name: "Baithak mug",
         category: "merch",
         description: "The mug members leave at their desk. 350 ml, stoneware.",
         keyPoints: ["350 ml stoneware", "Dishwasher safe"],
@@ -455,8 +455,8 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         qty: [1, 2],
     },
     {
-        slug: "desk-42-notebook",
-        name: "Desk 42 notebook",
+        slug: "baithak-notebook",
+        name: "Baithak notebook",
         category: "merch",
         description: "A5, dotted, 160 pages, lies flat.",
         keyPoints: ["A5 dotted", "160 pages"],
@@ -469,10 +469,10 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         qty: [1, 2],
     },
     {
-        slug: "desk-42-t-shirt",
-        name: "Desk 42 T-shirt",
+        slug: "baithak-t-shirt",
+        name: "Baithak T-shirt",
         category: "merch",
-        description: "Charcoal cotton, the 42 small on the chest.",
+        description: "Charcoal cotton, the Baithak mark small on the chest.",
         keyPoints: ["100% cotton", "S to XL"],
         price: "549.00",
         hsn: "6109",
@@ -519,7 +519,7 @@ export const DK_QR: readonly QrSpec[] = [
         targetKind: "SITE",
         place: "CARD",
         placeNote: "Back of Rhea's visiting cards",
-        label: "Desk 42, Baner",
+        label: "Baithak Cowork, Baner",
         color: "#0f766e",
         createdDaysAgo: 120,
         perDay: 1,
@@ -750,7 +750,7 @@ const text = (
 ) => block("richText", { format: "html", value, image: img(image), imageSide });
 
 export const DK_FOOTER =
-    "Desk 42 · 4th floor, Sai Capital, Baner Road, Pune 411045 · Mon–Fri 8 am–9 pm, Sat 9 am–6 pm · +91 20 4142 4242";
+    "Baithak Cowork · 4th floor, Sai Capital, Baner Road, Pune 411045 · Mon–Fri 8 am–9 pm, Sat 9 am–6 pm · +91 00000 00003";
 
 export const DK_SITE: SeedSite = {
     slug: DK_SLUG,
@@ -772,7 +772,7 @@ export const DK_SITE: SeedSite = {
                 ),
                 block("features", {
                     variant: "facts",
-                    heading: "Desk 42 at a glance",
+                    heading: "Baithak at a glance",
                     items: [
                         {
                             value: "₹499",
@@ -963,7 +963,7 @@ export const DK_SITE: SeedSite = {
             sections: [
                 block("journal", {
                     variant: "archive",
-                    title: "Notes from Desk 42",
+                    title: "Notes from Baithak",
                     showTotal: true,
                 }),
             ],

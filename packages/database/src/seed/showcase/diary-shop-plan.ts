@@ -16,8 +16,8 @@ import type { Rng } from "./random";
 import { createRng } from "./random";
 
 /**
- * The dated world of a diary-and-counter business (Noor Salon & Bridal,
- * Motion Physio), planned before anything is written. Pure: `now` and the
+ * The dated world of a diary-and-counter business (Gulmohar Salon & Bridal,
+ * Stride Physio), planned before anything is written. Pure: `now` and the
  * seeded random streams decide everything, so a re-run inside the same half
  * hour plans the same rows, and a later day moves the diary with it.
  *
@@ -401,7 +401,7 @@ export function planDiaryShop(
             first,
             last,
             email: emailOf(first, last),
-            phone: `+91 ${phoneNumber(peopleRng)}`,
+            phone: phoneNumber(peopleRng),
             gender: g,
         });
         return n;
@@ -1583,7 +1583,7 @@ export function planDiaryShop(
                     ? null
                     : {
                           name: walkFirst,
-                          phone: `+91 ${phoneNumber(counterRng)}`,
+                          phone: phoneNumber(counterRng),
                       },
                 placedAt,
                 paidAt: placedAt + MINUTE,
@@ -1624,7 +1624,7 @@ export function planDiaryShop(
                 first,
                 last,
                 email: emailOf(first, last),
-                phone: `+91 ${phoneNumber(counterRng)}`,
+                phone: phoneNumber(counterRng),
                 gender: isMan ? "m" : "f",
             });
             const variant = review.variantTitle
