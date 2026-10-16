@@ -1,8 +1,15 @@
-import { toFailure } from "@/lib/api/failure";
-import { apiFetch, getJson, getList } from "@/lib/api/http";
+import { unstable_rethrow } from "next/navigation";
 
-import { listStorefronts } from "@/lib/stores/storefronts";
+import { ApiError } from "@/lib/api/errors";
+import { toFailure } from "@/lib/api/failure";
+import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
+
+import type { BusinessStore } from "./business-stores";
+import { fromStorefronts, ownInBusiness } from "./business-stores";
 import type { CreateStoreInput, StoreResult, UpdateStoreInput } from "./schema";
+import type { StorefrontSummary } from "./storefronts";
+
+export type { BusinessStore } from "./business-stores";
 
 /**
  * Store data access for app.saroh.in. The app no longer touches the database
@@ -19,6 +26,8 @@ export interface Store {
     name: string;
     description: string | null;
     logo: string | null;
+    /** Its business; `GET /stores` spans every business the person is in. */
+    organizationId?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -68,23 +77,46 @@ export function updateStore(
 }
 
 /**
- * The storefronts of the ACTIVE business, with their store records.
+ * The ACTIVE business's locations, for every role (16 Oct audit, SEV 4).
  *
- * `listStores()` is `GET /stores`, which returns every store the signed-in
- * person owns in EVERY business they belong to — so a merchant with two
- * businesses saw the other one's storefront in this one's Products, Customers
- * and "which storefront?" pickers. The org-scoped storefronts list says which
- * belong here; this keeps only those.
+ * Read from the business's storefronts (`GET /organizations/:org/
+ * storefronts`, `store:read`), which the API scopes to the active business
+ * itself. It used to start from `GET /stores`, the locations the signed-in
+ * person OWNS, so an Admin or a Member was told "No locations yet" and
+ * "Product not found". Who may change anything is the permissions' answer
+ * (`store:write`, `inventory:write`) and the API's, never ownership.
  *
- * If that list cannot be read, the old behaviour stands rather than the page
- * going blank: the API still refuses any write outside the active business.
+ * A role that can't read the business's locations (no `store:read`) still
+ * sees the ones it was invited to: `GET /stores`, kept to this business.
+ *
+ * THROWS when the locations can't be read, so a caller says "Couldn't
+ * load your locations" rather than "No locations yet"; `readBusinessStores`
+ * is the same read as a value.
  */
-export async function listBusinessStores(): Promise<Store[]> {
-    const [stores, storefronts] = await Promise.all([
-        listStores(),
-        listStorefronts().catch(() => null),
-    ]);
-    if (!storefronts) return stores;
-    const here = new Set(storefronts.map((s) => s.id));
-    return stores.filter((s) => here.has(s.id));
+export async function listBusinessStores(): Promise<BusinessStore[]> {
+    const organizationId = await getActiveOrgId();
+    if (!organizationId) return [];
+    const path = `/organizations/${organizationId}/storefronts`;
+    const res = await apiFetch(path);
+    if (res.ok) {
+        return fromStorefronts((await res.json()) as StorefrontSummary[]);
+    }
+    if (res.status === 403) {
+        return ownInBusiness(await listStores(), organizationId);
+    }
+    if (res.status === 404) return [];
+    throw new ApiError(res.status, `GET ${path}`);
+}
+
+/**
+ * `listBusinessStores()`, with a failed read as `null` for the page to say
+ * so. A redirect or a `forbidden()` from the read still goes through.
+ */
+export async function readBusinessStores(): Promise<BusinessStore[] | null> {
+    try {
+        return await listBusinessStores();
+    } catch (error) {
+        unstable_rethrow(error);
+        return null;
+    }
 }
