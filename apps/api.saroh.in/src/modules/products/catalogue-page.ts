@@ -332,8 +332,9 @@ export async function cataloguePage(
 
 /**
  * What needs restocking at `storefronts`, among the products in `base` that
- * count stock and are listed there — published or draft, never archived,
- * the same scope as the Stock screen's "Needs you". Every shelf is judged
+ * count stock and are listed there — never archived, and a draft only
+ * when short for orders already placed (no customer can buy it yet) — the
+ * same scope as the Stock screen's "Needs you". Every shelf is judged
  * where the storefront sells it (and, for a variant, sells that variant);
  * a storefront that sells it with no shelf yet reads 0, as on Stock.
  * A product a lower plan paused (#800) is hidden from the site: it needs
@@ -363,6 +364,9 @@ export async function catalogueNeeds(
                 id: true,
                 name: true,
                 createdAt: true,
+                // A draft needs someone only for orders already placed.
+                status: true,
+                option: { select: { name: true } },
                 variants: {
                     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                     select: { id: true, title: true },

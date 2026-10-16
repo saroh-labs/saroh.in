@@ -204,8 +204,10 @@ export function emptyCopy(
         return {
             kind: "chip",
             title: "Nothing tracked yet",
-            note: "Turn on stock tracking for a product and its stock level shows here.",
-            action: "add-product",
+            // Tracking is switched on in a product's editor, not made: no
+            // New product here, which would answer a different question.
+            note: "Turn on Track stock in a product's editor and its stock level shows here.",
+            action: null,
         };
     }
     if (query.view === "needs") {

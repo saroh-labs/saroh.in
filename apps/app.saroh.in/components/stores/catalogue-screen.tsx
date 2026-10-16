@@ -20,7 +20,7 @@ import { deleteProduct, setProductStatus } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { catalogueRows } from "@/lib/products/catalogue";
 import type { FilterChoices } from "@/lib/products/filter-choices";
-import { productEditHref, productHref } from "@/lib/products/links";
+import { productEditHref } from "@/lib/products/links";
 import {
     duplicateListedProduct,
     loadCataloguePage,
@@ -32,7 +32,10 @@ import {
     listHref,
     pageHref,
 } from "@/lib/products/list-query";
-import { step } from "@/lib/products/quick-look";
+import type { NeedDetail } from "@/lib/products/needs-you";
+import { needOf } from "@/lib/products/needs-you";
+import type { SellsOnline } from "@/lib/products/quick-look";
+import { statusToast, step } from "@/lib/products/quick-look";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 
 import { catalogueColumns, RowMenu } from "./catalogue/catalogue-columns";
@@ -59,10 +62,27 @@ import { QuickLook } from "./catalogue/quick-look";
  *
  * The row is the action: anywhere on it opens the quick look, and the
  * product's own page is one step further. Selection gives the bulk bar
- * (Publish · Archive · Delete); the row menu holds Preview · Edit ·
- * Duplicate · Archive · Delete, with Delete below a divider and confirmed.
+ * (Publish · Archive · Delete, each only where it would change something);
+ * the row menu holds Preview · Edit · Duplicate · Archive · Delete, with
+ * Delete below a divider and confirmed — the quick look's menu the same.
  * Publishing and archiving act at once and offer Undo.
+ *
+ * Restock in Needs you opens the quick look on that product with its Add
+ * box ready, even when it isn't on the page on screen: the task finishes
+ * here. A search or filter on a dropped connection keeps the list and says
+ * so, rather than losing the page to the browser's offline screen.
  */
+const OFFLINE = "Couldn't search. Check your connection and try again.";
+const OFFLINE_HOW = "Check your connection and try again.";
+
+/** How many of `rows` match, for a bulk label: "Archive 2". */
+function countOf(
+    rows: readonly CatalogueRow[],
+    match: (r: CatalogueRow) => boolean,
+): number {
+    return rows.filter(match).length;
+}
+
 export function CatalogueScreen({
     query,
     page,
@@ -78,6 +98,7 @@ export function CatalogueScreen({
     meter = null,
     limitBannerShown = false,
     pausedCut = null,
+    sellsOnline = null,
 }: {
     query: ListQuery;
     /** The page the address asks for, read on the server. */
@@ -103,11 +124,23 @@ export function CatalogueScreen({
     limitBannerShown?: boolean;
     /** Past the plan's products limit (#800): rows before it are marked. */
     pausedCut?: PausedCut;
+    /**
+     * The online shop is live (null: the website couldn't be read): the
+     * quick look's Archive and Publish lines claim the website only then.
+     */
+    sellsOnline?: SellsOnline;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
     const [data, setData] = useState(page);
     const [openId, setOpenId] = useState<string | null>(null);
+    /** Restock opened it: the Add box gets the keyboard. */
+    const [focusAdd, setFocusAdd] = useState(false);
+    /**
+     * A product Restock opened that isn't on the page on screen, read on
+     * its own so the quick look can show it.
+     */
+    const [extra, setExtra] = useState<CatalogueRow | null>(null);
     const [pendingDelete, setPendingDelete] = useState<CatalogueRow[] | null>(
         null,
     );
@@ -134,17 +167,45 @@ export function CatalogueScreen({
     const first = stores.at(0);
     const filter = catalogueFilter(query);
 
+    const needs = data.needs as NeedDetail[];
+    const needById = useMemo(
+        () => new Map(needs.map((n) => [n.productId, n])),
+        [needs],
+    );
+
     const go = useCallback(
-        (patch: Partial<ListQuery>) =>
-            startNavigation(() =>
-                router.replace(listHref(query, patch), { scroll: false }),
-            ),
+        (patch: Partial<ListQuery>) => {
+            // Offline, a server navigation falls back to a full page load
+            // and the browser's offline screen: keep the list, and say so.
+            if (typeof navigator !== "undefined" && !navigator.onLine) {
+                showError(OFFLINE);
+                return;
+            }
+            startNavigation(() => {
+                try {
+                    router.replace(listHref(query, patch), { scroll: false });
+                } catch {
+                    showError(OFFLINE);
+                }
+            });
+        },
         [query, router],
     );
 
     /** Read the page on screen again, and the counts with it. */
     async function reload() {
-        const res = await loadCataloguePage(filter);
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+            showError(OFFLINE);
+            return;
+        }
+        let res: Awaited<ReturnType<typeof loadCataloguePage>>;
+        try {
+            res = await loadCataloguePage(filter);
+        } catch {
+            // The action's request itself failed: the connection.
+            showError("The list couldn't be refreshed.", OFFLINE_HOW);
+            return;
+        }
         if (!res.ok) {
             showError("The list couldn't be refreshed.", res.error);
             return;
@@ -161,6 +222,68 @@ export function CatalogueScreen({
             return;
         }
         setData(res.data);
+        // A product Restock opened from beyond this page: its row again.
+        if (extra) {
+            const fresh = await findRow(extra.id, extra.name);
+            if (fresh) setExtra(fresh);
+        }
+    }
+
+    /**
+     * One product's row, when it isn't on the page on screen: the list
+     * searched by its name (the catalogue read has no "by id"), then
+     * picked by its id.
+     */
+    async function findRow(
+        id: string,
+        name: string,
+    ): Promise<CatalogueRow | null> {
+        try {
+            const res = await loadCataloguePage({
+                q: name,
+                storefront: query.storefront ?? undefined,
+                size: 100,
+            });
+            if (!res.ok) return null;
+            return (
+                catalogueRows(res.data.items, pausedCut).find(
+                    (r) => r.id === id,
+                ) ?? null
+            );
+        } catch {
+            return null;
+        }
+    }
+
+    /** Restock or View: the quick look on it, here, never another page. */
+    async function openNeed(productId: string) {
+        setFocusAdd(canStock);
+        if (rows.some((r) => r.id === productId)) {
+            setExtra(null);
+            setOpenId(productId);
+            return;
+        }
+        const need = needOf(needs, productId);
+        const row = need ? await findRow(productId, need.name) : null;
+        if (!row) {
+            showError("That product couldn't be opened.", OFFLINE_HOW);
+            return;
+        }
+        setExtra(row);
+        setOpenId(productId);
+    }
+
+    /** A row clicked or walked to: read it, no Add box focused. */
+    function openRow(id: string) {
+        setFocusAdd(false);
+        setExtra(null);
+        setOpenId(id);
+    }
+
+    function closeLook() {
+        setOpenId(null);
+        setExtra(null);
+        setFocusAdd(false);
     }
 
     async function setStatus(
@@ -205,15 +328,13 @@ export function CatalogueScreen({
         }
         clear?.();
         await reload();
-        const one = targets.length === 1 ? targets[0] : undefined;
-        const said =
-            status === "ARCHIVED"
-                ? one
-                    ? `Archived ${one.name}. It's hidden from ${many ? "every location" : "your location"} until you sell it again.`
-                    : `${targets.length} products archived.`
-                : one
-                  ? `${one.name} is on sale.`
-                  : `${targets.length} products published.`;
+        const changed = targets.filter((r) =>
+            before.some((b) => b.id === r.id),
+        );
+        const said = statusToast(
+            status === "ARCHIVED" ? "ARCHIVED" : "PUBLISHED",
+            changed.map((r) => r.name),
+        );
         showUndo(said, async () => {
             const back = await Promise.all(
                 before.map((r) => setProductStatus(r.id, r.was)),
@@ -239,7 +360,7 @@ export function CatalogueScreen({
                 gone === 1 ? "Product deleted." : `${gone} products deleted.`,
             );
         }
-        setOpenId(null);
+        closeLook();
         await reload();
     }
 
@@ -255,13 +376,23 @@ export function CatalogueScreen({
     }
 
     const openIndex = rows.findIndex((r) => r.id === openId);
-    const open = openIndex >= 0 ? (rows[openIndex] ?? null) : null;
+    const open =
+        openIndex >= 0
+            ? (rows[openIndex] ?? null)
+            : extra?.id === openId
+              ? extra
+              : null;
     // J/K and the arrows move within the page on screen and stay put at
-    // its first and last rows: another page is the footer's to open.
+    // its first and last rows: another page is the footer's to open. A
+    // product from beyond the page (Restock) has no neighbours here.
     const onStep = useCallback(
         (by: 1 | -1) => {
+            if (openIndex < 0) return;
             const next = step(openIndex, by, rows.length);
-            if (next !== openIndex) setOpenId(rows[next]?.id ?? null);
+            if (next !== openIndex) {
+                setFocusAdd(false);
+                setOpenId(rows[next]?.id ?? null);
+            }
         },
         [openIndex, rows],
     );
@@ -303,10 +434,9 @@ export function CatalogueScreen({
                 count={data.total > 0 ? countLabel : undefined}
             />
             <NeedsYou
-                needs={data.needs}
-                restockHref={(id) =>
-                    productHref(query.storefront, id, "variants")
-                }
+                needs={needs}
+                canStock={canStock}
+                onOpen={(id) => void openNeed(id)}
                 onlyThese={query.view === "needs"}
                 toggleHref={listHref(query, {
                     view: query.view === "needs" ? "all" : "needs",
@@ -327,6 +457,7 @@ export function CatalogueScreen({
                         many,
                         filtered: !!store,
                         ratingById,
+                        needById,
                     })}
                     rowKey={(r) => r.key}
                     modes={["table", "list"]}
@@ -355,6 +486,16 @@ export function CatalogueScreen({
                             choices={choices}
                         />
                     }
+                    // Only a search narrows: the way back says so.
+                    clearLabel={
+                        query.q &&
+                        !query.status &&
+                        !query.category &&
+                        !query.collection &&
+                        !query.storefront
+                            ? "Clear search"
+                            : undefined
+                    }
                     onClearFilters={
                         catalogueNarrowed(query)
                             ? () =>
@@ -367,25 +508,46 @@ export function CatalogueScreen({
                                   })
                             : undefined
                     }
-                    onRowClick={(r) => setOpenId(r.id)}
+                    onRowClick={(r) => openRow(r.id)}
                     selectable={canWrite}
+                    rowLabel={(r) => r.name}
+                    // Each offered only where it would change something,
+                    // with how many it acts on; Delete last, at less weight.
                     bulkActions={[
                         {
                             id: "publish",
-                            label: "Publish",
+                            label: (sel) =>
+                                `Publish ${countOf(sel, (r) => r.status !== "PUBLISHED")}`,
+                            hidden: (sel) =>
+                                sel.every((r) => r.status === "PUBLISHED"),
                             run: (targets, clear) =>
-                                void setStatus(targets, "PUBLISHED", clear),
+                                void setStatus(
+                                    targets.filter(
+                                        (r) => r.status !== "PUBLISHED",
+                                    ),
+                                    "PUBLISHED",
+                                    clear,
+                                ),
                         },
                         {
                             id: "archive",
-                            label: "Archive",
+                            label: (sel) =>
+                                `Archive ${countOf(sel, (r) => r.status === "PUBLISHED")}`,
+                            hidden: (sel) =>
+                                !sel.some((r) => r.status === "PUBLISHED"),
                             run: (targets, clear) =>
-                                void setStatus(targets, "ARCHIVED", clear),
+                                void setStatus(
+                                    targets.filter(
+                                        (r) => r.status === "PUBLISHED",
+                                    ),
+                                    "ARCHIVED",
+                                    clear,
+                                ),
                         },
                         {
                             id: "delete",
-                            label: "Delete",
-                            tone: "destructive",
+                            label: (sel) => `Delete ${sel.length}`,
+                            tone: "destructive-outline",
                             run: (targets, clear) => {
                                 setPendingDelete(targets);
                                 clear();
@@ -398,7 +560,7 @@ export function CatalogueScreen({
                             editHref={productEditHref(query.storefront, r.id)}
                             canWrite={canWrite}
                             canStock={canStock}
-                            onPreview={() => setOpenId(r.id)}
+                            onPreview={() => openRow(r.id)}
                             onDuplicate={() => void duplicate(r)}
                             onStatus={(s) => void setStatus([r], s)}
                             onDelete={() => setPendingDelete([r])}
@@ -437,9 +599,16 @@ export function CatalogueScreen({
                 storeId={query.storefront}
                 canWrite={canWrite}
                 canStock={canStock}
+                need={open ? (needById.get(open.id) ?? null) : null}
+                focusAdd={focusAdd}
+                atFirst={openIndex <= 0}
+                atLast={openIndex < 0 || openIndex >= rows.length - 1}
+                sellsOnline={sellsOnline}
                 onStep={onStep}
-                onClose={() => setOpenId(null)}
+                onClose={closeLook}
                 onStatus={(r, s) => void setStatus([r], s)}
+                onDuplicate={(r) => void duplicate(r)}
+                onDelete={(r) => setPendingDelete([r])}
                 onChanged={() => void reload()}
             />
 

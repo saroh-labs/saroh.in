@@ -51,6 +51,11 @@ export interface DataColumn<TRow> {
     width?: string;
     /** Hide from the table only; useful for a list-only summary line. */
     tableHidden?: boolean;
+    /**
+     * Classes on the table's header and cells for this column, e.g.
+     * `hidden min-[1100px]:table-cell` to fold it away on a narrow desk.
+     */
+    tableClassName?: string;
 }
 
 /**
@@ -168,6 +173,8 @@ export interface DataViewProps<TRow> {
      * then shows, and also clears the list's own search and subset.
      */
     onClearFilters?: () => void;
+    /** What the toolbar's clear says: "Clear filters" unless told. */
+    clearLabel?: string;
     /**
      * The list's one attention toggle (`AttentionToggle`), after the
      * dropdowns.
@@ -190,6 +197,11 @@ export interface DataViewProps<TRow> {
     onRowClick?: (row: TRow) => void;
     /** Rows can be selected, and the bulk bar offers these actions. */
     selectable?: boolean;
+    /**
+     * A row's own name, for its checkbox: "Select Platform Trolley", not
+     * "Select product" twenty times over.
+     */
+    rowLabel?: (row: TRow) => string;
     bulkActions?: DataBulkAction<TRow>[];
     /**
      * The designed first-run state: shown when there are no rows at all. The
@@ -232,7 +244,15 @@ export interface DataPaging {
  */
 export interface DataBulkAction<TRow> {
     id: string;
-    label: string;
-    tone?: "default" | "destructive";
+    /** Its words, or words for the rows selected: "Archive 2". */
+    label: string | ((rows: TRow[]) => string);
+    /**
+     * `destructive` is a solid red button; `destructive-outline` the same
+     * action at less weight — red text on an outline — for a bar whose
+     * destructive action shouldn't be its loudest.
+     */
+    tone?: "default" | "destructive" | "destructive-outline";
+    /** Left out of the bar for these rows: Publish when all are live. */
+    hidden?: (rows: TRow[]) => boolean;
     run: (rows: TRow[], clear: () => void) => void;
 }
