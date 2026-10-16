@@ -209,6 +209,10 @@ jobs:
       - name: mktemp templates
         run: pnpm run check:mktemp
 
+      # An IconButton is its own tooltip: no <Tip> drawing a second one.
+      - name: Icon button tooltips
+        run: pnpm run check:icon-button-tips
+
       # No tag is stripped by one pattern replace with nothing: the code
       # scanner refuses it, and nothing else runs the scanner before a push.
       - name: Tag stripping

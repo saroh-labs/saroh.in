@@ -4658,3 +4658,18 @@ the two as well, so moving either date runs a test that sees both.
 **Rule**: a test that ties two files together sits where a change to either
 one runs it, or it is written on both sides.
 **Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`
+
+## Two tooltips over one icon button
+
+**Symptom**: hovering the products quick look's Previous button showed
+"Previous (K)" and "Previous product (K)" stacked over each other (owner,
+16 Oct). The variant row's Remove button did the same.
+**Cause**: `IconButton` turns its `label` into a tooltip, and a `<Tip>` was
+also wrapped around it with near-identical words.
+**Fix**: the extra `<Tip>`s are gone. Where a `<Tip>` is wanted (shorter
+words than the accessible label, or why a button is disabled), the button
+sets `tooltip` itself.
+**Check**: `pnpm run check:icon-button-tips` (prepush and CI) fails on a
+`<Tip>` around an `<IconButton>` that doesn't set `tooltip`.
+**Rule**: an icon button is its own tooltip; never wrap it in another.
+**Category**: frontend · `docs/patterns/frontend-design-system.md`

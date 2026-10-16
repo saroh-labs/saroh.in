@@ -24,7 +24,6 @@ import { position } from "@/lib/products/quick-look";
 import type { ProductStatus } from "@/lib/products/service";
 
 import { IconButton } from "@saroh/ui/icon-button";
-import { Tip } from "@saroh/ui/tooltip";
 import { ProductThumb } from "./product-thumb";
 import { StockBlock } from "./quick-look-stock";
 import { STATUS_LABEL, STATUS_VARIANT } from "./tones";
@@ -126,22 +125,19 @@ export function QuickLook({
                                 {position(index, total)}
                             </span>
                             <div className="ml-auto flex gap-0.5">
-                                <Tip label="Previous (K)">
-                                    <IconButton
-                                        label="Previous product (K)"
-                                        icon={<ChevronUp />}
-                                        variant="ghost"
-                                        onClick={() => onStep(-1)}
-                                    />
-                                </Tip>
-                                <Tip label="Next (J)">
-                                    <IconButton
-                                        label="Next product (J)"
-                                        icon={<ChevronDown />}
-                                        variant="ghost"
-                                        onClick={() => onStep(1)}
-                                    />
-                                </Tip>
+                                {/* IconButton's label is its tooltip: no Tip around it. */}
+                                <IconButton
+                                    label="Previous product (K)"
+                                    icon={<ChevronUp />}
+                                    variant="ghost"
+                                    onClick={() => onStep(-1)}
+                                />
+                                <IconButton
+                                    label="Next product (J)"
+                                    icon={<ChevronDown />}
+                                    variant="ghost"
+                                    onClick={() => onStep(1)}
+                                />
                             </div>
                             <SheetClose asChild>
                                 <IconButton
@@ -203,18 +199,28 @@ export function QuickLook({
                                 </Line>
                             </dl>
                         </div>
-                        <div className="flex flex-wrap items-center gap-[9px] border-t border-muted px-[18px] py-3.5">
-                            <Button asChild variant="outline">
-                                <Link href={pageHref}>Open product page</Link>
-                            </Button>
-                            {canWrite || canStock ? (
-                                <Button asChild>
-                                    <Link href={editHref}>
-                                        Edit
-                                        <ArrowRight className="ml-1.5 size-3.5" />
+                        <div className="flex flex-col gap-3 border-t border-muted px-[18px] py-3.5">
+                            {/* The two ways onward share one row; Edit, the
+                                usual next step, is the strong one. */}
+                            <div className="flex gap-[9px]">
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="flex-1"
+                                >
+                                    <Link href={pageHref}>
+                                        Open product page
                                     </Link>
                                 </Button>
-                            ) : null}
+                                {canWrite || canStock ? (
+                                    <Button asChild className="flex-1">
+                                        <Link href={editHref}>
+                                            Edit
+                                            <ArrowRight className="ml-1.5 size-3.5" />
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                            </div>
                             {canWrite &&
                             // Paused (#800): only taking it off sale is
                             // open, as in the Editor; never Publish.
@@ -243,19 +249,31 @@ function SellToggle({
         : row.status === "ARCHIVED"
           ? "Sell again"
           : "Publish";
+    // What the click does, in one true line: archiving deletes nothing and
+    // the toast offers Undo, so the stop is safe to try.
+    const what = selling
+        ? "Takes it off your shop. Nothing is deleted."
+        : "Puts it on your shop for customers.";
     return (
-        <Button
-            variant="ghost"
-            className={cn(
-                "ml-auto",
-                selling
-                    ? "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
-                    : "text-foreground",
-            )}
-            onClick={() => onStatus(row, selling ? "ARCHIVED" : "PUBLISHED")}
-        >
-            {label}
-        </Button>
+        <div className="flex items-center gap-3">
+            <Button
+                variant="ghost"
+                className={cn(
+                    "-ml-3 shrink-0",
+                    selling
+                        ? "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
+                        : "text-foreground",
+                )}
+                onClick={() =>
+                    onStatus(row, selling ? "ARCHIVED" : "PUBLISHED")
+                }
+            >
+                {label}
+            </Button>
+            <span className="min-w-0 text-pretty text-[12px] leading-[1.4] text-muted-foreground">
+                {what}
+            </span>
+        </div>
     );
 }
 
