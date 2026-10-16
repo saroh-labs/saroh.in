@@ -324,6 +324,7 @@ describe("shown once", () => {
             "first-booking",
             "orders-10",
             "orders-100",
+            "defaults-suggestions",
         ]);
     });
 });

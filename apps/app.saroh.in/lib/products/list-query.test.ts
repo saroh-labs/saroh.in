@@ -25,6 +25,7 @@ describe("the Products list's address (#519)", () => {
             storefront: "online",
             status: "DRAFT",
             category: null,
+            option: null,
             collection: "c1",
             page: 1,
             size: 50,
@@ -148,6 +149,17 @@ describe("the Products list's address (#519)", () => {
         ).toBe("/commerce/products?tab=collections&q=rye&new=collection");
     });
 
+    it("reads and writes Settings' links: an option, and Uncategorized", () => {
+        const byOption = readListQuery({ option: "o1" });
+        expect(byOption.option).toBe("o1");
+        expect(isNarrowed(byOption)).toBe(true);
+        expect(listHref(byOption)).toBe("/commerce/products?option=o1");
+        expect(catalogueFilter(byOption).option).toBe("o1");
+        expect(listHref(readListQuery({ category: "none" }))).toBe(
+            "/commerce/products?category=none",
+        );
+    });
+
     it("asks the API only for what narrows", () => {
         expect(catalogueFilter(readListQuery({ q: "rye" }))).toEqual({
             view: undefined,
@@ -155,6 +167,7 @@ describe("the Products list's address (#519)", () => {
             storefront: undefined,
             status: undefined,
             category: undefined,
+            option: undefined,
             collection: undefined,
             page: undefined,
             size: 50,

@@ -78,18 +78,18 @@ export function FieldSheet({
 
     const saved = field ?? created;
     const nl = name.trim();
+    const twin = fields.find(
+        (f) => f.id !== saved?.id && f.name.toLowerCase() === nl.toLowerCase(),
+    );
     const problem = !nl
         ? "A field needs a name."
-        : fields.some(
-                (f) =>
-                    f.id !== saved?.id &&
-                    f.name.toLowerCase() === nl.toLowerCase(),
-            )
-          ? `There is already a field called ${nl}.`
+        : twin
+          ? `${twin.name} already exists.`
           : nl.length > MAX
             ? `Keep it under ${MAX} characters.`
             : "";
-    const error = nl || tried ? problem : "";
+    // Said once Save is pressed, as every sheet does (frontend-forms).
+    const error = tried ? problem : "";
 
     function reset() {
         setCreated(null);
@@ -188,7 +188,7 @@ export function FieldSheet({
                     value={name}
                     autoFocus
                     disabled={busy}
-                    placeholder="Skin type"
+                    placeholder={error ? undefined : "Skin type"}
                     aria-invalid={!!error}
                     aria-describedby={error ? `${id}-name-error` : undefined}
                     onChange={(e) => setName(e.target.value)}

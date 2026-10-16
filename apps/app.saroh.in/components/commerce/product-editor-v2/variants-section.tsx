@@ -192,14 +192,20 @@ export function VariantsSection({
     // The row being added: its own gate, so Save is never blamed for it.
     const newTitle = values.find((x) => x.id === newValue)?.value ?? "";
     // The store's pattern (Settings → SKUs); off, the field starts empty.
+    // Two values that shorten alike ("Hindi · Paperback", "Hindi ·
+    // Hardcover") get -2, -3 rather than a SKU this product already has.
     const suggested =
         sku.suggest && newTitle
-            ? skuFrom(sku.pattern, {
-                  name: product.name,
-                  category: product.category?.name ?? "",
-                  value: newTitle,
-                  n: sku.n,
-              })
+            ? skuFrom(
+                  sku.pattern,
+                  {
+                      name: product.name,
+                      category: product.category?.name ?? "",
+                      value: newTitle,
+                      n: sku.n,
+                  },
+                  rows.map((r) => r.sku.trim()).filter(Boolean),
+              )
             : "";
     const newSkuValue = newSku.trim() || suggested;
     const dupSku =

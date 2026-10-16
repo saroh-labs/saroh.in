@@ -279,6 +279,7 @@ describe("Catalogue settings belong to the business (DB)", () => {
                 },
                 productCounts: { all: 1, "cat:Bakery": 0, "cat:Breads": 1 },
                 suggestions: [],
+                suggestionsPutAway: false,
             },
             canWrite: true,
         },
@@ -390,7 +391,7 @@ describe("Catalogue settings belong to the business (DB)", () => {
         // another "Cakes".
         await expect(
             categoriesViaStore.create(owner, second, { name: "cakes" }),
-        ).rejects.toThrow(/already a category called Cakes/);
+        ).rejects.toThrow(/Cakes already exists/);
         await expect(
             categoriesViaOrg.create(ctx, { name: "Cakes 2", slug: "cakes" }),
         ).rejects.toThrow(/slug is already taken/);

@@ -372,6 +372,7 @@ export interface CatalogueFilter {
     q?: string;
     view?: CatalogueView;
     category?: string;
+    option?: string;
     collection?: string;
     cursor?: string;
     limit?: number;

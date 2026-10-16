@@ -20,6 +20,8 @@ const actions = {
     removeOption: vi.fn(),
     addOptionValue: vi.fn(),
     removeOptionValue: vi.fn(),
+    renameOptionValue: vi.fn(),
+    reorderOptionValues: vi.fn(),
 };
 vi.mock("@/lib/products/settings-actions", () => ({
     addOption: (...a: unknown[]) => actions.addOption(...a) as unknown,
@@ -29,6 +31,10 @@ vi.mock("@/lib/products/settings-actions", () => ({
         actions.addOptionValue(...a) as unknown,
     removeOptionValue: (...a: unknown[]) =>
         actions.removeOptionValue(...a) as unknown,
+    renameOptionValue: (...a: unknown[]) =>
+        actions.renameOptionValue(...a) as unknown,
+    reorderOptionValues: (...a: unknown[]) =>
+        actions.reorderOptionValues(...a) as unknown,
 }));
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -75,9 +81,19 @@ const s = stage();
 const render = (options: Option[] = [SIZE, SHADE], canWrite = true) =>
     s.render(<OptionsTab catalogue={catalogue(options, canWrite)} />);
 const fields = () => s.inputs(s.sheet());
+/** The field a new value is typed in. */
+const newValue = () =>
+    fields().find((i) =>
+        i.getAttribute("aria-label")?.startsWith("Add a value"),
+    );
+/** The draft's values, in order, as their fields hold them. */
+const values = () =>
+    fields()
+        .filter((i) => i.getAttribute("aria-label")?.startsWith("Value "))
+        .map((i) => i.value);
 /** Types a value and adds it to the sheet's draft. */
 function addValue(v: string) {
-    s.type(fields()[1], v);
+    s.type(newValue(), v);
     s.press("Add value", s.sheet());
 }
 
@@ -92,7 +108,15 @@ describe("the list", () => {
     it("reads each option and its values with nothing to type in", () => {
         render();
         expect(s.text()).toContain("Size");
-        expect(s.text()).toContain("Used by 2 products");
+        expect(s.text()).toContain("2 products");
+        expect(s.text()).not.toContain("Used by");
+        // The count opens the products choosing by it.
+        expect(
+            document.querySelector('a[href="/commerce/products?option=o1"]')
+                ?.textContent,
+        ).toBe("2 products");
+        expect(s.text()).toContain("Not on any product");
+        expect(s.text()).toContain("A product picks one of these.");
         expect(s.text()).toContain("250g");
         expect(s.text()).toContain("500g");
         expect(s.text()).toContain("No values yet");
@@ -102,15 +126,14 @@ describe("the list", () => {
         expect(s.button("Edit Size")).toBeDefined();
         // No value is removed from the card.
         expect(s.button("Remove 500g")).toBeUndefined();
-        // One a product chooses by can't be deleted, and says why.
-        expect(s.button("Delete Size")?.disabled).toBe(true);
-        expect(s.text()).toContain("Change their variants first");
+        // One a product chooses by offers no Delete; its count says why.
+        expect(s.button("Delete Size")).toBeUndefined();
         expect(s.button("Delete Shade")?.disabled).toBe(false);
     });
 
     it("has no actions for a role that can only read", () => {
         render([SIZE], false);
-        expect(s.text()).toContain("Your role can read these settings");
+        expect(s.text()).toContain("You can see these but not change them");
         expect(s.text()).toContain("250g");
         for (const name of ["New option", "Edit Size", "Delete Size"])
             expect(s.button(name)).toBeUndefined();
@@ -148,6 +171,9 @@ describe("New option", () => {
     it("opens a sheet named New option: its name and its values", () => {
         open();
         expect(s.title(s.sheet())).toBe("New option");
+        expect(s.sheet()?.textContent).toContain(
+            "A product picks one of these. For size and colour together",
+        );
         expect(fields()).toHaveLength(2);
         expect(fields()[0].value).toBe("");
         expect(s.sheet()?.textContent).toContain("No values yet");
@@ -159,7 +185,7 @@ describe("New option", () => {
         s.type(fields()[0], " Grind ");
         addValue("Whole bean");
         // A value still in the field goes in with the rest.
-        s.type(fields()[1], "Espresso");
+        s.type(newValue(), "Espresso");
         expect(actions.addOption).not.toHaveBeenCalled();
         await s.submit(s.sheet());
         expect(actions.addOption).toHaveBeenCalledWith("Grind", [
@@ -184,17 +210,17 @@ describe("New option", () => {
         await s.submit(s.sheet());
         expect(showError).toHaveBeenCalledWith("Plan full.");
         expect(fields()[0].value).toBe("Grind");
-        expect(s.sheet()?.textContent).toContain("Whole bean");
+        expect(values()).toEqual(["Whole bean"]);
     });
 
     it("refuses a name that is taken, too long or empty, unsent", async () => {
         open();
         await s.submit(s.sheet());
         expect(s.sheet()?.textContent).toContain("An option needs a name.");
+        // A field in error drops its placeholder, which would read as typed.
+        expect(fields()[0].placeholder).toBe("");
         s.type(fields()[0], "size");
-        expect(s.sheet()?.textContent).toContain(
-            "There is already an option called size.",
-        );
+        expect(s.sheet()?.textContent).toContain("Size already exists.");
         s.type(fields()[0], "x".repeat(41));
         expect(s.sheet()?.textContent).toContain(
             "Keep it under 40 characters.",
@@ -208,8 +234,8 @@ describe("New option", () => {
         s.type(fields()[0], "Grind");
         addValue("Fine");
         addValue("fine");
-        expect(s.sheet()?.textContent).toContain("fine is already a value.");
-        s.type(fields()[1], "x".repeat(41));
+        expect(s.sheet()?.textContent).toContain("Fine is already a value.");
+        s.type(newValue(), "x".repeat(41));
         s.press("Add value", s.sheet());
         expect(s.sheet()?.textContent).toContain(
             "Keep a value under 40 characters.",
@@ -227,13 +253,11 @@ describe("Edit", () => {
         open();
         expect(s.title(s.sheet())).toBe("Edit Size");
         expect(fields()[0].value).toBe("Size");
-        // The one a variant uses says so and has no Remove.
-        expect(s.sheet()?.textContent).toContain("250g· in use");
+        expect(values()).toEqual(["250g", "500g"]);
+        // The one variants use says how many and has no Remove.
+        expect(s.sheet()?.textContent).toContain("2 variants");
         expect(s.button("Remove 250g", s.sheet())).toBeUndefined();
         expect(s.button("Remove 500g", s.sheet())).toBeDefined();
-        expect(s.sheet()?.textContent).toContain(
-            "A value in use by a variant cannot be removed.",
-        );
         expect(s.button("Edit Shade")).toBeDefined();
     });
 
@@ -248,7 +272,7 @@ describe("Edit", () => {
         s.type(fields()[0], "Weight");
         s.press("Remove 500g", s.sheet());
         addValue("1kg");
-        expect(s.sheet()?.textContent).not.toContain("500g");
+        expect(values()).toEqual(["250g", "1kg"]);
         for (const m of Object.values(actions))
             expect(m).not.toHaveBeenCalled();
         await s.submit(s.sheet());
@@ -270,7 +294,7 @@ describe("Edit", () => {
         addValue("1kg");
         await s.submit(s.sheet());
         expect(showError).toHaveBeenCalledWith("That value can't be added.");
-        expect(s.sheet()?.textContent).toContain("1kg");
+        expect(values()).toEqual(["250g", "500g", "1kg"]);
         expect(showUndo).not.toHaveBeenCalled();
     });
 
@@ -300,18 +324,113 @@ describe("Edit", () => {
 
     it("adds a value on Enter without saving the sheet", () => {
         open();
-        s.type(fields()[1], "1kg");
+        s.type(newValue(), "1kg");
         const e = new KeyboardEvent("keydown", {
             key: "Enter",
             bubbles: true,
             cancelable: true,
         });
         act(() => {
-            fields()[1].dispatchEvent(e);
+            newValue()?.dispatchEvent(e);
         });
         expect(e.defaultPrevented).toBe(true);
         expect(s.button("Remove 1kg", s.sheet())).toBeDefined();
         expect(actions.addOptionValue).not.toHaveBeenCalled();
         expect(s.sheet()).not.toBe(null);
+    });
+});
+
+describe("Rename and order values", () => {
+    function open() {
+        render();
+        s.press("Edit Size");
+    }
+    const valueField = (i: number) =>
+        fields().filter((x) =>
+            x.getAttribute("aria-label")?.startsWith("Value "),
+        )[i];
+
+    it("renames a value in use where it stands, on Save, with Undo", async () => {
+        actions.renameOptionValue.mockResolvedValue({
+            ok: true,
+            data: {
+                id: "v1",
+                value: "250 g",
+                previousValue: "250g",
+                variantCount: 2,
+            },
+        });
+        open();
+        s.type(valueField(0), "250 g");
+        expect(actions.renameOptionValue).not.toHaveBeenCalled();
+        await s.submit(s.sheet());
+        expect(actions.renameOptionValue).toHaveBeenCalledWith(
+            "o1",
+            "v1",
+            "250 g",
+        );
+        expect(actions.reorderOptionValues).not.toHaveBeenCalled();
+        expect(showUndo.mock.calls[0][0]).toBe(
+            "Size saved. Renamed on 2 variants.",
+        );
+        // Undo renames it back.
+        actions.renameOptionValue.mockResolvedValue({ ok: true, data: {} });
+        const undo = showUndo.mock.calls[0][1] as () => Promise<unknown>;
+        await act(async () => {
+            await undo();
+        });
+        expect(actions.renameOptionValue).toHaveBeenLastCalledWith(
+            "o1",
+            "v1",
+            "250g",
+        );
+    });
+
+    it("refuses an empty or doubled value on Save, unsent", async () => {
+        open();
+        s.type(valueField(0), " ");
+        await s.submit(s.sheet());
+        expect(s.sheet()?.textContent).toContain("A value can't be empty.");
+        s.type(valueField(0), "500G");
+        await s.submit(s.sheet());
+        expect(s.sheet()?.textContent).toContain("500g is there twice.");
+        expect(actions.renameOptionValue).not.toHaveBeenCalled();
+    });
+
+    it("sorts A to Z, reading numbers as numbers, and saves the order", async () => {
+        actions.reorderOptionValues.mockResolvedValue({ ok: true, data: {} });
+        render([
+            {
+                ...SIZE,
+                values: [
+                    { id: "a", value: "1 L", variantCount: 0 },
+                    { id: "b", value: "250 ml", variantCount: 0 },
+                    { id: "c", value: "50 ml", variantCount: 0 },
+                ],
+            },
+        ]);
+        s.press("Edit Size");
+        s.press("Sort A to Z", s.sheet());
+        expect(values()).toEqual(["1 L", "50 ml", "250 ml"]);
+        await s.submit(s.sheet());
+        expect(actions.reorderOptionValues).toHaveBeenCalledWith("o1", [
+            "a",
+            "c",
+            "b",
+        ]);
+    });
+
+    it("moves a value with the arrow keys on its handle", () => {
+        open();
+        const handle = s.button(
+            "Move 500g, 2 of 2. Use the up and down arrows.",
+            s.sheet(),
+        );
+        act(() => {
+            handle?.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
+            );
+        });
+        expect(values()).toEqual(["500g", "250g"]);
     });
 });

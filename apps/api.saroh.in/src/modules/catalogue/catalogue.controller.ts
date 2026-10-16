@@ -28,6 +28,8 @@ import {
     CreateFieldDto,
     CreateOptionDto,
     RenameOptionDto,
+    RenameOptionValueDto,
+    ReorderOptionValuesDto,
     SaveDefaultsDto,
     SaveSkuPatternDto,
     UndoDefaultsDto,
@@ -137,6 +139,36 @@ export class OrganizationCatalogueController {
         @Body() dto: AddOptionValueDto,
     ) {
         return this.options.addValue(this.access.write(ctx), optionId, dto);
+    }
+
+    /** Its new name, on every variant that uses it. */
+    @Patch("options/:optionId/values/:valueId")
+    renameValue(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("optionId") optionId: string,
+        @Param("valueId") valueId: string,
+        @Body() dto: RenameOptionValueDto,
+    ) {
+        return this.options.renameValue(
+            this.access.write(ctx),
+            optionId,
+            valueId,
+            dto,
+        );
+    }
+
+    /** The order customers pick values in: every value, once. */
+    @Put("options/:optionId/values/order")
+    reorderValues(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("optionId") optionId: string,
+        @Body() dto: ReorderOptionValuesDto,
+    ) {
+        return this.options.reorderValues(
+            this.access.write(ctx),
+            optionId,
+            dto,
+        );
     }
 
     @Delete("options/:optionId/values/:valueId")

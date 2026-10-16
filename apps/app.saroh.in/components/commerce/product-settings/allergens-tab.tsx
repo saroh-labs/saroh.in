@@ -5,19 +5,18 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import type { AllergenView } from "@/lib/products/settings";
 import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { listTable } from "@/components/shared/list-toolbar";
 import { NameDialog } from "@/components/shared/name-dialog";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { Tip } from "@saroh/ui/tooltip";
-import { TabIntro } from "./product-settings";
+import { SettingsReadOnly, TabIntro } from "./product-settings";
 
 const MAX = 30;
 const COMMON = [
@@ -38,6 +37,31 @@ const COMMON = [
  * one-field dialog. One a product lists can't be removed.
  */
 export function AllergensTab({
+    allergens,
+    canWrite,
+}: {
+    /** null: the list couldn't be read, which is said, never "none yet". */
+    allergens: AllergenView[] | null;
+    canWrite: boolean;
+}) {
+    if (allergens === null) {
+        return (
+            <section>
+                <TabIntro title="Allergens">
+                    What the editor offers under “Contains” and “May contain”.
+                </TabIntro>
+                <FailedRead
+                    size="panel"
+                    things="allergens"
+                    reassurance="Products keep the allergens they list."
+                />
+            </section>
+        );
+    }
+    return <AllergenList allergens={allergens} canWrite={canWrite} />;
+}
+
+function AllergenList({
     allergens,
     canWrite,
 }: {
@@ -80,8 +104,7 @@ export function AllergensTab({
         <NameDialog
             trigger={
                 <Button type="button" className="shrink-0">
-                    <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
-                    Add allergen
+                    New allergen
                 </Button>
             }
             title="New allergen"
@@ -90,17 +113,18 @@ export function AllergensTab({
             placeholder="Celery"
             submitLabel="Add allergen"
             busyLabel="Adding…"
-            problem={(name) =>
-                !name
+            problem={(name) => {
+                const twin = allergens.find(
+                    (a) => a.name.toLowerCase() === name.toLowerCase(),
+                );
+                return !name
                     ? "An allergen needs a name."
-                    : allergens.some(
-                            (a) => a.name.toLowerCase() === name.toLowerCase(),
-                        )
-                      ? `${name} is already on the list.`
+                    : twin
+                      ? `${twin.name} already exists.`
                       : name.length > MAX
                         ? `Keep it under ${MAX} characters.`
-                        : ""
-            }
+                        : "";
+            }}
             onSubmit={(name) =>
                 add([name], `${name} added. The editor offers it now.`)
             }
@@ -110,14 +134,14 @@ export function AllergensTab({
     return (
         <section>
             <TabIntro
-                title="Allergen list"
+                title="Allergens"
                 // With none yet, the empty state carries the buttons.
                 action={allergens.length > 0 ? addOne : null}
             >
                 What the editor offers under “Contains” and “May contain”.
                 Customers see each one as you name it here.
             </TabIntro>
-            {canWrite ? null : <ReadOnlyNote />}
+            {canWrite ? null : <SettingsReadOnly />}
 
             {allergens.length === 0 ? (
                 <EmptyState
@@ -237,10 +261,12 @@ export function AllergensTab({
                 </ul>
             )}
 
-            <p className="mt-2 text-[11.5px] text-muted-foreground">
-                One a product lists cannot be removed. Take it off those
-                products first.
-            </p>
+            {allergens.length > 0 ? (
+                <p className="mt-2 text-[11.5px] text-muted-foreground">
+                    One a product lists cannot be removed. Take it off those
+                    products first.
+                </p>
+            ) : null}
         </section>
     );
 }

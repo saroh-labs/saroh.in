@@ -17,7 +17,10 @@ export interface ListQuery {
     q: string;
     storefront: string | null;
     status: ProductStatus | null;
+    /** A category's id, or "none" for Uncategorized. */
     category: string | null;
+    /** Products choosing their variants by this option (Settings › Options). */
+    option: string | null;
     collection: string | null;
     /** The page on screen, from 1. */
     page: number;
@@ -71,6 +74,7 @@ export function readListQuery(
         storefront: one(params, "storefront") ?? null,
         status: STATUSES.find((s) => s === status) ?? null,
         category: one(params, "category") ?? null,
+        option: one(params, "option") ?? null,
         collection: one(params, "collection") ?? null,
         page: Number.isInteger(page) && page >= 1 ? page : 1,
         size: readPageSize(one(params, "size"), remembered),
@@ -100,6 +104,7 @@ export function listHref(
     if (next.storefront) q.set("storefront", next.storefront);
     if (next.status) q.set("status", next.status);
     if (next.category) q.set("category", next.category);
+    if (next.option) q.set("option", next.option);
     if (next.collection) q.set("collection", next.collection);
     if (next.page > 1) q.set("page", String(next.page));
     if (next.size !== PRODUCTS_PAGE_SIZE) q.set("size", String(next.size));
@@ -132,6 +137,7 @@ export function catalogueFilter(query: ListQuery) {
         storefront: query.storefront ?? undefined,
         status: query.status ?? undefined,
         category: query.category ?? undefined,
+        option: query.option ?? undefined,
         collection: query.collection ?? undefined,
         page: query.page > 1 ? query.page : undefined,
         size: query.size,
@@ -232,6 +238,7 @@ export function isNarrowed(query: ListQuery): boolean {
         query.q.length > 0 ||
         query.status !== null ||
         query.category !== null ||
+        query.option !== null ||
         query.collection !== null
     );
 }

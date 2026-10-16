@@ -376,6 +376,35 @@ describe("Catalogue page (DB)", () => {
         ]);
     });
 
+    it("narrows to Uncategorized, and to the products choosing by an option", async () => {
+        const none = await page({ category: "none" });
+        expect(none.items.length).toBeGreaterThan(0);
+        const cats = await prisma.product.findMany({
+            where: { id: { in: none.items.map((i) => i.id) } },
+            select: { categoryId: true },
+        });
+        expect(cats.every((c) => c.categoryId === null)).toBe(true);
+        expect(none.items.map((i) => i.id)).not.toContain(rye);
+
+        const size = await prisma.productOption.create({
+            data: { organizationId: orgId, name: `Size ${Date.now()}` },
+        });
+        await prisma.product.update({
+            where: { id: mug },
+            data: { optionId: size.id },
+        });
+        const bySize = await page({ option: size.id });
+        expect(bySize.items.map((i) => i.id)).toEqual([mug]);
+        await expect(page({ option: "nope" })).rejects.toThrow(
+            NotFoundException,
+        );
+        await prisma.product.update({
+            where: { id: mug },
+            data: { optionId: null },
+        });
+        await prisma.productOption.delete({ where: { id: size.id } });
+    });
+
     it("refuses ids from another business", async () => {
         await expect(page({ cursor: otherProduct })).rejects.toThrow(
             NotFoundException,

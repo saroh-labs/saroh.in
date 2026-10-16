@@ -1,6 +1,7 @@
 import {
-    clashProblem,
+    clashAdvice,
     DEFAULT_SKU_PATTERN,
+    distinctSkus,
     patternProblem,
     skuFrom,
 } from "./sku-pattern";
@@ -42,13 +43,75 @@ describe("SKU pattern", () => {
         expect(patternProblem(DEFAULT_SKU_PATTERN)).toBe("");
     });
 
-    it("names a clash and the part that would resolve it", () => {
-        expect(clashProblem("{NAME3}", ["VIT", "VIT", "ROS"])).toBe(
-            "2 variants would share VIT. Add {N} so each one differs.",
+    it("names a clash from what is missing, and never blocks", () => {
+        const row = (
+            productId: string,
+            product: string,
+            variant: string,
+            sku: string,
+        ) => ({
+            productId,
+            product,
+            variant,
+            sku,
+        });
+        // Both parts there: the value is cut to four letters.
+        expect(
+            clashAdvice(DEFAULT_SKU_PATTERN, [
+                row("p1", "Godaan", "Hindi · Paperback", "GOD01-HIND"),
+                row("p1", "Godaan", "Hindi · Hardcover", "GOD01-HIND"),
+                row("p1", "Godaan", "English", "GOD01-ENGL"),
+            ]),
+        ).toBe(
+            "Hindi · Paperback and Hindi · Hardcover both shorten to HIND. The editor will add -2, -3 to tell them apart.",
         );
-        expect(clashProblem("{NAME3}{N}", ["VIT01", "VIT01"])).toMatch(
-            /Add \{VALUE\}/,
+        // No {N}: two products share it.
+        expect(
+            clashAdvice("{NAME3}", [
+                row("p1", "Vitamin serum", "", "VIT"),
+                row("p2", "Vitamin oil", "", "VIT"),
+            ]),
+        ).toBe(
+            "Vitamin serum and Vitamin oil both get VIT. The editor will add -2, -3 to tell them apart, or add {N} to number each product.",
         );
-        expect(clashProblem("{NAME3}{N}", ["VIT01", "ROS02"])).toBe("");
+        // No {VALUE}: two variants of one product share it.
+        expect(
+            clashAdvice("{NAME3}{N}", [
+                row("p1", "Rose oil", "30 ml", "ROS01"),
+                row("p1", "Rose oil", "50 ml", "ROS01"),
+            ]),
+        ).toMatch(/both get ROS01\. .*add \{VALUE\}/);
+        expect(
+            clashAdvice("{NAME3}{N}", [
+                row("p1", "Vit", "", "VIT01"),
+                row("p2", "Ros", "", "ROS02"),
+            ]),
+        ).toBe("");
+    });
+
+    it("adds -2, -3 to a SKU that is taken", () => {
+        const parts = {
+            name: "Godaan",
+            category: "",
+            value: "Hindi · Hardcover",
+            n: 1,
+        };
+        expect(skuFrom(DEFAULT_SKU_PATTERN, parts)).toBe("GOD01-HIND");
+        expect(skuFrom(DEFAULT_SKU_PATTERN, parts, ["god01-hind"])).toBe(
+            "GOD01-HIND-2",
+        );
+        expect(
+            skuFrom(DEFAULT_SKU_PATTERN, parts, ["GOD01-HIND", "GOD01-HIND-2"]),
+        ).toBe("GOD01-HIND-3");
+        expect(skuFrom(DEFAULT_SKU_PATTERN, parts, ["OTHER"])).toBe(
+            "GOD01-HIND",
+        );
+        expect(distinctSkus(["A", "A", "B", "A", "A-2"])).toEqual([
+            "A",
+            "A-2",
+            "B",
+            "A-3",
+            "A-2-2",
+        ]);
     });
 });
