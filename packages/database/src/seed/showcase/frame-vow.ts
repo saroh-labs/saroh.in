@@ -1253,6 +1253,32 @@ function planOrders(
     const reviewsLeft: Record<string, string[]> = Object.fromEntries(
         Object.entries(REVIEWS).map(([k, v]) => [k, [...v]]),
     );
+    /**
+     * Delivered orders old enough to be reviewed that the dice passed over,
+     * by product: every review written is left by someone, whatever the
+     * seed clock (`--now`) makes of the dice (the check wants them all).
+     */
+    const couldReview: {
+        order: StudioOrder;
+        product: string;
+        makeDays: number;
+    }[] = [];
+    const reviewOf = (
+        product: string,
+        placedAt: Date,
+        makeDays: number,
+    ): StudioOrder["review"] => {
+        const at = earliest(
+            new Date(now.getTime() - 3_600_000),
+            new Date(placedAt.getTime() + (makeDays + rng.int(6, 12)) * DAY_MS),
+        );
+        return {
+            rating: rng.chance(0.8) ? 5 : 4,
+            body: must(reviewsLeft[product].shift()),
+            reply: rng.chance(0.5) ? rng.pick(REPLIES) : undefined,
+            at,
+        };
+    };
     const add = (
         customer: number,
         placedAt: Date,
@@ -1326,27 +1352,15 @@ function planOrders(
             ),
         );
         let review: StudioOrder["review"];
-        const pool = reviewsLeft[product.slug];
+        const reviewable = status === "DELIVERED" && ageDays > reviewAfterDays;
         if (
-            status === "DELIVERED" &&
-            pool.length &&
-            ageDays > reviewAfterDays &&
+            reviewable &&
+            reviewsLeft[product.slug].length &&
             rng.chance(0.55)
         ) {
-            const at = earliest(
-                new Date(now.getTime() - 3_600_000),
-                new Date(
-                    placedAt.getTime() + (makeDays + rng.int(6, 12)) * DAY_MS,
-                ),
-            );
-            review = {
-                rating: rng.chance(0.8) ? 5 : 4,
-                body: must(pool.shift()),
-                reply: rng.chance(0.5) ? rng.pick(REPLIES) : undefined,
-                at,
-            };
+            review = reviewOf(product.slug, placedAt, makeDays);
         }
-        orders.push({
+        const order: StudioOrder = {
             customer,
             placedAt,
             lines,
@@ -1363,7 +1377,11 @@ function planOrders(
                     ? `BD${rng.int(10_000_000, 99_999_999)}IN`
                     : undefined,
             review,
-        });
+        };
+        orders.push(order);
+        if (reviewable && !review) {
+            couldReview.push({ order, product: product.slug, makeDays });
+        }
     };
 
     // Albums from the couples whose galleries are out.
@@ -1430,6 +1448,39 @@ function planOrders(
             lines.push(pick(second));
         }
         add(customer, at, lines);
+    }
+
+    // The reviews the dice left unwritten go to the oldest delivered orders
+    // of their product that have none; a product the clock left with too
+    // few such orders gets a delivered one a month or two back, so every
+    // review is written whatever the seed clock (`--now`).
+    const fill = () => {
+        couldReview.sort(
+            (a, b) => a.order.placedAt.getTime() - b.order.placedAt.getTime(),
+        );
+        for (const c of couldReview.splice(0)) {
+            if (!reviewsLeft[c.product].length) continue;
+            c.order.review = reviewOf(c.product, c.order.placedAt, c.makeDays);
+        }
+    };
+    fill();
+    for (const p of sellable) {
+        for (let k = 0; reviewsLeft[p.slug].length && k < 20; k++) {
+            const customer =
+                JOBS.length + 20 + rng.skewed(contacts - JOBS.length - 20, 1.4);
+            add(
+                customer,
+                istAt(now, -(40 + 9 * k), rng.int(11 * 60, 20 * 60)),
+                [
+                    {
+                        product: p.slug,
+                        variant: p.option ? 0 : null,
+                        quantity: 1,
+                    },
+                ],
+            );
+            fill();
+        }
     }
     return orders;
 }

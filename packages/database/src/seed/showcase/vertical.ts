@@ -1139,9 +1139,30 @@ export function planMemberships(
     o.members.forEach((m, i) => {
         const plan = o.plans[m.plan];
         const staff = rng.pick(o.staff);
-        const anchor = istAt(now, -m.startDaysAgo, 0);
+        // A failed renewal must be overdue (issued over 7 days ago). "Twelve
+        // days into a month" drifts with month lengths, so at some seed
+        // clocks the start moves back until the current period began at
+        // least 9 days ago.
+        let startDaysAgo = m.startDaysAgo;
+        if (m.fate === "FAILED") {
+            const periodStart = (daysAgo: number) => {
+                const from = istAt(now, -daysAgo, 0);
+                let k = 0;
+                while (boundary(from, plan.interval, TIMEZONE, k + 1) <= now)
+                    k += 1;
+                return boundary(from, plan.interval, TIMEZONE, k);
+            };
+            for (
+                let extra = 0;
+                extra < 31 &&
+                now.getTime() - periodStart(startDaysAgo).getTime() < 9 * DAY;
+                extra++
+            )
+                startDaysAgo += 1;
+        }
+        const anchor = istAt(now, -startDaysAgo, 0);
         const subscribedAt = earliest(
-            istAt(now, -m.startDaysAgo, rng.int(10 * 60, 18 * 60)),
+            istAt(now, -startDaysAgo, rng.int(10 * 60, 18 * 60)),
             addMinutes(now, -30),
         );
         const at = (k: number) => boundary(anchor, plan.interval, TIMEZONE, k);

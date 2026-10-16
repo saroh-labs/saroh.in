@@ -556,19 +556,25 @@ export function planDiaryShop(
             istAt(now, sc.day, minuteOf(sc.from ?? "00:00")).getTime(),
             sc.day >= 0 ? t + 3 * HOUR : 0,
         );
-        const until = istAt(now, sc.day + (sc.spanDays ?? 3), 0).getTime();
         const candidates = (sc.staff ?? []).map(staffOf);
         for (const s of takers(svc))
             if (!candidates.includes(s)) candidates.push(s);
-        let found: { s: number; span: Span } | null = null;
-        for (const s of candidates) {
-            if (!takes(s, svc)) continue;
-            const span = firstSlot(s, svc, contact, from, until);
-            if (span) {
-                found = { s, span };
-                break;
+        const slotWithin = (days: number) => {
+            const until = istAt(now, sc.day + days, 0).getTime();
+            for (const s of candidates) {
+                if (!takes(s, svc)) continue;
+                const span = firstSlot(s, svc, contact, from, until);
+                if (span) return { s, span };
             }
-        }
+            return null;
+        };
+        const spanDays = sc.spanDays ?? 3;
+        // A future scene that lands on a closure (Diwali) or a stretch its
+        // staff don't work at this seed clock moves to the next week's
+        // first slot, so the seed holds at any `--now`.
+        const found: { s: number; span: Span } | null =
+            slotWithin(spanDays) ??
+            (sc.day > 0 ? slotWithin(spanDays + 7) : null);
         if (!found) {
             throw new Error(
                 `${biz.name}: no time for the scene "${sc.key}" (${sc.service}, day ${sc.day})`,

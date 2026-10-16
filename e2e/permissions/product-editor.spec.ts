@@ -30,9 +30,10 @@ test("a stock-only role saves Stock, and nothing else", async ({
     await scenario(context, "STOCK");
     await page.goto(EDIT);
 
+    // Told the one section it can change, in the product page's words.
     await expect(
         page.getByText(
-            "You're viewing as Packer. You can read this product but not change it. An owner or admin can change this in Settings › Team. Only the Stock section below can be changed.",
+            "You're signed in as Packer. You can change stock counts here, in the Stock section below. An owner or admin can change this in Settings › Team.",
         ),
     ).toBeVisible();
 

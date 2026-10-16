@@ -619,8 +619,12 @@ function planRetainers(
         const signer = rng.chance(0.6) ? o.team.owner : o.team.nikita;
         for (let p = 0; p <= n; p++) {
             const period = { start: at(p), end: at(p + 1) };
+            // A renewal goes out minutes after its period starts — or now,
+            // when the seed clock sits on the boundary itself.
             const issuedAt =
-                p === 0 ? createdAt : addMinutes(period.start, rng.int(2, 50));
+                p === 0
+                    ? createdAt
+                    : earliest(addMinutes(period.start, rng.int(2, 50)), now);
             if (issuedAt > now) break;
             const paidAt = new Date(
                 issuedAt.getTime() + rng.int(2, 6 * 24) * 3_600_000,

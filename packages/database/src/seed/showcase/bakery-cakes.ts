@@ -1,4 +1,4 @@
-import type { BakeryProduct, BakeryVariant } from "./bakery-catalogue";
+import type { BakeryProduct, BakeryVariant } from "./bakery-catalogue-types";
 
 /**
  * Rye & Co.'s custom cakes (the owner's birthday-and-anniversary story):

@@ -243,12 +243,12 @@ describe("Catalogue page (DB)", () => {
 
     it("says what needs restocking across the catalogue, shelf by shelf, as Stock does", async () => {
         const { needs } = await page({ limit: 1 });
-        // Bun: 4 at Hill Road (low) but 0 Online — sold out there. The
-        // draft focaccia counts, as it does on Stock; an archived product
-        // never would. Rye: nothing on its one shelf.
+        // Bun: 4 at Hill Road (low) but 0 Online — sold out there. Rye:
+        // nothing on its one shelf. The draft focaccia is empty too, but no
+        // customer can buy a draft yet, so it doesn't need anyone (as on
+        // Stock); an archived product never would.
         expect(needs.map((n) => [n.productId, n.kind, n.where])).toEqual([
             [bun, "out", ["Online"]],
-            [draft, "out", null],
             [rye, "out", null],
         ]);
 
@@ -264,11 +264,29 @@ describe("Catalogue page (DB)", () => {
             canSell: 0,
             where: ["Hill Road"],
         });
-        expect(short.items.map((i) => i.id)).toEqual([draft, rye, bun]);
+        expect(short.items.map((i) => i.id)).toEqual([rye, bun]);
         await prisma.stockLevel.updateMany({
             where: { productId: bun, storeId: hill },
             data: { promised: 0 },
         });
+
+        // A draft needs someone once orders already placed wait on it.
+        await prisma.stockLevel.updateMany({
+            where: { productId: draft, storeId: hill },
+            data: { promised: 3 },
+        });
+        try {
+            const waiting = await page({ view: "needs" });
+            expect(
+                waiting.needs.find((n) => n.productId === draft),
+            ).toMatchObject({ kind: "short", short: 3 });
+            expect(waiting.items.map((i) => i.id)).toEqual([draft, rye, bun]);
+        } finally {
+            await prisma.stockLevel.updateMany({
+                where: { productId: draft, storeId: hill },
+                data: { promised: 0 },
+            });
+        }
     });
 
     it("agrees with the Stock screen's Needs you, and leaves archived products out", async () => {
@@ -295,7 +313,8 @@ describe("Catalogue page (DB)", () => {
         try {
             expect(await listNeeds()).not.toContain(rye);
             expect(await stockNeeds()).not.toContain(rye);
-            expect((await readLevels(reader, {})).needsYou).toBe(2);
+            // Only the bun: the draft focaccia waits on no orders.
+            expect((await readLevels(reader, {})).needsYou).toBe(1);
         } finally {
             await prisma.product.update({
                 where: { id: rye },
@@ -306,10 +325,10 @@ describe("Catalogue page (DB)", () => {
 
     it("never drops a product when the one a page ended on has left the view", async () => {
         const first = await page({ view: "needs", limit: 1 });
-        expect(first.items.map((i) => i.id)).toEqual([draft]);
-        // Restocked from the list: the focaccia no longer needs anyone.
+        expect(first.items.map((i) => i.id)).toEqual([rye]);
+        // Restocked from the list: the rye no longer needs anyone.
         await prisma.stockLevel.updateMany({
-            where: { productId: draft },
+            where: { productId: rye },
             data: { onHand: 40 },
         });
         try {
@@ -318,10 +337,10 @@ describe("Catalogue page (DB)", () => {
                 limit: 1,
                 cursor: first.nextCursor ?? "",
             });
-            expect(next.items.map((i) => i.id)).toEqual([rye]);
+            expect(next.items.map((i) => i.id)).toEqual([bun]);
         } finally {
             await prisma.stockLevel.updateMany({
-                where: { productId: draft },
+                where: { productId: rye },
                 data: { onHand: 0 },
             });
         }

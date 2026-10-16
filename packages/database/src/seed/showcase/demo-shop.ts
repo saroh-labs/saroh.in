@@ -1646,8 +1646,13 @@ function planVolume(a: {
             o.fulfilment === "PICKUP" &&
             !o.walkIn &&
             readyForLate < V.latePickups &&
-            readyDaysAgo > 5 &&
-            readyDaysAgo < 9
+            // The oldest that fits: ready under 9 days ago, and already past
+            // the storefront's own threshold by an hour, so Home calls it
+            // late. Not "ready over 5 days ago": a quiet week (Ammi's 10-13
+            // days back) can leave no such order at some seed clocks.
+            readyDaysAgo > 1 &&
+            readyDaysAgo < 9 &&
+            o.placedAt.getTime() + lateMs.PICKUP < now.getTime() - 3_600_000
         ) {
             readyForLate++;
             lateIdx.add(n);
@@ -2297,10 +2302,12 @@ function planSubscriptions(
         let lastIssued = subscribedAt;
         for (let k = 0; k <= n; k++) {
             const period: Period = { start: at(k), end: at(k + 1) };
+            // A renewal goes out minutes after its period starts — or now,
+            // when the seed clock sits on the boundary itself.
             const issuedAt =
                 k === 0
                     ? subscribedAt
-                    : addMinutes(period.start, rng.int(1, 55));
+                    : earliest(addMinutes(period.start, rng.int(1, 55)), now);
             lastIssued = issuedAt;
             const unpaid =
                 owes && k === n && issuedAt.getTime() + 7 * DAY < now.getTime();

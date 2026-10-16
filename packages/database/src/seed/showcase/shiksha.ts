@@ -408,10 +408,11 @@ export async function seedShiksha(
         const secondYear = s % 2 === 1;
         const scholarship = s === 5;
         quarters.forEach((q, k) => {
-            const issuedAt = istAt(
+            // Raised mid-morning — or now, when the seed clock is earlier
+            // on the 1st itself.
+            const issuedAt = earliest(
+                istAt(now, q.issueDay, instRng.int(10 * 60, 12 * 60)),
                 now,
-                q.issueDay,
-                instRng.int(10 * 60, 12 * 60),
             );
             const dueAt = istAt(now, q.dueDay, 23 * 60 + 59);
             const latest = k === 0;
@@ -492,7 +493,11 @@ export async function seedShiksha(
     // Issued to the wrong student and voided the same day.
     {
         const q = quarters[0];
-        const issuedAt = istAt(now, q.issueDay, 10 * 60 + 5);
+        // Voided 50 minutes later, which must not be after the seed clock.
+        const issuedAt = earliest(
+            istAt(now, q.issueDay, 10 * 60 + 5),
+            addMinutes(now, -50),
+        );
         invoices.push({
             id: sid("invoice", "instalment", "void"),
             contact: onProgramme[3],
