@@ -2,8 +2,10 @@
 
 import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { Notice } from "@saroh/ui/notice";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -283,7 +285,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                             type="button"
                             onClick={() =>
                                 start(async () => {
-                                    await persist();
+                                    await runAction(persist);
                                 })
                             }
                             busy={pending}
@@ -314,37 +316,42 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                 Categories
             </h3>
             {line ? (
-                <div
+                <Notice
                     role="status"
-                    className="mb-2.5 flex flex-wrap items-center gap-2.5 rounded-[8px] bg-muted px-[11px] py-[9px]"
-                >
-                    <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.45]">
-                        {line}
-                    </span>
-                    <DefaultsReviewSheet
-                        trigger={
-                            <Button size="sm" type="button">
-                                Review
+                    align="center"
+                    className="mb-2.5"
+                    action={
+                        <div className="flex flex-wrap gap-2">
+                            <DefaultsReviewSheet
+                                trigger={
+                                    <Button size="sm" type="button">
+                                        Review
+                                    </Button>
+                                }
+                                suggestions={open}
+                                names={names}
+                                onUse={applySuggestions}
+                            />
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                onClick={notNow}
+                            >
+                                Not now
                             </Button>
-                        }
-                        suggestions={open}
-                        names={names}
-                        onUse={applySuggestions}
-                    />
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        type="button"
-                        onClick={notNow}
-                    >
-                        Not now
-                    </Button>
-                </div>
+                        </div>
+                    }
+                >
+                    <span className="text-pretty">{line}</span>
+                </Notice>
             ) : null}
             {categories.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    No categories yet. Each one you add can set its own.
-                </p>
+                <EmptyState
+                    size="inline"
+                    title="No categories yet"
+                    description="Each one you add can set its own."
+                />
             ) : (
                 <ul data-list-table="" className={listTable.card}>
                     {categories.map((r) => {

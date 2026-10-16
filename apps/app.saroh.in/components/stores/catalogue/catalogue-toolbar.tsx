@@ -127,7 +127,7 @@ export function CatalogueMoreFilters({
                 <ChoiceFilter
                     wide
                     label="Option"
-                    any="Any option"
+                    any="All options"
                     things="options"
                     empty="No options yet"
                     choices={choices.options ?? null}

@@ -139,7 +139,7 @@ export function SkuTab({
 
     function save() {
         start(async () => {
-            await persist();
+            await runAction(persist);
         });
     }
 
