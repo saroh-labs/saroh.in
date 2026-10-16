@@ -73,6 +73,10 @@ import { earliest, hashKey, istAt, makePeople } from "./people";
 import type { PulseCounts } from "./pulse";
 import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
 import { createRng } from "./random";
+import type { Desk42Counts } from "./desk42";
+import { checkDesk42, seedDesk42 } from "./desk42";
+import type { ShikshaCounts } from "./shiksha";
+import { checkShiksha, seedShiksha } from "./shiksha";
 
 /**
  * Lay the showcase over the base seed.
@@ -208,6 +212,18 @@ export async function seedShowcase(
             deskUserId: await ensureTeamMember(ctx, KAVI_DESK),
         }),
     );
+    // Two vertical demos (unit 4): a coaching centre in Jaipur and a
+    // coworking space in Pune, each linking its own payers.
+    const vertical = {
+        prisma,
+        now,
+        demoUserId: ctx.demoUserId,
+        teamUser: (person: TeamMember) => ensureTeamMember(ctx, person),
+    };
+    const shiksha = await seedShiksha(vertical);
+    const desk42 = await seedDesk42(vertical);
+    businesses.push(shiksha, desk42);
+    const linksOwnPayers = new Set([RYE.orgId, KAVI.orgId, shiksha.id, desk42.id]);
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -236,7 +252,7 @@ export async function seedShowcase(
         prisma,
         businesses
             .map((b) => b.id)
-            .filter((id) => id !== RYE.orgId && id !== KAVI.orgId),
+            .filter((id) => !linksOwnPayers.has(id)),
     );
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
@@ -246,6 +262,12 @@ export async function seedShowcase(
         : null;
     const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
     const kaviCounts: KaviCounts = await checkKavi(prisma, KAVI.orgId, now);
+    const shikshaCounts: ShikshaCounts = await checkShiksha(
+        prisma,
+        shiksha.id,
+        now,
+    );
+    const desk42Counts: Desk42Counts = await checkDesk42(prisma, desk42.id, now);
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -261,6 +283,10 @@ export async function seedShowcase(
     console.table(ryeCounts);
     console.log("[showcase] Kavi Dental, as its films need it:");
     console.table(kaviCounts);
+    console.log("[showcase] Shiksha Academy, as its demo needs it:");
+    console.table(shikshaCounts);
+    console.log("[showcase] Desk 42, as its demo needs it:");
+    console.table(desk42Counts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +

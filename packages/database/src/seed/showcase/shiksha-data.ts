@@ -642,7 +642,7 @@ export const SA_PRODUCTS: readonly ProductSpec[] = [
 export const SA_QR: readonly QrSpec[] = [
     {
         key: "admissions-flyer",
-        code: "K7RW",
+        code: "k7rw",
         targetKind: "PAGE",
         page: 5,
         place: "FLYER",
@@ -654,7 +654,7 @@ export const SA_QR: readonly QrSpec[] = [
     },
     {
         key: "demo-standee",
-        code: "H4PX",
+        code: "h4px",
         targetKind: "BOOK",
         place: "COUNTER",
         placeNote: "Standee at the reception",
@@ -665,7 +665,7 @@ export const SA_QR: readonly QrSpec[] = [
     },
     {
         key: "shop-counter",
-        code: "T9MB",
+        code: "t9mb",
         targetKind: "SHOP",
         place: "COUNTER",
         placeNote: "Study material counter",

@@ -52,6 +52,7 @@ import {
     requireStates,
     rngFor,
     setServiceGst,
+    settleOldLeads,
     setupBusiness,
     upsertProducts,
     upsertStaff,
@@ -207,6 +208,16 @@ export async function seedShiksha(
         wonShare: 0.55,
         lostShare: 0.15,
         leadId: (n) => sid("lead", n),
+        activityId: (n, k) => sid("activity", n, k),
+    });
+    settleOldLeads(leadRng, { leads, activities }, {
+        now,
+        days: 21,
+        stageIds,
+        stageNames: SA_PIPELINE.stages,
+        actor: b.users.kavita,
+        wonShare: 0.55,
+        lostShare: 0.25,
         activityId: (n, k) => sid("activity", n, k),
     });
     specs.forEach((s, i) => seen.push({ contact: i, at: s.createdAt }));

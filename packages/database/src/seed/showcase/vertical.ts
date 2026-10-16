@@ -1874,3 +1874,64 @@ export function requireStates(
         );
     }
 }
+
+
+/**
+ * A season's older enquiries have mostly been decided: an open lead more
+ * than `days` old is taken on to the last stage and won, or lost, with the
+ * stage changes the product would have logged on the way.
+ */
+export function settleOldLeads(
+    rng: Rng,
+    rows: {
+        leads: Prisma.LeadCreateManyInput[];
+        activities: Prisma.ActivityCreateManyInput[];
+    },
+    o: {
+        now: Date;
+        days: number;
+        stageIds: readonly string[];
+        stageNames: readonly string[];
+        actor: string;
+        wonShare: number;
+        lostShare: number;
+        activityId: (n: number, k: number) => string;
+    },
+): void {
+    const last = o.stageIds.length - 1;
+    rows.leads.forEach((lead, n) => {
+        const created = new Date(lead.createdAt ?? o.now);
+        const roll = rng.next();
+        if (
+            lead.status !== "OPEN" ||
+            created.getTime() > o.now.getTime() - o.days * DAY
+        ) {
+            return;
+        }
+        let k = rows.activities.filter((a) => a.leadId === lead.id).length;
+        let t = new Date(lead.updatedAt ?? created);
+        const ceiling = addMinutes(o.now, -60);
+        if (roll < o.wonShare) {
+            let stage = o.stageIds.indexOf(lead.stageId);
+            while (stage < last) {
+                t = earliest(ceiling, addMinutes(t, rng.int(18, 72) * 60));
+                rows.activities.push({
+                    id: o.activityId(n, k++),
+                    organizationId: lead.organizationId,
+                    leadId: lead.id ?? "",
+                    type: "STAGE_CHANGED",
+                    body: `Stage changed from "${o.stageNames[stage]}" to "${o.stageNames[stage + 1]}"`,
+                    actorUserId: o.actor,
+                    createdAt: t,
+                    updatedAt: t,
+                });
+                stage += 1;
+            }
+            lead.stageId = o.stageIds[last];
+            lead.status = "WON";
+            lead.updatedAt = t;
+        } else if (roll < o.wonShare + o.lostShare) {
+            lead.status = "LOST";
+        }
+    });
+}
