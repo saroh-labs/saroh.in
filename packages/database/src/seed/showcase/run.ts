@@ -29,6 +29,7 @@ import {
 import { seedPlanId } from "../pricing";
 import { deleteSeeded } from "../run";
 import { seedStandInPaymentProvider } from "../stand-in-providers";
+import { checkAchaar, seedAchaar } from "./achaar";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
 import { RYE, seedBakery } from "./bakery";
 import type { BillingContext, InvoiceRows, InvoiceSpec, Seen } from "./billing";
@@ -69,6 +70,7 @@ import {
     TIMEZONE,
 } from "./data";
 import { checkFrameVow, seedFrameVow } from "./frame-vow";
+import { checkPagdandi, seedPagdandi } from "./pagdandi";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
 import { checkPixelChai, seedPixelChai } from "./pixel-chai";
@@ -235,6 +237,33 @@ export async function seedShowcase(
         }),
     });
     businesses.push(pixelChai);
+    // Two demo shops: Ammi's Achaar, a home pickle kitchen in Lucknow
+    // (Faizan Khan takes the orders as an Admin), and Pagdandi Books, a
+    // bookshop with a café corner in Pune (Siddharth Kale, a Member).
+    businesses.push(
+        await seedAchaar({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            staffUserId: await ensureTeamMember(ctx, {
+                first: "Faizan",
+                last: "Khan",
+                role: "ADMIN",
+            }),
+            staffRole: "ADMIN",
+        }),
+        await seedPagdandi({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            staffUserId: await ensureTeamMember(ctx, {
+                first: "Siddharth",
+                last: "Kale",
+                role: "MEMBER",
+            }),
+            staffRole: "MEMBER",
+        }),
+    );
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -283,6 +312,10 @@ export async function seedShowcase(
         "Frame & Vow": await checkFrameVow(prisma, frameVow.id, now),
         "Pixel & Chai": await checkPixelChai(prisma, pixelChai.id, now),
     };
+    const demoShopCounts = [
+        await checkAchaar(prisma, now),
+        await checkPagdandi(prisma, now),
+    ];
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -302,6 +335,8 @@ export async function seedShowcase(
         "[showcase] Frame & Vow and Pixel & Chai, as their demos need them:",
     );
     console.table(studioCounts);
+    console.log("[showcase] Ammi's Achaar and Pagdandi Books:");
+    console.table(demoShopCounts);
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +

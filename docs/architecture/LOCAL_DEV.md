@@ -212,6 +212,39 @@ the boutique without one:
   any of these states is missing, and `clinic.test.ts` plans the clinic for
   every half hour's `now` over months and across Diwali, month, year and
   financial-year boundaries to prove it works on any day.
+- **Ammi's Achaar** (a home pickle kitchen in Nishatganj, Lucknow, owned by
+  `demo@saroh.dev`; Faizan Khan takes the orders as an Admin; `achaar.ts`,
+  on the Grow plan): 35 products — pickles in 250 g / 500 g / 1 kg jars (some
+  in mustard or sesame oil), winter pickles waiting for November, Diwali and
+  Eid boxes, and masalas, papad and aam papad counted on the shelf (one sold
+  out, two low). The pickles are made after the order comes in and count no
+  stock, so about 40 open orders sit in New or Preparing with "Pick-up Sat 18
+  Oct" or "Faizan delivers Tue 20 Oct" in their notes. About 460 orders over
+  three months from 105 customers (one-timers to weekly regulars), mostly
+  pick-up and local delivery, paid by UPI or cash at the handover; a few
+  cancelled, refunded, uncollected or delivered and not yet paid; Diwali
+  bulk orders. 40 reviews, an "Achaar ka Dabba" monthly box with 50 ongoing
+  and 50 ended subscribers and their invoices, enquiries from the site's "Ask
+  Ammi" form as leads, two QR codes with their scans, and 90 days of site
+  traffic that agrees with the orders. Its site
+  (`ammis-achaar.saroh.app.localhost`) has six pages and a journal of 30
+  posts in Help, News and Articles. `checkAchaar` stops the run if a designed
+  state is missing.
+- **Pagdandi Books & Café** (an independent bookshop with a café corner on
+  Prabhat Road, Pune, owned by `demo@saroh.dev`; Siddharth Kale is a Member;
+  `pagdandi.ts`, on Pro): 93 products — public-domain classics in Paperback,
+  Hardcover, used and Hindi/Marathi/Bengali editions, books by fictional Pune
+  writers (one, _Kasba Peth Rains_, on pre-order until 1 Nov, its paid orders
+  waiting), stationery with many variants (a notebook in 24, inks in 12) and
+  café things. Book covers are generated SVGs
+  (`scripts/demo-covers/generate-pagdandi-covers.mjs` →
+  `pagdandi-covers.ts`). About 500 orders, nearly half at the counter to
+  walk-ins; Thursday author evenings and a Saturday story hour with ~320
+  bookings; a Book of the Month club with 50 ongoing and 50 ended members;
+  reviews, enquiries, QR codes, traffic and a 30-post journal as above, at
+  `pagdandi-books.saroh.app.localhost`. `checkPagdandi` guards its states.
+  Both are written by `demo-shop.ts`; run `node scripts/check-demo-images.mjs`
+  before filming either.
 
 - **Frame & Vow** (a wedding photography and planning studio on Lake Palace
   Road, Udaipur, with a Jaipur desk; owned by `demo@saroh.dev`, Meher Bhati
