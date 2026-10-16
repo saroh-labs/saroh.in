@@ -51,6 +51,11 @@ export interface StorefrontSummary {
     id: string;
     name: string;
     orderCount: number;
+    /**
+     * The products it sells (their listings here), whatever their state:
+     * what a "which location?" chooser says beside each name.
+     */
+    productCount: number;
     kind: "SHOP" | "ONLINE";
     paused: boolean;
 }
@@ -68,7 +73,10 @@ export interface StorefrontProvider {
     status: string;
 }
 
-export interface StorefrontSettings extends StorefrontSummary {
+export interface StorefrontSettings extends Omit<
+    StorefrontSummary,
+    "productCount"
+> {
     currency: string;
     /**
      * Once a storefront has taken an order its currency is fixed: every order
@@ -197,7 +205,7 @@ export class StorefrontsService {
             select: {
                 id: true,
                 name: true,
-                _count: { select: { orders: true } },
+                _count: { select: { orders: true, listings: true } },
                 settings: { select: { kind: true, pausedAt: true } },
             },
         });
@@ -205,6 +213,7 @@ export class StorefrontsService {
             id: s.id,
             name: s.name,
             orderCount: s._count.orders,
+            productCount: s._count.listings,
             kind: s.settings?.kind === "SHOP" ? "SHOP" : "ONLINE",
             paused: Boolean(s.settings?.pausedAt),
         }));

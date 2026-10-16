@@ -20,6 +20,11 @@ export interface StorefrontSummary {
     id: string;
     name: string;
     orderCount: number;
+    /**
+     * The products it sells, whatever their state. Only the list carries
+     * it, and an API that predates it leaves it out.
+     */
+    productCount?: number;
     kind: StorefrontKind;
     paused: boolean;
 }

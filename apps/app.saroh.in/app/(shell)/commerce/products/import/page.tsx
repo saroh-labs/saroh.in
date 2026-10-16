@@ -8,17 +8,26 @@ import { CsvImport } from "@/components/stores/csv-import";
 import { requireCan } from "@/lib/access/require-can";
 import { planMeter } from "@/lib/billing/meter";
 import { describeImport } from "@/lib/imports/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import {
+    canAddLocation,
+    importChooserLead,
+    locationLine,
+} from "@/lib/stores/business-stores";
 import { importProductsHref } from "@/lib/stores/links";
 import { pickStorefront } from "@/lib/stores/pick";
-import { listBusinessStores } from "@/lib/stores/service";
+import { readBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Import products" };
 
 /**
  * Sell → Products → Import. The mappable fields come from the API, so they
  * cannot drift from the DTOs that validate each row.
+ *
+ * The locations are the business's, for every role (16 Oct audit, SEV 4);
+ * a failed read says so, never "No locations yet".
  */
 export default async function ImportProductsPage({
     searchParams,
@@ -26,11 +35,12 @@ export default async function ImportProductsPage({
     searchParams: Promise<{ storefront?: string }>;
 }) {
     await requireSession();
-    const [{ storefront }, stores] = await Promise.all([
+    const [{ storefront }, stores, organization] = await Promise.all([
         searchParams,
-        listBusinessStores(),
+        readBusinessStores(),
+        resolveActiveOrganization(),
     ]);
-    const store = pickStorefront(stores, storefront);
+    const store = stores ? pickStorefront(stores, storefront) : undefined;
 
     if (!store) {
         return (
@@ -43,6 +53,9 @@ export default async function ImportProductsPage({
                     description="A spreadsheet of products is brought into one location's catalogue."
                     stores={stores}
                     hrefFor={importProductsHref}
+                    lead={importChooserLead(stores?.length ?? 0)}
+                    detail={locationLine}
+                    canCreate={canAddLocation(organization)}
                 />
             </PageContainer>
         );
