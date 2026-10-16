@@ -3,7 +3,7 @@
  * Every photo the showcase seeds must load: Leela & Loom's and Rye & Co.'s products
  * (#471, #522), Pulse's counter and Rye's cakes, the journals, and the vertical
  * demos (Frame & Vow, Pixel & Chai, Ammi's Achaar, Pagdandi Books, Shiksha
- * Academy, Desk 42).
+ * Academy, Desk 42, Noor Salon & Bridal, Motion Physio).
  *
  * The boutique's photos are free-licence Unsplash images hot-linked by
  * address, because local storage does not persist uploads. A photo that stops
@@ -15,7 +15,9 @@
  *
  * It needs the network; the seed itself never does.
  */
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const read = (file) =>
     readFileSync(
@@ -26,6 +28,13 @@ const read = (file) =>
         "utf8",
     );
 const boutique = read("boutique-catalog.ts");
+// Noor Salon & Bridal and Motion Physio: catalogues and journals.
+const diaryShops = [
+    "salon-catalog.ts",
+    "salon-posts.ts",
+    "physio-catalog.ts",
+    "physio-posts.ts",
+].map(read);
 // Frame & Vow's and Pixel & Chai's photos are tables of Unsplash ids in their
 // writing; their sites and catalogues pick from the same tables
 // (`studio-photos.ts`). Their drawn pictures are data URIs and need no network.
@@ -65,6 +74,9 @@ const urls = [
             (m) =>
                 `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
         ),
+        ...diaryShops.flatMap((src) =>
+            [...src.matchAll(/url:\s*"([^"]+)"/g)].map((m) => m[1]),
+        ),
         ...[...journals.matchAll(/photo\(\s*"(photo-[^"]+)"/g)].map(
             (m) =>
                 `https://images.unsplash.com/${m[1]}?w=1600&q=80&auto=format&fit=crop`,
@@ -87,6 +99,56 @@ for (const text of demoShops) {
         );
     }
 }
+// Generated images (shade cards, band and tape colours) are files in the
+// workspace's public folder, served at https://app.saroh.localhost/demo/…
+// (`diary-shop-types.ts`): checked on disk, so this needs no running stack.
+const demoFiles = [
+    ...new Set(
+        diaryShops.flatMap((src) =>
+            [...src.matchAll(/demoAsset\(\s*"([^"]+)"/g)].map((m) => m[1]),
+        ),
+    ),
+];
+const swatchList = JSON.parse(
+    execFileSync(
+        "pnpm",
+        [
+            "--silent",
+            "--filter",
+            "@saroh/database",
+            "exec",
+            "tsx",
+            "../../scripts/demo-swatches/export.ts",
+        ],
+        {
+            cwd: fileURLToPath(new URL("..", import.meta.url)),
+            encoding: "utf8",
+        },
+    ),
+);
+const swatchFiles = [
+    ...new Set([
+        ...demoFiles,
+        ...swatchList.flatMap((g) => g.swatches.map((s) => s.file)),
+    ]),
+];
+let missing = 0;
+for (const file of swatchFiles) {
+    if (
+        !existsSync(
+            new URL(
+                `../apps/app.saroh.in/public/demo/${file}`,
+                import.meta.url,
+            ),
+        )
+    ) {
+        missing += 1;
+        console.error(
+            `✗ missing generated image apps/app.saroh.in/public/demo/${file} (run scripts/demo-swatches)`,
+        );
+    }
+}
+
 // Generated images (Pagdandi's book covers) are data: URIs, checked offline.
 let failed = 0;
 let generated = 0;
@@ -156,6 +218,6 @@ async function worker() {
 }
 await Promise.all(Array.from({ length: 8 }, worker));
 console.log(
-    `check-demo-images: ${urls.length + generated} images (${generated} generated) and ${drawn.size} drawn files checked, ${failed} failed.`,
+    `check-demo-images: ${urls.length + generated} images (${generated} generated), ${drawn.size} drawn files and ${swatchFiles.length} swatches checked; ${failed} failed, ${missing} missing.`,
 );
-process.exit(failed > 0 ? 1 : 0);
+process.exit(failed + missing > 0 ? 1 : 0);

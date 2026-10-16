@@ -74,18 +74,22 @@ import {
 } from "./data";
 import type { Desk42Counts } from "./desk42";
 import { checkDesk42, seedDesk42 } from "./desk42";
+import { seedDiaryShop } from "./diary-shop";
+import { checkDiaryShop } from "./diary-shop-check";
 import { checkFrameVow, seedFrameVow } from "./frame-vow";
 import type { JournalPost } from "./journal";
 import { seedJournal } from "./journal";
 import { checkPagdandi, seedPagdandi } from "./pagdandi";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
+import { MOTION } from "./physio-data";
 import { checkPixelChai, seedPixelChai } from "./pixel-chai";
 import type { PulseCounts } from "./pulse";
 import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
 import { PULSE_POSTS } from "./pulse-posts";
 import { checkPulseShop, seedPulseShop } from "./pulse-shop";
 import { createRng } from "./random";
+import { NOOR } from "./salon-data";
 import type { ShikshaCounts } from "./shiksha";
 import { checkShiksha, seedShiksha } from "./shiksha";
 import type { TrafficKind } from "./traffic";
@@ -296,6 +300,26 @@ export async function seedShowcase(
         frameVow.id,
         pixelChai.id,
     ]);
+    // A salon and bridal studio in Jaipur and a physio clinic in
+    // Indiranagar: diaries with several people, packs, memberships the desk
+    // books, a counter, and a journal (`diary-shop*.ts`).
+    const diaryShops = [NOOR, MOTION];
+    for (const biz of diaryShops) {
+        businesses.push(
+            await seedDiaryShop(
+                {
+                    prisma,
+                    now,
+                    demoUserId: ctx.demoUserId,
+                    deskUserId: await ensureTeamMember(ctx, {
+                        ...biz.desk,
+                        role: "MEMBER",
+                    }),
+                },
+                biz,
+            ),
+        );
+    }
     for (const business of SHOWCASE_BUSINESSES) {
         const orgId = await seedBusiness(ctx, business, roleUsers);
         await seedExtras(ctx, business, orgId);
@@ -359,6 +383,13 @@ export async function seedShowcase(
     const carepointCounts = carepoint
         ? await checkCarePoint(prisma, carepoint.id, now)
         : null;
+    const diaryShopCounts = [];
+    for (const biz of diaryShops) {
+        diaryShopCounts.push({
+            name: biz.name,
+            counts: await checkDiaryShop(prisma, biz, now),
+        });
+    }
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -391,6 +422,10 @@ export async function seedShowcase(
     if (carepointCounts) {
         console.log("[showcase] CarePoint Clinic's bills and journal:");
         console.table(carepointCounts);
+    }
+    for (const { name, counts } of diaryShopCounts) {
+        console.log(`[showcase] ${name}, as its demos need it:`);
+        console.table(counts);
     }
 
     console.log(
