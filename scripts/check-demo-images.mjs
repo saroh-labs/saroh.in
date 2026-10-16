@@ -12,13 +12,20 @@
  *
  * It needs the network; the seed itself never does.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const read = (file) =>
     readFileSync(new URL(`../packages/database/src/seed/showcase/${file}`, import.meta.url), "utf8");
 const boutique = read("boutique-catalog.ts");
 // Rye & Co.'s photos (#522) are written as unsplash("photo-…").
-const bakery = read("bakery-product-page.ts");
+const bakery = [
+    "bakery-product-page.ts",
+    // Shiksha Academy and Desk 42 (unit 4): photos as unsplash("photo-…").
+    "shiksha-photos.ts",
+    "desk42-photos.ts",
+]
+    .map(read)
+    .join("\n");
 const urls = [
     ...new Set([
         ...[...boutique.matchAll(/"url":\s*"([^"]+)"|url:\s*"([^"]+)"/g)].map((m) => m[1] ?? m[2]),
@@ -29,6 +36,21 @@ const urls = [
 ];
 
 let failed = 0;
+
+// Pictures the seed draws (`scripts/demo-assets/render-demo-assets.mjs`) are
+// files the local app serves: each named one must be there.
+const drawn = new Set();
+for (const file of ["shiksha-data.ts", "shiksha-posts.ts", "desk42-data.ts", "desk42-posts.ts"]) {
+    const text = read(file);
+    const business = /demoAsset\(\s*"([^"]+)"/.exec(text)?.[1] ?? /SLUG = "([^"]+)"/.exec(text)?.[1];
+    for (const m of text.matchAll(/"([a-z0-9-]+\.png)"/g)) drawn.add(`${business}/${m[1]}`);
+}
+for (const rel of drawn) {
+    if (!existsSync(new URL(`../apps/app.saroh.in/public/demo/${rel}`, import.meta.url))) {
+        failed += 1;
+        console.error(`✗ not drawn: apps/app.saroh.in/public/demo/${rel}`);
+    }
+}
 const queue = [...urls];
 async function worker() {
     for (let url = queue.shift(); url; url = queue.shift()) {
@@ -47,5 +69,7 @@ async function worker() {
     }
 }
 await Promise.all(Array.from({ length: 8 }, worker));
-console.log(`check-demo-images: ${urls.length - failed} of ${urls.length} photos load.`);
+console.log(
+    `check-demo-images: ${urls.length} photos and ${drawn.size} drawn pictures checked, ${failed} missing.`,
+);
 process.exit(failed > 0 ? 1 : 0);
