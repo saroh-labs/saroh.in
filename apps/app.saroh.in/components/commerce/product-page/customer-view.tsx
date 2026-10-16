@@ -7,8 +7,7 @@ import { useState } from "react";
 
 import { SwitchRow } from "@/components/shared/check-row";
 import { formatMoneyMajor } from "@/lib/format/money";
-import type { EditorSection } from "@/lib/products/links";
-import { productEditHref, productHref } from "@/lib/products/links";
+import { productHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import {
     allergenLine,
@@ -16,14 +15,29 @@ import {
     madeByLine,
     onTheShop,
 } from "@/lib/products/overview-rules";
+import {
+    customerPriceNote,
+    customerStockNote,
+} from "@/lib/products/overview-words";
 import { untrackedShort } from "@/lib/products/tracking";
+import type { ProductStock } from "@/lib/stock/product-stock";
 import { TextLink } from "@saroh/ui/text-link";
+
+import type { SheetKind } from "./sheet-button";
+import { SheetButton } from "./sheet-button";
+import { StockSheetButton } from "./sheets/stock-sheet";
+
+type NoteAction =
+    | { label: string; sheet: SheetKind }
+    | { label: string; sheet: "stock" }
+    | { label: string; href: string };
 
 /**
  * The Customer view: the product as its shop page shows it, drawn by the
  * same component the storefront will use (#465), with the team's notes
  * beside it — numbered to match the markers on the page, each opening the
- * editor section it describes. Try the variants; nothing reaches a basket.
+ * page's own sheet that changes it, so the fix is made here. Try the
+ * variants; nothing reaches a basket.
  */
 export function CustomerView({
     overview,
@@ -31,6 +45,8 @@ export function CustomerView({
     canWrite,
     counts,
     businessTracks,
+    categories = [],
+    shelves = null,
 }: {
     overview: ProductOverview;
     storeId: string;
@@ -39,29 +55,31 @@ export function CustomerView({
     counts: boolean;
     /** The business's Track stock switch: off, the editor has no Stock. */
     businessTracks: boolean;
+    /** For the details sheet's category. */
+    categories?: { id: string; name: string }[];
+    /** Its shelves, for the stock sheet; null when unread. */
+    shelves?: ProductStock | null;
 }) {
     const [notes, setNotes] = useState(true);
     const { product, stock, price } = overview;
     const money = (a: string) => formatMoneyMajor(a, product.currency);
-    const edit = (s: EditorSection) => productEditHref(storeId, product.id, s);
     const data = toShopData(overview, counts);
     const live = product.status === "PUBLISHED";
+    const option = product.option?.name ?? null;
 
-    const variantLine = product.variants
-        .map((v) => {
-            const line = stock.variants.find((l) => l.variantId === v.id);
-            return line
-                ? `${v.title}: ${line.canSell} can sell (${line.onHand} on hand, ${line.promised} promised)`
-                : null;
-        })
-        .filter(Boolean)
-        .join(". ");
+    // As a customer meets it: in stock or sold out, not every row's count.
+    const variantLines = product.variants.flatMap((v) => {
+        const line = stock.variants.find((l) => l.variantId === v.id);
+        return line
+            ? [{ title: v.title, soldOut: line.word === "SOLD_OUT" }]
+            : [];
+    });
 
     const notesList: {
         n: number;
         title: string;
         body: string;
-        action: { label: string; href: string };
+        action: NoteAction;
     }[] = [
         {
             n: 1,
@@ -70,43 +88,50 @@ export function CustomerView({
                 product.images.length > 0
                     ? `The cover and ${product.images.length - 1} more. The same for every variant unless one picks its own.`
                     : "No photos yet.",
-            action: { label: "Edit", href: edit("photos") },
+            action: { label: "Edit", sheet: "photos" },
         },
         {
             n: 2,
             title: "Price",
-            body:
-                product.variants.length > 0
-                    ? `Follows the variant picked: ${product.variants.map((v) => `${v.title} ${money(v.price ?? product.price)}`).join(", ")}.${price.mrp ? ` MRP ${money(price.mrp)} is shown struck through.` : ""}`
-                    : `${money(product.price)}${price.mrp && price.savingPercent !== null ? `, with MRP ${money(price.mrp)} struck through` : ""}.`,
-            action: { label: "Edit", href: edit("basics") },
+            body: customerPriceNote(
+                {
+                    price: product.price,
+                    variantPrices: product.variants.map(
+                        (v) => v.price ?? product.price,
+                    ),
+                    optionName: option,
+                    mrp: price.mrp,
+                    savingPercent: price.savingPercent,
+                },
+                money,
+            ),
+            action: { label: "Edit", sheet: "stock" },
         },
         {
             n: 3,
             title: product.variants.length > 0 ? "Variants and stock" : "Stock",
             body: !counts
                 ? untrackedShort(product.storefronts ?? [])
-                : variantLine ||
-                  (stock.product
-                      ? `${stock.product.canSell} can sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
-                      : "No stock count. The shop doesn't say how many are left."),
-            // The editor's Stock section counts a product that counts
-            // stock; untracked, its Sold out is marked on the Overview.
+                : variantLines.length > 0
+                  ? customerStockNote(variantLines, option)
+                  : stock.product
+                    ? `${stock.product.canSell} to sell (${stock.product.onHand} on hand, ${stock.product.promised} promised).`
+                    : "No stock count. The shop doesn't say how many are left.",
+            // The stock sheet counts and prices it; untracked with nothing
+            // to price, its Sold out is marked on the Overview.
             action:
-                product.variants.length > 0
-                    ? { label: "Edit", href: edit("variants") }
-                    : businessTracks && counts
-                      ? { label: "Edit", href: edit("stock") }
-                      : {
-                            label: "Open",
-                            href: productHref(storeId, product.id, "overview"),
-                        },
+                product.variants.length > 0 || (businessTracks && counts)
+                    ? { label: "Edit", sheet: "stock" }
+                    : {
+                          label: "Open",
+                          href: productHref(storeId, product.id, "overview"),
+                      },
         },
         {
             n: 4,
             title: "Description and details",
-            body: "Shown to everyone. Only the details switched to On the shop appear here.",
-            action: { label: "Edit", href: edit("description") },
+            body: "Shown to everyone. Only the details switched on for the shop appear here.",
+            action: { label: "Edit", sheet: "description" },
         },
         {
             n: 5,
@@ -116,7 +141,7 @@ export function CustomerView({
                     ? "One line under the price. Every variant shares it."
                     : "Written, but Team only, so it isn't shown."
                 : "Not written yet.",
-            action: { label: "Edit", href: edit("details") },
+            action: { label: "Edit", sheet: "details" },
         },
         {
             n: 6,
@@ -130,8 +155,8 @@ export function CustomerView({
         {
             n: 7,
             title: "Made by and returns",
-            body: "Shown under the description when switched to On the shop.",
-            action: { label: "Edit", href: edit("madeby") },
+            body: "Shown under the description when switched on for the shop.",
+            action: { label: "Edit", sheet: "details" },
         },
     ];
 
@@ -183,16 +208,15 @@ export function CustomerView({
                                                 {note.title}
                                             </p>
                                             {canWrite || note.n === 6 ? (
-                                                <TextLink
-                                                    href={note.action.href}
-                                                    className="text-[12px] coarse:min-h-11"
-                                                >
-                                                    {note.action.label}
-                                                    <span className="sr-only">
-                                                        {" "}
-                                                        {note.title}
-                                                    </span>
-                                                </TextLink>
+                                                <NoteButton
+                                                    action={note.action}
+                                                    what={note.title}
+                                                    overview={overview}
+                                                    storeId={storeId}
+                                                    counts={counts}
+                                                    shelves={shelves}
+                                                    categories={categories}
+                                                />
                                             ) : null}
                                         </div>
                                         <p className="mt-[3px] text-pretty text-[12px] leading-[1.5] text-foreground/75">
@@ -206,6 +230,66 @@ export function CustomerView({
                 ) : null}
             </div>
         </div>
+    );
+}
+
+/** A note's way to change what it describes: a sheet here, or a tab. */
+function NoteButton({
+    action,
+    what,
+    overview,
+    storeId,
+    counts,
+    shelves,
+    categories,
+}: {
+    action: NoteAction;
+    what: string;
+    overview: ProductOverview;
+    storeId: string;
+    counts: boolean;
+    shelves: ProductStock | null;
+    categories: { id: string; name: string }[];
+}) {
+    if ("href" in action) {
+        return (
+            <TextLink
+                href={action.href}
+                className="text-[12px] coarse:min-h-11"
+            >
+                {action.label}
+                <span className="sr-only"> {what}</span>
+            </TextLink>
+        );
+    }
+    const look = {
+        size: "inline" as const,
+        variant: "link" as const,
+        icon: false,
+    };
+    if (action.sheet === "stock") {
+        return (
+            <StockSheetButton
+                overview={overview}
+                storeId={storeId}
+                stock={shelves}
+                counts={counts}
+                label={action.label}
+                {...look}
+            />
+        );
+    }
+    return (
+        <SheetButton
+            kind={action.sheet}
+            label={action.label}
+            ariaLabel={`${action.label} ${what}`}
+            product={overview.product}
+            storeId={storeId}
+            categories={categories}
+            className="text-[12px]"
+            {...look}
+        />
     );
 }
 

@@ -12,7 +12,6 @@ import {
     photosInput,
     samePhotos,
 } from "@/lib/products/editor-sections";
-import { productEditHref } from "@/lib/products/links";
 import type { ProductDetail } from "@/lib/products/service";
 
 import { runAction } from "@/lib/api/run-action";
@@ -26,7 +25,7 @@ export function PhotosSheet({
     open,
     onOpenChange,
     product,
-    storeId,
+    storeId: _storeId,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -85,7 +84,6 @@ export function PhotosSheet({
             }}
             productName={product.name}
             title="Edit photos and videos"
-            fullEditorHref={productEditHref(storeId, product.id, "photos")}
             dirty={dirty}
             saving={saving}
             onSave={save}

@@ -27,7 +27,6 @@ import {
     madeByPatch,
     madeBySchema,
 } from "@/lib/products/editor-sections";
-import { productEditHref } from "@/lib/products/links";
 import type { ProductDetail, ProductPatch } from "@/lib/products/service";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -140,7 +139,6 @@ export function DetailsSheet({
             }}
             productName={product.name}
             title="Edit details"
-            fullEditorHref={productEditHref(storeId, product.id, "details")}
             dirty={isDirty}
             saving={isSubmitting}
             note={firstError}
@@ -162,7 +160,7 @@ export function DetailsSheet({
                                         options={[
                                             {
                                                 value: "PUBLISHED",
-                                                label: "On the shop",
+                                                label: "Live",
                                             },
                                             { value: "DRAFT", label: "Draft" },
                                             {

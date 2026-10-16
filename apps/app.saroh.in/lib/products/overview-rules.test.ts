@@ -1,17 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { productHref, productTabOf } from "./links";
-import type { OverviewOrder, ProductPlacement } from "./overview-rules";
+import type { ProductPlacement } from "./overview-rules";
 import { stockBadge } from "./overview-rules";
 import {
     accessLine,
     availability,
-    collectionsSummary,
     detailTag,
     heldByLine,
-    openOrderLine,
     orderRef,
-    ordersSummary,
     sellableByStore,
     shopProductUrl,
     websiteSummary,
@@ -79,7 +76,7 @@ describe("availability", () => {
                 { name: "Online", canSell: 15 },
             ]),
         );
-        expect(a.label).toBe("Can be sold now");
+        expect(a.label).toBe("To sell");
         expect(a.figure).toBe("25");
         expect(a.note).toBe(
             "30 on hand, 5 promised · 10 at Hill Road, 15 online",
@@ -104,34 +101,14 @@ describe("heldByLine", () => {
         expect(heldByLine(0, 0, [])).toBeNull();
     });
     it("keeps the number while orders can't be read", () => {
-        expect(heldByLine(2, null, [])).toMatch(/^Promised stock \(2\)/);
+        expect(heldByLine(2, null, [])).toBe("2 promised to open orders.");
     });
 });
 
-describe("Linked to this product", () => {
-    it("summarises orders this month", () => {
-        expect(ordersSummary(3, 41, new Date(2026, 8, 24))).toBe(
-            "3 open · 41 in September",
-        );
-    });
+describe("the Overview's words", () => {
     it("writes an order number as people say it", () => {
         expect(orderRef("1064")).toBe("#1064");
         expect(orderRef("ORD-507")).toBe("ORD-507");
-    });
-    it("writes an open order as one line", () => {
-        const order: OverviewOrder = {
-            id: "o1",
-            orderNumber: "#1020",
-            customerId: "c1",
-            customer: "Priya Raman",
-            status: "PENDING",
-            open: true,
-            createdAt: "2026-09-24T08:00:00Z",
-            lines: [{ variantId: "v1", title: "800g", quantity: 2 }],
-        };
-        expect(openOrderLine(order, "Sourdough")).toBe(
-            "#1020 Priya: 800g × 2, new",
-        );
     });
     const placement = (
         over: Partial<ProductPlacement> = {},
@@ -154,16 +131,6 @@ describe("Linked to this product", () => {
         ],
         website: { showsProducts: false, pages: [] },
         ...over,
-    });
-    it("counts the collections it shows in", () => {
-        expect(collectionsSummary(placement())).toEqual({
-            count: "In 2 collections",
-            names: "Bread, Weekend bakes",
-        });
-        expect(collectionsSummary(placement({ collections: [] }))).toEqual({
-            count: "In no collection",
-            names: "—",
-        });
     });
     it("says the website can't show products yet, rather than none", () => {
         expect(websiteSummary(placement()).lines).toEqual([
@@ -236,7 +203,7 @@ describe("a product live on the online shop (UX-082)", () => {
 describe("Details tags", () => {
     it("an empty field the shop would show is hidden until filled in", () => {
         expect(detailTag(false, true)).toBe("Hidden until filled in");
-        expect(detailTag(true, true)).toBe("On the shop");
+        expect(detailTag(true, true)).toBe("Shown online");
         expect(detailTag(true, false)).toBe("Team only");
         expect(detailTag(false, false)).toBe("Team only");
     });
@@ -247,10 +214,8 @@ describe("the header", () => {
         expect(whereItSells("PUBLISHED", ["Hill Road", "Online"])).toBe(
             "Hill Road, Online",
         );
-        expect(whereItSells("DRAFT", ["Hill Road"])).toBe(
-            "not on the shop yet",
-        );
-        expect(whereItSells("ARCHIVED", [])).toBe("not on the shop");
+        expect(whereItSells("DRAFT", ["Hill Road"])).toBe("not sold yet");
+        expect(whereItSells("ARCHIVED", [])).toBe("not sold");
     });
     it("tells a stock-only role what it can do, and nobody who can edit", () => {
         expect(

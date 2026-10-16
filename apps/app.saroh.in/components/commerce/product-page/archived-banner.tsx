@@ -12,8 +12,8 @@ import { Notice } from "@saroh/ui/notice";
 
 /**
  * Under an archived product's header: when it went, what that means, and
- * the way back — restored as a draft, so nothing reaches customers until
- * someone publishes it on purpose.
+ * a second way back — to a draft, so nothing reaches customers until
+ * someone publishes it. The header's Sell again is the first.
  */
 export function ArchivedBanner({
     storeId,
@@ -42,7 +42,7 @@ export function ArchivedBanner({
                 return;
             }
             router.refresh();
-            showUndo("Restored as a draft. Publish it when it is ready.", () =>
+            showUndo("Back to a draft. Publish it when it is ready.", () =>
                 start(async () => {
                     const undo = await runAction(() =>
                         patchProduct(storeId, productId, {
@@ -82,11 +82,12 @@ export function ArchivedBanner({
                     <Button
                         size="sm"
                         type="button"
+                        variant="outline"
                         onClick={restore}
                         busy={pending}
-                        busyLabel="Restoring…"
+                        busyLabel="Moving it…"
                     >
-                        Restore as a draft
+                        Back to draft
                     </Button>
                 ) : null}
             </div>

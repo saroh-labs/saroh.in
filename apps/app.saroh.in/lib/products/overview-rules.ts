@@ -156,24 +156,76 @@ export function customersSee(line: StockLine): string {
     return "In stock";
 }
 
+/** How many of a product's stock lines need someone, each counted once. */
+export interface StockCounts {
+    /** More promised than on the shelf. */
+    short: number;
+    /** Nothing left to sell (and not short). */
+    out: number;
+    /** At or under its warning level (and not out). */
+    low: number;
+}
+
 /**
- * The Stock tab's badge: "1 short" before "2 low", nothing when all is
- * well or the product doesn't count stock. From the page's one read, so it
- * says the same on every tab.
+ * Its lines at the page's storefront, judged one way each: short first,
+ * then out, then low — so a sold-out line is never also counted as low.
+ */
+export function stockCounts(
+    stock: Pick<ProductOverview["stock"], "mode" | "variants" | "product">,
+): StockCounts {
+    const lines =
+        stock.mode === "variant"
+            ? stock.variants
+            : stock.product
+              ? [stock.product]
+              : [];
+    const c: StockCounts = { short: 0, out: 0, low: 0 };
+    for (const l of lines) {
+        if (l.promised > l.onHand) c.short += 1;
+        else if (l.word === "SOLD_OUT") c.out += 1;
+        else if (l.word === "LOW") c.low += 1;
+    }
+    return c;
+}
+
+/**
+ * The Stock tab's badge: "1 short", "1 out · 2 low" — never an out line
+ * counted as low — or nothing when all is well or the product doesn't
+ * count stock. From the page's one read, so it says the same on every
+ * tab. The API's `needs` judges every open storefront but counts out with
+ * low; the out lines are this storefront's, taken off its low count.
  */
 export function stockBadge(
-    stock: Pick<ProductOverview["stock"], "needs" | "totals">,
+    stock: Pick<ProductOverview["stock"], "needs" | "totals"> &
+        Partial<
+            Pick<ProductOverview["stock"], "mode" | "variants" | "product">
+        >,
     counts: boolean,
 ): string | null {
     if (!counts) return null;
-    // An older API: this storefront's low count, as the badge once read.
-    const { short, low } = stock.needs ?? {
-        short: 0,
-        low: stock.totals.lowCount,
-    };
-    if (short > 0) return `${short} short`;
-    if (low > 0) return `${low} low`;
-    return null;
+    const here =
+        stock.mode !== undefined
+            ? stockCounts({
+                  mode: stock.mode,
+                  variants: stock.variants ?? [],
+                  product: stock.product ?? null,
+              })
+            : null;
+    let c: StockCounts;
+    if (stock.needs) {
+        const short = stock.needs.short;
+        const out = here?.out ?? 0;
+        c = { short, out, low: Math.max(0, stock.needs.low - short - out) };
+    } else {
+        // An older API: this storefront's lines, or its low count.
+        c = here ?? { short: 0, out: 0, low: stock.totals.lowCount };
+    }
+    const parts = [
+        c.short > 0 ? `${c.short} short` : null,
+        c.out > 0 ? `${c.out} out` : null,
+        c.low > 0 ? `${c.low} low` : null,
+    ].filter((p): p is string => p !== null);
+    return parts.length ? parts.join(" · ") : null;
 }
 
 /**

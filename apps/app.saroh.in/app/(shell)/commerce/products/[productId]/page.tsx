@@ -33,6 +33,7 @@ import {
 import { stockBadge } from "@/lib/products/overview-rules";
 import { accessLine, shopProductUrl } from "@/lib/products/overview-words";
 import { listCategories } from "@/lib/products/service";
+import { listAllergens } from "@/lib/products/settings";
 import { countsStock, trackingControl } from "@/lib/products/tracking";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
@@ -153,7 +154,13 @@ export default async function ProductPage({
     // Read-only as the Editor is (#800): nothing on the page changes it,
     // while stock can still be counted (`canStock` is kept).
     const overview = isPaused ? { ...read, canWrite: false } : read;
-    const shopUrl = shopProductUrl(web?.links.shop, overview.product);
+    // Paused, it is hidden from the site: nothing to open there (#800).
+    const shopUrl = isPaused
+        ? null
+        : shopProductUrl(web?.links.shop, overview.product);
+    // Whether the online shop is live at all; null when that is unread (a
+    // role that can't read the web address), so nothing is claimed.
+    const shopLive = web ? Boolean(web.links.shop) : null;
     const tracking = {
         counts: countsStock(
             overview.product.stockTracked,
@@ -167,40 +174,45 @@ export default async function ProductPage({
 
     const onCollections = view === "team" && tab === "collections";
     const onOverview = view === "team" && tab === "overview";
-    const [levels, log, checks, categories, collections, priceHistory] =
-        await Promise.all([
-            // Its shelves at every storefront — optional: without them, the
-            // Overview shows the address's storefront and the Stock tab says
-            // it couldn't load.
-            tracking.counts &&
-            view === "team" &&
-            (tab === "overview" || tab === "stock")
-                ? getStockLevels({ product: productId }).catch(() => null)
-                : Promise.resolve(null),
-            onStock
-                ? getStockLog({ product: productId, limit: 100 }).catch(
-                      () => null,
-                  )
-                : Promise.resolve(null),
-            onStock
-                ? getStockChecks().catch(() => null)
-                : Promise.resolve(null),
-            // The details sheet picks a category; only a writer opens it. The
-            // Collections tab says which category put it in an automatic one.
-            overview.canWrite || onCollections
-                ? listCategories().catch(() => [])
-                : Promise.resolve([]),
-            // The Collections tab's sizes and its Edit sheet (#524) — optional:
-            // without them the cards leave the count out and Edit waits.
-            onCollections
-                ? listCollections().catch(() => null)
-                : Promise.resolve(null),
-            // What it and its options have cost (12 Oct 2026), under the
-            // Overview. Optional: a read that fails is said in its place.
-            onOverview
-                ? readPriceHistory("products", productId).catch(() => null)
-                : Promise.resolve(undefined),
-        ]);
+    const [
+        levels,
+        log,
+        checks,
+        categories,
+        collections,
+        priceHistory,
+        allergens,
+    ] = await Promise.all([
+        // Its shelves at every storefront — optional: without them, the
+        // Overview shows the address's storefront and the Stock tab says
+        // it couldn't load. The Customer view's stock sheet uses them.
+        tracking.counts &&
+        (view === "customer" || tab === "overview" || tab === "stock")
+            ? getStockLevels({ product: productId }).catch(() => null)
+            : Promise.resolve(null),
+        onStock
+            ? getStockLog({ product: productId, limit: 100 }).catch(() => null)
+            : Promise.resolve(null),
+        onStock ? getStockChecks().catch(() => null) : Promise.resolve(null),
+        // The details sheet picks a category; only a writer opens it. The
+        // Collections tab says which category put it in an automatic one.
+        overview.canWrite || onCollections
+            ? listCategories().catch(() => [])
+            : Promise.resolve([]),
+        // The Collections tab's sizes and its Edit sheet (#524) — optional:
+        // without them the cards leave the count out and Edit waits.
+        onCollections
+            ? listCollections().catch(() => null)
+            : Promise.resolve(null),
+        // What it and its options have cost (12 Oct 2026), under the
+        // Overview. Optional: a read that fails is said in its place.
+        onOverview
+            ? readPriceHistory("products", productId).catch(() => null)
+            : Promise.resolve(undefined),
+        // A business that keeps an allergen list sells food: the
+        // description card says ingredients, else materials.
+        onOverview ? listAllergens().catch(() => null) : Promise.resolve(null),
+    ]);
     const stock: ProductStock | null = levels
         ? productStock(levels, productId)
         : null;
@@ -219,7 +231,8 @@ export default async function ProductPage({
     });
 
     return (
-        <main className="w-full">
+        // A phone docks the header's buttons at the foot: room for them.
+        <main className={overview.canWrite ? "w-full max-sm:pb-16" : "w-full"}>
             <ProductHeader
                 overview={overview}
                 storeId={store.id}
@@ -230,7 +243,9 @@ export default async function ProductPage({
             />
             {isPaused ? (
                 <div className="border-b border-border px-4 py-2.5 sm:px-[22px]">
-                    <PausedNote>{pausedWords("product")}</PausedNote>
+                    <PausedNote hiddenPlans="Paused: over your plan's product limit. Contact us to bring it back.">
+                        {pausedWords("product")}
+                    </PausedNote>
                 </div>
             ) : access ? (
                 <AccessLine line={access} />
@@ -251,6 +266,8 @@ export default async function ProductPage({
                         canWrite={overview.canWrite}
                         counts={tracking.counts}
                         businessTracks={tracking.business}
+                        categories={categories}
+                        shelves={stock}
                     />
                 </div>
             ) : (
@@ -278,8 +295,9 @@ export default async function ProductPage({
                                 categories={categories}
                                 tracking={tracking}
                                 stock={stock}
-                                now={now}
                                 onShop={shopUrl !== null}
+                                shopLive={shopLive}
+                                sellsFood={(allergens?.length ?? 0) > 0}
                                 priceHistory={priceHistory}
                             />
                         ) : null}

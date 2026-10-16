@@ -37,19 +37,25 @@ export function OverviewPhotos({
                 {overview.canWrite ? (
                     <SheetButton
                         kind="photos"
-                        label="Edit"
-                        ariaLabel="Edit photos and videos"
+                        label={media.length ? "Edit" : "Add"}
+                        ariaLabel={
+                            media.length
+                                ? "Edit photos and videos"
+                                : "Add photos and videos"
+                        }
                         product={product}
                         storeId={storeId}
                     />
                 ) : null}
-                <Link
-                    href={photosHref}
-                    scroll={false}
-                    className={`${FOCUS} rounded-sm px-0.5 text-[12px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground coarse:min-h-11`}
-                >
-                    {media.length ? `See all ${media.length}` : "Add"}
-                </Link>
+                {media.length ? (
+                    <Link
+                        href={photosHref}
+                        scroll={false}
+                        className={`${FOCUS} rounded-sm px-0.5 text-[12px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground coarse:min-h-11`}
+                    >
+                        See all {media.length}
+                    </Link>
+                ) : null}
             </CardHead>
             <div className="grid gap-2.5 px-[18px] pb-4">
                 {media.length > 0 ? (
@@ -99,27 +105,38 @@ export function OverviewPhotos({
 }
 
 /**
- * Description and ingredients (#522): the words customers read, the key
- * points under them, and what it is made of and contains — each with
- * whether the shop shows it.
+ * Description and ingredients (#522) — "and materials" for a business
+ * that doesn't sell food: the words customers read, the key points under
+ * them, and what it is made of and contains — each with whether the shop
+ * shows it.
  */
 export function OverviewDescription({
     overview,
     storeId,
+    shopLive = null,
+    sellsFood = false,
 }: {
     overview: ProductOverview;
     storeId: string;
+    /** The online shop is live; null when that couldn't be read. */
+    shopLive?: boolean | null;
+    /** The business keeps an allergen list: it sells food. */
+    sellsFood?: boolean;
 }) {
     const { product } = overview;
     const { contains, mayContain } = product.allergens;
+    const food = sellsFood || contains.length > 0 || mayContain.length > 0;
+    const title = food
+        ? "Description and ingredients"
+        : "Description and materials";
     return (
         <Card className="rounded-[12px] p-0">
-            <CardHead title="Description and ingredients">
+            <CardHead title={title}>
                 {overview.canWrite ? (
                     <SheetButton
                         kind="description"
                         label="Edit"
-                        ariaLabel="Edit description and ingredients"
+                        ariaLabel={`Edit ${title.toLowerCase()}`}
                         product={product}
                         storeId={storeId}
                     />
@@ -148,11 +165,12 @@ export function OverviewDescription({
                 </div>
                 <dl>
                     <DetailRow
-                        label="Ingredients or material"
+                        label={food ? "Ingredients" : "Materials"}
                         muted={!product.materials}
                         tag={detailTag(
                             Boolean(product.materials),
                             onTheShop(product.shopFields, "materials"),
+                            shopLive,
                         )}
                     >
                         {product.materials ?? "Not given."}
@@ -182,7 +200,13 @@ export function OverviewDescription({
                                     </span>
                                 ) : null}
                             </dd>
-                            <ShownTag tag="On the shop" />
+                            <ShownTag
+                                tag={
+                                    shopLive === false
+                                        ? "Shown when online"
+                                        : "Shown online"
+                                }
+                            />
                         </div>
                     ) : null}
                 </dl>

@@ -115,17 +115,19 @@ test.describe("Track stock and Sold out", () => {
                 page.getByText("Always available on the shop."),
             ).toBeVisible();
 
-            // 4. Track stock again: it starts at 0 and opens the count.
+            // 4. Track stock again: it starts at 0, and the page's stock
+            // sheet opens on the count — it never leaves for the editor.
             await page.getByRole("button", { name: "Track stock" }).click();
             await expect(
                 page.getByText("Stock is tracked for this product again."),
             ).toBeVisible();
-            await page.waitForURL(/\/commerce\/products\/[^/]+\/edit/);
-            await expect(
-                page.getByRole("switch", {
-                    name: "Track stock for this product",
-                }),
-            ).toHaveAttribute("aria-checked", "true");
+            await page.waitForURL(/tab=stock/);
+            expect(page.url()).not.toMatch(/\/edit/);
+            const sheet = page.getByRole("dialog", {
+                name: "Edit stock and prices",
+            });
+            await expect(sheet).toBeVisible();
+            await expect(sheet.getByLabel(/on hand/).first()).toBeFocused();
         } finally {
             // As it was found: tracked, counted at 7. Then out of the way.
             if (id) await putBack(page.request, id);

@@ -6,9 +6,9 @@ import type { SheetSize } from "@/lib/products/stock-sheet";
 import { SheetSizeRow } from "./stock-sheet-row";
 
 /**
- * A size in the stock sheet on a phone (T7): the size on its own line
- * beside a 44px remove button, then price, on hand and warn at in thirds,
- * each labelled — the desk's column heads are hidden there.
+ * A variant in the stock sheet on a phone (T7): its name on its own line,
+ * then price, on hand and warn at in thirds, each labelled — the desk's
+ * column heads are hidden there. No remove: that is the editor's.
  */
 const SIZE: SheetSize = {
     variantId: "v_1",
@@ -39,6 +39,7 @@ const row = (counts: boolean) =>
             hasVariants
             productPrice="450"
             currency="INR"
+            optionName="Size"
             onSize={() => undefined}
             onPrice={() => undefined}
             onShelf={() => undefined}
@@ -65,27 +66,24 @@ describe("SheetSizeRow on a phone", () => {
         }
     });
 
-    it("puts the size on its own line, remove beside it at 44px", () => {
+    it("puts the variant on its own line, and offers no remove", () => {
         const out = row(true);
-        expect(out).toContain("grid-cols-[repeat(3,minmax(0,1fr))_44px]");
+        expect(out).toContain("grid-cols-[repeat(3,minmax(0,1fr))]");
         const name = /<input[^>]*aria-label="Size 1 name"[^>]*>/.exec(out);
         expect(name?.[0]).toContain("col-span-3 sm:col-span-1");
-        const removes = out.match(
-            /<button[^>]*aria-label="Remove 800g"[^>]*>/g,
-        );
-        expect(removes).toHaveLength(2);
-        expect(removes?.[0]).toContain("size-11 sm:hidden");
-        expect(removes?.[1]).toContain("sm:inline-flex");
-        // The phone's remove follows the name; the desk's ends the row.
-        expect(out.indexOf("size-11 sm:hidden")).toBeLessThan(
-            out.indexOf('for="'),
-        );
+        // A sheet for typing counts never deletes a variant (audit, 16 Oct).
+        expect(out).not.toMatch(/aria-label="Remove /);
+        expect(out).not.toContain("<button");
+    });
+
+    it("marks the on-hand box the sheet opens on", () => {
+        expect(row(true)).toMatch(/<input[^>]*data-on-hand=""[^>]*>/);
     });
 
     it("an untracked size has just its labelled price", () => {
         const out = row(false);
         expect(out).toMatch(/<label[^>]* for="[^"]+"[^>]*>Price<\/label>/);
         expect(out).not.toContain("On hand");
-        expect(out).toContain("grid-cols-[minmax(0,1fr)_44px]");
+        expect(out).toContain("grid-cols-1");
     });
 });

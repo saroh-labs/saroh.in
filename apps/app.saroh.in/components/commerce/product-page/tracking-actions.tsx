@@ -1,8 +1,15 @@
 "use client";
 
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@saroh/ui/dropdown-menu";
+import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { PackageX } from "lucide-react";
+import { MoreHorizontal, PackageX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -10,7 +17,7 @@ import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { runAction } from "@/lib/api/run-action";
 import { setProductStockTracking } from "@/lib/products/actions";
-import { productEditHref, productHref } from "@/lib/products/links";
+import { productHref } from "@/lib/products/links";
 import {
     stopTrackingConfirm,
     TRACKING_OFF_SAID,
@@ -18,15 +25,17 @@ import {
     TRACKING_ON_SAID,
     TRACKING_STILL_ON,
 } from "@/lib/products/tracking";
+import { STOCK_SHEET_PARAM } from "./sheets/stock-sheet";
 
 /**
  * Track stock from the product page (#515), Owner and Admin only — the page
  * draws these only for them; the API refuses anyone else.
  *
  * "Track stock" needs no confirmation: nothing is lost, and every shelf
- * starts at 0. It goes on to the editor's Stock section, where the count is
- * made. "Stop tracking" asks first: the count goes to 0 and the product
- * sells without a count unless it is marked sold out.
+ * starts at 0. It stays on the page: the Stock tab, with the stock sheet
+ * open on the count. "Stop tracking" sits in the Stock card's ⋯ and asks
+ * first: the count goes to 0 and the product sells without a count unless
+ * it is marked sold out.
  */
 export function StartTrackingButton({
     productId,
@@ -51,7 +60,10 @@ export function StartTrackingButton({
                 return;
             }
             showSuccess(TRACKING_ON_SAID, TRACKING_ON_NEXT);
-            router.push(productEditHref(storeId, productId, "stock"));
+            router.push(
+                `${productHref(storeId, productId, "stock")}&${STOCK_SHEET_PARAM}=stock`,
+                { scroll: false },
+            );
         });
     }
 
@@ -101,16 +113,23 @@ export function StopTrackingButton({
 
     return (
         <>
-            <button
-                type="button"
-                onClick={() => setAsking(true)}
-                className={cn(
-                    "rounded-sm px-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:text-disabled-foreground coarse:min-h-11",
-                    className,
-                )}
-            >
-                Stop tracking
-            </button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <IconButton
+                        label="More stock actions"
+                        icon={<MoreHorizontal />}
+                        variant="ghost"
+                        size="sm"
+                        className={className}
+                    />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem onSelect={() => setAsking(true)}>
+                        <PackageX />
+                        Stop tracking…
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
             <ConfirmDialog
                 open={asking}
                 onOpenChange={setAsking}

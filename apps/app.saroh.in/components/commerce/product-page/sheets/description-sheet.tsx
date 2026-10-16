@@ -25,7 +25,6 @@ import {
     descriptionSchema,
     LIMITS,
 } from "@/lib/products/editor-sections";
-import { productEditHref } from "@/lib/products/links";
 import type { ProductDetail, ProductPatch } from "@/lib/products/service";
 
 import { QuickSheet } from "../quick-sheet";
@@ -131,7 +130,6 @@ export function DescriptionSheet({
             }}
             productName={product.name}
             title="Edit description"
-            fullEditorHref={productEditHref(storeId, product.id, "description")}
             dirty={isDirty}
             saving={isSubmitting}
             note={firstError}

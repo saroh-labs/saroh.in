@@ -14,6 +14,9 @@ import { priceLabel } from "@/lib/products/overview-rules";
 import { whereItSells } from "@/lib/products/overview-words";
 import { Notice } from "@saroh/ui/notice";
 
+import { PhoneShopMenu } from "./phone-shop-menu";
+import { ProductActions } from "./product-actions";
+
 export const STATUS_BADGE = {
     PUBLISHED: { label: "Live", variant: "success" },
     DRAFT: { label: "Draft", variant: "draft" },
@@ -24,6 +27,22 @@ const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /**
+ * Why "View on the shop" is off, said beside it (and in the phone's menu):
+ * null when it opens, and for an archived or paused product, whose banner
+ * or note under the header already says so — there it isn't offered.
+ */
+export function shopNote(
+    status: ProductOverview["product"]["status"],
+    shopUrl: string | null,
+    paused: boolean,
+): string | null {
+    if (shopUrl || paused || status === "ARCHIVED") return null;
+    return status === "PUBLISHED"
+        ? "Its shop page opens once your online shop is live."
+        : "Publish it first. A draft has no public page.";
+}
+
+/**
  * Before the header's button (#522): why the shop's page can't open yet,
  * the Team / Customer switch, its QR and "View on the shop".
  */
@@ -32,29 +51,24 @@ function ShopControls({
     storeId,
     view,
     shopUrl = null,
+    paused,
 }: {
     overview: ProductOverview;
     storeId: string;
     view: "team" | "customer";
     /** Its page on the live online shop (`shopProductUrl`); null when none. */
     shopUrl?: string | null;
+    paused: boolean;
 }) {
     const { product } = overview;
-    const live = product.status === "PUBLISHED";
-    const note = live
-        ? shopUrl
-            ? null
-            : "Its shop page opens once your online shop is live."
-        : product.status === "ARCHIVED"
-          ? "Archived. Its page does not open for customers."
-          : "Publish it first. A draft has no public page.";
+    const note = shopNote(product.status, shopUrl, paused);
     return (
         <>
             {note ? (
                 <span
                     id="shop-link-why"
                     role="status"
-                    className="max-w-[300px] text-pretty text-[12px] text-muted-foreground max-sm:hidden"
+                    className="max-w-[300px] text-pretty text-[12px] text-muted-foreground"
                 >
                     {note}
                 </span>
@@ -116,23 +130,19 @@ function ShopControls({
                         <ExternalLink aria-hidden className="size-3" />
                     </a>
                 </Button>
-            ) : (
+            ) : note ? (
+                // Off, with its reason beside it: no ↗, as it opens nothing.
                 <Button
                     size="xs"
                     type="button"
                     variant="ghost"
                     disabled
                     aria-describedby="shop-link-why"
-                    className="gap-1.5 font-medium"
+                    className="font-medium"
                 >
-                    {live
-                        ? "View on the shop"
-                        : product.status === "ARCHIVED"
-                          ? "Not on the shop"
-                          : "Not on the shop yet"}
-                    <ExternalLink aria-hidden className="size-3" />
+                    View on the shop
                 </Button>
-            )}
+            ) : null}
         </>
     );
 }
@@ -141,8 +151,10 @@ function ShopControls({
  * The product's page header: "Sell › Products › ‹name›", then who this
  * product is at a glance (#522): its cover — which opens Photos —
  * its name and saved status, then one line: what it sells for, its
- * category, where it sells and when it last changed. "Edit product" opens
- * the whole editor; each panel below has its own Edit.
+ * category, where it sells and when it last changed. Its buttons follow
+ * its state (`ProductActions`): Publish, Edit product or Sell again, and a
+ * ⋯ menu. On a phone: the name, its state and one ⋯ for the shop page
+ * and the Customer view; the buttons dock at the foot.
  */
 export function ProductHeader({
     overview,
@@ -167,7 +179,11 @@ export function ProductHeader({
     const { product, price } = overview;
     const money = (amount: string) =>
         formatMoneyMajor(amount, product.currency);
-    const status = STATUS_BADGE[product.status];
+    // Paused (#800) is the state customers meet: it replaces Live.
+    const status = paused
+        ? ({ label: "Paused", variant: "warning" } as const)
+        : STATUS_BADGE[product.status];
+    const places = product.storefronts ?? [];
     // The cover is the first photo; a video never stands in for it.
     const cover = product.images.find((i) => i.kind !== "video");
     const where = whereItSells(
@@ -198,11 +214,13 @@ export function ProductHeader({
                         <Badge variant={status.variant} size="sm">
                             {status.label}
                         </Badge>
-                        {paused ? (
-                            <Badge variant="warning" size="sm">
-                                Paused
-                            </Badge>
-                        ) : null}
+                        <PhoneShopMenu
+                            productId={product.id}
+                            storeId={storeId}
+                            view={view}
+                            shopUrl={shopUrl}
+                            note={shopNote(product.status, shopUrl, paused)}
+                        />
                     </>
                 }
                 description={
@@ -215,20 +233,30 @@ export function ProductHeader({
                     </p>
                 }
                 meta={
-                    <ShopControls
-                        overview={overview}
-                        storeId={storeId}
-                        view={view}
-                        shopUrl={shopUrl}
-                    />
+                    // A phone has these in the ⋯ beside the state instead.
+                    <div className="contents max-sm:hidden">
+                        <ShopControls
+                            overview={overview}
+                            storeId={storeId}
+                            view={view}
+                            shopUrl={shopUrl}
+                            paused={paused}
+                        />
+                    </div>
                 }
                 actions={
                     overview.canWrite ? (
-                        <Button asChild>
-                            <Link href={productEditHref(storeId, product.id)}>
-                                Edit product
-                            </Link>
-                        </Button>
+                        <ProductActions
+                            product={product}
+                            storeId={storeId}
+                            editHref={productEditHref(storeId, product.id)}
+                            deleteFrom={
+                                places.length > 1
+                                    ? "every location that sells it"
+                                    : (places[0]?.name ??
+                                      overview.storefront.name)
+                            }
+                        />
                     ) : undefined
                 }
                 lead={
@@ -249,6 +277,14 @@ export function ProductHeader({
                                 className="size-full object-cover"
                             />
                         </Link>
+                    ) : !overview.canWrite ? (
+                        // Nothing to add for a role that can't: a plain tile.
+                        <div
+                            aria-hidden
+                            className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+                        >
+                            <Camera className="size-[18px]" />
+                        </div>
                     ) : (
                         <Link
                             href={photosHref}
