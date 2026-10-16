@@ -2,7 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError, showUndo } from "@saroh/ui/toast";
+import { showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -14,7 +14,12 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import type { MrpPricing } from "@/lib/gst/mrp";
 import { optionOverMrpNote } from "@/lib/gst/mrp";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
-import { isMoney, LIMITS, trimMoney } from "@/lib/products/editor-sections";
+import {
+    isMoney,
+    LIMITS,
+    optionPlural,
+    trimMoney,
+} from "@/lib/products/editor-sections";
 import type { ProductListingView } from "@/lib/products/listing-changes";
 import { newVariantStores, soldAtFrom } from "@/lib/products/listing-changes";
 import type { ProductDetail, ProductOptionView } from "@/lib/products/service";
@@ -28,8 +33,10 @@ import {
 import { EmptyState } from "@saroh/ui/data-state";
 import { TextLink } from "@saroh/ui/text-link";
 
+import { ChangeOption, OptionShown } from "./change-option";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
+import { FIND_FROM, FindRow, matchesFind } from "./find-row";
 import { OptionValuesInline } from "./option-values-inline";
 import { SectionCard } from "./section-card";
 import { OptionChoice, VariantAddRow } from "./variant-add-row";
@@ -76,7 +83,7 @@ export function VariantsSection({
     /** The plan's cap on this product's variants; null when nothing caps them. */
     variantCap?: VariantCap | null;
 }) {
-    const { canWrite, saving } = useEditor();
+    const { canWrite, saving, sayError } = useEditor();
     // While its save runs, the list is what is being sent: typing into it
     // then would be overwritten by what comes back.
     const busy = saving.includes("variants");
@@ -106,6 +113,13 @@ export function VariantsSection({
     const [seen, setSeen] = useState(loadedKey);
     // Why the last save stopped: the API's refusal, or the connection.
     const [failed, setFailed] = useState<string | null>(null);
+    // The API's refusal of a row's SKU (another product has it), shown
+    // under that row until its SKU is changed.
+    const [skuRefused, setSkuRefused] = useState<
+        Partial<Record<string, { sku: string; message: string }>>
+    >({});
+    const [changing, setChanging] = useState(false);
+    const [find, setFind] = useState("");
     const [adding, setAdding] = useState(false);
     const [open, setOpen] = useState<string | null>(null);
     const [newValue, setNewValue] = useState("");
@@ -119,6 +133,7 @@ export function VariantsSection({
         setRows(fromProduct);
         setOptionId(savedOptionId);
         setFailed(null);
+        setSkuRefused({});
     }
 
     const option = options.find((o) => o.id === optionId) ?? null;
@@ -157,12 +172,16 @@ export function VariantsSection({
     // A variant shows a photo of its own, never a video.
     const photos = product.images.filter((i) => i.kind !== "video");
     const skuKey = (r: VariantRow) => r.sku.trim().toLowerCase();
+    const refusedOf = (r: VariantRow) => {
+        const said = skuRefused[r.key];
+        return said?.sku === r.sku ? said.message : "";
+    };
     const errOf = (r: VariantRow) =>
         variantProblem(r, rows, {
             opt,
             title: titleOf,
             overMrp: (x) => mrpNote(x.price, x.mrp),
-        });
+        }) || refusedOf(r);
     const bad = rows.some((r) => errOf(r));
     const dirty = optionId !== savedOptionId || !sameRows(rows, base);
     // Added or removed rows change what Stock counts; an edit in place doesn't.
@@ -215,16 +234,19 @@ export function VariantsSection({
             listings,
             sellAt,
         });
-        if (out.toast) showError(out.toast);
+        if (out.toast) sayError("variants", out.toast);
         // The plan's refusal is its own notice, with the way to more.
         if (out.plan) showPlanRefusal(out.plan);
         setRows(out.next);
+        // A SKU another product has is said under its row (16 Oct 2026).
+        const rowsRefused = Object.keys(out.rowErrors).length > 0;
+        setSkuRefused(out.rowErrors);
         // On success the rows as saved are the baseline, so the section is
         // clean at once; on a failure it is what did save, so the retry
         // skips it.
-        setBase(out.why ? out.saved : out.next);
+        setBase(out.why || rowsRefused ? out.saved : out.next);
         setFailed(out.failed);
-        return !out.why;
+        return !out.why && !rowsRefused;
     }
 
     useSection(
@@ -245,6 +267,7 @@ export function VariantsSection({
                 setRows(base);
                 setOptionId(savedOptionId);
                 setFailed(null);
+                setSkuRefused({});
                 setNewValue("");
                 setNewSku("");
                 setNewPrice("");
@@ -286,6 +309,16 @@ export function VariantsSection({
         setRows(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
     const collapsed = rows.length === 0 && !adding && !dirty;
+    // Past a dozen, a box finds one by its value or SKU; a row with
+    // something to fix is always shown.
+    const shownRows = rows
+        .map((r, i) => ({ r, i }))
+        .filter(
+            ({ r }) =>
+                rows.length <= FIND_FROM ||
+                matchesFind(find, titleOf(r), r.sku) ||
+                !!errOf(r),
+        );
 
     return (
         <SectionCard k="variants" title="Variants">
@@ -312,26 +345,45 @@ export function VariantsSection({
             ) : (
                 <>
                     <FieldHelp className="mb-[11px]">
-                        Each variant is the same product, with the same
-                        description and category. Its value comes from Settings
-                        → Options. SKU, price and photo can differ. A grey price
-                        is the product&apos;s {shownPrice}.
+                        Each {opt} is the same product, with the same
+                        description and category. SKU, price and photo can
+                        differ.
+                        {shownPrice ? ` A blank price uses ${shownPrice}.` : ""}
                     </FieldHelp>
-                    <OptionChoice
+                    {rows.length === 0 ? (
+                        // Nothing listed yet: any option can be chosen.
+                        <OptionChoice
+                            options={options}
+                            optionId={optionId}
+                            locked={locked}
+                            onPick={(o) => {
+                                setOptionId(o.id);
+                                setNewValue("");
+                            }}
+                        />
+                    ) : (
+                        // Listed under one option: only it is shown, and
+                        // changing it says what happens to the list first.
+                        <OptionShown
+                            name={optName}
+                            locked={locked || options.length < 2}
+                            onChange={() => setChanging(true)}
+                        />
+                    )}
+                    <ChangeOption
+                        open={changing}
+                        current={optionId}
                         options={options}
-                        optionId={optionId}
-                        locked={locked}
-                        onPick={(o) => {
-                            // Values belong to one option; switching would
-                            // orphan them all.
-                            if (rows.length > 0) {
-                                showError(
-                                    `Remove the variants first to sell it by ${o.name.toLowerCase()} instead.`,
-                                );
-                                return;
-                            }
-                            setOptionId(o.id);
+                        listed={rows.length}
+                        opt={opt}
+                        onClose={() => setChanging(false)}
+                        onChoose={(id) => {
+                            // Staged, as every change here is: Discard
+                            // brings the list back until Variants is saved.
+                            setRows([]);
+                            setOptionId(id);
                             setNewValue("");
+                            setChanging(false);
                         }}
                     />
                     {canWrite && (values.length === 0 || allTaken) ? (
@@ -357,8 +409,17 @@ export function VariantsSection({
                                 <span>Price</span>
                                 <span />
                             </div>
+                            {rows.length > FIND_FROM ? (
+                                <FindRow
+                                    label={`Search ${optionPlural(optName)}`}
+                                    value={find}
+                                    onChange={setFind}
+                                    shown={shownRows.length}
+                                    total={rows.length}
+                                />
+                            ) : null}
                             <ol className="mb-3.5 flex flex-col gap-2">
-                                {rows.map((r, i) => (
+                                {shownRows.map(({ r, i }) => (
                                     <VariantRowView
                                         key={r.key}
                                         row={r}
@@ -367,12 +428,15 @@ export function VariantsSection({
                                         opt={opt}
                                         values={values}
                                         takenIds={takenIds}
-                                        skuDupe={rows.some(
-                                            (x) =>
-                                                x.key !== r.key &&
-                                                !!skuKey(r) &&
-                                                skuKey(x) === skuKey(r),
-                                        )}
+                                        skuDupe={
+                                            !!refusedOf(r) ||
+                                            rows.some(
+                                                (x) =>
+                                                    x.key !== r.key &&
+                                                    !!skuKey(r) &&
+                                                    skuKey(x) === skuKey(r),
+                                            )
+                                        }
                                         error={errOf(r)}
                                         currency={currency}
                                         productPrice={productPrice}

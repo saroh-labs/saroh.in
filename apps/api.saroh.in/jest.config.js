@@ -215,6 +215,10 @@ module.exports = {
         "<rootDir>/src/modules/products/public-catalogue.serialize.spec.ts",
         // G12: what a Product grid asks the catalogue — pure.
         "<rootDir>/src/modules/products/product-grid.spec.ts",
+        // Products audit (16 Oct 2026): a free path for a taken name, and a
+        // SKU unique across the business — pure, or a jest-mocked Prisma.
+        "<rootDir>/src/modules/products/product-path.spec.ts",
+        "<rootDir>/src/modules/products/sku-holder.spec.ts",
         // #513 the stock log's words and arithmetic — pure.
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.

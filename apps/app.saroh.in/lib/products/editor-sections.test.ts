@@ -169,7 +169,7 @@ describe("the editor's header and Save all", () => {
             "Add a name first.",
         );
         expect(basicsProblem({ ...ok, slug: "Bad Slug" }, false)).toBe(
-            "Fix the address first.",
+            "Fix the path first.",
         );
         // Creating makes the address from the name; it is never the problem.
         expect(basicsProblem({ ...ok, slug: "" }, true)).toBe("");

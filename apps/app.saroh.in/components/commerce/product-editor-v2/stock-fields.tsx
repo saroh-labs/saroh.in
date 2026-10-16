@@ -3,19 +3,25 @@
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
+import { useState } from "react";
 
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
-import { isCount } from "@/lib/products/editor-sections";
+import { isCount, optionPlural } from "@/lib/products/editor-sections";
 
 import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 import { FieldHelp } from "./fields";
+import { FIND_FROM, FindRow, matchesFind } from "./find-row";
 
 /**
  * The Stock section's two ways of counting, after the Editor design: one
  * count for the product, or a row per variant with the product's total
  * under them. Promised is what open orders hold; Orders sets it, so it is
  * shown and never typed.
+ *
+ * Counts are text boxes with the number keyboard, not number inputs: a
+ * number input with no maximum reads to a screen reader as a spinbutton
+ * with a maximum of 0 (WCAG 4.1.2, products audit 16 Oct 2026).
  */
 
 /** One count: on hand, warn at, and what is promised. */
@@ -48,9 +54,8 @@ export function WholeStock({
                         dense
                         aria-invalid={!isCount(draft.quantity) || qtyBad}
                         id="pe-qty"
-                        type="number"
-                        min={0}
                         inputMode="numeric"
+                        pattern="[0-9]*"
                         value={draft.quantity}
                         disabled={ro}
                         aria-label="Quantity on hand"
@@ -65,9 +70,8 @@ export function WholeStock({
                         dense
                         aria-invalid={!isCount(draft.lowStockAlert)}
                         id="pe-low"
-                        type="number"
-                        min={0}
                         inputMode="numeric"
+                        pattern="[0-9]*"
                         value={draft.lowStockAlert}
                         disabled={ro}
                         onChange={(e) =>
@@ -111,11 +115,24 @@ export function VariantStockTable({
     lines,
     ro,
     onLine,
+    opt = "variant",
 }: {
     lines: StockLine[];
     ro: boolean;
     onLine: (variantId: string, patch: Partial<StockLine>) => void;
+    /** The option's name, lower case ("shade"); "variant" with none. */
+    opt?: string;
 }) {
+    const [find, setFind] = useState("");
+    // Past a dozen, a box finds one; a row with something to fix stays.
+    const shown = lines.filter(
+        (l) =>
+            lines.length <= FIND_FROM ||
+            matchesFind(find, l.title) ||
+            !isCount(l.quantity) ||
+            !isCount(l.lowStockAlert) ||
+            Number(l.quantity) < l.promised,
+    );
     const low = lowLines(lines);
     const total = lines.reduce(
         (n, l) => n + (isCount(l.quantity) ? Number(l.quantity) : 0),
@@ -124,16 +141,25 @@ export function VariantStockTable({
     const promised = lines.reduce((n, l) => n + l.promised, 0);
     return (
         <>
+            {lines.length > FIND_FROM ? (
+                <FindRow
+                    label={`Search ${optionPlural(opt)}`}
+                    value={find}
+                    onChange={setFind}
+                    shown={shown.length}
+                    total={lines.length}
+                />
+            ) : null}
             <div
                 className={cn(GRID, "label pb-[5px] text-muted-foreground/80")}
             >
-                <span>Variant</span>
+                <span className="capitalize">{opt}</span>
                 <span>On hand</span>
                 <span>Warn at</span>
                 <span className="text-right">Promised</span>
             </div>
             <div className="flex flex-col gap-1.5">
-                {lines.map((l) => (
+                {shown.map((l) => (
                     <div key={l.variantId} className={cn(GRID, "items-center")}>
                         <span className="flex min-w-0 items-center gap-1.5">
                             {low.includes(l) ? (
@@ -152,9 +178,8 @@ export function VariantStockTable({
                                 !isCount(l.quantity) ||
                                 Number(l.quantity) < l.promised
                             }
-                            type="number"
-                            min={0}
                             inputMode="numeric"
+                            pattern="[0-9]*"
                             value={l.quantity}
                             disabled={ro}
                             aria-label={`${l.title} on hand`}
@@ -167,9 +192,8 @@ export function VariantStockTable({
                         <Input
                             dense
                             aria-invalid={!isCount(l.lowStockAlert)}
-                            type="number"
-                            min={0}
                             inputMode="numeric"
+                            pattern="[0-9]*"
                             value={l.lowStockAlert}
                             disabled={ro}
                             aria-label={`${l.title} warn when on hand reaches`}

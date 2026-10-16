@@ -99,13 +99,10 @@ export const basicsSchema = z
         slug: z
             .string()
             .trim()
-            .min(
-                1,
-                "A product needs an address. It is what the link is made of.",
-            )
+            .min(1, "A product needs a path. It is what the link is made of.")
             .max(
                 LIMITS.slug,
-                `Longer than the ${LIMITS.slug} characters an address can be.`,
+                `Longer than the ${LIMITS.slug} characters a path can be.`,
             )
             .regex(
                 /^[a-z0-9-]+$/,
@@ -221,6 +218,22 @@ export const detailsSchema = z.object({
 });
 export type DetailsValues = z.infer<typeof detailsSchema>;
 
+/**
+ * A line saved before its limit, as the editor opens it (products audit,
+ * 16 Oct 2026): a held note, never an error the merchant didn't make — "" once
+ * it is within the limit or has been changed, when the limit is the rule
+ * again. Only the shop's own length is said; the frontend-forms rule "an
+ * editor never opens in an error state" is why.
+ */
+export function heldOverLimit(
+    value: string,
+    saved: string,
+    max: number,
+): string {
+    if (value.length <= max || value !== saved) return "";
+    return `${formatNumber(value.length)} characters. The shop shows ${formatNumber(max)}. Shorten it when you next save.`;
+}
+
 export function detailsFrom(p: ProductDetail): DetailsValues {
     return {
         howToUse: p.howToUse ?? "",
@@ -244,7 +257,7 @@ export function detailsPatch(v: DetailsValues): ProductPatch {
     };
 }
 
-// ---- Made by, warranty and returns ----
+// ---- Made by and returns ----
 
 export const madeBySchema = z
     .object({
@@ -643,7 +656,16 @@ function shown(fields: ShopFields, key: keyof ShopFields): boolean {
 }
 
 /**
- * An address made from a name: lowercase, accents dropped, "&" as "and",
+ * The free path a refusal suggests ("Packing Tape already uses this path.
+ * Try packing-tape-2."), for its "Use packing-tape-2"; "" when it names none.
+ */
+export function suggestedPath(refusal: string | undefined): string {
+    const m = /Try ([a-z0-9-]+)\.$/.exec(refusal ?? "");
+    return m?.[1] ?? "";
+}
+
+/**
+ * A path made from a name: lowercase, accents dropped, "&" as "and",
  * anything else a hyphen, trimmed to 150. Empty when nothing survives.
  */
 export function slugify(name: string): string {
@@ -690,7 +712,7 @@ export const SECTION_JUMPS: Record<SectionKey, string> = {
     basics: "Basics",
     description: "Description",
     details: "How to use",
-    madeby: "Made by",
+    madeby: "Made by and returns",
     photos: "Photos and videos",
     visibility: "Visibility",
     variants: "Variants",
@@ -722,7 +744,7 @@ export function basicsProblem(
     if (!creating && !basicsSchema.safeParse(v).success) {
         const slug = v.slug.trim();
         if (!slug || slug.length > LIMITS.slug || !/^[a-z0-9-]+$/.test(slug))
-            return "Fix the address first.";
+            return "Fix the path first.";
     }
     if (!v.price.trim()) return "Add a price first.";
     if (!isMoney(v.price)) return "Price: a number with at most two decimals.";
@@ -829,4 +851,41 @@ export function savedMessage(
 export function joinAnd(items: string[]): string {
     if (items.length <= 1) return items.join("");
     return `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
+}
+
+/**
+ * An option's name as the things it lists: "Shade" → "shades", "Size" →
+ * "sizes". A name that isn't one plain word ("Size · cover · pages") is
+ * said as "variants", the word for when there is no option.
+ */
+export function optionPlural(name: string | null | undefined): string {
+    const word = (name ?? "").trim().toLowerCase();
+    if (!/^[a-z]+$/.test(word)) return "variants";
+    if (/(s|x|z|ch|sh)$/.test(word)) return `${word}es`;
+    if (/[^aeiou]y$/.test(word)) return `${word.slice(0, -1)}ies`;
+    return `${word}s`;
+}
+
+/**
+ * What New product says once it is created (products audit, 16 Oct 2026):
+ * the state it is in, then the plan — the option's own things and stock,
+ * then Publish — so it reads the same on a phone, where they are below.
+ */
+export function createdMessage(input: {
+    live: boolean;
+    /** The option its variants will be picked from; null with none. */
+    optionName: string | null;
+    /** The business counts stock: "and stock" is part of the plan. */
+    tracksStock: boolean;
+    /** The photos went with it; false says to add them again. */
+    photosOk: boolean;
+}): string {
+    const things = optionPlural(input.optionName);
+    const next = input.tracksStock ? `${things} and stock` : things;
+    const plan = input.live
+        ? `Created and live. Add ${next} next if it needs them.`
+        : `Created as a draft. Add ${next} next, then Publish.`;
+    return input.photosOk
+        ? plan
+        : `${plan} The photos didn't save. Add them again.`;
 }
