@@ -92,7 +92,7 @@ export function CatalogueFilters({
                     value={query.storefront}
                     onChange={(storefront) => go({ storefront })}
                     noun={{ one: "product", other: "products" }}
-                    note="A filter, not a scope. The catalogue belongs to the business, and a location decides what it sells from it."
+                    note="Shows what this location sells. Products belong to the business."
                 />
             ) : null}
         </>
