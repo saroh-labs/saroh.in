@@ -35,7 +35,15 @@ test.describe("Products list", () => {
         await expect(
             page.getByText(`No products match “${nonsense}”`),
         ).toBeVisible();
-        await page.getByRole("button", { name: "Clear search" }).click();
+        // Only a search narrows, so the toolbar's way back says so too; the
+        // empty state's button is the one pressed.
+        await expect(page.locator('[data-slot="list-clear"]')).toHaveText(
+            "Clear search",
+        );
+        await page
+            .getByRole("button", { name: "Clear search" })
+            .and(page.locator(':not([data-slot="list-clear"])'))
+            .click();
         await expect(page).toHaveURL(/\/commerce\/products$/);
         await expect(
             page.getByText(`No products match “${nonsense}”`),

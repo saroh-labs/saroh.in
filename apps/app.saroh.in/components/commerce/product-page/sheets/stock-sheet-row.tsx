@@ -131,6 +131,7 @@ export function SheetSizeRow({
                             <Input
                                 id={`${id}-on-hand`}
                                 data-on-hand={split ? undefined : ""}
+                                data-autofocus={split ? undefined : ""}
                                 value={
                                     split ? String(sum) : (first?.onHand ?? "0")
                                 }
@@ -188,6 +189,7 @@ export function SheetSizeRow({
                           </span>
                           <Input
                               data-on-hand=""
+                              data-autofocus=""
                               value={x.onHand}
                               onChange={(e) =>
                                   onShelf(x.storeId, e.target.value)

@@ -7,7 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
@@ -140,22 +140,9 @@ export function StockSheet({
 }) {
     const { product } = overview;
     const router = useRouter();
-    const body = useRef<HTMLDivElement>(null);
     // The keyboard starts in the first on-hand box: a merchant who came to
-    // type a count isn't renaming a variant (audit, 16 Oct 2026). The frame
-    // focuses the first field as it opens; this runs after, and moves it.
-    useEffect(() => {
-        if (!open) return;
-        const box = body.current?.querySelector<HTMLInputElement>(
-            "input[data-on-hand]:not([readonly])",
-        );
-        if (!box) return;
-        const frame = requestAnimationFrame(() => {
-            box.focus();
-            box.select();
-        });
-        return () => cancelAnimationFrame(frame);
-    }, [open]);
+    // type a count isn't renaming a variant (audit, 16 Oct 2026). The rows
+    // mark their counts `data-autofocus`, which the frame focuses first.
     const word = product.option?.name ?? null;
     const may = {
         canWrite: overview.canWrite,
@@ -266,7 +253,7 @@ export function StockSheet({
             note={problem ?? undefined}
             onSave={save}
         >
-            <div ref={body}>
+            <div>
                 <div
                     aria-hidden
                     className={cn(counts ? ROW : PRICE_ROW, "label pb-1.5")}

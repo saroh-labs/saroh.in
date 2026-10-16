@@ -156,7 +156,8 @@ test.describe("Track stock and Sold out", () => {
                 `/commerce/products/${id}/edit?storefront=${STORE}#sec-stock`,
             );
             const stock = page.getByRole("region", { name: "Stock" });
-            const onHand = stock.getByRole("spinbutton", {
+            // A numeric text box, not a spinbutton (no valuemax 0).
+            const onHand = stock.getByRole("textbox", {
                 name: "Quantity on hand",
             });
             await expect(onHand).toHaveValue(String(COUNT));

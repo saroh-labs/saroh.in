@@ -91,7 +91,10 @@ test.describe("product page — status and the stock sheet", () => {
                     .getByRole("button", { name: "Publish", exact: true }),
             ).toHaveCount(0);
 
-            await page.getByRole("button", { name: "Undo" }).click();
+            // Exact: the product's own name has "Undo" in it.
+            await page
+                .getByRole("button", { name: "Undo", exact: true })
+                .click();
             await expect(page.getByText("Undone.")).toBeVisible();
             await expect.poll(() => statusOf(page.request, id)).toBe("DRAFT");
             await expect(
@@ -126,6 +129,13 @@ test.describe("product page — status and the stock sheet", () => {
                 });
                 expect(made.ok()).toBe(true);
             }
+            // A new product starts untracked (#515), and an untracked one's
+            // sheet edits prices only: tracking on, so it counts.
+            const tracked = await page.request.put(
+                store(`/${id}/stock-tracking`),
+                { headers: orgHeader, data: { tracked: true } },
+            );
+            expect(tracked.ok()).toBe(true);
             const before = await variantsOf(page.request, id);
             expect(before.length).toBeGreaterThanOrEqual(2);
 
@@ -153,7 +163,9 @@ test.describe("product page — status and the stock sheet", () => {
                 .first();
             await expect(onHand).toBeFocused();
 
-            await onHand.fill("4");
+            // A product brought back from an earlier run is counted
+            // already: aim for another number, so the save changes it.
+            await onHand.fill((await onHand.inputValue()) === "4" ? "5" : "4");
             await sheet.getByRole("button", { name: "Save" }).click();
             await expect(page.getByText(/saved\.$/).first()).toBeVisible();
 

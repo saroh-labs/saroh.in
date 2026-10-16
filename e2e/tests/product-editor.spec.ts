@@ -181,13 +181,15 @@ test.describe("product editor", () => {
                 .click();
             await page.getByRole("menuitemradio", { name: /^Live/ }).click();
             await expect(
-                visibility.getByText(/Saving publishes it for the first time/),
+                visibility.getByText(
+                    "Saving publishes it, so customers can buy it.",
+                ),
             ).toBeVisible();
             await visibility
                 .getByRole("button", { name: "Publish", exact: true })
                 .click();
             await expect(
-                page.getByText("Published. Customers can buy it now.").first(),
+                page.getByText(`${name} is live.`).first(),
             ).toBeVisible();
 
             // 10. The product page says everything that was just set.
