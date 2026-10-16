@@ -65,6 +65,49 @@ describe("products descriptor", () => {
     });
 });
 
+describe("product status in any case (products audit, 16 Oct)", () => {
+    const status = (raw: string) =>
+        products.normalize?.({ name: "Chair", price: "20", status: raw })
+            .status;
+
+    it("reads the list's words and other tools' in any case", () => {
+        expect(status("draft")).toBe("DRAFT");
+        expect(status(" Live ")).toBe("PUBLISHED");
+        expect(status("ACTIVE")).toBe("PUBLISHED");
+        expect(status("published")).toBe("PUBLISHED");
+        expect(status("Hidden")).toBe("ARCHIVED");
+        expect(status("archived")).toBe("ARCHIVED");
+    });
+
+    it("passes a normalised row and names the accepted words for any other", () => {
+        expect(
+            products.validateRow({
+                name: "Chair",
+                price: "20",
+                status: "DRAFT",
+            }),
+        ).toEqual([]);
+        const issues = products.validateRow({
+            name: "Chair",
+            price: "20",
+            status: status("pending") ?? "",
+        });
+        expect(issues).toEqual([
+            {
+                field: "status",
+                message:
+                    "Status is Draft, Live or Archived. 'pending' isn't one.",
+            },
+        ]);
+    });
+
+    it("labels the field in the list's words", () => {
+        expect(products.fieldLabels.status).toBe(
+            "Status: Draft, Live or Archived",
+        );
+    });
+});
+
 describe("customers descriptor", () => {
     it("normalizes the key to lowercase, matching @@unique([storeId, email])", () => {
         expect(customers.keyOf({ email: "  Priya@Example.COM " })).toBe(

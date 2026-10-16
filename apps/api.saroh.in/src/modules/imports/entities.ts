@@ -4,7 +4,8 @@ import { validateSync } from "class-validator";
 
 import { CreateCustomerDto } from "../customers/dto";
 import { isGstRate } from "../invoices/gst";
-import { CreateProductDto } from "../products/dto";
+import type { ProductStatus } from "../products/dto";
+import { CreateProductDto, PRODUCT_STATUSES } from "../products/dto";
 import { slugify } from "../stores/slug";
 import type { ImportValues, RowIssue } from "./import-plan";
 
@@ -66,6 +67,29 @@ export interface EntityDescriptor {
     keyLabel: string;
     keyOf: (values: ImportValues) => string | null;
     validateRow: (values: ImportValues) => Omit<RowIssue, "row">[];
+    /** Puts a row in the create DTO's words before it is checked or written. */
+    normalize?: (values: ImportValues) => ImportValues;
+}
+
+/**
+ * How a spreadsheet writes a product's status, in the words the products list
+ * uses (Draft · Live · Archived) and the ones other tools export. A file that
+ * wrote "draft", as the field's own label spelt it, failed every row as
+ * "Unknown status" (products audit, 16 Oct).
+ */
+const STATUS_WORDS: Readonly<Record<string, ProductStatus>> = {
+    draft: "DRAFT",
+    live: "PUBLISHED",
+    active: "PUBLISHED",
+    published: "PUBLISHED",
+    archived: "ARCHIVED",
+    hidden: "ARCHIVED",
+};
+
+/** A status in any case, or the cell as written when it is none of them. */
+export function normalizeStatus(raw: string): string {
+    const trimmed = raw.trim();
+    return STATUS_WORDS[trimmed.toLowerCase()] ?? trimmed;
 }
 
 /**
@@ -109,7 +133,7 @@ export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
             image: "Photo link",
             price: "Price",
             currency: "Currency",
-            status: "Status (draft, published, archived)",
+            status: "Status: Draft, Live or Archived",
             mrp: "MRP",
             gstRate: "GST rate (%)",
             hsnCode: "HSN code",
@@ -134,8 +158,24 @@ export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
             const slug = slugify(v.slug ?? v.name ?? "");
             return slug === "" ? null : slug;
         },
+        normalize: (v) =>
+            v.status === undefined
+                ? v
+                : { ...v, status: normalizeStatus(v.status) },
         validateRow: (v) => {
-            const issues = validateWith(CreateProductDto, v);
+            const status = v.status;
+            const badStatus =
+                status !== undefined &&
+                !(PRODUCT_STATUSES as readonly string[]).includes(status);
+            const issues = validateWith(CreateProductDto, v).filter(
+                (i) => !(badStatus && i.field === "status"),
+            );
+            if (badStatus) {
+                issues.push({
+                    field: "status",
+                    message: `Status is Draft, Live or Archived. '${status}' isn't one.`,
+                });
+            }
             // GST's own rates, as the editor checks them (ProductsService).
             const rate = v.gstRate?.trim();
             if (
