@@ -28,7 +28,12 @@ import {
 } from "./desk42-data";
 import { DK_POSTS } from "./desk42-posts";
 import { addMinutes, earliest, istAt } from "./people";
-import type { Business, GstInvoiceSpec, MemberSpec, VerticalContext } from "./vertical";
+import type {
+    Business,
+    GstInvoiceSpec,
+    MemberSpec,
+    VerticalContext,
+} from "./vertical";
 import {
     asGst,
     bump,
@@ -116,7 +121,12 @@ export async function seedDesk42(
             "Omkar Pawar": b.users.omkar,
         },
     });
-    const products = await upsertProducts(prisma, b, DK_CATEGORIES, DK_PRODUCTS);
+    const products = await upsertProducts(
+        prisma,
+        b,
+        DK_CATEGORIES,
+        DK_PRODUCTS,
+    );
     const extra = extraTraffic();
     const qrIds = await writeQrCodes(prisma, b, {
         now,
@@ -127,7 +137,11 @@ export async function seedDesk42(
     });
 
     // --- people: membership enquiries first, then members and visitors
-    const people = makeCast(rngFor(sid(""), "people"), LEADS + OTHERS, DK_NAMES);
+    const people = makeCast(
+        rngFor(sid(""), "people"),
+        LEADS + OTHERS,
+        DK_NAMES,
+    );
     const contacts = people.map((person, i) => ({
         id: sid("contact", i),
         person,
@@ -169,16 +183,20 @@ export async function seedDesk42(
         leadId: (n) => sid("lead", n),
         activityId: (n, k) => sid("activity", n, k),
     });
-    settleOldLeads(leadRng, { leads, activities }, {
-        now,
-        days: 25,
-        stageIds,
-        stageNames: DK_PIPELINE.stages,
-        actor: b.users.rhea,
-        wonShare: 0.45,
-        lostShare: 0.25,
-        activityId: (n, k) => sid("activity", n, k),
-    });
+    settleOldLeads(
+        leadRng,
+        { leads, activities },
+        {
+            now,
+            days: 25,
+            stageIds,
+            stageNames: DK_PIPELINE.stages,
+            actor: b.users.rhea,
+            wonShare: 0.45,
+            lostShare: 0.25,
+            activityId: (n, k) => sid("activity", n, k),
+        },
+    );
     specs.forEach((s, i) => seen.push({ contact: i, at: s.createdAt }));
     const submissions: Prisma.SubmissionCreateManyInput[] = specs
         .slice(0, FORM_LEADS)
@@ -225,7 +243,8 @@ export async function seedDesk42(
         bookingId: (n) => sid("booking", n),
         eventId: (n, kind) => sid("bookingevent", n, kind),
     });
-    for (const p of diary.placed) seen.push({ contact: p.contact, at: p.createdAt });
+    for (const p of diary.placed)
+        seen.push({ contact: p.contact, at: p.createdAt });
 
     const billing: BillingContext = {
         now,
@@ -260,7 +279,7 @@ export async function seedDesk42(
     const payRng = rngFor(sid(""), "booking-pay");
     const bookings = diary.bookings.map((row, n) => {
         const fixture = DK_SERVICES[planned[n].service];
-        const bookingId = row.id as string;
+        const bookingId = String(row.id);
         const paidOnline =
             fixture.priceCents !== null &&
             !redeemed.has(bookingId) &&
@@ -409,7 +428,14 @@ export async function seedDesk42(
             new Date(s.at.getTime() - (s.contact < FORM_LEADS ? 0 : DAY)),
         );
     }
-    const sources = ["WALK_IN", "GOOGLE", "INSTAGRAM", "REFERRAL", "WEBSITE", "QR"];
+    const sources = [
+        "WALK_IN",
+        "GOOGLE",
+        "INSTAGRAM",
+        "REFERRAL",
+        "WEBSITE",
+        "QR",
+    ];
     await createInChunks(
         contacts.map((c, i) => ({
             id: c.id,
@@ -422,7 +448,9 @@ export async function seedDesk42(
             source:
                 i < FORM_LEADS
                     ? "WEBSITE"
-                    : contactRng.weighted(sources, (s) => (s === "GOOGLE" ? 3 : 1)),
+                    : contactRng.weighted(sources, (s) =>
+                          s === "GOOGLE" ? 3 : 1,
+                      ),
             createdAt: earliest(firstSeen[i], now),
             updatedAt: earliest(firstSeen[i], now),
         })),
@@ -453,15 +481,19 @@ export async function seedDesk42(
         });
     }
     await prisma.classPackService.deleteMany({
-        where: { packId: { in: packs.packs.map((p) => p.id as string) } },
+        where: { packId: { in: packs.packs.map((p) => String(p.id)) } },
     });
     await prisma.classPackService.createMany({ data: packs.packServices });
-    await createInChunks(bookings, (data) => prisma.booking.createMany({ data }));
+    await createInChunks(bookings, (data) =>
+        prisma.booking.createMany({ data }),
+    );
     const events = diary.events.map((e) => {
         const by = packs.bookedBy.get(e.bookingId);
         return e.type === "BOOKED" && by ? { ...e, actorUserId: by } : e;
     });
-    await createInChunks(events, (data) => prisma.bookingEvent.createMany({ data }));
+    await createInChunks(events, (data) =>
+        prisma.bookingEvent.createMany({ data }),
+    );
     await prisma.packPurchase.createMany({ data: packs.purchases });
     await prisma.packRedemption.createMany({ data: packs.redemptions });
     await writeShop(prisma, shop);
@@ -472,7 +504,9 @@ export async function seedDesk42(
         contacts,
         invoices,
     );
-    await createInChunks(notes, (data) => prisma.contactNote.createMany({ data }));
+    await createInChunks(notes, (data) =>
+        prisma.contactNote.createMany({ data }),
+    );
     const traffic = await writeTraffic(prisma, b, {
         now,
         days: 92,
@@ -495,10 +529,22 @@ export async function seedDesk42(
 /** "Tue 13 Oct", in Kolkata. */
 function dayLabel(at: Date): string {
     const local = new Date(at.getTime() + 330 * 60_000);
-    const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][local.getUTCDay()];
+    const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+        local.getUTCDay()
+    ];
     const month = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     ][local.getUTCMonth()];
     const hh = String(local.getUTCHours()).padStart(2, "0");
     const mm = String(local.getUTCMinutes()).padStart(2, "0");
@@ -584,7 +630,9 @@ export async function checkDesk42(
         where,
         _count: true,
     });
-    const status = Object.fromEntries(subs.map((s) => [s.status, s._count]));
+    const status: Record<string, number | undefined> = Object.fromEntries(
+        subs.map((s) => [s.status, s._count]),
+    );
     const [productCount, variantCount] = await Promise.all([
         prisma.product.count({ where }),
         prisma.productVariant.count({ where: { product: where } }),
@@ -597,10 +645,16 @@ export async function checkDesk42(
         GROUP BY pc.name ORDER BY pc.name`;
     const counts: Desk42Counts = {
         bookings: byService
-            .map((r) => `${String(r.name).split(" —")[0]} ${Number(r.n)} (${Number(r.upcoming)} ahead)`)
+            .map(
+                (r) =>
+                    `${String(r.name).split(" —")[0]} ${Number(r.n)} (${Number(r.upcoming)} ahead)`,
+            )
             .join(", "),
-        memberships: subs.map((s) => `${s._count} ${s.status.toLowerCase()}`).join(", "),
-        failedRenewals: one(await prisma.$queryRaw<Row[]>`
+        memberships: subs
+            .map((s) => `${s._count} ${s.status.toLowerCase()}`)
+            .join(", "),
+        failedRenewals: one(
+            await prisma.$queryRaw<Row[]>`
             SELECT COUNT(*) AS n FROM "CustomerSubscription" cs
             JOIN LATERAL (
                 SELECT i.* FROM "Invoice" i
@@ -609,19 +663,23 @@ export async function checkDesk42(
             ) latest ON true
             WHERE cs."organizationId" = ${orgId} AND cs.status = 'ACTIVE'
               AND latest.status = 'ISSUED' AND latest."dueAt" < ${at}::timestamp
-              AND latest."createdByUserId" IS NULL`),
+              AND latest."createdByUserId" IS NULL`,
+        ),
         flexiPacks: `${await prisma.packPurchase.count({ where })} sold, ${await prisma.packRedemption.count({ where: { ...where, reversedAt: null } })} passes spent`,
         orders90: await prisma.order.count({
             where: { ...where, createdAt: { gte: new Date(since) } },
         }),
-        moneyEvents90: one(await prisma.$queryRaw<Row[]>`
+        moneyEvents90: one(
+            await prisma.$queryRaw<Row[]>`
             SELECT (SELECT COUNT(*) FROM "Order" WHERE "organizationId" = ${orgId}
                       AND "createdAt" >= ${since}::timestamp)
                  + (SELECT COUNT(*) FROM "Invoice" WHERE "organizationId" = ${orgId}
                       AND "issuedAt" >= ${since}::timestamp)
                  + (SELECT COUNT(*) FROM "Booking" WHERE "organizationId" = ${orgId}
-                      AND "paidWith" = 'PACK' AND "createdAt" >= ${since}::timestamp) AS n`),
-        payingContacts: one(await prisma.$queryRaw<Row[]>`
+                      AND "paidWith" = 'PACK' AND "createdAt" >= ${since}::timestamp) AS n`,
+        ),
+        payingContacts: one(
+            await prisma.$queryRaw<Row[]>`
             SELECT COUNT(DISTINCT c) AS n FROM (
                 SELECT "contactId" AS c FROM "Invoice"
                 WHERE "organizationId" = ${orgId} AND status = 'PAID'
@@ -629,21 +687,27 @@ export async function checkDesk42(
                 SELECT l."contactId" FROM "CustomerIdentityLink" l
                 JOIN "Order" o ON o."customerId" = l."customerId"
                 WHERE l."organizationId" = ${orgId} AND o."paymentStatus" = 'PAID'
-            ) x`),
+            ) x`,
+        ),
         products: `${productCount} products, ${variantCount} variants`,
         posts: postRows
             .map((r) => `${Number(r.n)} ${String(r.name).toLowerCase()}`)
             .join(", "),
     };
     const upcoming = (name: string) =>
-        byService.some((r) => String(r.name).startsWith(name) && Number(r.upcoming) > 0);
+        byService.some(
+            (r) => String(r.name).startsWith(name) && Number(r.upcoming) > 0,
+        );
     const postCounts = postRows.map((r) => Number(r.n));
     requireStates(DK_NAME, {
         "day passes ahead": upcoming("Day pass"),
         "the meeting room booked ahead": upcoming("The Sahyadri Room"),
         "the booth booked ahead": upcoming("Call & podcast booth"),
-        "day passes paid from a Flexi 10": byService.some((r) => Number(r.pack) > 0),
-        "memberships on the go": (status.ACTIVE ?? 0) + (status.PAUSED ?? 0) >= 34,
+        "day passes paid from a Flexi 10": byService.some(
+            (r) => Number(r.pack) > 0,
+        ),
+        "memberships on the go":
+            (status.ACTIVE ?? 0) + (status.PAUSED ?? 0) >= 34,
         "members who left": (status.CANCELLED ?? 0) >= 18,
         "a paused membership": (status.PAUSED ?? 0) >= 1,
         "a failed renewal": counts.failedRenewals >= 1,
@@ -660,7 +724,8 @@ export async function checkDesk42(
             postCounts.every((n) => n >= 8) &&
             postCounts.reduce((s, n) => s + n, 0) >= 24 &&
             postRows.every((r) => r.pictured === true),
-        "site traffic": (await prisma.analyticsDailyAggregate.count({ where })) > 150,
+        "site traffic":
+            (await prisma.analyticsDailyAggregate.count({ where })) > 150,
         "QR scans": (await prisma.qrScanDay.count({ where })) > 50,
     });
     return counts;

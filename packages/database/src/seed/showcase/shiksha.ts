@@ -164,7 +164,11 @@ export async function seedShiksha(
     });
 
     // --- people: enquiries first, then students
-    const people = makeCast(rngFor(sid(""), "people"), LEADS + STUDENTS, SA_NAMES);
+    const people = makeCast(
+        rngFor(sid(""), "people"),
+        LEADS + STUDENTS,
+        SA_NAMES,
+    );
     const contacts = people.map((person, i) => ({
         id: sid("contact", i),
         person,
@@ -210,16 +214,20 @@ export async function seedShiksha(
         leadId: (n) => sid("lead", n),
         activityId: (n, k) => sid("activity", n, k),
     });
-    settleOldLeads(leadRng, { leads, activities }, {
-        now,
-        days: 21,
-        stageIds,
-        stageNames: SA_PIPELINE.stages,
-        actor: b.users.kavita,
-        wonShare: 0.55,
-        lostShare: 0.25,
-        activityId: (n, k) => sid("activity", n, k),
-    });
+    settleOldLeads(
+        leadRng,
+        { leads, activities },
+        {
+            now,
+            days: 21,
+            stageIds,
+            stageNames: SA_PIPELINE.stages,
+            actor: b.users.kavita,
+            wonShare: 0.55,
+            lostShare: 0.25,
+            activityId: (n, k) => sid("activity", n, k),
+        },
+    );
     specs.forEach((s, i) => seen.push({ contact: i, at: s.createdAt }));
     const submissions: Prisma.SubmissionCreateManyInput[] = specs
         .slice(0, FORM_LEADS)
@@ -309,7 +317,8 @@ export async function seedShiksha(
         sourceCode:
             !row.courseEnrollmentId && qrRng.chance(0.12) ? qrIds[1] : null,
     }));
-    for (const p of diary.placed) seen.push({ contact: p.contact, at: p.createdAt });
+    for (const p of diary.placed)
+        seen.push({ contact: p.contact, at: p.createdAt });
 
     // --- monthly fee plans: about fifty on one now, as many who have left
     const memberRng = rngFor(sid(""), "members");
@@ -398,12 +407,19 @@ export async function seedShiksha(
         const secondYear = s % 2 === 1;
         const scholarship = s === 5;
         quarters.forEach((q, k) => {
-            const issuedAt = istAt(now, q.issueDay, instRng.int(10 * 60, 12 * 60));
+            const issuedAt = istAt(
+                now,
+                q.issueDay,
+                instRng.int(10 * 60, 12 * 60),
+            );
             const dueAt = istAt(now, q.dueDay, 23 * 60 + 59);
             const latest = k === 0;
             const id = sid("invoice", "instalment", s, k);
             const startYear = secondYear ? q.sessionYear - 1 : q.sessionYear;
-            const amount = scholarship && latest ? 1_800_000 : SA_PROGRAMME.instalmentPaise;
+            const amount =
+                scholarship && latest
+                    ? 1_800_000
+                    : SA_PROGRAMME.instalmentPaise;
             const line = {
                 description: `${SA_PROGRAMME.name} ${startYear}–${String((startYear + 2) % 100).padStart(2, "0")} · Year ${secondYear ? 2 : 1}, instalment ${q.number} of 4 (${q.label})${scholarship && latest ? " · 25% scholarship" : ""}`,
                 quantity: 1,
@@ -465,7 +481,11 @@ export async function seedShiksha(
         });
         seen.push({
             contact,
-            at: istAt(now, quarters[quarters.length - 1].issueDay - 10, 11 * 60),
+            at: istAt(
+                now,
+                quarters[quarters.length - 1].issueDay - 10,
+                11 * 60,
+            ),
         });
     });
     // Issued to the wrong student and voided the same day.
@@ -555,7 +575,14 @@ export async function seedShiksha(
             new Date(s.at.getTime() - (s.contact < FORM_LEADS ? 0 : DAY)),
         );
     }
-    const sources = ["WALK_IN", "REFERRAL", "WHATSAPP", "INSTAGRAM", "GOOGLE", "WEBSITE"];
+    const sources = [
+        "WALK_IN",
+        "REFERRAL",
+        "WHATSAPP",
+        "INSTAGRAM",
+        "GOOGLE",
+        "WEBSITE",
+    ];
     await createInChunks(
         contacts.map((c, i) => ({
             id: c.id,
@@ -637,8 +664,18 @@ function instalmentQuarters(now: Date, count: number) {
         local.getUTCDate(),
     );
     const MONTHS = [
-        "January", "February", "March", "April", "May", "June", "July",
-        "August", "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ];
     const out: {
         issueDay: number;
@@ -787,7 +824,9 @@ export async function checkShiksha(
         students: await prisma.contact.count({
             where: { ...where, notes: { some: {} } },
         }),
-        leads: leadRows.map((r) => `${r._count} ${r.status.toLowerCase()}`).join(", "),
+        leads: leadRows
+            .map((r) => `${r._count} ${r.status.toLowerCase()}`)
+            .join(", "),
         bookingsUpcoming: await prisma.booking.count({
             where: {
                 ...where,
@@ -799,8 +838,11 @@ export async function checkShiksha(
         courses: courseRows
             .map((r) => `${String(r.status).toLowerCase()} ${Number(r.people)}`)
             .join(", "),
-        feePlans: subRows.map((r) => `${r._count} ${r.status.toLowerCase()}`).join(", "),
-        failedRenewals: one(await prisma.$queryRaw<Row[]>`
+        feePlans: subRows
+            .map((r) => `${r._count} ${r.status.toLowerCase()}`)
+            .join(", "),
+        failedRenewals: one(
+            await prisma.$queryRaw<Row[]>`
             SELECT COUNT(*) AS n FROM "CustomerSubscription" cs
             JOIN LATERAL (
                 SELECT i.* FROM "Invoice" i
@@ -809,19 +851,25 @@ export async function checkShiksha(
             ) latest ON true
             WHERE cs."organizationId" = ${orgId} AND cs.status = 'ACTIVE'
               AND latest.status = 'ISSUED' AND latest."dueAt" < ${at}::timestamp
-              AND latest."createdByUserId" IS NULL`),
-        overdueInstalments: one(await prisma.$queryRaw<Row[]>`
+              AND latest."createdByUserId" IS NULL`,
+        ),
+        overdueInstalments: one(
+            await prisma.$queryRaw<Row[]>`
             SELECT COUNT(*) AS n FROM "Invoice" WHERE "organizationId" = ${orgId}
-              AND source = 'MANUAL' AND status = 'ISSUED' AND "dueAt" < ${at}::timestamp`),
+              AND source = 'MANUAL' AND status = 'ISSUED' AND "dueAt" < ${at}::timestamp`,
+        ),
         orders90: await prisma.order.count({
             where: { ...where, createdAt: { gte: new Date(since) } },
         }),
-        moneyEvents90: one(await prisma.$queryRaw<Row[]>`
+        moneyEvents90: one(
+            await prisma.$queryRaw<Row[]>`
             SELECT (SELECT COUNT(*) FROM "Order" WHERE "organizationId" = ${orgId}
                       AND "createdAt" >= ${since}::timestamp)
                  + (SELECT COUNT(*) FROM "Invoice" WHERE "organizationId" = ${orgId}
-                      AND "issuedAt" >= ${since}::timestamp) AS n`),
-        payingContacts: one(await prisma.$queryRaw<Row[]>`
+                      AND "issuedAt" >= ${since}::timestamp) AS n`,
+        ),
+        payingContacts: one(
+            await prisma.$queryRaw<Row[]>`
             SELECT COUNT(DISTINCT c) AS n FROM (
                 SELECT "contactId" AS c FROM "Invoice"
                 WHERE "organizationId" = ${orgId} AND status = 'PAID'
@@ -829,7 +877,8 @@ export async function checkShiksha(
                 SELECT l."contactId" FROM "CustomerIdentityLink" l
                 JOIN "Order" o ON o."customerId" = l."customerId"
                 WHERE l."organizationId" = ${orgId} AND o."paymentStatus" = 'PAID'
-            ) x`),
+            ) x`,
+        ),
         products: `${productCount} products, ${variantCount} variants`,
         posts: (
             await prisma.$queryRaw<Row[]>`
@@ -840,7 +889,10 @@ export async function checkShiksha(
                 WHERE s."organizationId" = ${orgId} AND p."currentPublicationId" IS NOT NULL
                 GROUP BY pc.name ORDER BY pc.name`
         )
-            .map((r) => `${Number(r.n)} ${String(r.name).toLowerCase()}${r.pictured ? "" : " (one without a picture)"}`)
+            .map(
+                (r) =>
+                    `${Number(r.n)} ${String(r.name).toLowerCase()}${r.pictured ? "" : " (one without a picture)"}`,
+            )
             .join(", "),
         parentNotes: await prisma.contactNote.count({
             where: { ...where, body: { startsWith: "Parent: " } },
@@ -850,18 +902,30 @@ export async function checkShiksha(
         courseRows.some((r) => r.status === status && test(r));
     const nowMs = now.getTime();
     const ms = (v: unknown) => (v as Date).getTime();
-    const subs = Object.fromEntries(subRows.map((r) => [r.status, r._count]));
+    const subs: Record<string, number | undefined> = Object.fromEntries(
+        subRows.map((r) => [r.status, r._count]),
+    );
     const postCounts = counts.posts.split(", ").map((p) => parseInt(p, 10));
     requireStates(SA_NAME, {
         "about 150 students": counts.students >= 150,
-        "about 40 leads in the admissions season": leadRows.reduce((s, r) => s + r._count, 0) >= 38,
+        "about 40 leads in the admissions season":
+            leadRows.reduce((s, r) => s + r._count, 0) >= 38,
         "leads in every stage": one(leadStages) === SA_PIPELINE.stages.length,
-        "admitted and lost leads": leadRows.some((r) => r.status === "WON") && leadRows.some((r) => r.status === "LOST"),
+        "admitted and lost leads":
+            leadRows.some((r) => r.status === "WON") &&
+            leadRows.some((r) => r.status === "LOST"),
         "an upcoming demo class": counts.bookingsUpcoming >= 1,
-        "a course starting soon": courseState("OPEN", (r) => ms(r.first) > nowMs),
-        "a course running": courseState("OPEN", (r) => ms(r.first) < nowMs && ms(r.last) > nowMs),
+        "a course starting soon": courseState(
+            "OPEN",
+            (r) => ms(r.first) > nowMs,
+        ),
+        "a course running": courseState(
+            "OPEN",
+            (r) => ms(r.first) < nowMs && ms(r.last) > nowMs,
+        ),
         "a course finished": courseState("CLOSED", (r) => ms(r.last) < nowMs),
-        "about 50 on a monthly fee plan": (subs.ACTIVE ?? 0) + (subs.PAUSED ?? 0) >= 48,
+        "about 50 on a monthly fee plan":
+            (subs.ACTIVE ?? 0) + (subs.PAUSED ?? 0) >= 48,
         "about 50 who left a fee plan": (subs.CANCELLED ?? 0) >= 45,
         "a failed renewal": counts.failedRenewals >= 1,
         "an overdue instalment": counts.overdueInstalments >= 1,
@@ -875,10 +939,11 @@ export async function checkShiksha(
             postCounts.reduce((s, n) => s + n, 0) >= 24 &&
             !counts.posts.includes("without"),
         "a parent on each student's record": counts.parentNotes >= 150,
-        "weekly hours for the faculty": (await prisma.staffHours.count({ where })) > 20,
-        "site traffic": (await prisma.analyticsDailyAggregate.count({ where })) > 200,
+        "weekly hours for the faculty":
+            (await prisma.staffHours.count({ where })) > 20,
+        "site traffic":
+            (await prisma.analyticsDailyAggregate.count({ where })) > 200,
         "QR scans": (await prisma.qrScanDay.count({ where })) > 50,
     });
     return counts;
 }
-

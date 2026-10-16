@@ -299,9 +299,7 @@ export const SA_STAFF: readonly StaffSpec[] = [
         name: "Saurabh Jain",
         title: "Chemistry",
         services: [SA_SERVICE.neet12],
-        hours: [
-            { days: MON_SAT, from: "13:00", to: "19:00" },
-        ],
+        hours: [{ days: MON_SAT, from: "13:00", to: "19:00" }],
     },
     {
         key: "amit",
@@ -548,7 +546,11 @@ export const SA_PRODUCTS: readonly ProductSpec[] = [
             asset("tshirt-navy.png", "Navy Shiksha Academy T-shirt, front"),
         ],
         option: "Size",
-        variants: sizes("TS-NV", ["S", "M", "L", "XL", "XXL"], [8, 22, 19, 9, 2]),
+        variants: sizes(
+            "TS-NV",
+            ["S", "M", "L", "XL", "XXL"],
+            [8, 22, 19, 9, 2],
+        ),
         weight: 3,
         qty: [1, 2],
         materials: "100% combed cotton, 180 GSM.",
@@ -568,7 +570,11 @@ export const SA_PRODUCTS: readonly ProductSpec[] = [
             asset("tshirt-white.png", "White Shiksha Academy T-shirt, front"),
         ],
         option: "Size",
-        variants: sizes("TS-WH", ["S", "M", "L", "XL", "XXL"], [6, 15, 14, 7, 3]),
+        variants: sizes(
+            "TS-WH",
+            ["S", "M", "L", "XL", "XXL"],
+            [6, 15, 14, 7, 3],
+        ),
         weight: 2,
         qty: [1, 1],
         materials: "100% combed cotton, 180 GSM.",
@@ -580,11 +586,17 @@ export const SA_PRODUCTS: readonly ProductSpec[] = [
         category: "uniform",
         description:
             "A full-sleeve white lab coat for the chemistry and biology practicals, with the academy crest on the pocket. Required from the first practical.",
-        keyPoints: ["Poly-cotton, full sleeves", "Crest on the pocket", "S to XL"],
+        keyPoints: [
+            "Poly-cotton, full sleeves",
+            "Crest on the pocket",
+            "S to XL",
+        ],
         price: "549.00",
         hsn: "6211",
         gstRate: 5,
-        images: [asset("lab-coat.png", "White lab coat with the academy crest")],
+        images: [
+            asset("lab-coat.png", "White lab coat with the academy crest"),
+        ],
         option: "Size",
         variants: sizes("LC", ["S", "M", "L", "XL"], [7, 12, 9, 4]),
         weight: 1.5,
@@ -646,7 +658,8 @@ export const SA_QR: readonly QrSpec[] = [
         targetKind: "PAGE",
         page: 5,
         place: "FLYER",
-        placeNote: "Admissions 2027–28 flyer, handed out at schools in Malviya Nagar and Mansarovar",
+        placeNote:
+            "Admissions 2027–28 flyer, handed out at schools in Malviya Nagar and Mansarovar",
         label: "Scan for admissions 2027–28",
         color: "#1d3a6b",
         createdDaysAgo: 18,
@@ -680,55 +693,174 @@ export const SA_QR: readonly QrSpec[] = [
 
 export const SA_NAMES = {
     first: [
-        "Aarav", "Aditya", "Ananya", "Arjun", "Bhavya", "Chirag", "Deepika",
-        "Devansh", "Divya", "Garima", "Harsh", "Ishaan", "Ishita", "Jatin",
-        "Kavya", "Khushi", "Kunal", "Lakshya", "Manan", "Mansi", "Naman",
-        "Nandini", "Nikita", "Pallavi", "Pranav", "Priyanshi", "Rahul", "Riya",
-        "Rohit", "Sakshi", "Sanya", "Shivam", "Shreya", "Simran", "Sneha",
-        "Tanishq", "Tanya", "Utkarsh", "Vaibhav", "Vanshika", "Yash", "Yuvraj",
-        "Ayaan", "Anushka", "Kritika", "Dhruv", "Muskan", "Aakash", "Vidhi",
-        "Lokesh", "Hemant", "Payal",
+        "Aarav",
+        "Aditya",
+        "Ananya",
+        "Arjun",
+        "Bhavya",
+        "Chirag",
+        "Deepika",
+        "Devansh",
+        "Divya",
+        "Garima",
+        "Harsh",
+        "Ishaan",
+        "Ishita",
+        "Jatin",
+        "Kavya",
+        "Khushi",
+        "Kunal",
+        "Lakshya",
+        "Manan",
+        "Mansi",
+        "Naman",
+        "Nandini",
+        "Nikita",
+        "Pallavi",
+        "Pranav",
+        "Priyanshi",
+        "Rahul",
+        "Riya",
+        "Rohit",
+        "Sakshi",
+        "Sanya",
+        "Shivam",
+        "Shreya",
+        "Simran",
+        "Sneha",
+        "Tanishq",
+        "Tanya",
+        "Utkarsh",
+        "Vaibhav",
+        "Vanshika",
+        "Yash",
+        "Yuvraj",
+        "Ayaan",
+        "Anushka",
+        "Kritika",
+        "Dhruv",
+        "Muskan",
+        "Aakash",
+        "Vidhi",
+        "Lokesh",
+        "Hemant",
+        "Payal",
     ],
     last: [
-        "Sharma", "Agarwal", "Jain", "Meena", "Choudhary", "Saini", "Gupta",
-        "Khandelwal", "Rathore", "Shekhawat", "Singh", "Mathur", "Joshi",
-        "Kumawat", "Gurjar", "Yadav", "Bansal", "Goyal", "Maheshwari", "Sethi",
-        "Verma", "Soni", "Bhatia", "Purohit", "Vyas", "Mittal", "Pareek",
-        "Rajawat", "Tak", "Bairwa",
+        "Sharma",
+        "Agarwal",
+        "Jain",
+        "Meena",
+        "Choudhary",
+        "Saini",
+        "Gupta",
+        "Khandelwal",
+        "Rathore",
+        "Shekhawat",
+        "Singh",
+        "Mathur",
+        "Joshi",
+        "Kumawat",
+        "Gurjar",
+        "Yadav",
+        "Bansal",
+        "Goyal",
+        "Maheshwari",
+        "Sethi",
+        "Verma",
+        "Soni",
+        "Bhatia",
+        "Purohit",
+        "Vyas",
+        "Mittal",
+        "Pareek",
+        "Rajawat",
+        "Tak",
+        "Bairwa",
     ],
 };
 
 export const SA_PARENT_NAMES = {
     father: [
-        "Rakesh", "Suresh", "Mahesh", "Anil", "Sanjay", "Rajendra", "Vinod",
-        "Pradeep", "Ashok", "Manoj", "Dinesh", "Ramesh", "Mukesh", "Sunil",
-        "Pankaj", "Naresh", "Girish", "Hemraj",
+        "Rakesh",
+        "Suresh",
+        "Mahesh",
+        "Anil",
+        "Sanjay",
+        "Rajendra",
+        "Vinod",
+        "Pradeep",
+        "Ashok",
+        "Manoj",
+        "Dinesh",
+        "Ramesh",
+        "Mukesh",
+        "Sunil",
+        "Pankaj",
+        "Naresh",
+        "Girish",
+        "Hemraj",
     ],
     mother: [
-        "Sunita", "Kavita", "Rekha", "Anita", "Meena", "Seema", "Pooja",
-        "Neelam", "Sangeeta", "Mamta", "Renu", "Sarita", "Usha", "Manju",
+        "Sunita",
+        "Kavita",
+        "Rekha",
+        "Anita",
+        "Meena",
+        "Seema",
+        "Pooja",
+        "Neelam",
+        "Sangeeta",
+        "Mamta",
+        "Renu",
+        "Sarita",
+        "Usha",
+        "Manju",
     ],
 };
 
 /** Programme an enquiry is about, and what a joining is worth (paise). */
-export const SA_LEADS: readonly { title: string; value: number; course: string }[] = [
-    { title: "NEET 2027–28 — Class 11 admission", value: 9_600_000, course: "NEET Class 11" },
-    { title: "JEE 2027–28 — Class 11 admission", value: 9_600_000, course: "JEE Class 11" },
-    { title: "Class 9 Foundation — 2027", value: 4_200_000, course: "Class 9–10 Foundation" },
-    { title: "JEE Main Crash Course", value: 1_800_000, course: "JEE Main Crash Course" },
+export const SA_LEADS: readonly {
+    title: string;
+    value: number;
+    course: string;
+}[] = [
+    {
+        title: "NEET 2027–28 — Class 11 admission",
+        value: 9_600_000,
+        course: "NEET Class 11",
+    },
+    {
+        title: "JEE 2027–28 — Class 11 admission",
+        value: 9_600_000,
+        course: "JEE Class 11",
+    },
+    {
+        title: "Class 9 Foundation — 2027",
+        value: 4_200_000,
+        course: "Class 9–10 Foundation",
+    },
+    {
+        title: "JEE Main Crash Course",
+        value: 1_800_000,
+        course: "JEE Main Crash Course",
+    },
     { title: "IELTS weekend batch", value: 1_400_000, course: "IELTS" },
-    { title: "Spoken English — December batch", value: 650_000, course: "Spoken English" },
-    { title: "NEET repeater — Class 12 pass-outs", value: 9_600_000, course: "NEET repeater" },
+    {
+        title: "Spoken English — December batch",
+        value: 650_000,
+        course: "Spoken English",
+    },
+    {
+        title: "NEET repeater — Class 12 pass-outs",
+        value: 9_600_000,
+        course: "NEET repeater",
+    },
 ];
 
 export const SA_PIPELINE = {
     name: "Admissions 2027–28",
-    stages: [
-        "Enquiry",
-        "Counselling call",
-        "Demo class attended",
-        "Admitted",
-    ],
+    stages: ["Enquiry", "Counselling call", "Demo class attended", "Admitted"],
 };
 
 export const SA_TIMELINE = {
@@ -849,10 +981,26 @@ export const SA_SITE: SeedSite = {
                     variant: "facts",
                     heading: "Shiksha in numbers",
                     items: [
-                        { value: "40", title: "seats in a batch", body: "Never more. Every student is known by name." },
-                        { value: "47", title: "above 550 in NEET 2026", body: "Of 112 students who sat the exam." },
-                        { value: "99.71", title: "percentile in JEE Main 2026", body: "Kunal Agarwal, our highest this year." },
-                        { value: "Every Sunday", title: "a test in the exam pattern", body: "With OMR sheets, ranks and analysis." },
+                        {
+                            value: "40",
+                            title: "seats in a batch",
+                            body: "Never more. Every student is known by name.",
+                        },
+                        {
+                            value: "47",
+                            title: "above 550 in NEET 2026",
+                            body: "Of 112 students who sat the exam.",
+                        },
+                        {
+                            value: "99.71",
+                            title: "percentile in JEE Main 2026",
+                            body: "Kunal Agarwal, our highest this year.",
+                        },
+                        {
+                            value: "Every Sunday",
+                            title: "a test in the exam pattern",
+                            body: "With OMR sheets, ranks and analysis.",
+                        },
                     ],
                 }),
                 {
@@ -866,14 +1014,36 @@ export const SA_SITE: SeedSite = {
                 block("testimonials", {
                     heading: "What families say",
                     items: [
-                        { quote: "The Sunday tests made the difference. By March she had sat thirty full papers and the real exam felt like another Sunday.", name: "Rekha Sharma", role: "Mother of Ananya, NEET 2026 (682)" },
-                        { quote: "Vikram sir answers doubts on the same day. My son stopped being afraid of Physics in the first month.", name: "Mahesh Kumawat", role: "Father of Mohit, NEET 2026" },
-                        { quote: "Small batch, and Kavita ma'am calls me every month about attendance and marks. As a parent that is what I needed.", name: "Seema Jain", role: "Mother of a Class 11 JEE student" },
+                        {
+                            quote: "The Sunday tests made the difference. By March she had sat thirty full papers and the real exam felt like another Sunday.",
+                            name: "Rekha Sharma",
+                            role: "Mother of Ananya, NEET 2026 (682)",
+                        },
+                        {
+                            quote: "Vikram sir answers doubts on the same day. My son stopped being afraid of Physics in the first month.",
+                            name: "Mahesh Kumawat",
+                            role: "Father of Mohit, NEET 2026",
+                        },
+                        {
+                            quote: "Small batch, and Kavita ma'am calls me every month about attendance and marks. As a parent that is what I needed.",
+                            name: "Seema Jain",
+                            role: "Mother of a Class 11 JEE student",
+                        },
                     ],
                 }),
-                block("productGrid", { title: "Study material and uniform", count: 4 }),
+                block("productGrid", {
+                    title: "Study material and uniform",
+                    count: 4,
+                }),
                 block("journal", { title: "News and articles", count: 3 }),
-                { type: "cta", content: { label: "Talk to our counsellor", href: "/admissions", style: "primary" } },
+                {
+                    type: "cta",
+                    content: {
+                        label: "Talk to our counsellor",
+                        href: "/admissions",
+                        style: "primary",
+                    },
+                },
             ],
         },
         {
@@ -927,9 +1097,18 @@ export const SA_SITE: SeedSite = {
                     content: {
                         heading: "About batches",
                         items: [
-                            { question: "Can my child change batch?", answer: "Once, free, in the first month — for example from the evening to the morning batch if school timings change." },
-                            { question: "What if a class is missed?", answer: "The class notes are in the module, and the faculty take doubts after class. Missing three classes in a row, we call the parent." },
-                            { question: "When are the tests?", answer: "Every Sunday at 9 am, and a full-length Major Test on the last Sunday of the month." },
+                            {
+                                question: "Can my child change batch?",
+                                answer: "Once, free, in the first month — for example from the evening to the morning batch if school timings change.",
+                            },
+                            {
+                                question: "What if a class is missed?",
+                                answer: "The class notes are in the module, and the faculty take doubts after class. Missing three classes in a row, we call the parent.",
+                            },
+                            {
+                                question: "When are the tests?",
+                                answer: "Every Sunday at 9 am, and a full-length Major Test on the last Sunday of the month.",
+                            },
                         ],
                     },
                 },
@@ -948,12 +1127,48 @@ export const SA_SITE: SeedSite = {
                     variant: "cards",
                     title: "Toppers 2026",
                     items: [
-                        { title: "Ananya Sharma — NEET 682/720", summary: "Two-year NEET programme, morning batch. Now at SMS Medical College, Jaipur.", image: img(SA_PHOTOS.studying), year: "2026" },
-                        { title: "Kunal Agarwal — JEE Main 99.71 percentile", summary: "JEE evening batch and the crash course. Now at NIT Trichy, Computer Science.", image: img(SA_PHOTOS.whiteboard), year: "2026" },
-                        { title: "Mohit Kumawat — NEET 664/720", summary: "Joined in Class 11 from a Hindi-medium school; wrote NEET in English.", image: img(SA_PHOTOS.selfStudy), year: "2026" },
-                        { title: "Ritika Jain — JEE Main 99.12 percentile", summary: "Evening batch. Topped our Major Tests five months running.", image: img(SA_PHOTOS.notebook), year: "2026" },
-                        { title: "Sneha Choudhary — NEET 651/720", summary: "Repeater batch: 498 in 2025, 651 in 2026.", image: img(SA_PHOTOS.exam), year: "2026" },
-                        { title: "Simran Kaur — IELTS band 8.0", summary: "Eight-week IELTS course, General Training. Now a nurse in Manchester.", image: img(SA_PHOTOS.english), year: "2026" },
+                        {
+                            title: "Ananya Sharma — NEET 682/720",
+                            summary:
+                                "Two-year NEET programme, morning batch. Now at SMS Medical College, Jaipur.",
+                            image: img(SA_PHOTOS.studying),
+                            year: "2026",
+                        },
+                        {
+                            title: "Kunal Agarwal — JEE Main 99.71 percentile",
+                            summary:
+                                "JEE evening batch and the crash course. Now at NIT Trichy, Computer Science.",
+                            image: img(SA_PHOTOS.whiteboard),
+                            year: "2026",
+                        },
+                        {
+                            title: "Mohit Kumawat — NEET 664/720",
+                            summary:
+                                "Joined in Class 11 from a Hindi-medium school; wrote NEET in English.",
+                            image: img(SA_PHOTOS.selfStudy),
+                            year: "2026",
+                        },
+                        {
+                            title: "Ritika Jain — JEE Main 99.12 percentile",
+                            summary:
+                                "Evening batch. Topped our Major Tests five months running.",
+                            image: img(SA_PHOTOS.notebook),
+                            year: "2026",
+                        },
+                        {
+                            title: "Sneha Choudhary — NEET 651/720",
+                            summary:
+                                "Repeater batch: 498 in 2025, 651 in 2026.",
+                            image: img(SA_PHOTOS.exam),
+                            year: "2026",
+                        },
+                        {
+                            title: "Simran Kaur — IELTS band 8.0",
+                            summary:
+                                "Eight-week IELTS course, General Training. Now a nurse in Manchester.",
+                            image: img(SA_PHOTOS.english),
+                            year: "2026",
+                        },
                     ],
                 }),
                 text(
@@ -975,12 +1190,36 @@ export const SA_SITE: SeedSite = {
                     bio: "Taught Physics in Kota for nine years before starting Shiksha in Jaipur in 2014, so students would not have to leave home at sixteen.",
                     image: img(SA_PHOTOS.whiteboard),
                     people: [
-                        { name: "Neha Agarwal", role: "Biology", bio: "M.Sc. Botany, University of Rajasthan. Twelve years teaching NEET Biology, NCERT line by line." },
-                        { name: "Saurabh Jain", role: "Chemistry", bio: "B.Tech, MNIT Jaipur. Organic chemistry as stories, not lists." },
-                        { name: "Amit Meena", role: "Mathematics", bio: "M.Sc. Mathematics. Runs the JEE problem-solving hour every Saturday." },
-                        { name: "Priya Rathore", role: "English & IELTS", bio: "CELTA-certified. Seven years preparing students for IELTS and interviews." },
-                        { name: "Farhan Qureshi", role: "Physics & Maths · Foundation", bio: "Teaches Class 9 and 10 at weekends; Olympiad mentor." },
-                        { name: "Kavita Saini", role: "Admissions counsellor", bio: "The first person families speak to, and the one who calls about attendance." },
+                        {
+                            name: "Neha Agarwal",
+                            role: "Biology",
+                            bio: "M.Sc. Botany, University of Rajasthan. Twelve years teaching NEET Biology, NCERT line by line.",
+                        },
+                        {
+                            name: "Saurabh Jain",
+                            role: "Chemistry",
+                            bio: "B.Tech, MNIT Jaipur. Organic chemistry as stories, not lists.",
+                        },
+                        {
+                            name: "Amit Meena",
+                            role: "Mathematics",
+                            bio: "M.Sc. Mathematics. Runs the JEE problem-solving hour every Saturday.",
+                        },
+                        {
+                            name: "Priya Rathore",
+                            role: "English & IELTS",
+                            bio: "CELTA-certified. Seven years preparing students for IELTS and interviews.",
+                        },
+                        {
+                            name: "Farhan Qureshi",
+                            role: "Physics & Maths · Foundation",
+                            bio: "Teaches Class 9 and 10 at weekends; Olympiad mentor.",
+                        },
+                        {
+                            name: "Kavita Saini",
+                            role: "Admissions counsellor",
+                            bio: "The first person families speak to, and the one who calls about attendance.",
+                        },
                     ],
                 }),
             ],
@@ -1001,12 +1240,17 @@ export const SA_SITE: SeedSite = {
                 ),
                 {
                     type: "enquiry",
-                    form: { name: "Admissions enquiry", fields: SA_ENQUIRY_FIELDS },
+                    form: {
+                        name: "Admissions enquiry",
+                        fields: SA_ENQUIRY_FIELDS,
+                    },
                     content: {
                         title: "Admissions enquiry",
-                        description: "Our counsellor calls the number you give within one working day.",
+                        description:
+                            "Our counsellor calls the number you give within one working day.",
                         submitLabel: "Send enquiry",
-                        successMessage: "Thank you. Kavita will call you within one working day.",
+                        successMessage:
+                            "Thank you. Kavita will call you within one working day.",
                     },
                 },
                 {
@@ -1014,9 +1258,11 @@ export const SA_SITE: SeedSite = {
                     service: SA_SERVICE.counselling,
                     content: {
                         title: "Or book a counselling call",
-                        description: "Thirty minutes, on the phone or at the centre.",
+                        description:
+                            "Thirty minutes, on the phone or at the centre.",
                         submitLabel: "Book the call",
-                        successMessage: "Booked. Kavita will call you at that time.",
+                        successMessage:
+                            "Booked. Kavita will call you at that time.",
                     },
                 },
             ],
@@ -1035,9 +1281,11 @@ export const SA_SITE: SeedSite = {
                     service: SA_SERVICE.demo,
                     content: {
                         title: "Book a demo class",
-                        description: "Bring a notebook and a pen. Fifteen places in each class.",
+                        description:
+                            "Bring a notebook and a pen. Fifteen places in each class.",
                         submitLabel: "Book my place",
-                        successMessage: "Booked. See you at the centre — third floor, Laxmi Complex.",
+                        successMessage:
+                            "Booked. See you at the centre — third floor, Laxmi Complex.",
                     },
                 },
             ],
@@ -1063,14 +1311,25 @@ export const SA_SITE: SeedSite = {
                     "Third floor, Laxmi Complex, on Gopalpura Bypass near the Gopalpura flyover. Parking in the basement.",
                     SA_PHOTOS.jaipur,
                 ),
-                block("visitUs", { title: "Find us", showMap: true, showHours: true }),
+                block("visitUs", {
+                    title: "Find us",
+                    showMap: true,
+                    showHours: true,
+                }),
                 {
                     type: "faq",
                     content: {
                         heading: "Before you visit",
                         items: [
-                            { question: "Do you have a hostel?", answer: "No. We keep a list of verified PGs in Gopalpura and Triveni Nagar, and one girls' PG run by a parent. Ask at the front desk." },
-                            { question: "Can parents see attendance and marks?", answer: "Kavita sends attendance and test marks to parents on WhatsApp every month, and we meet parents on the second Saturday." },
+                            {
+                                question: "Do you have a hostel?",
+                                answer: "No. We keep a list of verified PGs in Gopalpura and Triveni Nagar, and one girls' PG run by a parent. Ask at the front desk.",
+                            },
+                            {
+                                question:
+                                    "Can parents see attendance and marks?",
+                                answer: "Kavita sends attendance and test marks to parents on WhatsApp every month, and we meet parents on the second Saturday.",
+                            },
                         ],
                     },
                 },

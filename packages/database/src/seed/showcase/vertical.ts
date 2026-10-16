@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import type { SeedSection, SeedSite } from "../data";
 import type { Db } from "../helpers";
 import {
     buildAnalyticsRows,
@@ -9,7 +10,6 @@ import {
     utcDay,
     writeSite,
 } from "../helpers";
-import type { SeedSection, SeedSite } from "../data";
 import { seedPlanId } from "../pricing";
 import { seedStandInPaymentProvider } from "../stand-in-providers";
 import type { SeededService } from "./appointments";
@@ -20,8 +20,6 @@ import type { ModuleKey, OrgRole, TeamMember } from "./data";
 import { SHOWCASE_KEY, SHOWCASE_SEED, TIMEZONE } from "./data";
 import type { DemoImage, DemoPost } from "./demo-content";
 import { DEMO_POST_CATEGORIES } from "./demo-content";
-import type { Interval, Period } from "./periods";
-import { boundary, periodLabel } from "./periods";
 import type { Person } from "./people";
 import {
     addMinutes,
@@ -32,6 +30,8 @@ import {
     minuteOf,
     phoneNumber,
 } from "./people";
+import type { Interval, Period } from "./periods";
+import { boundary, periodLabel } from "./periods";
 import type { Rng } from "./random";
 import { createRng } from "./random";
 
@@ -594,8 +594,7 @@ export interface PlacedProduct {
     }[];
 }
 
-const toPaise = (rupeeString: string) =>
-    Math.round(Number(rupeeString) * 100);
+const toPaise = (rupeeString: string) => Math.round(Number(rupeeString) * 100);
 
 export async function upsertProducts(
     prisma: Db,
@@ -650,7 +649,9 @@ export async function upsertProducts(
         optionId[name] = row.id;
         for (let j = 0; j < values.length; j++) {
             const v = await prisma.productOptionValue.upsert({
-                where: { optionId_value: { optionId: row.id, value: values[j] } },
+                where: {
+                    optionId_value: { optionId: row.id, value: values[j] },
+                },
                 update: { position: j },
                 create: {
                     id: sid("optionvalue", key, j),
@@ -969,7 +970,10 @@ export function planShop(
         for (let g = 0; chosen.size < lineCount && g < 20; g++) {
             const pick = rng.weighted(
                 lineChoices,
-                (c) => c.p.spec.weight * (c.line.weight / c.p.lines.reduce((s, l) => s + l.weight, 0)),
+                (c) =>
+                    c.p.spec.weight *
+                    (c.line.weight /
+                        c.p.lines.reduce((s, l) => s + l.weight, 0)),
             );
             chosen.set(pick.p.productId, pick);
         }
@@ -1034,10 +1038,7 @@ export function planShop(
     return out;
 }
 
-export async function writeShop(
-    prisma: Db,
-    shop: PlannedShop,
-): Promise<void> {
+export async function writeShop(prisma: Db, shop: PlannedShop): Promise<void> {
     await createInChunks(shop.customers, (data) =>
         prisma.customer.createMany({ data }),
     );
@@ -1348,7 +1349,9 @@ export function asGst(
         contact: spec.contact,
         createdAt: spec.createdAt,
         issuedAt: spec.issuedAt,
-        dueAt: spec.issuedAt ? new Date(spec.issuedAt.getTime() + 7 * DAY) : null,
+        dueAt: spec.issuedAt
+            ? new Date(spec.issuedAt.getTime() + 7 * DAY)
+            : null,
         lines: spec.lines.map((l) => ({
             ...l,
             description: describe ? describe(l.description) : l.description,
@@ -1617,8 +1620,10 @@ export async function writePosts(
         authors: Record<string, string>;
     },
 ): Promise<number> {
-    const categoryId: Record<string, { id: string; name: string; slug: string }> =
-        {};
+    const categoryId: Record<
+        string,
+        { id: string; name: string; slug: string }
+    > = {};
     for (const c of DEMO_POST_CATEGORIES) {
         const row = await prisma.postCategory.upsert({
             where: { siteId_slug: { siteId: o.siteId, slug: c.key } },
@@ -1799,7 +1804,10 @@ export async function writeTraffic(
     },
 ): Promise<number> {
     await prisma.analyticsDailyAggregate.deleteMany({
-        where: { organizationId: b.orgId, id: { startsWith: b.sid("agg", "") } },
+        where: {
+            organizationId: b.orgId,
+            id: { startsWith: b.sid("agg", "") },
+        },
     });
     const since = new Date(utcDay(o.now).getTime() - o.days * DAY);
     const [paid, entries] = await Promise.all([
@@ -1874,7 +1882,6 @@ export function requireStates(
         );
     }
 }
-
 
 /**
  * A season's older enquiries have mostly been decided: an open lead more

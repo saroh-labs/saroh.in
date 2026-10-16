@@ -93,7 +93,8 @@ export const DK_SPEC: BusinessSpec = {
     createdDaysAgo: 520,
     storefront: {
         name: "Desk 42, Baner",
-        description: "Café, lockers, printing and Desk 42 things, at the front desk.",
+        description:
+            "Café, lockers, printing and Desk 42 things, at the front desk.",
         address: "4th floor, Sai Capital, Baner Road, Pune 411045",
         hours: [
             { day: "MON", open: "08:00", close: "21:00", closed: false },
@@ -256,7 +257,13 @@ export const DK_CATEGORIES = [
 
 const CAFE = { hsn: "996331", gstRate: 5, category: "cafe" } as const;
 const regularLarge = (sku: string, regular: string, large: string) => [
-    { title: "Regular", sku: `${sku}-R`, price: regular, onHand: 120, warnAt: 20 },
+    {
+        title: "Regular",
+        sku: `${sku}-R`,
+        price: regular,
+        onHand: 120,
+        warnAt: 20,
+    },
     { title: "Large", sku: `${sku}-L`, price: large, onHand: 80, warnAt: 15 },
 ];
 
@@ -267,7 +274,10 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         name: "Filter coffee",
         description:
             "South Indian filter coffee, decoction brewed fresh every morning, with hot milk and a little sugar unless you say otherwise.",
-        keyPoints: ["Brewed fresh every morning", "Regular 150 ml, Large 250 ml"],
+        keyPoints: [
+            "Brewed fresh every morning",
+            "Regular 150 ml, Large 250 ml",
+        ],
         price: "60.00",
         images: [DK_PHOTOS.filterCoffee],
         option: "Size",
@@ -292,7 +302,8 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         ...CAFE,
         slug: "cold-coffee",
         name: "Cold coffee",
-        description: "Blended with ice and a scoop of vanilla ice cream. The 4 pm one.",
+        description:
+            "Blended with ice and a scoop of vanilla ice cream. The 4 pm one.",
         keyPoints: ["Made to order"],
         price: "140.00",
         images: [DK_PHOTOS.coldCoffee],
@@ -305,7 +316,8 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         ...CAFE,
         slug: "masala-chai",
         name: "Masala chai",
-        description: "Sunita's chai: ginger, cardamom, a little clove. Boiled, not brewed.",
+        description:
+            "Sunita's chai: ginger, cardamom, a little clove. Boiled, not brewed.",
         keyPoints: ["Ginger and cardamom", "Cutting or full glass"],
         price: "40.00",
         images: [DK_PHOTOS.chai],
@@ -317,7 +329,8 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         ...CAFE,
         slug: "poha",
         name: "Kanda poha",
-        description: "Poha with onion, peanuts and a squeeze of lime, made until 11 am.",
+        description:
+            "Poha with onion, peanuts and a squeeze of lime, made until 11 am.",
         keyPoints: ["Until 11 am"],
         price: "70.00",
         images: [DK_PHOTOS.poha],
@@ -329,7 +342,8 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         ...CAFE,
         slug: "veg-grilled-sandwich",
         name: "Veg grilled sandwich",
-        description: "Potato, capsicum, tomato and green chutney, grilled. With ketchup.",
+        description:
+            "Potato, capsicum, tomato and green chutney, grilled. With ketchup.",
         keyPoints: ["Green chutney", "Grilled to order"],
         price: "110.00",
         images: [DK_PHOTOS.sandwich],
@@ -362,8 +376,20 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         images: [DK_PHOTOS.lockers],
         option: "Locker size",
         variants: [
-            { title: "Small", sku: "LK-S", price: "600.00", onHand: 9, warnAt: 2 },
-            { title: "Large", sku: "LK-L", price: "900.00", onHand: 2, warnAt: 1 },
+            {
+                title: "Small",
+                sku: "LK-S",
+                price: "600.00",
+                onHand: 9,
+                warnAt: 2,
+            },
+            {
+                title: "Large",
+                sku: "LK-L",
+                price: "900.00",
+                onHand: 2,
+                warnAt: 1,
+            },
         ],
         weight: 1.2,
         qty: [1, 1],
@@ -381,8 +407,20 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         images: [DK_PHOTOS.printer],
         option: "Pack",
         variants: [
-            { title: "100 black & white pages", sku: "PR-BW100", price: "300.00", onHand: 500, warnAt: 50 },
-            { title: "50 colour pages", sku: "PR-CL50", price: "600.00", onHand: 500, warnAt: 50 },
+            {
+                title: "100 black & white pages",
+                sku: "PR-BW100",
+                price: "300.00",
+                onHand: 500,
+                warnAt: 50,
+            },
+            {
+                title: "50 colour pages",
+                sku: "PR-CL50",
+                price: "600.00",
+                onHand: 500,
+                warnAt: 50,
+            },
         ],
         weight: 2.5,
         qty: [1, 1],
@@ -391,7 +429,8 @@ export const DK_PRODUCTS: readonly ProductSpec[] = [
         slug: "desk-42-tote",
         name: "Desk 42 tote bag",
         category: "merch",
-        description: "A heavy cotton tote that takes a 15-inch laptop and lunch.",
+        description:
+            "A heavy cotton tote that takes a 15-inch laptop and lunch.",
         keyPoints: ["Heavy cotton canvas", "Fits a 15-inch laptop"],
         price: "399.00",
         hsn: "6305",
@@ -489,18 +528,71 @@ export const DK_QR: readonly QrSpec[] = [
 
 export const DK_NAMES = {
     first: [
-        "Aditya", "Amruta", "Aniket", "Ashwini", "Chinmay", "Gauri", "Harshad",
-        "Isha", "Ketaki", "Mihir", "Neha", "Nikhil", "Pooja", "Prathamesh",
-        "Rasika", "Rohan", "Rutuja", "Sagar", "Saee", "Shreyas", "Siddharth",
-        "Sneha", "Tanvi", "Tejas", "Varun", "Vrushali", "Yash", "Arjun",
-        "Kabir", "Meera", "Zoya", "Ankita", "Devika", "Kunal", "Priya",
-        "Rahul", "Aarti", "Manish",
+        "Aditya",
+        "Amruta",
+        "Aniket",
+        "Ashwini",
+        "Chinmay",
+        "Gauri",
+        "Harshad",
+        "Isha",
+        "Ketaki",
+        "Mihir",
+        "Neha",
+        "Nikhil",
+        "Pooja",
+        "Prathamesh",
+        "Rasika",
+        "Rohan",
+        "Rutuja",
+        "Sagar",
+        "Saee",
+        "Shreyas",
+        "Siddharth",
+        "Sneha",
+        "Tanvi",
+        "Tejas",
+        "Varun",
+        "Vrushali",
+        "Yash",
+        "Arjun",
+        "Kabir",
+        "Meera",
+        "Zoya",
+        "Ankita",
+        "Devika",
+        "Kunal",
+        "Priya",
+        "Rahul",
+        "Aarti",
+        "Manish",
     ],
     last: [
-        "Kulkarni", "Deshpande", "Joshi", "Patil", "Bhosale", "Gokhale",
-        "Apte", "Kale", "Shinde", "Jadhav", "Phadke", "Ranade", "Sathe",
-        "Karve", "Naik", "Gadgil", "Mehta", "Shah", "Iyer", "Nair", "Rao",
-        "Menon", "Khan", "D'Souza", "Chavan",
+        "Kulkarni",
+        "Deshpande",
+        "Joshi",
+        "Patil",
+        "Bhosale",
+        "Gokhale",
+        "Apte",
+        "Kale",
+        "Shinde",
+        "Jadhav",
+        "Phadke",
+        "Ranade",
+        "Sathe",
+        "Karve",
+        "Naik",
+        "Gadgil",
+        "Mehta",
+        "Shah",
+        "Iyer",
+        "Nair",
+        "Rao",
+        "Menon",
+        "Khan",
+        "D'Souza",
+        "Chavan",
     ],
     companies: [
         "Pixel and Paper Studio",
@@ -557,24 +649,76 @@ export const DK_ENQUIRY_FIELDS = [
     { name: "phone", label: "Phone", type: "tel" },
     { name: "company", label: "Company (if any)", type: "text" },
     { name: "team", label: "How many desks?", type: "text" },
-    { name: "message", label: "What do you need?", type: "textarea", required: true },
+    {
+        name: "message",
+        label: "What do you need?",
+        type: "textarea",
+        required: true,
+    },
 ] as const;
 
 export const DK_ENQUIRIES: readonly { team: string; message: string }[] = [
-    { team: "4", message: "We are a four-person design studio moving out of a flat in Aundh. Do you have four dedicated desks together?" },
-    { team: "1", message: "Need a virtual office address in Baner for GST registration. What documents do you give?" },
-    { team: "1", message: "Can I try a day before taking the hot desk membership?" },
-    { team: "0", message: "Is the meeting room available for a half-day workshop on Saturdays, 10 to 2?" },
-    { team: "1", message: "I record a podcast. How soundproof is the booth, and can I bring my own mic?" },
-    { team: "2", message: "Two of us, remote for a Bengaluru company. Is the Wi-Fi reliable enough for calls all day?" },
-    { team: "1", message: "Do you have parking for a car, or only two-wheelers?" },
-    { team: "6", message: "Our team of six needs a base in Pune for three months. Can you do a custom monthly price?" },
-    { team: "1", message: "Is there 24-hour access? I work US hours sometimes." },
-    { team: "1", message: "Can I bring a client to the café without a day pass?" },
+    {
+        team: "4",
+        message:
+            "We are a four-person design studio moving out of a flat in Aundh. Do you have four dedicated desks together?",
+    },
+    {
+        team: "1",
+        message:
+            "Need a virtual office address in Baner for GST registration. What documents do you give?",
+    },
+    {
+        team: "1",
+        message: "Can I try a day before taking the hot desk membership?",
+    },
+    {
+        team: "0",
+        message:
+            "Is the meeting room available for a half-day workshop on Saturdays, 10 to 2?",
+    },
+    {
+        team: "1",
+        message:
+            "I record a podcast. How soundproof is the booth, and can I bring my own mic?",
+    },
+    {
+        team: "2",
+        message:
+            "Two of us, remote for a Bengaluru company. Is the Wi-Fi reliable enough for calls all day?",
+    },
+    {
+        team: "1",
+        message: "Do you have parking for a car, or only two-wheelers?",
+    },
+    {
+        team: "6",
+        message:
+            "Our team of six needs a base in Pune for three months. Can you do a custom monthly price?",
+    },
+    {
+        team: "1",
+        message: "Is there 24-hour access? I work US hours sometimes.",
+    },
+    {
+        team: "1",
+        message: "Can I bring a client to the café without a day pass?",
+    },
     { team: "1", message: "Do day passes work on Saturdays?" },
-    { team: "3", message: "Looking for a small space for our CA practice — three desks and a cabinet." },
-    { team: "1", message: "How does mail handling work for the virtual office?" },
-    { team: "1", message: "I'm moving to Baner next month. Can I book a tour on Saturday?" },
+    {
+        team: "3",
+        message:
+            "Looking for a small space for our CA practice — three desks and a cabinet.",
+    },
+    {
+        team: "1",
+        message: "How does mail handling work for the virtual office?",
+    },
+    {
+        team: "1",
+        message:
+            "I'm moving to Baner next month. Can I book a tour on Saturday?",
+    },
 ];
 
 // --- The site ----------------------------------------------------------------
@@ -630,28 +774,66 @@ export const DK_SITE: SeedSite = {
                     variant: "facts",
                     heading: "Desk 42 at a glance",
                     items: [
-                        { value: "₹499", title: "a day pass", body: "Monday to Friday, 8 am to 9 pm." },
-                        { value: "300 Mbps", title: "fibre, and a backup line", body: "Two providers, so a call never drops." },
-                        { value: "8 seats", title: "in the Sahyadri Room", body: "Screen, whiteboard, booked by the hour." },
-                        { value: "24×7", title: "for dedicated desks", body: "With your own key card." },
+                        {
+                            value: "₹499",
+                            title: "a day pass",
+                            body: "Monday to Friday, 8 am to 9 pm.",
+                        },
+                        {
+                            value: "300 Mbps",
+                            title: "fibre, and a backup line",
+                            body: "Two providers, so a call never drops.",
+                        },
+                        {
+                            value: "8 seats",
+                            title: "in the Sahyadri Room",
+                            body: "Screen, whiteboard, booked by the hour.",
+                        },
+                        {
+                            value: "24×7",
+                            title: "for dedicated desks",
+                            body: "With your own key card.",
+                        },
                     ],
                 }),
                 {
                     type: "servicesList",
                     services: [0, 1, 2],
-                    content: { heading: "Book by the day or the hour", showPrices: true },
+                    content: {
+                        heading: "Book by the day or the hour",
+                        showPrices: true,
+                    },
                 },
                 block("plans", { title: "Memberships", highlight: "first" }),
                 block("testimonials", {
                     heading: "Members",
                     items: [
-                        { quote: "I used to lose an hour a day to the Hinjewadi traffic. Now I walk here, and my calls don't drop.", name: "Nikhil Bhosale", role: "Remote engineer, member since 2024" },
-                        { quote: "We moved our studio out of a flat in Aundh. Four desks by the window and a room for client reviews — that was all we needed.", name: "Ananya Kulkarni", role: "Pixel and Paper Studio" },
-                        { quote: "The booth is properly quiet. I record two episodes a week there.", name: "Tanvi Rao", role: "Podcaster" },
+                        {
+                            quote: "I used to lose an hour a day to the Hinjewadi traffic. Now I walk here, and my calls don't drop.",
+                            name: "Nikhil Bhosale",
+                            role: "Remote engineer, member since 2024",
+                        },
+                        {
+                            quote: "We moved our studio out of a flat in Aundh. Four desks by the window and a room for client reviews — that was all we needed.",
+                            name: "Ananya Kulkarni",
+                            role: "Pixel and Paper Studio",
+                        },
+                        {
+                            quote: "The booth is properly quiet. I record two episodes a week there.",
+                            name: "Tanvi Rao",
+                            role: "Podcaster",
+                        },
                     ],
                 }),
                 block("journal", { title: "From the front desk", count: 3 }),
-                { type: "cta", content: { label: "Book a free tour", href: "/visit", style: "primary" } },
+                {
+                    type: "cta",
+                    content: {
+                        label: "Book a free tour",
+                        href: "/visit",
+                        style: "primary",
+                    },
+                },
             ],
         },
         {
@@ -679,9 +861,18 @@ export const DK_SITE: SeedSite = {
                     content: {
                         heading: "Memberships",
                         items: [
-                            { question: "Can I pause?", answer: "Once a year, for up to a month. Tell Rhea before your renewal date." },
-                            { question: "Can I bring a guest?", answer: "One guest a day for up to two hours. Longer than that, they need a day pass." },
-                            { question: "Is there a deposit?", answer: "One month's fee for a dedicated desk, returned when you leave. None for the others." },
+                            {
+                                question: "Can I pause?",
+                                answer: "Once a year, for up to a month. Tell Rhea before your renewal date.",
+                            },
+                            {
+                                question: "Can I bring a guest?",
+                                answer: "One guest a day for up to two hours. Longer than that, they need a day pass.",
+                            },
+                            {
+                                question: "Is there a deposit?",
+                                answer: "One month's fee for a dedicated desk, returned when you leave. None for the others.",
+                            },
                         ],
                     },
                 },
@@ -701,12 +892,17 @@ export const DK_SITE: SeedSite = {
                     service: 0,
                     content: {
                         title: "Pick your day",
-                        description: "Pay online when you book. Cancel up to 24 hours before for a full refund.",
+                        description:
+                            "Pay online when you book. Cancel up to 24 hours before for a full refund.",
                         submitLabel: "Book my desk",
-                        successMessage: "Booked. Ask for Omkar at the front desk on the 4th floor.",
+                        successMessage:
+                            "Booked. Ask for Omkar at the front desk on the 4th floor.",
                     },
                 },
-                block("packs", { title: "Coming often? Flexi 10", buttonLabel: "Buy Flexi 10" }),
+                block("packs", {
+                    title: "Coming often? Flexi 10",
+                    buttonLabel: "Buy Flexi 10",
+                }),
             ],
         },
         {
@@ -723,9 +919,11 @@ export const DK_SITE: SeedSite = {
                     service: 1,
                     content: {
                         title: "Book the Sahyadri Room",
-                        description: "₹800 an hour. Need two hours? Book two slots back to back.",
+                        description:
+                            "₹800 an hour. Need two hours? Book two slots back to back.",
                         submitLabel: "Book the room",
-                        successMessage: "Booked. The screen's HDMI and USB-C cables are in the drawer.",
+                        successMessage:
+                            "Booked. The screen's HDMI and USB-C cables are in the drawer.",
                     },
                 },
                 {
@@ -733,9 +931,11 @@ export const DK_SITE: SeedSite = {
                     service: 2,
                     content: {
                         title: "Book the call & podcast booth",
-                        description: "₹300 an hour. Two microphones and a ring light inside.",
+                        description:
+                            "₹300 an hour. Two microphones and a ring light inside.",
                         submitLabel: "Book the booth",
-                        successMessage: "Booked. The booth's door code is on your confirmation.",
+                        successMessage:
+                            "Booked. The booth's door code is on your confirmation.",
                     },
                 },
                 text(
@@ -777,7 +977,11 @@ export const DK_SITE: SeedSite = {
                     "Fourth floor, Sai Capital, on Baner Road near Balewadi Phata. Two-wheeler parking in the basement; cars on the lane behind.",
                     DK_PHOTOS.pune,
                 ),
-                block("visitUs", { title: "Where we are", showMap: true, showHours: true }),
+                block("visitUs", {
+                    title: "Where we are",
+                    showMap: true,
+                    showHours: true,
+                }),
                 text(
                     "<h2>The floor</h2><p>The open hot desks by the windows, dedicated desks along the back wall, the Sahyadri Room and the booth on the left as you come in, the café and lockers by the front desk.</p>",
                     DK_DRAWN.floorPlan,
@@ -788,14 +992,19 @@ export const DK_SITE: SeedSite = {
                     service: 3,
                     content: {
                         title: "Book a free tour",
-                        description: "Thirty minutes with Rhea, Monday to Saturday.",
+                        description:
+                            "Thirty minutes with Rhea, Monday to Saturday.",
                         submitLabel: "Book the tour",
-                        successMessage: "Booked. Ask for Rhea at the front desk.",
+                        successMessage:
+                            "Booked. Ask for Rhea at the front desk.",
                     },
                 },
                 {
                     type: "enquiry",
-                    form: { name: "Membership enquiry", fields: DK_ENQUIRY_FIELDS },
+                    form: {
+                        name: "Membership enquiry",
+                        fields: DK_ENQUIRY_FIELDS,
+                    },
                     content: {
                         title: "Ask about a membership",
                         description: "Rhea replies the same working day.",

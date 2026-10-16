@@ -68,13 +68,13 @@ import {
     staffEmail,
     TIMEZONE,
 } from "./data";
+import type { Desk42Counts } from "./desk42";
+import { checkDesk42, seedDesk42 } from "./desk42";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
 import type { PulseCounts } from "./pulse";
 import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
 import { createRng } from "./random";
-import type { Desk42Counts } from "./desk42";
-import { checkDesk42, seedDesk42 } from "./desk42";
 import type { ShikshaCounts } from "./shiksha";
 import { checkShiksha, seedShiksha } from "./shiksha";
 
@@ -223,7 +223,12 @@ export async function seedShowcase(
     const shiksha = await seedShiksha(vertical);
     const desk42 = await seedDesk42(vertical);
     businesses.push(shiksha, desk42);
-    const linksOwnPayers = new Set([RYE.orgId, KAVI.orgId, shiksha.id, desk42.id]);
+    const linksOwnPayers = new Set([
+        RYE.orgId,
+        KAVI.orgId,
+        shiksha.id,
+        desk42.id,
+    ]);
     for (const business of SHOWCASE_BUSINESSES) {
         businesses.push({
             id: await seedBusiness(ctx, business, roleUsers),
@@ -250,9 +255,7 @@ export async function seedShowcase(
     // Rye & Co. and Kavi Dental link their own (their films count them).
     await linkSeededPayers(
         prisma,
-        businesses
-            .map((b) => b.id)
-            .filter((id) => !linksOwnPayers.has(id)),
+        businesses.map((b) => b.id).filter((id) => !linksOwnPayers.has(id)),
     );
     const counts = await checkShowcase(prisma, now, businesses);
     await checkBoutique(prisma);
@@ -267,7 +270,11 @@ export async function seedShowcase(
         shiksha.id,
         now,
     );
-    const desk42Counts: Desk42Counts = await checkDesk42(prisma, desk42.id, now);
+    const desk42Counts: Desk42Counts = await checkDesk42(
+        prisma,
+        desk42.id,
+        now,
+    );
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(

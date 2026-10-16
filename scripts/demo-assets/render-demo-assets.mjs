@@ -28,7 +28,10 @@ const { chromium } = require("@playwright/test");
 const W = 1600;
 const H = 1000;
 
-const page = (css, body) => `<!doctype html><html><head><meta charset="utf-8"><style>
+const page = (
+    css,
+    body,
+) => `<!doctype html><html><head><meta charset="utf-8"><style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:${W}px;height:${H}px;overflow:hidden}
 body{font-family:"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
@@ -36,7 +39,13 @@ ${css}</style></head><body>${body}</body></html>`;
 
 // --- Shiksha Academy -------------------------------------------------------
 
-const SA = { navy: "#1d3a6b", ink: "#14213d", saffron: "#e07a1f", cream: "#f7f3ea", line: "#d9d2c3" };
+const SA = {
+    navy: "#1d3a6b",
+    ink: "#14213d",
+    saffron: "#e07a1f",
+    cream: "#f7f3ea",
+    line: "#d9d2c3",
+};
 
 const crest = (size = 120, fg = SA.navy, bg = "#fff") => `
 <svg width="${size}" height="${size}" viewBox="0 0 120 120">
@@ -60,10 +69,29 @@ const saCard = (title, kicker, inner, extraCss = "") =>
 
 const timetable = () => {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const a = ["Physics", "Chemistry", "Physics", "Biology", "Chemistry", "Physics"];
-    const b = ["Biology", "Biology", "Chemistry", "Physics", "Biology", "Chemistry"];
-    const who = { Physics: "Vikram sir", Chemistry: "Saurabh sir", Biology: "Neha ma'am" };
-    const cell = (s) => `<td class="${s.toLowerCase()}"><b>${s}</b><span>${who[s]}</span></td>`;
+    const a = [
+        "Physics",
+        "Chemistry",
+        "Physics",
+        "Biology",
+        "Chemistry",
+        "Physics",
+    ];
+    const b = [
+        "Biology",
+        "Biology",
+        "Chemistry",
+        "Physics",
+        "Biology",
+        "Chemistry",
+    ];
+    const who = {
+        Physics: "Vikram sir",
+        Chemistry: "Saurabh sir",
+        Biology: "Neha ma'am",
+    };
+    const cell = (s) =>
+        `<td class="${s.toLowerCase()}"><b>${s}</b><span>${who[s]}</span></td>`;
     return saCard(
         "NEET Foundation — Class 11 Morning Batch",
         "Weekly timetable · 2026–27",
@@ -85,12 +113,30 @@ const results = () =>
         "Results 2026",
         "Our toppers",
         `<div class="cols"><div><h2>NEET 2026</h2>
-          ${[["Ananya Sharma", "682 / 720"], ["Mohit Kumawat", "664 / 720"], ["Sneha Choudhary", "651 / 720"], ["Aditya Saini", "640 / 720"]].map(([n, s]) => `<p><span>${n}</span><b>${s}</b></p>`).join("")}
+          ${[
+              ["Ananya Sharma", "682 / 720"],
+              ["Mohit Kumawat", "664 / 720"],
+              ["Sneha Choudhary", "651 / 720"],
+              ["Aditya Saini", "640 / 720"],
+          ]
+              .map(([n, s]) => `<p><span>${n}</span><b>${s}</b></p>`)
+              .join("")}
           <div class="note">47 of our 112 NEET students scored above 550</div></div>
           <div><h2>JEE Main 2026</h2>
-          ${[["Kunal Agarwal", "99.71 %ile"], ["Ritika Jain", "99.12 %ile"], ["Harsh Meena", "98.64 %ile"]].map(([n, s]) => `<p><span>${n}</span><b>${s}</b></p>`).join("")}
+          ${[
+              ["Kunal Agarwal", "99.71 %ile"],
+              ["Ritika Jain", "99.12 %ile"],
+              ["Harsh Meena", "98.64 %ile"],
+          ]
+              .map(([n, s]) => `<p><span>${n}</span><b>${s}</b></p>`)
+              .join("")}
           <h2 style="margin-top:34px">IELTS</h2>
-          ${[["Simran Kaur", "Band 8.0"], ["Arjun Rathi", "Band 7.5"]].map(([n, s]) => `<p><span>${n}</span><b>${s}</b></p>`).join("")}</div></div>`,
+          ${[
+              ["Simran Kaur", "Band 8.0"],
+              ["Arjun Rathi", "Band 7.5"],
+          ]
+              .map(([n, s]) => `<p><span>${n}</span><b>${s}</b></p>`)
+              .join("")}</div></div>`,
         `.cols{display:grid;grid-template-columns:1fr 1fr;gap:56px}
          h2{font-size:30px;color:${SA.saffron};margin-bottom:16px;text-transform:uppercase;letter-spacing:.06em}
          p{display:flex;justify-content:space-between;font-size:32px;padding:14px 0;border-bottom:2px dashed ${SA.line}}
@@ -101,7 +147,17 @@ const fees = () =>
     saCard(
         "₹96,000 a year, in four instalments",
         "Two-year NEET/JEE classroom programme",
-        `<div class="row">${[["1", "10 April", "₹24,000"], ["2", "10 July", "₹24,000"], ["3", "10 October", "₹24,000"], ["4", "10 January", "₹24,000"]].map(([n, d, a]) => `<div class="box"><div class="n">Instalment ${n}</div><div class="a">${a}</div><div class="d">due ${d}</div></div>`).join("")}</div>
+        `<div class="row">${[
+            ["1", "10 April", "₹24,000"],
+            ["2", "10 July", "₹24,000"],
+            ["3", "10 October", "₹24,000"],
+            ["4", "10 January", "₹24,000"],
+        ]
+            .map(
+                ([n, d, a]) =>
+                    `<div class="box"><div class="n">Instalment ${n}</div><div class="a">${a}</div><div class="d">due ${d}</div></div>`,
+            )
+            .join("")}</div>
          <ul><li>₹2,000 registration fee at admission</li><li>Study modules and the Sunday Test Series included</li><li>Fees include 18% GST · UPI, card, bank transfer or cash · a GST invoice for every payment</li><li>Prefer monthly? ₹8,500 a month for Class 11–12</li></ul>`,
         `.row{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin:10px 0 40px}
          .box{background:#fff;border:3px solid ${SA.navy};border-radius:16px;padding:28px}
@@ -111,9 +167,32 @@ const fees = () =>
 
 const testCalendar = () => {
     const months = [
-        ["October", [["18", "Sunday test"], ["25", "Major Test"]]],
-        ["November", [["1", "Sunday test"], ["8", "No test · Diwali"], ["15", "Sunday test"], ["22", "Sunday test"], ["29", "Major Test"]]],
-        ["December", [["6", "Sunday test"], ["13", "Sunday test"], ["20", "Sunday test"], ["27", "Major Test"]]],
+        [
+            "October",
+            [
+                ["18", "Sunday test"],
+                ["25", "Major Test"],
+            ],
+        ],
+        [
+            "November",
+            [
+                ["1", "Sunday test"],
+                ["8", "No test · Diwali"],
+                ["15", "Sunday test"],
+                ["22", "Sunday test"],
+                ["29", "Major Test"],
+            ],
+        ],
+        [
+            "December",
+            [
+                ["6", "Sunday test"],
+                ["13", "Sunday test"],
+                ["20", "Sunday test"],
+                ["27", "Major Test"],
+            ],
+        ],
     ];
     return saCard(
         "Sunday tests, October to December",
@@ -129,7 +208,10 @@ const testCalendar = () => {
 
 const steps = (items, accent, ink) =>
     `<div class="steps">${items.map(([t, d], i) => `<div class="step"><div class="num">${i + 1}</div><h3>${t}</h3><p>${d}</p></div>`).join("")}</div>`;
-const stepsCss = (accent, ink) => `.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:20px}
+const stepsCss = (
+    accent,
+    ink,
+) => `.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:20px}
  .step{background:#fff;border-radius:18px;padding:30px;min-height:420px;border:2px solid #ddd}
  .num{width:72px;height:72px;border-radius:50%;background:${accent};color:#fff;font-size:38px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:24px}
  h3{font-size:32px;color:${ink};margin-bottom:14px} .step p{font-size:24px;line-height:1.45;color:#555}`;
@@ -140,9 +222,18 @@ const admissions = () =>
         "Admissions 2027–28",
         steps([
             ["Enquiry", "Fill the form on our site or call +91 141 400 7720."],
-            ["Counselling call", "Kavita calls within a day: batch, fees, scholarship test."],
-            ["Demo class", "Sit in on Saturday 4 pm or Sunday 11 am. Parents welcome."],
-            ["Admission", "Form, Class 10 marksheet, two photos, ₹2,000 registration."],
+            [
+                "Counselling call",
+                "Kavita calls within a day: batch, fees, scholarship test.",
+            ],
+            [
+                "Demo class",
+                "Sit in on Saturday 4 pm or Sunday 11 am. Parents welcome.",
+            ],
+            [
+                "Admission",
+                "Form, Class 10 marksheet, two photos, ₹2,000 registration.",
+            ],
         ]),
         stepsCss(SA.saffron, SA.navy),
     );
@@ -161,13 +252,26 @@ const ielts = () =>
          <div class="f"><span>With Priya Rathore, CELTA · Academic &amp; General Training</span>${crest(110, "#fff", SA.navy)}</div>`,
     );
 
-const SUBJECT_COLOURS = { Physics: "#2f5aa8", Chemistry: "#c2410c", Biology: "#2f7d4a", Mathematics: "#6d28d9" };
-const HINDI = { Physics: "भौतिक विज्ञान", Chemistry: "रसायन विज्ञान", Biology: "जीव विज्ञान", Mathematics: "गणित" };
+const SUBJECT_COLOURS = {
+    Physics: "#2f5aa8",
+    Chemistry: "#c2410c",
+    Biology: "#2f7d4a",
+    Mathematics: "#6d28d9",
+};
+const HINDI = {
+    Physics: "भौतिक विज्ञान",
+    Chemistry: "रसायन विज्ञान",
+    Biology: "जीव विज्ञान",
+    Mathematics: "गणित",
+};
 
 const bookCover = (kind, subject, medium) => {
     const c = SUBJECT_COLOURS[subject];
     const title = kind === "module" ? "Study Module" : "Sunday Test Series";
-    const sub = kind === "module" ? "Theory · Solved examples · PYQs" : "20 chapter tests · Answer key · Solutions";
+    const sub =
+        kind === "module"
+            ? "Theory · Solved examples · PYQs"
+            : "20 chapter tests · Answer key · Solutions";
     const name = medium === "Hindi" ? HINDI[subject] : subject;
     return page(
         `body{background:#ebe5d9;display:flex;align-items:center;justify-content:center}
@@ -204,7 +308,10 @@ const saTshirt = (colour) => {
     const fill = colour === "navy" ? "#1f3560" : "#fbfbf8";
     const fg = colour === "navy" ? "#fff" : SA.navy;
     const bg = colour === "navy" ? "#1f3560" : "#fbfbf8";
-    return productBg(tshirtSvg(fill, fg, crest(120, fg, bg)), `Academy T-shirt · ${colour}`);
+    return productBg(
+        tshirtSvg(fill, fg, crest(120, fg, bg)),
+        `Academy T-shirt · ${colour}`,
+    );
 };
 
 const labCoat = () =>
@@ -227,11 +334,21 @@ const omr = () =>
           <rect x="230" y="30" width="620" height="760" rx="8" fill="#fff" stroke="#b9a9e0" stroke-width="4"/>
           <rect x="230" y="30" width="620" height="90" fill="#6d4fc2"/>
           <text x="540" y="88" text-anchor="middle" font-family="Arial" font-weight="700" font-size="34" fill="#fff">OMR ANSWER SHEET · NEET</text>
-          ${Array.from({ length: 10 }, (_, r) => Array.from({ length: 3 }, (_, c) => {
-              const x = 270 + c * 200, y = 170 + r * 60;
-              return `<text x="${x}" y="${y + 8}" font-family="Arial" font-size="20" fill="#6d4fc2">${c * 50 + r + 1}</text>` +
-                  [0, 1, 2, 3].map((o) => `<circle cx="${x + 50 + o * 34}" cy="${y}" r="12" fill="${(r * 3 + c + o) % 4 === 1 && r < 6 ? "#222" : "none"}" stroke="#6d4fc2" stroke-width="2"/>`).join("");
-          }).join("")).join("")}
+          ${Array.from({ length: 10 }, (_, r) =>
+              Array.from({ length: 3 }, (_, c) => {
+                  const x = 270 + c * 200,
+                      y = 170 + r * 60;
+                  return (
+                      `<text x="${x}" y="${y + 8}" font-family="Arial" font-size="20" fill="#6d4fc2">${c * 50 + r + 1}</text>` +
+                      [0, 1, 2, 3]
+                          .map(
+                              (o) =>
+                                  `<circle cx="${x + 50 + o * 34}" cy="${y}" r="12" fill="${(r * 3 + c + o) % 4 === 1 && r < 6 ? "#222" : "none"}" stroke="#6d4fc2" stroke-width="2"/>`,
+                          )
+                          .join("")
+                  );
+              }).join(""),
+          ).join("")}
         </svg>`,
         "OMR practice pack · 50 sheets",
     );
@@ -251,7 +368,13 @@ const formulaBook = () =>
 
 // --- Desk 42 ----------------------------------------------------------------
 
-const DK = { teal: "#0f766e", ink: "#1f2933", warm: "#f4efe6", amber: "#b45309", line: "#ddd5c7" };
+const DK = {
+    teal: "#0f766e",
+    ink: "#1f2933",
+    warm: "#f4efe6",
+    amber: "#b45309",
+    line: "#ddd5c7",
+};
 const dkMark = (size = 90, fg = "#fff", bg = DK.teal) => `
 <svg width="${size}" height="${size}" viewBox="0 0 90 90"><rect width="90" height="90" rx="18" fill="${bg}"/>
 <text x="45" y="60" text-anchor="middle" font-family="Arial" font-weight="800" font-size="44" fill="${fg}">42</text></svg>`;
@@ -297,10 +420,42 @@ const plansCard = () =>
         "Three ways to be a member",
         "Memberships · monthly · GST included",
         `<div class="cols">${[
-            ["Hot desk", "₹6,500", ["Any free desk in the open area", "Mon–Sat, opening hours", "Member printing rates", "Café tab on your invoice"]],
-            ["Dedicated desk", "₹9,500", ["Your own desk and pedestal", "24×7 key-card access", "4 meeting-room hours a month", "Deposit: one month"]],
-            ["Virtual office", "₹1,999", ["Baner address for GST and letterhead", "Mail received and scanned", "2 day passes a month", "NOC for registration"]],
-        ].map(([n, p, items], i) => `<div class="plan ${i === 1 ? "hi" : ""}"><h2>${n}</h2><div class="p">${p}<small>/month</small></div><ul>${items.map((x) => `<li>${x}</li>`).join("")}</ul></div>`).join("")}</div>`,
+            [
+                "Hot desk",
+                "₹6,500",
+                [
+                    "Any free desk in the open area",
+                    "Mon–Sat, opening hours",
+                    "Member printing rates",
+                    "Café tab on your invoice",
+                ],
+            ],
+            [
+                "Dedicated desk",
+                "₹9,500",
+                [
+                    "Your own desk and pedestal",
+                    "24×7 key-card access",
+                    "4 meeting-room hours a month",
+                    "Deposit: one month",
+                ],
+            ],
+            [
+                "Virtual office",
+                "₹1,999",
+                [
+                    "Baner address for GST and letterhead",
+                    "Mail received and scanned",
+                    "2 day passes a month",
+                    "NOC for registration",
+                ],
+            ],
+        ]
+            .map(
+                ([n, p, items], i) =>
+                    `<div class="plan ${i === 1 ? "hi" : ""}"><h2>${n}</h2><div class="p">${p}<small>/month</small></div><ul>${items.map((x) => `<li>${x}</li>`).join("")}</ul></div>`,
+            )
+            .join("")}</div>`,
         `.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
          .plan{background:#fff;border:2px solid ${DK.line};border-radius:18px;padding:34px;min-height:560px}
          .hi{border:4px solid ${DK.teal}} h2{font-size:34px}.p{font-size:58px;font-weight:800;color:${DK.teal};margin:14px 0 22px}
@@ -335,10 +490,16 @@ const roomBooking = () =>
         "Booking the Sahyadri Room",
         "Meeting room · ₹800 an hour",
         steps([
-            ["Pick a slot", "On the Meeting rooms page. Two hours? Book two slots back to back."],
+            [
+                "Pick a slot",
+                "On the Meeting rooms page. Two hours? Book two slots back to back.",
+            ],
             ["Pay online", "UPI or card. Your GST invoice comes by email."],
             ["Guests sign in", "At the front desk; Omkar brings them up."],
-            ["Leave it tidy", "Wipe the board, cables in the drawer. Cancel 24 hours ahead for a refund."],
+            [
+                "Leave it tidy",
+                "Wipe the board, cables in the drawer. Cancel 24 hours ahead for a refund.",
+            ],
         ]),
         stepsCss(DK.teal, DK.ink),
     );
@@ -348,17 +509,35 @@ const events = () =>
         "Coming up at Desk 42",
         "Events · October to December",
         `<div class="list">${[
-            ["Sat 24 Oct", "11:00 – 13:00", "GST for freelancers — a workshop with Ashwini Patil, CA", "Sahyadri Room"],
-            ["Thu 5 Nov", "18:00", "Diwali potluck — bring one dish from home", "Café"],
+            [
+                "Sat 24 Oct",
+                "11:00 – 13:00",
+                "GST for freelancers — a workshop with Ashwini Patil, CA",
+                "Sahyadri Room",
+            ],
+            [
+                "Thu 5 Nov",
+                "18:00",
+                "Diwali potluck — bring one dish from home",
+                "Café",
+            ],
             ["Fri 6 Nov", "17:30", "Founders' Chai", "Café"],
             ["Fri 4 Dec", "17:30", "Founders' Chai", "Café"],
-        ].map(([d, t, w, p]) => `<div class="ev"><div class="d">${d}</div><div class="t">${t}</div><div class="w">${w}<span>${p}</span></div></div>`).join("")}</div>`,
+        ]
+            .map(
+                ([d, t, w, p]) =>
+                    `<div class="ev"><div class="d">${d}</div><div class="t">${t}</div><div class="w">${w}<span>${p}</span></div></div>`,
+            )
+            .join("")}</div>`,
         `.ev{display:grid;grid-template-columns:200px 200px 1fr;align-items:center;background:#fff;border-radius:16px;padding:26px 30px;margin-bottom:16px;border:2px solid ${DK.line}}
          .d{font-size:34px;font-weight:800;color:${DK.teal}}.t{font-size:28px;color:#555}.w{font-size:30px;font-weight:600}.w span{display:block;font-size:22px;color:#777;font-weight:400;margin-top:6px}`,
     );
 
 const dkTshirt = () =>
-    productBg(tshirtSvg("#2b2f33", "#fff", dkMark(110, "#2b2f33", "#e7e2d8")), "Desk 42 T-shirt · charcoal");
+    productBg(
+        tshirtSvg("#2b2f33", "#fff", dkMark(110, "#2b2f33", "#e7e2d8")),
+        "Desk 42 T-shirt · charcoal",
+    );
 
 // --- Render -----------------------------------------------------------------
 
@@ -380,8 +559,14 @@ const cards = {
         ...Object.fromEntries(
             SUBJECTS.flatMap((s) =>
                 MEDIUMS.flatMap((m) => [
-                    [`module-${s.toLowerCase()}-${m.toLowerCase()}.png`, bookCover("module", s, m)],
-                    [`tests-${s.toLowerCase()}-${m.toLowerCase()}.png`, bookCover("tests", s, m)],
+                    [
+                        `module-${s.toLowerCase()}-${m.toLowerCase()}.png`,
+                        bookCover("module", s, m),
+                    ],
+                    [
+                        `tests-${s.toLowerCase()}-${m.toLowerCase()}.png`,
+                        bookCover("tests", s, m),
+                    ],
                 ]),
             ),
         ),
