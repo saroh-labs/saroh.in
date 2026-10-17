@@ -67,7 +67,7 @@ function addressLine(c: BillingCustomer): string | null {
     if (!a) return null;
     return note(
         [a.line1, a.line2, a.city, a.state, a.postalCode]
-            .filter((p) => p && p.trim())
+            .filter((p) => p?.trim())
             .join(", "),
     );
 }
@@ -102,7 +102,7 @@ export function razorpayCustomerName(c: BillingCustomer): string | null {
     const clean = (v: string | null | undefined) =>
         (v ?? "")
             .replace(/&/g, " and ")
-            .replace(/[^\p{L}\p{N} .'\/@()-]/gu, " ")
+            .replace(/[^\p{L}\p{N} .'/@()-]/gu, " ")
             .replace(/\s+/g, " ")
             .trim()
             .slice(0, 50)

@@ -479,8 +479,8 @@ export class CheckoutService {
                 select: { name: true },
             }),
         ]);
-        const businessName = org?.name?.trim() || null;
-        const legal = profile?.legalName?.trim() || null;
+        const businessName = nonEmpty(org?.name);
+        const legal = nonEmpty(profile?.legalName);
         return {
             name: legal ?? businessName ?? user?.name ?? "",
             businessName,
