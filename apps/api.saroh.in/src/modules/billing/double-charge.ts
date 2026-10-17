@@ -1,6 +1,8 @@
 import type { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import type { BillingEventPhase } from "./providers/billing-provider.port";
+
 import {
     BILLING_NOTE_AUTHOR,
     raiseBillingOpsNoticeInTx,
@@ -74,10 +76,24 @@ export async function recordDoubleChargeInTx(
         providerPaymentId: string | null | undefined;
         amountPaise?: number | null;
         reason: string;
+        /** What the event said happened; see below. */
+        phase?: BillingEventPhase;
     },
 ): Promise<void> {
     const where = providerName(input.provider);
     const paymentId = input.providerPaymentId;
+    // Razorpay's `subscription.activated` names no payment; the
+    // `subscription.charged` that follows it does, and that one claims and
+    // refunds it. A note now would tell the owner to refund by hand a
+    // payment Saroh refunds itself a moment later. An authorisation
+    // (`authenticated`) with an upfront charge is still noted: no charge
+    // event may follow it once its autopay is cancelled.
+    if (!paymentId && input.phase === "activated") {
+        logger.warn(
+            `billing_double_charge_awaits_payment org=${input.organizationId} sub=${input.providerSubscriptionId}: the charge event that names the payment settles it`,
+        );
+        return;
+    }
     if (!paymentId) {
         await raiseBillingOpsNoticeInTx(tx, logger, {
             code: "billing_double_charge_refund_owed",

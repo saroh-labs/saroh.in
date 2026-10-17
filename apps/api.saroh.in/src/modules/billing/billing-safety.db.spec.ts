@@ -396,6 +396,43 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
         expect(told[0]!.body).toContain("Nothing to do.");
     });
 
+    it("an activation naming no payment stops the autopay but leaves the refund to the charge that names it: never a 'refund by hand' note as well", async () => {
+        const ctx = await business();
+        const first = await start(ctx, "b");
+        const second = await start(ctx, "c");
+        await deliver(second.ref, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+        // Razorpay's `subscription.activated` carries no payment.
+        await expect(
+            deliver(first.ref, "activated", {
+                currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+            }),
+        ).resolves.toMatchObject({ status: "processed", changed: true });
+        expect(await notes(ctx.organizationId)).toHaveLength(0);
+        expect(await refundJobs()).toHaveLength(0);
+        expect(
+            (await cancelJobs("PENDING")).map((j) => j.payload),
+        ).toContainEqual(
+            expect.objectContaining({ providerSubscriptionId: first.ref }),
+        );
+        // The charge that follows names it: refunded automatically, once.
+        const paymentId = `pay_after_activation_${seq}`;
+        await deliver(first.ref, "charged", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+            paymentId,
+            amountPaise: 118_000,
+        });
+        expect((await refundJobs()).map((j) => j.payload)).toEqual([
+            expect.objectContaining({ providerPaymentId: paymentId }),
+        ]);
+        expect(
+            (await notes(ctx.organizationId)).filter((n) =>
+                n.body.includes("by hand"),
+            ),
+        ).toHaveLength(0);
+    });
+
     it("a refund Razorpay refuses is never retried: the owner is told to refund it by hand, in Razorpay's words", async () => {
         const { ctx, paymentId } = await chargedTwice();
         const [job] = await refundJobs();
