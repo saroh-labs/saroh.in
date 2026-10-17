@@ -1018,9 +1018,21 @@ export class CheckoutService {
         // Every checkout's order or subscription is linked to the business's
         // one customer at the provider (DEC-165: made at sign-up, made now
         // if it hasn't been), so its dashboard shows who it bills from the
-        // start, paid or not; a failure leaves the notes and the window's
-        // prefill to say it.
-        const customerId = await this.customers.idFor(ctx.organizationId);
+        // start, paid or not. A refusal leaves the notes and the window's
+        // prefill to say it; a provider that can't answer stops here, as a
+        // subscription made without the customer would have the provider
+        // make a second one of its own.
+        let customerId: string | null;
+        try {
+            customerId = await this.customers.idFor(ctx.organizationId);
+        } catch (error) {
+            this.logger.warn(
+                `billing_checkout_customer_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
+            );
+            throw new ServiceUnavailableException(
+                "We couldn't start the payment. Try again in a minute.",
+            );
+        }
         let made: {
             providerSubscriptionId: string;
             providerCustomerId?: string;

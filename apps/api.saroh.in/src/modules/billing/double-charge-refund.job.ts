@@ -87,6 +87,9 @@ export class DoubleChargeRefundHandler {
             refund = await refunds.refundPayment({
                 providerPaymentId,
                 reference: `refund:${providerPaymentId}`,
+                organizationId,
+                providerSubscriptionId: p.providerSubscriptionId ?? null,
+                reason: "double_charge",
             });
         } catch (error) {
             const refused =

@@ -29,11 +29,13 @@ import { planRows } from "@saroh/pricing-catalog";
 import { giveBillingDetails } from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { BILLING_NOTE_AUTHOR } from "./billing-ops-notice";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { CheckoutConfirmService } from "./checkout-confirm.service";
 import { CheckoutService } from "./checkout.service";
 import {
     BILLING_PAYMENT_NOTES_TYPE,
+    PAYMENT_NOTES_MAX_ATTEMPTS,
     PaymentNotesHandler,
 } from "./payment-notes.job";
 import { PlansService } from "./plans.service";
@@ -370,21 +372,47 @@ describe("the payment's notes job", () => {
         return j!;
     }
 
-    it("a provider that can't answer is retried; a refusal is logged and dropped", async () => {
+    const opsNotes = (organizationId: string) =>
+        prisma.adminOrganizationNote.findMany({
+            where: { organizationId, authorUserId: BILLING_NOTE_AUTHOR },
+        });
+
+    it("a provider that can't answer is retried; a refusal is logged and left as an operator's note", async () => {
         const j = await job();
+        expect(j.maxAttempts).toBe(PAYMENT_NOTES_MAX_ATTEMPTS);
+        expect(PAYMENT_NOTES_MAX_ATTEMPTS).toBeGreaterThanOrEqual(10);
         const handler = new PaymentNotesHandler(factory);
         fake.paymentNotes.failNext = new BillingProviderError(
             "UNKNOWN",
             "network error",
         );
         await expect(handler.handle(j)).rejects.toThrow("network error");
+        expect(await opsNotes(j.organizationId!)).toHaveLength(0);
         fake.paymentNotes.failNext = new BillingProviderError(
             "REFUSED",
             "HTTP 400",
         );
         await expect(handler.handle(j)).resolves.toBeUndefined();
         expect(fake.paymentNotes.set).toHaveLength(0);
+        expect(await opsNotes(j.organizationId!)).toHaveLength(1);
         await handler.handle(j);
         expect(fake.paymentNotes.set).toHaveLength(1);
+    });
+
+    it("still unanswered on the queue's last try: an operator's note, never dropped in silence", async () => {
+        const j = await job();
+        fake.paymentNotes.failNext = new BillingProviderError(
+            "UNKNOWN",
+            "network error",
+        );
+        await expect(
+            new PaymentNotesHandler(factory).handle({
+                ...j,
+                attempts: j.maxAttempts - 1,
+            }),
+        ).resolves.toBeUndefined();
+        const told = await opsNotes(j.organizationId!);
+        expect(told).toHaveLength(1);
+        expect(told[0]!.body).toContain(`after ${j.maxAttempts} tries`);
     });
 });

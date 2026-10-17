@@ -30,8 +30,12 @@ type Tx = Prisma.TransactionClient;
  */
 export const BILLING_REFUND_TYPE = "billing.refund.double-charge";
 
-/** Tries before the queue gives up (its backoff: 1 s doubling, 5 min cap). */
-export const REFUND_MAX_ATTEMPTS = 10;
+/**
+ * Tries before the queue gives up (its backoff: 1 s doubling, 5 min cap):
+ * about an hour of a provider that can't answer before the owner is told
+ * to refund by hand.
+ */
+export const REFUND_MAX_ATTEMPTS = 20;
 
 /** The claim: a refund is owed and queued. */
 export const REFUND_AUDIT_ACTION = "billing.double_charge.refund";

@@ -368,7 +368,14 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
         await refunder.handle(jobs[0]!);
         await refunder.handle(jobs[0]!);
         expect(fake.refunds.refunded).toEqual([
-            { providerPaymentId: paymentId, reference: `refund:${paymentId}` },
+            {
+                providerPaymentId: paymentId,
+                reference: `refund:${paymentId}`,
+                // Whose and why, on the refund's notes at the provider.
+                organizationId: ctx.organizationId,
+                providerSubscriptionId: first.ref,
+                reason: "double_charge",
+            },
         ]);
         expect(fake.refunds.asked).toEqual([paymentId]);
         const emails = await refundedEmails();
@@ -469,7 +476,7 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
     it("a refund still unanswered on its last try tells the owner to refund it by hand", async () => {
         const { ctx, paymentId } = await chargedTwice();
         const [job] = await refundJobs();
-        expect(job!.maxAttempts).toBe(10);
+        expect(job!.maxAttempts).toBe(20);
         fake.refunds.failNext("UNKNOWN");
         await expect(
             new DoubleChargeRefundHandler(factory).handle({
@@ -480,7 +487,7 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
         const told = await notes(ctx.organizationId);
         expect(told).toHaveLength(1);
         expect(told[0]!.body).toContain(
-            `Refund payment ${paymentId} (₹1,180) in Razorpay by hand: the automatic refund didn't go through after 10 tries`,
+            `Refund payment ${paymentId} (₹1,180) in Razorpay by hand: the automatic refund didn't go through after 20 tries`,
         );
     });
 

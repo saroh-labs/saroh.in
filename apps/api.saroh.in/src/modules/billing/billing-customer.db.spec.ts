@@ -32,7 +32,11 @@ import {
     BillingCustomerSyncHandler,
     billingCustomerOf,
 } from "./billing-customer";
-import { BILLING_CUSTOMER_SYNC_TYPE } from "./billing-customer-sync";
+import {
+    BILLING_CUSTOMER_SYNC_MAX_ATTEMPTS,
+    BILLING_CUSTOMER_SYNC_TYPE,
+} from "./billing-customer-sync";
+import { BILLING_NOTE_AUTHOR } from "./billing-ops-notice";
 import { CheckoutService } from "./checkout.service";
 import { PlansService } from "./plans.service";
 import { BillingProviderError } from "./providers/billing-provider.port";
@@ -60,7 +64,15 @@ beforeEach(async () => {
     checkout = new CheckoutService(new PlansService(), factory);
     await prisma.job.deleteMany({});
     await prisma.billingCustomer.deleteMany({});
+    await prisma.adminOrganizationNote.deleteMany({
+        where: { authorUserId: BILLING_NOTE_AUTHOR },
+    });
 });
+
+const opsNotes = (organizationId: string) =>
+    prisma.adminOrganizationNote.findMany({
+        where: { organizationId, authorUserId: BILLING_NOTE_AUTHOR },
+    });
 
 async function signUp(email = `${uniq("owner-")}@example.com`) {
     const user =
@@ -104,7 +116,11 @@ const row = (organizationId: string) =>
 describe("one customer per business, made at sign-up (DEC-165)", () => {
     it("sign-up queues the sync once; the job makes the customer with its details", async () => {
         const { organizationId } = await signUp();
-        expect(await syncJobs(organizationId)).toHaveLength(1);
+        const queued = await syncJobs(organizationId);
+        expect(queued).toHaveLength(1);
+        // Enough tries to ride out a provider's blip or rate limiting.
+        expect(queued[0]!.maxAttempts).toBe(BILLING_CUSTOMER_SYNC_MAX_ATTEMPTS);
+        expect(BILLING_CUSTOMER_SYNC_MAX_ATTEMPTS).toBeGreaterThanOrEqual(10);
         await runSync(organizationId);
         expect(fake.customers.created).toHaveLength(1);
         expect(fake.customers.created[0]).toMatchObject({
@@ -229,6 +245,105 @@ describe("one customer per business, made at sign-up (DEC-165)", () => {
     });
 });
 
+describe("never a second customer for one business (17 Oct 2026)", () => {
+    it("a create whose answer was lost: the next try finds its own customer by its notes, never makes a second", async () => {
+        const { organizationId } = await signUp();
+        const [job] = await syncJobs(organizationId);
+        fake.customers.loseNextAnswer = true;
+        await expect(handler.handle(job!)).rejects.toThrow("network error");
+        expect(await row(organizationId)).toMatchObject({
+            providerCustomerId: null,
+        });
+        await handler.handle(job!);
+        expect(fake.customers.created).toHaveLength(1);
+        expect(await row(organizationId)).toMatchObject({
+            providerCustomerId: `fake_cus_${organizationId}`,
+            // Its own: the phone was never another's.
+            contactWithheld: false,
+            lastError: null,
+        });
+        // Adopted, then brought up to date.
+        expect(fake.customers.updated.at(-1)).toMatchObject({
+            providerCustomerId: `fake_cus_${organizationId}`,
+            withContact: true,
+        });
+    });
+
+    it("details saved since that are another customer's email and phone: sent without the phone, withheld from then on", async () => {
+        const email = `${uniq("move-")}@example.com`;
+        const first = await signUp(email);
+        await runSync(first.organizationId);
+        const second = await signUp(email);
+        await prisma.businessProfile.update({
+            where: { organizationId: second.organizationId },
+            data: { phone: "+919811111111" },
+        });
+        await runSync(second.organizationId);
+        expect(await row(second.organizationId)).toMatchObject({
+            contactWithheld: false,
+        });
+        // The owner gives the second business the first's phone.
+        await settings.update(
+            {
+                organizationId: second.organizationId,
+                userId: second.userId,
+                role: "OWNER",
+            },
+            { profile: { phone: "+919800000000" } },
+        );
+        const waiting = (await syncJobs(second.organizationId)).filter(
+            (j) => j.status === "PENDING",
+        );
+        await handler.handle(waiting[0]!);
+        expect(fake.customers.updated.at(-1)).toMatchObject({
+            providerCustomerId: `fake_cus_${second.organizationId}`,
+            withContact: false,
+        });
+        expect(await row(second.organizationId)).toMatchObject({
+            contactWithheld: true,
+            lastError: null,
+        });
+        expect(await opsNotes(second.organizationId)).toHaveLength(0);
+    });
+
+    it("any other refusal of an update is an operator's note, once, however often it is asked", async () => {
+        const { organizationId } = await signUp();
+        await runSync(organizationId);
+        const refused = () =>
+            new BillingProviderError(
+                "REFUSED",
+                "Razorpay customer update failed (HTTP 400)",
+            );
+        const job = { ...(await syncJobs(organizationId))[0]! };
+        fake.customers.failNext = refused();
+        await expect(handler.handle(job)).resolves.toBeUndefined();
+        fake.customers.failNext = refused();
+        await expect(handler.handle(job)).resolves.toBeUndefined();
+        const told = await opsNotes(organizationId);
+        expect(told).toHaveLength(1);
+        expect(told[0]!.body).toContain("refused this business's customer");
+        expect(await row(organizationId)).toMatchObject({
+            lastError: "Razorpay customer update failed (HTTP 400)",
+        });
+    });
+
+    it("sends the profile's GSTIN only while the business says it is GST-registered, as its invoice does", async () => {
+        const { organizationId } = await signUp();
+        await prisma.businessProfile.update({
+            where: { organizationId },
+            data: { taxId: "29ABCDE1234F1ZW", gstRegistered: false },
+        });
+        expect((await billingCustomerOf(organizationId)).gstin).toBeNull();
+        await prisma.businessProfile.update({
+            where: { organizationId },
+            data: { gstRegistered: true },
+        });
+        expect((await billingCustomerOf(organizationId)).gstin).toBe(
+            "29ABCDE1234F1ZW",
+        );
+    });
+});
+
 describe("a checkout uses the business's customer", () => {
     beforeEach(async () => {
         await prisma.sarohInvoice.deleteMany({});
@@ -348,6 +463,91 @@ describe("a checkout uses the business's customer", () => {
         await runSync(organizationId);
         expect(fake.customers.created).toHaveLength(1);
         expect(fake.customers.updated).toHaveLength(1);
+    });
+
+    it("a provider that can't make the customer stops the checkout before anything is made there; a refusal goes on without one", async () => {
+        const { organizationId, userId } = await signUp();
+        const before = fake.createCalls.length;
+        fake.customers.failNext = new BillingProviderError(
+            "UNKNOWN",
+            "Razorpay customer creation failed (HTTP 503)",
+        );
+        await expect(
+            paidCheckout(organizationId, userId),
+        ).rejects.toMatchObject({
+            status: 503,
+        });
+        expect(fake.createCalls).toHaveLength(before);
+        expect(
+            await prisma.billingCheckout.count({ where: { organizationId } }),
+        ).toBe(0);
+
+        fake.customers.failNext = new BillingProviderError(
+            "REFUSED",
+            "Razorpay customer skipped: no usable name",
+        );
+        const r = await paidCheckout(organizationId, userId);
+        expect(r.kind).not.toBe("TO_FREE");
+        expect(fake.createCalls.at(-1)?.providerCustomerId ?? null).toBeNull();
+    });
+
+    /** A business on a paid plan from before DEC-165: Razorpay's customer. */
+    async function paidBefore(organizationId: string, customerId: string) {
+        const plan = await prisma.plan.findFirstOrThrow({
+            where: { priceCents: { gt: 0 } },
+        });
+        const data = {
+            planId: plan.id,
+            status: "ACTIVE",
+            provider: "RAZORPAY",
+            providerSubscriptionId: uniq("sub_before_"),
+            providerCustomerId: customerId,
+        };
+        await prisma.subscription.upsert({
+            where: { organizationId },
+            create: { organizationId, ...data },
+            update: data,
+        });
+    }
+
+    it("a business that paid before DEC-165 keeps the customer Razorpay made at its payment: adopted, brought up to date", async () => {
+        const { organizationId } = await signUp();
+        await paidBefore(organizationId, "cust_paid_before");
+        fake.customers.addCustomer("cust_paid_before", null);
+        await runSync(organizationId);
+        expect(fake.customers.created).toHaveLength(0);
+        expect(fake.customers.looked).toEqual(["cust_paid_before"]);
+        expect(await row(organizationId)).toMatchObject({
+            providerCustomerId: "cust_paid_before",
+            contactWithheld: false,
+        });
+        expect(fake.customers.updated).toEqual([
+            expect.objectContaining({
+                providerCustomerId: "cust_paid_before",
+                withContact: true,
+                input: expect.objectContaining({ organizationId }),
+            }),
+        ]);
+    });
+
+    it("an earlier customer the provider no longer has, or another business holds, is not adopted", async () => {
+        const gone = await signUp();
+        await paidBefore(gone.organizationId, "cust_deleted");
+        await runSync(gone.organizationId);
+        expect((await row(gone.organizationId))?.providerCustomerId).toBe(
+            `fake_cus_${gone.organizationId}`,
+        );
+
+        // Razorpay reused one customer for an owner's two businesses.
+        const first = await signUp();
+        await runSync(first.organizationId);
+        const shared = `fake_cus_${first.organizationId}`;
+        const second = await signUp();
+        await paidBefore(second.organizationId, shared);
+        await runSync(second.organizationId);
+        expect((await row(second.organizationId))?.providerCustomerId).not.toBe(
+            shared,
+        );
     });
 
     it("with no keys the checkout goes on without one", async () => {

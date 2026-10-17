@@ -8,6 +8,13 @@ import type { Prisma } from "@saroh/database";
 export const BILLING_CUSTOMER_SYNC_TYPE = "billing.customer.sync";
 
 /**
+ * Tries before the queue gives up (1 s doubling, 5 min cap: about 20
+ * minutes), so a provider's blip or a burst of rate limiting (a backfill)
+ * doesn't leave a business without its customer.
+ */
+export const BILLING_CUSTOMER_SYNC_MAX_ATTEMPTS = 10;
+
+/**
  * Queue the sync on the caller's transaction (the outbox), so sign-up or a
  * saved profile never waits on the provider. One waiting run per business
  * is enough — it reads the details when it runs — so a second is not
@@ -30,6 +37,7 @@ export async function enqueueBillingCustomerSync(
         data: {
             type: BILLING_CUSTOMER_SYNC_TYPE,
             organizationId,
+            maxAttempts: BILLING_CUSTOMER_SYNC_MAX_ATTEMPTS,
             payload: {},
         },
     });
