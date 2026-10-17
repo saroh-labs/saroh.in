@@ -111,6 +111,7 @@ export class CheckoutConfirmService {
                 ? { currentPeriodEnd: said.currentPeriodEnd }
                 : {}),
             providerPaymentId: said.providerPaymentId ?? null,
+            providerCustomerId: said.providerCustomerId ?? null,
         };
         await this.webhooks.reconcileCheckout(open.id, event, now);
         const after = await prisma.billingCheckout.findUnique({

@@ -27,13 +27,24 @@ import type { HeldAddon } from "./addons-ending";
 import { checkoutClearsAddons } from "./addons-ending";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { isOneTime } from "./billing-term";
+import { unmatchedEventInTx } from "./billing-unmatched";
 import { billingMayChargeFor } from "./business-closing";
 import { leavesWithCycle, runsToMoveDate } from "./change-timing";
+import { chargesStartInTx } from "./charges-start";
 import { periodEnd, periodStart } from "./checkout-quote";
+import { recordDoubleChargeInTx } from "./double-charge";
 import { redeemCouponInTx, trialNoticeAt } from "./offers";
+import {
+    chargeAfterEndConflictInTx,
+    dropOpenCheckoutsInTx,
+    droppedCheckoutConflictInTx,
+} from "./paid-after-end";
 import type { AppliedMove } from "./plan-moves";
 import { applyDueMoveInTx } from "./plan-moves";
-import { enqueueProviderCancel } from "./provider-cancel.job";
+import {
+    enqueueProviderCancel,
+    withdrawProviderCancelsInTx,
+} from "./provider-cancel.job";
 import type {
     BillingEventPhase,
     BillingProviderFactory,
@@ -79,6 +90,8 @@ interface Outcome {
     completed?: Completed;
     /** Add-ons the change ended (DEC-157), for the audit log after commit. */
     ended?: EndedAddons;
+    /** Left without `processedAt`: it matched nothing (DEC-166). */
+    unapplied?: boolean;
 }
 
 /** What a move that applied ended, for the audit log; nothing when none. */
@@ -235,9 +248,20 @@ export class BillingWebhookService {
             } else if (checkout) {
                 outcome = await this.onCheckout(tx, checkout, event, now);
             } else {
-                outcome = { result: { status: "ignored", changed: false } };
+                // No business (DEC-166): a refund or dispute is kept; an
+                // unmatched charge is raised and left not applied.
+                const unmatched = await unmatchedEventInTx(
+                    tx,
+                    this.logger,
+                    name,
+                    event,
+                );
+                outcome = {
+                    result: { status: "ignored", changed: false },
+                    unapplied: !unmatched.applied,
+                };
             }
-            if (outcome.result.status !== "failed") {
+            if (outcome.result.status !== "failed" && !outcome.unapplied) {
                 await tx.billingWebhookEvent.update({
                     where: {
                         provider_providerEventId: {
@@ -247,7 +271,7 @@ export class BillingWebhookService {
                     },
                     data: { processedAt: now },
                 });
-            } else {
+            } else if (!outcome.unapplied) {
                 this.logger.warn(
                     `Billing webhook ${name}/${event.providerEventId} reconcile rejected (${event.type})`,
                 );
@@ -332,10 +356,16 @@ export class BillingWebhookService {
         const checkout = await tx.billingCheckout.findUnique({
             where: { id: seen.id },
         });
-        if (
-            !checkout ||
-            (checkout.status !== "OPEN" && checkout.status !== "SCHEDULED")
-        ) {
+        if (!checkout) return ignored;
+        // Paid after Saroh let it go (owner, 17 Oct 2026): never money
+        // taken with no plan, no invoice and no word.
+        if (checkout.status === "CANCELLED") {
+            return this.onDroppedCheckout(tx, checkout, event, now);
+        }
+        if (checkout.status === "COMPLETED") {
+            return this.onLeftCheckout(tx, checkout, event, now);
+        }
+        if (checkout.status !== "OPEN" && checkout.status !== "SCHEDULED") {
             return ignored;
         }
 
@@ -369,24 +399,53 @@ export class BillingWebhookService {
                 select: {
                     id: true,
                     cancelAtPeriodEnd: true,
-                    plan: { select: { version: true } },
+                    billingCycle: true,
+                    plan: { select: { version: true, key: true } },
                 },
             });
             if (waiting) {
                 // The plan it is on was already told to end with what was
                 // paid, and nothing bills it after that: Free from the
-                // same date, never a plan nobody pays for (DEC-159).
-                const free = waiting.cancelAtPeriodEnd
-                    ? await freePlanRowInTx(tx, waiting.plan.version)
-                    : null;
+                // same date, never a plan nobody pays for (DEC-159). A
+                // one-tap renewal (RENEW: the same plan and cycle) is the
+                // same: the term it renews ends on that date with nothing
+                // after it, so it never runs on unbilled.
+                const plan = await tx.plan.findUnique({
+                    where: { id: checkout.planId },
+                    select: { key: true },
+                });
+                const renewal =
+                    plan?.key === waiting.plan.key &&
+                    checkout.cycle === waiting.billingCycle;
+                const free =
+                    waiting.cancelAtPeriodEnd || renewal
+                        ? await freePlanRowInTx(tx, waiting.plan.version)
+                        : null;
                 await tx.subscription.update({
                     where: { id: waiting.id },
                     data: free
-                        ? { pendingPlanId: free.id }
+                        ? { pendingPlanId: free.id, cancelAtPeriodEnd: true }
                         : { pendingPlanId: null, pendingFrom: null },
                 });
             }
             return { result: { status: "processed", changed: true } };
+        }
+
+        // A SCHEDULED change's first charge failed (Razorpay retries it)
+        // before the sweep applied the move: the move is due all the same —
+        // the business authorised it — so it applies now, and the failure
+        // is the subscription's own (PAST_DUE, the payment-failed email),
+        // whichever ran first.
+        if (checkout.status === "SCHEDULED" && phase === "pending") {
+            const sub = await tx.subscription.findUnique({
+                where: { organizationId: checkout.organizationId },
+                select: { id: true, organizationId: true },
+            });
+            if (!sub) return ignored;
+            const applied = await applyDueMoveInTx(tx, sub.id, now);
+            if (!applied.applied) return ignored;
+            const failed = await this.onSubscription(tx, sub.id, event, now);
+            return { ...failed, ...endedByMove(sub, applied) };
         }
 
         // When it counts as done: a new plan once paid; one that starts
@@ -426,7 +485,288 @@ export class BillingWebhookService {
             };
         }
 
+        // Approved after the date it starts (it lapses then, but the sweep
+        // runs hourly): its quote is stale — the plan it replaces has
+        // renewed — so it is dropped, and the payment settled as one on a
+        // dropped checkout (refunded automatically).
+        if (
+            checkout.kind !== "NEW" &&
+            checkout.startAt &&
+            checkout.startAt.getTime() <= now.getTime()
+        ) {
+            const lapsed = await tx.billingCheckout.update({
+                where: { id: checkout.id },
+                data: { status: "CANCELLED", endedReason: "expired" },
+            });
+            return this.onDroppedCheckout(tx, lapsed, event, now);
+        }
+
         return this.completeCheckout(tx, checkout, event, now);
+    }
+
+    /**
+     * A checkout Saroh gave up on (replaced, lapsed, the business moved to
+     * Free) authorised or paid anyway: a UPI approval that came late, a
+     * second tab, a yearly order (Razorpay orders can't be cancelled or
+     * given an expiry). Honoured as if never dropped when nothing conflicts
+     * (`paid-after-end.ts`) — the business paid for it; otherwise its
+     * provider subscription is ended now and, if money was taken, it is
+     * refunded automatically, with no invoice (DEC-164).
+     */
+    private async onDroppedCheckout(
+        tx: Tx,
+        checkout: BillingCheckout,
+        event: ParsedBillingEvent,
+        now: Date,
+    ): Promise<Outcome> {
+        const ignored: Outcome = {
+            result: { status: "ignored", changed: false },
+        };
+        const phase = event.phase ?? "other";
+        const done =
+            checkout.kind === "NEW"
+                ? PAID_PHASES.includes(phase)
+                : phase === "authenticated" || PAID_PHASES.includes(phase);
+        if (!done && phase !== "authenticated") return ignored;
+
+        const conflict = await droppedCheckoutConflictInTx(tx, checkout, now);
+        if (!conflict) {
+            // A new plan's mandate authorised: honoured once it is paid.
+            if (!done) return ignored;
+            await withdrawProviderCancelsInTx(
+                tx,
+                checkout.providerSubscriptionId,
+            );
+            await dropOpenCheckoutsInTx(
+                tx,
+                checkout.organizationId,
+                checkout.id,
+                "replaced",
+            );
+            const reopened = await tx.billingCheckout.update({
+                where: { id: checkout.id },
+                data: { status: "OPEN", endedReason: null },
+            });
+            this.logger.warn(
+                `billing_paid_on_dropped_checkout_honoured org=${checkout.organizationId} checkout=${checkout.id} was=${checkout.endedReason ?? "cancelled"}`,
+            );
+            return this.completeCheckout(tx, reopened, event, now);
+        }
+
+        await enqueueProviderCancel(tx, {
+            organizationId: checkout.organizationId,
+            provider: checkout.provider,
+            providerSubscriptionId: checkout.providerSubscriptionId,
+            atCycleEnd: false,
+        });
+        const moneyTaken =
+            PAID_PHASES.includes(phase) ||
+            (checkout.kind !== "NEW" && checkout.chargeNowPaise > 0);
+        if (moneyTaken) {
+            // A second payment for one period: given back in full, no
+            // invoice (DEC-164).
+            this.logger.error(
+                `billing_paid_on_dropped_checkout org=${checkout.organizationId} checkout=${checkout.id} payment=${event.providerPaymentId ?? "none"}: ${conflict}`,
+            );
+            await recordDoubleChargeInTx(tx, this.logger, {
+                organizationId: checkout.organizationId,
+                provider: checkout.provider,
+                providerSubscriptionId: checkout.providerSubscriptionId,
+                providerPaymentId: event.providerPaymentId,
+                amountPaise: event.paymentAmountPaise,
+                phase: event.phase,
+                reason: `paid for a dropped plan change (${checkout.endedReason ?? "cancelled"}): ${conflict}`,
+            });
+        } else {
+            this.logger.warn(
+                `billing_authorised_dropped_checkout org=${checkout.organizationId} checkout=${checkout.id}: ${conflict}; cancelled at the provider`,
+            );
+        }
+        return { result: { status: "processed", changed: true } };
+    }
+
+    /**
+     * A charge on a COMPLETED checkout's provider subscription the business
+     * is no longer billed through (a move to Free while a charge was
+     * failing: its cancel was refused and Razorpay's retry went through).
+     * With no other paid plan the business keeps the plan for the period it
+     * paid, then Free, as it chose; otherwise the subscription is ended now
+     * and the charge refunded automatically (DEC-164).
+     */
+    private async onLeftCheckout(
+        tx: Tx,
+        checkout: BillingCheckout,
+        event: ParsedBillingEvent,
+        now: Date,
+    ): Promise<Outcome> {
+        if (event.phase !== "charged") {
+            return { result: { status: "ignored", changed: false } };
+        }
+        const org = checkout.organizationId;
+        const ref = checkout.providerSubscriptionId;
+        // Still the subscription the business is billed through: not one it
+        // left. The business's return (`reconcileCheckout`) reaches here when
+        // the webhook completed the checkout first; its charge is that same
+        // one, already applied, and must never end the plan just bought.
+        const current = await tx.subscription.findFirst({
+            where: {
+                organizationId: org,
+                provider: checkout.provider,
+                providerSubscriptionId: ref,
+            },
+            select: { id: true },
+        });
+        if (current) {
+            return { result: { status: "ignored", changed: false } };
+        }
+        const conflict = await chargeAfterEndConflictInTx(tx, org, ref);
+        const sub = await tx.subscription.findUnique({
+            where: { organizationId: org },
+            select: { id: true, plan: { select: { version: true } } },
+        });
+        const plan = await tx.plan.findUniqueOrThrow({
+            where: { id: checkout.planId },
+            select: {
+                id: true,
+                name: true,
+                version: true,
+                interval: true,
+                priceCents: true,
+            },
+        });
+        const free = await freePlanRowInTx(tx, plan.version);
+        if (conflict || !sub || !free) {
+            await enqueueProviderCancel(tx, {
+                organizationId: org,
+                provider: checkout.provider,
+                providerSubscriptionId: ref,
+                atCycleEnd: false,
+            });
+            this.logger.error(
+                `billing_paid_on_left_subscription org=${org} sub=${ref} payment=${event.providerPaymentId ?? "none"}: ${conflict ?? "no plan to put it on"}`,
+            );
+            await recordDoubleChargeInTx(tx, this.logger, {
+                organizationId: org,
+                provider: checkout.provider,
+                providerSubscriptionId: ref,
+                providerPaymentId: event.providerPaymentId,
+                amountPaise: event.paymentAmountPaise,
+                phase: event.phase,
+                reason: `charged by a subscription it had left: ${conflict ?? "no plan to put it on"}`,
+            });
+            return { result: { status: "processed", changed: true } };
+        }
+        const cycle = checkout.cycle === "year" ? "year" : "month";
+        const end = event.currentPeriodEnd ?? periodEnd(now, cycle);
+        await dropOpenCheckoutsInTx(tx, org, null, "plan-reinstated");
+        await tx.subscription.update({
+            where: { id: sub.id },
+            data: {
+                planId: checkout.planId,
+                billingCycle: cycle,
+                status: "ACTIVE",
+                provider: checkout.provider,
+                providerSubscriptionId: ref,
+                ...(checkout.providerCustomerId
+                    ? { providerCustomerId: checkout.providerCustomerId }
+                    : {}),
+                currentPeriodEnd: end,
+                // The plan for the period paid, then Free, as it chose; the
+                // provider ends it now (Saroh's date keeps the plan).
+                pendingPlanId: free.id,
+                pendingFrom: end,
+                cancelAtPeriodEnd: true,
+                ...(event.eventAt ? { providerEventAt: event.eventAt } : {}),
+            },
+        });
+        await enqueueProviderCancel(tx, {
+            organizationId: org,
+            provider: checkout.provider,
+            providerSubscriptionId: ref,
+            atCycleEnd: false,
+        });
+        await this.invoices?.invoiceRenewalInTx(tx, {
+            organizationId: org,
+            subscription: {
+                provider: checkout.provider,
+                providerSubscriptionId: ref,
+                plan,
+            },
+            event,
+            now,
+        });
+        this.logger.warn(
+            `billing_paid_on_left_subscription_honoured org=${org} sub=${ref} until=${end.toISOString()}`,
+        );
+        return { result: { status: "processed", changed: true } };
+    }
+
+    /**
+     * A charge on the subscription's own provider subscription after Saroh
+     * ended it (halted, then the business paid Razorpay's retry link): it
+     * paid, so the plan is back — ACTIVE, the period it paid, invoiced, and
+     * the cancel still waiting withdrawn. With another paid plan (or a
+     * closing business) the subscription is ended now and the charge
+     * refunded automatically (DEC-164).
+     */
+    private async chargedAfterCancel(
+        tx: Tx,
+        sub: {
+            id: string;
+            organizationId: string;
+            provider: string | null;
+            providerSubscriptionId: string | null;
+        },
+        event: ParsedBillingEvent,
+        now: Date,
+    ): Promise<Outcome> {
+        if (!sub.provider || !sub.providerSubscriptionId) {
+            return { result: { status: "ignored", changed: false } };
+        }
+        const ref = sub.providerSubscriptionId;
+        const conflict = await chargeAfterEndConflictInTx(
+            tx,
+            sub.organizationId,
+            ref,
+        );
+        if (conflict) {
+            await enqueueProviderCancel(tx, {
+                organizationId: sub.organizationId,
+                provider: sub.provider,
+                providerSubscriptionId: ref,
+                atCycleEnd: false,
+            });
+            this.logger.error(
+                `billing_paid_on_cancelled_subscription org=${sub.organizationId} sub=${ref} payment=${event.providerPaymentId ?? "none"}: ${conflict}`,
+            );
+            await recordDoubleChargeInTx(tx, this.logger, {
+                organizationId: sub.organizationId,
+                provider: sub.provider,
+                providerSubscriptionId: ref,
+                providerPaymentId: event.providerPaymentId,
+                amountPaise: event.paymentAmountPaise,
+                phase: event.phase,
+                reason: `charged by a subscription Saroh had ended: ${conflict}`,
+            });
+            return { result: { status: "processed", changed: true } };
+        }
+        await withdrawProviderCancelsInTx(tx, ref);
+        await dropOpenCheckoutsInTx(
+            tx,
+            sub.organizationId,
+            null,
+            "plan-reinstated",
+        );
+        // The one way back from CANCELLED (`subscription-state.ts`): the
+        // provider took the money.
+        await tx.subscription.update({
+            where: { id: sub.id },
+            data: { status: "ACTIVE" },
+        });
+        this.logger.warn(
+            `billing_paid_on_cancelled_subscription_honoured org=${sub.organizationId} sub=${ref}`,
+        );
+        return this.renewed(tx, sub.id, event, now);
     }
 
     /** An OPEN checkout authorised (and paid where it must be). */
@@ -529,7 +869,11 @@ export class BillingWebhookService {
                 await enqueueProviderCancel(tx, {
                     organizationId: org,
                     ...oldProvider,
-                    atCycleEnd: leavesWithCycle(sub),
+                    atCycleEnd: leavesWithCycle(
+                        sub,
+                        await chargesStartInTx(tx, sub),
+                        now,
+                    ),
                 });
                 await rehomeAddonChargesInTx(tx, {
                     organizationId: org,
@@ -570,13 +914,18 @@ export class BillingWebhookService {
                 : trial
                   ? checkout.startAt
                   : (event.currentPeriodEnd ?? periodEnd(now, cycle));
+        // The business as the provider's customer: Saroh's record of the
+        // checkout, else what the provider said (17 Oct 2026). Never
+        // cleared by a checkout that names none.
+        const customerId =
+            checkout.providerCustomerId ?? event.providerCustomerId ?? null;
         const fields = {
             planId: checkout.planId,
             billingCycle: cycle,
             status: trial ? "TRIALING" : "ACTIVE",
             provider: checkout.provider,
             providerSubscriptionId: checkout.providerSubscriptionId,
-            providerCustomerId: checkout.providerCustomerId,
+            ...(customerId ? { providerCustomerId: customerId } : {}),
             currentPeriodEnd,
             cancelAtPeriodEnd: false,
             freeChosenAt: null,
@@ -596,7 +945,13 @@ export class BillingWebhookService {
               });
         await tx.billingCheckout.update({
             where: { id: checkout.id },
-            data: { status: "COMPLETED", completedAt: now },
+            data: {
+                status: "COMPLETED",
+                completedAt: now,
+                ...(customerId && !checkout.providerCustomerId
+                    ? { providerCustomerId: customerId }
+                    : {}),
+            },
         });
         // A new plan starts with no add-ons; a plan taking over billing
         // takes what was owed on the old one's next charge (U16).
@@ -734,6 +1089,11 @@ export class BillingWebhookService {
         const current = sub.status as SubscriptionStatus;
         const stamp = event.eventAt ? { providerEventAt: event.eventAt } : {};
 
+        // Charged after Saroh ended it: never paid and left on Free.
+        if (current === "CANCELLED" && phase === "charged") {
+            return this.chargedAfterCancel(tx, sub, event, now);
+        }
+
         // Completed (DEC-093, DEC-161): the charges its autopay covered are
         // done, and the last one paid for a period still running. The plan
         // stays until that period ends: a renewal or a move already waiting
@@ -809,6 +1169,26 @@ export class BillingWebhookService {
                     data: { ...stamp },
                 });
                 return { result: { status: "processed", changed: false } };
+            }
+            // Cancelled at the provider with no move of Saroh's own (the
+            // autopay stopped in a UPI or bank app, or from Razorpay's
+            // page): what was paid still runs to its end, then Free. Never
+            // cut short at once, a first month included.
+            if (
+                phase === "cancelled" &&
+                !sub.pendingFrom &&
+                sub.currentPeriodEnd &&
+                sub.currentPeriodEnd > now &&
+                (current === "ACTIVE" || current === "TRIALING")
+            ) {
+                const set = await endTermAtInTx(tx, sub, sub.currentPeriodEnd);
+                if (set) {
+                    await tx.subscription.update({
+                        where: { id: sub.id },
+                        data: { ...stamp },
+                    });
+                    return { result: { status: "processed", changed: true } };
+                }
             }
             if (sub.pendingFrom) {
                 const applied = await applyDueMoveInTx(

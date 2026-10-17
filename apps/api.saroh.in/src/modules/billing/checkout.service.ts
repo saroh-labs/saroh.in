@@ -33,12 +33,30 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
-import { gstinProblem, stateCode } from "../invoices/gst-states";
+import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
+import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
 import type { EndingAddon } from "./addons-ending";
 import { addonsEndingWith } from "./addons-ending";
+import { BillingCustomers } from "./billing-customer";
+import { enqueueBillingCustomerSync } from "./billing-customer-sync";
+import type {
+    BillingDetail,
+    BillingDetailsSent,
+    BillingParty,
+    CheckoutDetails,
+} from "./billing-details";
+import {
+    addressComplete,
+    billingEmail,
+    billingName,
+    checkoutDetails,
+    missingBillingDetails,
+    nonEmpty,
+    readBillingParty,
+} from "./billing-details";
 import type { Term } from "./billing-term";
 import {
     isOneTime,
@@ -50,9 +68,11 @@ import {
 import {
     assertBillingMayStart,
     dropLiveCheckoutsInTx,
+    renewsAtProvider,
 } from "./business-closing";
 import type { FirstMonthMove } from "./change-timing";
 import { leavesWithCycle, paidUntil } from "./change-timing";
+import { chargesStartInTx } from "./charges-start";
 import type {
     ChangeKind,
     ChangeQuote,
@@ -70,6 +90,7 @@ import { PlansService } from "./plans.service";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
 import type {
+    BillingCustomer,
     BillingProvider,
     BillingProviderFactory,
     CheckoutHandoff,
@@ -78,6 +99,20 @@ import {
     BILLING_PROVIDER_FACTORY,
     BillingProviderError,
 } from "./providers/billing-provider.port";
+import { billingNotes } from "./providers/razorpay.provider";
+
+/** The quote's word on who is billed: what is missing, and a phone. */
+function billingDetailsView(
+    party: BillingParty,
+): Pick<ChangePlanQuoteView, "registeredAddress" | "billingDetails"> {
+    return {
+        registeredAddress: addressComplete(party.profile),
+        billingDetails: {
+            missing: missingBillingDetails(party),
+            phone: Boolean(nonEmpty(party.profile?.phone)),
+        },
+    };
+}
 
 type Tx = Prisma.TransactionClient;
 
@@ -147,11 +182,18 @@ export interface ChangePlanQuoteView {
      */
     addonsEnding: EndingAddon[];
     /**
-     * Whether the business has its registered address on its profile.
-     * Without one the dialog asks for it: Saroh's invoice to a registered
-     * buyer carries their address (CGST Rule 46(e)).
+     * Whether the business has its registered address on its profile,
+     * whole (first line, city, six-digit PIN). Without one the dialog asks
+     * for it: Saroh's invoice prints it (CGST Rule 46(e)).
      */
     registeredAddress: boolean;
+    /**
+     * Who Saroh bills, before it charges or sets up autopay (17 Oct 2026,
+     * `billing-details.ts`): what is still missing — the dialog asks for
+     * each, and a paid checkout is refused until they're given — and
+     * whether the business has a phone (asked for, optional, when not).
+     */
+    billingDetails: { missing: BillingDetail[]; phone: boolean };
 }
 
 /** A checkout as the business sees it; never the provider's link. */
@@ -297,7 +339,12 @@ export class CheckoutService {
         @Inject(BILLING_PROVIDER_FACTORY)
         private readonly providers: BillingProviderFactory,
         @Optional() private readonly audit?: AuditService,
-    ) {}
+    ) {
+        this.customers = new BillingCustomers(providers, this.logger);
+    }
+
+    /** The business's one customer at the provider (DEC-165). */
+    private readonly customers: BillingCustomers;
 
     async quote(
         ctx: OrganizationContext,
@@ -312,11 +359,14 @@ export class CheckoutService {
             input,
             now,
         );
+        const party = await readBillingParty(
+            prisma,
+            ctx.organizationId,
+            ctx.userId,
+        );
         return {
             ...this.quoteView(target, quote, coupon, addonsEnding),
-            registeredAddress: Boolean(
-                (await profileAddress(ctx.organizationId))?.addressLine1,
-            ),
+            ...billingDetailsView(party),
         };
     }
 
@@ -406,7 +456,13 @@ export class CheckoutService {
         ctx: OrganizationContext,
         row: Pick<
             BillingCheckout,
-            "provider" | "providerSubscriptionId" | "providerPlanId"
+            | "provider"
+            | "providerSubscriptionId"
+            | "providerPlanId"
+            | "providerCustomerId"
+            | "billToGstin"
+            | "billToEmail"
+            | "billToPhone"
         >,
         amountPaise: number,
     ): Promise<CheckoutHandoff | null> {
@@ -419,20 +475,7 @@ export class CheckoutService {
         }
         const keyId = provider.publicKey?.() ?? null;
         if (!keyId) return null;
-        const [user, profile, org] = await Promise.all([
-            prisma.user.findUnique({
-                where: { id: ctx.userId },
-                select: { email: true, name: true },
-            }),
-            prisma.businessProfile.findUnique({
-                where: { organizationId: ctx.organizationId },
-                select: { phone: true },
-            }),
-            prisma.organization.findUnique({
-                where: { id: ctx.organizationId },
-                select: { name: true },
-            }),
-        ]);
+        const customer = await this.billingCustomer(ctx, row);
         const oneTime = isOneTime(row);
         return {
             provider: row.provider,
@@ -442,10 +485,53 @@ export class CheckoutService {
             amountPaise: oneTime ? amountPaise : null,
             currency: "INR",
             prefill: {
-                name: org?.name ?? user?.name ?? null,
-                email: user?.email ?? null,
-                contact: profile?.phone ?? null,
+                name: customer.name,
+                email: customer.email,
+                contact: customer.contact,
             },
+            // Razorpay's window takes a customer with an order; a
+            // subscription's customer is the one it authorises.
+            customerId: oneTime ? (row.providerCustomerId ?? null) : null,
+            notes: billingNotes(customer),
+        };
+    }
+
+    /**
+     * Who Saroh bills: the legal name (else the business's), the owner's
+     * email (else one given at checkout), the business's phone (else one
+     * given at checkout), the GSTIN given at checkout (else the profile's)
+     * and the registered address.
+     */
+    private async billingCustomer(
+        ctx: OrganizationContext,
+        given: {
+            billToGstin: string | null;
+            billToEmail?: string | null;
+            billToPhone?: string | null;
+        },
+    ): Promise<BillingCustomer> {
+        const party = await readBillingParty(
+            prisma,
+            ctx.organizationId,
+            ctx.userId,
+        );
+        const profile = party.profile;
+        return {
+            name: billingName(party) ?? party.userName ?? "",
+            businessName: party.orgName,
+            email: billingEmail(party) ?? given.billToEmail ?? null,
+            contact: nonEmpty(profile?.phone) ?? given.billToPhone ?? null,
+            gstin: given.billToGstin ?? profile?.taxId ?? null,
+            address: profile?.addressLine1
+                ? {
+                      line1: profile.addressLine1,
+                      line2: profile.addressLine2 ?? null,
+                      city: profile.city ?? null,
+                      state: stateName(profile.gstState),
+                      postalCode: profile.postalCode ?? null,
+                  }
+                : null,
+            organizationId: ctx.organizationId,
         };
     }
 
@@ -458,8 +544,7 @@ export class CheckoutService {
             billingState?: string | null;
             gstin?: string | null;
             coupon?: string | null;
-            registeredAddress?: AddressSent | null;
-        },
+        } & BillingDetailsSent,
         now: Date = new Date(),
         client: CheckoutClient = {},
     ): Promise<ChangePlanResult> {
@@ -468,12 +553,14 @@ export class CheckoutService {
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, subscription, coupon, addonsEnding } =
             await this.resolve(ctx.organizationId, input, now);
-        const hasAddress = Boolean(
-            (await profileAddress(ctx.organizationId))?.addressLine1,
+        const party = await readBillingParty(
+            prisma,
+            ctx.organizationId,
+            ctx.userId,
         );
         const view = {
             ...this.quoteView(target, quote, coupon, addonsEnding),
-            registeredAddress: hasAddress,
+            ...billingDetailsView(party),
         };
         if (quote.kind === "NONE") {
             throw new ConflictException(`You're already on ${target.name}.`);
@@ -500,30 +587,57 @@ export class CheckoutService {
                 effectiveAt: at.toISOString(),
             };
         }
-        // Asked for before anything is made at the provider, and kept as
-        // the business's own registered address (never over one it has).
-        if (!hasAddress) {
-            const address = checkoutAddress(
-                input.registeredAddress,
-                Boolean(billTo.billToGstin),
-            );
-            if (address) {
-                await this.saveRegisteredAddress(ctx, address);
-                view.registeredAddress = true;
-            }
+        // Its route stays open to a suspended business so it can pay less
+        // (`lower-charges`); anything but a cheaper plan is a new charge,
+        // which only an open business starts (17 Oct 2026).
+        if (!(
+            quote.kind === "SCHEDULED" && lowersCharge(subscription, target)
+        )) {
+            await assertWorkspaceWrite(ctx.organizationId, "new");
         }
-        return this.checkout(ctx, target, quote, view, now, billTo, coupon);
+        // Every other kind charges or sets up autopay: who is billed is
+        // whole first (owner, 17 Oct 2026), refused by field before
+        // anything is made at the provider. What was missing and given here
+        // is kept: the address, state and name on the business's profile
+        // (never over what it has), an email or phone on the checkout.
+        const details = checkoutDetails(party, input, billTo.billToState);
+        if (Object.keys(details.profile).length) {
+            await this.saveBillingProfile(ctx, details.profile);
+        }
+        // Whole now: nothing is missing any more.
+        view.registeredAddress = true;
+        view.billingDetails = {
+            missing: [],
+            phone: view.billingDetails.phone || Boolean(details.billToPhone),
+        };
+        const withDetails: CheckoutBillTo = {
+            ...billTo,
+            billToEmail: details.billToEmail,
+            billToPhone: details.billToPhone,
+        };
+        return this.checkout(
+            ctx,
+            target,
+            quote,
+            view,
+            now,
+            withDetails,
+            coupon,
+        );
     }
 
-    /** The address given at checkout, as the business's registered address. */
-    private async saveRegisteredAddress(
+    /**
+     * What a checkout filled in of the business's profile: its registered
+     * address, state or legal name, each only where it had none.
+     */
+    private async saveBillingProfile(
         ctx: OrganizationContext,
-        address: CheckoutAddress,
+        fields: CheckoutDetails["profile"],
     ): Promise<void> {
         await prisma.businessProfile.upsert({
             where: { organizationId: ctx.organizationId },
-            create: { organizationId: ctx.organizationId, ...address },
-            update: address,
+            create: { organizationId: ctx.organizationId, ...fields },
+            update: fields,
         });
         await this.audit?.record({
             action: AuditAction.ProfileUpdate,
@@ -534,7 +648,7 @@ export class CheckoutService {
             targetId: ctx.organizationId,
             outcome: AuditOutcome.Success,
             metadata: {
-                fields: Object.keys(address),
+                fields: Object.keys(fields),
                 via: "checkout",
             },
         });
@@ -690,7 +804,7 @@ export class CheckoutService {
         quote: ChangeQuote,
         coupon: PricingCoupon | null = null,
         addonsEnding: EndingAddon[] = [],
-    ): Omit<ChangePlanQuoteView, "registeredAddress"> {
+    ): Omit<ChangePlanQuoteView, "registeredAddress" | "billingDetails"> {
         return {
             plan: {
                 id: catalogPlanIdForKey(target.key) ?? target.key,
@@ -746,6 +860,33 @@ export class CheckoutService {
                 where: { organizationId: ctx.organizationId },
                 select: SUB_SELECT,
             });
+            // A year already paid for and waiting to start (a renewal, or a
+            // move from monthly to yearly): giving it up would keep the
+            // business's money for a year it never gets. Refused, never
+            // dropped (17 Oct 2026); it can be cancelled once it has
+            // started, or refunded by hand.
+            const paidYear = await tx.billingCheckout.findFirst({
+                where: {
+                    organizationId: ctx.organizationId,
+                    status: "SCHEDULED",
+                    providerPlanId: ONE_TIME_PAYMENT,
+                },
+                select: { startAt: true, plan: { select: { name: true } } },
+            });
+            if (paidYear) {
+                const starts = paidYear.startAt
+                    ? ` on ${paidYear.startAt.toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          timeZone: "Asia/Kolkata",
+                      })}`
+                    : "";
+                throw new ConflictException({
+                    message: `A year of ${paidYear.plan.name} is already paid for and starts${starts}. Moving to ${target.name} now would give that year up, so it can't be done here. Write to us if you'd like it refunded.`,
+                    details: { reason: "paid-year-scheduled" },
+                });
+            }
             await this.dropLiveCheckouts(
                 tx,
                 ctx.organizationId,
@@ -776,17 +917,29 @@ export class CheckoutService {
                         freeChosenAt: now,
                     },
                 });
-                await enqueueProviderCancel(tx, {
-                    organizationId: ctx.organizationId,
-                    provider: live.provider,
-                    providerSubscriptionId: live.providerSubscriptionId,
-                    atCycleEnd: leavesWithCycle(live),
-                });
+                // A year paid once is an order: nothing more to stop.
+                if (await renewsAtProvider(tx, live)) {
+                    await enqueueProviderCancel(tx, {
+                        organizationId: ctx.organizationId,
+                        provider: live.provider,
+                        providerSubscriptionId: live.providerSubscriptionId,
+                        atCycleEnd: leavesWithCycle(
+                            live,
+                            await chargesStartInTx(tx, live),
+                            now,
+                        ),
+                    });
+                }
                 return paidTo;
             }
             // Nothing paid ahead: on Free now. A provider subscription still
             // running (a past-due one) is ended at once.
-            if (sub.provider && sub.providerSubscriptionId && live) {
+            if (
+                sub.provider &&
+                sub.providerSubscriptionId &&
+                live &&
+                (await renewsAtProvider(tx, live))
+            ) {
                 await enqueueProviderCancel(tx, {
                     organizationId: ctx.organizationId,
                     provider: sub.provider,
@@ -803,7 +956,7 @@ export class CheckoutService {
                     status: "ACTIVE",
                     provider: null,
                     providerSubscriptionId: null,
-                    providerCustomerId: null,
+                    // The provider's customer is kept (17 Oct 2026).
                     currentPeriodEnd: null,
                     cancelAtPeriodEnd: false,
                     freeChosenAt: null,
@@ -859,7 +1012,27 @@ export class CheckoutService {
         }
 
         const id = randomUUID();
+        const expiresAt = checkoutExpiresAt(stored, quote.startAt, now);
         const provider = this.providers.get(CATALOGUE_BILLING_PROVIDER);
+        const customer = await this.billingCustomer(ctx, billTo);
+        // Every checkout's order or subscription is linked to the business's
+        // one customer at the provider (DEC-165: made at sign-up, made now
+        // if it hasn't been), so its dashboard shows who it bills from the
+        // start, paid or not. A refusal leaves the notes and the window's
+        // prefill to say it; a provider that can't answer stops here, as a
+        // subscription made without the customer would have the provider
+        // make a second one of its own.
+        let customerId: string | null;
+        try {
+            customerId = await this.customers.idFor(ctx.organizationId);
+        } catch (error) {
+            this.logger.warn(
+                `billing_checkout_customer_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
+            );
+            throw new ServiceUnavailableException(
+                "We couldn't start the payment. Try again in a minute.",
+            );
+        }
         let made: {
             providerSubscriptionId: string;
             providerCustomerId?: string;
@@ -881,6 +1054,7 @@ export class CheckoutService {
                     reference: id,
                     organizationId: ctx.organizationId,
                     planKey: target.key,
+                    customer,
                 });
                 made = { providerSubscriptionId: order.providerOrderId };
             } else {
@@ -917,6 +1091,11 @@ export class CheckoutService {
                               }
                             : null,
                     reference: id,
+                    customer,
+                    providerCustomerId: customerId,
+                    // Past the checkout's life it can't be approved: a
+                    // checkout Saroh gave up on never charges later.
+                    expireBy: expiresAt,
                 });
             }
         } catch (error) {
@@ -959,7 +1138,8 @@ export class CheckoutService {
             providerPlanId: oneTime
                 ? ONE_TIME_PAYMENT
                 : providerPlan.providerPlanId,
-            providerCustomerId: made.providerCustomerId ?? null,
+            // The business's one customer (DEC-165), else what the provider made.
+            providerCustomerId: customerId ?? made.providerCustomerId ?? null,
             pricePaise: target.priceCents,
             chargeNowPaise: quote.chargeNowPaise,
             chargeNowGstPaise: quote.chargeNowGstPaise,
@@ -967,7 +1147,7 @@ export class CheckoutService {
             discountPaise: discounted ? quote.discountPaise : 0,
             discountCharges: discounted ? quote.discountCharges : 0,
             startAt: stored === "NEW" ? null : quote.startAt,
-            expiresAt: new Date(now.getTime() + CHECKOUT_TTL_MS),
+            expiresAt,
             createdByUserId: ctx.userId,
             ...billTo,
         };
@@ -976,6 +1156,8 @@ export class CheckoutService {
             row = await prisma.$transaction(async (tx) => {
                 await assertBillingMayStart(tx, ctx.organizationId);
                 await this.dropOpenCheckout(tx, ctx.organizationId);
+                // Details given at checkout reach the provider's customer.
+                await enqueueBillingCustomerSync(tx, ctx.organizationId);
                 return tx.billingCheckout.create({ data });
             });
         } catch (error) {
@@ -1034,80 +1216,49 @@ export class CheckoutService {
     }
 }
 
-/** A typed value, trimmed; blank is none. */
-function nonEmpty(value: string | null | undefined): string | null {
-    const t = value?.trim();
-    return t === undefined || t === "" ? null : t;
-}
-
-/** What a checkout sent of the registered address (`RegisteredAddressDto`). */
-export interface AddressSent {
-    line1?: string | null;
-    line2?: string | null;
-    city?: string | null;
-    postalCode?: string | null;
-}
-
-/** The registered address a checkout saves to the business's profile. */
-export interface CheckoutAddress {
-    addressLine1: string;
-    addressLine2: string | null;
-    city: string;
-    postalCode: string;
-}
-
-/** An Indian PIN code: six digits, never starting with 0. */
-const PIN = /^[1-9][0-9]{5}$/;
-
-function addressError(message: string, field: string): never {
-    throw new BadRequestException({ message, details: { field } });
+/**
+ * A scheduled change that lowers what the business pays: a plan that costs
+ * less a month than the one it is on (the same plan on the other cycle, or
+ * a renewal, is not).
+ */
+function lowersCharge(
+    subscription: { plan: { priceCents: number; interval: string } } | null,
+    target: { priceCents: number; interval: string },
+): boolean {
+    if (!subscription) return false;
+    const monthly = (p: { priceCents: number; interval: string }) =>
+        p.interval === "year" ? p.priceCents / 12 : p.priceCents;
+    return monthly(target) < monthly(subscription.plan);
 }
 
 /**
- * The registered address given at checkout, checked before the provider is
- * asked: none at all is fine unless a GSTIN was given (a registered buyer's
- * invoice carries their address, CGST Rule 46(e)); any part given needs
- * the first line, the city and a six-digit PIN, as Settings › Business
- * asks.
+ * When a checkout lapses: a day after it was made, and never after the date
+ * an upgrade or a scheduled change starts (17 Oct 2026). Its quote — the
+ * difference for what is left of the period, the date the old autopay is
+ * told to stop — is only true until then; approved later, the old plan has
+ * renewed and the business would pay twice for one period. A new plan (and
+ * a first month, which starts a month ahead) keeps the day.
  */
-export function checkoutAddress(
-    sent: AddressSent | null | undefined,
-    gstinGiven: boolean,
-): CheckoutAddress | null {
-    const line1 = nonEmpty(sent?.line1);
-    const line2 = nonEmpty(sent?.line2);
-    const city = nonEmpty(sent?.city);
-    const pin = nonEmpty(sent?.postalCode)?.replace(/\s+/g, "") ?? null;
-    if (!line1 && !line2 && !city && !pin) {
-        if (gstinGiven) {
-            addressError(
-                "Add the business's registered address: it prints on Saroh's invoice with your GSTIN.",
-                "addressLine1",
-            );
-        }
-        return null;
-    }
-    if (!line1) addressError("Add the address's first line.", "addressLine1");
-    if (!city) addressError("Add the city.", "city");
-    if (!pin) addressError("Add the PIN code.", "postalCode");
-    if (!PIN.test(pin)) {
-        addressError("A PIN code is six digits, like 560038.", "postalCode");
-    }
-    return { addressLine1: line1, addressLine2: line2, city, postalCode: pin };
+export function checkoutExpiresAt(
+    kind: string,
+    startAt: Date | null,
+    now: Date,
+): Date {
+    const day = new Date(now.getTime() + CHECKOUT_TTL_MS);
+    if (kind === "NEW" || !startAt) return day;
+    return startAt.getTime() < day.getTime() ? startAt : day;
 }
 
-/** The business's registered address as its profile holds it, or null. */
-async function profileAddress(organizationId: string) {
-    return prisma.businessProfile.findUnique({
-        where: { organizationId },
-        select: { addressLine1: true },
-    });
-}
-
-/** Who Saroh's invoice for a checkout is billed to (U17). */
+/**
+ * Who Saroh's invoice for a checkout is billed to (U17): the state and
+ * GSTIN given at checkout, and an email or phone given there because the
+ * business had none (17 Oct 2026).
+ */
 export interface CheckoutBillTo {
     billToState: string | null;
     billToGstin: string | null;
+    billToEmail?: string | null;
+    billToPhone?: string | null;
 }
 
 /**

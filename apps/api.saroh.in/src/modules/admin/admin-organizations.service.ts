@@ -47,7 +47,12 @@ export type AttentionReason =
      * Past its deletion window and still `PENDING_DELETION`: its customers
      * are owed refunds (#921, owner 9 Oct). The business page lists them.
      */
-    | "DELETION_WAITING_REFUNDS";
+    | "DELETION_WAITING_REFUNDS"
+    /**
+     * Saroh's billing needs an operator (DEC-166): an open row in Admin ›
+     * Billing › Needs action (a refund owed, a payment unmatched…).
+     */
+    | "BILLING_ACTION";
 
 export interface OrganizationDirectoryRow {
     id: string;
@@ -126,11 +131,19 @@ export class AdminOrganizationsService {
         caller: { canReadPii: boolean },
     ): Promise<OrganizationDirectoryPage> {
         const limit = clamp(query.limit);
-        const waiting =
-            query.health === "attention"
-                ? await businessesWaitingOnRefunds(new Date())
-                : new Set<string>();
-        const where = this.where(query, caller, waiting);
+        const attention = query.health === "attention";
+        const waiting = attention
+            ? await businessesWaitingOnRefunds(new Date())
+            : new Set<string>();
+        // Open billing actions (DEC-166): few, read once.
+        const billing = attention
+            ? await businessesWithBillingActions()
+            : new Set<string>();
+        const where = this.where(
+            query,
+            caller,
+            new Set([...waiting, ...billing]),
+        );
 
         const records = await prisma.organization.findMany({
             where,
@@ -293,50 +306,59 @@ export class AdminOrganizationsService {
         const since = new Date(Date.now() - ATTENTION_WINDOW_MS);
 
         const now = new Date();
-        const [activity, failedJobs, failedWebhooks, plans, cleanups, waiting] =
-            await Promise.all([
-                prisma.auditEvent.groupBy({
-                    by: ["organizationId"],
-                    where: {
-                        organizationId: { in: ids },
-                        // What the business did, not what an operator did to it.
-                        action: { notIn: [...OPERATOR_LIFECYCLE_ACTIONS] },
-                    },
-                    _max: { createdAt: true },
-                }),
-                prisma.job.groupBy({
-                    by: ["organizationId"],
-                    where: {
-                        organizationId: { in: ids },
-                        status: "FAILED",
-                        updatedAt: { gte: since },
-                    },
-                    _count: { _all: true },
-                }),
-                prisma.webhookEvent.groupBy({
-                    by: ["organizationId"],
-                    where: {
-                        organizationId: { in: ids },
-                        status: "FAILED",
-                        createdAt: { gte: since },
-                    },
-                    _count: { _all: true },
-                }),
-                // The resolver, once a business (a page is at most 100): a plan
-                // override can't be read in a grouped query without deciding
-                // again here what wins, which only the resolver may do.
-                Promise.all(ids.map((id) => this.effective(id, now))),
-                // A deleted business's clean-up that has failed (#921).
-                prisma.job.findMany({
-                    where: {
-                        organizationId: { in: ids },
-                        ...UNFINISHED_CLEANUP_JOB,
-                    },
-                    select: { organizationId: true },
-                }),
-                // A deletion held back by refunds owed (#921).
-                businessesWaitingOnRefunds(now, ids),
-            ]);
+        const [
+            activity,
+            failedJobs,
+            failedWebhooks,
+            plans,
+            cleanups,
+            waiting,
+            billingActions,
+        ] = await Promise.all([
+            prisma.auditEvent.groupBy({
+                by: ["organizationId"],
+                where: {
+                    organizationId: { in: ids },
+                    // What the business did, not what an operator did to it.
+                    action: { notIn: [...OPERATOR_LIFECYCLE_ACTIONS] },
+                },
+                _max: { createdAt: true },
+            }),
+            prisma.job.groupBy({
+                by: ["organizationId"],
+                where: {
+                    organizationId: { in: ids },
+                    status: "FAILED",
+                    updatedAt: { gte: since },
+                },
+                _count: { _all: true },
+            }),
+            prisma.webhookEvent.groupBy({
+                by: ["organizationId"],
+                where: {
+                    organizationId: { in: ids },
+                    status: "FAILED",
+                    createdAt: { gte: since },
+                },
+                _count: { _all: true },
+            }),
+            // The resolver, once a business (a page is at most 100): a plan
+            // override can't be read in a grouped query without deciding
+            // again here what wins, which only the resolver may do.
+            Promise.all(ids.map((id) => this.effective(id, now))),
+            // A deleted business's clean-up that has failed (#921).
+            prisma.job.findMany({
+                where: {
+                    organizationId: { in: ids },
+                    ...UNFINISHED_CLEANUP_JOB,
+                },
+                select: { organizationId: true },
+            }),
+            // A deletion held back by refunds owed (#921).
+            businessesWaitingOnRefunds(now, ids),
+            // Saroh's billing needs an operator (DEC-166).
+            businessesWithBillingActions(ids),
+        ]);
         const effective = new Map(ids.map((id, i) => [id, plans[i]]));
         const cleanupUnfinished = new Set(
             cleanups.map((row) => row.organizationId),
@@ -367,6 +389,9 @@ export class AdminOrganizationsService {
             if (waiting.has(record.id)) {
                 attention.push("DELETION_WAITING_REFUNDS");
             }
+            if (billingActions.has(record.id)) {
+                attention.push("BILLING_ACTION");
+            }
 
             return {
                 id: record.id,
@@ -393,4 +418,26 @@ function clamp(limit?: number): number {
     if (limit === undefined || !Number.isFinite(limit))
         return DEFAULT_PAGE_SIZE;
     return Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(limit)));
+}
+
+/**
+ * Businesses with an open billing action (DEC-166), among `ids` when given.
+ * `BillingAction` is relation-free, so the ids are read first.
+ */
+async function businessesWithBillingActions(
+    ids?: string[],
+): Promise<Set<string>> {
+    const rows = await prisma.billingAction.findMany({
+        where: {
+            resolvedAt: null,
+            organizationId: ids ? { in: ids } : { not: null },
+        },
+        distinct: ["organizationId"],
+        select: { organizationId: true },
+    });
+    return new Set(
+        rows
+            .map((r) => r.organizationId)
+            .filter((id): id is string => id !== null),
+    );
 }

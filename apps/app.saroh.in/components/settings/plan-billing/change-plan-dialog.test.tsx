@@ -240,51 +240,100 @@ describe("ChangePlanDialog: the registered address for Saroh's invoice (Rule 46(
     const newPlan = (over: Partial<ChangeQuote> = {}) =>
         quote({ kind: "NEW", startAt: null, ...over });
 
-    it("asks nothing when the business already has its registered address", async () => {
-        const dialog = await open(newPlan({ registeredAddress: true }));
+    const label = (dialog: Element, id: string) =>
+        dialog.querySelector(`label[for="${id}"]`)?.textContent;
+
+    it("asks nothing when the business has it all", async () => {
+        const dialog = await open(
+            newPlan({
+                registeredAddress: true,
+                billingDetails: { missing: [], phone: true },
+            }),
+        );
         expect(dialog.querySelector("#bill-address-line1")).toBeNull();
+        expect(dialog.querySelector("#bill-phone")).toBeNull();
         expect(dialog.textContent).toContain(
             "Details for Saroh's invoice (optional)",
         );
+        expect(dialog.querySelector("details")?.open).toBe(false);
     });
 
-    it("asks for it when there is none: optional without a GSTIN", async () => {
-        const dialog = await open(newPlan({ registeredAddress: false }));
-        expect(dialog.textContent).toContain("Registered address");
+    it("asks for what is missing before the payment opens, open from the start; the rest is optional", async () => {
+        const dialog = await open(
+            newPlan({
+                registeredAddress: false,
+                billingDetails: {
+                    missing: ["email", "address", "state"],
+                    phone: false,
+                },
+            }),
+        );
+        expect(dialog.querySelector("details")?.open).toBe(true);
         expect(dialog.querySelector("summary")?.textContent).toBe(
             "Details for Saroh's invoice",
         );
-        const label = dialog.querySelector('label[for="bill-address-line1"]');
-        expect(label?.textContent).toBe("Address line 1 (optional)");
+        expect(label(dialog, "bill-email")).toBe("Email for invoices");
+        expect(label(dialog, "bill-address-line1")).toBe("Address line 1");
+        expect(label(dialog, "bill-state")).toBe(
+            "State your business is registered in",
+        );
+        expect(label(dialog, "bill-gstin")).toBe("GSTIN (optional)");
+        expect(label(dialog, "bill-phone")).toBe("Phone (optional)");
+        // The name is the business's: not asked.
+        expect(dialog.querySelector("#bill-name")).toBeNull();
     });
 
-    it("needs it with a GSTIN: says so on the field and sends nothing", async () => {
-        const dialog = await open(newPlan({ registeredAddress: false }));
-        type(field(dialog, "bill-gstin"), "29AABCI1234A1Z7");
-        expect(
-            dialog.querySelector('label[for="bill-address-line1"]')
-                ?.textContent,
-        ).toBe("Address line 1");
+    it("says on each field what is missing, and sends nothing", async () => {
+        const dialog = await open(
+            newPlan({
+                registeredAddress: false,
+                billingDetails: {
+                    missing: ["name", "email", "address", "state"],
+                    phone: false,
+                },
+            }),
+        );
         await press(dialog, "Continue to payment");
         expect(changePlanAction).not.toHaveBeenCalled();
-        const line1 = field(dialog, "bill-address-line1");
-        expect(line1.getAttribute("aria-invalid")).toBe("true");
+        for (const id of [
+            "bill-name",
+            "bill-email",
+            "bill-address-line1",
+            "bill-city",
+            "bill-pin",
+            "bill-state",
+        ]) {
+            expect(field(dialog, id).getAttribute("aria-invalid")).toBe("true");
+        }
         expect(dialog.textContent).toContain(
-            "Add the registered address: it prints on Saroh's invoice with your GSTIN.",
+            "Add the business's registered address: it prints on Saroh's invoice.",
+        );
+        expect(dialog.textContent).toContain(
+            "Choose the state your business is registered in.",
+        );
+        expect(field(dialog, "bill-phone").getAttribute("aria-invalid")).toBe(
+            null,
         );
     });
 
-    it("sends the address it was given with the GSTIN", async () => {
+    it("a GSTIN gives the state, and what was typed is sent", async () => {
         changePlanAction.mockResolvedValue({ ok: false, error: "stop" });
-        const dialog = await open(newPlan({ registeredAddress: false }));
+        const dialog = await open(
+            newPlan({
+                registeredAddress: false,
+                billingDetails: { missing: ["address", "state"], phone: false },
+            }),
+        );
         type(field(dialog, "bill-gstin"), "29AABCI1234A1Z7");
         type(field(dialog, "bill-address-line1"), "4 Mill Road");
         type(field(dialog, "bill-city"), "Pune");
         type(field(dialog, "bill-pin"), "411001");
+        type(field(dialog, "bill-phone"), "+91 98450 12345");
         await press(dialog, "Continue to payment");
         expect(changePlanAction).toHaveBeenCalledWith(
             expect.objectContaining({
                 gstin: "29AABCI1234A1Z7",
+                phone: "+91 98450 12345",
                 registeredAddress: {
                     line1: "4 Mill Road",
                     line2: "",
@@ -293,6 +342,36 @@ describe("ChangePlanDialog: the registered address for Saroh's invoice (Rule 46(
                 },
             }),
         );
+    });
+
+    it("puts the API's refusal on the field it names", async () => {
+        changePlanAction.mockResolvedValue({
+            ok: false,
+            error: "That email doesn't look right.",
+            field: "billingEmail",
+        });
+        const dialog = await open(
+            newPlan({
+                registeredAddress: true,
+                billingDetails: { missing: ["email"], phone: true },
+            }),
+        );
+        type(field(dialog, "bill-email"), "owner@example.com");
+        await press(dialog, "Continue to payment");
+        expect(changePlanAction).toHaveBeenCalledWith(
+            expect.objectContaining({ billingEmail: "owner@example.com" }),
+        );
+        expect(field(dialog, "bill-email").getAttribute("aria-invalid")).toBe(
+            "true",
+        );
+        expect(dialog.textContent).toContain("That email doesn't look right.");
+    });
+
+    it("an API from before the billing details asks for a missing address, required", async () => {
+        const dialog = await open(newPlan({ registeredAddress: false }));
+        expect(label(dialog, "bill-address-line1")).toBe("Address line 1");
+        await press(dialog, "Continue to payment");
+        expect(changePlanAction).not.toHaveBeenCalled();
     });
 });
 

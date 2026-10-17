@@ -11,6 +11,20 @@ const ID = /^[A-Za-z0-9_]{1,64}$/;
 const text = (v: unknown, max: number): string | null =>
     typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
 
+const NOTE_KEY = /^[a-z_]{1,32}$/;
+
+/** At most 15 short notes, as Razorpay keeps them. */
+function cleanNotes(value: unknown): Record<string, string> {
+    if (!value || typeof value !== "object") return {};
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        if (Object.keys(out).length >= 15) break;
+        const t = text(v, 250);
+        if (NOTE_KEY.test(k) && t) out[k] = t;
+    }
+    return out;
+}
+
 export function cleanHandoff(value: unknown): CheckoutHandoff | null {
     if (!value || typeof value !== "object") return null;
     const v = value as Record<string, unknown>;
@@ -28,6 +42,7 @@ export function cleanHandoff(value: unknown): CheckoutHandoff | null {
             ? v.amountPaise
             : null;
     const prefill = (v.prefill ?? {}) as Record<string, unknown>;
+    const customerId = text(v.customerId, 64);
     return {
         provider: "RAZORPAY",
         keyId,
@@ -40,5 +55,10 @@ export function cleanHandoff(value: unknown): CheckoutHandoff | null {
             email: text(prefill.email, 254),
             contact: text(prefill.contact, 20),
         },
+        customerId:
+            !subscriptionId && customerId && ID.test(customerId)
+                ? customerId
+                : null,
+        notes: cleanNotes(v.notes),
     };
 }

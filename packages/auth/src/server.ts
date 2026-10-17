@@ -145,6 +145,14 @@ export interface CreateAuthOptions {
      */
     onUserCreated?: (user: { id: string }) => void;
     /**
+     * Told after a user's email has changed (Better Auth's change-email,
+     * once approved), so the host can bring what copies it up to date — the
+     * API re-sends the billing customer of every business the user owns.
+     * Handed the id only. Whatever it throws or rejects is swallowed: it
+     * can't fail the change.
+     */
+    onUserEmailChanged?: (user: { id: string }) => void | Promise<void>;
+    /**
      * Told when Better Auth answered a request 5xx: the thrown value and the
      * status, for the host's error reporter. Never told about an expected
      * outcome (a wrong password, an unverified email, a rate limit, a failed
@@ -322,6 +330,66 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
  * {@link createAuth}'s options, on their own so a test can run the real
  * library on them with a database of its own (`sign-in-code.test.ts`).
  */
+/**
+ * Better Auth's user hooks for what the host asked to be told: a user's
+ * first write (`onUserCreated`) and a change of email
+ * (`onUserEmailChanged`). An update's `before` sees only the fields being
+ * written and its `after` only the row, so `before` marks the request's
+ * context when `email` is among them and `after` tells the host once for
+ * it. Exported for its test; nothing here can fail the write.
+ */
+export function userDatabaseHooks(
+    opts: Pick<CreateAuthOptions, "onUserCreated" | "onUserEmailChanged">,
+): Pick<BetterAuthOptions, "databaseHooks"> {
+    const user: NonNullable<
+        NonNullable<BetterAuthOptions["databaseHooks"]>["user"]
+    > = {};
+    if (opts.onUserCreated) {
+        const told = opts.onUserCreated;
+        user.create = {
+            after: (row: { id: string }) => {
+                try {
+                    told({ id: row.id });
+                } catch {
+                    // Never a sign-up's problem.
+                }
+                return Promise.resolve();
+            },
+        };
+    }
+    if (opts.onUserEmailChanged) {
+        const told = opts.onUserEmailChanged;
+        const emailChanging = new WeakSet<object>();
+        user.update = {
+            before: (data: Record<string, unknown>, context: unknown) => {
+                if (
+                    typeof data.email === "string" &&
+                    context &&
+                    typeof context === "object"
+                ) {
+                    emailChanging.add(context);
+                }
+                return Promise.resolve();
+            },
+            after: async (row: { id: string }, context: unknown) => {
+                if (
+                    !context ||
+                    typeof context !== "object" ||
+                    !emailChanging.delete(context)
+                ) {
+                    return;
+                }
+                try {
+                    await told({ id: row.id });
+                } catch {
+                    // Never the email change's problem.
+                }
+            },
+        };
+    }
+    return Object.keys(user).length > 0 ? { databaseHooks: { user } } : {};
+}
+
 export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
     const secret = resolveAuthSecret();
     const cookieDomain = sessionCookieDomain(process.env.BETTER_AUTH_URL);
@@ -334,24 +402,7 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
             provider: "postgresql",
         }),
         // Only when the host asked to be told: no hook otherwise.
-        ...(opts.onUserCreated
-            ? {
-                  databaseHooks: {
-                      user: {
-                          create: {
-                              after: (user: { id: string }) => {
-                                  try {
-                                      opts.onUserCreated?.({ id: user.id });
-                                  } catch {
-                                      // Never a sign-up's problem.
-                                  }
-                                  return Promise.resolve();
-                              },
-                          },
-                      },
-                  },
-              }
-            : {}),
+        ...userDatabaseHooks(opts),
         // Only when the host asked to be told: Better Auth's own logging of
         // these errors otherwise.
         ...(opts.onServerError

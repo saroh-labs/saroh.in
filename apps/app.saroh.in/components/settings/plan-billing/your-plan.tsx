@@ -8,8 +8,13 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { NextCharge } from "@/lib/saroh-billing/plan";
 import type { StatusPart } from "@/lib/saroh-billing/plan-status";
 import { nextParts, planMessage } from "@/lib/saroh-billing/plan-status";
-import type { PendingCheckout, PlanNote } from "@/lib/saroh-billing/plan-view";
+import type {
+    CancelOffer,
+    PendingCheckout,
+    PlanNote,
+} from "@/lib/saroh-billing/plan-view";
 
+import { CancelPlan } from "./cancel-plan";
 import { CheckoutPending } from "./checkout-pending";
 import { PLANS_HREF } from "./styles";
 
@@ -34,6 +39,11 @@ export interface YourPlanProps {
      * method, no way into a plan change and no payment to carry on.
      */
     canChange?: boolean;
+    /**
+     * "Cancel plan" (owner, 17 Oct 2026): offered on a paid plan the
+     * business isn't already leaving; shown only with `canChange`.
+     */
+    cancel?: CancelOffer | null;
 }
 
 /** Where a note's action goes: Change plan, with its plan's change open. */
@@ -61,7 +71,9 @@ export function NoteWords({ note }: { note: PlanNote }) {
  * any other warning). What is true but asks nothing (the first month's
  * small print, how many charges its autopay covers) is behind "How billing
  * works", under the plans. The line about last month is the foot, left
- * out until there is such a summary (UX-080).
+ * out until there is such a summary (UX-080). On a paid plan it isn't
+ * already leaving, the owner has "Cancel plan" under the status (17 Oct
+ * 2026); once cancelled, the status line says when it ends.
  */
 export function YourPlan(props: YourPlanProps) {
     const { canChange = true } = props;
@@ -111,6 +123,9 @@ export function YourPlan(props: YourPlanProps) {
                     </p>
                 ) : null}
             </div>
+            {props.cancel && canChange ? (
+                <CancelPlan offer={props.cancel} />
+            ) : null}
             {message === "pending" && props.pending ? (
                 <CheckoutPending pending={props.pending} />
             ) : message && message !== "pending" ? (

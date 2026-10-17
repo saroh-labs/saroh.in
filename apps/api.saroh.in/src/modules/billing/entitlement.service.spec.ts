@@ -437,7 +437,21 @@ describe("EntitlementService on the catalogue (U12)", () => {
         });
     });
 
-    it("lets a plan override win over the subscription, dropping the legacy row it no longer is", async () => {
+    it("lets a dearer plan override win over the subscription, dropping the legacy row it no longer is", async () => {
+        subFindUnique.mockResolvedValue(
+            onPlan("business", {
+                entitlements: { sites: 41, customDomain: true },
+            }),
+        );
+        findMany.mockResolvedValue([planOverride("pro")]);
+        liveVersion.mockResolvedValue(versionRow(3, fakeLegacyMappedCatalog()));
+
+        const got = await service().getPlanEntitlements("org_1");
+        expect(got).toMatchObject({ invoicing: true, products: true });
+        expect(got.sites).not.toBe(41);
+    });
+
+    it("never lets a cheaper plan override take away the plan the business pays for (owner, 17 Oct)", async () => {
         subFindUnique.mockResolvedValue(
             onPlan("business", {
                 entitlements: { sites: 41, customDomain: true },
@@ -449,10 +463,10 @@ describe("EntitlementService on the catalogue (U12)", () => {
         await expect(
             service().getPlanEntitlements("org_1"),
         ).resolves.toMatchObject({
-            sites: 1,
-            customDomain: false,
-            invoicing: false,
-            products: 11,
+            sites: 41,
+            customDomain: true,
+            invoicing: true,
+            products: 222,
         });
     });
 

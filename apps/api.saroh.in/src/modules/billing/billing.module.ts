@@ -11,7 +11,13 @@ import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AddonsSyncHandler, BILLING_ADDONS_SYNC_TYPE } from "./addon-charges";
 import { AddonsService } from "./addons.service";
+import { BillingCustomerSyncHandler } from "./billing-customer";
+import { BILLING_CUSTOMER_SYNC_TYPE } from "./billing-customer-sync";
 import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
+import {
+    BILLING_RECONCILE_TYPE,
+    BillingReconcileHandler,
+} from "./billing-reconcile.job";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
@@ -19,6 +25,8 @@ import { DeletedBusinessBilling } from "./business-closing";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import { CheckoutConfirmService } from "./checkout-confirm.service";
 import { CheckoutService } from "./checkout.service";
+import { BILLING_REFUND_TYPE } from "./double-charge";
+import { DoubleChargeRefundHandler } from "./double-charge-refund.job";
 import { EntitlementService } from "./entitlement.service";
 import { BILLING_FREE_ROWS_TYPE, FreeRowsHandler } from "./free-rows.job";
 import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
@@ -27,6 +35,10 @@ import {
     MovesApplyHandler,
 } from "./moves-apply.handler";
 import { OverLimitService } from "./over-limit.service";
+import {
+    BILLING_PAYMENT_NOTES_TYPE,
+    PaymentNotesHandler,
+} from "./payment-notes.job";
 import {
     PLAN_CHANGE_NOTICE_TYPE,
     PlanChangeNoticeHandler,
@@ -115,7 +127,12 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         CheckoutConfirmService,
         ProviderPlanSyncService,
         ProviderCancelHandler,
+        DoubleChargeRefundHandler,
         MovesApplyHandler,
+        PaymentNotesHandler,
+        BillingCustomerSyncHandler,
+        // The daily match of what the provider took (DEC-166).
+        BillingReconcileHandler,
         SarohInvoicesService,
         BillingEmailHandler,
         AddonsService,
@@ -128,6 +145,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
     ],
     exports: [
         DeletedBusinessBilling,
+        // An operator ends a business's autopay the in-app way (DEC-166).
+        CheckoutService,
         CatalogueAccessService,
         EntitlementService,
         MeteringService,
@@ -149,10 +168,14 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         private readonly billingEmail: BillingEmailHandler,
         private readonly addonsSync: AddonsSyncHandler,
         private readonly freeRows: FreeRowsHandler,
+        private readonly refund: DoubleChargeRefundHandler,
+        private readonly paymentNotes: PaymentNotesHandler,
+        private readonly customerSync: BillingCustomerSyncHandler,
+        private readonly reconcile: BillingReconcileHandler,
     ) {}
 
     /**
-     * Registers the eight jobs and starts the sweep's chain — the renewal
+     * Registers the twelve jobs and starts the two sweeps' chains — the renewal
      * job's shape (ADR-007): never under test, where no worker runs, and
      * never throwing, so a database not up yet cannot stop the boot.
      */
@@ -171,10 +194,22 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
             this.addonsSync.handle,
         );
         this.registry.register(BILLING_FREE_ROWS_TYPE, this.freeRows.handle);
+        this.registry.register(BILLING_REFUND_TYPE, this.refund.handle);
+        this.registry.register(
+            BILLING_PAYMENT_NOTES_TYPE,
+            this.paymentNotes.handle,
+        );
+        this.registry.register(
+            BILLING_CUSTOMER_SYNC_TYPE,
+            this.customerSync.handle,
+        );
+        this.registry.register(BILLING_RECONCILE_TYPE, this.reconcile.handle);
         if (env.NODE_ENV === "test") return;
         await this.sweep.schedule(new Date());
+        await this.reconcile.ensureScheduled();
         this.chainCheck = setInterval(() => {
             void this.sweep.ensureScheduled();
+            void this.reconcile.ensureScheduled();
         }, CHAIN_CHECK_MS);
         this.chainCheck.unref();
     }

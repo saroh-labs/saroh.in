@@ -69,7 +69,7 @@ describe("llmsText", () => {
             "/integrations/razorpay",
             "/integrations/cashfree",
             "/integrations/email",
-            "/privacy",
+            // Privacy republishes on 17 Oct with Help (DEC-165).
             "/terms",
             "/refunds",
         ]);

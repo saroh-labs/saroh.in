@@ -37,6 +37,9 @@ export * from "./backfill/class-packs-module";
 // The D10 classes-a-month backfill, exported so the API's integration suite
 // can run it against the previous image's rows (twice) and check them.
 export * from "./backfill/classes-per-period";
+// The DEC-165 billing customers backfill, exported so the API's integration
+// suite can run it twice and check what it queued.
+export * from "./backfill/billing-customers";
 // The F16 storefront-people-on-the-team backfill, exported so the API's
 // integration suite can run it twice, and for the API's storefront invite
 // accept, which runs its per-person rule (`joinTeamFromStorefront`).

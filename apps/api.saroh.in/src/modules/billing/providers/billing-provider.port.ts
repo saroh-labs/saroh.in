@@ -89,6 +89,92 @@ export interface CreateSubscriptionInput {
     } | null;
     /** Saroh's reference for this attempt (the checkout id), for the notes. */
     reference?: string;
+    /** Who is billed, kept in the subscription's notes. */
+    customer?: BillingCustomer | null;
+    /**
+     * The business's provider customer (`BillingCustomer`), linked
+     * to the subscription from the start so the provider's dashboard shows
+     * who it bills before it is paid, and after it is cancelled.
+     */
+    providerCustomerId?: string | null;
+    /**
+     * Until when it may be authorised (the checkout's `expiresAt`). Past it
+     * the provider lets it lapse, so a checkout Saroh gave up on can't be
+     * approved late and charge for a plan the business isn't on.
+     */
+    expireBy?: Date | null;
+}
+
+/**
+ * Who Saroh bills for a plan: the business's billing name, the owner's email,
+ * its phone, GSTIN and registered address. Sent to the provider so its
+ * dashboard, receipts and the customer it keeps carry them.
+ */
+export interface BillingCustomer {
+    /** The name on the bill: the legal name, else the business's name. */
+    name: string;
+    businessName: string | null;
+    email: string | null;
+    contact: string | null;
+    gstin: string | null;
+    address: {
+        line1: string | null;
+        line2: string | null;
+        city: string | null;
+        state: string | null;
+        postalCode: string | null;
+    } | null;
+    organizationId: string;
+    /** The business's Saroh address (slug), for the customer's notes. */
+    businessSlug?: string | null;
+}
+
+/**
+ * What the provider answered a new customer with: its id, or that it has
+ * one already for the same email and phone (Razorpay with
+ * `fail_existing: "1"`).
+ */
+export type CustomerCreated = { providerCustomerId: string } | "exists";
+
+/** A customer the provider holds, and the business its notes name. */
+export interface ProviderCustomer {
+    providerCustomerId: string;
+    /** Saroh's `organizationId` note; null: none (made by the provider). */
+    organizationId: string | null;
+}
+
+/**
+ * The provider's own customer record for a business: made once at sign-up
+ * and kept current (`billing-customer.ts`). Never handed to a business by
+ * email or phone alone: one the provider already holds for the same
+ * details is adopted only when its notes name the same business.
+ */
+export interface ProviderCustomerCapability {
+    /** Whether the provider's keys are set here; false: nothing is asked. */
+    configured(): boolean;
+    createCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<CustomerCreated>;
+    /**
+     * The customer the provider already holds for these details (the one
+     * `createCustomer` answered `exists` for), with its notes' business.
+     */
+    existingCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<ProviderCustomer>;
+    /** A customer by its id; null when the provider has none by it. */
+    findCustomer(providerCustomerId: string): Promise<ProviderCustomer | null>;
+    /**
+     * Its details as they are now; `exists`: the email and phone are
+     * another customer's, and nothing was changed.
+     */
+    updateCustomer(
+        providerCustomerId: string,
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<"updated" | "exists">;
 }
 
 /** The provider's accepted-subscription receipt. */
@@ -191,6 +277,8 @@ export interface CreateOrderInput {
     reference: string;
     organizationId: string;
     planKey: string;
+    /** Who is billed, kept in the order's notes. */
+    customer?: BillingCustomer | null;
 }
 
 /**
@@ -215,11 +303,68 @@ export interface CheckoutStatus {
     currentPeriodEnd?: Date | null;
     /** The payment that paid it, when one did. */
     providerPaymentId?: string | null;
+    /** The provider's customer the subscription bills, when it says. */
+    providerCustomerId?: string | null;
 }
+
+/**
+ * Saroh's ids on the provider's payment (17 Oct 2026), so its dashboard
+ * leads back to Saroh's invoice and business. Never in the way of an
+ * invoice: called from a job, its failure logged.
+ */
+export interface ProviderPaymentNotesCapability {
+    setPaymentNotes(input: {
+        providerPaymentId: string;
+        notes: Record<string, string>;
+    }): Promise<void>;
+}
+
+/**
+ * Where a provider subscription stands, asked when a cancel is refused
+ * (`provider-cancel.job.ts`):
+ *
+ * - `ended` — cancelled, completed or expired: it charges nothing more.
+ * - `created` — never authorised; it lapses at its `expire_by`.
+ * - `authorised` — authorised, its first charge still ahead (no cycle
+ *   running, so only a cancel now is accepted).
+ * - `running` — charging, with charges left.
+ * - `last-cycle` — charging its last cycle; it completes by itself.
+ * - `failing` — a charge failed (pending, being retried) or halted.
+ * - `unknown` — anything else.
+ */
+export type SubscriptionStanding =
+    | "ended"
+    | "created"
+    | "authorised"
+    | "running"
+    | "last-cycle"
+    | "failing"
+    | "unknown";
 
 export interface ProviderStatusCapability {
     /** `ref` is the checkout's provider subscription id, or its order's. */
     checkoutStatus(ref: string, oneTime: boolean): Promise<CheckoutStatus>;
+    /** Where a provider subscription stands; absent: never asked. */
+    subscriptionStanding?(ref: string): Promise<SubscriptionStanding>;
+}
+
+/**
+ * Giving a double charge back in full (DEC-164, owner 17 Oct 2026: "for
+ * double charge we can make the payment automatic refund"). Asked again
+ * for a payment already refunded in full, the adapter answers with that
+ * refund rather than refunding twice. A refusal (`REFUSED`) carries the
+ * provider's own words in its message, for the owner's note.
+ */
+export interface ProviderRefundCapability {
+    refundPayment(input: {
+        providerPaymentId: string;
+        /** Saroh's reference, kept in the refund's notes. */
+        reference: string;
+        /** Whose and why, in the refund's notes too (absent: not said). */
+        organizationId?: string | null;
+        providerSubscriptionId?: string | null;
+        reason?: string | null;
+    }): Promise<{ providerRefundId: string; amountPaise: number | null }>;
 }
 
 /**
@@ -241,6 +386,10 @@ export interface CheckoutHandoff {
         email: string | null;
         contact: string | null;
     };
+    /** The provider's customer, where its window takes one (an order). */
+    customerId?: string | null;
+    /** Who is billed, shown on the provider's payment record. */
+    notes?: Record<string, string>;
 }
 
 /**
@@ -252,6 +401,12 @@ export class BillingProviderError extends Error {
     constructor(
         readonly kind: "REFUSED" | "UNKNOWN",
         message: string,
+        /**
+         * The provider's own words for a refusal (Razorpay's
+         * `error.description`), where an operator needs them. Never a
+         * request, a credential or a card detail.
+         */
+        readonly said?: string,
     ) {
         super(message);
         this.name = "BillingProviderError";
@@ -284,6 +439,56 @@ export interface ParsedBillingEvent {
      * one (a `charged` event). Kept on Saroh's invoice for the charge (U17).
      */
     providerPaymentId?: string | null;
+    /** That payment's amount in paise, when the event carries it. */
+    paymentAmountPaise?: number | null;
+    /** The provider's customer it bills, when the event names one. */
+    providerCustomerId?: string | null;
+    /** A `refund.*` event's refund (DEC-166). */
+    refund?: ProviderRefundEvent;
+    /** A `payment.dispute.*` event's dispute (DEC-166). */
+    dispute?: ProviderDisputeEvent;
+}
+
+/**
+ * A refund on a payment, as the provider's `refund.*` webhook reports it
+ * (DEC-166): kept as a `BillingRefund`, its status as the provider last
+ * said.
+ */
+export interface ProviderRefundEvent {
+    providerRefundId: string;
+    providerPaymentId: string;
+    amountPaise: number | null;
+    status: "PENDING" | "PROCESSED" | "FAILED";
+}
+
+/** A dispute (a chargeback) on a payment, from `payment.dispute.*` (DEC-166). */
+export interface ProviderDisputeEvent {
+    providerDisputeId: string;
+    providerPaymentId: string;
+    amountPaise: number | null;
+    /** OPEN | UNDER_REVIEW | ACTION_REQUIRED | WON | LOST | CLOSED */
+    status: string;
+    /** The provider's reason code, when it gives one. */
+    reason: string | null;
+}
+
+/** One payment the provider took on a subscription or order (DEC-166). */
+export interface ProviderPaidCharge {
+    providerPaymentId: string;
+    /** What it took, in paise, GST included; null when it didn't say. */
+    amountPaise: number | null;
+    paidAt: Date | null;
+}
+
+/**
+ * What the provider took on a subscription or a one-time order, read by the
+ * daily reconcile (`billing-reconcile.job.ts`) to find a payment Saroh never
+ * heard of and an invoice whose total isn't what was paid. Optional on the
+ * port: a provider without it is never reconciled.
+ */
+export interface ProviderReconcileCapability {
+    /** `ref` is the subscription id, or the order's when `oneTime`. */
+    paidCharges(ref: string, oneTime: boolean): Promise<ProviderPaidCharge[]>;
 }
 
 export interface BillingProvider {
@@ -305,6 +510,14 @@ export interface BillingProvider {
     readonly orders?: ProviderOrderCapability;
     /** Asking how a checkout stands (DEC-093); absent: the webhook alone. */
     readonly statuses?: ProviderStatusCapability;
+    /** Saroh's ids on a payment; absent: the provider keeps none. */
+    readonly paymentNotes?: ProviderPaymentNotesCapability;
+    /** The provider's own customer record; absent: the window's prefill alone. */
+    readonly customers?: ProviderCustomerCapability;
+    /** Refunds (a double charge); absent: the owner refunds by hand. */
+    readonly refunds?: ProviderRefundCapability;
+    /** What it took, for the daily reconcile (DEC-166); absent: never asked. */
+    readonly reconcile?: ProviderReconcileCapability;
     /**
      * The public key the browser opens the provider's checkout with, or
      * null when there's no such window (the page link is used instead).

@@ -126,8 +126,12 @@ export async function dropLiveCheckoutsInTx(
     return live.length;
 }
 
-/** The subscription's provider subscription renews by itself (not a paid year). */
-async function renewsAtProvider(
+/**
+ * The subscription's provider subscription renews by itself (not a paid
+ * year): only such a one has anything to cancel. A year paid once is a
+ * provider order, which charges nothing more (DEC-093).
+ */
+export async function renewsAtProvider(
     tx: Pick<Tx, "billingCheckout">,
     sub: {
         status: string;

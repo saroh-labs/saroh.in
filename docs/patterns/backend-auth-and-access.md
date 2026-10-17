@@ -547,7 +547,8 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
 - **Current** — **Cross-tenant reads live only behind the admin guards** (plan
   D2). The admin services (`admin-organizations`, `admin-people`,
   `admin-machinery`, `admin-waitlist`, `admin-metrics`, `admin-usage`
-  (storage per business, #798), and the pricing
+  (storage per business, #798), `admin-billing` (Saroh's invoices and
+  subscriptions, DEC-163), and the pricing
   catalogue's `ImpactService`) read across every
   business with no organization context, so the `org_isolation` policies take
   their permissive branch. Each says **CROSS-TENANT READ** in its doc comment,
@@ -565,6 +566,24 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   `organization:pii:read`. It is read-only and adds no permission. The
   public write (`POST /public/contact-messages`) is guardless, rate-limited
   per visitor and answers nothing back; rows go after 12 months.
+- **Current** (DEC-163) — **Saroh's own billing across businesses**
+  (`/admin/billing/*`: every Saroh invoice, its PDF, the month's GST CSV,
+  every business's Saroh subscription, its checkouts and the provider's
+  events) needs `saroh-billing:read`, which only Platform Owners and Billing
+  hold — never Support, Operations, Release manager or Auditor. The route
+  declares it and `AdminBillingService` checks it again
+  (`assertSarohBillingReader`); every read is audited. A tenant path never
+  calls it; the business's own invoice list stays its own.
+- **Current** (DEC-166) — **Acting on Saroh's own billing** needs
+  `saroh-billing:act`, which only Platform Owners and Billing hold: mark a
+  Needs-action row resolved, end a business's autopay (its own Cancel
+  plan, run through `CheckoutService` under an operator context holding
+  `billing:manage` alone, so its history shows Saroh support), re-check a
+  double charge's refund, sync its Razorpay customer again, record a hand
+  refund on an invoice. Each is a POST with a reason and an idempotency
+  key, checked on the route and again in the service
+  (`assertSarohBillingActor`), and on the admin ledger. No support-access
+  session: Support, even with one open, is refused (403).
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator

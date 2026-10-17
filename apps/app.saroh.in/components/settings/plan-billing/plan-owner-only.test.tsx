@@ -385,6 +385,42 @@ describe("Your plan, read without billing:manage", () => {
     });
 });
 
+describe("Cancel plan, by who is reading (17 Oct 2026)", () => {
+    const withCancel = (canChange: boolean, offered = true) =>
+        renderToStaticMarkup(
+            <YourPlan
+                name="Plan B"
+                price="₹111 a month + GST"
+                includes=""
+                next={{ kind: "text", text: "Nothing to pay" }}
+                method="Paid through Razorpay"
+                footnote=""
+                cancel={
+                    offered
+                        ? {
+                              planName: "Plan B",
+                              freePlanId: "a",
+                              freePlanName: "Plan A",
+                              yearly: false,
+                          }
+                        : null
+                }
+                canChange={canChange}
+            />,
+        );
+
+    it("is the owner's: a button under Your plan", () => {
+        expect(withCancel(true)).toMatch(
+            /<button[^>]*>.*?Cancel plan.*?<\/button>/,
+        );
+    });
+
+    it("is not drawn without billing:manage, or where it isn't offered", () => {
+        expect(withCancel(false)).not.toContain("Cancel plan");
+        expect(withCancel(true, false)).not.toContain("Cancel plan");
+    });
+});
+
 const addons: AddonRow[] = [
     {
         id: "seat",
