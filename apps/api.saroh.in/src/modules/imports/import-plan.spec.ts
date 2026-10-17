@@ -1,6 +1,7 @@
 import {
     applyMapping,
     buildImportPlan,
+    groupIssues,
     isApplicable,
     suggestMapping,
     writableRows,
@@ -52,15 +53,33 @@ describe("buildImportPlan — outcomes", () => {
         expect(p.rows[0].outcome).toBe("CREATE");
     });
 
-    it("numbers rows from 1, excluding the header", () => {
+    it("numbers rows as the spreadsheet shows them: the headings are row 1", () => {
         const p = plan({ records: [{ Name: "A" }, { Name: "B" }] });
-        expect(p.rows.map((r) => r.row)).toEqual([1, 2]);
+        expect(p.rows.map((r) => r.row)).toEqual([2, 3]);
     });
 
-    it("errors a row missing a required field, naming the field", () => {
-        const p = plan({ records: [{ Price: "10" }] });
+    it("errors a row missing a required field, naming the field in words", () => {
+        const p = plan({
+            records: [{ Price: "10" }],
+            fieldLabels: { name: "Name" },
+        });
         expect(p.rows[0].outcome).toBe("ERROR");
-        expect(p.rows[0].issues[0]).toMatchObject({ row: 1, field: "name" });
+        expect(p.rows[0].issues[0]).toEqual({
+            row: 2,
+            field: "name",
+            message: "Name is empty.",
+        });
+    });
+
+    it("judges and writes the normalized values", () => {
+        const p = plan({
+            records: [{ Name: "Chair", Price: "₹1,299" }],
+            normalize: (v) => ({ ...v, price: v.price?.replace(/[₹,]/g, "") }),
+            validateRow: (v) =>
+                v.price === "1299" ? [] : [{ message: "not normalized" }],
+        });
+        expect(p.rows[0].outcome).toBe("CREATE");
+        expect(p.rows[0].values.price).toBe("1299");
     });
 
     it("surfaces domain validation failures against the row", () => {
@@ -72,7 +91,7 @@ describe("buildImportPlan — outcomes", () => {
         });
         expect(p.rows[0].outcome).toBe("ERROR");
         expect(p.rows[0].issues[0]).toEqual({
-            row: 1,
+            row: 2,
             field: "price",
             message: "Price must be a number",
         });
@@ -118,7 +137,7 @@ describe("buildImportPlan — duplicates within the file", () => {
         const p = plan({ records });
         expect(p.rows[0].outcome).toBe("CREATE");
         expect(p.rows[1].outcome).toBe("ERROR");
-        expect(p.rows[1].issues[0].message).toContain("row 1");
+        expect(p.rows[1].issues[0].message).toBe("Repeats row 2.");
     });
 
     it("errors it under UPDATE too — the file contradicts itself", () => {
@@ -129,12 +148,23 @@ describe("buildImportPlan — duplicates within the file", () => {
 });
 
 describe("buildImportPlan — file-level problems", () => {
-    it("reports a required field with no column mapped to it", () => {
+    it("reports a required field with no column mapped to it, once, in words", () => {
         const p = plan({
             mapping: { Price: "price" },
-            records: [{ Price: "1" }],
+            records: [{ Price: "1" }, { Price: "2" }, { Price: "3" }],
+            fieldLabels: { name: "Name" },
         });
-        expect(p.fileIssues[0]).toMatchObject({ field: "name" });
+        expect(p.fileIssues).toEqual([
+            {
+                row: 0,
+                field: "name",
+                message: "No column is matched to Name. Pick it above.",
+            },
+        ]);
+        // Not repeated on every row: the file's line says it.
+        expect(p.rows.every((r) => r.issues.length === 0)).toBe(true);
+        expect(p.issueGroups).toEqual([]);
+        expect(p.counts.ERROR).toBe(3);
     });
 
     it("blocks apply when the file itself is unusable", () => {
@@ -231,5 +261,28 @@ describe("suggestMapping with other headings (UX-065)", () => {
                 },
             ),
         ).toEqual({ "Full Name": "name", "Pin code": "zipCode" });
+    });
+});
+
+describe("groupIssues — one line per problem", () => {
+    it("groups the same problem across rows, in the order first met", () => {
+        const p = plan({
+            records: [
+                { Name: "A", Price: "x" },
+                { Name: "B", Price: "1" },
+                { Name: "C", Price: "y" },
+                { Price: "2" },
+            ],
+            validateRow: (v) =>
+                /^\d+$/.test(v.price ?? "")
+                    ? []
+                    : [{ field: "price", message: "Price isn't a number." }],
+            fieldLabels: { name: "Name" },
+        });
+        expect(p.issueGroups).toEqual([
+            { field: "price", message: "Price isn't a number.", rows: [2, 4] },
+            { field: "name", message: "Name is empty.", rows: [5] },
+        ]);
+        expect(groupIssues(p.rows)).toEqual(p.issueGroups);
     });
 });

@@ -25,7 +25,7 @@ export interface CategoryChoice {
 
 /**
  * The product's one category, searched rather than scrolled, with a way to
- * make a new one without leaving the product. Uncategorized is a real choice:
+ * make a new one without leaving the product. "No category" is a real choice:
  * it clears the category rather than leaving it alone.
  */
 export function CategoryPicker({
@@ -79,12 +79,12 @@ export function CategoryPicker({
                     type="button"
                     role="combobox"
                     aria-expanded={open}
-                    aria-label={`Category: ${chosen?.name ?? "Uncategorized"}. Change it.`}
+                    aria-label={`Category: ${chosen?.name ?? "No category"}. Change it.`}
                     disabled={disabled}
                     className="flex h-9 w-full items-center gap-2 rounded-[8px] border border-border bg-card px-2.5 text-left text-[13px] hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:text-muted-foreground coarse:h-11"
                 >
                     <span className="min-w-0 flex-1 truncate">
-                        {chosen?.name ?? "Uncategorized"}
+                        {chosen?.name ?? "No category"}
                     </span>
                     <ChevronDown
                         aria-hidden
@@ -107,7 +107,7 @@ export function CategoryPicker({
                         <CommandEmpty className="px-2 py-2 text-[12.5px] text-muted-foreground">
                             {noMatchLine("categories")}
                         </CommandEmpty>
-                        {[{ id: "", name: "Uncategorized" }, ...categories].map(
+                        {[{ id: "", name: "No category" }, ...categories].map(
                             (c) => (
                                 <CommandItem
                                     key={c.id || "none"}

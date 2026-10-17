@@ -570,7 +570,7 @@ async function seedAppointments(prisma: Db, orgId: string, now: Date) {
 /** Where Northwind's local deliveries and shipments go. */
 const NORTHWIND_DELIVERY_ADDRESS = {
     deliveryName: "Receiving desk",
-    deliveryPhone: "+91 80 4100 2200",
+    deliveryPhone: "+91 00000 00006",
     deliveryLine1: "Plot 14, EPIP Zone",
     deliveryLine2: "Whitefield",
     deliveryCity: "Bengaluru",
@@ -1519,6 +1519,12 @@ export async function deleteSeeded(
         () => prisma.storeFeatures.deleteMany({ where }),
         () => prisma.storeSettings.deleteMany({ where }),
         () => prisma.storeOwner.deleteMany({ where }),
+        // A site names the storefront it sells from; let go of it first, or
+        // the store cannot be removed before the site is.
+        () =>
+            prisma.site
+                .updateMany({ where, data: { storefrontId: null } })
+                .then(() => ({ count: 0 })),
         () => prisma.store.deleteMany({ where }),
         // Both cascade from their parent, but the showcase writes them with
         // seeded ids, so they are removed explicitly and counted.

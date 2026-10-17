@@ -113,6 +113,19 @@ describe("Stock API (DB)", () => {
         return id;
     }
 
+    /**
+     * A live product: a new one starts as a draft, which no customer can
+     * buy yet, so it needs nobody unless orders already wait on it.
+     */
+    async function live(name: string, onHand: number | null) {
+        const id = await product(name, onHand);
+        await prisma.product.update({
+            where: { id },
+            data: { status: "PUBLISHED" },
+        });
+        return id;
+    }
+
     const shelf = (storeId: string, productId: string) =>
         prisma.stockLevel.findFirstOrThrow({
             where: { storeId, productId, variantId: null },
@@ -398,7 +411,9 @@ describe("Stock API (DB)", () => {
         });
 
         it("searches names and SKUs, and keeps only what needs someone", async () => {
-            const low = await product(`Rye ${tag}`, 1);
+            const low = await live(`Rye ${tag}`, 1);
+            // Empty too, but a draft: nobody can buy it yet.
+            const draft = await product(`Rye draft ${tag}`, 0);
             await prisma.stockLevel.update({
                 where: { id: (await shelf(hill, low)).id },
                 data: { lowStockAlert: 4 },
@@ -408,6 +423,7 @@ describe("Stock API (DB)", () => {
 
             const needs = await api.levels(owner(), { needs: true });
             expect(needs.rows.some((r) => r.productId === low)).toBe(true);
+            expect(needs.rows.some((r) => r.productId === draft)).toBe(false);
             expect(
                 needs.rows.every((r) =>
                     r.cells.some(
@@ -429,7 +445,7 @@ describe("Stock API (DB)", () => {
         });
 
         it("an archived product never needs you, and the storefront shown doesn't narrow Needs you", async () => {
-            const gone = await product(`Stollen ${tag}`, 0);
+            const gone = await live(`Stollen ${tag}`, 0);
             const before = await api.levels(owner(), {});
             expect(
                 (await api.levels(owner(), { needs: true })).rows.some(

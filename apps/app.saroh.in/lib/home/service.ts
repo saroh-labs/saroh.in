@@ -316,6 +316,11 @@ export interface HomeModel {
     needs: HomeNeed[];
     /** How many things need doing; a "3 more" row counts as three. */
     needsTotal: number;
+    /**
+     * Open orders kept off Needs you because they are due after tomorrow
+     * (DEC-163): in progress, in Orders. 0 from an API that predates it.
+     */
+    ordersInProgress: number;
     /** Today (F5); null when the viewer reads none of it, or it failed. */
     today: HomeToday | null;
     /** The header (F6); null from an API that predates it. */
@@ -333,6 +338,7 @@ const EMPTY: HomeModel = {
     unavailable: [],
     needs: [],
     needsTotal: 0,
+    ordersInProgress: 0,
     today: null,
     lastDay: null,
     week: null,
@@ -354,7 +360,9 @@ async function readHome(projectId?: string): Promise<HomeModel> {
     if (!res.ok) {
         throw new Error(`GET home failed: ${res.status}`);
     }
-    const read = (await res.json()) as HomeModel;
+    const read = (await res.json()) as Omit<HomeModel, "ordersInProgress"> & {
+        ordersInProgress?: number;
+    };
     // An API from before F5 sends no `today`: no column, not an empty day.
     // One from before F6 sends no `lastDay`: a plain greeting, no strip.
     // One from before F9 sends no `view`: it is the business's Home.
@@ -367,6 +375,8 @@ async function readHome(projectId?: string): Promise<HomeModel> {
                 ? read.view
                 : "business",
         staff: read.view === "staff" ? (read.staff ?? null) : null,
+        // One from before DEC-163 sends no `ordersInProgress`.
+        ordersInProgress: read.ordersInProgress ?? 0,
         today: read.today ?? null,
         lastDay: read.lastDay ?? null,
         week: read.week ?? null,

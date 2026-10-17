@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { Input } from "@saroh/ui/input";
-import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -18,6 +17,7 @@ import {
     madeByFrom,
     madeByPatch,
     madeBySchema,
+    SECTION_NAMES,
 } from "@/lib/products/editor-sections";
 import { productSettingsHref } from "@/lib/products/links";
 import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
@@ -63,7 +63,7 @@ export function MadeBySection({
     /** Creating: Settings → Defaults for the chosen category. */
     defaults: EffectiveDefaults | null;
 }) {
-    const { canWrite } = useEditor();
+    const { canWrite, sayError } = useEditor();
     // A new product starts with its category's returns rule; picking
     // another category changes it only while the merchant hasn't.
     const baseline = product
@@ -115,7 +115,7 @@ export function MadeBySection({
                 if (!res.ok) {
                     if (res.field === "maker" || res.field === "returnsText")
                         form.setError(res.field, { message: res.error });
-                    else showError(res.error);
+                    else sayError("madeby", res.error);
                     return false;
                 }
                 form.reset(values);
@@ -142,7 +142,7 @@ export function MadeBySection({
     );
 
     return (
-        <SectionCard k="madeby" title="Made by, warranty and returns">
+        <SectionCard k="madeby" title={SECTION_NAMES.madeby}>
             <div className="mb-3.5">
                 <ChoicePills
                     label="Who makes it"
@@ -187,7 +187,7 @@ export function MadeBySection({
                                 id="pe-maker"
                                 {...form.register("maker")}
                                 disabled={ro}
-                                placeholder="Vetiver Labs"
+                                placeholder="e.g. the maker's name"
                                 aria-invalid={makerMissing || !!errors.maker}
                             />
                         </div>
@@ -202,7 +202,7 @@ export function MadeBySection({
                                 id="pe-made-in"
                                 {...form.register("madeIn")}
                                 disabled={ro}
-                                placeholder="Pune, India"
+                                placeholder="e.g. a city and country"
                             />
                         </div>
                     </div>
@@ -248,7 +248,7 @@ export function MadeBySection({
                 id="pe-warranty"
                 {...form.register("warranty")}
                 disabled={ro}
-                placeholder="None"
+                placeholder="e.g. how long, and what it covers"
             />
             <FieldHelp className="mb-4 mt-1.5">
                 How long, and what it covers, in one line. Leave it empty if
@@ -284,7 +284,7 @@ export function MadeBySection({
                         {...form.register("returnsText")}
                         disabled={ro}
                         aria-label="This product's returns rule"
-                        placeholder="Exchange within 7 days, tags on"
+                        placeholder="e.g. what can come back, and by when"
                         aria-invalid={ownMissing || !!errors.returnsText}
                         className="mt-2"
                     />

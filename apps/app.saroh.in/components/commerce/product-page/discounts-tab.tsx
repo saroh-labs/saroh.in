@@ -48,6 +48,7 @@ export function ProductDiscountsTab({
         return <PanelForbidden what="discounts" />;
     const money = (amount: string) =>
         formatMoneyMajor(amount, product.currency);
+    const archived = product.status === "ARCHIVED";
 
     if (discounts.data.length === 0) {
         return (
@@ -69,10 +70,19 @@ export function ProductDiscountsTab({
             </p>
             <ul className="flex flex-col gap-2.5">
                 {discounts.data.map((d) => {
-                    const state =
+                    const known =
                         d.state in STATE
                             ? STATE[d.state as keyof typeof STATE]
                             : STATE.EXPIRED;
+                    // Archived, nothing is sold: a live code would apply
+                    // only if it were sold again (audit, 16 Oct 2026).
+                    const state =
+                        archived && d.state === "ACTIVE"
+                            ? ({
+                                  label: "Would apply if sold again",
+                                  variant: "neutral",
+                              } as const)
+                            : known;
                     const ended =
                         d.state === "EXPIRED" || d.state === "EXHAUSTED";
                     // Only what applies now is at full strength.

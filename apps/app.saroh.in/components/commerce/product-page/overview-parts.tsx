@@ -1,16 +1,12 @@
 import { FailedRead } from "@/components/shared/failed-read";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import type { DetailTag } from "@/lib/products/overview-words";
 
 /** Small pieces the product page's Overview is built from, at the design's sizes. */
-
-const FOCUS =
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /** A card's heading row: 15px title, then its Edit and any link. */
 export function CardHead({
@@ -60,70 +56,7 @@ export function ProductStat({
     );
 }
 
-/** One thing linked to the product, with "Open" to its tab. */
-export function LinkedCard({
-    title,
-    href,
-    children,
-}: {
-    title: string;
-    href: string;
-    children: ReactNode;
-}) {
-    return (
-        <Card className="flex min-w-0 flex-col gap-[7px] rounded-[12px] px-[15px] py-[13px]">
-            <div className="flex items-baseline gap-2">
-                <p className="flex-1 text-[11.5px] text-muted-foreground">
-                    {title}
-                </p>
-                <Link
-                    href={href}
-                    scroll={false}
-                    aria-label={`Open ${title.toLowerCase()}`}
-                    className={cn(
-                        FOCUS,
-                        "rounded-sm text-[12px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground coarse:min-h-11",
-                    )}
-                >
-                    Open
-                </Link>
-            </div>
-            {children}
-        </Card>
-    );
-}
-
-/** A linked card that is one tap target as a whole (Reviews). */
-export function LinkedCardLink({
-    title,
-    href,
-    children,
-}: {
-    title: string;
-    href: string;
-    children: ReactNode;
-}) {
-    return (
-        <Link
-            href={href}
-            scroll={false}
-            className={cn(
-                FOCUS,
-                "flex min-w-0 flex-col gap-[7px] rounded-[12px] border border-border bg-card px-[15px] py-[13px] text-left transition-colors duration-fast hover:border-border-strong",
-            )}
-        >
-            <span className="flex items-baseline gap-2">
-                <span className="flex-1 text-[11.5px] text-muted-foreground">
-                    {title}
-                </span>
-                <span className="text-[12px] text-foreground">Open</span>
-            </span>
-            {children}
-        </Link>
-    );
-}
-
-/** The card's headline: "3 open · 41 in September". */
+/** A card's headline: "Not online yet". */
 export function LinkedHeadline({ children }: { children: ReactNode }) {
     return <p className="text-pretty text-[14px] font-semibold">{children}</p>;
 }
@@ -162,14 +95,14 @@ export function PanelLine({
     );
 }
 
-/** On the shop · Team only · Hidden until filled in. */
+/** Shown online · Shown when online · Team only · Hidden until filled in. */
 export function ShownTag({ tag }: { tag: DetailTag }) {
     return (
         <StatusBadge
             tone={
                 tag === "Hidden until filled in"
                     ? "draft"
-                    : tag === "On the shop"
+                    : tag === "Shown online"
                       ? "success"
                       : "neutral"
             }
@@ -203,7 +136,8 @@ export function DetailRow({
                 className={cn(
                     "min-w-0 flex-1 text-pretty break-words text-[13.5px] max-sm:min-w-[calc(100%-116px)]",
                     muted && "text-muted-foreground",
-                    mono && "break-all font-mono text-[12.5px]",
+                    // A path breaks where a hyphen allows, not mid-word.
+                    mono && "font-mono text-[12.5px] [overflow-wrap:anywhere]",
                 )}
             >
                 {children}

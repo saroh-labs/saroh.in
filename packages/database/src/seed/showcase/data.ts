@@ -1021,6 +1021,8 @@ export interface ShowcaseBusiness {
     companies?: readonly string[];
     services: readonly ShowcaseService[];
     bookings: number;
+    /** The diary's first day, relative to today; default 60 days back. */
+    diaryFromDay?: number;
     /** Extra weight for a weekday in the diary, Sunday first. */
     weekdayWeights?: readonly number[];
     /**
@@ -1124,6 +1126,10 @@ export const PULSE: ShowcaseBusiness = {
         "COURSES",
         // Sells packs, so Class packs is on (E12).
         "CLASS_PACKS",
+        // Supplements, gear and training wear at the front desk
+        // (`pulse-shop.ts`), and the site's traffic.
+        "COMMERCE",
+        "INSIGHTS",
     ],
     demoRole: "OWNER",
     owner: null,
@@ -1407,6 +1413,9 @@ export const PULSE: ShowcaseBusiness = {
         subdomain: "pulse-fitness",
         published: true,
         createdDaysAgo: 146,
+        // Its journal (`pulse-posts.ts`) in the menu.
+        navigationExtra: [{ label: "Journal", href: "/blog" }],
+        revision: "journal",
         pages: [
             {
                 path: "/",
@@ -1551,68 +1560,69 @@ export const PULSE: ShowcaseBusiness = {
         {
             message:
                 "Looking at the annual plan. I work late — are there evening PT slots after 7?",
-            phone: "98450 22817",
+            phone: "+91 00000 00065",
         },
         {
             message:
                 "Training for my first half marathon in December. Do your coaches do run-specific strength?",
-            phone: "99001 38264",
+            phone: "+91 00000 00092",
         },
         {
             message:
                 "Want to join with my wife. Is there a couple rate on the annual membership?",
-            phone: "98862 40193",
+            phone: "+91 00000 00084",
         },
         {
             message:
                 "Recovering from a knee injury, physio has cleared me. Can a coach take me through it slowly?",
-            phone: "97411 55026",
+            phone: "+91 00000 00041",
         },
         {
             message:
                 "Our office of 8 people nearby wants a corporate plan. Who do I speak to?",
-            phone: "98441 70358",
+            phone: "+91 00000 00063",
         },
         {
             message:
                 "Just moved to Indiranagar. What time is the quietest to use the gym floor?",
-            phone: "90085 16472",
+            phone: "+91 00000 00015",
         },
         {
             message:
                 "Interested in the yoga classes only. Is there a class-pack instead of a membership?",
-            phone: "96113 82650",
+            phone: "+91 00000 00029",
         },
         {
             message:
                 "Want to lose about 8 kg before a wedding in February. Is PT 3x a week enough?",
-            phone: "98804 91237",
+            phone: "+91 00000 00078",
         },
         {
             message: "Can I pause my membership for a month when I travel?",
-            phone: "99160 24785",
+            phone: "+91 00000 00098",
         },
         {
             message: "Do you have women-only batches or a female coach for PT?",
-            phone: "97402 63518",
+            phone: "+91 00000 00037",
         },
         {
             message: "My son is 16 — can he join with me?",
-            phone: "98455 07342",
+            phone: "+91 00000 00074",
         },
         {
             message: "Is the free trial really free? No card needed?",
-            phone: "90361 48829",
+            phone: "+91 00000 00020",
         },
     ],
     analytics: {
         paths: [
-            { path: "/", weight: 0.42 },
-            { path: "/classes", weight: 0.2 },
-            { path: "/book-a-trial", weight: 0.22 },
-            { path: "/join", weight: 0.16 },
+            { path: "/", weight: 0.38 },
+            { path: "/classes", weight: 0.19 },
+            { path: "/book-a-trial", weight: 0.2 },
+            { path: "/join", weight: 0.14 },
+            { path: "/blog", weight: 0.09 },
         ],
-        trendBase: 58,
+        trendBase: 120,
         weekendFactor: 0.7,
         enquiryRate: 0.02,
     },
@@ -2105,12 +2115,14 @@ export const CAREPOINT: ShowcaseBusiness = {
     slug: "carepoint-clinic",
     name: "CarePoint Clinic",
     registeredAddress: {
-        addressLine1: "22 MG Road",
+        addressLine1: "18, 5th Cross, Malleshwaram",
         city: "Bengaluru",
-        postalCode: "560001",
+        postalCode: "560003",
         gstState: "29",
     },
-    modules: ["APPOINTMENTS", "CRM", "WEBSITE"],
+    // Bills its visits (`carepoint-billing.ts`) and reads its Insights.
+    modules: ["APPOINTMENTS", "CRM", "WEBSITE", "PAYMENTS", "INSIGHTS"],
+    paymentProvider: "RAZORPAY",
     // A Member, on purpose: the film shows what a Member may and may not see.
     demoRole: "MEMBER",
     owner: { first: "Meera", last: "Nair", role: "OWNER" },
@@ -2197,7 +2209,9 @@ export const CAREPOINT: ShowcaseBusiness = {
             weight: 3,
         },
     ],
-    bookings: 340,
+    // Three months back, about 150 paid visits a month.
+    bookings: 620,
+    diaryFromDay: -90,
     weekdayWeights: [0, 1.3, 1.1, 1, 1.05, 1, 1.2],
     footer: "CarePoint Clinic · 5th Cross, Malleshwaram, Bengaluru · Mon–Sat 7:30am–8pm · For an emergency, call 108",
     site: {
@@ -2206,6 +2220,9 @@ export const CAREPOINT: ShowcaseBusiness = {
         subdomain: "carepoint-clinic",
         published: true,
         createdDaysAgo: 240,
+        // Its journal (`carepoint-posts.ts`) in the menu.
+        navigationExtra: [{ label: "Journal", href: "/blog" }],
+        revision: "journal",
         pages: [
             {
                 path: "/",
@@ -2340,12 +2357,13 @@ export const CAREPOINT: ShowcaseBusiness = {
     ],
     analytics: {
         paths: [
-            { path: "/", weight: 0.4 },
-            { path: "/book", weight: 0.32 },
-            { path: "/doctors", weight: 0.18 },
-            { path: "/contact", weight: 0.1 },
+            { path: "/", weight: 0.34 },
+            { path: "/book", weight: 0.3 },
+            { path: "/doctors", weight: 0.14 },
+            { path: "/contact", weight: 0.08 },
+            { path: "/blog", weight: 0.14 },
         ],
-        trendBase: 70,
+        trendBase: 150,
         weekendFactor: 0.6,
         enquiryRate: 0.006,
     },
@@ -2747,3 +2765,22 @@ export const LEAD_TIMELINE: Readonly<
         ],
     },
 };
+
+/**
+ * Businesses renamed after a database may already hold them, by key, with the
+ * site address they have now. Ids come from the key, so a rename keeps every
+ * id; but posts, pages and publications are written once and never
+ * overwritten, so a business seeded under its old name would keep its old
+ * words. A seeded site at any other address is that old seeding: its
+ * `seed_sc_<key>_` rows are removed and written again under the new name.
+ */
+export const RENAMED_BUSINESSES: readonly { key: string; slug: string }[] = [
+    { key: "aa", slug: "ammi-ki-barni" },
+    { key: "pb", slug: "margin-books" },
+    { key: "fv", slug: "golden-hour-weddings" },
+    { key: "pc", slug: "loop-local-media" },
+    { key: "sa", slug: "aarohan-academy" },
+    { key: "dk", slug: "baithak-cowork" },
+    { key: "ns", slug: "gulmohar-salon" },
+    { key: "mp", slug: "stride-physio" },
+];

@@ -10,8 +10,8 @@ import { SkuService } from "./sku.service";
 
 /**
  * The SKU pattern (#484) against a real Postgres: the preview names every
- * variant, a pattern that would give two the same SKU is refused, a saved
- * one is read back with the product's number, and no SKU is rewritten.
+ * variant, a pattern that would give two the same SKU is advice (the
+ * editor adds -2, -3), never a refusal, a saved one is read back with the product's number, and no SKU is rewritten.
  */
 const tag = `${process.pid}-${Date.now()}`;
 
@@ -88,17 +88,25 @@ describe("SKU pattern (DB)", () => {
         expect(view.problem).toBe("");
     });
 
-    it("refuses a pattern that would name two variants alike", async () => {
+    it("advises on a clash, adds -2, -3, and still saves", async () => {
         const view = await sku.preview(orgId, "{NAME3}");
-        expect(view.problem).toBe(
-            "3 variants would share VIT. Add {N} so each one differs.",
+        expect(view.problem).toBe("");
+        expect(view.advice).toMatch(
+            /both get VIT\. The editor will add -2, -3/,
         );
+        expect(view.rows.map((r) => r.next)).toEqual(["VIT", "VIT-2", "VIT-3"]);
         await expect(
             sku.save(orgId, { pattern: "{NAME3}", suggest: true }),
-        ).rejects.toThrow(/would share VIT/);
+        ).resolves.toMatchObject({ pattern: "{NAME3}", suggest: true });
         await expect(
             sku.save(orgId, { pattern: "{SIZE}", suggest: true }),
         ).rejects.toThrow(/at least one part in braces|Only/);
+    });
+
+    it("turning suggestions off never checks the pattern", async () => {
+        await expect(
+            sku.save(orgId, { pattern: "{SIZE}", suggest: false }),
+        ).resolves.toMatchObject({ pattern: "{NAME3}", suggest: false });
     });
 
     it("saves, reads back with the product's number, and rewrites nothing", async () => {

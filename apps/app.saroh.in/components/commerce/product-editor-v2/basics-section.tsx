@@ -2,8 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@saroh/ui/input";
-import { showError } from "@saroh/ui/toast";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import type { MrpPricing } from "@/lib/gst/mrp";
@@ -34,18 +33,22 @@ import {
     joinAnd,
     LIMITS,
     needsGstRate,
+    paise,
     slugify,
+    suggestedPath,
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
+import { TextLink } from "@saroh/ui/text-link";
 import type { CategoryChoice } from "./category-picker";
 import { CategoryPicker } from "./category-picker";
 import { useEditor, useSection } from "./editor-state";
 import { Count, FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
+import { usePathPreview } from "./use-path-preview";
 
 const EMPTY: BasicsValues = {
     name: "",
@@ -69,17 +72,10 @@ const FIELDS = [
     "hsnCode",
 ] as const;
 
-const CURRENCY_WORD: Record<string, string> = {
-    INR: "rupees",
-    USD: "US dollars",
-    EUR: "euros",
-    GBP: "pounds",
-};
-
 /**
  * Basics: what the product is called, where it lives on the shop, what it
  * sells for and what it is. Creating needs a name and a price and nothing
- * else; the address is made from the name and can be changed afterwards.
+ * else; the path is made from the name and can be changed afterwards.
  * A GST-registered business's priced product also needs its GST rate,
  * asked under the price, and beside it "GST on this price" for the one
  * product priced differently from the business's own way (12 Oct 2026). A
@@ -119,8 +115,10 @@ export function BasicsSection({
     /** Creating: the category picked, so its defaults can apply. */
     onCategoryChange?: (categoryId: string) => void;
 }) {
-    const { mode, canWrite } = useEditor();
+    const { mode, canWrite, sayError, createTries } = useEditor();
     const creating = mode === "create";
+    // Create was pressed with something missing: mark it, as a save would.
+    const tried = creating && createTries > 0;
     const [categories, setCategories] = useState(initialCategories);
     const baseline = product ? basicsFrom(product) : EMPTY;
     const form = useForm<BasicsValues>({
@@ -180,7 +178,7 @@ export function BasicsSection({
                   )
                 : undefined,
             note: slugMoved
-                ? `Saving moves the address. Links people saved to /products/${baseline.slug} will stop working.`
+                ? `Saving changes the path. Links people saved to /products/${baseline.slug} will stop working.`
                 : undefined,
         },
         {
@@ -198,7 +196,7 @@ export function BasicsSection({
                         form.setError(field as (typeof FIELDS)[number], {
                             message: res.error,
                         });
-                    else showError(res.error);
+                    else sayError("basics", res.error);
                     return false;
                 }
                 form.reset(values);
@@ -214,16 +212,42 @@ export function BasicsSection({
     );
 
     const nameLong = v.name.length > LIMITS.name;
-    const nameEmpty = !creating && !v.name.trim();
+    const nameEmpty = (!creating || tried) && !v.name.trim();
+    const priceEmpty = tried && !v.price.trim();
     const priceBad =
         v.price.trim() !== "" ? !isMoney(v.price) : !creating && isDirty;
+
+    // Each press of Create with something missing takes the keyboard to
+    // the first thing to fix (frontend-forms: never off, said on press).
+    useEffect(() => {
+        if (!creating || createTries === 0) return;
+        const values = form.getValues();
+        const first = !values.name.trim()
+            ? "pe-name"
+            : !isMoney(values.price)
+              ? "pe-price"
+              : needsGstRate(values, gstRateNeeded)
+                ? "pe-gst"
+                : null;
+        if (first === "pe-gst") setRateAsked(true);
+        if (first) document.getElementById(first)?.focus();
+        // Only a new press moves the keyboard, never a keystroke.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [createTries]);
     const overMrp =
         isMoney(v.mrp) && isMoney(v.price)
             ? overMrpProblem(v.price, v.mrp, pricing, currency)
             : null;
     const mrpBad = v.mrp.trim() !== "" && (!isMoney(v.mrp) || overMrp !== null);
-    const derived = slugify(v.name);
+    // Creating: the path it will really get, a number on the end when
+    // another product has the name's own (16 Oct 2026).
+    const preview = usePathPreview(v.name, creating);
+    const derived = preview.path || slugify(v.name);
+    // A path another product has: the refusal's free one, one press away.
+    const freeSlug = suggestedPath(errors.slug?.message);
     const hsnBad = v.hsnCode.trim() !== "" && !isHsnSac(v.hsnCode);
+    const sameAsPrice =
+        isMoney(v.mrp) && isMoney(v.price) && paise(v.mrp) === paise(v.price);
 
     return (
         <SectionCard k="basics" title="Basics">
@@ -232,7 +256,7 @@ export function BasicsSection({
                 id="pe-name"
                 {...form.register("name")}
                 disabled={ro}
-                placeholder="Vitamin C brightening serum"
+                placeholder="The name on the label"
                 aria-invalid={nameEmpty || nameLong || !!errors.name}
             />
             <div className="mb-4 mt-1.5 flex items-baseline gap-2.5">
@@ -243,14 +267,16 @@ export function BasicsSection({
                     {errors.name?.message && !nameEmpty
                         ? errors.name.message
                         : nameEmpty
-                          ? "A product needs a name before it can be saved."
+                          ? creating
+                              ? "Add a name."
+                              : "A product needs a name before it can be saved."
                           : "What customers see on the shop and on the receipt."}
                 </FieldHelp>
                 <Count value={v.name.length} max={LIMITS.name} />
             </div>
 
             <FieldLabel htmlFor={creating ? undefined : "pe-slug"}>
-                Address on the shop
+                Path
             </FieldLabel>
             {creating ? (
                 <>
@@ -269,8 +295,9 @@ export function BasicsSection({
                         </span>
                     </div>
                     <FieldHelp className="mb-4 mt-1.5">
-                        Made from the name. You can change it after it is
-                        created.
+                        {preview.holder
+                            ? `${preview.holder} already uses ${slugify(v.name)}, so this one gets ${derived}. You can change it after it is created.`
+                            : "Made from the name. You can change it after it is created."}
                     </FieldHelp>
                 </>
             ) : (
@@ -287,29 +314,45 @@ export function BasicsSection({
                             aria-invalid={!slugOk || !!errors.slug}
                             className="min-w-0 flex-[1_1_150px] font-mono"
                         />
+                    </div>
+                    <div className="mb-4 mt-1.5 flex items-baseline gap-2.5">
+                        <FieldHelp
+                            className="min-w-0 flex-1"
+                            tone={
+                                !v.slug.trim() || !slugOk || errors.slug
+                                    ? "bad"
+                                    : slugMoved
+                                      ? "warn"
+                                      : "quiet"
+                            }
+                        >
+                            {!v.slug.trim()
+                                ? "A product needs a path. It is what the link is made of."
+                                : v.slug.length > LIMITS.slug
+                                  ? "Longer than the 150 characters a path can be."
+                                  : !slugOk
+                                    ? "Only lowercase letters, numbers and hyphens."
+                                    : (errors.slug?.message ??
+                                      (slugMoved
+                                          ? `Old links to /products/${baseline.slug} stop working once you save.`
+                                          : "Changing it later breaks links people have saved."))}
+                        </FieldHelp>
+                        {/* Under the box, so on a phone the path keeps the row. */}
                         <Count value={v.slug.length} max={LIMITS.slug} />
                     </div>
-                    <FieldHelp
-                        className="mb-4 mt-1.5"
-                        tone={
-                            !v.slug.trim() || !slugOk || errors.slug
-                                ? "bad"
-                                : slugMoved
-                                  ? "warn"
-                                  : "quiet"
-                        }
-                    >
-                        {!v.slug.trim()
-                            ? "A product needs an address. It is what the link is made of."
-                            : v.slug.length > LIMITS.slug
-                              ? "Longer than the 150 characters an address can be."
-                              : !slugOk
-                                ? "Only lowercase letters, numbers and hyphens."
-                                : (errors.slug?.message ??
-                                  (slugMoved
-                                      ? `Old links to /products/${baseline.slug} stop working once you save.`
-                                      : "Changing it later breaks links people have saved."))}
-                    </FieldHelp>
+                    {freeSlug && !ro ? (
+                        <TextLink
+                            onClick={() =>
+                                form.setValue("slug", freeSlug, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                })
+                            }
+                            className="-mt-3 mb-4 text-[12px] coarse:min-h-11"
+                        >
+                            Use {freeSlug}
+                        </TextLink>
+                    ) : null}
                 </>
             )}
 
@@ -319,19 +362,17 @@ export function BasicsSection({
                     label="Price"
                     className="flex-[1_1_150px]"
                     error={
-                        seen("price")
-                            ? errors.price?.message && !priceBad
-                                ? errors.price.message
-                                : priceBad
-                                  ? "A number with at most two decimal places."
-                                  : null
-                            : null
+                        priceEmpty
+                            ? "Add a price."
+                            : seen("price")
+                              ? errors.price?.message && !priceBad
+                                  ? errors.price.message
+                                  : priceBad
+                                    ? "A number with at most two decimal places."
+                                    : null
+                              : null
                     }
-                    hint={
-                        creating && !v.price
-                            ? "What it sells for. Variants can set their own."
-                            : `In ${CURRENCY_WORD[currency] ?? currency}, the business's currency.`
-                    }
+                    hint="What it sells for. Variants can set their own."
                 >
                     <MoneyInput
                         id="pe-price"
@@ -347,7 +388,6 @@ export function BasicsSection({
                             })
                         }
                         disabled={ro}
-                        placeholder="549"
                     />
                 </Field>
                 <Field
@@ -366,7 +406,9 @@ export function BasicsSection({
                     hint={
                         payLine
                             ? `The printed price, which includes GST. ${payLine}, so the MRP can't be lower.`
-                            : "The printed price, shown struck through. Leave it empty if it sells at MRP."
+                            : sameAsPrice
+                              ? "Same as the price, so nothing is struck through."
+                              : "The printed price, shown struck through. Leave it empty if it sells at MRP."
                     }
                 >
                     <MoneyInput
@@ -383,7 +425,6 @@ export function BasicsSection({
                             })
                         }
                         disabled={ro}
-                        placeholder={v.price || "699"}
                     />
                 </Field>
             </div>
@@ -404,14 +445,14 @@ export function BasicsSection({
                         className="flex-[1_1_150px]"
                         error={
                             errors.gstRate?.message ??
-                            (rateMissing && (rateAsked || !creating)
+                            (rateMissing && (rateAsked || !creating || tried)
                                 ? GST_RATE_NEEDED
                                 : null)
                         }
                         hint={rateHint(
                             businessPriceMode,
                             gstRateNeeded ? v.gstPriceMode : "INCLUDED",
-                            "Included in the price. Bread and other nil-rated goods are 0%.",
+                            "Included in the price.",
                         )}
                     >
                         <OptionSelect<GstRateValue>
@@ -475,22 +516,13 @@ export function BasicsSection({
                             {...form.register("hsnCode")}
                             inputMode="numeric"
                             disabled={ro}
-                            placeholder="1905 90 10"
                             className="font-mono"
                         />
                     </Field>
                 </div>
             ) : null}
 
-            <Field
-                label="Category"
-                className="mt-4"
-                hint={
-                    v.categoryId === ""
-                        ? "Uncategorized is a real choice. It clears the category rather than leaving it alone."
-                        : "A product sits in one category. Choosing Uncategorized clears it."
-                }
-            >
+            <Field label="Category" className="mt-4">
                 <CategoryPicker
                     id="pe-category"
                     value={v.categoryId}

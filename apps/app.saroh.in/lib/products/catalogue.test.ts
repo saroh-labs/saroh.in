@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { CatalogueRow } from "./catalogue";
-import {
-    catalogueRows,
-    initials,
-    priceRange,
-    rowFacts,
-    stockWords,
-} from "./catalogue";
+import { catalogueRows, rowFacts, stockWords } from "./catalogue";
 import { catalogueProduct } from "./catalogue.fixture";
+import type { NeedDetail } from "./needs-you";
 
 /** The single row a case expects; fails the test when there is not exactly one. */
 function only(rows: CatalogueRow[]): CatalogueRow {
@@ -29,7 +24,8 @@ describe("the row's second line (#524)", () => {
         expect(
             rowFacts({ variantCount: 1, sku: "RYE-800", places }, true),
         ).toEqual({
-            variants: "1 variant",
+            // One variant is the product itself: nothing to say.
+            variants: null,
             sku: "RYE-800",
             places: "Hill Road · Online",
         });
@@ -120,55 +116,114 @@ describe("catalogueRows (#531, #519)", () => {
             ]),
         );
         expect(row.canSell).toBe(0);
-        expect(stockWords(row)).toEqual({
-            text: "4 in stock",
-            tone: "danger",
-        });
+        expect(
+            stockWords(row, {
+                productId: "p1",
+                name: "p1",
+                kind: "short",
+                short: 2,
+                canSell: 0,
+            }),
+        ).toEqual({ text: "2 short for orders", tone: "danger" });
     });
 });
 
-describe("stockWords", () => {
-    const at = (stock: number, lowStockAlert: number, promised = 0) => ({
+describe("stockWords — what can be sold, and the worst shelf", () => {
+    const at = (stock: number, promised = 0) => ({
         stock,
         canSell: Math.max(0, stock - promised),
-        lowStockAlert,
+        promised,
         soldOut: false,
     });
+    const need = (
+        kind: NeedDetail["kind"],
+        over: Partial<NeedDetail> = {},
+    ): NeedDetail => ({
+        productId: "p",
+        name: "p",
+        kind,
+        short: 0,
+        canSell: 0,
+        where: null,
+        ...over,
+    });
 
-    it("is out of stock at nothing on the shelf", () => {
-        expect(stockWords(at(0, 5))).toEqual({
+    it("says plain 'to sell' when every shelf is fine", () => {
+        expect(stockWords(at(18))).toEqual({
+            text: "18 to sell",
+            tone: "plain",
+        });
+        // Promised units come off: 4 on hand, 1 promised.
+        expect(stockWords(at(4, 1)).text).toBe("3 to sell");
+    });
+
+    it("says what is promised when nothing is left to sell", () => {
+        expect(stockWords(at(156, 156), need("out"))).toEqual({
+            text: "0 to sell · 156 promised",
+            tone: "danger",
+        });
+        expect(stockWords(at(0), need("out"))).toEqual({
             text: "Out of stock",
             tone: "danger",
         });
     });
 
-    it("warns at the product's own level, not a fixed five", () => {
-        expect(stockWords(at(8, 10)).tone).toBe("warn");
-        expect(stockWords(at(4, 3)).tone).toBe("plain");
-        // A level of 0 never warns.
-        expect(stockWords(at(1, 0)).tone).toBe("plain");
-    });
-});
-
-describe("priceRange", () => {
-    it("is the variants' range, a variant without a price selling at the product's", () => {
-        expect(priceRange("260", [{ price: null }, { price: "480" }])).toEqual({
-            low: "260",
-            high: "480",
+    it("says how many are short for orders", () => {
+        expect(stockWords(at(13, 15), need("short", { short: 2 }))).toEqual({
+            text: "2 short for orders",
+            tone: "danger",
         });
     });
 
-    it("is null with one variant or one price", () => {
-        expect(priceRange("260", [{ price: "300" }])).toBeNull();
+    it("names the variants that are out, by the product's option", () => {
         expect(
-            priceRange("260", [{ price: null }, { price: "260.00" }]),
-        ).toBeNull();
+            stockWords(
+                at(167),
+                need("out", {
+                    where: ["7.44 Intense Copper Blonde"],
+                    option: "Shade",
+                    variants: { worst: 1, of: 28 },
+                    places: [],
+                }),
+            ),
+        ).toEqual({ text: "167 to sell · 1 shade out", tone: "danger" });
+        expect(
+            stockWords(
+                at(40),
+                need("low", {
+                    where: ["S", "M"],
+                    option: null,
+                    variants: { worst: 2, of: 4 },
+                    places: [],
+                }),
+            ),
+        ).toEqual({ text: "40 to sell · 2 variants low", tone: "warn" });
     });
-});
 
-describe("initials", () => {
-    it("takes two words, skipping symbols", () => {
-        expect(initials("Rye & caraway loaf")).toBe("RC");
-        expect(initials("Mug")).toBe("M");
+    it("names the place when it is out at only some", () => {
+        expect(
+            stockWords(
+                at(95),
+                need("out", {
+                    where: ["Online"],
+                    variants: { worst: 0, of: 0 },
+                    places: ["Online"],
+                }),
+            ),
+        ).toEqual({ text: "Out at Online", tone: "danger" });
+    });
+
+    it("takes the accent at its warning level, from Needs you", () => {
+        expect(stockWords(at(3), need("low", { canSell: 3 }))).toEqual({
+            text: "3 to sell",
+            tone: "warn",
+        });
+    });
+
+    it("stays calm about what Needs you leaves out (a draft)", () => {
+        expect(stockWords(at(0))).toEqual({
+            text: "Out of stock",
+            tone: "muted",
+        });
     });
 });

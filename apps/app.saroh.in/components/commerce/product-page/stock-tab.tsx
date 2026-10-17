@@ -9,15 +9,15 @@ import {
     canStartCounting,
     SPLIT_NEEDS_WRITE,
 } from "@/lib/products/editor-stock";
-import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
+import { optionNoun } from "@/lib/products/overview-words";
 import type { ProductTracking } from "@/lib/products/tracking";
 import { TRACKING_LOCKED, untrackedShort } from "@/lib/products/tracking";
 import type { ProductStock } from "@/lib/stock/product-stock";
 import { stockFootnote } from "@/lib/stock/product-stock";
 import type { StockCheck, StockLogEntry } from "@/lib/stock/service";
 
-import { PanelFailed, StateLink, TabState } from "./panel-state";
+import { PanelFailed, TabState } from "./panel-state";
 import { StockSheetButton } from "./sheets/stock-sheet";
 import { LastChange, ProductChecks, RecentChanges } from "./stock-recent";
 import { StockTable } from "./stock-table";
@@ -72,6 +72,7 @@ export function ProductStockTab({
             variantId={openId}
             onClose={() => setOpenId(null)}
             counts={counts}
+            stock={stock}
         />
     );
 
@@ -84,7 +85,7 @@ export function ProductStockTab({
                     title="Not tracked"
                     description={`${untrackedShort(product.storefronts ?? [])} ${
                         product.variants.length
-                            ? `Sold in ${product.variants.length} sizes: ${product.variants
+                            ? `Sold in ${product.variants.length} ${optionNoun(product.option?.name, product.variants.length)}: ${product.variants
                                   .map(
                                       (v) =>
                                           `${v.title} ${money(v.price ?? product.price)}`,
@@ -99,14 +100,13 @@ export function ProductStockTab({
                             storeId={storeId}
                             stock={null}
                             counts={false}
-                            label="Change prices"
                         />
                     ) : null}
                 </TabState>
                 {product.variants.length > 0 ? (
                     <Card className="rounded-[12px] p-0">
                         <ul
-                            aria-label="Sizes and prices"
+                            aria-label={`${cap(optionNoun(product.option?.name, 2))} and prices`}
                             className="px-[18px] py-1"
                         >
                             {product.variants.map((v) => (
@@ -145,11 +145,12 @@ export function ProductStockTab({
     if (!counted) {
         return (
             <TabState
+                data-ph-mask=""
                 icon={Box}
                 title="No stock count yet"
                 description={
                     product.variants.length
-                        ? `Each of the ${product.variants.length} sizes gets its own count, so a small one can run out before a large one.`
+                        ? `Each of the ${product.variants.length} ${optionNoun(product.option?.name, product.variants.length)} gets its own count, so one can run out before another.`
                         : "Add a count to see how many you have and get a warning when it runs low."
                 }
             >
@@ -160,6 +161,7 @@ export function ProductStockTab({
                         stock={stock}
                         counts
                         label="Add stock"
+                        openFromAddress
                     />
                 ) : overview.canStock ? (
                     // With variants, the first count is the switch to
@@ -167,13 +169,7 @@ export function ProductStockTab({
                     <p className="max-w-[46ch] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                         {SPLIT_NEEDS_WRITE}
                     </p>
-                ) : (
-                    <StateLink
-                        href={productEditHref(storeId, product.id, "stock")}
-                    >
-                        Open the Stock section
-                    </StateLink>
-                )}
+                ) : null}
             </TabState>
         );
     }
@@ -183,29 +179,27 @@ export function ProductStockTab({
             <Card className="rounded-[12px] p-0">
                 <div className="flex flex-wrap items-center gap-2 px-[18px] pb-1 pt-3.5">
                     <h2 className="font-display text-[15px] font-semibold tracking-[-0.015em]">
-                        Sizes and stock
+                        {product.variants.length
+                            ? `${cap(optionNoun(product.option?.name, 2))} and stock`
+                            : "Stock"}
                     </h2>
                     <span className="min-w-0 flex-[1_1_200px] text-[12px] text-muted-foreground">
                         {log?.at(0) ? <LastChange entry={log[0]} /> : null}
                     </span>
-                    {tracking.control === "change" ? (
-                        <StopTrackingButton
-                            productId={product.id}
-                            productName={product.name}
-                            storeId={storeId}
-                        />
-                    ) : null}
                     {overview.canStock ? (
                         <StockSheetButton
                             overview={overview}
                             storeId={storeId}
                             stock={stock}
                             counts
-                            label={
-                                overview.canWrite
-                                    ? "Change stock or prices"
-                                    : "Change stock"
-                            }
+                            openFromAddress
+                        />
+                    ) : null}
+                    {tracking.control === "change" ? (
+                        <StopTrackingButton
+                            productId={product.id}
+                            productName={product.name}
+                            storeId={storeId}
                         />
                     ) : null}
                 </div>
@@ -233,3 +227,5 @@ export function ProductStockTab({
         </div>
     );
 }
+
+const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);

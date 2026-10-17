@@ -12,6 +12,7 @@ import type { OverviewReview } from "@/lib/products/overview-rules";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
+
 import { REPLY_MAX, useReviewActions } from "./use-review-actions";
 
 /**
@@ -156,15 +157,19 @@ export function ReviewList({
                                 </form>
                             ) : null}
                             {canReply && replyingTo !== r.id ? (
-                                <div className="mt-[9px] flex gap-3.5">
+                                // Reply leads; hiding a buyer's voice is the
+                                // rarer act, a quiet word with Undo after it.
+                                <div className="mt-[9px] flex flex-wrap items-center gap-3.5">
                                     {r.reply ? null : (
-                                        <TextLink
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            type="button"
                                             onClick={() => startReply(r.id)}
                                             disabled={pending}
-                                            className="text-[12.5px] disabled:text-disabled-foreground coarse:min-h-11"
                                         >
                                             Reply
-                                        </TextLink>
+                                        </Button>
                                     )}
                                     <Button
                                         variant="link"
@@ -174,7 +179,7 @@ export function ReviewList({
                                             toggleHidden(r.id, r.status)
                                         }
                                         disabled={pending}
-                                        className="text-muted-foreground"
+                                        className="text-[12.5px] font-normal text-muted-foreground no-underline hover:text-foreground hover:underline coarse:min-h-11"
                                     >
                                         {hidden
                                             ? "Show on the shop"

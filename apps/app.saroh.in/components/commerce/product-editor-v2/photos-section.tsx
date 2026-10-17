@@ -49,7 +49,7 @@ function fileName(photo: PhotoDraft): string {
  * way on a phone.
  */
 export function PhotosSection({ product }: { product: ProductDetail | null }) {
-    const { canWrite, saving } = useEditor();
+    const { canWrite, saving, sayError } = useEditor();
     // Read-only, or saving: the set on screen is the one being sent.
     const ro = !canWrite || saving.includes("photos");
     const fromProduct = product ? photosFrom(product.images) : [];
@@ -97,7 +97,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                     photosInput(draft),
                 );
                 if (!res.ok) {
-                    showError(res.error);
+                    sayError("photos", res.error);
                     return false;
                 }
                 const next = photosFrom(res.data);

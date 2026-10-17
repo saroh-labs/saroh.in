@@ -74,11 +74,8 @@ test.describe("product page — Overview and Stock", () => {
                 tabs.getByRole("link", { name: new RegExp(`^${name}`) }),
             ).toBeVisible();
         }
-        await expect(page.getByText("Linked to this product")).toBeVisible();
         await expect(
-            page.getByText(
-                /^Can be sold now$|^Short for orders already placed$/,
-            ),
+            page.getByText(/^To sell$|^Short for orders already placed$/),
         ).toBeVisible();
         await expect(
             page.getByText("How it's sold", { exact: false }),
@@ -100,7 +97,7 @@ test.describe("product page — Overview and Stock", () => {
             `/commerce/products/seed_product_11?storefront=${STORE}&tab=variants`,
         );
         await expect(
-            page.getByRole("heading", { name: "Sizes and stock" }),
+            page.getByRole("heading", { name: /and stock$|^Stock$/ }),
         ).toBeVisible();
         await expect(page.getByText("Recent changes")).toBeVisible();
     });
@@ -127,10 +124,10 @@ test.describe("product page — Overview and Stock", () => {
                 `/commerce/products/${id}?storefront=${STORE}&tab=stock`,
             );
             await page
-                .getByRole("button", { name: "Change stock or prices" })
+                .getByRole("button", { name: "Edit stock and prices" })
                 .click();
             const sheet = page.getByRole("dialog");
-            await expect(sheet).toContainText("Edit prices and stock");
+            await expect(sheet).toContainText("Edit stock and prices");
             const onHand = sheet.getByLabel(/on hand/).first();
             await expect(onHand).toHaveValue(String(COUNT));
             await onHand.fill("5");

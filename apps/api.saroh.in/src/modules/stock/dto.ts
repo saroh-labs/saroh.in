@@ -122,7 +122,7 @@ export class WarnRowDto {
     variantId?: string | null;
 
     @IsInt({ message: "Whole numbers only." })
-    @Min(0, { message: "Warn at 0 or more." })
+    @Min(0, { message: "Low stock at 0 or more." })
     @Max(1_000_000)
     lowStockAlert!: number;
 }

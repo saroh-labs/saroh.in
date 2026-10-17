@@ -4680,6 +4680,13 @@ sets `tooltip` itself.
 straight away, with no pointer over it (owner, 16 Oct).
 **Cause**: a sheet moves focus to its first control as it opens, and Radix
 opens a tooltip on any focus, keyboard or not.
+**Fix**: `Tip`'s hint opens for a pointer over the control, or for focus that
+didn't arrive within a second of a mouse, pen or touch press anywhere on the
+page (a press that opened a sheet, which then focused its first control).
+Tab still shows it. (`:focus-visible` was tried first; jsdom can't tell
+keyboard focus from any other, so it broke the keyboard test.)
+**Check**: `small-pieces.test.tsx` — "shows no tooltip for focus a press just
+moved there", beside "shows the label as a tooltip on keyboard focus".
 **Fix**: `Tip`'s hint opens only for a pointer over the control or for focus
 the keyboard brought (`:focus-visible`). Focus left by a click, or moved by
 a sheet or dialog, shows nothing. Tab still shows it.
@@ -5001,6 +5008,7 @@ clears every row.
 
 **Rule.** An integration spec never cleans rows up in `afterAll`: the
 setup truncates after every file.
+
 ### A move to Free dropped a year the business had already paid for (17 Oct 2026)
 
 **Symptom** (review, before release): a monthly business that had paid a
@@ -5132,6 +5140,16 @@ writes its source, including writes another library makes
 
 **Cause.** The form moves focus in an effect after the card changes over; the test asserted `document.activeElement` straight after the click, so a slow runner could check before the effect ran.
 
-**Fix.** The assertion waits (`await waitFor(...)`).
+**Fix.** The assertions wait (`await waitFor(...)`): the message box's, then the thanks heading's, which flaked the same way on #972.
 
 **Rule.** Focus that a component moves in an effect is asserted with `waitFor`, never synchronously after the event (`docs/patterns/frontend-verification.md`).
+
+### The order Edit panel didn't open on CI's phone run (17 Oct 2026)
+
+**Symptom.** `order-detail.spec.ts` "Add an item before preparing" failed on CI's phone run, twice in a row (no `Edit #` dialog), and passed locally on desk and phone and on development.
+
+**Cause.** The press on "Edit items or address" landed before the built page was ready to answer it, so it did nothing; one press, then a wait for the dialog, never recovers.
+
+**Fix.** The spec presses until the panel opens (`expect(...).toPass`, as `business-settings.spec.ts`'s `openSheet`).
+
+**Rule.** A browser spec that opens a sheet or dialog presses again until it shows, never once and waits (`saroh-browser-tests` skill).

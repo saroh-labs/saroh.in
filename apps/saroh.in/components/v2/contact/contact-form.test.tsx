@@ -182,8 +182,10 @@ describe("ContactForm: sending", () => {
         );
         // What they typed, said back: masked in a session recording.
         expect(thanks.hasAttribute("data-ph-mask")).toBe(true);
-        expect(document.activeElement).toBe(
-            screen.getByRole("heading", { level: 2 }),
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByRole("heading", { level: 2 }),
+            ),
         );
 
         const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];

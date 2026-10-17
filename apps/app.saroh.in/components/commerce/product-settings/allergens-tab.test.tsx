@@ -53,6 +53,21 @@ beforeEach(() => {
 });
 afterEach(() => s.unmount());
 
+describe("a list that couldn't be read", () => {
+    it("says so with Try again, never none yet or a count", () => {
+        s.render(<AllergensTab allergens={null} canWrite />);
+        expect(s.text()).toContain("Couldn't load allergens");
+        expect(s.button("Try again")).toBeDefined();
+        expect(s.text()).not.toContain("No allergens yet");
+        expect(s.button("Add the common food allergens")).toBeUndefined();
+    });
+
+    it("says nothing about removing one while there are none", () => {
+        render([]);
+        expect(s.text()).not.toContain("cannot be removed");
+    });
+});
+
 describe("the list", () => {
     it("shows each allergen with nothing open", () => {
         render();
@@ -61,7 +76,7 @@ describe("the list", () => {
         expect(s.text()).toContain("Not on any product yet");
         expect(s.inputs()).toHaveLength(0);
         expect(s.dialog()).toBe(null);
-        expect(s.button("Add allergen")).toBeDefined();
+        expect(s.button("New allergen")).toBeDefined();
         // One on a product can't be removed, and says why.
         expect(
             s.button("Milk is on 3 products. Take it off them first")?.disabled,
@@ -71,8 +86,8 @@ describe("the list", () => {
 
     it("has no actions for a role that can only read", () => {
         render(LIST, false);
-        expect(s.text()).toContain("Your role can read these settings");
-        expect(s.button("Add allergen")).toBeUndefined();
+        expect(s.text()).toContain("You can see these but not change them");
+        expect(s.button("New allergen")).toBeUndefined();
         expect(s.button("Remove Sesame")).toBeUndefined();
     });
 
@@ -80,7 +95,7 @@ describe("the list", () => {
         addAllergens.mockResolvedValue({ ok: true, data: [] });
         render([]);
         expect(s.text()).toContain("No allergens yet");
-        expect(s.button("Add allergen")).toBeDefined();
+        expect(s.button("New allergen")).toBeDefined();
         s.press("Add the common food allergens");
         await s.settle();
         expect(addAllergens.mock.calls[0][0]).toHaveLength(8);
@@ -92,7 +107,7 @@ describe("the list", () => {
     it("says none yet without buttons for a role that can only read", () => {
         render([], false);
         expect(s.text()).toContain("No allergens yet");
-        expect(s.button("Add allergen")).toBeUndefined();
+        expect(s.button("New allergen")).toBeUndefined();
         expect(s.button("Add the common food allergens")).toBeUndefined();
     });
 
@@ -109,7 +124,7 @@ describe("the list", () => {
 describe("Add allergen", () => {
     function open() {
         render();
-        s.press("Add allergen");
+        s.press("New allergen");
         return s.inputs(s.dialog())[0];
     }
 
@@ -148,9 +163,7 @@ describe("Add allergen", () => {
         await s.submit(s.dialog());
         expect(s.dialog()?.textContent).toContain("An allergen needs a name.");
         s.type(input, "milk");
-        expect(s.dialog()?.textContent).toContain(
-            "milk is already on the list.",
-        );
+        expect(s.dialog()?.textContent).toContain("Milk already exists.");
         s.type(input, "x".repeat(31));
         expect(s.dialog()?.textContent).toContain(
             "Keep it under 30 characters.",
@@ -164,7 +177,7 @@ describe("Add allergen", () => {
         s.press("Cancel", s.dialog());
         expect(s.dialog()).toBe(null);
         expect(addAllergens).not.toHaveBeenCalled();
-        s.press("Add allergen");
+        s.press("New allergen");
         expect(s.inputs(s.dialog())[0].value).toBe("");
     });
 });

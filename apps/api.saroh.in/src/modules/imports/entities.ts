@@ -48,6 +48,96 @@ function validateWith<T extends object>(
     return toIssues(validateSync(instance, { skipMissingProperties: false }));
 }
 
+/**
+ * How a spreadsheet writes a product's status, in the words the products
+ * list uses (Draft · Live · Archived) and the ones other tools export.
+ */
+const STATUS_WORDS: Readonly<Record<string, ProductStatus>> = {
+    draft: "DRAFT",
+    live: "PUBLISHED",
+    active: "PUBLISHED",
+    published: "PUBLISHED",
+    archived: "ARCHIVED",
+    hidden: "ARCHIVED",
+};
+
+/** A status in any case, or the cell as written when it is none of them. */
+export function normalizeStatus(raw: string): string {
+    const trimmed = raw.trim();
+    return STATUS_WORDS[trimmed.toLowerCase()] ?? trimmed;
+}
+
+/** 1,299 and 1,20,000 — thousands commas, the western way or the Indian. */
+const GROUPED = /^-?(?:\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3})(?:\.\d+)?$/;
+
+/**
+ * An amount as a spreadsheet writes it: "₹1,299", "Rs. 450", "450.00 ".
+ * The rupee sign and thousands commas go; anything else is left for the
+ * check to name.
+ */
+export function normalizeMoney(raw: string): string {
+    const bare = raw
+        .trim()
+        .replace(/^(?:₹|rs\.?|inr)\s*/i, "")
+        .replace(/\s*\/-$/, "")
+        .trim();
+    return GROUPED.test(bare) ? bare.replace(/,/g, "") : bare;
+}
+
+/** Why an amount can't be written, in the merchant's words; null when it can. */
+function moneyProblem(label: string, value: string): string | null {
+    if (/^-\d+(?:\.\d+)?$/.test(value)) {
+        return `${label} can't be less than 0.`;
+    }
+    if (!/^\d+(?:\.\d+)?$/.test(value)) return `${label} isn't a number.`;
+    if (!/^\d+(?:\.\d{1,2})?$/.test(value)) {
+        return `${label} has more than 2 decimals.`;
+    }
+    return null;
+}
+
+const PRODUCT_LABELS = {
+    name: "Name",
+    slug: "Path",
+    description: "Description",
+    image: "Photo link",
+    price: "Price",
+    status: "Status: Draft, Live or Archived",
+    mrp: "MRP",
+    gstRate: "GST rate (%)",
+    hsnCode: "HSN code",
+} as const;
+
+/** A field's short name inside a sentence ("Status", not its whole label). */
+function shortLabel(field: string): string {
+    return field === "status"
+        ? "Status"
+        : ((PRODUCT_LABELS as Record<string, string>)[field] ?? field);
+}
+
+/**
+ * The DTO's messages are the product form's; a few are written for a
+ * developer ("description must be shorter than or equal to 5000
+ * characters"). Those are said in the merchant's words.
+ */
+function productMessage(issue: Omit<RowIssue, "row">): Omit<RowIssue, "row"> {
+    const field = issue.field ?? "";
+    if (field === "slug") {
+        return {
+            field,
+            message: "Path uses only lower-case letters, numbers and hyphens.",
+        };
+    }
+    if (!issue.message.startsWith(`${field} `)) return issue;
+    const longest = /shorter than or equal to (\d+)/.exec(issue.message);
+    return {
+        field,
+        message: longest
+            ? `${shortLabel(field)} is longer than ${longest[1]} characters.`
+            : `${shortLabel(field)} can't be read. Check it in your file.`,
+    };
+}
+
 export interface EntityDescriptor {
     /** Domain fields a row cannot be written without. */
     requiredFields: readonly string[];
@@ -67,29 +157,13 @@ export interface EntityDescriptor {
     keyLabel: string;
     keyOf: (values: ImportValues) => string | null;
     validateRow: (values: ImportValues) => Omit<RowIssue, "row">[];
-    /** Puts a row in the create DTO's words before it is checked or written. */
+    /** Forgive how a spreadsheet writes a value, before it is judged. */
     normalize?: (values: ImportValues) => ImportValues;
-}
-
-/**
- * How a spreadsheet writes a product's status, in the words the products list
- * uses (Draft · Live · Archived) and the ones other tools export. A file that
- * wrote "draft", as the field's own label spelt it, failed every row as
- * "Unknown status" (products audit, 16 Oct).
- */
-const STATUS_WORDS: Readonly<Record<string, ProductStatus>> = {
-    draft: "DRAFT",
-    live: "PUBLISHED",
-    active: "PUBLISHED",
-    published: "PUBLISHED",
-    archived: "ARCHIVED",
-    hidden: "ARCHIVED",
-};
-
-/** A status in any case, or the cell as written when it is none of them. */
-export function normalizeStatus(raw: string): string {
-    const trimmed = raw.trim();
-    return STATUS_WORDS[trimmed.toLowerCase()] ?? trimmed;
+    /**
+     * A file to start from: the headings, then example rows. Every heading
+     * is matched to its field when the file comes back (entities.spec).
+     */
+    sample: readonly (readonly string[])[];
 }
 
 /**
@@ -114,68 +188,94 @@ export function splitFullName(values: ImportValues): ImportValues {
 export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
     products: {
         requiredFields: ["name", "price"],
+        // No currency: a business sells in one (DEC-030), so a product
+        // takes its storefront's and a form never asks which.
         mappableFields: [
             "name",
-            "slug",
-            "description",
-            "image",
             "price",
-            "currency",
-            "status",
             "mrp",
             "gstRate",
             "hsnCode",
+            "status",
+            "description",
+            "slug",
+            "image",
         ],
-        fieldLabels: {
-            name: "Name",
-            slug: "Web address",
-            description: "Description",
-            image: "Photo link",
-            price: "Price",
-            currency: "Currency",
-            status: "Status: Draft, Live or Archived",
-            mrp: "MRP",
-            gstRate: "GST rate (%)",
-            hsnCode: "HSN code",
-        },
+        fieldLabels: PRODUCT_LABELS,
         aliases: {
             title: "name",
             productname: "name",
+            item: "name",
+            itemname: "name",
+            path: "slug",
             url: "slug",
             webaddress: "slug",
             photo: "image",
+            photolink: "image",
             imageurl: "image",
+            image: "image",
             sellingprice: "price",
+            saleprice: "price",
+            rate: "price",
             gst: "gstRate",
             gstpercent: "gstRate",
+            gstrate: "gstRate",
             hsn: "hsnCode",
+            hsncode: "hsnCode",
             maximumretailprice: "mrp",
         },
-        keyLabel: "the product's web address",
+        keyLabel: "the product's name",
         // Mirrors ProductsService.create: an explicit slug wins, otherwise it is
         // derived from the name. Unique per business (@@unique([organizationId, slug])).
         keyOf: (v) => {
             const slug = slugify(v.slug ?? v.name ?? "");
             return slug === "" ? null : slug;
         },
-        normalize: (v) =>
-            v.status === undefined
-                ? v
-                : { ...v, status: normalizeStatus(v.status) },
+        normalize: (v) => ({
+            ...v,
+            ...(v.status !== undefined
+                ? { status: normalizeStatus(v.status) }
+                : {}),
+            ...(v.price !== undefined
+                ? { price: normalizeMoney(v.price) }
+                : {}),
+            ...(v.mrp !== undefined ? { mrp: normalizeMoney(v.mrp) } : {}),
+            ...(v.gstRate !== undefined
+                ? { gstRate: v.gstRate.replace(/\s*%$/, "").trim() }
+                : {}),
+            ...(v.hsnCode !== undefined
+                ? { hsnCode: v.hsnCode.replace(/\s+/g, "") }
+                : {}),
+        }),
         validateRow: (v) => {
+            // Status and amounts are said here, in the import's words; the
+            // DTO's own rules still judge every other field.
+            const own: Omit<RowIssue, "row">[] = [];
             const status = v.status;
-            const badStatus =
+            if (
                 status !== undefined &&
-                !(PRODUCT_STATUSES as readonly string[]).includes(status);
-            const issues = validateWith(CreateProductDto, v).filter(
-                (i) => !(badStatus && i.field === "status"),
-            );
-            if (badStatus) {
-                issues.push({
+                !(PRODUCT_STATUSES as readonly string[]).includes(status)
+            ) {
+                own.push({
                     field: "status",
                     message: `Status is Draft, Live or Archived. '${status}' isn't one.`,
                 });
             }
+            for (const field of ["price", "mrp"] as const) {
+                const value = v[field];
+                const problem =
+                    value === undefined
+                        ? null
+                        : moneyProblem(shortLabel(field), value);
+                if (problem) own.push({ field, message: problem });
+            }
+            const judged = new Set(own.map((i) => i.field));
+            const issues = [
+                ...own,
+                ...validateWith(CreateProductDto, v)
+                    .filter((i) => !judged.has(i.field))
+                    .map(productMessage),
+            ];
             // GST's own rates, as the editor checks them (ProductsService).
             const rate = v.gstRate?.trim();
             if (
@@ -190,6 +290,35 @@ export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
             }
             return issues;
         },
+        sample: [
+            [
+                "Name",
+                "Price",
+                "MRP",
+                "GST rate",
+                "HSN code",
+                "Status",
+                "Description",
+            ],
+            [
+                "Steel Water Bottle 1L",
+                "499",
+                "599",
+                "18",
+                "7323",
+                "Live",
+                "Keeps water cold for 12 hours.",
+            ],
+            [
+                "Masala Chai 250g",
+                "180",
+                "200",
+                "5",
+                "0902",
+                "Draft",
+                "Assam tea with cardamom, ginger and clove.",
+            ],
+        ],
     },
     customers: {
         requiredFields: ["email"],
@@ -237,5 +366,24 @@ export const ENTITY_DESCRIPTORS: Record<ImportEntity, EntityDescriptor> = {
             return email === "" ? null : email;
         },
         validateRow: (v) => validateWith(CreateCustomerDto, splitFullName(v)),
+        sample: [
+            ["Email", "Full name", "Phone", "City", "State", "PIN code"],
+            [
+                "priya.sharma@example.com",
+                "Priya Sharma",
+                "98765 43210",
+                "Pune",
+                "Maharashtra",
+                "411001",
+            ],
+            [
+                "arjun.mehta@example.com",
+                "Arjun Mehta",
+                "91234 56789",
+                "Jaipur",
+                "Rajasthan",
+                "302001",
+            ],
+        ],
     },
 };

@@ -73,8 +73,14 @@ export function ProductPhotosTab({
                         product.images.findIndex((m) => m.kind !== "video");
                     return (
                         <li key={img.id} className="min-w-0">
-                            <div className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-border">
-                                <MediaThumb item={img} alt={img.alt} />
+                            <div className="relative aspect-[4/3] overflow-hidden rounded-[10px] border border-border bg-muted">
+                                {/* Whole, not cropped: a shade card's words
+                                    run to its edges (audit, 16 Oct 2026). */}
+                                <MediaThumb
+                                    item={img}
+                                    alt={img.alt}
+                                    className="object-contain"
+                                />
                                 {cover ? (
                                     <Badge
                                         variant="neutral"

@@ -209,6 +209,10 @@ jobs:
       - name: mktemp templates
         run: pnpm run check:mktemp
 
+      # An IconButton is its own tooltip: no <Tip> drawing a second one.
+      - name: Icon button tooltips
+        run: pnpm run check:icon-button-tips
+
       # No API db spec queries in its top-level afterAll: the setup ends
       # the pool first (DEV_LEARNINGS, 17 Oct 2026).
       - name: Db spec teardown

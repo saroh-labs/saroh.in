@@ -36,7 +36,7 @@ async function order(
         ago: number;
         status?: string;
         paymentStatus?: string;
-        fulfilment?: "PICKUP" | "LOCAL_DELIVERY";
+        fulfilment?: "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING";
         placedOnline?: boolean;
         org?: string;
         store?: string;
@@ -115,8 +115,11 @@ beforeAll(async () => {
     }
     // A pick-up 150 minutes old: late (2 hours), and newer than all five.
     await order("latePickup", { ago: 150 * MIN, fulfilment: "PICKUP" });
-    // Shipped: open until delivered, never late.
+    // Shipped: open until delivered, never late — in progress (DEC-163).
     await order("shipped", { ago: 10 * HOUR, status: "SHIPPED" });
+    // A shipping order placed an hour ago: late after 48 hours, so due the
+    // day after tomorrow — in progress, off Needs you (DEC-163).
+    await order("shipsLater", { ago: HOUR, fulfilment: "SHIPPING" });
     // Paid online: a real order, open.
     await order("paidOnline", {
         ago: 30 * MIN,
@@ -170,29 +173,44 @@ beforeAll(async () => {
 const view = { now: NOW, zone: ZONE, money: true };
 
 describe("Home's open orders (DB)", () => {
-    it("counts exactly the Orders list's Open tab for the same orders (H-3, O-1)", async () => {
+    it("splits exactly the Orders list's Open tab into soon and in progress (H-3, O-1, DEC-163)", async () => {
         const [home, list] = await Promise.all([
             readOpenOrders(prisma, orgId, view),
             listOrderRows(orgId, {}, { contact: true, money: true }, NOW),
         ]);
-        expect(list.counts.open).toBe(8);
-        expect(home.count).toBe(list.counts.open);
+        expect(list.counts.open).toBe(9);
+        expect(home.count + home.later).toBe(list.counts.open);
+        // Late, due today or due tomorrow: the late pick-up, the five local
+        // deliveries (late tomorrow morning) and the pick-up paid online.
+        expect(home.count).toBe(7);
+        // On its way, and the shipping order due the day after tomorrow.
+        expect(home.later).toBe(2);
     });
 
-    it("shows a late order before five that are merely due (H-1)", async () => {
+    it("shows a late order before five that are merely due, and none due later (H-1, DEC-163)", async () => {
         const home = await readOpenOrders(prisma, orgId, view);
         expect(home.evidence.map((e) => e.id)).toEqual([
             ids.latePickup,
-            ids.shipped,
             ids.due8,
             ids.due7,
             ids.due6,
+            ids.due5,
         ]);
         expect(home.evidence[0]).toMatchObject({ tone: "bad" });
         expect(home.evidence[0].tag).toMatch(/^Late/);
-        expect(home.evidence[1].headline).toMatch(/is on its way to/);
-        // None of the three past the five is late.
+        expect(home.evidence[1].tag).toBe("Due tomorrow");
+        // None of the two past the five is late.
         expect(home.moreTone).toBe("due");
+    });
+
+    it("lists the shipping order once it is due tomorrow (DEC-163)", async () => {
+        // A day on: it turns late at noon tomorrow.
+        const home = await readOpenOrders(prisma, orgId, {
+            ...view,
+            now: new Date(NOW.getTime() + 24 * HOUR),
+        });
+        expect(home.later).toBe(1);
+        expect(home.count).toBe(8);
     });
 
     it("says 'N more' holds a late order when one is past the five (H-1)", async () => {
@@ -221,7 +239,7 @@ describe("Home's open orders (DB)", () => {
         const orders = items.find((i) => i.kind === "ORDERS");
         // Its link opens the list's All tab from the same instant.
         expect(orders?.count).toBe(list.counts.all);
-        expect(orders?.count).toBe(11);
+        expect(orders?.count).toBe(12);
     });
 
     it("greets a business with only an abandoned checkout as fresh (H-3)", async () => {

@@ -48,14 +48,33 @@ export interface ToastAction {
  * worse than none.
  */
 export function showError(message: string, description?: string) {
+    sayError(message, description);
+}
+
+/**
+ * `showError`, handing back the toast's id (undefined for a refusal, said
+ * calmly instead), for a screen that clears it once the thing it was about
+ * succeeds — the product editor's section saves — with `dismissToast`.
+ */
+export function showErrorToast(
+    message: string,
+    description?: string,
+): string | number | undefined {
+    return sayError(message, description);
+}
+
+function sayError(
+    message: string,
+    description?: string,
+): string | number | undefined {
     // A refusal is not a breakage: it is said calmly, never in red.
     if (refusals.some((is) => is(message))) {
         showRefusal(message, description);
-        return;
+        return undefined;
     }
     const way =
         errorActions.get(message) ?? errorActions.get(description ?? "");
-    toast.error(message, {
+    return toast.error(message, {
         description,
         duration: Number.POSITIVE_INFINITY,
         closeButton: true,

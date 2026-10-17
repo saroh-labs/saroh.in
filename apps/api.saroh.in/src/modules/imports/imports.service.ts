@@ -232,15 +232,24 @@ export class ImportsService {
         };
     }
 
-    /** The columns available to map, for the mapping step. */
-    describe(entity: ImportEntity) {
+    /**
+     * The columns available to map, for the mapping step, a sample file to
+     * start from, and the currency the preview's amounts read in.
+     */
+    async describe(storeId: string, entity: ImportEntity) {
         const d = ENTITY_DESCRIPTORS[entity];
+        const currency =
+            entity === "products"
+                ? await storefrontCurrency(prisma, storeId)
+                : null;
         return {
             entity,
             requiredFields: d.requiredFields,
             mappableFields: d.mappableFields,
             fieldLabels: d.fieldLabels,
             keyLabel: d.keyLabel,
+            sample: d.sample,
+            currency,
         };
     }
 
@@ -269,9 +278,15 @@ export class ImportsService {
 
         // An empty mapping means "you choose": suggest one so the first preview
         // is already informative rather than a wall of missing-field errors.
+        // Only a field the import takes: a column sent for another one (an
+        // older tab's "currency") is left out, as "Don't import" is.
         const mapping =
             Object.keys(dto.mapping).length > 0
-                ? dto.mapping
+                ? Object.fromEntries(
+                      Object.entries(dto.mapping).filter(([, field]) =>
+                          descriptor.mappableFields.includes(field),
+                      ),
+                  )
                 : suggestMapping(
                       parsed.headers,
                       descriptor.mappableFields,
@@ -293,8 +308,9 @@ export class ImportsService {
                 ? new Set(mrp.existing.keys())
                 : await this.existingKeys(storeId, organizationId, entity),
             requiredFields: descriptor.requiredFields,
-            keyOf: descriptor.keyOf,
+            fieldLabels: descriptor.fieldLabels,
             normalize: descriptor.normalize,
+            keyOf: descriptor.keyOf,
             validateRow: mrp
                 ? (values) => {
                       const issues = descriptor.validateRow(values);

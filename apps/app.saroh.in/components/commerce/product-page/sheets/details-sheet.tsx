@@ -11,23 +11,25 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { Count } from "@/components/commerce/product-editor-v2/fields";
 import {
     ChoicePills,
     ShopSwitch,
 } from "@/components/commerce/product-sections/shop-switch";
 import { patchProduct } from "@/lib/products/actions";
 import {
+    heldOverLimit,
     LIMITS,
     madeByFrom,
     madeByPatch,
     madeBySchema,
 } from "@/lib/products/editor-sections";
-import { productEditHref } from "@/lib/products/links";
 import type { ProductDetail, ProductPatch } from "@/lib/products/service";
 import { OptionSelect } from "@saroh/ui/option-select";
 
@@ -37,12 +39,9 @@ const schema = z.intersection(
     z.object({
         status: z.enum(["PUBLISHED", "DRAFT", "ARCHIVED"]),
         categoryId: z.string(),
-        howToUse: z
-            .string()
-            .max(
-                LIMITS.howToUse,
-                `Keep the line under ${LIMITS.howToUse} characters.`,
-            ),
+        // Its limit is checked on save, not here: a line saved before the
+        // limit opens as a held note, never an error (`heldOverLimit`).
+        howToUse: z.string(),
         showHowToUse: z.boolean(),
     }),
     madeBySchema,
@@ -106,10 +105,26 @@ export function DetailsSheet({
     const returnsMode = form.watch("returnsMode");
     const status = form.watch("status");
     const firstError = Object.values(errors)[0]?.message;
+    const howToUse = form.watch("howToUse");
+    // Saved before its limit and untouched: a held note, as the editor
+    // says it (audit, 16 Oct 2026). The rest of the sheet saves around it.
+    const held = heldOverLimit(
+        howToUse,
+        product.howToUse ?? "",
+        LIMITS.howToUse,
+    );
 
     async function save(v: Values) {
+        if (!held && v.howToUse.length > LIMITS.howToUse) {
+            form.setError("howToUse", {
+                message: `Keep it under ${LIMITS.howToUse} characters. It is ${v.howToUse.length} now.`,
+            });
+            return;
+        }
         const before = patchOf(valuesOf(product));
-        const res = await patchProduct(storeId, product.id, patchOf(v));
+        const patch = patchOf(v);
+        if (held) delete patch.howToUse;
+        const res = await patchProduct(storeId, product.id, patch);
         if (!res.ok) {
             if (
                 res.field === "maker" ||
@@ -140,7 +155,6 @@ export function DetailsSheet({
             }}
             productName={product.name}
             title="Edit details"
-            fullEditorHref={productEditHref(storeId, product.id, "details")}
             dirty={isDirty}
             saving={isSubmitting}
             note={firstError}
@@ -162,7 +176,7 @@ export function DetailsSheet({
                                         options={[
                                             {
                                                 value: "PUBLISHED",
-                                                label: "On the shop",
+                                                label: "Live",
                                             },
                                             { value: "DRAFT", label: "Draft" },
                                             {
@@ -230,15 +244,32 @@ export function DetailsSheet({
                                     />
                                 </div>
                                 <FormControl>
-                                    <Input
+                                    <Textarea
                                         {...field}
+                                        rows={3}
+                                        className="resize-y"
                                         placeholder="Two drops, morning and night, on clean skin."
                                     />
                                 </FormControl>
-                                <FormDescription>
-                                    One line under the price. Every variant
-                                    shares it.
-                                </FormDescription>
+                                <div className="flex items-baseline gap-2.5">
+                                    <FormDescription
+                                        data-ph-unmask=""
+                                        className={
+                                            held
+                                                ? "min-w-0 flex-1 text-warning-subtle-foreground"
+                                                : "min-w-0 flex-1"
+                                        }
+                                    >
+                                        {held ||
+                                            "One line under the price. Every variant shares it."}
+                                    </FormDescription>
+                                    {held ? null : (
+                                        <Count
+                                            value={howToUse.length}
+                                            max={LIMITS.howToUse}
+                                        />
+                                    )}
+                                </div>
                                 <FormMessage />
                             </FormItem>
                         )}

@@ -5,20 +5,24 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { stockWords } from "@/lib/products/catalogue";
 import { addQuickStock } from "@/lib/products/list-actions";
+import type { NeedDetail } from "@/lib/products/needs-you";
+import { optionWord } from "@/lib/products/needs-you";
 import type { QuickShelf } from "@/lib/products/quick-look";
 import {
+    foldShelves,
+    orderShelves,
     quickStock,
     readAdd,
     shelfLine,
     shelfTone,
     shortTitle,
     showShelves,
-    stockLine,
+    stockHeadline,
     storefrontsLine,
 } from "@/lib/products/quick-look";
 import { addedWords } from "@/lib/stock/levels";
@@ -29,30 +33,42 @@ import { Notice } from "@saroh/ui/notice";
 import { TONE_TEXT } from "./tones";
 
 /**
- * Stock: the line, the short alert, and each variant with "+N · Add" for
- * someone who can count stock. Untracked says so, never 0.
+ * Stock: the headline, the short alert, and each variant with "Qty · Add"
+ * for someone who can count stock. Shelves that need someone come first
+ * (short, out, low), so the one shade that's out isn't the 26th row; past
+ * six healthy ones the rest wait behind "Show all 28 shades". Someone who
+ * counts stock always gets an Add row, even for one shelf: Restock lands
+ * here. Untracked says so, never 0.
  */
 export function StockBlock({
     row,
     storeId,
     canStock,
+    need,
     onChanged,
 }: {
     row: CatalogueRow;
     storeId: string | null;
     canStock: boolean;
+    /** What Needs you says about it, if anything. */
+    need: NeedDetail | null;
     onChanged: () => void;
 }) {
     const addId = useId();
     const stock = useMemo(() => quickStock(row, storeId), [row, storeId]);
+    const ordered = useMemo(() => orderShelves(stock.shelves), [stock]);
+    const [all, setAll] = useState(false);
+    const { shown, hidden } = foldShelves(ordered, all);
     const where = row.places.filter((p) =>
         stock.shelves.some((s) => s.storeIds.includes(p.storeId)),
     );
+    // Add starts where Needs you says it is needed, else the first place.
+    const needed = where.find((p) => need?.places?.includes(p.storeName));
     const [addAt, setAddAt] = useState<string | null>(
-        where.at(0)?.storeId ?? null,
+        (needed ?? where.at(0))?.storeId ?? null,
     );
     const across = storeId ? null : storefrontsLine(row);
-    const words = stockWords(row);
+    const words = stockWords(row, need);
     const lineTone = stock.tracked
         ? shelfTone({
               short: stock.total.short,
@@ -66,16 +82,30 @@ export function StockBlock({
                 <dt className="w-[86px] shrink-0 text-[12.5px] text-muted-foreground">
                     Stock
                 </dt>
-                <dd className={cn("text-[13px]", TONE_TEXT[lineTone])}>
+                <dd
+                    className={cn(
+                        "text-[13px]",
+                        TONE_TEXT[need ? words.tone : lineTone],
+                    )}
+                >
                     {stock.tracked
-                        ? stockLine(stock.total)
+                        ? stockHeadline(stock.total, need)
                         : words.tone === "danger"
                           ? "Sold out · marked by hand"
                           : "Not tracked · always available"}
                 </dd>
             </div>
             {across ? (
-                <p className="pl-[98px] text-[12px] text-muted-foreground">
+                <p
+                    className={cn(
+                        "pl-[98px] text-[12px]",
+                        // Sold out somewhere: said in the warning tone, not
+                        // grey, so it isn't read past.
+                        across.startsWith("Sold out")
+                            ? "text-warning-subtle-foreground"
+                            : "text-muted-foreground",
+                    )}
+                >
                     {across}
                 </p>
             ) : null}
@@ -87,7 +117,7 @@ export function StockBlock({
                         : "Someone who counts stock can add it, or tell the customers their order will be late."}
                 </Notice>
             ) : null}
-            {showShelves(stock) ? (
+            {showShelves(stock, canStock) ? (
                 <>
                     {canStock && where.length > 1 ? (
                         <div className="flex items-center gap-2">
@@ -110,7 +140,7 @@ export function StockBlock({
                             />
                         </div>
                     ) : null}
-                    {stock.shelves.map((s) => (
+                    {shown.map((s) => (
                         <ShelfRow
                             key={s.variantId ?? "whole"}
                             shelf={s}
@@ -137,6 +167,20 @@ export function StockBlock({
                             onChanged={onChanged}
                         />
                     ))}
+                    {hidden > 0 ? (
+                        <Button
+                            type="button"
+                            variant="link"
+                            size="inline"
+                            className="self-start text-[12.5px]"
+                            onClick={() => setAll(true)}
+                        >
+                            Show all {ordered.length}
+                            {need?.option
+                                ? ` ${optionWord(need.option, ordered.length)}`
+                                : ""}
+                        </Button>
+                    ) : null}
                 </>
             ) : null}
         </div>
@@ -162,11 +206,19 @@ function ShelfRow({
     const [draft, setDraft] = useState("");
     const [saving, setSaving] = useState(false);
     const [key, setKey] = useState(() => crypto.randomUUID());
+    const input = useRef<HTMLInputElement>(null);
     const units = readAdd(draft);
-    const off = units === null || storeId === null || saving;
+    // Off only where Add can't add (this location doesn't sell it) or
+    // while saving — never for "not typed yet": muted until a number, and
+    // pressed early it puts the keyboard in the box.
+    const off = storeId === null || saving;
 
     async function add() {
-        if (units === null || storeId === null || saving) return;
+        if (units === null) {
+            input.current?.focus();
+            return;
+        }
+        if (storeId === null || saving) return;
         const res = await runAction(
             () =>
                 addQuickStock({
@@ -203,6 +255,8 @@ function ShelfRow({
             {canStock ? (
                 <>
                     <Input
+                        ref={input}
+                        data-add-input=""
                         dense
                         type="text"
                         inputMode="numeric"
@@ -217,11 +271,12 @@ function ShelfRow({
                             }
                         }}
                         aria-label={`Add stock to ${shelf.title}`}
-                        placeholder="+0"
+                        placeholder="Qty"
                         className="w-[52px] text-right"
                     />
                     <Button
                         size="sm"
+                        variant={units === null ? "outline" : "default"}
                         disabled={off}
                         onClick={() => void add()}
                         aria-label={`Add to ${shelf.title}`}

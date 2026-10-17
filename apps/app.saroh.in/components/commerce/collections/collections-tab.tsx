@@ -16,7 +16,10 @@ import type { CategoryNode } from "@/lib/collections/rules";
 import { collectionNote, whyIn } from "@/lib/collections/rules";
 import type { CollectionSummary } from "@/lib/collections/service";
 import type { ProductOverview } from "@/lib/products/overview";
-import { websiteSummary } from "@/lib/products/overview-words";
+import {
+    collectionExamples,
+    websiteSummary,
+} from "@/lib/products/overview-words";
 import { EmptyState } from "@saroh/ui/data-state";
 
 import { TextLink } from "@saroh/ui/text-link";
@@ -96,15 +99,18 @@ export function ProductCollectionsTab({
     );
 
     if (inIt.length === 0 && !placement.data.website.showsProducts) {
+        // Examples from what this business sells, not a bakery's.
+        const examples = collectionExamples(categories.map((c) => c.name));
         return (
             <>
                 <TabState
+                    data-ph-mask=""
                     icon={Layers}
                     title="Not in a collection, not on the website"
                     description={
                         canEdit && handPicked
-                            ? "Collections are how it shows up on the site: a Breads section, a Weekend list. Add it to one here, or make one from Products."
-                            : "Collections are how it shows up on the site: a Breads section, a Weekend list. Add it to one from Products."
+                            ? `Collections are how it shows up on the site: ${examples}. Add it to one here, or make one from Products.`
+                            : `Collections are how it shows up on the site: ${examples}. Make one from Products.`
                     }
                 >
                     {canEdit && handPicked ? (
@@ -116,9 +122,11 @@ export function ProductCollectionsTab({
                             Add to a collection
                         </Button>
                     ) : null}
-                    <StateLink href="/commerce/products?tab=collections">
-                        Open Products
-                    </StateLink>
+                    {canEdit && handPicked ? null : (
+                        <StateLink href="/commerce/products?tab=collections">
+                            Open Products
+                        </StateLink>
+                    )}
                 </TabState>
                 {sheets}
             </>

@@ -3,7 +3,11 @@ import { Card } from "@saroh/ui/card";
 import { fulfilmentLine } from "@/lib/products/fulfilment-types";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import { customFieldText, onTheShop } from "@/lib/products/overview-rules";
-import { detailTag, NOT_FILLED_IN } from "@/lib/products/overview-words";
+import {
+    detailTag,
+    NOT_FILLED_IN,
+    visibilityLine,
+} from "@/lib/products/overview-words";
 import { untrackedDetail } from "@/lib/products/tracking";
 
 import { CardHead, DetailRow } from "./overview-parts";
@@ -11,7 +15,8 @@ import { SheetButton } from "./sheet-button";
 
 /**
  * Details (#522), in two groups as the design has them: "How it's sold" —
- * visibility, where, how it's fulfilled (B12), its category, its address
+ * visibility (as far as it truly reaches), where, how it's fulfilled
+ * (B12), its category, its path
  * and whether stock is counted — and "On the product page", each with a tag saying whether
  * customers see it. One the shop would show but that is empty reads "Not
  * filled in · Hidden until filled in".
@@ -21,10 +26,13 @@ export function ProductDetailsCard({
     storeId,
     categories,
     stock,
+    shopLive = null,
 }: {
     overview: ProductOverview;
     storeId: string;
     categories: { id: string; name: string }[];
+    /** The online shop is live; null when that couldn't be read. */
+    shopLive?: boolean | null;
     /** How stock is counted, or null when the business doesn't track it. */
     stock: "tracked" | "tracked-per-storefront" | "untracked" | null;
 }) {
@@ -53,11 +61,7 @@ export function ProductDetailsCard({
             <div className="px-[18px] pb-1.5">
                 <Group label="How it's sold">
                     <DetailRow label="Visibility">
-                        {product.status === "PUBLISHED"
-                            ? "On the shop. Customers can buy it"
-                            : product.status === "DRAFT"
-                              ? "Draft. Only the team can see it"
-                              : "Archived. Not sold, and its page does not open"}
+                        {visibilityLine(product.status, shopLive)}
                     </DetailRow>
                     <DetailRow label="Sold at" muted={places.length === 0}>
                         {places.length ? places.join(", ") : "Nowhere yet"}
@@ -66,10 +70,20 @@ export function ProductDetailsCard({
                         {fulfilmentLine(product.fulfilmentTypes)}
                     </DetailRow>
                     <DetailRow label="Category">
-                        {product.category?.name ?? "Uncategorized"}
+                        {product.category?.name ?? "No category"}
                     </DetailRow>
-                    <DetailRow label="Address" mono>
-                        /products/{product.slug}
+                    <DetailRow label="Path" mono>
+                        /products/
+                        {product.slug.split("-").map((part, i) => (
+                            <span key={i}>
+                                {i > 0 ? (
+                                    <>
+                                        -<wbr />
+                                    </>
+                                ) : null}
+                                {part}
+                            </span>
+                        ))}
                     </DetailRow>
                     {stock ? (
                         <DetailRow label="Stock">
@@ -88,6 +102,7 @@ export function ProductDetailsCard({
                         tag={detailTag(
                             Boolean(product.howToUse),
                             shown("howToUse"),
+                            shopLive,
                         )}
                     >
                         {product.howToUse ?? NOT_FILLED_IN}
@@ -95,7 +110,11 @@ export function ProductDetailsCard({
                     <DetailRow
                         label="Made by"
                         muted={!maker}
-                        tag={detailTag(Boolean(maker), shown("maker"))}
+                        tag={detailTag(
+                            Boolean(maker),
+                            shown("maker"),
+                            shopLive,
+                        )}
                     >
                         {maker || NOT_FILLED_IN}
                     </DetailRow>
@@ -105,13 +124,14 @@ export function ProductDetailsCard({
                         tag={detailTag(
                             Boolean(product.warranty),
                             shown("warranty"),
+                            shopLive,
                         )}
                     >
                         {product.warranty ?? NOT_FILLED_IN}
                     </DetailRow>
                     <DetailRow
                         label="Returns"
-                        tag={detailTag(true, shown("returns"))}
+                        tag={detailTag(true, shown("returns"), shopLive)}
                     >
                         {product.returnsMode === "OWN" && product.returnsText
                             ? product.returnsText
@@ -122,7 +142,11 @@ export function ProductDetailsCard({
                             key={f.id}
                             label={f.name}
                             muted={f.value === null}
-                            tag={detailTag(f.value !== null, f.onShop)}
+                            tag={detailTag(
+                                f.value !== null,
+                                f.onShop,
+                                shopLive,
+                            )}
                         >
                             {f.value === null
                                 ? NOT_FILLED_IN

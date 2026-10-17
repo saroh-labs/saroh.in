@@ -1,9 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
-import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -16,6 +14,7 @@ import {
     detailsPatch,
     detailsSchema,
     firstProblem,
+    heldOverLimit,
     LIMITS,
 } from "@/lib/products/editor-sections";
 import {
@@ -30,7 +29,7 @@ import type { EffectiveDefaults } from "@/lib/products/settings";
 
 import { Chip } from "@/components/shared/chip";
 import { useEditor, useSection } from "./editor-state";
-import { FieldHelp, FieldLabel } from "./fields";
+import { Count, FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
 
 const EMPTY: DetailsValues = {
@@ -59,7 +58,7 @@ export function DetailsSection({
     /** Creating: Settings → Defaults for the chosen category. */
     defaults: EffectiveDefaults | null;
 }) {
-    const { canWrite } = useEditor();
+    const { canWrite, sayError } = useEditor();
     // A new product starts with its category's line; picking another
     // category changes it only while the merchant hasn't typed their own.
     const baseline = product
@@ -94,7 +93,18 @@ export function DetailsSection({
     // field here (#525).
     const allergenPatch = () =>
         contains.length || may.length ? { contains, mayContain: may } : {};
-    const howLong = v.howToUse.length > LIMITS.howToUse;
+    // Saved over the limit before it was one (How to use, 395 of 300): a
+    // held note, and the rest of the section still saves around it.
+    const held = heldOverLimit(v.howToUse, baseline.howToUse, LIMITS.howToUse);
+    const howLong = !held && v.howToUse.length > LIMITS.howToUse;
+    const howTooLong = `Keep it under ${LIMITS.howToUse} characters. It is ${v.howToUse.length} now.`;
+    const patchOf = (values: DetailsValues) => {
+        const patch = detailsPatch(values);
+        // Unchanged and held: left as it is, so the API isn't asked to
+        // judge a line nobody touched.
+        if (held) delete patch.howToUse;
+        return patch;
+    };
 
     useSection(
         "details",
@@ -102,21 +112,24 @@ export function DetailsSection({
             dirty: isDirty || allergensDirty,
             note: copy.saves,
             problem: howLong
-                ? `Keep the line under ${LIMITS.howToUse} characters.`
-                : firstProblem(detailsSchema, v),
+                ? howTooLong
+                : firstProblem(detailsSchema, {
+                      ...v,
+                      howToUse: held ? "" : v.howToUse,
+                  }),
         },
         {
             save: async () => {
                 if (!product) return false;
                 const values = form.getValues();
                 const res = await patchProduct(storeId, product.id, {
-                    ...detailsPatch(values),
+                    ...patchOf(values),
                     ...(allergensDirty ? { contains, mayContain: may } : {}),
                 });
                 if (!res.ok) {
                     if (res.field === "howToUse" || res.field === "materials")
                         form.setError(res.field, { message: res.error });
-                    else showError(res.error);
+                    else sayError("details", res.error);
                     return false;
                 }
                 form.reset(values);
@@ -153,21 +166,39 @@ export function DetailsSection({
             >
                 {copy.how.label}
             </FieldLabel>
-            <Input
+            <Textarea
                 id="pe-how"
                 {...form.register("howToUse")}
+                rows={3}
                 disabled={ro}
                 placeholder={copy.how.placeholder}
-                aria-invalid={howLong || !!errors.howToUse}
+                aria-invalid={howLong || (!held && !!errors.howToUse)}
+                aria-describedby="pe-how-note"
+                className="resize-y"
             />
-            <FieldHelp
-                className="mb-4 mt-1.5"
-                tone={howLong || errors.howToUse ? "bad" : "quiet"}
-            >
-                {howLong
-                    ? `Keep the line under ${LIMITS.howToUse} characters.`
-                    : (errors.howToUse?.message ?? copy.how.help)}
-            </FieldHelp>
+            <div className="mb-4 mt-1.5 flex items-baseline gap-2.5">
+                <FieldHelp
+                    id="pe-how-note"
+                    className="min-w-0 flex-1"
+                    tone={
+                        howLong || (!held && errors.howToUse)
+                            ? "bad"
+                            : held
+                              ? "warn"
+                              : "quiet"
+                    }
+                >
+                    {held ||
+                        (howLong
+                            ? howTooLong
+                            : (errors.howToUse?.message ?? copy.how.help))}
+                </FieldHelp>
+                {/* Held, the note says the count: red only for a line
+                    being typed past the limit. */}
+                {held ? null : (
+                    <Count value={v.howToUse.length} max={LIMITS.howToUse} />
+                )}
+            </div>
 
             <FieldLabel
                 htmlFor="pe-materials"

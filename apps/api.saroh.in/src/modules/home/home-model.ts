@@ -457,6 +457,12 @@ export interface HomeModel {
      */
     needsTotal: number;
     /**
+     * Open orders left off `needs` because they are due after tomorrow, or
+     * never turn late (DEC-163): still in progress, and in Orders. Home
+     * says "and N more in progress" with a link there, never a row each.
+     */
+    ordersInProgress: number;
+    /**
      * The business's day (F5): its bookings, classes and pick-ups in time
      * order. Null when the viewer reads none of them, or when the read
      * failed (then `unavailable` names "Today").

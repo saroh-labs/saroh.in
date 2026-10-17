@@ -1,12 +1,12 @@
 "use client";
 
-import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { EmptyState } from "@saroh/ui/data-state";
-import { Label } from "@saroh/ui/label";
 import { planLabel } from "@saroh/ui/lib/state-copy";
+import { cn } from "@saroh/ui/lib/utils";
+import { Notice } from "@saroh/ui/notice";
 import {
     Select,
     SelectContent,
@@ -14,7 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
-import { showSuccess } from "@saroh/ui/toast";
+import { Download, FileUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
@@ -25,16 +25,29 @@ import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { runAction } from "@/lib/api/run-action";
 import type { PlanMeter } from "@/lib/billing/meter";
 import { importRoom } from "@/lib/billing/meter";
+import { joinFacts } from "@/lib/format/join";
+import { count } from "@/lib/format/plural";
 import { applyImport, previewImport } from "@/lib/imports/actions";
-import { fieldLabel } from "@/lib/imports/labels";
+import {
+    columnWords,
+    entityNoun,
+    fieldOption,
+    issueGroups,
+    matchNote,
+    neededSentence,
+    problemsLead,
+    rowLine,
+    rowsInFile,
+    toCsv,
+} from "@/lib/imports/review";
 import type {
     ApplyResult,
     DuplicatePolicy,
     ImportEntity,
+    IssueGroup,
     PreviewResult,
     RowIssue,
 } from "@/lib/imports/service";
-import { Notice } from "@saroh/ui/notice";
 
 /**
  * CSV import (#175) — pick a file, check the mapping, see what will happen,
@@ -52,15 +65,25 @@ import { Notice } from "@saroh/ui/notice";
  * Fields read in words (UX-065), and on a plan with a product limit the
  * preview says how many of the new rows fit and offers to bring in those
  * (UX-036) — never "7 will be created", then the whole file refused.
+ *
+ * Products audit (16 Oct): the columns and a sample file come before the
+ * file; problems are grouped and numbered as the spreadsheet numbers rows;
+ * the first rows read as the products they'll become; a failed re-check
+ * keeps the last good preview; the done card is the only feedback.
  */
 
 /** Matches the api's own cap; refused here too so the file is never uploaded. */
 const MAX_BYTES = 5 * 1024 * 1024;
 const IGNORE = "__ignore__";
-/** Errors are listed up to this many; the rest are counted, never hidden silently. */
-const MAX_LISTED_ISSUES = 50;
+/** Problems are listed up to this many kinds; the rest are counted. */
+const MAX_LISTED_GROUPS = 20;
+/** How many rows the preview reads out as they'll come in. */
+const PREVIEW_ROWS = 5;
 
 type Phase = "choose" | "review" | "done";
+
+/** A preview that came back, with the duplicate rule it was checked under. */
+type Checked = PreviewResult & { policy: DuplicatePolicy };
 
 export interface Descriptor {
     entity: ImportEntity;
@@ -68,43 +91,58 @@ export interface Descriptor {
     mappableFields: string[];
     fieldLabels?: Record<string, string>;
     keyLabel: string;
+    /** Headings, then example rows; absent from an older API. */
+    sample?: string[][];
+    currency?: string | null;
 }
 
-function IssueList({
-    issues,
-    total,
-    labels,
+/** What the product import can't bring in yet, said where the columns are matched. */
+const NOT_YET: Partial<Record<ImportEntity, string>> = {
+    products:
+        "Category, SKU and stock can't be imported yet. Set them on each product after.",
+};
+
+function IssueGroups({
+    groups,
+    limit = MAX_LISTED_GROUPS,
 }: {
-    issues: RowIssue[];
-    total: number;
-    labels?: Record<string, string>;
+    groups: IssueGroup[];
+    limit?: number;
 }) {
+    const shown = groups.slice(0, limit);
     return (
         <div className="space-y-2">
-            <ul className="space-y-1.5">
-                {issues.map((issue, i) => (
-                    <li
-                        key={`${issue.row}-${issue.field ?? ""}-${i}`}
-                        className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm"
-                    >
-                        <span className="tabular-nums text-muted-foreground">
-                            Row {issue.row}
+            <ul className="space-y-2">
+                {shown.map((group, i) => (
+                    <li key={`${group.field ?? ""}-${i}`} className="text-sm">
+                        <span>{group.message}</span>{" "}
+                        <span className="text-muted-foreground">
+                            {rowsInFile(group.rows)}
                         </span>
-                        {issue.field ? (
-                            <span className="rounded bg-muted px-1 py-0.5 text-xs font-medium">
-                                {fieldLabel(labels, issue.field)}
-                            </span>
-                        ) : null}
-                        <span>{issue.message}</span>
                     </li>
                 ))}
             </ul>
-            {total > issues.length ? (
+            {groups.length > shown.length ? (
                 <p className="text-sm text-muted-foreground">
-                    …and {total - issues.length} more.
+                    …and {count(groups.length - shown.length, "more problem")}.
                 </p>
             ) : null}
         </div>
+    );
+}
+
+function FileIssues({ issues }: { issues: RowIssue[] }) {
+    return (
+        <ul className="space-y-1">
+            {issues.map((issue, i) => (
+                <li
+                    key={`${issue.field ?? ""}-${i}`}
+                    className="text-sm font-medium text-destructive"
+                >
+                    {issue.message}
+                </li>
+            ))}
+        </ul>
     );
 }
 
@@ -115,6 +153,19 @@ function Count({ label, value }: { label: string; value: number }) {
             <div className="text-sm text-muted-foreground">{label}</div>
         </div>
     );
+}
+
+/** Hand the merchant the sample file to fill in. */
+function downloadSample(entity: ImportEntity, sample: string[][]) {
+    const blob = new Blob([toCsv(sample)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `saroh-${entity}-sample.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 }
 
 export function CsvImport({
@@ -131,16 +182,25 @@ export function CsvImport({
 }) {
     const router = useRouter();
     const fileInput = useRef<HTMLInputElement>(null);
+    const noun = entityNoun(descriptor.entity);
 
     const [phase, setPhase] = useState<Phase>("choose");
     const [fileName, setFileName] = useState("");
     const [csv, setCsv] = useState("");
     const [policy, setPolicy] = useState<DuplicatePolicy>("SKIP");
     const [mapping, setMapping] = useState<Record<string, string>>({});
-    const [preview, setPreview] = useState<PreviewResult | null>(null);
+    // The last preview that came back: kept on screen when a re-check fails.
+    const [preview, setPreview] = useState<Checked | null>(null);
     const [result, setResult] = useState<ApplyResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [fileIssues, setFileIssues] = useState<RowIssue[]>([]);
+    // A re-check that didn't come back, and what it asked, for Try again.
+    const [recheck, setRecheck] = useState<{
+        error: string;
+        mapping: Record<string, string>;
+        policy: DuplicatePolicy;
+    } | null>(null);
+    const [dragging, setDragging] = useState(false);
     const [pending, startTransition] = useTransition();
     // A file checked and its columns matched, and nothing written yet.
     const guard = useLeaveGuard({
@@ -153,23 +213,48 @@ export function CsvImport({
             text: string,
             nextMapping: Record<string, string>,
             next: DuplicatePolicy,
+            /** The preview on screen, kept if this one fails. */
+            kept: Checked | null,
         ) => {
             startTransition(async () => {
-                const res = await runAction(() =>
-                    previewImport(storeId, descriptor.entity, {
-                        csv: text,
-                        mapping: nextMapping,
-                        policy: next,
-                    }),
+                let unreached: string | null = null;
+                const res = await runAction(
+                    () =>
+                        previewImport(storeId, descriptor.entity, {
+                            csv: text,
+                            mapping: nextMapping,
+                            policy: next,
+                        }),
+                    // A re-check says it failed where the preview is.
+                    kept
+                        ? {
+                              quiet: true,
+                              onUnreached: (s) => {
+                                  unreached = s;
+                              },
+                          }
+                        : {},
                 );
-                if (!res) return;
-                if (!res.ok) {
-                    setError(res.error);
-                    setPreview(null);
+                const failed = !res ? unreached : res.ok ? null : res.error;
+                if (!res?.ok) {
+                    if (failed === null) return;
+                    if (kept) {
+                        // Keep the last good preview and what it matched.
+                        setMapping(kept.mapping);
+                        setPolicy(kept.policy);
+                        setRecheck({
+                            error: failed,
+                            mapping: nextMapping,
+                            policy: next,
+                        });
+                    } else {
+                        setError(failed);
+                    }
                     return;
                 }
                 setError(null);
-                setPreview(res.data);
+                setRecheck(null);
+                setPreview({ ...res.data, policy: next });
                 // The api suggests a mapping when none was sent; adopt it so the
                 // controls show what the preview was actually computed from.
                 setMapping(res.data.mapping);
@@ -182,18 +267,28 @@ export function CsvImport({
 
     async function onFile(file: File) {
         setResult(null);
+        setRecheck(null);
         if (file.size > MAX_BYTES) {
             setError(
                 "This file is larger than 5 MB. Split it and import in parts.",
             );
-            setPreview(null);
             return;
         }
         const text = await file.text();
         setFileName(file.name);
         setCsv(text);
         setMapping({});
-        runPreview(text, {}, policy);
+        setPreview(null);
+        setPhase("choose");
+        runPreview(text, {}, policy, null);
+    }
+
+    function chooseFile() {
+        if (fileInput.current) {
+            // The same file chosen again still counts as a choice.
+            fileInput.current.value = "";
+            fileInput.current.click();
+        }
     }
 
     function changeMapping(header: string, field: string) {
@@ -201,12 +296,12 @@ export function CsvImport({
         if (field === IGNORE) delete next[header];
         else next[header] = field;
         setMapping(next);
-        runPreview(csv, next, policy);
+        runPreview(csv, next, policy, preview);
     }
 
     function changePolicy(next: DuplicatePolicy) {
         setPolicy(next);
-        runPreview(csv, mapping, next);
+        runPreview(csv, mapping, next, preview);
     }
 
     function onImport(createAtMost?: number) {
@@ -227,12 +322,10 @@ export function CsvImport({
                 if (res.fileIssues) setFileIssues(res.fileIssues);
                 return;
             }
+            // The done card is the feedback: no toast to say it twice.
             setError(null);
             setResult(res.data);
             setPhase("done");
-            showSuccess(
-                `Imported ${res.data.created + res.data.updated} ${descriptor.entity}.`,
-            );
             router.refresh();
         });
     }
@@ -242,6 +335,7 @@ export function CsvImport({
         setPreview(null);
         setResult(null);
         setError(null);
+        setRecheck(null);
         setFileIssues([]);
         setCsv("");
         setFileName("");
@@ -269,14 +363,24 @@ export function CsvImport({
           plan.counts.UPDATE -
           (fits === null ? 0 : adding - fits)
         : 0;
-    const rowIssues = plan
-        ? plan.rows.flatMap((r) => r.issues).slice(0, MAX_LISTED_ISSUES)
+    const groups = issueGroups(plan);
+    const firstRows = plan
+        ? plan.rows
+              .filter((r) => r.outcome === "CREATE" || r.outcome === "UPDATE")
+              .slice(0, PREVIEW_ROWS)
         : [];
-    const totalRowIssues = plan
-        ? plan.rows.reduce((n, r) => n + r.issues.length, 0)
-        : 0;
+    const statusUnmatched =
+        descriptor.entity === "products" &&
+        descriptor.mappableFields.includes("status") &&
+        !Object.values(preview?.mapping ?? {}).includes("status");
+    const columns = columnWords(
+        descriptor.requiredFields,
+        descriptor.mappableFields,
+        descriptor.fieldLabels,
+    );
 
     if (phase === "done" && result) {
+        const resultGroups = issueGroups(result.plan);
         return (
             <Card className="wk-surface">
                 <CardContent className="space-y-6 p-6">
@@ -288,31 +392,27 @@ export function CsvImport({
                             {fileName}
                         </p>
                     </div>
-                    <div className="flex flex-wrap gap-x-10 gap-y-4">
-                        <Count label="Created" value={result.created} />
-                        <Count label="Updated" value={result.updated} />
-                        <Count label="Skipped" value={result.skipped} />
-                        <Count label="Not imported" value={result.failed} />
-                        {result.overLimit ? (
-                            <Count
-                                label="Left out to fit your plan"
-                                value={result.overLimit}
-                            />
-                        ) : null}
-                    </div>
+                    <p className="text-base font-medium">
+                        {joinFacts(
+                            `${count(result.created, noun)} added`,
+                            result.updated > 0 &&
+                                `${count(result.updated, noun)} updated`,
+                            result.skipped > 0 &&
+                                `${count(result.skipped, "row")} already there, left as they were`,
+                            result.overLimit
+                                ? `${count(result.overLimit, noun)} left out to fit your plan`
+                                : null,
+                        )}
+                    </p>
                     {result.failed > 0 ? (
                         <div className="space-y-2">
                             <p className="text-sm font-medium">
-                                {count(result.failed, "row")} could not be
+                                {count(result.failed, "row")} couldn’t be
                                 imported. Fix these in your file and import it
-                                again. Rows that already succeeded will be
-                                skipped or updated, not duplicated.
+                                again. Rows already in will be left as they are
+                                or updated, not added twice.
                             </p>
-                            <IssueList
-                                issues={rowIssues}
-                                total={totalRowIssues}
-                                labels={descriptor.fieldLabels}
-                            />
+                            <IssueGroups groups={resultGroups} />
                         </div>
                     ) : null}
                     <div className="flex flex-wrap gap-3">
@@ -330,38 +430,111 @@ export function CsvImport({
 
     return (
         <div className="space-y-6">
+            <input
+                ref={fileInput}
+                id="csv-file"
+                type="file"
+                accept=".csv,text/csv"
+                className="sr-only"
+                tabIndex={-1}
+                aria-label="Choose a CSV file"
+                disabled={pending}
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void onFile(file);
+                }}
+            />
             <Card className="wk-surface">
-                <CardContent className="space-y-4 p-6">
-                    <div className="space-y-1">
-                        <Label htmlFor="csv-file">CSV file</Label>
-                        <p className="text-sm text-muted-foreground">
-                            The first row must be column headings. Required:{" "}
-                            {descriptor.requiredFields
-                                .map((f) =>
-                                    fieldLabel(descriptor.fieldLabels, f),
-                                )
-                                .join(", ")}
-                            .
-                        </p>
-                    </div>
-                    <input
-                        ref={fileInput}
-                        id="csv-file"
-                        type="file"
-                        accept=".csv,text/csv"
-                        disabled={pending}
-                        onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) void onFile(file);
-                        }}
-                        className="block w-full cursor-pointer text-sm file:mr-4 file:cursor-pointer file:rounded-md file:border-0 file:bg-muted file:px-4 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-muted/80"
-                    />
+                <CardContent
+                    className="space-y-4 p-6"
+                    onDragOver={(e) => {
+                        if (pending) return;
+                        e.preventDefault();
+                        setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        setDragging(false);
+                        if (pending) return;
+                        const file = e.dataTransfer.files.item(0);
+                        if (file) void onFile(file);
+                    }}
+                >
                     {fileName ? (
-                        <p className="text-sm text-muted-foreground">
-                            {fileName}
-                            {plan ? ` · ${plan.totalRows} rows` : ""}
-                        </p>
-                    ) : null}
+                        <div
+                            className={cn(
+                                "flex flex-wrap items-center justify-between gap-3 rounded-[10px]",
+                                dragging &&
+                                    "outline-dashed outline-2 outline-offset-4 outline-foreground",
+                            )}
+                        >
+                            <p className="min-w-0 text-sm">
+                                <span className="font-medium">{fileName}</span>
+                                {plan ? (
+                                    <span className="text-muted-foreground">
+                                        {` · ${count(plan.totalRows, "row")}`}
+                                    </span>
+                                ) : null}
+                            </p>
+                            <Button
+                                variant="outline"
+                                onClick={chooseFile}
+                                disabled={pending}
+                            >
+                                Choose a different file
+                            </Button>
+                        </div>
+                    ) : (
+                        <>
+                            <Button
+                                variant="outline"
+                                onClick={chooseFile}
+                                disabled={pending}
+                                className={cn(
+                                    "h-auto min-h-[132px] w-full flex-col gap-2 whitespace-normal rounded-[10px] border-dashed border-border-strong p-4",
+                                    dragging && "border-foreground bg-muted/50",
+                                )}
+                            >
+                                <FileUp
+                                    className="size-5 text-muted-foreground"
+                                    aria-hidden
+                                />
+                                Drop a CSV here or choose one
+                            </Button>
+                            <div className="space-y-2 text-sm">
+                                <p>
+                                    Your first row is the headings.{" "}
+                                    {neededSentence(
+                                        descriptor.requiredFields,
+                                        descriptor.fieldLabels,
+                                    )}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    {joinFacts(
+                                        `Needed: ${columns.required.join(", ")}`,
+                                        columns.optional.length > 0 &&
+                                            `Optional: ${columns.optional.join(", ")}`,
+                                    )}
+                                </p>
+                                {descriptor.sample?.length ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            downloadSample(
+                                                descriptor.entity,
+                                                descriptor.sample ?? [],
+                                            )
+                                        }
+                                    >
+                                        <Download aria-hidden />
+                                        Download a sample file
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </>
+                    )}
                 </CardContent>
             </Card>
 
@@ -372,11 +545,7 @@ export function CsvImport({
                             {error}
                         </p>
                         {fileIssues.length > 0 ? (
-                            <IssueList
-                                issues={fileIssues}
-                                total={fileIssues.length}
-                                labels={descriptor.fieldLabels}
-                            />
+                            <FileIssues issues={fileIssues} />
                         ) : null}
                     </CardContent>
                 </Card>
@@ -391,8 +560,8 @@ export function CsvImport({
                                     Match your columns
                                 </h2>
                                 <p className="text-sm text-muted-foreground">
-                                    We matched what we recognised. Anything set
-                                    to “Don’t import” is ignored.
+                                    Matched from your headings. Columns set to
+                                    “Don’t import” are left out.
                                 </p>
                             </div>
                             <div className="space-y-3">
@@ -436,15 +605,11 @@ export function CsvImport({
                                                                     )
                                                                 }
                                                             >
-                                                                {fieldLabel(
+                                                                {fieldOption(
+                                                                    field,
+                                                                    descriptor.requiredFields,
                                                                     descriptor.fieldLabels,
-                                                                    field,
                                                                 )}
-                                                                {descriptor.requiredFields.includes(
-                                                                    field,
-                                                                )
-                                                                    ? " (required)"
-                                                                    : ""}
                                                             </SelectItem>
                                                         ),
                                                     )}
@@ -455,13 +620,23 @@ export function CsvImport({
                                 })}
                             </div>
 
+                            {fileIssues.length > 0 ? (
+                                <FileIssues issues={fileIssues} />
+                            ) : null}
+
+                            {NOT_YET[descriptor.entity] ? (
+                                <p className="text-sm text-muted-foreground">
+                                    {NOT_YET[descriptor.entity]}
+                                </p>
+                            ) : null}
+
                             <div className="grid items-center gap-2 border-t pt-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:gap-4">
                                 <div className="min-w-0">
                                     <div className="text-sm font-medium">
-                                        Rows that already exist
+                                        {`${noun.charAt(0).toUpperCase()}${noun.slice(1)}s you already have`}
                                     </div>
                                     <p className="text-sm text-muted-foreground">
-                                        Matched on {descriptor.keyLabel}.
+                                        {matchNote(descriptor.entity, mapping)}
                                     </p>
                                 </div>
                                 <Select
@@ -473,7 +648,7 @@ export function CsvImport({
                                 >
                                     <SelectTrigger
                                         className="w-full"
-                                        aria-label="Rows that already exist"
+                                        aria-label={`${noun.charAt(0).toUpperCase()}${noun.slice(1)}s you already have`}
                                     >
                                         <SelectValue />
                                     </SelectTrigger>
@@ -501,31 +676,92 @@ export function CsvImport({
                                 ) : null}
                             </div>
 
-                            <div
-                                aria-live="polite"
-                                className="flex flex-wrap gap-x-10 gap-y-4"
-                            >
-                                <Count
-                                    label="Will be created"
-                                    value={plan?.counts.CREATE ?? 0}
-                                />
-                                <Count
-                                    label={
-                                        policy === "UPDATE"
-                                            ? "Will be updated"
-                                            : "Already exist"
-                                    }
-                                    value={
-                                        policy === "UPDATE"
-                                            ? (plan?.counts.UPDATE ?? 0)
-                                            : (plan?.counts.SKIP ?? 0)
-                                    }
-                                />
-                                <Count
-                                    label="Have errors"
-                                    value={plan?.counts.ERROR ?? 0}
-                                />
+                            {recheck ? (
+                                <Notice tone="error" align="center">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <p className="min-w-0 flex-[1_1_240px] text-sm">
+                                            {recheck.error} Below is the last
+                                            check that came back.
+                                        </p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={pending}
+                                            onClick={() => {
+                                                setMapping(recheck.mapping);
+                                                setPolicy(recheck.policy);
+                                                runPreview(
+                                                    csv,
+                                                    recheck.mapping,
+                                                    recheck.policy,
+                                                    preview,
+                                                );
+                                            }}
+                                        >
+                                            Try again
+                                        </Button>
+                                    </div>
+                                </Notice>
+                            ) : null}
+
+                            <div className="grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:gap-10">
+                                <div
+                                    aria-live="polite"
+                                    className="flex flex-wrap content-start gap-x-10 gap-y-4"
+                                >
+                                    <Count
+                                        label="Will be added"
+                                        value={plan?.counts.CREATE ?? 0}
+                                    />
+                                    {policy === "UPDATE" ? (
+                                        <Count
+                                            label="Will be updated"
+                                            value={plan?.counts.UPDATE ?? 0}
+                                        />
+                                    ) : (plan?.counts.SKIP ?? 0) > 0 ? (
+                                        <Count
+                                            label="Already there"
+                                            value={plan?.counts.SKIP ?? 0}
+                                        />
+                                    ) : null}
+                                    <Count
+                                        label="Can’t import"
+                                        value={plan?.counts.ERROR ?? 0}
+                                    />
+                                </div>
+                                {firstRows.length > 0 ? (
+                                    <div className="min-w-0 space-y-1.5">
+                                        <p className="text-sm font-medium">
+                                            {firstRows.length < willWrite
+                                                ? `The first ${firstRows.length}, as they’ll read`
+                                                : "As they’ll read"}
+                                        </p>
+                                        <ul
+                                            className="space-y-1"
+                                            aria-label={`The first ${count(firstRows.length, noun)} as they’ll read`}
+                                        >
+                                            {firstRows.map((r) => (
+                                                <li
+                                                    key={r.row}
+                                                    className="truncate text-sm text-muted-foreground"
+                                                >
+                                                    {rowLine(
+                                                        descriptor.entity,
+                                                        r.values,
+                                                        descriptor.currency,
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ) : null}
                             </div>
+
+                            {statusUnmatched ? (
+                                <p className="text-sm text-muted-foreground">
+                                    New products start as Draft.
+                                </p>
+                            ) : null}
 
                             {plan?.totalRows === 0 ? (
                                 <p className="text-sm text-muted-foreground">
@@ -533,20 +769,15 @@ export function CsvImport({
                                 </p>
                             ) : null}
 
-                            {totalRowIssues > 0 ? (
+                            {groups.length > 0 ? (
                                 <div className="space-y-2 border-t pt-5">
                                     <p className="text-sm font-medium">
-                                        Rows that will not be imported
+                                        Rows that can’t be imported
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                        The rest can still be imported. Fix
-                                        these and run the file again.
+                                        {problemsLead(willWrite)}
                                     </p>
-                                    <IssueList
-                                        issues={rowIssues}
-                                        total={totalRowIssues}
-                                        labels={descriptor.fieldLabels}
-                                    />
+                                    <IssueGroups groups={groups} />
                                 </div>
                             ) : null}
 
@@ -583,13 +814,6 @@ export function CsvImport({
                                     busyLabel="Importing…"
                                 >
                                     {`Import ${count(willWrite, "row")}`}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={reset}
-                                    disabled={pending}
-                                >
-                                    Choose a different file
                                 </Button>
                                 {willWrite === 0 && !pending ? (
                                     <EmptyState

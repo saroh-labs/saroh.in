@@ -2,7 +2,6 @@
 
 import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
-import { showError } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -60,6 +59,7 @@ export function StockSection({
     countedAt,
     defaultWarn,
     control,
+    opt = "variant",
 }: {
     product: ProductDetail;
     storeId: string;
@@ -69,8 +69,10 @@ export function StockSection({
     defaultWarn: number | null;
     /** Who may flip Track stock (#515): Owner/Admin, locked, or no switch. */
     control: TrackingControl;
+    /** The product's option, lower case ("shade"); "variant" with none. */
+    opt?: string;
 }) {
-    const { canWrite, mayEdit, states } = useEditor();
+    const { canWrite, mayEdit, states, sayError } = useEditor();
     const ro = !mayEdit("stock");
     const fromProduct = stockDraftFrom(
         product,
@@ -161,7 +163,7 @@ export function StockSection({
                           lowStockAlert: Number(draft.lowStockAlert),
                       });
                 if (!res.ok) {
-                    showError(res.error);
+                    sayError("stock", res.error);
                     return false;
                 }
                 setBase(draft);
@@ -321,7 +323,12 @@ export function StockSection({
     return (
         <SectionCard k="stock" title="Stock" aside={aside}>
             {head}
-            <VariantStockTable lines={draft.lines} ro={ro} onLine={setLine} />
+            <VariantStockTable
+                lines={draft.lines}
+                ro={ro}
+                onLine={setLine}
+                opt={opt}
+            />
             <FieldHelp className="mt-[9px]" tone={problem ? "bad" : "quiet"}>
                 {problem ||
                     (splitting && counting === "whole"

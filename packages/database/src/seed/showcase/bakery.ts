@@ -36,11 +36,14 @@ import {
     writeVariantsAndListings,
 } from "./bakery-stock";
 import { SHOWCASE_SEED, TIMEZONE } from "./data";
+import { seedJournal } from "./journal";
 import { addMinutes, earliest, hashKey, istAt, istWeekday } from "./people";
+
 import type { Period } from "./periods";
 import { boundary, periodLabel } from "./periods";
 import type { Rng } from "./random";
 import { createRng } from "./random";
+import { RYE_POSTS } from "./rye-posts";
 
 /**
  * Rye & Co. (U9, ADR-008): the GST bakery the invoices, orders, subscriptions
@@ -260,7 +263,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "priya",
         first: "Priya",
         last: "Raman",
-        phone: "+91 98450 11223",
+        phone: "+91 00000 00064",
         address: blr("14 Hill Road", "Indiranagar", "560038"),
         weight: 6,
     },
@@ -268,7 +271,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "meera",
         first: "Meera",
         last: "Nair",
-        phone: "+91 98860 40211",
+        phone: "+91 00000 00080",
         address: blr("88 Queen Street", "Indiranagar", "560038"),
         weight: 4,
     },
@@ -276,7 +279,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "kavya",
         first: "Kavya",
         last: "Iyer",
-        phone: "+91 99005 31870",
+        phone: "+91 00000 00096",
         address: blr("22 Church Street", null, "560001"),
         weight: 3,
     },
@@ -284,7 +287,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "dev",
         first: "Dev",
         last: "Shah",
-        phone: "+91 99000 21876",
+        phone: "+91 00000 00090",
         address: blr("7 Ulsoor Road", "Halasuru", "560042"),
         weight: 4,
     },
@@ -292,7 +295,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "arjun",
         first: "Arjun",
         last: "Mehta",
-        phone: "+91 98451 77302",
+        phone: "+91 00000 00072",
         address: blr("3 Lavelle Road", null, "560001"),
         weight: 3,
     },
@@ -300,7 +303,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "sana",
         first: "Sana",
         last: "Qureshi",
-        phone: "+91 97410 55628",
+        phone: "+91 00000 00039",
         address: blr("40 MG Road", null, "560001"),
         weight: 2,
     },
@@ -308,7 +311,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "elena",
         first: "Elena",
         last: "Rossi",
-        phone: "+91 98220 61447",
+        phone: "+91 00000 00047",
         address: {
             line1: "7 Harbour View",
             line2: "Altinho",
@@ -322,7 +325,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "yuki",
         first: "Yuki",
         last: "Tanaka",
-        phone: "+91 90000 48213",
+        phone: "+91 00000 00011",
         address: {
             line1: "31 Park Row",
             line2: "Jubilee Hills",
@@ -336,7 +339,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "aditya",
         first: "Aditya",
         last: "Shetty",
-        phone: "+91 98311 20954",
+        phone: "+91 00000 00061",
         address: {
             line1: "5 Fell Road",
             line2: "Salt Lake",
@@ -350,7 +353,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "sanjay",
         first: "Sanjay",
         last: "Whitfield",
-        phone: "+91 98230 70315",
+        phone: "+91 00000 00048",
         address: {
             line1: "2 Beech Court",
             line2: "Koregaon Park",
@@ -364,7 +367,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "rohan",
         first: "Rohan",
         last: "Das",
-        phone: "+91 99160 84422",
+        phone: "+91 00000 00099",
         address: blr("11 Brigade Road", null, "560025"),
         weight: 2,
     },
@@ -372,7 +375,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "nikhil",
         first: "Nikhil",
         last: "Rao",
-        phone: "+91 98804 12059",
+        phone: "+91 00000 00076",
         address: blr("4 Cambridge Road", "Halasuru", "560008"),
         weight: 4,
     },
@@ -380,7 +383,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "tara",
         first: "Tara",
         last: "Pillai",
-        phone: "+91 97401 66310",
+        phone: "+91 00000 00036",
         address: blr("26 Richmond Road", null, "560025"),
         weight: 3,
     },
@@ -388,7 +391,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "ishaan",
         first: "Ishaan",
         last: "Menon",
-        phone: "+91 99720 30481",
+        phone: "+91 00000 00107",
         address: blr("9 Promenade Road", "Frazer Town", "560005"),
         weight: 2,
     },
@@ -396,7 +399,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "anjali",
         first: "Anjali",
         last: "Bose",
-        phone: "+91 98867 20113",
+        phone: "+91 00000 00086",
         address: blr("61 Residency Road", null, "560025"),
         weight: 2,
     },
@@ -404,7 +407,7 @@ const SHOPPERS: readonly Shopper[] = [
         key: "vikram",
         first: "Vikram",
         last: "Hegde",
-        phone: "+91 90088 14720",
+        phone: "+91 00000 00017",
         address: blr("2 Coles Road", "Frazer Town", "560005"),
         weight: 2,
     },
@@ -426,7 +429,7 @@ const CAFES = [
         last: "Rao",
         company: "Kiln & Co. Café",
         email: "kilnandco@example.com",
-        phone: "+91 80 4110 2231",
+        phone: "+91 00000 00007",
         pan: "AAKFK8124M",
         state: "29",
         address:
@@ -438,7 +441,7 @@ const CAFES = [
         last: "Menon",
         company: "Little Fern Café",
         email: "littlefern@example.com",
-        phone: "+91 80 4092 7710",
+        phone: "+91 00000 00004",
         pan: "AAGFL5531Q",
         state: "29",
         address:
@@ -450,7 +453,7 @@ const CAFES = [
         last: "Nair",
         company: "Brew Lane",
         email: "brewlane@example.com",
-        phone: "+91 80 4718 3302",
+        phone: "+91 00000 00009",
         pan: "ABCFB2207K",
         state: "29",
         address:
@@ -462,7 +465,7 @@ const CAFES = [
         last: "D'Souza",
         company: "Salt Pan Café",
         email: "saltpan@example.com",
-        phone: "+91 832 222 4190",
+        phone: "+91 00000 00010",
         pan: "AAQFS6618D",
         state: "30",
         address:
@@ -472,8 +475,8 @@ const CAFES = [
 
 /** People on a Sourdough plan who have no store customer. */
 const SUBSCRIBERS_ONLY = [
-    { key: "lakshmi", first: "Lakshmi", last: "Rao", phone: "+91 98451 30982" },
-    { key: "farhan", first: "Farhan", last: "Ali", phone: "+91 99011 62045" },
+    { key: "lakshmi", first: "Lakshmi", last: "Rao", phone: "+91 00000 00069" },
+    { key: "farhan", first: "Farhan", last: "Ali", phone: "+91 00000 00097" },
 ] as const;
 
 /** The Sourdough plans: weekly, and a month of Saturdays paid at once. */
@@ -804,7 +807,20 @@ export async function seedBakery(
         at: todayClock(now)(10 * 60 + 15),
         by: ctx.counterUserId,
     });
-    await writeRyeSite(prisma, { orgId, userId: demoUserId, now });
+    const siteId = await writeRyeSite(prisma, {
+        orgId,
+        userId: demoUserId,
+        now,
+    });
+    // Its journal: cakes, the subscription, and how the bakery bakes.
+    await seedJournal(prisma, {
+        siteId,
+        orgId,
+        authorId: demoUserId,
+        now,
+        posts: RYE_POSTS,
+        id: (...parts) => sid(...parts),
+    });
 
     return { id: orgId, name: NAME, prefix: RYE.prefix };
 }
@@ -999,6 +1015,11 @@ interface OrderLine {
 }
 
 interface OrderPlan {
+    /**
+     * Its rows' key when not its place in the list (the custom-cake orders):
+     * the films' orders keep the ids they had before cakes were sold.
+     */
+    key?: string;
     shopper: number;
     placedAt: Date;
     /** The storefront it was placed at; default Hill Road. */
@@ -1540,11 +1561,116 @@ function planOrders(input: PlanInput): OrderPlan[] {
         }
     }
 
+    orders.push(...planCakeOrders(input, t));
+
     return orders.sort(
         (a, b) =>
             a.placedAt.getTime() - b.placedAt.getTime() ||
             a.shopper - b.shopper,
     );
+}
+
+/** "Sat 18 Oct", a day `days` from today, on the Kolkata calendar. */
+function dayLabel(now: Date, days: number): string {
+    return new Intl.DateTimeFormat("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        timeZone: TIMEZONE,
+    })
+        .format(istAt(now, days, 12 * 60))
+        .replace(",", "");
+}
+
+/**
+ * The custom cakes on order (the owner's birthday story): placed this
+ * morning, paid online, for delivery in Bengaluru two to five days out —
+ * the day, the theme and the words on the cake in the order's note, since
+ * an order has no due date of its own. Delivered by the bakery's rider, so
+ * none reads as late before it is due a day's wait (`LOCAL_DELIVERY`).
+ * Keyed `cake-<n>`, so the films' orders keep their ids.
+ */
+function planCakeOrders(
+    input: PlanInput,
+    t: (minute: number) => Date,
+): OrderPlan[] {
+    const { now, counterUserId: nisha } = input;
+    const line = (slug: string, value: string, qty = 1): OrderLine => {
+        const product = P[slug];
+        const variant = (PRODUCTS[product].variants ?? []).findIndex(
+            (v) => v.value === value,
+        );
+        return variant >= 0 ? { product, variant, qty } : { product, qty };
+    };
+    const plan = (
+        key: string,
+        shopper: number,
+        minute: number,
+        lines: OrderLine[],
+        notes: string,
+        preparingAt?: number,
+    ): OrderPlan => ({
+        key,
+        shopper,
+        placedAt: t(minute),
+        fulfilment: "LOCAL_DELIVERY",
+        lines,
+        pay: "ONLINE",
+        notes,
+        moves:
+            preparingAt === undefined
+                ? []
+                : [{ to: "PREPARING", at: t(preparingAt), by: nisha }],
+    });
+    return [
+        plan(
+            "cake_0",
+            SHOPPER.kavya,
+            6 * 60 + 40,
+            [
+                line("theme-cake", "1.5 kg, eggless"),
+                line("number-candle", "7"),
+                line("cake-topper", "Gold"),
+            ],
+            `For ${dayLabel(now, 3)}, 4–6pm. Theme: a jungle safari — a lion, a giraffe and palm trees in fondant. Chocolate truffle inside. Message: "Happy 7th, Aarav!" (reference photo sent on WhatsApp)`,
+        ),
+        plan(
+            "cake_1",
+            SHOPPER.meera,
+            7 * 60 + 25,
+            [line("red-velvet-cake", "1 kg"), line("birthday-candles", "")],
+            `Anniversary cake for ${dayLabel(now, 2)} evening, after 7pm. Message: "25 years, Amma & Appa". White and gold piping, no fondant please.`,
+            10 * 60 + 30,
+        ),
+        plan(
+            "cake_2",
+            SHOPPER.arjun,
+            8 * 60 + 5,
+            [
+                line("rasmalai-cake", "2 kg, eggless"),
+                line("message-plaque", ""),
+            ],
+            `Diwali office party, ${dayLabel(now, 4)} — deliver to Prestige Tech Park, Tower B reception, by 3pm. Plaque: "Shubh Deepavali". Pure veg, eggless.`,
+        ),
+        plan(
+            "cake_3",
+            SHOPPER.tara,
+            9 * 60 + 30,
+            [
+                line("chocolate-truffle-cake", "1 kg"),
+                line("number-candle", "3"),
+                line("number-candle", "0"),
+            ],
+            `Surprise for my husband's 30th on ${dayLabel(now, 2)}. Deliver 11pm–midnight if you can, else 9pm. Message: "Thirty, flirty & thriving, Rahul". Please don't call him — call me.`,
+        ),
+        plan(
+            "cake_4",
+            SHOPPER.vikram,
+            10 * 60 + 15,
+            [line("lemon-blueberry-cake", "500 g")],
+            `For ${dayLabel(now, 5)}, lunchtime. Small get-together for my mother's 60th. Message: "Happy 60th, Ma". Less sweet if possible.`,
+        ),
+    ];
 }
 
 /** An order's last touch: its latest step, edit payment or refund. */
@@ -1685,9 +1811,13 @@ export function planWorld(input: PlanInput): World {
     const payRng = rngFor("payments");
     const firstOrder = new Map<number, Date>();
     const firstOnline = new Map<number, Date>();
-    planned.forEach((o, n) => {
+    // Ids by place among the films' orders, as before the cakes; numbers by
+    // place among them all, in the order they were placed.
+    let plain = 0;
+    planned.forEach((o, rank) => {
+        const n: number | string = o.key ?? plain++;
         const orderId = sid("order", n);
-        const number = String(1001 + n);
+        const number = String(1001 + rank);
         const shopper = SHOPPERS[o.shopper];
         const store = o.store ?? "H";
         const firsts = store === "H" ? firstOrder : firstOnline;

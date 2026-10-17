@@ -487,17 +487,31 @@ describe("Listings and StockLevel per storefront (DB)", () => {
         ).toBe(1);
     });
 
-    it("gives a product an address unique in its business, whichever storefront made it", async () => {
-        await products.create(hill, ownerId, {
+    it("gives a product a path unique in its business, whichever storefront made it", async () => {
+        const first = await products.create(hill, ownerId, {
             name: "Focaccia",
             price: "150.00",
         });
+        // A name another storefront's product has takes the next free
+        // path rather than refusing (16 Oct 2026); a typed path is refused.
+        const second = await products.create(online, ownerId, {
+            name: "Focaccia",
+            price: "150.00",
+        });
+        const slugs = await prisma.product.findMany({
+            where: { id: { in: [first.id, second.id] } },
+            select: { id: true, slug: true },
+        });
+        const slugOf = (id: string) => slugs.find((s) => s.id === id)?.slug;
+        expect(slugOf(first.id)).toBe("focaccia");
+        expect(slugOf(second.id)).toBe("focaccia-2");
         await expect(
             products.create(online, ownerId, {
                 name: "Focaccia",
+                slug: "focaccia",
                 price: "150.00",
             }),
-        ).rejects.toThrow("That slug is already taken");
+        ).rejects.toThrow("Focaccia already uses this path. Try focaccia-3.");
     });
 
     describe("one currency for the business (DEC-030)", () => {
