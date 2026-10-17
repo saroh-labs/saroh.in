@@ -810,6 +810,26 @@ export class BillingWebhookService {
                 });
                 return { result: { status: "processed", changed: false } };
             }
+            // Cancelled at the provider with no move of Saroh's own (the
+            // autopay stopped in a UPI or bank app, or from Razorpay's
+            // page): what was paid still runs to its end, then Free. Never
+            // cut short at once, a first month included.
+            if (
+                phase === "cancelled" &&
+                !sub.pendingFrom &&
+                sub.currentPeriodEnd &&
+                sub.currentPeriodEnd > now &&
+                (current === "ACTIVE" || current === "TRIALING")
+            ) {
+                const set = await endTermAtInTx(tx, sub, sub.currentPeriodEnd);
+                if (set) {
+                    await tx.subscription.update({
+                        where: { id: sub.id },
+                        data: { ...stamp },
+                    });
+                    return { result: { status: "processed", changed: true } };
+                }
+            }
             if (sub.pendingFrom) {
                 const applied = await applyDueMoveInTx(
                     tx,
