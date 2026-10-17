@@ -142,7 +142,8 @@ export type AdminPermission =
     | "deployments:run"
     | "reports:resolve"
     | "organization:legal-hold:lift"
-    | "saroh-billing:read";
+    | "saroh-billing:read"
+    | "saroh-billing:act";
 
 export type ControlPlaneResult<T> =
     | { ok: true; data: T }

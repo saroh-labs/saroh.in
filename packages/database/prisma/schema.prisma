@@ -4340,6 +4340,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_organization_retention_erase", where: raw("type = 'organization.retention.erase' AND status = 'PENDING'"))
   // One waiting run of the daily security-log retention sweep (DEC-122), like the renewal chain.
   @@unique([type], map: "Job_one_pending_security_logs_retention", where: raw("type = 'security-logs.retention' AND status = 'PENDING'"))
+  // One waiting run of the daily billing reconcile against the provider (DEC-166), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_billing_reconcile", where: raw("type = 'billing.reconcile' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -7377,6 +7379,75 @@ model BillingCustomer {
   @@unique([organizationId, provider])
 }
 
+// Something about Saroh's billing an operator must act on by hand (DEC-166,
+// owner 17 Oct 2026): a refund owed, a cancel the provider keeps refusing,
+// a payment Saroh never matched, an invoice whose total isn't what the
+// provider took, a credit note that may be needed. Written beside every
+// billing ops notice (`billing-ops-notice.ts`) and by the daily reconcile;
+// listed across businesses in Admin › Billing › Needs action and marked
+// resolved there with a reason. Relation-free like AdminOrganizationNote: the
+// platform's record about a business, never the business's own, so it never
+// cascades from a tenant delete and no tenant path reads it.
+model BillingAction {
+  id             String    @id @default(cuid())
+  // Null: about no business Saroh could find (an unmatched payment).
+  organizationId String?
+  // The log code, e.g. `billing_double_charge_refund_given_up`.
+  code           String
+  // Ids an operator follows it by (provider ids, the checkout, the invoice).
+  refs           Json
+  // What happened and what to do, in Saroh's words.
+  note           String
+  // Once per thing it is about, for a raise that repeats (the reconcile
+  // runs daily); null: every raise is its own.
+  dedupeKey      String?   @unique
+  createdAt      DateTime  @default(now())
+  resolvedAt     DateTime?
+  // The operator's user id.
+  resolvedBy     String?
+  resolution     String?
+
+  @@index([resolvedAt, createdAt])
+  @@index([organizationId, resolvedAt])
+}
+
+// A refund or a dispute on a payment Saroh took for a plan (DEC-166): the
+// automatic double-charge refund (AUTO), one the owner made by hand in the
+// provider's dashboard and recorded in the console (MANUAL), or one the
+// provider told Saroh of by webhook (PROVIDER: `refund.*`,
+// `payment.dispute.*`). Followed by the provider's refund or dispute id, so
+// whichever of the three comes first, the others fill it in. Saroh issues
+// no credit note for it: each one raises a billing action to ask the CA.
+model BillingRefund {
+  id                String   @id @default(cuid())
+  // Null: a payment no Saroh invoice or business carries.
+  organizationId    String?
+  provider          String
+  // REFUND | DISPUTE
+  kind              String   @default("REFUND")
+  // Razorpay's `rfnd_…`, or a dispute's `disp_…`.
+  providerRefundId  String
+  providerPaymentId String
+  // The Saroh invoice the payment paid, when one did.
+  invoiceId         String?
+  amountPaise       Int?
+  // A refund: PENDING | PROCESSED | FAILED. A dispute: OPEN | UNDER_REVIEW |
+  // ACTION_REQUIRED | WON | LOST | CLOSED. As the provider last said.
+  status            String
+  reason            String?
+  // AUTO | MANUAL | PROVIDER: who first told Saroh of it.
+  source            String
+  // The operator who recorded a manual one.
+  recordedBy        String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([provider, providerRefundId])
+  @@index([providerPaymentId])
+  @@index([invoiceId])
+  @@index([organizationId, createdAt])
+}
+
 // BillingCheckout — one attempt to put a business on a paid catalogue plan
 // (pricing catalogue U15). Saroh asks its own billing provider for a new
 // provider subscription on the plan's provider plan; the business authorises
@@ -7534,6 +7605,11 @@ model SarohInvoice {
 
   // When its email left; null until then (the `billing.email` job).
   emailedAt DateTime?
+
+  // What the provider says the payment was, in paise, when it said
+  // (DEC-166): from the charge's event, or the daily reconcile. A number
+  // that differs from `totalPaise` is raised as a billing action.
+  providerAmountPaise Int?
 
   createdAt DateTime @default(now())
 

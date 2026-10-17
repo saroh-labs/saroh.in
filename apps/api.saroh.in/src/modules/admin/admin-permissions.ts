@@ -76,6 +76,12 @@ export const AdminPermission = {
     // (owner, 17 Oct): never Support, Operations, Release manager or the
     // read-only Auditor.
     SarohBillingRead: "saroh-billing:read",
+    // Act on Saroh's own billing (DEC-166): mark a billing action resolved,
+    // end a business's autopay keeping its paid period, re-check a double
+    // charge's refund, sync the provider's customer again, record a refund
+    // the owner made by hand. Platform Owners and Billing only, like the
+    // read; every write asks a reason and is on the ledger.
+    SarohBillingAct: "saroh-billing:act",
 } as const;
 
 export type AdminPermission =
@@ -123,6 +129,8 @@ const ROLE_PERMISSIONS = {
         AdminPermission.CouponsManage,
         // Saroh's invoices and subscriptions (DEC-163).
         AdminPermission.SarohBillingRead,
+        // Acting on them: Needs action, autopay, refunds (DEC-166).
+        AdminPermission.SarohBillingAct,
     ],
     [AdminRole.ReleaseManager]: [
         AdminPermission.PlatformRead,

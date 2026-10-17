@@ -77,6 +77,19 @@ export const PERMISSION: Record<OperationKind, AdminPermission> = {
  * is what runs — with one honest difference: anything that changed between
  * the two is classified again at execution, not trusted from the preview.
  */
+/**
+ * Jobs that stop or give back Saroh's own billing (DEC-166): cancelling a
+ * provider subscription, refunding a double charge, putting Saroh's ids on
+ * a payment. Retrying one never acts for the business, so a suspended or
+ * closing business's failed one may be retried: a closing business must
+ * not be renewal-charged because its cancel failed on a network error.
+ */
+export const PROTECTIVE_JOB_TYPES: ReadonlySet<string> = new Set([
+    "billing.provider.cancel",
+    "billing.refund.double-charge",
+    "billing.payment.notes",
+]);
+
 @Injectable()
 export class AdminOperationsService implements OnApplicationBootstrap {
     private readonly logger = new Logger(AdminOperationsService.name);
@@ -390,7 +403,8 @@ export class AdminOperationsService implements OnApplicationBootstrap {
             }
             if (
                 job.organization &&
-                job.organization.lifecycleStatus !== "ACTIVE"
+                job.organization.lifecycleStatus !== "ACTIVE" &&
+                !PROTECTIVE_JOB_TYPES.has(job.type)
             ) {
                 return {
                     targetId: id,

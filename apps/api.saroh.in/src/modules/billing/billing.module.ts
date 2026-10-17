@@ -14,6 +14,10 @@ import { AddonsService } from "./addons.service";
 import { BillingCustomerSyncHandler } from "./billing-customer";
 import { BILLING_CUSTOMER_SYNC_TYPE } from "./billing-customer-sync";
 import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
+import {
+    BILLING_RECONCILE_TYPE,
+    BillingReconcileHandler,
+} from "./billing-reconcile.job";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
@@ -127,6 +131,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         MovesApplyHandler,
         PaymentNotesHandler,
         BillingCustomerSyncHandler,
+        // The daily match of what the provider took (DEC-166).
+        BillingReconcileHandler,
         SarohInvoicesService,
         BillingEmailHandler,
         AddonsService,
@@ -139,6 +145,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
     ],
     exports: [
         DeletedBusinessBilling,
+        // An operator ends a business's autopay the in-app way (DEC-166).
+        CheckoutService,
         CatalogueAccessService,
         EntitlementService,
         MeteringService,
@@ -163,10 +171,11 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         private readonly refund: DoubleChargeRefundHandler,
         private readonly paymentNotes: PaymentNotesHandler,
         private readonly customerSync: BillingCustomerSyncHandler,
+        private readonly reconcile: BillingReconcileHandler,
     ) {}
 
     /**
-     * Registers the eleven jobs and starts the sweep's chain — the renewal
+     * Registers the twelve jobs and starts the two sweeps' chains — the renewal
      * job's shape (ADR-007): never under test, where no worker runs, and
      * never throwing, so a database not up yet cannot stop the boot.
      */
@@ -194,10 +203,13 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
             BILLING_CUSTOMER_SYNC_TYPE,
             this.customerSync.handle,
         );
+        this.registry.register(BILLING_RECONCILE_TYPE, this.reconcile.handle);
         if (env.NODE_ENV === "test") return;
         await this.sweep.schedule(new Date());
+        await this.reconcile.ensureScheduled();
         this.chainCheck = setInterval(() => {
             void this.sweep.ensureScheduled();
+            void this.reconcile.ensureScheduled();
         }, CHAIN_CHECK_MS);
         this.chainCheck.unref();
     }

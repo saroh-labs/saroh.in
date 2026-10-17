@@ -20,6 +20,7 @@ import type {
     ProviderOrderCapability,
     ProviderPaymentNotesCapability,
     ProviderPlanCapability,
+    ProviderReconcileCapability,
     ProviderRefundCapability,
     ProviderStatusCapability,
     SubscriptionStanding,
@@ -34,6 +35,10 @@ import {
     readPlatformSecret,
     requirePlatformSecret,
 } from "./platform-secrets";
+import {
+    razorpayPaidCharges,
+    razorpayRefundOrDispute,
+} from "./razorpay-reconcile";
 
 /** How long one call to Razorpay may take (Node's fetch has no deadline). */
 const CALL_TIMEOUT_MS = 15_000;
@@ -224,6 +229,16 @@ export class RazorpayBillingProvider implements BillingProvider {
         refundPayment: (input) => this.refundPayment(input),
     };
 
+    /** What it took, for the daily reconcile (DEC-166, `razorpay-reconcile.ts`). */
+    readonly reconcile: ProviderReconcileCapability = {
+        paidCharges: (ref, oneTime) =>
+            razorpayPaidCharges(
+                (what, path) => this.call(what, "GET", path),
+                ref,
+                oneTime,
+            ),
+    };
+
     /** The key id Checkout opens with: public by design, never the secret. */
     publicKey(): string | null {
         return readPlatformSecret(RAZORPAY_KEY_ID) ?? null;
@@ -412,6 +427,8 @@ export class RazorpayBillingProvider implements BillingProvider {
                 ? { paymentAmountPaise: body.payload.payment.entity.amount }
                 : {}),
             ...(customerId ? { providerCustomerId: customerId } : {}),
+            // A refund or a dispute on a payment (DEC-166).
+            ...razorpayRefundOrDispute(type, payload),
         };
     }
 

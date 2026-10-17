@@ -16,6 +16,7 @@ import { chargedAddonRowsInTx } from "./addon-charges";
 import { billingEmail, nonEmpty, readBillingParty } from "./billing-details";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { periodStart as periodStartOf } from "./checkout-quote";
+import { keepProviderAmountInTx } from "./invoice-amount";
 import { enqueuePaymentNotes } from "./payment-notes.job";
 import type { ParsedBillingEvent } from "./providers/billing-provider.port";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
@@ -46,6 +47,11 @@ export interface ChargeToInvoice {
     providerSubscriptionId: string | null;
     providerEventId: string;
     providerPaymentId?: string | null;
+    /**
+     * What the provider says the payment was, in paise (DEC-166): kept on
+     * the invoice and checked against its total. Only with the payment.
+     */
+    providerAmountPaise?: number | null;
     /** The business as the provider's customer; null: the subscription's. */
     providerCustomerId?: string | null;
     checkoutId?: string | null;
@@ -151,6 +157,7 @@ export class SarohInvoicesService {
                 providerSubscriptionId: checkout.providerSubscriptionId,
                 providerEventId: event.providerEventId,
                 providerPaymentId: event.providerPaymentId ?? null,
+                providerAmountPaise: event.paymentAmountPaise ?? null,
                 providerCustomerId: customerOf(checkout, event),
                 checkoutId: checkout.id,
                 planId: checkout.planId,
@@ -200,6 +207,7 @@ export class SarohInvoicesService {
             providerSubscriptionId: checkout.providerSubscriptionId,
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
+            providerAmountPaise: event.paymentAmountPaise ?? null,
             providerCustomerId: customerOf(checkout, event),
             checkoutId: checkout.id,
             planId: checkout.planId,
@@ -247,6 +255,7 @@ export class SarohInvoicesService {
             providerSubscriptionId: checkout.providerSubscriptionId,
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
+            providerAmountPaise: event.paymentAmountPaise ?? null,
             providerCustomerId: customerOf(checkout, event),
             checkoutId: checkout.id,
             planId: checkout.planId,
@@ -367,6 +376,7 @@ export class SarohInvoicesService {
             providerSubscriptionId: sub.providerSubscriptionId,
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
+            providerAmountPaise: event.paymentAmountPaise ?? null,
             providerCustomerId:
                 event.providerCustomerId ??
                 checkout?.providerCustomerId ??
@@ -467,6 +477,7 @@ export class SarohInvoicesService {
             await this.fillProviderIdsInTx(tx, existing.id, {
                 providerPaymentId: charge.providerPaymentId,
                 providerCustomerId: charge.providerCustomerId,
+                providerAmountPaise: charge.providerAmountPaise,
             });
             return null;
         }
@@ -580,6 +591,22 @@ export class SarohInvoicesService {
             },
             select: { id: true, number: true },
         });
+        if (charge.providerPaymentId) {
+            await keepProviderAmountInTx(
+                tx,
+                this.logger,
+                {
+                    id: invoice.id,
+                    organizationId: charge.organizationId,
+                    number: invoice.number,
+                    provider: charge.provider,
+                    providerPaymentId: charge.providerPaymentId,
+                    totalPaise: totals.totalPaise,
+                    providerAmountPaise: null,
+                },
+                charge.providerAmountPaise,
+            );
+        }
         await enqueueBillingEmail(tx, {
             kind: "INVOICE",
             organizationId: charge.organizationId,
@@ -609,16 +636,31 @@ export class SarohInvoicesService {
         ids: {
             providerPaymentId?: string | null;
             providerCustomerId?: string | null;
+            providerAmountPaise?: number | null;
         },
     ): Promise<void> {
         const invoice = await tx.sarohInvoice.findUniqueOrThrow({
             where: { id: invoiceId },
             select: {
                 organizationId: true,
+                number: true,
+                provider: true,
+                totalPaise: true,
+                providerAmountPaise: true,
                 providerPaymentId: true,
                 providerCustomerId: true,
             },
         });
+        // The amount only for the payment the invoice is for (DEC-166).
+        const paidBy = invoice.providerPaymentId ?? ids.providerPaymentId;
+        if (paidBy && paidBy === ids.providerPaymentId) {
+            await keepProviderAmountInTx(
+                tx,
+                this.logger,
+                { ...invoice, id: invoiceId, providerPaymentId: paidBy },
+                ids.providerAmountPaise,
+            );
+        }
         const payment = !invoice.providerPaymentId
             ? (ids.providerPaymentId ?? null)
             : null;

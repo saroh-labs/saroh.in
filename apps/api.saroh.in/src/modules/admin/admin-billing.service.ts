@@ -8,6 +8,10 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import {
+    REFUND_AUDIT_ACTION,
+    REFUNDED_AUDIT_ACTION,
+} from "../billing/double-charge";
 import { renderSarohInvoicePdf } from "../billing/saroh-invoice-paper";
 import type { SubscriptionStatusKey, SubscriptionView } from "./admin-billing";
 import {
@@ -56,6 +60,30 @@ export interface AdminInvoiceRow {
     billToGstin: string | null;
     provider: string;
     providerPaymentId: string | null;
+    /** The provider's subscription (or a yearly plan's order), DEC-166. */
+    providerSubscriptionId: string | null;
+    providerCustomerId: string | null;
+    /** What the provider says it took; null: it hasn't said. */
+    providerAmountPaise: number | null;
+    /** The provider took another amount than the invoice's total. */
+    amountMismatch: boolean;
+    /** Refunds and disputes recorded on it (DEC-166). */
+    refunds: AdminRefundRow[];
+}
+
+/** A refund or dispute on a Saroh payment (DEC-166). */
+export interface AdminRefundRow {
+    id: string;
+    kind: string;
+    provider: string;
+    providerRefundId: string;
+    providerPaymentId: string;
+    invoiceId: string | null;
+    amountPaise: number | null;
+    status: string;
+    reason: string | null;
+    source: string;
+    createdAt: string;
 }
 
 export interface InvoiceTotals {
@@ -73,6 +101,8 @@ export interface AdminInvoicePage {
 }
 
 export interface SubscriptionQuery {
+    /** A business's name or slug, or a provider id (sub_, cust_, order_). */
+    q?: string;
     status?: SubscriptionStatusKey;
     /** A plan's catalogue key ("catalog.grow"), any version or cycle. */
     plan?: string;
@@ -132,6 +162,36 @@ export interface AdminSubscriptionPage {
 
 export interface AdminSubscriptionDetail {
     subscription: AdminSubscriptionRow;
+    /** The business as the provider's customer (DEC-165), and its sync. */
+    billingCustomer: {
+        provider: string;
+        providerCustomerId: string | null;
+        syncedAt: string | null;
+        lastError: string | null;
+        contactWithheld: boolean;
+    } | null;
+    /** Its last invoices, with their refunds (DEC-166). */
+    invoices: AdminInvoiceRow[];
+    /** Refunds and disputes on its payments, invoiced or not. */
+    refunds: AdminRefundRow[];
+    /** Its open Needs-action rows (DEC-166), oldest first. */
+    openActions: {
+        id: string;
+        code: string;
+        note: string;
+        refs: Record<string, string>;
+        createdAt: string;
+    }[];
+    /** Double charges Saroh owes or has refunded (DEC-164). */
+    doubleCharges: {
+        providerPaymentId: string;
+        provider: string;
+        amountPaise: number | null;
+        reason: string | null;
+        claimedAt: string;
+        refundedAt: string | null;
+        providerRefundId: string | null;
+    }[];
     checkouts: {
         id: string;
         kind: string;
@@ -208,6 +268,7 @@ export class AdminBillingService {
                 _sum: { taxablePaise: true, taxPaise: true, totalPaise: true },
             }),
         ]);
+        const refunds = await refundsByInvoice(rows.map((r) => r.id));
         return {
             items: rows.map((r) => ({
                 id: r.id,
@@ -230,6 +291,8 @@ export class AdminBillingService {
                 billToGstin: r.billToGstin,
                 provider: r.provider,
                 providerPaymentId: r.providerPaymentId,
+                ...providerColumns(r),
+                refunds: refunds.get(r.id) ?? [],
             })),
             page,
             limit: BILLING_PAGE_SIZE,
@@ -298,6 +361,7 @@ export class AdminBillingService {
                 subscriptionViewWhere(query.view, now),
                 query.status ? { status: query.status } : {},
                 query.plan ? { plan: { key: query.plan } } : {},
+                subscriptionSearch(query.q),
             ],
         };
         const page = Math.max(1, query.page ?? 1);
@@ -340,7 +404,7 @@ export class AdminBillingService {
             include: SUBSCRIPTION_INCLUDE,
         });
         if (!sub) throw new NotFoundException("Subscription not found");
-        const [rows, checkouts, events] = await Promise.all([
+        const [rows, checkouts, events, extra] = await Promise.all([
             this.rows([sub], now),
             prisma.billingCheckout.findMany({
                 where: { organizationId: sub.organizationId },
@@ -362,9 +426,11 @@ export class AdminBillingService {
                     processedAt: true,
                 },
             }),
+            this.detailExtra(sub.organizationId),
         ]);
         return {
             subscription: rows[0],
+            ...extra,
             checkouts: checkouts.map((c) => ({
                 id: c.id,
                 kind: c.kind,
@@ -386,6 +452,86 @@ export class AdminBillingService {
                 ...e,
                 receivedAt: e.receivedAt.toISOString(),
                 processedAt: e.processedAt?.toISOString() ?? null,
+            })),
+        };
+    }
+
+    /**
+     * What the sheet shows beyond the subscription (DEC-166): the provider
+     * customer and its sync, the last 12 invoices with their refunds,
+     * every refund and dispute, and the double charges owed or refunded.
+     */
+    private async detailExtra(organizationId: string) {
+        const [customer, invoices, refunds, claims, actions] =
+            await Promise.all([
+                prisma.billingCustomer.findFirst({
+                    where: { organizationId },
+                    orderBy: { createdAt: "asc" },
+                }),
+                prisma.sarohInvoice.findMany({
+                    where: { organizationId },
+                    orderBy: [{ issuedAt: "desc" }, { number: "desc" }],
+                    take: 12,
+                    include: { organization: ORG_BRIEF },
+                }),
+                prisma.billingRefund.findMany({
+                    where: { organizationId },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    take: 50,
+                }),
+                prisma.adminAuditEvent.findMany({
+                    where: {
+                        organizationId,
+                        action: {
+                            in: [REFUND_AUDIT_ACTION, REFUNDED_AUDIT_ACTION],
+                        },
+                    },
+                    orderBy: { createdAt: "asc" },
+                    take: 100,
+                    select: {
+                        action: true,
+                        targetId: true,
+                        reason: true,
+                        metadata: true,
+                        createdAt: true,
+                    },
+                }),
+                prisma.billingAction.findMany({
+                    where: { organizationId, resolvedAt: null },
+                    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                    take: 25,
+                }),
+            ]);
+        const refundRows = refunds.map(refundRow);
+        const byInvoice = new Map<string, AdminRefundRow[]>();
+        for (const r of refundRows) {
+            if (!r.invoiceId) continue;
+            byInvoice.set(r.invoiceId, [
+                ...(byInvoice.get(r.invoiceId) ?? []),
+                r,
+            ]);
+        }
+        return {
+            billingCustomer: customer
+                ? {
+                      provider: customer.provider,
+                      providerCustomerId: customer.providerCustomerId,
+                      syncedAt: customer.syncedAt?.toISOString() ?? null,
+                      lastError: customer.lastError,
+                      contactWithheld: customer.contactWithheld,
+                  }
+                : null,
+            invoices: invoices.map((r) =>
+                invoiceRow(r, byInvoice.get(r.id) ?? []),
+            ),
+            refunds: refundRows,
+            doubleCharges: doubleChargesOf(claims),
+            openActions: actions.map((a) => ({
+                id: a.id,
+                code: a.code,
+                note: a.note,
+                refs: stringRefs(a.refs),
+                createdAt: a.createdAt.toISOString(),
             })),
         };
     }
@@ -530,7 +676,17 @@ export function invoiceWhere(
     if (query.gstin === "yes") and.push({ billToGstin: { not: null } });
     if (query.gstin === "no") and.push({ billToGstin: null });
     const q = query.q?.trim();
-    if (q) {
+    if (q && PROVIDER_ID.test(q)) {
+        // A provider's id (DEC-166): exact, on the columns that carry it.
+        and.push({
+            OR: [
+                { providerPaymentId: q },
+                { providerSubscriptionId: q },
+                { providerCustomerId: q },
+                { providerEventId: q },
+            ],
+        });
+    } else if (q) {
         and.push({
             OR: [
                 { number: { contains: q, mode: "insensitive" } },
@@ -549,4 +705,200 @@ export function invoiceWhere(
         });
     }
     return { AND: and };
+}
+
+/** A billing provider's id: Razorpay's pay_, sub_, cust_, order_, rfnd_. */
+export const PROVIDER_ID =
+    /^(pay|sub|cust|order|rfnd|inv|disp)_[A-Za-z0-9]{4,40}$/;
+
+/**
+ * The subscriptions search (DEC-166): a provider id finds the subscription
+ * that carries it, or the business whose checkout, customer or invoice
+ * does; anything else is a business's name or slug.
+ */
+export function subscriptionSearch(
+    raw: string | undefined,
+): Prisma.SubscriptionWhereInput {
+    const q = raw?.trim();
+    if (!q) return {};
+    if (PROVIDER_ID.test(q)) {
+        return {
+            OR: [
+                { providerSubscriptionId: q },
+                { providerCustomerId: q },
+                {
+                    organization: {
+                        billingCheckouts: {
+                            some: {
+                                OR: [
+                                    { providerSubscriptionId: q },
+                                    { providerCustomerId: q },
+                                ],
+                            },
+                        },
+                    },
+                },
+                {
+                    organization: {
+                        billingCustomers: { some: { providerCustomerId: q } },
+                    },
+                },
+                {
+                    organization: {
+                        sarohInvoices: { some: { providerPaymentId: q } },
+                    },
+                },
+            ],
+        };
+    }
+    return {
+        OR: [
+            { organization: { name: { contains: q, mode: "insensitive" } } },
+            { organization: { slug: { contains: q, mode: "insensitive" } } },
+        ],
+    };
+}
+
+type RefundRecord = Prisma.BillingRefundGetPayload<object>;
+
+function refundRow(r: RefundRecord): AdminRefundRow {
+    return {
+        id: r.id,
+        kind: r.kind,
+        provider: r.provider,
+        providerRefundId: r.providerRefundId,
+        providerPaymentId: r.providerPaymentId,
+        invoiceId: r.invoiceId,
+        amountPaise: r.amountPaise,
+        status: r.status,
+        reason: r.reason,
+        source: r.source,
+        createdAt: r.createdAt.toISOString(),
+    };
+}
+
+/** The refunds and disputes on a page of invoices, by invoice. */
+async function refundsByInvoice(
+    invoiceIds: string[],
+): Promise<Map<string, AdminRefundRow[]>> {
+    const out = new Map<string, AdminRefundRow[]>();
+    if (invoiceIds.length === 0) return out;
+    const rows = await prisma.billingRefund.findMany({
+        where: { invoiceId: { in: invoiceIds } },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    for (const r of rows) {
+        if (!r.invoiceId) continue;
+        out.set(r.invoiceId, [...(out.get(r.invoiceId) ?? []), refundRow(r)]);
+    }
+    return out;
+}
+
+/** The provider's columns of an invoice row (DEC-166). */
+function providerColumns(r: {
+    providerSubscriptionId: string | null;
+    providerCustomerId: string | null;
+    providerAmountPaise: number | null;
+    totalPaise: number;
+}) {
+    return {
+        providerSubscriptionId: r.providerSubscriptionId,
+        providerCustomerId: r.providerCustomerId,
+        providerAmountPaise: r.providerAmountPaise,
+        amountMismatch:
+            r.providerAmountPaise !== null &&
+            r.providerAmountPaise !== r.totalPaise,
+    };
+}
+
+function invoiceRow(
+    r: Prisma.SarohInvoiceGetPayload<{
+        include: { organization: typeof ORG_BRIEF };
+    }>,
+    refunds: AdminRefundRow[],
+): AdminInvoiceRow {
+    return {
+        id: r.id,
+        number: r.number,
+        issuedAt: r.issuedAt.toISOString(),
+        organization: r.organization,
+        source: r.source,
+        planName: r.planName,
+        cycle: r.cycle,
+        currency: r.currency,
+        taxType: r.taxType,
+        placeOfSupply: r.placeOfSupply,
+        taxablePaise: r.taxablePaise,
+        cgstPaise: r.cgstPaise,
+        sgstPaise: r.sgstPaise,
+        igstPaise: r.igstPaise,
+        taxPaise: r.taxPaise,
+        totalPaise: r.totalPaise,
+        billToName: r.billToName,
+        billToGstin: r.billToGstin,
+        provider: r.provider,
+        providerPaymentId: r.providerPaymentId,
+        ...providerColumns(r),
+        refunds,
+    };
+}
+
+/** Double charges from their claim and refunded rows (DEC-164). */
+function doubleChargesOf(
+    rows: {
+        action: string;
+        targetId: string | null;
+        reason: string | null;
+        metadata: Prisma.JsonValue;
+        createdAt: Date;
+    }[],
+): AdminSubscriptionDetail["doubleCharges"] {
+    const byPayment = new Map<
+        string,
+        AdminSubscriptionDetail["doubleCharges"][number]
+    >();
+    for (const row of rows) {
+        if (!row.targetId) continue;
+        const meta = (
+            row.metadata &&
+            typeof row.metadata === "object" &&
+            !Array.isArray(row.metadata)
+                ? row.metadata
+                : {}
+        ) as Record<string, unknown>;
+        const entry = byPayment.get(row.targetId) ?? {
+            providerPaymentId: row.targetId,
+            provider: typeof meta.provider === "string" ? meta.provider : "",
+            amountPaise: null,
+            reason: null,
+            claimedAt: row.createdAt.toISOString(),
+            refundedAt: null,
+            providerRefundId: null,
+        };
+        if (typeof meta.amountPaise === "number") {
+            entry.amountPaise = meta.amountPaise;
+        }
+        if (row.action === REFUND_AUDIT_ACTION) {
+            entry.reason = row.reason;
+            entry.claimedAt = row.createdAt.toISOString();
+        } else {
+            entry.refundedAt = row.createdAt.toISOString();
+            entry.providerRefundId =
+                typeof meta.providerRefundId === "string"
+                    ? meta.providerRefundId
+                    : null;
+        }
+        byPayment.set(row.targetId, entry);
+    }
+    return [...byPayment.values()].reverse();
+}
+
+function stringRefs(value: Prisma.JsonValue): Record<string, string> {
+    const out: Record<string, string> = {};
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+        for (const [k, v] of Object.entries(value)) {
+            if (typeof v === "string") out[k] = v;
+        }
+    }
+    return out;
 }

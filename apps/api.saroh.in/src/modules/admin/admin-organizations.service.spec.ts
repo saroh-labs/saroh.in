@@ -8,6 +8,8 @@ jest.mock("@saroh/database", () => ({
             findMany: jest.fn(async () => []),
         },
         webhookEvent: { groupBy: jest.fn(async () => []) },
+        // Open billing actions (DEC-166): none unless a test says so.
+        billingAction: { findMany: jest.fn(async () => []) },
     },
 }));
 // Deletions waiting on refunds (#921): none unless a test says so.
@@ -214,6 +216,25 @@ describe("AdminOrganizationsService.directory", () => {
         const where = JSON.stringify(findMany.mock.calls[0][0].where);
         expect(where).toContain('{"id":{"in":["closing"]}}');
         (businessesWaitingOnRefunds as jest.Mock).mockResolvedValue(new Set());
+    });
+
+    it("flags a business with an open billing action, and finds it under Needs attention (DEC-166)", async () => {
+        findMany.mockResolvedValue([record("owed")]);
+        const actions = prisma.billingAction.findMany as jest.Mock;
+        actions.mockResolvedValue([{ organizationId: "owed" }]);
+        const page = await service.directory(
+            { health: "attention" },
+            { canReadPii: false },
+        );
+        expect(page.items[0]?.attention).toEqual(["BILLING_ACTION"]);
+        const where = JSON.stringify(findMany.mock.calls[0][0].where);
+        expect(where).toContain('{"id":{"in":["owed"]}}');
+        expect(actions).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ resolvedAt: null }),
+            }),
+        );
+        actions.mockResolvedValue([]);
     });
 
     it("filters to businesses without a plan", async () => {

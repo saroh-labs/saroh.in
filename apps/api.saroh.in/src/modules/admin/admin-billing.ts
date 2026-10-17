@@ -52,6 +52,10 @@ export interface InvoiceForCsv {
     igstPaise: number;
     totalPaise: number;
     lines: { sac: string | null }[];
+    /** The provider's ids, so a row is found in its dashboard (DEC-166). */
+    providerPaymentId?: string | null;
+    providerSubscriptionId?: string | null;
+    providerCustomerId?: string | null;
 }
 
 export const INVOICE_CSV_HEADER = [
@@ -69,6 +73,11 @@ export const INVOICE_CSV_HEADER = [
     "SGST",
     "IGST",
     "Total",
+    // The billing provider's ids (DEC-166): the payment, the subscription
+    // (or a yearly plan's order) and the customer, to match in its dashboard.
+    "Payment id",
+    "Subscription id",
+    "Customer id",
 ] as const;
 
 /**
@@ -121,6 +130,9 @@ export function invoiceCsvRow(invoice: InvoiceForCsv): string[] {
         paiseToRupees(invoice.sgstPaise),
         paiseToRupees(invoice.igstPaise),
         paiseToRupees(invoice.totalPaise),
+        invoice.providerPaymentId ?? "",
+        invoice.providerSubscriptionId ?? "",
+        invoice.providerCustomerId ?? "",
     ];
 }
 

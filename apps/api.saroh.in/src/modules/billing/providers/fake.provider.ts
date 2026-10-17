@@ -16,10 +16,14 @@ import type {
     ParsedBillingEvent,
     ProviderChargeCapability,
     ProviderCustomerCapability,
+    ProviderDisputeEvent,
     ProviderOrderCapability,
+    ProviderPaidCharge,
     ProviderPaymentNotesCapability,
     ProviderPlanCapability,
+    ProviderReconcileCapability,
     ProviderRefundCapability,
+    ProviderRefundEvent,
     ProviderStatusCapability,
     SubscriptionStanding,
     SubscriptionStatus,
@@ -262,6 +266,31 @@ export class FakeProviderRefunds implements ProviderRefundCapability {
 }
 
 /**
+ * What the fake says it took on a subscription or order (DEC-166): set per
+ * reference by a test, else nothing. A test makes it fail with
+ * {@link failNext}.
+ */
+export class FakeProviderReconcile implements ProviderReconcileCapability {
+    readonly asked: { ref: string; oneTime: boolean }[] = [];
+    private readonly byRef = new Map<string, ProviderPaidCharge[]>();
+    failNext: BillingProviderError | null = null;
+
+    set(ref: string, charges: ProviderPaidCharge[]): void {
+        this.byRef.set(ref, charges);
+    }
+
+    paidCharges(ref: string, oneTime: boolean): Promise<ProviderPaidCharge[]> {
+        this.asked.push({ ref, oneTime });
+        if (this.failNext) {
+            const error = this.failNext;
+            this.failNext = null;
+            return Promise.reject(error);
+        }
+        return Promise.resolve(this.byRef.get(ref) ?? []);
+    }
+}
+
+/**
  * What the fake says a checkout stands at when asked (DEC-093): set per
  * reference by a test, else still waiting. Every question is recorded.
  */
@@ -317,6 +346,7 @@ export class FakeBillingProvider implements BillingProvider {
     readonly statuses = new FakeProviderStatuses();
     readonly paymentNotes = new FakeProviderPaymentNotes();
     readonly refunds = new FakeProviderRefunds();
+    readonly reconcile = new FakeProviderReconcile();
     /** The public key Checkout would open with; null: no window. */
     publicKeyValue: string | null = null;
     /** The next `createSubscription` fails with this, once. */
@@ -410,6 +440,8 @@ export class FakeBillingProvider implements BillingProvider {
             providerPaymentId?: string;
             paymentAmountPaise?: number;
             providerCustomerId?: string;
+            refund?: ProviderRefundEvent;
+            dispute?: ProviderDisputeEvent;
         };
         return {
             type: body.type ?? "unknown",
@@ -434,6 +466,8 @@ export class FakeBillingProvider implements BillingProvider {
             ...(body.providerCustomerId
                 ? { providerCustomerId: body.providerCustomerId }
                 : {}),
+            ...(body.refund ? { refund: body.refund } : {}),
+            ...(body.dispute ? { dispute: body.dispute } : {}),
         };
     }
 }

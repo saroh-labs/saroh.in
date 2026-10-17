@@ -12,6 +12,7 @@ import type { BillingEmailPayload } from "./billing-email-payload";
 import { parseBillingEmailPayload } from "./billing-email-payload";
 import type { RenderedEmail } from "./billing-emails";
 import {
+    autopayEndedEmail,
     domainEmail,
     doubleChargeRefundedEmail,
     firstMonthEndingEmail,
@@ -169,6 +170,20 @@ export class BillingEmailHandler {
                     businessName: org?.name ?? "your business",
                     amount:
                         p.amountPaise !== null ? money(p.amountPaise) : null,
+                });
+            });
+        }
+        if (p.kind === "AUTOPAY_ENDED") {
+            const key = `saroh-billing:autopay-ended:${p.subscriptionId}:${p.endsAt}`;
+            return this.once(job, p.organizationId, key, async () => {
+                const org = await prisma.organization.findUnique({
+                    where: { id: p.organizationId },
+                    select: { name: true },
+                });
+                return autopayEndedEmail({
+                    businessName: org?.name ?? "your business",
+                    planName: p.planName,
+                    endsOn: day(new Date(p.endsAt)),
                 });
             });
         }

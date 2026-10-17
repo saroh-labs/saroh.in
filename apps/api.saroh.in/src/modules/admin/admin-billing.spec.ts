@@ -95,16 +95,19 @@ describe("invoicesCsv", () => {
                 sgstPaise: 0,
                 igstPaise: 1_998,
                 lines: [{ sac: "999999" }, { sac: "999999" }, { sac: null }],
+                providerPaymentId: "pay_T2",
+                providerSubscriptionId: "sub_T2",
+                providerCustomerId: "cust_T2",
             }),
         ]);
         const rows = csv.trimEnd().split("\r\n");
         expect(rows).toHaveLength(3);
         expect(rows[0]).toBe(INVOICE_CSV_HEADER.join(","));
         expect(rows[1]).toBe(
-            "Invoice,TST/26-27/0001,2026-10-17,Example Studio,,Karnataka,29,B2C,999999,111.00,9.99,9.99,0.00,130.98",
+            "Invoice,TST/26-27/0001,2026-10-17,Example Studio,,Karnataka,29,B2C,999999,111.00,9.99,9.99,0.00,130.98,,,",
         );
         expect(rows[2]).toBe(
-            'Invoice,TST/26-27/0002,2026-10-17,"Other, Ltd",27AAAAA0000A1Z5,Maharashtra,27,B2B,999999,111.00,0.00,0.00,19.98,130.98',
+            'Invoice,TST/26-27/0002,2026-10-17,"Other, Ltd",27AAAAA0000A1Z5,Maharashtra,27,B2B,999999,111.00,0.00,0.00,19.98,130.98,pay_T2,sub_T2,cust_T2',
         );
     });
 

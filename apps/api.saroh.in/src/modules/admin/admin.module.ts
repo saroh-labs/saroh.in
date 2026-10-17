@@ -22,6 +22,9 @@ import { WaitlistModule } from "../waitlist/waitlist.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
+import { AdminBillingActionsService } from "./admin-billing-actions.service";
+import { AdminBillingControlsController } from "./admin-billing-controls.controller";
+import { AdminBillingControlsService } from "./admin-billing-controls.service";
 import { AdminBillingController } from "./admin-billing.controller";
 import { AdminBillingService } from "./admin-billing.service";
 import { AdminBusinessReportsController } from "./admin-business-reports.controller";
@@ -106,6 +109,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminContactMessagesController,
         AdminUsageController,
         AdminBillingController,
+        AdminBillingControlsController,
     ],
     providers: [
         IdempotencyService,
@@ -129,6 +133,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminContactMessagesService,
         AdminUsageService,
         AdminBillingService,
+        AdminBillingActionsService,
+        AdminBillingControlsService,
         // Pricing catalogue writes (U4): they audit through AdminAuditService.
         CatalogueWritesService,
         CouponsService,

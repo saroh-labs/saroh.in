@@ -61,6 +61,13 @@ export class ExportSarohInvoicesDto {
 
 /** Every business's Saroh subscription (DEC-163): filters and page. */
 export class ListSarohSubscriptionsDto {
+    /** A business's name or slug, or a provider id (DEC-166). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(120)
+    q?: string;
+
     @IsOptional()
     @IsIn(SUBSCRIPTION_STATUSES)
     status?: SubscriptionStatusKey;
