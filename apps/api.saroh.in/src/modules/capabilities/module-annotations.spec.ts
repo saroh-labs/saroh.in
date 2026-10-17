@@ -318,6 +318,12 @@ const NEVER: Record<string, string> = {
         "saroh.in's contact form, not a tenant surface",
     "admin/admin-contact-messages.controller.ts":
         "staff control plane (messages from saroh.in/contact), not a tenant surface",
+    // DEC-163, DEC-166: Saroh's own invoices, subscriptions and the billing
+    // queue and controls, across businesses.
+    "admin/admin-billing.controller.ts":
+        "staff control plane (Saroh's own billing), not a tenant surface",
+    "admin/admin-billing-controls.controller.ts":
+        "staff control plane (Saroh's billing queue and controls), not a tenant surface",
     // DEC-120: an owner takes the business's data whatever it has switched
     // off, and while it is closing or suspended.
     "data-export/data-export.controller.ts":

@@ -27,6 +27,7 @@ import type { HeldAddon } from "./addons-ending";
 import { checkoutClearsAddons } from "./addons-ending";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { isOneTime } from "./billing-term";
+import { unmatchedEventInTx } from "./billing-unmatched";
 import { billingMayChargeFor } from "./business-closing";
 import { leavesWithCycle, runsToMoveDate } from "./change-timing";
 import { chargesStartInTx } from "./charges-start";
@@ -89,6 +90,8 @@ interface Outcome {
     completed?: Completed;
     /** Add-ons the change ended (DEC-157), for the audit log after commit. */
     ended?: EndedAddons;
+    /** Left without `processedAt`: it matched nothing (DEC-166). */
+    unapplied?: boolean;
 }
 
 /** What a move that applied ended, for the audit log; nothing when none. */
@@ -245,9 +248,20 @@ export class BillingWebhookService {
             } else if (checkout) {
                 outcome = await this.onCheckout(tx, checkout, event, now);
             } else {
-                outcome = { result: { status: "ignored", changed: false } };
+                // No business (DEC-166): a refund or dispute is kept; an
+                // unmatched charge is raised and left not applied.
+                const unmatched = await unmatchedEventInTx(
+                    tx,
+                    this.logger,
+                    name,
+                    event,
+                );
+                outcome = {
+                    result: { status: "ignored", changed: false },
+                    unapplied: !unmatched.applied,
+                };
             }
-            if (outcome.result.status !== "failed") {
+            if (outcome.result.status !== "failed" && !outcome.unapplied) {
                 await tx.billingWebhookEvent.update({
                     where: {
                         provider_providerEventId: {
@@ -257,7 +271,7 @@ export class BillingWebhookService {
                     },
                     data: { processedAt: now },
                 });
-            } else {
+            } else if (!outcome.unapplied) {
                 this.logger.warn(
                     `Billing webhook ${name}/${event.providerEventId} reconcile rejected (${event.type})`,
                 );

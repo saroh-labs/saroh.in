@@ -19,7 +19,9 @@ export type AttentionReason =
     /** A deleted business whose clean-up has failed and isn't done (#921). */
     | "DELETION_CLEANUP"
     /** Past its deletion window, held back by refunds owed (#921). */
-    | "DELETION_WAITING_REFUNDS";
+    | "DELETION_WAITING_REFUNDS"
+    /** Saroh's billing needs an operator: Billing › Needs action (DEC-166). */
+    | "BILLING_ACTION";
 
 export interface BusinessRow {
     id: string;

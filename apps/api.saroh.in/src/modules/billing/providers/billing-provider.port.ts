@@ -443,6 +443,52 @@ export interface ParsedBillingEvent {
     paymentAmountPaise?: number | null;
     /** The provider's customer it bills, when the event names one. */
     providerCustomerId?: string | null;
+    /** A `refund.*` event's refund (DEC-166). */
+    refund?: ProviderRefundEvent;
+    /** A `payment.dispute.*` event's dispute (DEC-166). */
+    dispute?: ProviderDisputeEvent;
+}
+
+/**
+ * A refund on a payment, as the provider's `refund.*` webhook reports it
+ * (DEC-166): kept as a `BillingRefund`, its status as the provider last
+ * said.
+ */
+export interface ProviderRefundEvent {
+    providerRefundId: string;
+    providerPaymentId: string;
+    amountPaise: number | null;
+    status: "PENDING" | "PROCESSED" | "FAILED";
+}
+
+/** A dispute (a chargeback) on a payment, from `payment.dispute.*` (DEC-166). */
+export interface ProviderDisputeEvent {
+    providerDisputeId: string;
+    providerPaymentId: string;
+    amountPaise: number | null;
+    /** OPEN | UNDER_REVIEW | ACTION_REQUIRED | WON | LOST | CLOSED */
+    status: string;
+    /** The provider's reason code, when it gives one. */
+    reason: string | null;
+}
+
+/** One payment the provider took on a subscription or order (DEC-166). */
+export interface ProviderPaidCharge {
+    providerPaymentId: string;
+    /** What it took, in paise, GST included; null when it didn't say. */
+    amountPaise: number | null;
+    paidAt: Date | null;
+}
+
+/**
+ * What the provider took on a subscription or a one-time order, read by the
+ * daily reconcile (`billing-reconcile.job.ts`) to find a payment Saroh never
+ * heard of and an invoice whose total isn't what was paid. Optional on the
+ * port: a provider without it is never reconciled.
+ */
+export interface ProviderReconcileCapability {
+    /** `ref` is the subscription id, or the order's when `oneTime`. */
+    paidCharges(ref: string, oneTime: boolean): Promise<ProviderPaidCharge[]>;
 }
 
 export interface BillingProvider {
@@ -470,6 +516,8 @@ export interface BillingProvider {
     readonly customers?: ProviderCustomerCapability;
     /** Refunds (a double charge); absent: the owner refunds by hand. */
     readonly refunds?: ProviderRefundCapability;
+    /** What it took, for the daily reconcile (DEC-166); absent: never asked. */
+    readonly reconcile?: ProviderReconcileCapability;
     /**
      * The public key the browser opens the provider's checkout with, or
      * null when there's no such window (the page link is used instead).

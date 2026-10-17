@@ -1,7 +1,13 @@
 import type { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
-type Tx = Pick<Prisma.TransactionClient, "adminOrganizationNote">;
+import { raiseBillingActionInTx } from "./billing-actions";
+
+type NoteTx = Pick<Prisma.TransactionClient, "adminOrganizationNote">;
+type Tx = Pick<
+    Prisma.TransactionClient,
+    "adminOrganizationNote" | "billingAction"
+>;
 
 /**
  * Who wrote an automatic operator note: no operator, so the admin console
@@ -14,7 +20,9 @@ export const BILLING_NOTE_AUTHOR = "billing-provider";
  * payment to refund, a provider subscription that won't cancel — raised
  * where operators look: an ERROR log line by its code (error tracking picks
  * it up) and a note on the business in the admin console
- * (`AdminOrganizationNote`, read only there; the business never sees it).
+ * (`AdminOrganizationNote`, read only there; the business never sees it),
+ * and a row in Admin › Billing › Needs action (`BillingAction`, DEC-166),
+ * which lists it across businesses until an operator marks it resolved.
  * Written on the caller's transaction, so it stands or falls with the
  * change that found it. Never carries a credential or a card detail: ids
  * and Saroh's own words only.
@@ -30,12 +38,21 @@ export async function raiseBillingOpsNoticeInTx(
         refs: Record<string, string | null | undefined>;
         /** What happened and what to do, for the note. */
         note: string;
+        /** One Needs-action row per thing, however often raised. */
+        dedupeKey?: string | null;
     },
 ): Promise<void> {
     logger.error(
         `${input.code} org=${input.organizationId} ${refsLine(input.refs)}`.trim(),
     );
     await addBillingNoteInTx(tx, input);
+    await raiseBillingActionInTx(tx, {
+        organizationId: input.organizationId,
+        code: input.code,
+        refs: input.refs,
+        note: input.note,
+        dedupeKey: input.dedupeKey,
+    });
 }
 
 const refsLine = (refs: Record<string, string | null | undefined>) =>
@@ -51,7 +68,7 @@ const refsLine = (refs: Record<string, string | null | undefined>) =>
  * {@link raiseBillingOpsNoticeInTx}, without the ERROR log.
  */
 export async function addBillingNoteInTx(
-    tx: Tx,
+    tx: NoteTx,
     input: {
         organizationId: string;
         refs: Record<string, string | null | undefined>;

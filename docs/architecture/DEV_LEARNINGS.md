@@ -4945,6 +4945,62 @@ number on the payment (`provider-ids.db.spec.ts`).
 **Rule.** Every money row keeps the provider's ids both ways
 (`backend-integrations.md`, "What Saroh keeps of Razorpay's ids").
 
+### A billing problem an operator had to act on reached no operator (17 Oct 2026)
+
+**Symptom.** A refused double-charge refund, a provider cancel stuck for
+days, a webhook for a subscription Saroh had no row for: each left an
+ERROR log line and, at most, an admin note on one business, which only
+someone with a support session could read. The Billing role saw none of
+it, and a webhook that matched nothing was marked processed as "ignored".
+
+**Cause.** The ops notice wrote a note, not something listable; the
+webhook's no-match branch had no outcome but "ignored"; nothing read back
+what Razorpay took, so a charge whose webhook never arrived was never
+noticed.
+
+**Fix.** DEC-166: every ops notice also writes a `BillingAction`, listed
+across businesses in Admin › Billing › Needs action and flagged in the
+directory; an unmatched charge or subscription event is raised and left
+not applied; the daily `billing.reconcile` raises a payment with no
+invoice and an amount that differs (`billing-reconcile.db.spec.ts`,
+`admin-billing-controls.db.spec.ts`).
+
+**Rule.** A money problem the code gives up on is a row an operator can
+list and close, never only a log line or a note (`backend-jobs.md`,
+Saroh billing).
+
+### Admin Jobs couldn't retry the cancel that stops a closing business's billing (17 Oct 2026)
+
+**Symptom.** A `billing.provider.cancel` of a business scheduled for
+deletion failed on a network error; Admin › Jobs called the retry
+"unsafe", so Razorpay could renew-charge the closing business.
+
+**Cause.** `classifyJobs` refused every job of a business not ACTIVE, on
+the rule that a retry acts for the business. A cancel, a refund and
+payment notes stop or give back money; they never act for it.
+
+**Fix.** `PROTECTIVE_JOB_TYPES` are retried whatever the lifecycle
+(`admin-operations-protective.db.spec.ts`).
+
+**Rule.** A guard that refuses on a business's state lists the jobs that
+protect money as exceptions, with a spec.
+
+### A db spec's afterAll clean-up failed with "Cannot use a pool after calling end" (17 Oct 2026)
+
+**Symptom.** `admin-billing.db.spec.ts` passed every test and still
+reported "Test suite failed to run: Cannot use a pool after calling end on
+the pool". Moving its `deleteMany` before `app.close()` didn't help.
+
+**Cause.** The integration setup's own `afterAll`
+(`test/integration-setup.ts`: truncate, then end the pool) is registered
+before the spec's and runs first, so any query in the spec's `afterAll`
+meets a closed pool.
+
+**Fix.** The spec's `afterAll` only closes the app; the setup's truncate
+clears every row.
+
+**Rule.** An integration spec never cleans rows up in `afterAll`: the
+setup truncates after every file.
 ### A move to Free dropped a year the business had already paid for (17 Oct 2026)
 
 **Symptom** (review, before release): a monthly business that had paid a

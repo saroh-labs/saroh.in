@@ -8,6 +8,7 @@ import {
     BILLING_NOTE_AUTHOR,
     raiseBillingOpsNoticeInTx,
 } from "./billing-ops-notice";
+import { recordRefundInTx } from "./billing-refunds";
 import type { DoubleChargeRefundPayload } from "./double-charge";
 import {
     providerName,
@@ -125,6 +126,19 @@ export class DoubleChargeRefundHandler {
 
         const amountPaise = refund.amountPaise ?? p.amountPaise ?? null;
         await prisma.$transaction(async (tx) => {
+            // Kept by its id (DEC-166), whether or not this run is the one
+            // that tells: the refund webhook moves its status on.
+            await recordRefundInTx(tx, this.logger, {
+                provider,
+                kind: "REFUND",
+                providerRefundId: refund.providerRefundId,
+                providerPaymentId,
+                amountPaise,
+                status: "PENDING",
+                reason: p.reason ?? "Charged twice",
+                source: "AUTO",
+                organizationId,
+            });
             const written = await tx.adminAuditEvent.createMany({
                 data: [
                     {

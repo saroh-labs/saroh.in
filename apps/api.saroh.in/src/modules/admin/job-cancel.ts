@@ -34,6 +34,8 @@ export const CANCEL_REFUSED: Readonly<Record<string, string>> = {
         "The waitlist retention sweep runs itself again; cancelling a run would only hide it",
     "billing.moves.apply":
         "The plan-move sweep runs itself again; cancelling a run would only hide it",
+    "billing.reconcile":
+        "The billing reconcile runs itself again; cancelling a run would only hide it",
     "analytics.rollup":
         "The Insights rollup runs itself again; cancelling a run would only hide it",
     "organization.deletion":
