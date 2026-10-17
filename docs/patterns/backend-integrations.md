@@ -429,6 +429,86 @@ transaction as its row and ignores one older than the last applied
   whichever of the two lands second changes nothing (the invoice is keyed
   once per charge). Rate-limited per business; an unanswered call is
   "still waiting", never a reason to pay again.
+- **The business as Razorpay's customer: one per business, made at
+  sign-up (DEC-165, owner, 17 Oct 2026)** (`billing-customer.ts`,
+  `customers` capability). Its id is kept on `BillingCustomer`
+  (organization × provider) and copied to every checkout, subscription and
+  Saroh invoice; it is never looked up by email or phone.
+    - **Made** by the `billing.customer.sync` job, queued in the sign-up's
+      transaction: `POST /customers` with the billing name, the owner's email,
+      the phone and the GSTIN, `notes` `organizationId`, `business_name`,
+      the billing name, email, phone, GSTIN and address, and
+      `fail_existing: "1"`. Razorpay refuses a second customer with the same
+      email and phone (400 "Customer already exists for the merchant",
+      checked in test mode 17 Oct 2026; the same email without a phone makes
+      a new one), so an owner's second business is made **without the
+      phone** (`contactWithheld`; the phone stays in Saroh and is never sent
+      on an update). Never `fail_existing: "0"`, which hands back another
+      business's customer.
+    - **Kept current**: Settings › Business (the name, legal name, contact
+      email, phone, GSTIN, state or registered address) and every checkout
+      (its details step) queue the same job, at most one waiting per
+      business; it sends `PUT /customers/:id` with the name, email, phone and
+      GSTIN (PUT takes the GSTIN, checked in test mode). **The address can't
+      be updated**: a customer's notes are create-only (a PUT leaves them as
+      they were, checked in test mode), so the current address is on each
+      subscription's or order's notes and on Saroh's invoice. A change of the
+      owner's email reaches it with the next save or checkout.
+    - **A checkout** uses the stored id, and makes the customer then only
+      when the sign-up's job hasn't (under a per-business advisory lock, so
+      the two never make two): `customer_id` on `POST /subscriptions`, and on
+      the window for an order. Never in the way of a payment: a failure is
+      logged (`billing_customer_failed`) and the checkout goes on with the
+      notes and the prefill.
+    - **No keys, nothing asked**: where Saroh's Razorpay key id and secret
+      aren't set (local, CI) the job skips quietly
+      (`billing_customer_skipped`) and the first checkout there makes it. A
+      provider that can't answer is retried by the queue; the last error is
+      kept on the row (`lastError`), a refusal logged
+      (`billing_customer_sync_failed`) and not retried.
+    - **Businesses from before**: `backfill/billing-customers.cli.ts`
+      (`packages/database`) queues the job for every business without a
+      customer; idempotent.
+
+**After Saroh lets go (17 Oct 2026, DEC-164)**: a subscription is made with
+`expire_by` (the checkout's `expiresAt`); a refused cancel asks
+`statuses.subscriptionStanding` (`GET /subscriptions/:id`) and is retried
+rather than dropped — Razorpay cancels only an active or authenticated
+subscription; and a double charge is refunded through the `refunds`
+capability (`POST /payments/:id/refund` with no amount, the whole payment;
+`GET /payments/:id` first, so a repeat never refunds twice). Its 4xx is
+`REFUSED` carrying Razorpay's `error.description` (`BillingProviderError.said`),
+which the owner's admin note quotes; it is never retried. The payment's
+`amount` for the notes is read from the webhook's `payload.payment.entity`
+(`double-charge.ts`, `double-charge-refund.job.ts`). What to verify:
+`PRICING_ROLLOUT.md` › "Money after Saroh let go (DEC-164)".
+
+**What Saroh keeps of Razorpay's ids, and what Razorpay keeps of Saroh's
+(owner, 17 Oct 2026: "so that we can track payments easily and dont get
+confused")**:
+
+- Saroh keeps the Razorpay customer (`cust_…`) on the checkout, the
+  subscription and each of its invoices (`providerCustomerId`); the
+  subscription or order (`providerSubscriptionId`, an order's id for a
+  yearly plan); and the payment on the invoice (`providerPaymentId`). A
+  checkout completes with Saroh's customer, else the one the provider names
+  (`customer_id` on the webhook's subscription or payment, or on
+  `GET /subscriptions/:id`); a checkout that names none never clears the
+  subscription's, and a move to Free keeps it.
+- A subscription carries no payment id, so the return from paying asks
+  `GET /invoices?subscription_id=` for the latest paid invoice's
+  `payment_id` (checked in test mode, 17 Oct 2026); an order's comes from
+  `GET /orders/:id/payments`. Still unknown, the charge's
+  `subscription.charged` fills it in on the invoice already written (the
+  same `chargeKey` or period), never a second invoice.
+- Razorpay keeps Saroh's: once an invoice has its payment, the
+  `billing.payment.notes` job sets the payment's notes
+  (`PATCH /payments/:id`, notes only, at most 15 pairs,
+  https://razorpay.com/docs/api/payments/update/) to `saroh_invoice` (the
+  number), `organizationId` and `saroh_checkout`, keeping the notes it had.
+  A failure is logged (`billing_payment_notes_failed`) and never touches
+  the invoice. Subscriptions and orders already carry `saroh_ref` (the
+  checkout) and the business in their notes.
 
 ## Media storage — **Current**
 

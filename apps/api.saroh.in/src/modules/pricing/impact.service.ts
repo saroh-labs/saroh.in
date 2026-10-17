@@ -6,6 +6,7 @@ import {
     catalogPlanIdForKey,
     effectivePlanId,
     monthlyEquivalentPaise,
+    planPriceOf,
     priceOverridePaise,
 } from "@saroh/pricing-catalog";
 
@@ -52,6 +53,8 @@ export class ImpactService {
     async read(
         knownPlanIds: ReadonlySet<string>,
         now: Date,
+        /** The plans' prices: a dearer billed plan beats a plan override. */
+        priceOf?: (planId: string) => number | undefined,
     ): Promise<CatalogueBusinesses> {
         const [orgs, subs, overrides] = await Promise.all([
             prisma.organization.findMany({
@@ -111,7 +114,13 @@ export class ImpactService {
             const own = overridesOf.get(org.id) ?? [];
             const basePlanId =
                 (sub && catalogPlanIdForKey(sub.plan.key)) ?? fallbackPlanId;
-            const planId = effectivePlanId(basePlanId, own, now, knownPlanIds);
+            const planId = effectivePlanId(
+                basePlanId,
+                own,
+                now,
+                knownPlanIds,
+                priceOf,
+            );
             const cycle = sub?.plan.interval === "year" ? "year" : "month";
             const paying =
                 !!sub &&
@@ -175,7 +184,11 @@ export class ImpactService {
             ...live.plans.map((p) => p.id),
             ...next.plans.map((p) => p.id),
         ]);
-        const { businesses, measured } = await this.read(known, now);
+        const { businesses, measured } = await this.read(
+            known,
+            now,
+            planPriceOf(live),
+        );
         return catalogueImpact({ live, next, businesses, measured });
     }
 }

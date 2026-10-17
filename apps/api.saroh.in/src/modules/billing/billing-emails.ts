@@ -169,6 +169,26 @@ export function paymentFailedEmail(input: {
 }
 
 /**
+ * A payment that charged the business twice for one period, given back in
+ * full (DEC-164, owner 17 Oct 2026). Sent once Razorpay took the refund;
+ * the money reaches the account it came from, usually in 5 to 7 working
+ * days (Razorpay's normal refund).
+ */
+export function doubleChargeRefundedEmail(input: {
+    businessName: string;
+    amount: string | null;
+}): RenderedEmail {
+    const what = input.amount ? `the ${input.amount}` : "the payment";
+    return {
+        subject: `We've refunded a payment for ${input.businessName}`,
+        html: wrap("We've refunded a payment", [
+            `${input.businessName} was charged twice for the same period of its Saroh plan, so we've refunded ${what} in full. Nothing else changes: your plan stays as it is.`,
+            "The money goes back to the card, bank account or UPI app it came from, usually within 5 to 7 working days. If it hasn't arrived by then, reply to this email and we'll look into it.",
+        ]),
+    };
+}
+
+/**
  * A free trial ends soon and the first charge follows (U16 queues it).
  * Only a trial that cost nothing: a paid first month says so instead
  * ({@link firstMonthEndingEmail}).

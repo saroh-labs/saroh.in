@@ -25,6 +25,7 @@ import {
 import type { Catalog } from "@saroh/pricing-catalog";
 import { addMonthsUtc, planRows, withGstPaise } from "@saroh/pricing-catalog";
 
+import { giveBillingDetails } from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ONE_TIME_PAYMENT } from "./billing-term";
@@ -33,7 +34,10 @@ import { CheckoutConfirmService } from "./checkout-confirm.service";
 import { CheckoutService } from "./checkout.service";
 import { MovesApplyHandler } from "./moves-apply.handler";
 import { PlansService } from "./plans.service";
-import { BILLING_PROVIDER_CANCEL_TYPE } from "./provider-cancel.job";
+import {
+    BILLING_PROVIDER_CANCEL_TYPE,
+    ProviderCancelHandler,
+} from "./provider-cancel.job";
 import type { BillingEventPhase } from "./providers/billing-provider.port";
 import {
     FakeBillingProvider,
@@ -141,6 +145,7 @@ async function business(): Promise<OrganizationContext> {
         data: { name: `Terms ${seq}`, slug: `terms-${seq}-${tag}` },
     });
     await startOnFreePlan(prisma, org.id, { planId: "free" });
+    await giveBillingDetails(org.id);
     return { organizationId: org.id, userId: "owner-user", role: "OWNER" };
 }
 
@@ -209,6 +214,12 @@ describe("monthly: autopay for a 12-charge term", () => {
             },
         });
         expect(fake.createCalls[0]).toMatchObject({ totalCount: 12 });
+        // The subscription is the business's customer's from the start, so
+        // the provider shows who it bills before it is paid.
+        expect(fake.customers.created).toHaveLength(1);
+        expect(fake.createCalls[0]).toMatchObject({
+            providerCustomerId: `fake_cus_${ctx.organizationId}`,
+        });
     });
 
     it("takes the catalogue's first month with the mandate and invoices it on its own", async () => {
@@ -307,7 +318,10 @@ describe("yearly: one payment for the year", () => {
         expect(saved).toMatchObject({
             providerPlanId: ONE_TIME_PAYMENT,
             providerSubscriptionId: `fake_order_${saved.id}`,
+            // An order's window takes the business as the provider's customer.
+            providerCustomerId: `fake_cus_${ctx.organizationId}`,
         });
+        expect(fake.customers.created).toHaveLength(1);
     });
 
     it("a plan with a first month has no trial yearly: the year starts when it's paid", async () => {
@@ -345,6 +359,56 @@ describe("yearly: one payment for the year", () => {
             provider: null,
             providerSubscriptionId: null,
         });
+    });
+
+    it("Free chosen in a year paid once: the year runs out, and nothing is sent to cancel an order", async () => {
+        await install();
+        const ctx = await business();
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "year" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        const order = `fake_order_${r.checkout.id}`;
+        await deliver(order, "charged", { type: "order.paid" });
+        const on = await sub(ctx.organizationId);
+
+        // The in-app Cancel plan's call (change-plan → Free): same answer.
+        const free = await checkout.changePlan(ctx, {
+            plan: "free",
+            cycle: "month",
+        });
+        expect(free).toMatchObject({
+            kind: "TO_FREE",
+            effectiveAt: on.currentPeriodEnd!.toISOString(),
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.c" },
+            pendingFrom: on.currentPeriodEnd,
+            cancelAtPeriodEnd: true,
+        });
+        expect(
+            await prisma.job.count({
+                where: { type: BILLING_PROVIDER_CANCEL_TYPE },
+            }),
+        ).toBe(0);
+
+        // One queued for an order anyway (an older path) asks nothing.
+        await prisma.job.create({
+            data: {
+                type: BILLING_PROVIDER_CANCEL_TYPE,
+                organizationId: ctx.organizationId,
+                payload: {
+                    provider: "RAZORPAY",
+                    providerSubscriptionId: order,
+                    atCycleEnd: true,
+                },
+            },
+        });
+        const job = await prisma.job.findFirstOrThrow({
+            where: { type: BILLING_PROVIDER_CANCEL_TYPE },
+        });
+        await new ProviderCancelHandler(
+            new FakeBillingProviderFactory(fake),
+        ).handle(job);
+        expect(fake.cancelCalls).toEqual([]);
     });
 });
 
@@ -561,6 +625,49 @@ describe("the end of a term", () => {
                 })
             ).status,
         ).toBe("SCHEDULED");
+    });
+
+    it("a renewal cancelled at the provider before it starts: the term still ends in Free, never a plan nobody pays for", async () => {
+        await install();
+        const ctx = await business();
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        const ref = `fake_sub_${r.checkout.id}`;
+        const now = new Date();
+        const started = addMonthsUtc(new Date(now.getTime() + 10 * DAY), -12);
+        const termEnds = addMonthsUtc(started, 12);
+        await deliver(ref, "activated", { currentPeriodEnd: termEnds });
+        await prisma.billingCheckout.update({
+            where: { id: r.checkout.id },
+            data: { completedAt: started },
+        });
+        // The old autopay's 12 charges are done: Free at the term's end.
+        await deliver(ref, "completed", { currentPeriodEnd: termEnds });
+        const renew = await checkout.changePlan(
+            ctx,
+            { plan: "c", cycle: "month" },
+            now,
+        );
+        if (renew.kind === "TO_FREE") throw new Error("expected a checkout");
+        expect(renew.kind).toBe("RENEW");
+        const renewRef = `fake_sub_${renew.checkout.id}`;
+        await deliver(renewRef, "authenticated");
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            pendingFrom: termEnds,
+            cancelAtPeriodEnd: false,
+        });
+
+        // The new mandate revoked in a UPI app, before it starts.
+        await deliver(renewRef, "cancelled");
+        const free = await row("free");
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.c" },
+            pendingPlanId: free.id,
+            pendingFrom: termEnds,
+            cancelAtPeriodEnd: true,
+        });
+        await sweep.sweep(new Date(termEnds.getTime() + DAY));
+        expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.free");
     });
 
     it("with time left on the term, the same plan is nothing to do", async () => {

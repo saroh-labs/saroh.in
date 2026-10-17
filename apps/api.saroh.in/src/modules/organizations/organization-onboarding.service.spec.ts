@@ -3,6 +3,12 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 // Mock the database package so the service never touches a real Postgres. The
 // `$transaction` mock simply invokes its callback with the same mocked client,
 // so we can assert every write happens inside the one transaction.
+// The billing customer's sync job (DEC-165) has its own db spec.
+const mockEnqueueBillingCustomerSync = jest.fn();
+jest.mock("../billing/billing-customer-sync", () => ({
+    enqueueBillingCustomerSync: (...args: unknown[]) =>
+        mockEnqueueBillingCustomerSync(...args),
+}));
 jest.mock("@saroh/database", () => {
     const client = {
         organization: {

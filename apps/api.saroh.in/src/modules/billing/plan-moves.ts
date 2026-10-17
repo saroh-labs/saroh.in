@@ -167,7 +167,9 @@ export async function applyDueMoveInTx(
         // takes over from the one that ended with the period.
         data.provider = scheduled.provider;
         data.providerSubscriptionId = scheduled.providerSubscriptionId;
-        data.providerCustomerId = scheduled.providerCustomerId;
+        if (scheduled.providerCustomerId) {
+            data.providerCustomerId = scheduled.providerCustomerId;
+        }
         data.status = "ACTIVE";
         data.cancelAtPeriodEnd = false;
         data.freeChosenAt = null;
@@ -196,7 +198,8 @@ export async function applyDueMoveInTx(
         await clearAddonsInTx(tx, sub.id);
         data.provider = null;
         data.providerSubscriptionId = null;
-        data.providerCustomerId = null;
+        // The provider's customer is the business's, kept for history and
+        // the next checkout (17 Oct 2026).
         data.status = "ACTIVE";
         data.cancelAtPeriodEnd = false;
         data.freeChosenAt = null;

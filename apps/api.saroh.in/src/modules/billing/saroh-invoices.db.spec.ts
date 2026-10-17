@@ -35,6 +35,7 @@ import {
 } from "@saroh/database";
 import { gstPaise, planRows, withGstPaise } from "@saroh/pricing-catalog";
 
+import { giveBillingDetails } from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { SarohBillingEmail } from "../../common/email";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -48,6 +49,7 @@ import {
     FakeBillingProvider,
     FakeBillingProviderFactory,
 } from "./providers/fake.provider";
+import { sarohInvoicePaper } from "./saroh-invoice-paper";
 import { SarohInvoicesService } from "./saroh-invoices.service";
 import type { SarohSeller } from "./saroh-seller";
 
@@ -146,13 +148,18 @@ async function row(planId: string) {
 
 let seq = 0;
 async function business(
-    profile: { gstState?: string } = {},
+    profile: { gstState?: string; bare?: boolean } = {},
 ): Promise<OrganizationContext> {
     seq += 1;
     const org = await prisma.organization.create({
         data: { name: `Invoice Shop ${seq}`, slug: `sinv-${seq}-${tag}` },
     });
     await startOnFreePlan(prisma, org.id, { planId: "free" });
+    // A paid plan needs who Saroh bills (17 Oct 2026); `bare` has no
+    // profile, to be asked for it.
+    if (!profile.gstState && !profile.bare) {
+        await giveBillingDetails(org.id);
+    }
     if (profile.gstState) {
         await prisma.businessProfile.create({
             data: {
@@ -252,6 +259,7 @@ async function onPaidPlan(
     billTo: {
         billingState?: string;
         gstin?: string;
+        phone?: string;
         registeredAddress?: {
             line1?: string;
             city?: string;
@@ -395,6 +403,37 @@ describe("a plan's charges", () => {
         expect(saved).toMatchObject({ billToState: "27", billToGstin: theirs });
     });
 
+    it("a renewal is billed to the business as it is now, not the checkout's GSTIN and state (17 Oct 2026)", async () => {
+        const ctx = await business({ gstState: "29" });
+        const old = gstin("27");
+        const { providerSub, periodEnd } = await onPaidPlan(ctx, "b", {
+            billingState: "Maharashtra",
+            gstin: old,
+        });
+        // Since: the business corrected its GSTIN, registered in Karnataka.
+        const now = gstin("29");
+        await prisma.businessProfile.update({
+            where: { organizationId: ctx.organizationId },
+            data: { gstRegistered: true, taxId: now, gstState: "29" },
+        });
+        await deliver(providerSub, "charged", {
+            currentPeriodEnd: new Date(periodEnd.getTime() + 30 * DAY),
+            paymentId: "pay_renewal",
+        });
+        const rows = await invoicesOf(ctx.organizationId);
+        expect(rows).toHaveLength(2);
+        // The first charge keeps what was given at checkout.
+        expect(rows[0]).toMatchObject({ billToGstin: old, taxType: "INTER" });
+        expect(rows[1]).toMatchObject({
+            source: "RENEWAL",
+            billToGstin: now,
+            billToState: "29",
+            placeOfSupply: "29",
+            taxType: "INTRA",
+            igstPaise: 0,
+        });
+    });
+
     it("refuses a GSTIN that doesn't check out, or isn't in the state given, before the provider is asked", async () => {
         const ctx = await business();
         const good = gstin("27");
@@ -421,7 +460,7 @@ describe("a plan's charges", () => {
     });
 
     it("asks a business with a GSTIN and no address for its registered address, keeps it, and prints it (Rule 46(e))", async () => {
-        const ctx = await business();
+        const ctx = await business({ bare: true });
         const theirs = gstin("27");
         await expect(
             checkout.changePlan(ctx, {
@@ -453,6 +492,65 @@ describe("a plan's charges", () => {
             billToAddress: "4 Mill Road, Pune 411001",
             placeOfSupply: "27",
         });
+    });
+
+    it("bills the owner's email and the business's phone, and prints them (17 Oct 2026)", async () => {
+        const ctx = await business({ gstState: "29" });
+        await prisma.businessProfile.update({
+            where: { organizationId: ctx.organizationId },
+            data: { phone: "+919845012345" },
+        });
+        await onPaidPlan(ctx);
+        const owner = await prisma.user.findUniqueOrThrow({
+            where: { id: ctx.userId },
+        });
+        const [invoice] = await invoicesOf(ctx.organizationId);
+        expect(invoice).toMatchObject({
+            billToEmail: owner.email,
+            billToPhone: "+919845012345",
+        });
+        const paper = sarohInvoicePaper(invoice!);
+        expect(paper.billedTo.detail).toContain(owner.email);
+        expect(paper.billedTo.detail).toContain("+919845012345");
+
+        // The renewal is billed to the same.
+        const sub = await prisma.subscription.findUniqueOrThrow({
+            where: { organizationId: ctx.organizationId },
+        });
+        await deliver(sub.providerSubscriptionId!, "charged", {
+            currentPeriodEnd: new Date(
+                sub.currentPeriodEnd!.getTime() + 30 * DAY,
+            ),
+        });
+        const rows = await invoicesOf(ctx.organizationId);
+        expect(rows[1]).toMatchObject({
+            source: "RENEWAL",
+            billToEmail: owner.email,
+            billToPhone: "+919845012345",
+        });
+    });
+
+    it("a phone given at checkout is billed and kept on the checkout, never on the profile (its website's)", async () => {
+        const ctx = await business({ gstState: "29" });
+        await onPaidPlan(ctx, "b", { phone: "+91 98450 12345" });
+        const [invoice] = await invoicesOf(ctx.organizationId);
+        expect(invoice!.billToPhone).toBe("+919845012345");
+        const saved = await prisma.billingCheckout.findFirstOrThrow({
+            where: { organizationId: ctx.organizationId },
+        });
+        expect(saved.billToPhone).toBe("+919845012345");
+        const profile = await prisma.businessProfile.findUniqueOrThrow({
+            where: { organizationId: ctx.organizationId },
+        });
+        expect(profile.phone).toBeNull();
+    });
+
+    it("an invoice with no phone anywhere has none, and still has the email", async () => {
+        const ctx = await business({ gstState: "29" });
+        await onPaidPlan(ctx);
+        const [invoice] = await invoicesOf(ctx.organizationId);
+        expect(invoice!.billToPhone).toBeNull();
+        expect(invoice!.billToEmail).toMatch(/^owner-/);
     });
 
     it("an upgrade's difference is invoiced once authorised; the new plan's first charge later is a renewal", async () => {

@@ -10,9 +10,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@saroh/ui/dialog";
-import { Field, focusFirstError } from "@saroh/ui/field";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
+import { focusFirstError } from "@saroh/ui/field";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { LoaderCircle } from "lucide-react";
@@ -20,7 +18,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { GST_STATES } from "@/lib/invoices/gst";
 import {
     changePlanAction,
     quoteChangeAction,
@@ -31,9 +28,23 @@ import {
     quoteSummary,
 } from "@/lib/saroh-billing/quote-words";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
-import { OptionSelect } from "@saroh/ui/option-select";
 
 import { runAction } from "@/lib/api/run-action";
+import type {
+    DetailErrors,
+    DetailField,
+    DetailsAsked,
+    DetailsDraft,
+} from "./invoice-details";
+import {
+    DETAIL_FIELDS,
+    detailsAsked,
+    detailsProblems,
+    detailsSent,
+    EMPTY_DETAILS,
+    InvoiceDetailsFields,
+    needsDetails,
+} from "./invoice-details";
 import { useCheckoutConfirm } from "./use-checkout-confirm";
 
 /** The plan picked: which, on which cycle, and what the row's button said. */
@@ -53,55 +64,15 @@ type Answer =
     | { key: string; state: "ready"; quote: ChangeQuote }
     | { key: string; state: "failed"; error: string };
 
-/** The registered address's fields, by the API's field names. */
-type AddressField = "addressLine1" | "addressLine2" | "city" | "postalCode";
-const ADDRESS_FIELDS: AddressField[] = [
-    "addressLine1",
-    "addressLine2",
-    "city",
-    "postalCode",
-];
+export { addressProblems } from "./invoice-details";
 
-/**
- * What is wrong with the registered address typed at checkout, by field:
- * nothing typed is fine unless a GSTIN was given (a registered buyer's
- * invoice carries their address, CGST Rule 46(e)); anything typed needs
- * the first line, the city and a six-digit PIN, as the API asks.
- */
-export function addressProblems(
-    a: Record<AddressField, string>,
-    gstinGiven: boolean,
-): Partial<Record<AddressField, string>> {
-    const line1 = a.addressLine1.trim();
-    const city = a.city.trim();
-    const pin = a.postalCode.replace(/\s+/g, "");
-    const any = Boolean(line1 || a.addressLine2.trim() || city || pin);
-    if (!any && !gstinGiven) return {};
-    const out: Partial<Record<AddressField, string>> = {};
-    if (!line1) {
-        out.addressLine1 = gstinGiven
-            ? "Add the registered address: it prints on Saroh's invoice with your GSTIN."
-            : "Add the address's first line.";
-    }
-    if (!city) out.city = "Add the city.";
-    if (!pin) out.postalCode = "Add the PIN code.";
-    else if (!/^[1-9][0-9]{5}$/.test(pin)) {
-        out.postalCode = "A PIN code is six digits, like 560038.";
-    }
-    return out;
-}
-
-const NO_ADDRESS: Record<AddressField, string> = {
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    postalCode: "",
+const NOTHING_ASKED: DetailsAsked = {
+    name: false,
+    email: false,
+    address: false,
+    state: false,
+    phone: false,
 };
-
-const STATE_OPTIONS = [
-    { value: "", label: "As on the business's details" },
-    ...GST_STATES,
-];
 
 /**
  * Changing plan (U15–U17), after a row on the picker: the API's quote first
@@ -116,7 +87,10 @@ const STATE_OPTIONS = [
  * without it. Add-ons the new plan isn't offered end with the old one
  * (DEC-157): the quote names them and a note says so before Confirm.
  * When the change starts is said first (DEC-159): "Starts today" with what
- * is paid now, or "From ‹date›" with the plan kept until then.
+ * is paid now, or "From ‹date›" with the plan kept until then. Who Saroh
+ * bills is asked for here, before the payment opens (17 Oct 2026): what
+ * the business is missing must be given, never by a trip to Settings
+ * (`invoice-details.tsx`).
  *
  * The design moves plan on a click; real money asks first (design
  * deviation, U14).
@@ -158,14 +132,8 @@ export function ChangePlanDialog({
         code: string;
         error: string;
     } | null>(null);
-    const [billingState, setBillingState] = useState("");
-    const [gstin, setGstin] = useState("");
-    const [gstinError, setGstinError] = useState<string | null>(null);
-    const [address, setAddress] =
-        useState<Record<AddressField, string>>(NO_ADDRESS);
-    const [addressErrors, setAddressErrors] = useState<
-        Partial<Record<AddressField, string>>
-    >({});
+    const [details, setDetails] = useState<DetailsDraft>(EMPTY_DETAILS);
+    const [detailErrors, setDetailErrors] = useState<DetailErrors>({});
     const detailsRef = useRef<HTMLDetailsElement>(null);
     const [pending, start] = useTransition();
     const [attempt, setAttempt] = useState(0);
@@ -215,12 +183,13 @@ export function ChangePlanDialog({
             ? endingAddonsNote(quoting.quote, { currentPlan })
             : null;
 
-    // The profile has no registered address: the invoice's details ask
-    // for it (an API from before the field asks nothing).
-    const asksAddress =
-        quoting.state === "ready" &&
-        quoting.quote.registeredAddress === false &&
-        Boolean(summary?.toPayment);
+    // Who Saroh bills (17 Oct 2026): what the business is missing must be
+    // given before the payment opens; the rest is optional.
+    const asked: DetailsAsked =
+        quoting.state === "ready" && summary?.toPayment
+            ? detailsAsked(quoting.quote)
+            : NOTHING_ASKED;
+    const required = needsDetails(asked);
 
     /** Open the details and put the keyboard on the first field in error. */
     function showProblems() {
@@ -230,51 +199,30 @@ export function ChangePlanDialog({
 
     function confirm() {
         if (!picked || quoting.state !== "ready") return;
-        const g = gstin.trim().toUpperCase();
-        if (g && !/^[0-9A-Z]{15}$/.test(g)) {
-            setGstinError("A GSTIN is 15 characters.");
-            showProblems();
-            return;
-        }
-        const problems = asksAddress
-            ? addressProblems(address, Boolean(g))
+        const problems = summary?.toPayment
+            ? detailsProblems(details, asked)
             : {};
-        setAddressErrors(problems);
+        setDetailErrors(problems);
         if (Object.keys(problems).length) {
             showProblems();
             return;
         }
-        const typed = asksAddress && address.addressLine1.trim();
         start(async () => {
             const res = await runAction(() =>
                 changePlanAction({
                     plan: picked.planId,
                     cycle: picked.cycle,
                     coupon: code || undefined,
-                    billingState: billingState || undefined,
-                    gstin: g || undefined,
-                    registeredAddress: typed
-                        ? {
-                              line1: address.addressLine1,
-                              line2: address.addressLine2,
-                              city: address.city,
-                              postalCode: address.postalCode,
-                          }
-                        : undefined,
+                    ...detailsSent(details, asked),
                 }),
             );
             if (!res) return;
             if (!res.ok) {
-                if (res.field === "gstin") {
-                    setGstinError(res.error);
-                    showProblems();
-                } else if (
+                if (
                     res.field &&
-                    (ADDRESS_FIELDS as string[]).includes(res.field)
+                    (DETAIL_FIELDS as string[]).includes(res.field)
                 ) {
-                    setAddressErrors({
-                        [res.field as AddressField]: res.error,
-                    });
+                    setDetailErrors({ [res.field as DetailField]: res.error });
                     showProblems();
                 } else if (res.field === "coupon" && code) {
                     setDropped({ code, error: res.error });
@@ -488,80 +436,27 @@ export function ChangePlanDialog({
                 {summary?.toPayment ? (
                     <details
                         ref={detailsRef}
+                        // Open from the start when something must be given.
+                        open={required || undefined}
                         className="group rounded-lg border border-border px-3.5 py-2.5 text-[13px]"
                     >
                         <summary className="cursor-pointer font-semibold">
                             Details for Saroh&apos;s invoice
-                            {asksAddress ? null : " (optional)"}
+                            {required ? null : " (optional)"}
                         </summary>
-                        <div className="mt-3 grid gap-3">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="bill-state">
-                                    State your business is registered in
-                                    {asksAddress ? <Optional /> : null}
-                                </Label>
-                                <OptionSelect
-                                    id="bill-state"
-                                    value={billingState}
-                                    onValueChange={setBillingState}
-                                    options={STATE_OPTIONS}
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="bill-gstin">
-                                    GSTIN
-                                    {asksAddress ? <Optional /> : null}
-                                </Label>
-                                <Input
-                                    id="bill-gstin"
-                                    value={gstin}
-                                    onChange={(e) => {
-                                        setGstin(e.target.value);
-                                        setGstinError(null);
-                                    }}
-                                    maxLength={15}
-                                    autoComplete="off"
-                                    className="font-mono uppercase"
-                                    aria-invalid={gstinError ? true : undefined}
-                                    aria-describedby={
-                                        gstinError
-                                            ? "bill-gstin-error"
-                                            : undefined
-                                    }
-                                />
-                                {gstinError ? (
-                                    <p
-                                        id="bill-gstin-error"
-                                        role="alert"
-                                        className="text-[12.5px] text-destructive"
-                                    >
-                                        {gstinError}
-                                    </p>
-                                ) : (
-                                    <p className="text-[12px] text-muted-foreground">
-                                        Leave it empty if the business has none.
-                                    </p>
-                                )}
-                            </div>
-                            {asksAddress ? (
-                                <CheckoutAddressFields
-                                    value={address}
-                                    errors={addressErrors}
-                                    // Asked for with a GSTIN; optional without.
-                                    optional={!gstin.trim()}
-                                    onChange={(field, v) => {
-                                        setAddress((a) => ({
-                                            ...a,
-                                            [field]: v,
-                                        }));
-                                        setAddressErrors((e) => {
-                                            const { [field]: _gone, ...rest } =
-                                                e;
-                                            return rest;
-                                        });
-                                    }}
-                                />
-                            ) : null}
+                        <div className="mt-3">
+                            <InvoiceDetailsFields
+                                asked={asked}
+                                value={details}
+                                errors={detailErrors}
+                                onChange={(field, v) => {
+                                    setDetails((d) => ({ ...d, [field]: v }));
+                                    setDetailErrors((e) => {
+                                        const { [field]: _gone, ...rest } = e;
+                                        return rest;
+                                    });
+                                }}
+                            />
                         </div>
                     </details>
                 ) : null}
@@ -599,97 +494,5 @@ export function ChangePlanDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-    );
-}
-
-/** "(optional)" after a label, as `Field` writes it. */
-function Optional() {
-    return (
-        <span className="font-normal text-muted-foreground"> (optional)</span>
-    );
-}
-
-/**
- * The business's registered address, asked for when its profile has none
- * and kept there (Settings › Business shows it after): it prints on
- * Saroh's invoice, required with a GSTIN (CGST Rule 46(e)).
- */
-function CheckoutAddressFields({
-    value,
-    errors,
-    optional,
-    onChange,
-}: {
-    value: Record<AddressField, string>;
-    errors: Partial<Record<AddressField, string>>;
-    optional: boolean;
-    onChange: (field: AddressField, value: string) => void;
-}) {
-    return (
-        <div
-            role="group"
-            aria-labelledby="bill-address-label"
-            className="grid gap-3"
-        >
-            <div>
-                <p
-                    id="bill-address-label"
-                    className="text-[13px] font-semibold"
-                >
-                    Registered address
-                </p>
-                <p className="text-[12px] text-muted-foreground">
-                    It prints on Saroh&apos;s invoice and is saved to your
-                    business details.
-                </p>
-            </div>
-            <Field
-                label="Address line 1"
-                optional={optional}
-                error={errors.addressLine1}
-            >
-                <Input
-                    id="bill-address-line1"
-                    value={value.addressLine1}
-                    onChange={(e) => onChange("addressLine1", e.target.value)}
-                    maxLength={120}
-                    autoComplete="address-line1"
-                />
-            </Field>
-            <Field label="Address line 2" optional error={errors.addressLine2}>
-                <Input
-                    id="bill-address-line2"
-                    value={value.addressLine2}
-                    onChange={(e) => onChange("addressLine2", e.target.value)}
-                    maxLength={120}
-                    autoComplete="address-line2"
-                />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-                <Field label="City" optional={optional} error={errors.city}>
-                    <Input
-                        id="bill-city"
-                        value={value.city}
-                        onChange={(e) => onChange("city", e.target.value)}
-                        maxLength={60}
-                        autoComplete="address-level2"
-                    />
-                </Field>
-                <Field
-                    label="PIN code"
-                    optional={optional}
-                    error={errors.postalCode}
-                >
-                    <Input
-                        id="bill-pin"
-                        value={value.postalCode}
-                        onChange={(e) => onChange("postalCode", e.target.value)}
-                        maxLength={12}
-                        inputMode="numeric"
-                        autoComplete="postal-code"
-                    />
-                </Field>
-            </div>
-        </div>
     );
 }

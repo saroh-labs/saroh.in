@@ -61,12 +61,9 @@ const WRITES: Record<string, (ctx: OrganizationContext) => Promise<unknown>> = {
             providers,
             {} as BillingWebhookService,
         ).confirm(ctx),
-    "POST subscribe": (ctx) =>
-        new SubscriptionsService(new PlansService(), providers).subscribe(ctx, {
-            planKey: "pro",
-        }),
-    "POST cancel": (ctx) =>
-        new SubscriptionsService(new PlansService(), providers).cancel(ctx, {}),
+    // Retired (410), still the owner's alone to be told so.
+    "POST subscribe": (ctx) => new SubscriptionsService().subscribe(ctx),
+    "POST cancel": (ctx) => new SubscriptionsService().cancel(ctx),
     "POST launch-offer": (ctx) =>
         new LaunchOfferService().redeem(ctx, user, "token"),
 };
@@ -180,11 +177,7 @@ describe("reading Plan and billing is unchanged", () => {
     it("an Admin gets past the read guards", async () => {
         const admin = REFUSED["an Admin, resolved"]!;
         const reads = [
-            () =>
-                new SubscriptionsService(
-                    new PlansService(),
-                    providers,
-                ).getCurrent(admin),
+            () => new SubscriptionsService().getCurrent(admin),
             () => new AddonsService().list(admin),
             () =>
                 new CheckoutService(new PlansService(), providers).current(

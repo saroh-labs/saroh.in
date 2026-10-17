@@ -16,6 +16,15 @@ export type BillingEmailPayload =
           final: boolean;
       }
     | {
+          /** A double charge given back in full (DEC-164). */
+          kind: "DOUBLE_CHARGE_REFUNDED";
+          organizationId: string;
+          /** The payment refunded: one email per payment. */
+          providerPaymentId: string;
+          /** What was refunded, in paise, when the provider said. */
+          amountPaise: number | null;
+      }
+    | {
           kind: "TRIAL_ENDING";
           organizationId: string;
           subscriptionId: string;
@@ -157,6 +166,16 @@ export function parseBillingEmailPayload(
         typeof p.eventKey === "string"
     ) {
         return { ...(p as object), final: p.final === true } as never;
+    }
+    if (
+        p.kind === "DOUBLE_CHARGE_REFUNDED" &&
+        typeof p.providerPaymentId === "string"
+    ) {
+        return {
+            ...(p as object),
+            amountPaise:
+                typeof p.amountPaise === "number" ? p.amountPaise : null,
+        } as never;
     }
     if (
         p.kind === "TRIAL_ENDING" &&

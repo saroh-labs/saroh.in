@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type {
+    BillingCustomer,
     BillingEventPhase,
     BillingProvider,
     BillingProviderFactory,
@@ -10,12 +11,17 @@ import type {
     CreateProviderPlanInput,
     CreateSubscriptionInput,
     CreateSubscriptionResult,
+    CustomerCreated,
     NextChargeItem,
     ParsedBillingEvent,
     ProviderChargeCapability,
+    ProviderCustomerCapability,
     ProviderOrderCapability,
+    ProviderPaymentNotesCapability,
     ProviderPlanCapability,
+    ProviderRefundCapability,
     ProviderStatusCapability,
+    SubscriptionStanding,
     SubscriptionStatus,
     WebhookHeaders,
 } from "./billing-provider.port";
@@ -120,6 +126,142 @@ export class FakeProviderOrders implements ProviderOrderCapability {
 }
 
 /**
+ * The fake's provider customers, as Razorpay with `fail_existing: "1"`:
+ * one per email and phone, a second refused as `exists`; the same email
+ * without a phone is a new one. Every create and update recorded; a test
+ * turns the keys off with {@link keys}, or queues a failure.
+ */
+export class FakeProviderCustomers implements ProviderCustomerCapability {
+    readonly created: { input: BillingCustomer; withContact: boolean }[] = [];
+    readonly updated: {
+        providerCustomerId: string;
+        input: BillingCustomer;
+        withContact: boolean;
+    }[] = [];
+    keys = true;
+    failNext: BillingProviderError | null = null;
+    private readonly byEmailPhone = new Map<string, string>();
+
+    configured(): boolean {
+        return this.keys;
+    }
+
+    createCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<CustomerCreated> {
+        if (this.failNext) {
+            const error = this.failNext;
+            this.failNext = null;
+            return Promise.reject(error);
+        }
+        const contact = options.withContact ? input.contact : null;
+        if (input.email && contact) {
+            const key = `${input.email}|${contact}`;
+            if (this.byEmailPhone.has(key)) return Promise.resolve("exists");
+            this.byEmailPhone.set(key, input.organizationId);
+        }
+        this.created.push({ input, withContact: options.withContact });
+        return Promise.resolve({
+            providerCustomerId: `fake_cus_${input.organizationId}`,
+        });
+    }
+
+    updateCustomer(
+        providerCustomerId: string,
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<void> {
+        if (this.failNext) {
+            const error = this.failNext;
+            this.failNext = null;
+            return Promise.reject(error);
+        }
+        this.updated.push({
+            providerCustomerId,
+            input,
+            withContact: options.withContact,
+        });
+        return Promise.resolve();
+    }
+}
+
+/**
+ * The fake's payment notes (17 Oct 2026): every call recorded; a test
+ * queues a failure with {@link failNext}.
+ */
+export class FakeProviderPaymentNotes implements ProviderPaymentNotesCapability {
+    readonly set: {
+        providerPaymentId: string;
+        notes: Record<string, string>;
+    }[] = [];
+    failNext: BillingProviderError | null = null;
+
+    setPaymentNotes(input: {
+        providerPaymentId: string;
+        notes: Record<string, string>;
+    }): Promise<void> {
+        if (this.failNext) {
+            const error = this.failNext;
+            this.failNext = null;
+            return Promise.reject(error);
+        }
+        this.set.push(input);
+        return Promise.resolve();
+    }
+}
+
+/**
+ * The fake's refunds (DEC-164): one per payment, however often asked, as
+ * Razorpay refuses to refund more than was paid. A test queues failures
+ * with {@link failNext}; a refusal carries Razorpay-like words.
+ */
+export class FakeProviderRefunds implements ProviderRefundCapability {
+    readonly refunded: { providerPaymentId: string; reference: string }[] = [];
+    readonly asked: string[] = [];
+    /** What a refund answers it gave back; null: the provider didn't say. */
+    amountPaise: number | null = null;
+    private readonly failures: BillingProviderError[] = [];
+
+    failNext(...kinds: ("REFUSED" | "UNKNOWN")[]): void {
+        this.failures.push(
+            ...kinds.map((kind) =>
+                kind === "REFUSED"
+                    ? new BillingProviderError(
+                          kind,
+                          "Razorpay payment refund failed (HTTP 400): invalid request sent",
+                          "invalid request sent",
+                      )
+                    : new BillingProviderError(
+                          kind,
+                          "Razorpay payment refund failed: network error",
+                      ),
+            ),
+        );
+    }
+
+    refundPayment(input: {
+        providerPaymentId: string;
+        reference: string;
+    }): Promise<{ providerRefundId: string; amountPaise: number | null }> {
+        this.asked.push(input.providerPaymentId);
+        const failure = this.failures.shift();
+        if (failure) return Promise.reject(failure);
+        if (
+            !this.refunded.some(
+                (r) => r.providerPaymentId === input.providerPaymentId,
+            )
+        ) {
+            this.refunded.push(input);
+        }
+        return Promise.resolve({
+            providerRefundId: `fake_rfnd_${input.providerPaymentId}`,
+            amountPaise: this.amountPaise,
+        });
+    }
+}
+
+/**
  * What the fake says a checkout stands at when asked (DEC-093): set per
  * reference by a test, else still waiting. Every question is recorded.
  */
@@ -130,6 +272,13 @@ export class FakeProviderStatuses implements ProviderStatusCapability {
 
     set(ref: string, status: CheckoutStatus): void {
         this.byRef.set(ref, status);
+    }
+
+    /** What `subscriptionStanding` answers, per reference; else `unknown`. */
+    readonly standings = new Map<string, SubscriptionStanding>();
+
+    subscriptionStanding(ref: string): Promise<SubscriptionStanding> {
+        return Promise.resolve(this.standings.get(ref) ?? "unknown");
     }
 
     checkoutStatus(ref: string, oneTime: boolean): Promise<CheckoutStatus> {
@@ -164,11 +313,16 @@ export class FakeBillingProvider implements BillingProvider {
     readonly plans = new FakeProviderPlans();
     readonly charges = new FakeProviderCharges();
     readonly orders = new FakeProviderOrders();
+    readonly customers = new FakeProviderCustomers();
     readonly statuses = new FakeProviderStatuses();
+    readonly paymentNotes = new FakeProviderPaymentNotes();
+    readonly refunds = new FakeProviderRefunds();
     /** The public key Checkout would open with; null: no window. */
     publicKeyValue: string | null = null;
     /** The next `createSubscription` fails with this, once. */
     failNextCreate: BillingProviderError | null = null;
+    /** The next `cancelSubscription` calls fail with these, in order. */
+    readonly failCancels: BillingProviderError[] = [];
 
     constructor(
         readonly name = "RAZORPAY",
@@ -223,7 +377,8 @@ export class FakeBillingProvider implements BillingProvider {
     ): Promise<void> {
         this.cancelCalls.push(providerSubscriptionId);
         this.cancelOptions.push(options);
-        return Promise.resolve();
+        const failure = this.failCancels.shift();
+        return failure ? Promise.reject(failure) : Promise.resolve();
     }
 
     verifyWebhook(rawBody: Buffer, headers: WebhookHeaders): boolean {
@@ -253,6 +408,8 @@ export class FakeBillingProvider implements BillingProvider {
             eventAt?: string;
             currentPeriodEnd?: string | null;
             providerPaymentId?: string;
+            paymentAmountPaise?: number;
+            providerCustomerId?: string;
         };
         return {
             type: body.type ?? "unknown",
@@ -270,6 +427,12 @@ export class FakeBillingProvider implements BillingProvider {
                 : {}),
             ...(body.providerPaymentId
                 ? { providerPaymentId: body.providerPaymentId }
+                : {}),
+            ...(typeof body.paymentAmountPaise === "number"
+                ? { paymentAmountPaise: body.paymentAmountPaise }
+                : {}),
+            ...(body.providerCustomerId
+                ? { providerCustomerId: body.providerCustomerId }
                 : {}),
         };
     }

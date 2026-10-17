@@ -31,6 +31,7 @@ import {
 import type { Catalog } from "@saroh/pricing-catalog";
 import { gstPaise, planRows, withGstPaise } from "@saroh/pricing-catalog";
 
+import { giveBillingDetails } from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { validationPipeOptions } from "../../common/validation";
@@ -119,6 +120,7 @@ async function business(): Promise<OrganizationContext> {
         data: { name: `Billing ${seq}`, slug: `bill-${seq}-${tag}` },
     });
     await startOnFreePlan(prisma, org.id, { planId: "free" });
+    await giveBillingDetails(org.id);
     return { organizationId: org.id, userId: "owner-user", role: "OWNER" };
 }
 
@@ -348,10 +350,7 @@ describe("checkout from Free", () => {
                 atCycleEnd: false,
             },
         ]);
-        // A late activation of the replaced one changes nothing.
-        await deliver(`fake_sub_${first.checkout.id}`, "activated");
-        expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.free");
-
+        // An abandoned one lapses.
         const out = await sweep.sweep(new Date(Date.now() + 2 * DAY));
         expect(out.lapsed).toBe(1);
         expect(
@@ -361,6 +360,11 @@ describe("checkout from Free", () => {
                 })
             ).status,
         ).toBe("CANCELLED");
+        // The replaced one paid late anyway, with no other plan bought: the
+        // business keeps what it paid for (owner, 17 Oct 2026;
+        // billing-safety.db.spec.ts has the rest).
+        await deliver(`fake_sub_${first.checkout.id}`, "activated");
+        expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.b");
     });
 });
 

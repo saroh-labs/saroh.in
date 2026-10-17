@@ -664,7 +664,35 @@ overrideId, reason }`. Re-read, then decide
   queues `pricing.site.revalidate` on the same transaction.
 - **`billing.provider.cancel`** cancels a provider subscription (now, or at
   the cycle's end) after a plan change commits: the change never waits on the
-  provider, and a refusal (already cancelled) isn't retried.
+  provider. A refusal is not settled (17 Oct 2026): the job asks where the
+  subscription stands — ended (or in its last cycle, told to end with it) is
+  done, authorised with no cycle running is cancelled now — and otherwise
+  queues itself again with a growing pause (15 minutes to a day, its count
+  in the payload), telling an operator after 8 tries and stopping after 14.
+  `withdrawProviderCancelsInTx` takes back the ones still waiting when a
+  payment is honoured.
+- **`billing.customer.sync`** (DEC-165) makes the business's one customer
+  at Saroh's billing provider, or sends its details as they are now:
+  queued in the sign-up's transaction, by a Settings › Business save that
+  touches billing details and by every checkout, at most one waiting per
+  business (`enqueueBillingCustomerSync`). Skips quietly with no provider
+  keys; retried by the queue; a refusal is logged and dropped
+  (`billing-customer.ts`). Businesses from before are queued by
+  `backfill/billing-customers.cli.ts`.
+- **`billing.payment.notes`** (17 Oct 2026) puts Saroh's invoice number,
+  business and checkout on the provider's payment once Saroh's invoice
+  has its payment id: queued on the invoice's transaction, retried by the
+  queue, a refusal or the last try logged (`billing_payment_notes_failed`)
+  and dropped (`payment-notes.job.ts`).
+- **`billing.refund.double-charge`** (DEC-164) refunds a double charge in
+  full through the provider: claimed once per payment by a platform audit
+  row on the webhook's transaction, which queues it. A refusal (4xx) is
+  never retried: an admin note asks the owner to refund it by hand, in
+  the provider's words, with an ERROR log. No answer (5xx, network) is
+  retried by the queue (10 attempts, each failure logged at ERROR), the
+  same note on the last. Once refunded it writes a second audit row,
+  queues `billing.email` `DOUBLE_CHARGE_REFUNDED` and leaves an admin note
+  that it was refunded (`double-charge-refund.job.ts`).
 - **`billing.email`** (U17) is Saroh's own mail to a business: an
   invoice with its PDF (queued with the invoice), a failed charge (queued by
   the webhook on `pending` or `halted`), a first month or a free trial

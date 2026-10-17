@@ -73,7 +73,9 @@ release time.
 8. **Saroh billing (U15)** needs, on the instance: Saroh's own Razorpay keys
    and webhook secret (`SAROH_RAZORPAY_KEY_ID`, `SAROH_RAZORPAY_KEY_SECRET`,
    `SAROH_RAZORPAY_WEBHOOK_SECRET`), the webhook pointed at
-   `/public/billing/webhooks/razorpay` with the `subscription.*` events, and
+   `/public/billing/webhooks/razorpay` with the `subscription.*` events and
+   `order.paid` (a yearly plan's one payment: without it a year paid with
+   the tab closed never reaches the plan), and
    the migration `20261021120000_saroh_billing`. Run the test-mode spike
    below before the first real checkout. Until the keys are set, a publish
    with paid plans stays **waiting** (its plans can't reach the provider) and
@@ -623,12 +625,17 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   keeps the base amount, discount, taxable value, each tax and the total
   apart, on the invoice and on each line. Saroh issues no refunds and has
   no credit note.
-- **The buyer's address** (Rule 46(e)): the quote says whether the
-  business has its registered address (`registeredAddress`); without one
-  the change-plan dialog asks for it, required with a GSTIN and optional
-  otherwise, and `POST …/billing/change-plan` takes `registeredAddress`
-  (line1, line2, city, PIN), checked before the provider is asked and saved
-  to the business's own registered address, never over one it has.
+- **The buyer's details** (Rule 46(e); owner, 17 Oct 2026): a paid
+  checkout is refused until the business has a billing name, an email, a
+  whole registered address and a state (`billing/billing-details.ts`). The
+  quote says what is missing (`billingDetails.missing`, and
+  `registeredAddress`); the change-plan dialog asks for it, required, with
+  a GSTIN and a phone optional; `POST …/billing/change-plan` takes
+  `registeredAddress` (line1, line2, city, PIN), `billingState`,
+  `billingName`, `billingEmail` and `phone`, checked before the provider is
+  asked. The address, state and name are saved to the business's own
+  profile, never over what it has; an email or phone on the checkout. The
+  invoice prints the billing email and, when there is one, the phone.
 - **After money, nothing is refused** (DEC-068): a business with no address
   still gets its invoice; missing seller details are logged
   (`saroh_invoice_seller_incomplete`) and the paper says "Invoice", not
@@ -641,6 +648,78 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   queues it) and, 3 days before each autopay charge, the renewal reminder
   (#804, queued by the hourly sweep), to everyone whose role has
   `billing:manage`.
+
+### Money after Saroh let go (DEC-164) — **verify in test mode**
+
+The owner's rule: a business keeps what it paid for until the paid period
+ends; Saroh never shows Free while Razorpay keeps charging, nor keeps a paid
+plan nobody is charged for, and never takes two payments for one period.
+
+- **A checkout Saroh dropped** (replaced, lapsed, the business moved to
+  Free) that is approved or paid anyway is completed as if never dropped,
+  when nothing conflicts. It conflicts when the business is closing, the
+  provider had ended it, its start date has passed (an upgrade's quote is
+  stale), or another plan was authorised or bought since: then its
+  subscription is cancelled now, no Saroh invoice written, and the payment
+  refunded in full, automatically, through Razorpay, once per payment
+  (owner 17 Oct 2026: "for double charge we can make the payment automatic
+  refund"). Refunded: the people who manage billing are emailed (money back
+  "usually within 5 to 7 working days") and an admin note on the business
+  names the refund. Refused by Razorpay (4xx): never retried, and an admin
+  note asks the owner to refund it by hand, quoting Razorpay ("Refund
+  payment pay_… (₹1,180) in Razorpay by hand: the automatic refund was
+  refused (…)"). Not answered (5xx, network): retried, 10 tries, the same
+  note on the last (`double-charge.ts`, `double-charge-refund.job.ts`).
+  Every other refund stays the owner's, by hand in Razorpay.
+- **A charge on a subscription Saroh ended** (halted, then paid through
+  Razorpay's link) puts the plan back, invoiced, and withdraws the cancel
+  still waiting; **one Saroh left** (a move to Free while a charge was
+  failing) keeps the plan for the period paid, then Free. Either, with
+  another paid plan billing the business, is refunded as above.
+- **A refused cancel** is not final: the job asks where the subscription
+  stands (`GET /subscriptions/:id`) and retries with a growing pause,
+  telling an operator after 8 tries and stopping after 14 (an admin note
+  on the business and an ERROR log line).
+- **Checkouts can't be approved late**: a subscription is made with
+  `expire_by` at the checkout's `expiresAt`, which an upgrade's or a
+  scheduled change's start date caps. **A yearly order can't**: Razorpay
+  orders take no expiry and can't be cancelled
+  (https://razorpay.com/docs/api/orders/create/ lists none), so an order
+  paid after its checkout lapsed is the dropped-checkout case above.
+
+To verify in test mode before relying on it:
+
+1. Which states `POST /subscriptions/:id/cancel` accepts. The docs say
+   "active or authenticated"
+   (https://razorpay.com/docs/api/payments/subscriptions/cancel-subscription/);
+   check `created`, `pending` and `halted` are refused with a 4xx, and that
+   `cancel_at_cycle_end: 1` on an authenticated one is refused ("no billing
+   cycle is going on").
+2. `expire_by` on `POST /subscriptions`
+   (https://razorpay.com/docs/api/payments/subscriptions/create-subscription/):
+   that a subscription past it can't be authorised and moves to `expired`
+   (and whether `subscription.expired` is sent).
+3. `GET /subscriptions/:id`'s `remaining_count` in the last cycle (0).
+4. Which payment id (and `amount`) `subscription.charged` and
+   `subscription.authenticated` carry: an upfront charge taken at
+   authorisation names one, or the note asks the owner to find it in the
+   dashboard and refund it by hand.
+5. That a halted subscription the customer pays through Razorpay's link
+   sends `subscription.charged` (and `activated`), and the order.
+6. Refunds (https://razorpay.com/docs/api/refunds/create-normal/): that
+   `POST /payments/:id/refund` with no `amount` refunds the whole payment
+   and answers `id` and `amount`, and that a second full refund of the
+   same payment is refused (4xx). **Not yet seen to work**: see below.
+
+In test mode on 17 Oct 2026, a full refund of a UPI subscription payment,
+sent with no amount and with the full amount, was refused by Razorpay with
+"invalid request sent", while smaller partial refunds on it went through
+(likely the test account's balance). So the automatic refund has not yet
+been seen to succeed in full: **verify it on production's first real
+double charge** (the admin note says refunded or refused). A refusal
+leaves the owner the note to refund by hand. For a refund by hand: check
+the payment's refunded amount in the dashboard first; where part is
+already refunded, refund the rest rather than the full amount.
 
 ### Razorpay test-mode spike (OQ-6)
 
