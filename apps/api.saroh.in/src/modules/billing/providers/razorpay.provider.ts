@@ -12,13 +12,18 @@ import type {
     CreateProviderPlanInput,
     CreateSubscriptionInput,
     CreateSubscriptionResult,
+    CustomerCreated,
     NextChargeItem,
     ParsedBillingEvent,
     ProviderChargeCapability,
+    ProviderCustomer,
     ProviderCustomerCapability,
     ProviderOrderCapability,
+    ProviderPaymentNotesCapability,
     ProviderPlanCapability,
+    ProviderRefundCapability,
     ProviderStatusCapability,
+    SubscriptionStanding,
     SubscriptionStatus,
     WebhookHeaders,
 } from "./billing-provider.port";
@@ -52,6 +57,32 @@ const FIND_PLAN_PAGE_SIZE = 100;
 
 /** The note Saroh's reference travels in on a Razorpay object. */
 const REFERENCE_NOTE = "saroh_ref";
+
+/** The 4xx answers that are a refusal (it would answer the same again); 429 is a retry. */
+const REFUSAL_STATUSES = Array.from({ length: 100 }, (_, i) => 400 + i).filter(
+    (status) => status !== 429,
+);
+/** A rate-limited call is asked again this many times before it fails. */
+const RATE_LIMIT_RETRIES = 2;
+/** The longest pause a `Retry-After` is honoured for; longer, the caller retries. */
+const RATE_LIMIT_WAIT_MAX_MS = 10_000;
+/** The pause when a 429 names none. */
+const RATE_LIMIT_WAIT_DEFAULT_MS = 2_000;
+
+/** A `Retry-After` (seconds, or an HTTP date) as a pause, within bounds. */
+export function retryAfterMs(
+    header: string | null,
+    now: number = Date.now(),
+): number {
+    const v = header?.trim();
+    let ms = RATE_LIMIT_WAIT_DEFAULT_MS;
+    if (v && /^\d+(\.\d+)?$/.test(v)) ms = Number(v) * 1000;
+    else if (v && Number.isFinite(Date.parse(v))) ms = Date.parse(v) - now;
+    return Math.min(Math.max(ms, 0), RATE_LIMIT_WAIT_MAX_MS);
+}
+
+/** Razorpay keeps at most 15 notes on anything. */
+const PAYMENT_NOTES_MAX = 15;
 
 /** Razorpay keeps at most 15 notes, each at most 256 characters. */
 const NOTE_MAX = 250;
@@ -114,6 +145,82 @@ export function razorpayCustomerName(c: BillingCustomer): string | null {
     return null;
 }
 
+/**
+ * The customer's own fields Razorpay takes: a name it accepts, an email of
+ * at most 64 characters, a phone (unless withheld) and a well-formed
+ * GSTIN; anything it would refuse is left out rather than sent.
+ */
+function customerFields(
+    input: BillingCustomer,
+    withContact: boolean,
+): Record<string, string> {
+    const name = razorpayCustomerName(input);
+    if (!name) {
+        throw new BillingProviderError(
+            "REFUSED",
+            "Razorpay customer skipped: no usable name",
+        );
+    }
+    const email = input.email && input.email.length <= 64 ? input.email : null;
+    const contact = withContact ? razorpayContact(input.contact) : null;
+    const gstin =
+        input.gstin && /^[0-9A-Z]{15}$/.test(input.gstin) ? input.gstin : null;
+    return {
+        name,
+        ...(email ? { email } : {}),
+        ...(contact ? { contact } : {}),
+        ...(gstin ? { gstin } : {}),
+    };
+}
+
+/** A refund's notes: Saroh's reference, the business, its subscription, why. */
+export function refundNotes(input: {
+    reference: string;
+    organizationId?: string | null;
+    providerSubscriptionId?: string | null;
+    reason?: string | null;
+}): Record<string, string> {
+    const out: Record<string, string> = { [REFERENCE_NOTE]: input.reference };
+    const put = (k: string, v: string | null | undefined) => {
+        const n = note(v);
+        if (n) out[k] = n;
+    };
+    put("organizationId", input.organizationId);
+    put("saroh_subscription", input.providerSubscriptionId);
+    put("saroh_reason", input.reason);
+    return out;
+}
+
+/** Razorpay's 400 saying a customer with these details already exists. */
+async function alreadyExists(res: Response): Promise<boolean> {
+    const err = (await res.json().catch(() => ({}))) as {
+        error?: { description?: unknown };
+    };
+    const said = err.error?.description;
+    return typeof said === "string" && /already exists/i.test(said);
+}
+
+/** A Razorpay customer entity as Saroh reads it: its id and its business. */
+function customerOf(json: unknown, what: string): ProviderCustomer {
+    const c = json as { id?: unknown; notes?: unknown };
+    if (typeof c.id !== "string" || !c.id) {
+        throw new BillingProviderError(
+            "UNKNOWN",
+            `Razorpay ${what} failed: missing customer id`,
+        );
+    }
+    // An empty notes object comes back as an empty array.
+    const notes =
+        c.notes && typeof c.notes === "object" && !Array.isArray(c.notes)
+            ? (c.notes as Record<string, unknown>)
+            : {};
+    const org = notes.organizationId;
+    return {
+        providerCustomerId: c.id,
+        organizationId: typeof org === "string" && org ? org : null,
+    };
+}
+
 /** A phone Razorpay takes: digits with an optional leading +, 8 to 15. */
 function razorpayContact(raw: string | null): string | null {
     const v = raw?.replace(/[\s()-]/g, "") ?? "";
@@ -146,6 +253,9 @@ export class RazorpayBillingProvider implements BillingProvider {
 
     /** The HTTP call; a spec swaps it for a fake. */
     fetchFn: typeof fetch = (input, init) => fetch(input, init);
+    /** The pause before a rate-limited call is asked again; a spec swaps it. */
+    sleepFn: (ms: number) => Promise<void> = (ms) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
 
     readonly plans: ProviderPlanCapability = {
         findPlan: (reference) => this.findPlan(reference),
@@ -161,12 +271,31 @@ export class RazorpayBillingProvider implements BillingProvider {
     };
 
     readonly customers: ProviderCustomerCapability = {
-        ensureCustomer: (input) => this.ensureCustomer(input),
+        configured: () =>
+            Boolean(
+                readPlatformSecret(RAZORPAY_KEY_ID) &&
+                readPlatformSecret(RAZORPAY_KEY_SECRET),
+            ),
+        createCustomer: (input, options) => this.createCustomer(input, options),
+        existingCustomer: (input, options) =>
+            this.existingCustomer(input, options),
+        findCustomer: (id) => this.findCustomer(id),
+        updateCustomer: (id, input, options) =>
+            this.updateCustomer(id, input, options),
     };
 
     readonly statuses: ProviderStatusCapability = {
         checkoutStatus: (ref, oneTime) =>
             oneTime ? this.orderStatus(ref) : this.subscriptionStatus(ref),
+        subscriptionStanding: (ref) => this.subscriptionStanding(ref),
+    };
+
+    readonly paymentNotes: ProviderPaymentNotesCapability = {
+        setPaymentNotes: (input) => this.setPaymentNotes(input),
+    };
+
+    readonly refunds: ProviderRefundCapability = {
+        refundPayment: (input) => this.refundPayment(input),
     };
 
     /** The key id Checkout opens with: public by design, never the secret. */
@@ -210,9 +339,22 @@ export class RazorpayBillingProvider implements BillingProvider {
             },
         };
         if (input.providerPlanId) body.plan_id = input.providerPlanId;
+        // Taken on create (checked in test mode, 17 Oct 2026): without it
+        // the subscription has no customer until someone pays.
+        if (input.providerCustomerId) {
+            body.customer_id = input.providerCustomerId;
+        }
         if (offerId) body.offer_id = offerId;
         if (input.startAt) {
             body.start_at = Math.floor(input.startAt.getTime() / 1000);
+        }
+        // Until when it may be authorised: "Unix timestamp that indicates
+        // till when the customer can make the authorisation payment"
+        // (https://razorpay.com/docs/api/payments/subscriptions/create-subscription/,
+        // default 30 years). Unverified in test mode: that an expired one
+        // can't be approved late and sends `subscription.expired`.
+        if (input.expireBy) {
+            body.expire_by = Math.floor(input.expireBy.getTime() / 1000);
         }
         if (input.upfront && input.upfront.amountPaise > 0) {
             body.addons = [
@@ -298,9 +440,16 @@ export class RazorpayBillingProvider implements BillingProvider {
                         id?: string;
                         status?: string;
                         current_end?: number | null;
+                        customer_id?: string | null;
                     };
                 };
-                payment?: { entity?: { id?: string } };
+                payment?: {
+                    entity?: {
+                        id?: string;
+                        amount?: number;
+                        customer_id?: string | null;
+                    };
+                };
                 order?: { entity?: { id?: string } };
             };
         };
@@ -312,6 +461,8 @@ export class RazorpayBillingProvider implements BillingProvider {
         const order =
             type === "order.paid" ? body.payload?.order?.entity : undefined;
         const providerSubscriptionId = entity?.id ?? order?.id;
+        const customerId =
+            entity?.customer_id ?? body.payload?.payment?.entity?.customer_id;
 
         return {
             type,
@@ -331,45 +482,45 @@ export class RazorpayBillingProvider implements BillingProvider {
             ...(body.payload?.payment?.entity?.id
                 ? { providerPaymentId: body.payload.payment.entity.id }
                 : {}),
+            ...(typeof body.payload?.payment?.entity?.amount === "number"
+                ? { paymentAmountPaise: body.payload.payment.entity.amount }
+                : {}),
+            ...(customerId ? { providerCustomerId: customerId } : {}),
         };
     }
 
     // ── One-time payments and asking how a checkout stands (DEC-093) ────
 
-    /** A yearly plan's one payment: an order Checkout pays. */
     /**
-     * The business as a Razorpay customer: name, email, phone, GSTIN and
-     * the address in its notes. `fail_existing: "0"` hands back the one
-     * Razorpay already has for the same email and phone.
+     * The business as a new Razorpay customer (owner, 17 Oct 2026): its
+     * billing name, email, phone and GSTIN. Its notes hold only what never
+     * changes, `organizationId` and the business's address (slug): notes
+     * are create-only (a `PUT` leaves them unchanged, checked in test
+     * mode), so a billing name, GSTIN or address there would go stale; the
+     * details as billed stay on each subscription's or order's notes.
+     * `fail_existing: "1"`: Razorpay refuses a second customer with the same
+     * email and phone with a 400 "Customer already exists for the merchant"
+     * (checked in test mode), answered as `exists`; the same email without
+     * a phone makes a new one. Which customer that is, {@link existingCustomer}.
      */
-    private async ensureCustomer(
+    private async createCustomer(
         input: BillingCustomer,
-    ): Promise<{ providerCustomerId: string }> {
-        const name = razorpayCustomerName(input);
-        if (!name) {
+        options: { withContact: boolean },
+    ): Promise<CustomerCreated> {
+        const res = await this.call(
+            "customer creation",
+            "POST",
+            "/customers",
+            this.customerBody(input, options.withContact, "1"),
+            { accept: [400] },
+        );
+        if (res.status === 400) {
+            if (await alreadyExists(res)) return "exists";
             throw new BillingProviderError(
                 "REFUSED",
-                "Razorpay customer creation skipped: no usable name",
+                "Razorpay customer creation failed (HTTP 400)",
             );
         }
-        const email =
-            input.email && input.email.length <= 64 ? input.email : null;
-        const contact = razorpayContact(input.contact);
-        const gstin =
-            input.gstin && /^[0-9A-Z]{15}$/.test(input.gstin)
-                ? input.gstin
-                : null;
-        const res = await this.call("customer creation", "POST", "/customers", {
-            name,
-            ...(email ? { email } : {}),
-            ...(contact ? { contact } : {}),
-            ...(gstin ? { gstin } : {}),
-            fail_existing: "0",
-            notes: {
-                organizationId: input.organizationId,
-                ...billingNotes(input),
-            },
-        });
         const json = (await res.json()) as { id?: string };
         if (!json.id) {
             throw new BillingProviderError(
@@ -380,6 +531,94 @@ export class RazorpayBillingProvider implements BillingProvider {
         return { providerCustomerId: json.id };
     }
 
+    /**
+     * The customer Razorpay holds for the same email and phone: the same
+     * create with `fail_existing: "0"`, which "fetches details of the
+     * existing customer" (Razorpay's create-customer docs) — its id and its
+     * notes, so Saroh's `organizationId` says whether it is this business's
+     * own (an earlier try whose answer was lost) or another's. Not yet run
+     * in test mode: that the answer carries the notes is from the docs'
+     * customer entity.
+     */
+    private async existingCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<ProviderCustomer> {
+        const res = await this.call(
+            "customer lookup",
+            "POST",
+            "/customers",
+            this.customerBody(input, options.withContact, "0"),
+        );
+        return customerOf(await res.json(), "customer lookup");
+    }
+
+    /**
+     * A customer by id (`GET /customers/:id`); null when Razorpay has none
+     * by it (it answers an unknown id with a 400 "does not exist", or 404).
+     */
+    private async findCustomer(
+        providerCustomerId: string,
+    ): Promise<ProviderCustomer | null> {
+        const res = await this.call(
+            "customer fetch",
+            "GET",
+            `/customers/${encodeURIComponent(providerCustomerId)}`,
+            undefined,
+            { accept: [400, 404] },
+        );
+        if (!res.ok) return null;
+        return customerOf(await res.json(), "customer fetch");
+    }
+
+    private customerBody(
+        input: BillingCustomer,
+        withContact: boolean,
+        failExisting: "0" | "1",
+    ) {
+        const notes: Record<string, string> = {
+            organizationId: input.organizationId,
+        };
+        const slug = note(input.businessSlug);
+        if (slug) notes.saroh_business = slug;
+        return {
+            ...customerFields(input, withContact),
+            fail_existing: failExisting,
+            notes,
+        };
+    }
+
+    /**
+     * The business's details as they are now, on its customer: `PUT
+     * /customers/:id` takes the name, email, phone and GSTIN (checked in
+     * test mode, 17 Oct 2026). A phone withheld at creation stays withheld.
+     * An email and phone another customer has is answered `exists` when
+     * Razorpay's 400 says "already exists" (the create's words; the
+     * update's are not yet seen in test mode), any other 400 is REFUSED.
+     */
+    private async updateCustomer(
+        providerCustomerId: string,
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<"updated" | "exists"> {
+        const res = await this.call(
+            "customer update",
+            "PUT",
+            `/customers/${encodeURIComponent(providerCustomerId)}`,
+            customerFields(input, options.withContact),
+            { accept: [400] },
+        );
+        if (res.status === 400) {
+            if (await alreadyExists(res)) return "exists";
+            throw new BillingProviderError(
+                "REFUSED",
+                "Razorpay customer update failed (HTTP 400)",
+            );
+        }
+        return "updated";
+    }
+
+    /** A yearly plan's one payment: an order Checkout pays. */
     private async createOrder(
         input: CreateOrderInput,
     ): Promise<{ providerOrderId: string }> {
@@ -419,16 +658,28 @@ export class RazorpayBillingProvider implements BillingProvider {
             status?: string;
             current_end?: number | null;
             paid_count?: number;
+            customer_id?: string | null;
         };
         const end = unixDate(json.current_end);
+        const customer = json.customer_id
+            ? { providerCustomerId: json.customer_id }
+            : {};
         switch (json.status) {
             case "authenticated":
-                return { phase: "authenticated", status: "IGNORED" };
+                return {
+                    phase: "authenticated",
+                    status: "IGNORED",
+                    ...customer,
+                    // An upfront charge is taken with the authorisation.
+                    providerPaymentId: await this.paidInvoicePayment(id),
+                };
             case "active":
                 return {
                     phase: (json.paid_count ?? 0) > 0 ? "charged" : "activated",
                     status: "ACTIVE",
                     currentPeriodEnd: end,
+                    ...customer,
+                    providerPaymentId: await this.paidInvoicePayment(id),
                 };
             case "pending":
                 return { phase: "pending", status: "PAST_DUE" };
@@ -446,6 +697,199 @@ export class RazorpayBillingProvider implements BillingProvider {
             default:
                 return { phase: "other", status: "IGNORED" };
         }
+    }
+
+    /**
+     * Where a subscription stands, asked when a cancel is refused. Razorpay
+     * cancels only an `active` or `authenticated` one ("Ensure that the
+     * Subscription is in the active or authenticated state to cancel",
+     * https://razorpay.com/docs/api/payments/subscriptions/cancel-subscription/),
+     * refuses a cancel at cycle end with no cycle running or in the last
+     * cycle, and one while another operation is in progress. Unverified in
+     * test mode: that `pending` and `halted` are refused.
+     */
+    private async subscriptionStanding(
+        id: string,
+    ): Promise<SubscriptionStanding> {
+        const res = await this.call(
+            "subscription lookup",
+            "GET",
+            `/subscriptions/${encodeURIComponent(id)}`,
+        );
+        const json = (await res.json()) as {
+            status?: string;
+            remaining_count?: number | string | null;
+        };
+        switch (json.status) {
+            case "cancelled":
+            case "completed":
+            case "expired":
+                return "ended";
+            case "created":
+                return "created";
+            case "authenticated":
+                return "authorised";
+            case "active":
+                return Number(json.remaining_count ?? 1) > 0
+                    ? "running"
+                    : "last-cycle";
+            case "pending":
+            case "halted":
+                return "failing";
+            default:
+                return "unknown";
+        }
+    }
+
+    /**
+     * The payment behind a subscription's latest paid invoice. A
+     * subscription carries no payment id (`GET /subscriptions/:id`), so the
+     * confirm path, which never sees `subscription.charged`, would write
+     * Saroh's invoice without one; `GET /invoices?subscription_id=` lists
+     * its invoices, newest first, each paid one with its `payment_id`
+     * (checked in test mode, 17 Oct 2026). Null when none is paid yet or
+     * the lookup fails: a later `subscription.charged` fills it in.
+     */
+    private async paidInvoicePayment(
+        subscriptionId: string,
+    ): Promise<string | null> {
+        try {
+            const res = await this.call(
+                "subscription invoices lookup",
+                "GET",
+                `/invoices?subscription_id=${encodeURIComponent(subscriptionId)}`,
+            );
+            const json = (await res.json()) as {
+                items?: { status?: string; payment_id?: string | null }[];
+            };
+            const paid = (json.items ?? []).find(
+                (i) => i.status === "paid" && i.payment_id,
+            );
+            return paid?.payment_id ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Saroh's ids on a payment, so the Razorpay dashboard leads back to
+     * Saroh: `PATCH /payments/:id` takes `notes` only, at most 15 pairs
+     * (https://razorpay.com/docs/api/payments/update/). The payment's notes
+     * are read first and kept, Saroh's added over them, so a note the
+     * subscription or order put there isn't lost.
+     */
+    private async setPaymentNotes(input: {
+        providerPaymentId: string;
+        notes: Record<string, string>;
+    }): Promise<void> {
+        const id = encodeURIComponent(input.providerPaymentId);
+        const payment = (await (
+            await this.call("payment lookup", "GET", `/payments/${id}`)
+        ).json()) as { notes?: Record<string, unknown> | unknown[] };
+        const had =
+            payment.notes && !Array.isArray(payment.notes)
+                ? Object.fromEntries(
+                      Object.entries(payment.notes).filter(
+                          ([k]) => !(k in input.notes),
+                      ),
+                  )
+                : {};
+        const room = Math.max(
+            0,
+            PAYMENT_NOTES_MAX - Object.keys(input.notes).length,
+        );
+        const notes = {
+            ...Object.fromEntries(Object.entries(had).slice(0, room)),
+            ...input.notes,
+        };
+        await this.call("payment notes", "PATCH", `/payments/${id}`, {
+            notes,
+        });
+    }
+
+    /**
+     * A double charge given back in full (DEC-164). Razorpay's create
+     * refund, `POST /payments/:id/refund`, refunds the whole payment when
+     * no amount is sent (https://razorpay.com/docs/api/refunds/create-normal/)
+     * and takes `speed`, `notes` and `receipt`; it has no idempotency key,
+     * so the payment is read first and one already refunded in full answers
+     * with its refund (`GET /payments/:id/refunds`) instead of a second.
+     * A 4xx is REFUSED with Razorpay's own `error.description` in the
+     * message (the owner's note quotes it); never retried. In test mode on
+     * 17 Oct 2026 a full refund, with or without the amount, was refused
+     * ("invalid request sent") on a UPI payment where smaller partial
+     * refunds went through: verify on production's first real case.
+     */
+    private async refundPayment(input: {
+        providerPaymentId: string;
+        reference: string;
+        organizationId?: string | null;
+        providerSubscriptionId?: string | null;
+        reason?: string | null;
+    }): Promise<{ providerRefundId: string; amountPaise: number | null }> {
+        const id = encodeURIComponent(input.providerPaymentId);
+        const payment = (await (
+            await this.call("payment lookup", "GET", `/payments/${id}`)
+        ).json()) as { amount?: number; amount_refunded?: number };
+        const amount = typeof payment.amount === "number" ? payment.amount : 0;
+        if (amount > 0 && (payment.amount_refunded ?? 0) >= amount) {
+            const list = (await (
+                await this.call(
+                    "payment refunds lookup",
+                    "GET",
+                    `/payments/${id}/refunds`,
+                )
+            ).json()) as { items?: { id?: string }[] };
+            const done = (list.items ?? []).find((r) => r.id);
+            if (done?.id) {
+                return { providerRefundId: done.id, amountPaise: amount };
+            }
+        }
+        const res = await this.call(
+            "payment refund",
+            "POST",
+            `/payments/${id}/refund`,
+            {
+                speed: "normal",
+                receipt: input.reference.slice(0, 40),
+                // Whose refund and why, read from Razorpay's refunds list.
+                notes: refundNotes(input),
+            },
+            { accept: REFUSAL_STATUSES },
+        );
+        if (!res.ok) {
+            const err = (await res.json().catch(() => ({}))) as {
+                error?: { description?: unknown };
+            };
+            const said =
+                typeof err.error?.description === "string"
+                    ? err.error.description.slice(0, 200)
+                    : undefined;
+            this.logger.warn(
+                `Razorpay payment refund failed with HTTP ${res.status}`,
+            );
+            throw new BillingProviderError(
+                "REFUSED",
+                `Razorpay payment refund failed (HTTP ${res.status})${said ? `: ${said}` : ""}`,
+                said,
+            );
+        }
+        const json = (await res.json()) as { id?: string; amount?: number };
+        if (!json.id) {
+            throw new BillingProviderError(
+                "UNKNOWN",
+                "Razorpay payment refund failed: missing refund id",
+            );
+        }
+        return {
+            providerRefundId: json.id,
+            amountPaise:
+                typeof json.amount === "number"
+                    ? json.amount
+                    : amount > 0
+                      ? amount
+                      : null,
+        };
     }
 
     /** An order: paid, or still waiting (`created`, `attempted`). */
@@ -567,36 +1011,52 @@ export class RazorpayBillingProvider implements BillingProvider {
 
     /**
      * One authenticated call. A 4xx is REFUSED (it would answer the same
-     * again); anything else that isn't a success is UNKNOWN. Only the status
+     * again); anything else that isn't a success is UNKNOWN. A 429 (rate
+     * limited) is asked again after the pause its `Retry-After` names (at
+     * most {@link RATE_LIMIT_WAIT_MAX_MS}), up to {@link RATE_LIMIT_RETRIES}
+     * times, before it is UNKNOWN for the caller's retries. Only the status
      * is kept: never the request, the auth header or Razorpay's body.
      */
     private async call(
         what: string,
-        method: "GET" | "POST",
+        method: "GET" | "POST" | "PUT" | "PATCH",
         path: string,
         body?: unknown,
+        /** Statuses handed back to the caller instead of thrown. */
+        options: { accept?: number[] } = {},
     ): Promise<Response> {
         const basic = this.basicAuth();
         let res: Response;
-        try {
-            res = await this.fetchFn(`${this.baseUrl}${path}`, {
-                method,
-                headers: {
-                    Authorization: `Basic ${basic}`,
+        for (let retry = 0; ; retry += 1) {
+            try {
+                res = await this.fetchFn(`${this.baseUrl}${path}`, {
+                    method,
+                    headers: {
+                        Authorization: `Basic ${basic}`,
+                        ...(body === undefined
+                            ? {}
+                            : { "Content-Type": "application/json" }),
+                    },
                     ...(body === undefined
                         ? {}
-                        : { "Content-Type": "application/json" }),
-                },
-                ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-                signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-            });
-        } catch {
-            // Never echo the request — it carries the platform secret.
-            throw new BillingProviderError(
-                "UNKNOWN",
-                `Razorpay ${what} failed: network error`,
+                        : { body: JSON.stringify(body) }),
+                    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+                });
+            } catch {
+                // Never echo the request — it carries the platform secret.
+                throw new BillingProviderError(
+                    "UNKNOWN",
+                    `Razorpay ${what} failed: network error`,
+                );
+            }
+            if (res.status !== 429 || retry >= RATE_LIMIT_RETRIES) break;
+            const wait = retryAfterMs(res.headers.get("retry-after"));
+            this.logger.warn(
+                `Razorpay ${what} rate limited; asking again in ${wait} ms`,
             );
+            await this.sleepFn(wait);
         }
+        if (!res.ok && options.accept?.includes(res.status)) return res;
         if (!res.ok) {
             this.logger.warn(`Razorpay ${what} failed with HTTP ${res.status}`);
             const refused =

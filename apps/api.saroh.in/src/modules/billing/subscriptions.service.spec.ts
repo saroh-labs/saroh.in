@@ -1,8 +1,7 @@
-// DB-free unit tests for the plans/subscriptions surface (S7-005). Only the
-// BILLING delegates (plan/subscription) are mocked; the MERCHANT payment
-// delegates are mocked too and asserted NEVER-CALLED during subscribe/cancel —
-// the credential-separation boundary. The billing provider is a
-// FakeBillingProvider (no network, no process.env).
+// DB-free unit tests for the subscription read (S7-005) and the retired
+// writes (`POST …/billing/subscribe` and `…/cancel`, 410 since 17 Oct 2026):
+// the owner check first, then Gone, touching nothing — no plan, no
+// subscription, no merchant payment delegate.
 jest.mock("@saroh/database", () => {
     const plan = { findFirst: jest.fn(), findMany: jest.fn() };
     const subscription = {
@@ -24,9 +23,31 @@ jest.mock("@saroh/database", () => {
         prisma: {
             // An active business may be charged (#921).
             organization: {
-                findUnique: jest
-                    .fn()
-                    .mockResolvedValue({ lifecycleStatus: "ACTIVE" }),
+                findUnique: jest.fn().mockResolvedValue({
+                    lifecycleStatus: "ACTIVE",
+                    name: "Billing Test",
+                }),
+            },
+            // Who Saroh bills is whole (17 Oct 2026): a name, an email, a
+            // registered address and its state.
+            businessProfile: {
+                findUnique: jest.fn().mockResolvedValue({
+                    legalName: null,
+                    contactEmail: null,
+                    phone: null,
+                    taxId: null,
+                    gstState: "29",
+                    addressLine1: "3 Hill Road",
+                    addressLine2: null,
+                    city: "Bengaluru",
+                    postalCode: "560038",
+                }),
+            },
+            user: {
+                findUnique: jest.fn().mockResolvedValue({
+                    email: "owner@example.com",
+                    name: null,
+                }),
             },
             plan,
             subscription,
@@ -39,23 +60,19 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, GoneException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { roleDenial } from "../organizations/organization-policy";
-import { PlansService } from "./plans.service";
-import {
-    FakeBillingProvider,
-    FakeBillingProviderFactory,
-} from "./providers/fake.provider";
 import { SubscriptionsService } from "./subscriptions.service";
 
 const planFindFirst = prisma.plan.findFirst as jest.Mock;
 const subFindUnique = prisma.subscription.findUnique as jest.Mock;
 const subUpsert = prisma.subscription.upsert as jest.Mock;
+const subUpdate = prisma.subscription.update as jest.Mock;
 
-/** Every mocked merchant delegate — asserted never-called after each flow. */
+/** Every mocked merchant delegate — asserted never-called. */
 function merchantDelegates(): jest.Mock[] {
     const p = prisma as unknown as Record<string, Record<string, jest.Mock>>;
     return [
@@ -71,12 +88,6 @@ function merchantDelegates(): jest.Mock[] {
     ];
 }
 
-function expectNoMerchantAccess(): void {
-    for (const delegate of merchantDelegates()) {
-        expect(delegate).not.toHaveBeenCalled();
-    }
-}
-
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     return {
         organizationId: "org_1",
@@ -87,231 +98,59 @@ function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
     };
 }
 
-function makeService(fake = new FakeBillingProvider("RAZORPAY")) {
-    const service = new SubscriptionsService(
-        new PlansService(),
-        new FakeBillingProviderFactory(fake),
-    );
-    return { service, fake };
-}
-
-const FREE_PLAN = {
-    id: "plan_free",
-    key: "free",
-    version: 1,
-    priceCents: 0,
-    currency: "INR",
-    interval: "month",
-};
-const PRO_PLAN = {
-    id: "plan_pro",
-    key: "pro",
-    version: 2,
-    priceCents: 49900,
-    currency: "INR",
-    interval: "month",
-};
-
 beforeEach(() => jest.clearAllMocks());
 
 describe("SubscriptionsService authz", () => {
-    it("denies a MEMBER subscribing (billing:manage) before any I/O", async () => {
-        const { service } = makeService();
-
-        await expect(
-            service.subscribe(ctx({ role: "MEMBER" }), { planKey: "pro" }),
-        ).rejects.toBeInstanceOf(ForbiddenException);
-        expect(planFindFirst).not.toHaveBeenCalled();
-    });
-
     it.each(["ADMIN", "MEMBER", "REVIEWER"] as const)(
         "denies %s subscribing and cancelling, in the owner-only sentence",
         async (role) => {
-            const { service } = makeService();
+            const service = new SubscriptionsService();
             const refusal = { response: roleDenial("billing:manage") };
 
             await expect(
-                service.subscribe(ctx({ role }), { planKey: "pro" }),
+                service.subscribe(ctx({ role })),
             ).rejects.toMatchObject(refusal);
-            await expect(
-                service.cancel(ctx({ role }), {}),
-            ).rejects.toMatchObject(refusal);
+            await expect(service.cancel(ctx({ role }))).rejects.toMatchObject(
+                refusal,
+            );
             expect(planFindFirst).not.toHaveBeenCalled();
             expect(subFindUnique).not.toHaveBeenCalled();
         },
     );
 
     it("lets an ADMIN read the subscription (billing:read)", async () => {
-        const { service } = makeService();
         subFindUnique.mockResolvedValue(null);
 
         await expect(
-            service.getCurrent(ctx({ role: "ADMIN" })),
+            new SubscriptionsService().getCurrent(ctx({ role: "ADMIN" })),
         ).resolves.toBeNull();
     });
 
     it("denies a MEMBER reading the subscription (billing:read)", async () => {
-        const { service } = makeService();
-
         await expect(
-            service.getCurrent(ctx({ role: "MEMBER" })),
+            new SubscriptionsService().getCurrent(ctx({ role: "MEMBER" })),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(subFindUnique).not.toHaveBeenCalled();
     });
 });
 
-describe("SubscriptionsService.subscribe (free plan)", () => {
-    it("upserts a provider-less ACTIVE subscription and calls NO provider", async () => {
-        const { service, fake } = makeService();
-        planFindFirst.mockResolvedValue(FREE_PLAN);
-        subUpsert.mockResolvedValue({ id: "sub_1", plan: FREE_PLAN });
-
-        await service.subscribe(ctx(), { planKey: "free" });
-
-        // One-sub-per-org: upsert keyed on organizationId.
-        expect(subUpsert).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { organizationId: "org_1" },
-                create: expect.objectContaining({
-                    planId: "plan_free",
-                    status: "ACTIVE",
-                }),
-                update: expect.objectContaining({ provider: null }),
-            }),
+describe("the retired writes (17 Oct 2026)", () => {
+    it("are Gone for the owner, and change nothing: no Free over a paid period, no provider left charging", async () => {
+        const service = new SubscriptionsService();
+        await expect(service.subscribe(ctx())).rejects.toBeInstanceOf(
+            GoneException,
         );
-        // A free plan never reaches a billing provider.
-        expect(fake.createCalls).toHaveLength(0);
-        expectNoMerchantAccess();
-    });
-});
-
-describe("SubscriptionsService.subscribe (paid plan)", () => {
-    it("creates the provider subscription and stores its ids (one upsert per org)", async () => {
-        const { service, fake } = makeService();
-        planFindFirst.mockResolvedValue(PRO_PLAN);
-        subUpsert.mockResolvedValue({ id: "sub_1", plan: PRO_PLAN });
-
-        await service.subscribe(ctx(), {
-            planKey: "pro",
-            provider: "RAZORPAY",
-        });
-
-        // The billing provider was asked to create the subscription with the
-        // resolved plan terms — never a merchant credential.
-        expect(fake.createCalls).toHaveLength(1);
-        expect(fake.createCalls[0]).toEqual(
-            expect.objectContaining({
-                planKey: "pro",
-                planId: "plan_pro",
-                priceCents: 49900,
-                organizationId: "org_1",
-            }),
+        await expect(service.cancel(ctx())).rejects.toBeInstanceOf(
+            GoneException,
         );
-        // The provider ids are persisted on the single per-org row.
-        expect(subUpsert).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { organizationId: "org_1" },
-                create: expect.objectContaining({
-                    provider: "RAZORPAY",
-                    providerSubscriptionId: "fake_sub_org_1",
-                    status: "ACTIVE",
-                }),
-            }),
-        );
-        expectNoMerchantAccess();
-    });
-
-    it("400s a paid plan with no billing provider (and calls no provider)", async () => {
-        const { service, fake } = makeService();
-        planFindFirst.mockResolvedValue(PRO_PLAN);
-
-        await expect(
-            service.subscribe(ctx(), { planKey: "pro" }),
-        ).rejects.toBeInstanceOf(BadRequestException);
-        expect(fake.createCalls).toHaveLength(0);
-        expect(subUpsert).not.toHaveBeenCalled();
-    });
-});
-
-describe("SubscriptionsService.cancel", () => {
-    it("400s when the org has no subscription", async () => {
-        const { service } = makeService();
-        subFindUnique.mockResolvedValue(null);
-
-        await expect(service.cancel(ctx(), {})).rejects.toBeInstanceOf(
-            BadRequestException,
-        );
-    });
-
-    it("cancels the provider sub and flips cancelAtPeriodEnd", async () => {
-        const { service, fake } = makeService();
-        subFindUnique.mockResolvedValue({
-            id: "sub_1",
-            organizationId: "org_1",
-            provider: "RAZORPAY",
-            providerSubscriptionId: "fake_sub_org_1",
-        });
-        (prisma.subscription.update as jest.Mock).mockResolvedValue({
-            id: "sub_1",
-            plan: PRO_PLAN,
-        });
-
-        await service.cancel(ctx(), {});
-
-        expect(fake.cancelCalls).toEqual(["fake_sub_org_1"]);
-        expect(prisma.subscription.update).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { organizationId: "org_1" },
-                data: expect.objectContaining({ cancelAtPeriodEnd: true }),
-            }),
-        );
-        expectNoMerchantAccess();
-    });
-});
-
-describe("SubscriptionsService.subscribe — the plan change in Activity (#509)", () => {
-    const withAudit = () => {
-        const record = jest.fn().mockResolvedValue(undefined);
-        const service = new SubscriptionsService(
-            new PlansService(),
-            new FakeBillingProviderFactory(new FakeBillingProvider("RAZORPAY")),
-            { record } as never,
-        );
-        return { service, record };
-    };
-
-    it("records the plan it moved from and to, by name", async () => {
-        const { service, record } = withAudit();
-        planFindFirst.mockResolvedValue({ ...FREE_PLAN, name: "Free" });
-        subFindUnique.mockResolvedValue({
-            planId: "plan_pro",
-            plan: { name: "Pro" },
-        });
-        subUpsert.mockResolvedValue({ id: "sub_1", plan: FREE_PLAN });
-
-        await service.subscribe(ctx(), { planKey: "free" });
-
-        expect(record).toHaveBeenCalledWith(
-            expect.objectContaining({
-                action: "organization.plan.changed",
-                organizationId: "org_1",
-                actorUserId: "user_1",
-                metadata: { from: "Pro", to: "Free" },
-            }),
-        );
-    });
-
-    it("records nothing when the business is already on that plan", async () => {
-        const { service, record } = withAudit();
-        planFindFirst.mockResolvedValue({ ...FREE_PLAN, name: "Free" });
-        subFindUnique.mockResolvedValue({
-            planId: "plan_free",
-            plan: { name: "Free" },
-        });
-        subUpsert.mockResolvedValue({ id: "sub_1", plan: FREE_PLAN });
-
-        await service.subscribe(ctx(), { planKey: "free" });
-
-        expect(record).not.toHaveBeenCalled();
+        for (const touched of [
+            planFindFirst,
+            subFindUnique,
+            subUpsert,
+            subUpdate,
+            ...merchantDelegates(),
+        ]) {
+            expect(touched).not.toHaveBeenCalled();
+        }
     });
 });

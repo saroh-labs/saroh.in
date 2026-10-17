@@ -11,7 +11,7 @@ import {
     unsyncedCatalogueVersions,
 } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
-import { diff, validateCatalog } from "@saroh/pricing-catalog";
+import { diff, planPriceOf, validateCatalog } from "@saroh/pricing-catalog";
 
 import type { Impact, ModuleUsage } from "./impact";
 import { moduleUsage } from "./impact";
@@ -319,7 +319,11 @@ export class CatalogueService {
             for (const p of v.catalog.plans) known.add(p.id);
         for (const p of draftCatalog?.plans ?? []) known.add(p.id);
         const { businesses, measured, movingTo } =
-            await this.impactService.read(known, now);
+            await this.impactService.read(
+                known,
+                now,
+                editingCatalog ? planPriceOf(editingCatalog) : undefined,
+            );
 
         const staffIds = new Set<string>();
         for (const v of versions) {

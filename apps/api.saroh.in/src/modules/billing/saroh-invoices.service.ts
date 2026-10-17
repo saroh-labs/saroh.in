@@ -13,8 +13,10 @@ import { stateCode } from "../invoices/gst-states";
 import { formatSellerAddress } from "../invoices/order-invoice";
 import { authorize } from "../organizations/organization-policy";
 import { chargedAddonRowsInTx } from "./addon-charges";
+import { billingEmail, nonEmpty, readBillingParty } from "./billing-details";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { periodStart as periodStartOf } from "./checkout-quote";
+import { enqueuePaymentNotes } from "./payment-notes.job";
 import type { ParsedBillingEvent } from "./providers/billing-provider.port";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
 import type { SarohInvoiceSource, SarohLineInput } from "./saroh-invoice-terms";
@@ -44,6 +46,8 @@ export interface ChargeToInvoice {
     providerSubscriptionId: string | null;
     providerEventId: string;
     providerPaymentId?: string | null;
+    /** The business as the provider's customer; null: the subscription's. */
+    providerCustomerId?: string | null;
     checkoutId?: string | null;
     planId: string | null;
     planName: string;
@@ -147,6 +151,7 @@ export class SarohInvoicesService {
                 providerSubscriptionId: checkout.providerSubscriptionId,
                 providerEventId: event.providerEventId,
                 providerPaymentId: event.providerPaymentId ?? null,
+                providerCustomerId: customerOf(checkout, event),
                 checkoutId: checkout.id,
                 planId: checkout.planId,
                 planName,
@@ -195,6 +200,7 @@ export class SarohInvoicesService {
             providerSubscriptionId: checkout.providerSubscriptionId,
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
+            providerCustomerId: customerOf(checkout, event),
             checkoutId: checkout.id,
             planId: checkout.planId,
             planName,
@@ -241,6 +247,7 @@ export class SarohInvoicesService {
             providerSubscriptionId: checkout.providerSubscriptionId,
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
+            providerCustomerId: customerOf(checkout, event),
             checkoutId: checkout.id,
             planId: checkout.planId,
             planName,
@@ -299,7 +306,12 @@ export class SarohInvoicesService {
             },
             select: { id: true },
         });
-        if (invoiced) return null;
+        if (invoiced) {
+            // The confirm path may have written it with no payment id (a
+            // subscription's lookup names none): this charge's event does.
+            await this.fillProviderIdsInTx(tx, invoiced.id, event);
+            return null;
+        }
         const checkout = await tx.billingCheckout.findUnique({
             where: {
                 provider_providerSubscriptionId: {
@@ -355,6 +367,10 @@ export class SarohInvoicesService {
             providerSubscriptionId: sub.providerSubscriptionId,
             providerEventId: event.providerEventId,
             providerPaymentId: event.providerPaymentId ?? null,
+            providerCustomerId:
+                event.providerCustomerId ??
+                checkout?.providerCustomerId ??
+                null,
             checkoutId: checkout?.id ?? null,
             planId: sub.plan.id,
             planName: sub.plan.name,
@@ -362,7 +378,11 @@ export class SarohInvoicesService {
             periodStart: chargedAt,
             periodEnd: end,
             lines: [line, ...addons.lines],
-            billTo: checkout ? billToOf(checkout) : null,
+            // The GSTIN and state given at checkout are for that checkout's
+            // own first charge; a renewal is billed to the business as it
+            // is now (its profile), so a GSTIN corrected or a move of state
+            // since reaches every later invoice (17 Oct 2026).
+            billTo: checkout && firstOf ? billToOf(checkout) : null,
             issuedAt: now,
         });
         await this.markAddonsInvoiced(tx, addons.rowIds, id);
@@ -443,7 +463,22 @@ export class SarohInvoicesService {
             where: { chargeKey: charge.chargeKey },
             select: { id: true },
         });
-        if (existing) return null;
+        if (existing) {
+            await this.fillProviderIdsInTx(tx, existing.id, {
+                providerPaymentId: charge.providerPaymentId,
+                providerCustomerId: charge.providerCustomerId,
+            });
+            return null;
+        }
+        const providerCustomerId =
+            charge.providerCustomerId ??
+            (
+                await tx.subscription.findUnique({
+                    where: { organizationId: charge.organizationId },
+                    select: { providerCustomerId: true },
+                })
+            )?.providerCustomerId ??
+            null;
 
         const seller = this.sellerNow();
         const gaps = sellerGaps(seller);
@@ -453,7 +488,7 @@ export class SarohInvoicesService {
             );
         }
 
-        const [org, profile] = await Promise.all([
+        const [org, profile, contact] = await Promise.all([
             tx.organization.findUnique({
                 where: { id: charge.organizationId },
                 select: { name: true },
@@ -471,6 +506,7 @@ export class SarohInvoicesService {
                     postalCode: true,
                 },
             }),
+            buyerContactInTx(tx, charge.organizationId, charge.checkoutId),
         ]);
         const profileGstin =
             profile?.gstRegistered && profile.taxId ? profile.taxId : null;
@@ -506,6 +542,7 @@ export class SarohInvoicesService {
                 providerSubscriptionId: charge.providerSubscriptionId,
                 providerEventId: charge.providerEventId,
                 providerPaymentId: charge.providerPaymentId ?? null,
+                providerCustomerId,
                 checkoutId: charge.checkoutId ?? null,
                 planId: charge.planId,
                 planName: charge.planName,
@@ -520,7 +557,8 @@ export class SarohInvoicesService {
                 sellerAddress: seller.address,
                 sellerEmail: seller.email,
                 billToName: buyerName(profile?.legalName, org?.name),
-                billToEmail: null,
+                billToEmail: contact.email,
+                billToPhone: contact.phone,
                 // The address only: the paper adds the state from the
                 // place of supply, so the two never disagree (Rule 46(e)).
                 billToAddress: profile
@@ -547,10 +585,60 @@ export class SarohInvoicesService {
             organizationId: charge.organizationId,
             invoiceId: invoice.id,
         });
+        if (charge.providerPaymentId) {
+            await enqueuePaymentNotes(tx, {
+                organizationId: charge.organizationId,
+                invoiceId: invoice.id,
+            });
+        }
         this.logger.log(
             `saroh_invoice_written org=${charge.organizationId} number=${invoice.number} source=${charge.source}`,
         );
         return invoice.id;
+    }
+
+    /**
+     * The provider's ids an invoice was written without, filled in by a
+     * later event for the same charge (17 Oct 2026): the confirm path can
+     * write it before the provider names the payment. Never overwritten;
+     * the payment's notes are set once it is known.
+     */
+    private async fillProviderIdsInTx(
+        tx: Tx,
+        invoiceId: string,
+        ids: {
+            providerPaymentId?: string | null;
+            providerCustomerId?: string | null;
+        },
+    ): Promise<void> {
+        const invoice = await tx.sarohInvoice.findUniqueOrThrow({
+            where: { id: invoiceId },
+            select: {
+                organizationId: true,
+                providerPaymentId: true,
+                providerCustomerId: true,
+            },
+        });
+        const payment = !invoice.providerPaymentId
+            ? (ids.providerPaymentId ?? null)
+            : null;
+        const customer = !invoice.providerCustomerId
+            ? (ids.providerCustomerId ?? null)
+            : null;
+        if (!payment && !customer) return;
+        await tx.sarohInvoice.update({
+            where: { id: invoiceId },
+            data: {
+                ...(payment ? { providerPaymentId: payment } : {}),
+                ...(customer ? { providerCustomerId: customer } : {}),
+            },
+        });
+        if (payment) {
+            await enqueuePaymentNotes(tx, {
+                organizationId: invoice.organizationId,
+                invoiceId,
+            });
+        }
     }
 
     // ── Reading them ────────────────────────────────────────────────────
@@ -606,6 +694,49 @@ function buyerName(
     return "Your business";
 }
 
+/**
+ * The buyer's email and phone on Saroh's invoice (17 Oct 2026), by the
+ * checkout's rule (`billingCustomer`): the email of the owner who checked
+ * out, else the business's contact email, else one given at checkout, else
+ * the owner's today; the business's phone, else one given at checkout.
+ * Either may be null; the invoice is never held up for them.
+ */
+async function buyerContactInTx(
+    tx: Tx,
+    organizationId: string,
+    checkoutId: string | null | undefined,
+): Promise<{ email: string | null; phone: string | null }> {
+    const checkout = checkoutId
+        ? await tx.billingCheckout.findUnique({
+              where: { id: checkoutId },
+              select: {
+                  createdByUserId: true,
+                  billToEmail: true,
+                  billToPhone: true,
+              },
+          })
+        : null;
+    const party = await readBillingParty(
+        tx,
+        organizationId,
+        checkout?.createdByUserId ?? null,
+    );
+    let email = billingEmail(party) ?? nonEmpty(checkout?.billToEmail);
+    if (!email) {
+        const owner = await tx.membership.findFirst({
+            where: { organizationId, role: "OWNER" },
+            orderBy: { createdAt: "asc" },
+            select: { user: { select: { email: true } } },
+        });
+        email = nonEmpty(owner?.user.email);
+    }
+    return {
+        email,
+        phone:
+            nonEmpty(party.profile?.phone) ?? nonEmpty(checkout?.billToPhone),
+    };
+}
+
 function periodKey(
     provider: string,
     providerSubscriptionId: string,
@@ -633,4 +764,12 @@ function planLine(
         sac: seller.sac,
         unitPaise: pricePaise,
     };
+}
+
+/** The customer a checkout's charge bills: Saroh's record, else the event's. */
+function customerOf(
+    checkout: BillingCheckout,
+    event: ParsedBillingEvent,
+): string | null {
+    return checkout.providerCustomerId ?? event.providerCustomerId ?? null;
 }

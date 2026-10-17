@@ -81,6 +81,68 @@ export function endingAddonsNote(
     return `${said} After the change you can add ${listWords(own)} on ${q.plan.name}, from Add-ons on this page. Nothing is added for you.`;
 }
 
+/** What moving to Free does to what is over its limits: one sentence, two places. */
+const OVER_FREE_LIMITS =
+    "anything over Free's limits stays readable, but you can't add more.";
+
+/** "Cancel plan"'s confirm, in words around its one date. */
+export interface CancelWords {
+    title: string;
+    /** The sentence(s) before the date, or all of it when there is none. */
+    lead: string;
+    /** When the plan ends: the API's `effectiveAt`; null: today. */
+    iso: string | null;
+    tail: string;
+    confirm: string;
+    keep: string;
+}
+
+/**
+ * "Cancel plan" (owner, 17 Oct 2026): what cancelling does, from Free's
+ * own quote, so the date is the API's (`effectiveAt`, the end of what is
+ * paid). Monthly autopay stops; a first month runs to its end with nothing
+ * more charged (the ₹1 promise); a year paid once runs to the end of the
+ * year with nothing asked for the next. Then the plan is Free, and what is
+ * over its limits is said once, in the change dialog's own words. Nothing
+ * takes it back yet, so it says so.
+ */
+export function cancelWords(
+    q: Pick<ChangeQuote, "plan" | "effectiveAt" | "firstMonth">,
+    opts: { planName: string; yearly: boolean; now?: Date },
+): CancelWords {
+    const free = q.plan.name;
+    const now = opts.now ?? new Date();
+    const ahead =
+        q.effectiveAt !== null && new Date(q.effectiveAt) > now
+            ? q.effectiveAt
+            : null;
+    const over = OVER_FREE_LIMITS;
+    const base = {
+        title: "Cancel your plan?",
+        confirm: "Cancel plan",
+        keep: `Keep ${opts.planName}`,
+    };
+    if (!ahead) {
+        return {
+            ...base,
+            lead: `${opts.yearly ? "You" : "Autopay stops and you"} move to ${free} today. From then, ${over} This cannot be undone.`,
+            iso: null,
+            tail: "",
+        };
+    }
+    const stops = opts.yearly
+        ? "We won't ask you to pay for another year."
+        : q.firstMonth === "AT_END"
+          ? "Autopay stops, so nothing more is charged after your first month."
+          : "Autopay stops, so nothing more is charged.";
+    return {
+        ...base,
+        lead: `${stops} You keep ${opts.planName} until `,
+        iso: ahead,
+        tail: `${opts.yearly ? ", the end of the year you paid for," : ","} then move to ${free}. After that, ${over} This cannot be undone.`,
+    };
+}
+
 /** A change's quote in words, from the plan the business is on now. */
 export function quoteSummary(
     q: ChangeQuote,
@@ -151,8 +213,7 @@ export function quoteSummary(
             };
         case "TO_FREE": {
             const from = waitsFor(q.effectiveAt);
-            const over =
-                "anything over Free's limits stays readable, but you can't add more.";
+            const over = OVER_FREE_LIMITS;
             return {
                 title: `Move to ${plan}`,
                 from,
@@ -177,7 +238,7 @@ export function quoteSummary(
             if (q.chargeNowPaise > 0) {
                 return {
                     title: `Start ${plan} with your first month`,
-                    lead: `Your first month is ${withGst(q.chargeNowTotalPaise)}, paid today as you set up UPI Autopay or a card. It pays for the month and isn't refunded. Cancel before the month ends and you pay nothing more. ${stay}`,
+                    lead: `Your first month is ${withGst(q.chargeNowTotalPaise)}, paid today as you set up UPI Autopay or a card. It pays for the month and isn't refunded. Cancel plan under Your plan before the month ends and you pay nothing more. ${stay}`,
                     lines: [
                         today("Today, your first month"),
                         { label: "Then from", value: "", iso: q.trialEndsAt },
@@ -190,7 +251,7 @@ export function quoteSummary(
             }
             return {
                 title: `Start your ${plan} trial`,
-                lead: `${REFUNDED} Cancel before the trial ends and you pay nothing. ${stay}`,
+                lead: `${REFUNDED} Cancel plan under Your plan before the trial ends and you pay nothing. ${stay}`,
                 lines: [
                     { label: "Trial ends", value: "", iso: q.trialEndsAt },
                     recurring,

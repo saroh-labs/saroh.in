@@ -350,6 +350,8 @@ describe("ContactForm: send another message", () => {
         // A fresh form: nothing is marked until Send is pressed again.
         expect(screen.queryByRole("alert")).toBeNull();
         expect(message().getAttribute("aria-invalid")).toBeNull();
-        expect(document.activeElement).toBe(message());
+        // Focus moves in an effect once the card has changed over: waited
+        // for, as a slow runner may not have run it yet (flaked on CI).
+        await waitFor(() => expect(document.activeElement).toBe(message()));
     });
 });

@@ -1,54 +1,32 @@
-import {
-    BadRequestException,
-    Inject,
-    Injectable,
-    Optional,
-} from "@nestjs/common";
+import { GoneException, Injectable } from "@nestjs/common";
 import type { Plan, Subscription } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import {
-    AuditAction,
-    AuditOutcome,
-    AuditService,
-} from "../audit/audit.service";
 import { authorize } from "../organizations/organization-policy";
-import { assertBillingMayStart } from "./business-closing";
-import type { CancelSubscriptionDto, SubscribeDto } from "./dto";
-import { PlansService } from "./plans.service";
-import type { BillingProviderFactory } from "./providers/billing-provider.port";
-import { BILLING_PROVIDER_FACTORY } from "./providers/billing-provider.port";
 
 /** A `Subscription` with its resolved `Plan` embedded (the common read shape). */
 export type SubscriptionWithPlan = Subscription & { plan: Plan };
 
+/** What the retired writes answer: where a plan is changed now. */
+export const RETIRED_BILLING_WRITE =
+    "This way of changing the plan was retired. Change it in Settings › Plan (POST …/billing/change-plan).";
+
 /**
- * An Organization's subscription to a Saroh plan (S7-005).
+ * An Organization's subscription to a Saroh plan (S7-005): the read.
  *
- * At most ONE subscription per org (`organizationId @unique`), so subscribe /
- * change-plan is an UPSERT keyed on the org. A FREE plan (`priceCents === 0`)
- * needs no billing provider — the row simply records the plan. A PAID plan
- * calls the platform {@link BillingProvider} to create the provider
- * subscription and stores `provider` / `providerSubscriptionId` /
- * `providerCustomerId`. Cancel flips `cancelAtPeriodEnd` (or, when `immediate`,
- * moves status straight to CANCELLED).
+ * The first writes here — `POST …/billing/subscribe` and `…/billing/cancel`
+ * — are retired (410 Gone, 17 Oct 2026). They bypassed the paid-period rule
+ * (cancel `immediate` read Free at once on a period paid for) and moved a
+ * business to a free plan with its provider subscription still charging
+ * and its ids forgotten. Every change of plan goes through
+ * `CheckoutService.changePlan` (DEC-159). The owner check still comes
+ * first, so who may call them is unchanged (`plan-owner-only.spec.ts`).
  *
- * CREDENTIAL BOUNDARY: this service touches ONLY the billing models
- * (`Subscription`, `Plan`) + Saroh's platform provider — NEVER a per-org
- * merchant payment record (`MerchantPaymentProvider` / `PaymentIntent` / …).
  * Reads require `billing:read`, writes `billing:manage` (the Owner's alone).
  */
 @Injectable()
 export class SubscriptionsService {
-    constructor(
-        private readonly plans: PlansService,
-        @Inject(BILLING_PROVIDER_FACTORY)
-        private readonly providers: BillingProviderFactory,
-        // Optional so the unit specs build it bare; the module provides it.
-        @Optional() private readonly audit?: AuditService,
-    ) {}
-
     /** The org's current subscription (with its plan), or null if unsubscribed. */
     async getCurrent(
         ctx: OrganizationContext,
@@ -60,157 +38,17 @@ export class SubscriptionsService {
         });
     }
 
-    /**
-     * Subscribe the org to a plan (or change plan). Authorizes `billing:manage`.
-     * Resolves the latest active plan for `planKey`; a free plan upserts a
-     * provider-less ACTIVE subscription, a paid plan creates the provider
-     * subscription first (requires `provider`) and records its ids. One row per
-     * org (upsert on `organizationId`).
-     */
-    async subscribe(
-        ctx: OrganizationContext,
-        dto: SubscribeDto,
-    ): Promise<SubscriptionWithPlan> {
+    /** Retired: 410 (after the owner check). */
+    // eslint-disable-next-line @typescript-eslint/require-await -- refuses as a rejection, as the routes always did
+    async subscribe(ctx: OrganizationContext): Promise<SubscriptionWithPlan> {
         authorize(ctx, "billing:manage");
-
-        const plan = await this.plans.resolveActiveByKey(dto.planKey);
-        const was = await prisma.subscription.findUnique({
-            where: { organizationId: ctx.organizationId },
-            select: { planId: true, plan: { select: { name: true } } },
-        });
-
-        const subscription =
-            plan.priceCents === 0
-                ? await this.subscribeFree(ctx, plan)
-                : await this.subscribePaid(ctx, plan, dto.provider);
-
-        // A change of plan, from what to what, by the plans' names (#509).
-        // Resubscribing to the plan it is on changes nothing to report.
-        if (was?.planId !== plan.id) {
-            await this.audit?.record({
-                action: AuditAction.PlanChange,
-                actorUserId: ctx.userId,
-                organizationId: ctx.organizationId,
-                targetType: "subscription",
-                targetId: subscription.id,
-                outcome: AuditOutcome.Success,
-                metadata: { from: was?.plan.name ?? null, to: plan.name },
-            });
-        }
-        return subscription;
+        throw new GoneException(RETIRED_BILLING_WRITE);
     }
 
-    /**
-     * Cancel the org's subscription. Authorizes `billing:manage`. Default is
-     * cancel-at-period-end (`cancelAtPeriodEnd = true`, status unchanged so
-     * access lasts until the period ends); `immediate` moves status to CANCELLED
-     * now. When a provider subscription exists, the provider is asked to cancel
-     * too. 400s when the org has no subscription.
-     */
-    async cancel(
-        ctx: OrganizationContext,
-        dto: CancelSubscriptionDto,
-    ): Promise<SubscriptionWithPlan> {
+    /** Retired: 410 (after the owner check). */
+    // eslint-disable-next-line @typescript-eslint/require-await -- refuses as a rejection, as the routes always did
+    async cancel(ctx: OrganizationContext): Promise<SubscriptionWithPlan> {
         authorize(ctx, "billing:manage");
-
-        const existing = await prisma.subscription.findUnique({
-            where: { organizationId: ctx.organizationId },
-        });
-        if (!existing) {
-            throw new BadRequestException("No subscription to cancel");
-        }
-
-        if (existing.provider && existing.providerSubscriptionId) {
-            await this.providers
-                .get(existing.provider)
-                .cancelSubscription(existing.providerSubscriptionId);
-        }
-
-        const immediate = dto.immediate === true;
-        return prisma.subscription.update({
-            where: { organizationId: ctx.organizationId },
-            data: {
-                cancelAtPeriodEnd: true,
-                // The owner's own choice (DEC-100): its term's end says so.
-                freeChosenAt: new Date(),
-                ...(immediate ? { status: "CANCELLED" } : {}),
-            },
-            include: { plan: true },
-        });
-    }
-
-    /** Upsert a provider-less ACTIVE subscription for a free plan. */
-    private subscribeFree(
-        ctx: OrganizationContext,
-        plan: Plan,
-    ): Promise<SubscriptionWithPlan> {
-        return prisma.subscription.upsert({
-            where: { organizationId: ctx.organizationId },
-            create: {
-                organizationId: ctx.organizationId,
-                planId: plan.id,
-                status: "ACTIVE",
-                cancelAtPeriodEnd: false,
-            },
-            update: {
-                planId: plan.id,
-                status: "ACTIVE",
-                provider: null,
-                providerSubscriptionId: null,
-                providerCustomerId: null,
-                cancelAtPeriodEnd: false,
-                freeChosenAt: null,
-            },
-            include: { plan: true },
-        });
-    }
-
-    /** Create the provider subscription for a paid plan, then upsert the row. */
-    private async subscribePaid(
-        ctx: OrganizationContext,
-        plan: Plan,
-        provider: string | undefined,
-    ): Promise<SubscriptionWithPlan> {
-        if (!provider) {
-            throw new BadRequestException(
-                "A paid plan requires a billing provider",
-            );
-        }
-        // A closing or deleted business starts nothing that charges (#921).
-        await assertBillingMayStart(prisma, ctx.organizationId);
-
-        const result = await this.providers.get(provider).createSubscription({
-            planKey: plan.key,
-            planId: plan.id,
-            priceCents: plan.priceCents,
-            currency: plan.currency,
-            interval: plan.interval,
-            organizationId: ctx.organizationId,
-        });
-
-        return prisma.subscription.upsert({
-            where: { organizationId: ctx.organizationId },
-            create: {
-                organizationId: ctx.organizationId,
-                planId: plan.id,
-                status: result.status,
-                provider,
-                providerSubscriptionId: result.providerSubscriptionId,
-                providerCustomerId: result.providerCustomerId ?? null,
-                currentPeriodEnd: result.currentPeriodEnd ?? null,
-                cancelAtPeriodEnd: false,
-            },
-            update: {
-                planId: plan.id,
-                status: result.status,
-                provider,
-                providerSubscriptionId: result.providerSubscriptionId,
-                providerCustomerId: result.providerCustomerId ?? null,
-                currentPeriodEnd: result.currentPeriodEnd ?? null,
-                cancelAtPeriodEnd: false,
-                freeChosenAt: null,
-            },
-            include: { plan: true },
-        });
+        throw new GoneException(RETIRED_BILLING_WRITE);
     }
 }

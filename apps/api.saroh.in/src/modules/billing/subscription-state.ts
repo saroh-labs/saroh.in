@@ -9,7 +9,10 @@ import type { SubscriptionStatus } from "./providers/billing-provider.port";
  * transitions below — the SaaS analogue of the merchant order/payment state
  * machine. `ACTIVE ↔ PAST_DUE` covers dunning (a failed charge halts the sub,
  * a recovered charge reactivates it); any live state may go `→ CANCELLED`;
- * `TRIALING` may activate, lapse, or cancel. `CANCELLED` is TERMINAL. A
+ * `TRIALING` may activate, lapse, or cancel. `CANCELLED` is TERMINAL here;
+ * the one way back is a charge the provider took after Saroh ended it
+ * (`BillingWebhookService.chargedAfterCancel`, DEC-164), never a plain
+ * status event. A
  * same→same move is an idempotent no-op (never asserted), so a re-delivered
  * event can never error.
  */

@@ -16,6 +16,7 @@ import {
     catalogPlanIdForKey,
     effectivePlanId,
     LEGACY_PLAN_KEYS,
+    planPriceOf,
     resolveAllAccess,
     validateCatalog,
 } from "@saroh/pricing-catalog";
@@ -385,8 +386,16 @@ export class CatalogueAccessService {
 
         const overrides = toOverrides(overrideRows);
         const addons: BoughtAddon[] = live?.addons ?? [];
-        const effective = effectivePlanId(planId, overrides, now, planIds);
-        if (planOverride && effective !== planOverride.planKey) {
+        // A dearer plan the business pays for beats a plan override (owner,
+        // 17 Oct 2026): a grandfathered Grow that buys Pro reads Pro.
+        const effective = effectivePlanId(
+            planId,
+            overrides,
+            now,
+            planIds,
+            planPriceOf(catalog),
+        );
+        if (planOverride && !planIds.has(planOverride.planKey)) {
             this.logger.warn(
                 `plan_override_unresolved org=${organizationId} override=${planOverride.id} plan=${planOverride.planKey} version=${snapshot.version}`,
             );
@@ -443,7 +452,10 @@ export class CatalogueAccessService {
                 }),
                 raises,
             ),
-            planOverride,
+            // Only an override that is the plan it reads: one a dearer
+            // billed plan shadows ends with nothing to tell (`planEnding`).
+            planOverride:
+                planOverride?.planKey === effective ? planOverride : null,
         };
     }
 

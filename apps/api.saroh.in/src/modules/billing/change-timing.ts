@@ -82,12 +82,21 @@ export function firstMonthMove(input: {
 
 /**
  * How the provider subscription a business is leaving is ended: with the
- * cycle already paid, or, in a first month, at once. A first month's has
- * no cycle running (its charges start when the month ends), and left alone
- * it would take the plan's full charge then.
+ * cycle already paid, or at once when it has no cycle running yet — a
+ * first month's (its charges start when the month ends), or an upgrade's
+ * or a checkout's whose first charge is still ahead (`chargesStartAt`, the
+ * checkout's `startAt`; `charges-start.ts`). Left alone, such a one would
+ * take the plan's full charge when its charges start, and Razorpay refuses
+ * a cancel at cycle end with no cycle running (PRICING_ROLLOUT.md, spike).
+ * The plan itself still runs to the date paid (`runsToMoveDate`).
  */
-export function leavesWithCycle(sub: { status: string }): boolean {
-    return sub.status !== "TRIALING";
+export function leavesWithCycle(
+    sub: { status: string },
+    chargesStartAt: Date | null = null,
+    now: Date = new Date(),
+): boolean {
+    if (sub.status === "TRIALING") return false;
+    return !(chargesStartAt && chargesStartAt.getTime() > now.getTime());
 }
 
 /**

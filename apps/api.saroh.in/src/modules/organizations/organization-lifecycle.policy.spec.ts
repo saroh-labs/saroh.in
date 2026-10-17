@@ -140,14 +140,53 @@ describe("the lifecycle decision table (#921)", () => {
     // DEC-120 (owner, 9 Oct): a business winding down starts nothing new,
     // finishes what it started, and can always take its data away.
     it.each([
-        ["ACTIVE", { new: true, "wind-down": true, takeout: true }],
-        ["SUSPENDED", { new: false, "wind-down": false, takeout: true }],
-        ["PENDING_DELETION", { new: false, "wind-down": true, takeout: true }],
+        // A suspended business is still billed, so it may always pay less
+        // (`lower-charges`, 17 Oct 2026).
+        [
+            "ACTIVE",
+            {
+                new: true,
+                "wind-down": true,
+                takeout: true,
+                "lower-charges": true,
+            },
+        ],
+        [
+            "SUSPENDED",
+            {
+                new: false,
+                "wind-down": false,
+                takeout: true,
+                "lower-charges": true,
+            },
+        ],
+        [
+            "PENDING_DELETION",
+            {
+                new: false,
+                "wind-down": true,
+                takeout: true,
+                "lower-charges": true,
+            },
+        ],
         [
             "DELETED_RETAINED",
-            { new: false, "wind-down": false, takeout: false },
+            {
+                new: false,
+                "wind-down": false,
+                takeout: false,
+                "lower-charges": false,
+            },
         ],
-        ["ARCHIVED", { new: false, "wind-down": false, takeout: false }],
+        [
+            "ARCHIVED",
+            {
+                new: false,
+                "wind-down": false,
+                takeout: false,
+                "lower-charges": false,
+            },
+        ],
     ] as const)("%s allows writes by class", (state, expected) => {
         for (const cls of LIFECYCLE_WRITE_CLASSES) {
             expect([cls, lifecycleAllows(state, cls)]).toEqual([
@@ -195,10 +234,6 @@ const CONSUMERS: Record<
         // the provider subscription ended when deletion is scheduled.
         {
             file: "modules/billing/checkout.service.ts",
-            asks: /\bassertBillingMayStart\(/,
-        },
-        {
-            file: "modules/billing/subscriptions.service.ts",
             asks: /\bassertBillingMayStart\(/,
         },
         {

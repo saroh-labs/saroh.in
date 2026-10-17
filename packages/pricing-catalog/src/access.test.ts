@@ -89,6 +89,26 @@ describe("resolveAccess", () => {
             });
         });
 
+        it("never puts a business below the dearer plan it is billed for", () => {
+            const granted = (planKey: string) => [
+                {
+                    kind: "plan" as const,
+                    key: "plan",
+                    planKey,
+                    createdAt: t(1),
+                },
+            ];
+            // Billed for C, granted B: C, the dearer.
+            expect(
+                resolveAccess(on("c", granted("b")), "products"),
+            ).toMatchObject({ planId: "c" });
+            expect(businessPricePaise(on("c", granted("b")))).toBe(22_200);
+            // Billed for B, granted C: C still.
+            expect(
+                resolveAccess(on("b", granted("c")), "products").planId,
+            ).toBe("c");
+        });
+
         it("ignores a plan override naming a plan the version doesn't have", () => {
             const r = resolveAccess(
                 on("a", [

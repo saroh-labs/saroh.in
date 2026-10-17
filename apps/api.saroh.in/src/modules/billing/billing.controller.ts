@@ -15,6 +15,7 @@ import type { Plan } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { hashClientIp } from "../../common/client-ip";
+import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -31,13 +32,7 @@ import type {
     CheckoutsView,
 } from "./checkout.service";
 import { CheckoutService } from "./checkout.service";
-import {
-    CancelSubscriptionDto,
-    ChangePlanDto,
-    ChangePlanQuery,
-    SetAddonDto,
-    SubscribeDto,
-} from "./dto";
+import { ChangePlanDto, ChangePlanQuery, SetAddonDto } from "./dto";
 import { OverLimitService } from "./over-limit.service";
 import type { PausedView } from "./paused-view";
 import { pausedView } from "./paused-view";
@@ -140,6 +135,9 @@ export class BillingController {
      * `billing:manage`.
      */
     @Post("change-plan")
+    // Moving down stays open to a suspended business, still billed; the
+    // service asks `new` for anything that charges more (17 Oct 2026).
+    @LifecycleWrite("lower-charges")
     changePlan(
         @OrgContext() ctx: OrganizationContext,
         @Body() dto: ChangePlanDto,
@@ -161,6 +159,8 @@ export class BillingController {
      * once; billed with the plan's next charge. `billing:manage`.
      */
     @Put("addons/:addonId")
+    // Fewer stays open to a suspended business; more asks `new`.
+    @LifecycleWrite("lower-charges")
     setAddon(
         @OrgContext() ctx: OrganizationContext,
         @Param("addonId") addonId: string,
@@ -236,19 +236,19 @@ export class BillingController {
         return this.subscriptions.getCurrent(ctx);
     }
 
+    /** Retired (410): change the plan with `change-plan`. */
     @Post("subscribe")
     subscribe(
         @OrgContext() ctx: OrganizationContext,
-        @Body() dto: SubscribeDto,
     ): Promise<SubscriptionWithPlan> {
-        return this.subscriptions.subscribe(ctx, dto);
+        return this.subscriptions.subscribe(ctx);
     }
 
+    /** Retired (410): move to Free with `change-plan`. */
     @Post("cancel")
     cancel(
         @OrgContext() ctx: OrganizationContext,
-        @Body() dto: CancelSubscriptionDto,
     ): Promise<SubscriptionWithPlan> {
-        return this.subscriptions.cancel(ctx, dto);
+        return this.subscriptions.cancel(ctx);
     }
 }

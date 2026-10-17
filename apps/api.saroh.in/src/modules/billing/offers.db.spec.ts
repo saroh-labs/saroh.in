@@ -28,6 +28,7 @@ import {
 import type { Catalog } from "@saroh/pricing-catalog";
 import { gstPaise, planRows, withGstPaise } from "@saroh/pricing-catalog";
 
+import { giveBillingDetails } from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditService } from "../audit/audit.service";
@@ -150,6 +151,7 @@ async function business(): Promise<OrganizationContext> {
         data: { name: `Offers ${seq}`, slug: `offers-${seq}-${tag}` },
     });
     await startOnFreePlan(prisma, org.id, { planId: "free" });
+    await giveBillingDetails(org.id);
     return { organizationId: org.id, userId: "owner-user", role: "OWNER" };
 }
 

@@ -252,16 +252,16 @@ describe("grandfathering (DB, U5)", () => {
             });
         });
 
-        it("honours a plan override over the subscription's own plan", async () => {
-            const o = await org("Override wins");
+        it("never moves a paying business down to a cheaper override's plan (owner, 17 Oct)", async () => {
+            const o = await org("Override below");
             await subscribe(o.id, "business");
             await planOverride(o.id, "free");
 
+            // Billed as Grow, which costs more than Free: Grow stays.
             expect(await service.getPlanEntitlements(o.id)).toMatchObject({
-                invoicing: false,
-                products: 11,
-                customDomain: false,
-                sites: 1,
+                invoicing: true,
+                products: 222,
+                customDomain: true,
             });
         });
 

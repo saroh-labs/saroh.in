@@ -384,6 +384,7 @@ model Organization {
   pricingCouponRedemptions PricingCouponRedemption[]
   // Saroh billing: checkouts for a plan change (pricing catalogue U15).
   billingCheckouts         BillingCheckout[]
+  billingCustomers         BillingCustomer[]
   sarohInvoices            SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
   subscriptionAddonCharges SubscriptionAddonCharge[]
@@ -7350,6 +7351,32 @@ model PricingProviderPlan {
   @@index([status])
 }
 
+// The business as Saroh's billing provider's customer (owner, 17 Oct
+// 2026: "make sure to create a razorpay customer when they join the app,
+// and then update the details based on info they fill in for billing").
+// One per business and provider, made at sign-up by the
+// `billing.customer.sync` job and kept current with the business's billing
+// details; every checkout, subscription and Saroh invoice copies its id.
+model BillingCustomer {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider           String
+  // Razorpay's `cust_…`; null until the provider has made it.
+  providerCustomerId String?
+  // Made without the phone: another business of the same owner has a
+  // customer with the same email and phone, which Razorpay refuses twice.
+  // The phone stays in Saroh and is never sent on an update either.
+  contactWithheld    Boolean      @default(false)
+  // Last time the provider took Saroh's details, and why the last try failed.
+  syncedAt           DateTime?
+  lastError          String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@unique([organizationId, provider])
+}
+
 // BillingCheckout — one attempt to put a business on a paid catalogue plan
 // (pricing catalogue U15). Saroh asks its own billing provider for a new
 // provider subscription on the plan's provider plan; the business authorises
@@ -7417,6 +7444,12 @@ model BillingCheckout {
   // GSTIN when it has one. Null: the business profile's at invoice time.
   billToState String?
   billToGstin String?
+  // The billing email and phone, when given at checkout because the
+  // business had none (17 Oct 2026). Kept here, not on the profile, whose
+  // phone is the one its website shows. Null: the owner's email and the
+  // profile's phone at invoice time.
+  billToEmail String?
+  billToPhone String?
 
   createdByUserId String?
 
@@ -7455,6 +7488,10 @@ model SarohInvoice {
   providerSubscriptionId String?
   providerEventId        String
   providerPaymentId      String?
+  // The business as the provider's customer (Razorpay `cust_…`), so a
+  // payment, its customer and Saroh's invoice can be followed either way
+  // (17 Oct 2026). Null on invoices written before it was kept.
+  providerCustomerId     String?
   checkoutId             String?
   planId                 String?
   planName               String
@@ -7474,6 +7511,8 @@ model SarohInvoice {
 
   billToName    String
   billToEmail   String?
+  // The buyer's phone, when the business has one (17 Oct 2026).
+  billToPhone   String?
   billToAddress String?
   billToState   String?
   billToGstin   String?

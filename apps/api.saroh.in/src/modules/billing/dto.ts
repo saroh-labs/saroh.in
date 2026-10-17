@@ -1,6 +1,5 @@
 import { Transform, Type } from "class-transformer";
 import {
-    IsBoolean,
     IsIn,
     IsInt,
     IsOptional,
@@ -15,47 +14,12 @@ import {
 
 import { RegisteredAddressDto } from "../organizations/dto";
 import { MAX_ADDON_QUANTITY } from "./offers";
-import { SUPPORTED_BILLING_PROVIDERS } from "./providers/billing-provider.port";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
 const upper = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim().toUpperCase() : value;
-
-/**
- * Subscribe the org to a plan, or change to a different plan (S7-005).
- *
- * `planKey` selects the catalog plan (the latest active version is resolved
- * server-side — the client never picks a version). `provider` is REQUIRED for a
- * paid plan (which one of Saroh's platform billing providers to charge through)
- * and ignored for a free plan, which needs no provider.
- */
-export class SubscribeDto {
-    @Transform(trim)
-    @IsString()
-    @MinLength(1)
-    @MaxLength(64)
-    planKey!: string;
-
-    @IsOptional()
-    @Transform(upper)
-    @IsIn(SUPPORTED_BILLING_PROVIDERS, {
-        message: `provider must be one of: ${SUPPORTED_BILLING_PROVIDERS.join(", ")}`,
-    })
-    provider?: string;
-}
-
-/**
- * Cancel the org's subscription (S7-005). By default the cancellation takes
- * effect at the end of the current paid period (`cancelAtPeriodEnd`); pass
- * `immediate: true` to cancel right away (status → CANCELLED now).
- */
-export class CancelSubscriptionDto {
-    @IsOptional()
-    @IsBoolean()
-    immediate?: boolean;
-}
 
 /**
  * Change the business's catalogue plan (pricing catalogue U15): the plan's id
@@ -93,14 +57,45 @@ export class ChangePlanDto {
 
     /**
      * The business's registered address, asked for when its profile has
-     * none (Rule 46(e): a registered buyer's invoice carries its address).
-     * Required with a GSTIN, optional otherwise; saved to the business's
-     * own registered address, never over one it already has.
+     * none whole: required before a paid plan (17 Oct 2026,
+     * `billing-details.ts`), and saved to the business's own registered
+     * address, never over a whole one it already has.
      */
     @IsOptional()
     @ValidateNested()
     @Type(() => RegisteredAddressDto)
     registeredAddress?: RegisteredAddressDto;
+
+    /**
+     * The name for Saroh's invoice, asked for only when the business has
+     * neither a legal name nor a name; saved as its legal name.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(200)
+    billingName?: string;
+
+    /**
+     * An email for Saroh's invoices, asked for only when neither the owner
+     * nor the business has one; kept on the checkout.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(254)
+    billingEmail?: string;
+
+    /**
+     * A phone for Saroh's invoice, optional, asked for when the business
+     * has none; kept on the checkout, never on the profile (whose phone
+     * its website shows). Its shape is the service's, which names it.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(32)
+    phone?: string;
 
     /**
      * A coupon code (U16), upper-cased. Checked on the server against the

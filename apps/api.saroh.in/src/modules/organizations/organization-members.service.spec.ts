@@ -48,6 +48,10 @@ jest.mock("@saroh/database", () => ({
 jest.mock("../notifications/team-alerts", () => ({
     enqueueTeamAlert: jest.fn(),
 }));
+// A change of owners re-sends the billing customer (DEC-165): only queued.
+jest.mock("../billing/billing-customer-sync", () => ({
+    enqueueBillingCustomerSync: jest.fn(),
+}));
 jest.mock("../../common/email", () => ({
     sendOrganizationInvitationEmail: jest.fn().mockResolvedValue(undefined),
 }));

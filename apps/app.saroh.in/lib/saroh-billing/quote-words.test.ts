@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChangeQuote } from "./plan-view";
-import { endingAddonsNote, quoteSummary } from "./quote-words";
+import { cancelWords, endingAddonsNote, quoteSummary } from "./quote-words";
 
 /** Made up on purpose: Plan C at ₹222, a first month of ₹7 — no real prices. */
 const quote = (over: Partial<ChangeQuote> = {}): ChangeQuote => ({
@@ -71,6 +71,10 @@ describe("quoteSummary (DEC-093)", () => {
         expect(s.lead).toContain("₹8.26 (incl. GST)");
         expect(s.lead).toContain("isn't refunded");
         expect(s.lead).not.toMatch(/nothing is (owed|charged) today/i);
+        // The promise names the action that keeps it (17 Oct 2026).
+        expect(s.lead).toContain(
+            "Cancel plan under Your plan before the month ends and you pay nothing more.",
+        );
         expect(s.lines[1]).toMatchObject({
             label: "Then from",
             iso: "2026-11-06T00:00:00.000Z",
@@ -89,6 +93,9 @@ describe("quoteSummary (DEC-093)", () => {
         );
         expect(s.title).toBe("Start your Plan C trial");
         expect(s.lead).toMatch(/Razorpay takes a small amount and refunds it/);
+        expect(s.lead).toContain(
+            "Cancel plan under Your plan before the trial ends and you pay nothing.",
+        );
     });
 
     it("words the failure from the plan it's on, never 'back on Free'", () => {
@@ -405,5 +412,72 @@ describe("endingAddonsNote (DEC-157)", () => {
     it("is nothing when none ends, or the API sent none", () => {
         expect(endingAddonsNote(quote({ addonsEnding: [] }))).toBeNull();
         expect(endingAddonsNote(quote())).toBeNull();
+    });
+});
+
+describe("cancelWords: Cancel plan's confirm (17 Oct 2026)", () => {
+    const NOW = new Date("2026-10-13T00:00:00.000Z");
+    const END = "2026-11-06T00:00:00.000Z";
+    const free = (over: Partial<ChangeQuote> = {}) =>
+        quote({
+            kind: "TO_FREE",
+            plan: { id: "a", name: "Plan A", version: 3 },
+            effectiveAt: END,
+            ...over,
+        });
+    const said = (w: ReturnType<typeof cancelWords>) =>
+        `${w.lead}${w.iso ? "‹date›" : ""}${w.tail}`;
+
+    it("monthly: autopay stops, the plan is kept to the API's date, then Free", () => {
+        const w = cancelWords(free(), {
+            planName: "Plan B",
+            yearly: false,
+            now: NOW,
+        });
+        expect(w).toMatchObject({
+            title: "Cancel your plan?",
+            confirm: "Cancel plan",
+            keep: "Keep Plan B",
+            iso: END,
+        });
+        expect(said(w)).toBe(
+            "Autopay stops, so nothing more is charged. You keep Plan B until ‹date›, then move to Plan A. After that, anything over Free's limits stays readable, but you can't add more. This cannot be undone.",
+        );
+    });
+
+    it("in the first month: nothing more after it, as the first month's copy promised", () => {
+        const w = cancelWords(free({ firstMonth: "AT_END" }), {
+            planName: "Plan B",
+            yearly: false,
+            now: NOW,
+        });
+        expect(w.lead).toBe(
+            "Autopay stops, so nothing more is charged after your first month. You keep Plan B until ",
+        );
+        expect(w.iso).toBe(END);
+    });
+
+    it("yearly: no autopay to stop; the year paid for runs out, and the next isn't asked for", () => {
+        const w = cancelWords(free(), {
+            planName: "Plan B",
+            yearly: true,
+            now: NOW,
+        });
+        expect(said(w)).toMatch(
+            /^We won't ask you to pay for another year\. You keep Plan B until ‹date›, the end of the year you paid for, then move to Plan A\./,
+        );
+        expect(said(w)).not.toMatch(/autopay/i);
+    });
+
+    it("nothing paid ahead: Free from today, with no date", () => {
+        const w = cancelWords(free({ effectiveAt: NOW.toISOString() }), {
+            planName: "Plan B",
+            yearly: false,
+            now: NOW,
+        });
+        expect(w.iso).toBeNull();
+        expect(w.lead).toBe(
+            "Autopay stops and you move to Plan A today. From then, anything over Free's limits stays readable, but you can't add more. This cannot be undone.",
+        );
     });
 });

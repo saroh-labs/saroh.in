@@ -23,6 +23,7 @@ import {
 } from "@saroh/database";
 import { addMonthsUtc, planRows } from "@saroh/pricing-catalog";
 
+import { giveBillingDetails } from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { SarohBillingEmail } from "../../common/email";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -84,6 +85,7 @@ async function business() {
         data: { name: `Term ${seq}`, slug: `term-${seq}-${tag}` },
     });
     await startOnFreePlan(prisma, org.id, { planId: "free" });
+    await giveBillingDetails(org.id);
     const owner = await prisma.user.create({
         data: { email: `owner-term-${seq}-${tag}@example.test` },
     });
