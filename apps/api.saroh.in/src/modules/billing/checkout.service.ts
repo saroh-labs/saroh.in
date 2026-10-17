@@ -860,6 +860,33 @@ export class CheckoutService {
                 where: { organizationId: ctx.organizationId },
                 select: SUB_SELECT,
             });
+            // A year already paid for and waiting to start (a renewal, or a
+            // move from monthly to yearly): giving it up would keep the
+            // business's money for a year it never gets. Refused, never
+            // dropped (17 Oct 2026); it can be cancelled once it has
+            // started, or refunded by hand.
+            const paidYear = await tx.billingCheckout.findFirst({
+                where: {
+                    organizationId: ctx.organizationId,
+                    status: "SCHEDULED",
+                    providerPlanId: ONE_TIME_PAYMENT,
+                },
+                select: { startAt: true, plan: { select: { name: true } } },
+            });
+            if (paidYear) {
+                const starts = paidYear.startAt
+                    ? ` on ${paidYear.startAt.toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          timeZone: "Asia/Kolkata",
+                      })}`
+                    : "";
+                throw new ConflictException({
+                    message: `A year of ${paidYear.plan.name} is already paid for and starts${starts}. Moving to ${target.name} now would give that year up, so it can't be done here. Write to us if you'd like it refunded.`,
+                    details: { reason: "paid-year-scheduled" },
+                });
+            }
             await this.dropLiveCheckouts(
                 tx,
                 ctx.organizationId,

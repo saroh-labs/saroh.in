@@ -40,6 +40,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { lifecycleAllows } from "../organizations/organization-lifecycle.policy";
 import { BILLING_EMAIL_TYPE } from "./billing-email.job";
 import { BILLING_NOTE_AUTHOR } from "./billing-ops-notice";
+import { ONE_TIME_PAYMENT } from "./billing-term";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { CheckoutService } from "./checkout.service";
 import {
@@ -703,6 +704,47 @@ describe("ending what the business leaves (DEC-159)", () => {
                 atCycleEnd: false,
             },
         ]);
+    });
+
+    it("a monthly plan whose next year is already paid is never moved to Free: refused, the paid year kept", async () => {
+        const ctx = await business();
+        const { periodEnd } = await onPaidPlan(ctx, "b");
+        // Monthly B now, a year of C paid by order and waiting to start.
+        const year = await prisma.billingCheckout.create({
+            data: {
+                organizationId: ctx.organizationId,
+                planId: (await row("c")).id,
+                cycle: "year",
+                kind: "SCHEDULED",
+                status: "SCHEDULED",
+                provider: "RAZORPAY",
+                providerSubscriptionId: `order_paid_year_${tag}`,
+                providerPlanId: ONE_TIME_PAYMENT,
+                pricePaise: 118_000,
+                chargeNowPaise: 0,
+                startAt: periodEnd,
+                expiresAt: periodEnd,
+            },
+        });
+        await prisma.job.deleteMany({});
+
+        await expect(
+            checkout.changePlan(ctx, { plan: "free", cycle: "month" }),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: { details: { reason: "paid-year-scheduled" } },
+        });
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: year.id },
+            }),
+        ).toMatchObject({ status: "SCHEDULED", endedReason: null });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            cancelAtPeriodEnd: false,
+            pendingPlanId: null,
+        });
+        expect(await cancelJobs()).toHaveLength(0);
     });
 
     it("a scheduled change's first charge failing before the sweep applies it: PAST_DUE on the new plan, and told", async () => {

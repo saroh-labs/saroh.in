@@ -1322,6 +1322,11 @@ describe("cancelOffer: Cancel plan (owner, 17 Oct 2026)", () => {
                 checkouts: { open: null, scheduled, term: null },
             }),
         ).toBeNull();
+        // Monthly moving to a yearly already paid: the paid year would be
+        // given up, so Cancel isn't offered either.
+        expect(
+            offer({ checkouts: { open: null, scheduled, term: null } }),
+        ).toBeNull();
         // Monthly: the next autopay approved stops with the rest.
         expect(
             offer({
