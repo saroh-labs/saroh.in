@@ -5140,7 +5140,7 @@ writes its source, including writes another library makes
 
 **Cause.** The form moves focus in an effect after the card changes over; the test asserted `document.activeElement` straight after the click, so a slow runner could check before the effect ran.
 
-**Fix.** The assertion waits (`await waitFor(...)`).
+**Fix.** The assertions wait (`await waitFor(...)`): the message box's, then the thanks heading's, which flaked the same way on #972.
 
 **Rule.** Focus that a component moves in an effect is asserted with `waitFor`, never synchronously after the event (`docs/patterns/frontend-verification.md`).
 
