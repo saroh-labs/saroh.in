@@ -89,6 +89,37 @@ export interface CreateSubscriptionInput {
     } | null;
     /** Saroh's reference for this attempt (the checkout id), for the notes. */
     reference?: string;
+    /** Who is billed, kept in the subscription's notes. */
+    customer?: BillingCustomer | null;
+}
+
+/**
+ * Who Saroh bills for a plan: the business's billing name, the owner's email,
+ * its phone, GSTIN and registered address. Sent to the provider so its
+ * dashboard, receipts and the customer it keeps carry them.
+ */
+export interface BillingCustomer {
+    /** The name on the bill: the legal name, else the business's name. */
+    name: string;
+    businessName: string | null;
+    email: string | null;
+    contact: string | null;
+    gstin: string | null;
+    address: {
+        line1: string | null;
+        line2: string | null;
+        city: string | null;
+        state: string | null;
+        postalCode: string | null;
+    } | null;
+    organizationId: string;
+}
+
+/** The provider's own customer record for a business (made or found again). */
+export interface ProviderCustomerCapability {
+    ensureCustomer(
+        input: BillingCustomer,
+    ): Promise<{ providerCustomerId: string }>;
 }
 
 /** The provider's accepted-subscription receipt. */
@@ -191,6 +222,8 @@ export interface CreateOrderInput {
     reference: string;
     organizationId: string;
     planKey: string;
+    /** Who is billed, kept in the order's notes. */
+    customer?: BillingCustomer | null;
 }
 
 /**
@@ -241,6 +274,10 @@ export interface CheckoutHandoff {
         email: string | null;
         contact: string | null;
     };
+    /** The provider's customer, where its window takes one (an order). */
+    customerId?: string | null;
+    /** Who is billed, shown on the provider's payment record. */
+    notes?: Record<string, string>;
 }
 
 /**
@@ -305,6 +342,8 @@ export interface BillingProvider {
     readonly orders?: ProviderOrderCapability;
     /** Asking how a checkout stands (DEC-093); absent: the webhook alone. */
     readonly statuses?: ProviderStatusCapability;
+    /** The provider's own customer record; absent: the window's prefill alone. */
+    readonly customers?: ProviderCustomerCapability;
     /**
      * The public key the browser opens the provider's checkout with, or
      * null when there's no such window (the page link is used instead).
