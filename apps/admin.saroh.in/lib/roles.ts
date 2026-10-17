@@ -21,7 +21,8 @@ export const ROLE_PURPOSE: Record<AdminRole, string> = {
     SUPPORT: "Opens businesses to help them, and fixes their people.",
     OPERATIONS:
         "Keeps the machinery running: jobs, webhooks, providers, modules.",
-    BILLING: "Plans, trials and limits.",
+    BILLING:
+        "Plans, trials and limits, and Saroh's invoices and subscriptions.",
     RELEASE_MANAGER: "Turns capabilities on for one business, then everyone.",
-    AUDITOR: "Reads everything, changes nothing.",
+    AUDITOR: "Reads everything but Saroh's invoices, changes nothing.",
 };

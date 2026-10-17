@@ -8,6 +8,8 @@ import {
     Flag,
     HardDrive,
     Mail,
+    ReceiptText,
+    Repeat,
     Rocket,
     ScrollText,
     ShieldCheck,
@@ -95,6 +97,23 @@ const GROUPS: ConsoleNavGroup[] = [
                 label: "Audit trail",
                 icon: ScrollText,
                 permission: "audit:read",
+            },
+        ],
+    },
+    {
+        label: "Billing",
+        items: [
+            {
+                href: "/billing/invoices",
+                label: "Invoices",
+                icon: ReceiptText,
+                permission: "saroh-billing:read",
+            },
+            {
+                href: "/billing/subscriptions",
+                label: "Subscriptions",
+                icon: Repeat,
+                permission: "saroh-billing:read",
             },
         ],
     },
