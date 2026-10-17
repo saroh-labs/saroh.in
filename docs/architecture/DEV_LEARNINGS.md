@@ -5069,3 +5069,13 @@ leaving queue it too.
 **Rule.** A value copied to a provider is re-sent from every place that
 writes its source, including writes another library makes
 (`backend-integrations.md`, Razorpay customer).
+
+### The contact form's focus test flaked on CI (17 Oct 2026)
+
+**Symptom.** `contact-form.test.tsx` "send another message" failed on CI (focus still on `<body>`) and passed locally and on development.
+
+**Cause.** The form moves focus in an effect after the card changes over; the test asserted `document.activeElement` straight after the click, so a slow runner could check before the effect ran.
+
+**Fix.** The assertion waits (`await waitFor(...)`).
+
+**Rule.** Focus that a component moves in an effect is asserted with `waitFor`, never synchronously after the event (`docs/patterns/frontend-verification.md`).
