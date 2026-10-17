@@ -26,6 +26,7 @@ import { giveBillingDetails } from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import { AuditService } from "../audit/audit.service";
 import type { MediaService } from "../media/media.service";
+import { OrganizationMembersService } from "../organizations/organization-members.service";
 import { OrganizationOnboardingService } from "../organizations/organization-onboarding.service";
 import { OrganizationSettingsService } from "../organizations/organization-settings.service";
 import {
@@ -35,6 +36,7 @@ import {
 import {
     BILLING_CUSTOMER_SYNC_MAX_ATTEMPTS,
     BILLING_CUSTOMER_SYNC_TYPE,
+    enqueueOwnedBusinessesSync,
 } from "./billing-customer-sync";
 import { BILLING_NOTE_AUTHOR } from "./billing-ops-notice";
 import { CheckoutService } from "./checkout.service";
@@ -49,6 +51,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const audit = new AuditService();
 const onboarding = new OrganizationOnboardingService(audit);
 const settings = new OrganizationSettingsService(audit, {} as MediaService);
+const members = new OrganizationMembersService(audit);
 
 let fake: FakeBillingProvider;
 let handler: BillingCustomerSyncHandler;
@@ -242,6 +245,60 @@ describe("one customer per business, made at sign-up (DEC-165)", () => {
             providerCustomerId: `fake_cus_${organizationId}`,
             lastError: null,
         });
+    });
+});
+
+describe("the owner's email reaches the customer (17 Oct 2026)", () => {
+    const waiting = async (organizationId: string) =>
+        (await syncJobs(organizationId)).filter((j) => j.status === "PENDING");
+    const settle = () =>
+        prisma.job.updateMany({
+            where: { type: BILLING_CUSTOMER_SYNC_TYPE },
+            data: { status: "DONE" },
+        });
+
+    it("a change of the owner's email queues the sync for every business they own, and none they only work in", async () => {
+        const email = `${uniq("mail-")}@example.com`;
+        const one = await signUp(email);
+        const two = await signUp(email);
+        const elsewhere = await signUp();
+        await prisma.membership.create({
+            data: {
+                organizationId: elsewhere.organizationId,
+                userId: one.userId,
+                role: "ADMIN",
+            },
+        });
+        await settle();
+        await expect(enqueueOwnedBusinessesSync(one.userId)).resolves.toBe(2);
+        expect(await waiting(one.organizationId)).toHaveLength(1);
+        expect(await waiting(two.organizationId)).toHaveLength(1);
+        expect(await waiting(elsewhere.organizationId)).toHaveLength(0);
+    });
+
+    it("a new owner, or an owner's role changed, queues the sync", async () => {
+        const owner = await signUp();
+        const other = await prisma.user.create({
+            data: { email: `${uniq("next-")}@example.com`, name: "Ravi" },
+        });
+        await prisma.membership.create({
+            data: {
+                organizationId: owner.organizationId,
+                userId: other.id,
+                role: "ADMIN",
+            },
+        });
+        await settle();
+        await members.updateRole(
+            {
+                organizationId: owner.organizationId,
+                userId: owner.userId,
+                role: "OWNER",
+            },
+            other.id,
+            { role: "OWNER" },
+        );
+        expect(await waiting(owner.organizationId)).toHaveLength(1);
     });
 });
 

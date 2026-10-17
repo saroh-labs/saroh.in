@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import { prisma } from "@saroh/database";
 
 /**
  * Make or bring up to date the business's customer at Saroh's billing
@@ -41,4 +42,29 @@ export async function enqueueBillingCustomerSync(
             payload: {},
         },
     });
+}
+
+/**
+ * A user's email changed (Better Auth's `onUserEmailChanged`): the billing
+ * email of every business they own is theirs, so each one's customer is
+ * brought up to date. A deleted business is left alone.
+ */
+export async function enqueueOwnedBusinessesSync(
+    userId: string,
+): Promise<number> {
+    const owned = await prisma.membership.findMany({
+        where: {
+            userId,
+            role: "OWNER",
+            organization: { deletedRetainedAt: null },
+        },
+        select: { organizationId: true },
+    });
+    if (owned.length === 0) return 0;
+    await prisma.$transaction(async (tx) => {
+        for (const { organizationId } of owned) {
+            await enqueueBillingCustomerSync(tx, organizationId);
+        }
+    });
+    return owned.length;
 }
