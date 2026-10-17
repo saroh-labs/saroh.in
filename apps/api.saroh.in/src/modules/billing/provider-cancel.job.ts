@@ -7,6 +7,7 @@ import {
     errorResult,
     logDeletionProviderCall,
 } from "../organizations/deletion-provider-log";
+import { billingMayCharge } from "../organizations/organization-lifecycle.policy";
 import { raiseBillingOpsNoticeInTx } from "./billing-ops-notice";
 import { isOneTime } from "./billing-term";
 import type {
@@ -114,6 +115,25 @@ function isRefused(error: unknown): error is BillingProviderError {
     return error instanceof BillingProviderError && error.kind === "REFUSED";
 }
 
+/**
+ * The business is billed through this provider subscription again and it
+ * isn't told to end: a payment honoured since this cancel was asked for
+ * (`withdrawProviderCancelsInTx` takes back only the waiting ones). A
+ * closing business is never kept billing (#921).
+ */
+async function keptSince(provider: string, ref: string): Promise<boolean> {
+    const kept = await prisma.subscription.findFirst({
+        where: {
+            provider,
+            providerSubscriptionId: ref,
+            status: { not: "CANCELLED" },
+            cancelAtPeriodEnd: false,
+        },
+        select: { organization: { select: { lifecycleStatus: true } } },
+    });
+    return kept ? billingMayCharge(kept.organization.lifecycleStatus) : false;
+}
+
 @Injectable()
 export class ProviderCancelHandler {
     private readonly logger = new Logger(ProviderCancelHandler.name);
@@ -151,6 +171,12 @@ export class ProviderCancelHandler {
         };
         const provider = this.providers.get(p.provider);
         const ref = p.providerSubscriptionId;
+        if (await keptSince(p.provider, ref)) {
+            this.logger.log(
+                `billing_provider_cancel_withdrawn job=${job.id} sub=${ref}: the business is billed through it again`,
+            );
+            return;
+        }
         // A year paid once is a provider order: nothing to cancel, and
         // nothing more it can charge (DEC-093). Never asked, never retried.
         const checkout = await prisma.billingCheckout.findUnique({
@@ -179,7 +205,25 @@ export class ProviderCancelHandler {
         } catch (error) {
             const refused = isRefused(error);
             trail(refused ? "refused" : errorResult(error));
-            if (!refused) throw error;
+            if (!refused) {
+                // A provider that can't answer: the queue's quick retries,
+                // then the long chain (a programming error is thrown).
+                if (!this.lastQuickTry(job, error)) throw error;
+                this.logger.warn(
+                    `billing_provider_cancel_unanswered job=${job.id} sub=${ref}: ${(error as Error).message}`,
+                );
+                await this.againUnlessKept(
+                    job,
+                    {
+                        ...p,
+                        provider: p.provider,
+                        providerSubscriptionId: ref,
+                        atCycleEnd,
+                    },
+                    "unknown",
+                );
+                return;
+            }
             this.logger.warn(
                 `billing_provider_cancel_refused job=${job.id} sub=${ref}: ${error.message}`,
             );
@@ -209,10 +253,12 @@ export class ProviderCancelHandler {
                 );
                 return;
             } catch (error) {
-                if (!isRefused(error)) throw error;
+                if (!isRefused(error) && !this.lastQuickTry(job, error)) {
+                    throw error;
+                }
             }
         }
-        await this.again(
+        await this.againUnlessKept(
             job,
             {
                 provider: p.provider,
@@ -223,6 +269,31 @@ export class ProviderCancelHandler {
             standing,
         );
     };
+
+    /**
+     * A provider error the queue has retried for the last time: the long
+     * chain takes over. Anything that isn't the provider's (a bug) is
+     * thrown as it is.
+     */
+    private lastQuickTry(job: Job, error: unknown): boolean {
+        if (!(error instanceof BillingProviderError)) return false;
+        return job.attempts + 1 >= job.maxAttempts;
+    }
+
+    /** {@link again}, unless a payment was honoured while this one ran. */
+    private async againUnlessKept(
+        job: Job,
+        p: ProviderCancelPayload,
+        standing: SubscriptionStanding,
+    ): Promise<void> {
+        if (await keptSince(p.provider, p.providerSubscriptionId)) {
+            this.logger.log(
+                `billing_provider_cancel_withdrawn job=${job.id} sub=${p.providerSubscriptionId}: the business is billed through it again`,
+            );
+            return;
+        }
+        await this.again(job, p, standing);
+    }
 
     /** Ask again later; tell an operator once it has been refused long enough. */
     private async again(

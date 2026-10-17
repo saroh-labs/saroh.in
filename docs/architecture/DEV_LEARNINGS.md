@@ -5001,3 +5001,127 @@ clears every row.
 
 **Rule.** An integration spec never cleans rows up in `afterAll`: the
 setup truncates after every file.
+### A move to Free dropped a year the business had already paid for (17 Oct 2026)
+
+**Symptom** (review, before release): a monthly business that had paid a
+yearly order waiting to start could press Cancel plan (or pick Free); the
+paid SCHEDULED checkout was cancelled, its move cleared, the business put
+on Free, and nothing refunded or flagged the year's money.
+
+**Cause.** `cancelOffer` hid Cancel only when the plan _now_ was yearly,
+and `toFree` gave up every OPEN and SCHEDULED checkout alike — but a
+SCHEDULED one-time checkout is paid at authorisation, unlike a scheduled
+autopay.
+
+**Fix.** `toFree` refuses with a 409 (`paid-year-scheduled`) while a paid
+year is scheduled; `cancelOffer` hides Cancel whenever the scheduled
+checkout is `ONE_TIME`.
+
+**Check.** `billing-safety.db.spec.ts` ("a monthly plan whose next year is
+already paid is never moved to Free"), `plan-view.test.ts`.
+
+**Rule.** Code that gives up a checkout asks whether money was already
+taken for it; a paid one is refused or refunded, never dropped
+(`backend-billing-and-classes.md` › Cancelling a plan).
+
+### A retried Razorpay create read its own lost answer as another business's (17 Oct 2026)
+
+**Symptom** (review): a customer made at Razorpay whose answer was lost (a
+timeout, or the 40-second transaction around the call rolling back) left
+no id in Saroh; the retry got "already exists" for that same customer,
+took it for the owner's other business, and made a second customer
+without the phone. A checkout whose customer call failed went on and
+Razorpay made a third customer of its own from the prefill.
+
+**Cause.** "Exists" was read as "someone else's" without asking whose; the
+id was stored in the same transaction as the provider call; a checkout
+treated "couldn't ask" like "refused".
+
+**Fix.** On "exists", the same create with `fail_existing: "0"` names the
+customer, adopted when its notes' `organizationId` is this business's; the
+lock's transaction only holds the lock and each id is stored the moment it
+is answered, on its own connection; a customer Razorpay made at an earlier
+payment is adopted; a checkout whose customer can't be made is a 503 before
+the subscription is made.
+
+**Check.** `billing-customer.db.spec.ts` ("a create whose answer was lost",
+"paid before DEC-165", "a provider that can't make the customer stops the
+checkout").
+
+**Rule.** A provider write with no idempotency key is followed by a lookup
+that can recognise Saroh's own earlier write (its notes), and its answer is
+stored outside any transaction that can still roll back
+(`backend-integrations.md`, Razorpay customer).
+
+### A Razorpay blip left an autopay live while Saroh showed Free (17 Oct 2026)
+
+**Symptom** (review): a cancel answered with a 5xx, a 429 or a network
+error got the queue's five quick retries (about 30 s) and was then FAILED,
+so the provider subscription went on charging; a cancel already running
+when the webhook honoured a payment could queue itself again and cancel
+the subscription just reinstated.
+
+**Cause.** Only a refusal joined the long retry chain; `withdrawProviderCancelsInTx`
+takes back only PENDING jobs, and the handler never re-read whether the
+subscription was the business's again.
+
+**Fix.** After the queue's last try an unanswered cancel joins the same
+chain (standing `unknown`, operator note at 8 tries); the job stands down,
+before asking the provider and before queuing itself again, when the
+business is billed through that subscription again and isn't closing.
+
+**Check.** `billing-safety.db.spec.ts` ("a provider that can't answer: the
+queue's quick retries, then the long chain", "a cancel still in flight
+…is withdrawn").
+
+**Rule.** A job whose failure leaves money moving never ends on the queue's
+short backoff; it hands itself to a long chain with an operator note, and
+re-reads the state it acts on before every provider call
+(`backend-jobs.md`, `billing.provider.cancel`).
+
+### Double charges: a spurious "refund by hand", and a second plan honoured (17 Oct 2026)
+
+**Symptom** (review): a dropped checkout paid while another plan ran got a
+`subscription.activated` (no payment named) that told the owner to refund
+by hand, then a `subscription.charged` that refunded the same payment
+automatically. A checkout dropped because a late payment reinstated the
+old plan was honoured when paid too: two plans paid for one period.
+
+**Cause.** Every paid phase was recorded as the double charge, though only
+`charged` names the payment; `droppedCheckoutConflictInTx` looked only at
+other checkouts, not at a plan reinstated with no checkout of its own.
+
+**Fix.** An `activated` event naming no payment stops the autopay and
+leaves the refund to the charge that names it; a checkout dropped as
+`plan-reinstated`, or a NEW one paid while a paid plan's period runs
+through another subscription, is a conflict (refund path).
+
+**Check.** `billing-safety.db.spec.ts` ("an activation naming no payment",
+"halted, a new plan started, then the old one paid").
+
+**Rule.** A webhook phase that carries no payment never stands in for the
+one that does; "nothing conflicts" asks what the business is billed for,
+not only which checkouts exist (`paid-after-end.ts`).
+
+### An owner's new email never reached Razorpay (17 Oct 2026)
+
+**Symptom** (review): the billing email is the first owner's account
+email, but an owner who changed it (Better Auth's change-email) kept
+receiving Razorpay's receipts at the old one, and Saroh's next invoice
+disagreed with Razorpay's customer.
+
+**Cause.** The customer sync was queued only by sign-up, Settings › Business
+and checkouts; the user row is written by Better Auth with no hook, and a
+change of owners queued nothing.
+
+**Fix.** `@saroh/auth` `onUserEmailChanged` (Better Auth `user.update`
+before/after hooks); the API queues `billing.customer.sync` for every
+business the user owns; a role change to or from OWNER and an owner
+leaving queue it too.
+
+**Check.** `auth-layer.test.ts` (`userDatabaseHooks`),
+`billing-customer.db.spec.ts` ("the owner's email reaches the customer").
+
+**Rule.** A value copied to a provider is re-sent from every place that
+writes its source, including writes another library makes
+(`backend-integrations.md`, Razorpay customer).

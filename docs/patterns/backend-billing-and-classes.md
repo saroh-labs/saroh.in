@@ -95,8 +95,11 @@ kind are `cancelWords` (`quote-words.ts`). There is no undo: the plan it
 is on quotes `NONE` until it ends, and taking a pending Free back would
 need a new autopay at the provider, since the old one was told to end.
 Not offered under a plan given for a while, on a plan already ending, or
-on a year whose next year is already paid (moving to Free gives up that
-scheduled checkout).
+while a year paid once is scheduled to start, whatever the cycle now. The
+API refuses that move too (`toFree`: 409 `paid-year-scheduled`): a
+SCHEDULED one-time checkout is paid at authorisation, and dropping it
+would keep a year's money for a year never given. It can be cancelled
+once it has started, or refunded by hand.
 
 **How a plan is paid (DEC-093, DEC-161, #803).** Monthly is autopay; one
 approval covers the catalogue's `autopay.charges` monthly charges (12

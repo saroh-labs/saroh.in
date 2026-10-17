@@ -860,6 +860,33 @@ export class CheckoutService {
                 where: { organizationId: ctx.organizationId },
                 select: SUB_SELECT,
             });
+            // A year already paid for and waiting to start (a renewal, or a
+            // move from monthly to yearly): giving it up would keep the
+            // business's money for a year it never gets. Refused, never
+            // dropped (17 Oct 2026); it can be cancelled once it has
+            // started, or refunded by hand.
+            const paidYear = await tx.billingCheckout.findFirst({
+                where: {
+                    organizationId: ctx.organizationId,
+                    status: "SCHEDULED",
+                    providerPlanId: ONE_TIME_PAYMENT,
+                },
+                select: { startAt: true, plan: { select: { name: true } } },
+            });
+            if (paidYear) {
+                const starts = paidYear.startAt
+                    ? ` on ${paidYear.startAt.toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          timeZone: "Asia/Kolkata",
+                      })}`
+                    : "";
+                throw new ConflictException({
+                    message: `A year of ${paidYear.plan.name} is already paid for and starts${starts}. Moving to ${target.name} now would give that year up, so it can't be done here. Write to us if you'd like it refunded.`,
+                    details: { reason: "paid-year-scheduled" },
+                });
+            }
             await this.dropLiveCheckouts(
                 tx,
                 ctx.organizationId,
@@ -991,9 +1018,21 @@ export class CheckoutService {
         // Every checkout's order or subscription is linked to the business's
         // one customer at the provider (DEC-165: made at sign-up, made now
         // if it hasn't been), so its dashboard shows who it bills from the
-        // start, paid or not; a failure leaves the notes and the window's
-        // prefill to say it.
-        const customerId = await this.customers.idFor(ctx.organizationId);
+        // start, paid or not. A refusal leaves the notes and the window's
+        // prefill to say it; a provider that can't answer stops here, as a
+        // subscription made without the customer would have the provider
+        // make a second one of its own.
+        let customerId: string | null;
+        try {
+            customerId = await this.customers.idFor(ctx.organizationId);
+        } catch (error) {
+            this.logger.warn(
+                `billing_checkout_customer_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
+            );
+            throw new ServiceUnavailableException(
+                "We couldn't start the payment. Try again in a minute.",
+            );
+        }
         let made: {
             providerSubscriptionId: string;
             providerCustomerId?: string;

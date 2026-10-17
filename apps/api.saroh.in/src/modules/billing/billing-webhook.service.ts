@@ -574,6 +574,7 @@ export class BillingWebhookService {
                 providerSubscriptionId: checkout.providerSubscriptionId,
                 providerPaymentId: event.providerPaymentId,
                 amountPaise: event.paymentAmountPaise,
+                phase: event.phase,
                 reason: `paid for a dropped plan change (${checkout.endedReason ?? "cancelled"}): ${conflict}`,
             });
         } else {
@@ -650,6 +651,7 @@ export class BillingWebhookService {
                 providerSubscriptionId: ref,
                 providerPaymentId: event.providerPaymentId,
                 amountPaise: event.paymentAmountPaise,
+                phase: event.phase,
                 reason: `charged by a subscription it had left: ${conflict ?? "no plan to put it on"}`,
             });
             return { result: { status: "processed", changed: true } };
@@ -743,6 +745,7 @@ export class BillingWebhookService {
                 providerSubscriptionId: ref,
                 providerPaymentId: event.providerPaymentId,
                 amountPaise: event.paymentAmountPaise,
+                phase: event.phase,
                 reason: `charged by a subscription Saroh had ended: ${conflict}`,
             });
             return { result: { status: "processed", changed: true } };

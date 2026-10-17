@@ -6,9 +6,11 @@
  *     pnpm --filter @saroh/database exec tsx src/backfill/billing-customers.cli.ts
  *
  * Run it once after the deploy that ships migration
- * 20261124110000_billing_customer, against the environment whose API has
- * the Razorpay keys it should use; the API's worker makes the customers.
- * Safe to run more than once (see billing-customers.ts).
+ * 20261124110000_billing_customer, once the old API is stopped and the new
+ * API has the Razorpay keys it should use (`PRICING_ROLLOUT.md`); the
+ * API's worker makes or adopts the customers. Safe to run more than once
+ * (see billing-customers.ts): run it again once the jobs have run to see
+ * `queued now: 0`, and to queue any whose sync failed.
  */
 import { assertDatabaseTarget } from "../database-target";
 import { loadEnvFallback } from "../load-env";

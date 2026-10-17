@@ -16,6 +16,7 @@ import type {
     NextChargeItem,
     ParsedBillingEvent,
     ProviderChargeCapability,
+    ProviderCustomer,
     ProviderCustomerCapability,
     ProviderOrderCapability,
     ProviderPaymentNotesCapability,
@@ -66,6 +67,25 @@ const REFERENCE_NOTE = "saroh_ref";
 const REFUSAL_STATUSES = Array.from({ length: 100 }, (_, i) => 400 + i).filter(
     (status) => status !== 429,
 );
+/** A rate-limited call is asked again this many times before it fails. */
+const RATE_LIMIT_RETRIES = 2;
+/** The longest pause a `Retry-After` is honoured for; longer, the caller retries. */
+const RATE_LIMIT_WAIT_MAX_MS = 10_000;
+/** The pause when a 429 names none. */
+const RATE_LIMIT_WAIT_DEFAULT_MS = 2_000;
+
+/** A `Retry-After` (seconds, or an HTTP date) as a pause, within bounds. */
+export function retryAfterMs(
+    header: string | null,
+    now: number = Date.now(),
+): number {
+    const v = header?.trim();
+    let ms = RATE_LIMIT_WAIT_DEFAULT_MS;
+    if (v && /^\d+(\.\d+)?$/.test(v)) ms = Number(v) * 1000;
+    else if (v && Number.isFinite(Date.parse(v))) ms = Date.parse(v) - now;
+    return Math.min(Math.max(ms, 0), RATE_LIMIT_WAIT_MAX_MS);
+}
+
 /** Razorpay keeps at most 15 notes on anything. */
 const PAYMENT_NOTES_MAX = 15;
 
@@ -158,6 +178,54 @@ function customerFields(
     };
 }
 
+/** A refund's notes: Saroh's reference, the business, its subscription, why. */
+export function refundNotes(input: {
+    reference: string;
+    organizationId?: string | null;
+    providerSubscriptionId?: string | null;
+    reason?: string | null;
+}): Record<string, string> {
+    const out: Record<string, string> = { [REFERENCE_NOTE]: input.reference };
+    const put = (k: string, v: string | null | undefined) => {
+        const n = note(v);
+        if (n) out[k] = n;
+    };
+    put("organizationId", input.organizationId);
+    put("saroh_subscription", input.providerSubscriptionId);
+    put("saroh_reason", input.reason);
+    return out;
+}
+
+/** Razorpay's 400 saying a customer with these details already exists. */
+async function alreadyExists(res: Response): Promise<boolean> {
+    const err = (await res.json().catch(() => ({}))) as {
+        error?: { description?: unknown };
+    };
+    const said = err.error?.description;
+    return typeof said === "string" && /already exists/i.test(said);
+}
+
+/** A Razorpay customer entity as Saroh reads it: its id and its business. */
+function customerOf(json: unknown, what: string): ProviderCustomer {
+    const c = json as { id?: unknown; notes?: unknown };
+    if (typeof c.id !== "string" || !c.id) {
+        throw new BillingProviderError(
+            "UNKNOWN",
+            `Razorpay ${what} failed: missing customer id`,
+        );
+    }
+    // An empty notes object comes back as an empty array.
+    const notes =
+        c.notes && typeof c.notes === "object" && !Array.isArray(c.notes)
+            ? (c.notes as Record<string, unknown>)
+            : {};
+    const org = notes.organizationId;
+    return {
+        providerCustomerId: c.id,
+        organizationId: typeof org === "string" && org ? org : null,
+    };
+}
+
 /** A phone Razorpay takes: digits with an optional leading +, 8 to 15. */
 function razorpayContact(raw: string | null): string | null {
     const v = raw?.replace(/[\s()-]/g, "") ?? "";
@@ -190,6 +258,9 @@ export class RazorpayBillingProvider implements BillingProvider {
 
     /** The HTTP call; a spec swaps it for a fake. */
     fetchFn: typeof fetch = (input, init) => fetch(input, init);
+    /** The pause before a rate-limited call is asked again; a spec swaps it. */
+    sleepFn: (ms: number) => Promise<void> = (ms) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
 
     readonly plans: ProviderPlanCapability = {
         findPlan: (reference) => this.findPlan(reference),
@@ -211,6 +282,9 @@ export class RazorpayBillingProvider implements BillingProvider {
                 readPlatformSecret(RAZORPAY_KEY_SECRET),
             ),
         createCustomer: (input, options) => this.createCustomer(input, options),
+        existingCustomer: (input, options) =>
+            this.existingCustomer(input, options),
+        findCustomer: (id) => this.findCustomer(id),
         updateCustomer: (id, input, options) =>
             this.updateCustomer(id, input, options),
     };
@@ -434,46 +508,31 @@ export class RazorpayBillingProvider implements BillingProvider {
 
     // ── One-time payments and asking how a checkout stands (DEC-093) ────
 
-    /** A yearly plan's one payment: an order Checkout pays. */
     /**
      * The business as a new Razorpay customer (owner, 17 Oct 2026): its
-     * billing name, email, phone and GSTIN, with `organizationId`, the
-     * business's name and its billing address in the notes — notes are
-     * create-only (a `PUT` leaves them unchanged, checked in test mode), so
-     * the address stays there and on each subscription's or order's notes.
+     * billing name, email, phone and GSTIN. Its notes hold only what never
+     * changes, `organizationId` and the business's address (slug): notes
+     * are create-only (a `PUT` leaves them unchanged, checked in test
+     * mode), so a billing name, GSTIN or address there would go stale; the
+     * details as billed stay on each subscription's or order's notes.
      * `fail_existing: "1"`: Razorpay refuses a second customer with the same
      * email and phone with a 400 "Customer already exists for the merchant"
      * (checked in test mode), answered as `exists`; the same email without
-     * a phone makes a new one. Never `"0"`, which would hand back another
-     * business's customer.
+     * a phone makes a new one. Which customer that is, {@link existingCustomer}.
      */
     private async createCustomer(
         input: BillingCustomer,
         options: { withContact: boolean },
     ): Promise<CustomerCreated> {
-        const fields = customerFields(input, options.withContact);
         const res = await this.call(
             "customer creation",
             "POST",
             "/customers",
-            {
-                ...fields,
-                fail_existing: "1",
-                notes: {
-                    organizationId: input.organizationId,
-                    ...billingNotes(input),
-                },
-            },
+            this.customerBody(input, options.withContact, "1"),
             { accept: [400] },
         );
         if (res.status === 400) {
-            const err = (await res.json().catch(() => ({}))) as {
-                error?: { description?: unknown };
-            };
-            const said = err.error?.description;
-            if (typeof said === "string" && /already exists/i.test(said)) {
-                return "exists";
-            }
+            if (await alreadyExists(res)) return "exists";
             throw new BillingProviderError(
                 "REFUSED",
                 "Razorpay customer creation failed (HTTP 400)",
@@ -490,23 +549,93 @@ export class RazorpayBillingProvider implements BillingProvider {
     }
 
     /**
+     * The customer Razorpay holds for the same email and phone: the same
+     * create with `fail_existing: "0"`, which "fetches details of the
+     * existing customer" (Razorpay's create-customer docs) — its id and its
+     * notes, so Saroh's `organizationId` says whether it is this business's
+     * own (an earlier try whose answer was lost) or another's. Not yet run
+     * in test mode: that the answer carries the notes is from the docs'
+     * customer entity.
+     */
+    private async existingCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<ProviderCustomer> {
+        const res = await this.call(
+            "customer lookup",
+            "POST",
+            "/customers",
+            this.customerBody(input, options.withContact, "0"),
+        );
+        return customerOf(await res.json(), "customer lookup");
+    }
+
+    /**
+     * A customer by id (`GET /customers/:id`); null when Razorpay has none
+     * by it (it answers an unknown id with a 400 "does not exist", or 404).
+     */
+    private async findCustomer(
+        providerCustomerId: string,
+    ): Promise<ProviderCustomer | null> {
+        const res = await this.call(
+            "customer fetch",
+            "GET",
+            `/customers/${encodeURIComponent(providerCustomerId)}`,
+            undefined,
+            { accept: [400, 404] },
+        );
+        if (!res.ok) return null;
+        return customerOf(await res.json(), "customer fetch");
+    }
+
+    private customerBody(
+        input: BillingCustomer,
+        withContact: boolean,
+        failExisting: "0" | "1",
+    ) {
+        const notes: Record<string, string> = {
+            organizationId: input.organizationId,
+        };
+        const slug = note(input.businessSlug);
+        if (slug) notes.saroh_business = slug;
+        return {
+            ...customerFields(input, withContact),
+            fail_existing: failExisting,
+            notes,
+        };
+    }
+
+    /**
      * The business's details as they are now, on its customer: `PUT
      * /customers/:id` takes the name, email, phone and GSTIN (checked in
      * test mode, 17 Oct 2026). A phone withheld at creation stays withheld.
+     * An email and phone another customer has is answered `exists` when
+     * Razorpay's 400 says "already exists" (the create's words; the
+     * update's are not yet seen in test mode), any other 400 is REFUSED.
      */
     private async updateCustomer(
         providerCustomerId: string,
         input: BillingCustomer,
         options: { withContact: boolean },
-    ): Promise<void> {
-        await this.call(
+    ): Promise<"updated" | "exists"> {
+        const res = await this.call(
             "customer update",
             "PUT",
             `/customers/${encodeURIComponent(providerCustomerId)}`,
             customerFields(input, options.withContact),
+            { accept: [400] },
         );
+        if (res.status === 400) {
+            if (await alreadyExists(res)) return "exists";
+            throw new BillingProviderError(
+                "REFUSED",
+                "Razorpay customer update failed (HTTP 400)",
+            );
+        }
+        return "updated";
     }
 
+    /** A yearly plan's one payment: an order Checkout pays. */
     private async createOrder(
         input: CreateOrderInput,
     ): Promise<{ providerOrderId: string }> {
@@ -711,6 +840,9 @@ export class RazorpayBillingProvider implements BillingProvider {
     private async refundPayment(input: {
         providerPaymentId: string;
         reference: string;
+        organizationId?: string | null;
+        providerSubscriptionId?: string | null;
+        reason?: string | null;
     }): Promise<{ providerRefundId: string; amountPaise: number | null }> {
         const id = encodeURIComponent(input.providerPaymentId);
         const payment = (await (
@@ -737,7 +869,8 @@ export class RazorpayBillingProvider implements BillingProvider {
             {
                 speed: "normal",
                 receipt: input.reference.slice(0, 40),
-                notes: { [REFERENCE_NOTE]: input.reference },
+                // Whose refund and why, read from Razorpay's refunds list.
+                notes: refundNotes(input),
             },
             { accept: REFUSAL_STATUSES },
         );
@@ -895,7 +1028,10 @@ export class RazorpayBillingProvider implements BillingProvider {
 
     /**
      * One authenticated call. A 4xx is REFUSED (it would answer the same
-     * again); anything else that isn't a success is UNKNOWN. Only the status
+     * again); anything else that isn't a success is UNKNOWN. A 429 (rate
+     * limited) is asked again after the pause its `Retry-After` names (at
+     * most {@link RATE_LIMIT_WAIT_MAX_MS}), up to {@link RATE_LIMIT_RETRIES}
+     * times, before it is UNKNOWN for the caller's retries. Only the status
      * is kept: never the request, the auth header or Razorpay's body.
      */
     private async call(
@@ -908,24 +1044,34 @@ export class RazorpayBillingProvider implements BillingProvider {
     ): Promise<Response> {
         const basic = this.basicAuth();
         let res: Response;
-        try {
-            res = await this.fetchFn(`${this.baseUrl}${path}`, {
-                method,
-                headers: {
-                    Authorization: `Basic ${basic}`,
+        for (let retry = 0; ; retry += 1) {
+            try {
+                res = await this.fetchFn(`${this.baseUrl}${path}`, {
+                    method,
+                    headers: {
+                        Authorization: `Basic ${basic}`,
+                        ...(body === undefined
+                            ? {}
+                            : { "Content-Type": "application/json" }),
+                    },
                     ...(body === undefined
                         ? {}
-                        : { "Content-Type": "application/json" }),
-                },
-                ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-                signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-            });
-        } catch {
-            // Never echo the request — it carries the platform secret.
-            throw new BillingProviderError(
-                "UNKNOWN",
-                `Razorpay ${what} failed: network error`,
+                        : { body: JSON.stringify(body) }),
+                    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+                });
+            } catch {
+                // Never echo the request — it carries the platform secret.
+                throw new BillingProviderError(
+                    "UNKNOWN",
+                    `Razorpay ${what} failed: network error`,
+                );
+            }
+            if (res.status !== 429 || retry >= RATE_LIMIT_RETRIES) break;
+            const wait = retryAfterMs(res.headers.get("retry-after"));
+            this.logger.warn(
+                `Razorpay ${what} rate limited; asking again in ${wait} ms`,
             );
+            await this.sleepFn(wait);
         }
         if (!res.ok && options.accept?.includes(res.status)) return res;
         if (!res.ok) {

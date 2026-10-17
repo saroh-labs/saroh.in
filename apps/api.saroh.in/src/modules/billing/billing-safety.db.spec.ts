@@ -40,6 +40,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { lifecycleAllows } from "../organizations/organization-lifecycle.policy";
 import { BILLING_EMAIL_TYPE } from "./billing-email.job";
 import { BILLING_NOTE_AUTHOR } from "./billing-ops-notice";
+import { ONE_TIME_PAYMENT } from "./billing-term";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { CheckoutService } from "./checkout.service";
 import {
@@ -367,7 +368,14 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
         await refunder.handle(jobs[0]!);
         await refunder.handle(jobs[0]!);
         expect(fake.refunds.refunded).toEqual([
-            { providerPaymentId: paymentId, reference: `refund:${paymentId}` },
+            {
+                providerPaymentId: paymentId,
+                reference: `refund:${paymentId}`,
+                // Whose and why, on the refund's notes at the provider.
+                organizationId: ctx.organizationId,
+                providerSubscriptionId: first.ref,
+                reason: "double_charge",
+            },
         ]);
         expect(fake.refunds.asked).toEqual([paymentId]);
         const emails = await refundedEmails();
@@ -393,6 +401,43 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
             `Refunded payment ${paymentId} (₹1,180) in Razorpay automatically, refund fake_rfnd_${paymentId}`,
         );
         expect(told[0]!.body).toContain("Nothing to do.");
+    });
+
+    it("an activation naming no payment stops the autopay but leaves the refund to the charge that names it: never a 'refund by hand' note as well", async () => {
+        const ctx = await business();
+        const first = await start(ctx, "b");
+        const second = await start(ctx, "c");
+        await deliver(second.ref, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+        // Razorpay's `subscription.activated` carries no payment.
+        await expect(
+            deliver(first.ref, "activated", {
+                currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+            }),
+        ).resolves.toMatchObject({ status: "processed", changed: true });
+        expect(await notes(ctx.organizationId)).toHaveLength(0);
+        expect(await refundJobs()).toHaveLength(0);
+        expect(
+            (await cancelJobs("PENDING")).map((j) => j.payload),
+        ).toContainEqual(
+            expect.objectContaining({ providerSubscriptionId: first.ref }),
+        );
+        // The charge that follows names it: refunded automatically, once.
+        const paymentId = `pay_after_activation_${seq}`;
+        await deliver(first.ref, "charged", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+            paymentId,
+            amountPaise: 118_000,
+        });
+        expect((await refundJobs()).map((j) => j.payload)).toEqual([
+            expect.objectContaining({ providerPaymentId: paymentId }),
+        ]);
+        expect(
+            (await notes(ctx.organizationId)).filter((n) =>
+                n.body.includes("by hand"),
+            ),
+        ).toHaveLength(0);
     });
 
     it("a refund Razorpay refuses is never retried: the owner is told to refund it by hand, in Razorpay's words", async () => {
@@ -431,7 +476,7 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
     it("a refund still unanswered on its last try tells the owner to refund it by hand", async () => {
         const { ctx, paymentId } = await chargedTwice();
         const [job] = await refundJobs();
-        expect(job!.maxAttempts).toBe(10);
+        expect(job!.maxAttempts).toBe(20);
         fake.refunds.failNext("UNKNOWN");
         await expect(
             new DoubleChargeRefundHandler(factory).handle({
@@ -442,7 +487,7 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
         const told = await notes(ctx.organizationId);
         expect(told).toHaveLength(1);
         expect(told[0]!.body).toContain(
-            `Refund payment ${paymentId} (₹1,180) in Razorpay by hand: the automatic refund didn't go through after 10 tries`,
+            `Refund payment ${paymentId} (₹1,180) in Razorpay by hand: the automatic refund didn't go through after 20 tries`,
         );
     });
 
@@ -561,6 +606,59 @@ describe("a charge on a subscription Saroh ended or left", () => {
         ).toMatchObject({ source: "RENEWAL" });
     });
 
+    it("halted, a new plan started, then the old one paid through Razorpay's link: the new one paid later is a double charge, refunded, never a second plan", async () => {
+        const ctx = await business();
+        const { ref } = await onPaidPlan(ctx, "b");
+        await deliver(ref, "halted");
+        const fresh = await start(ctx, "c");
+        expect(fresh.kind).toBe("NEW");
+        // The old one is paid: the plan is back, the new checkout dropped.
+        const next = new Date(Date.now() + 50 * DAY);
+        await deliver(ref, "charged", {
+            currentPeriodEnd: next,
+            paymentId: "pay_link",
+        });
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: fresh.id },
+            }),
+        ).toMatchObject({
+            status: "CANCELLED",
+            endedReason: "plan-reinstated",
+        });
+
+        // The dropped checkout is paid anyway (a second tab).
+        await deliver(fresh.ref, "charged", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+            paymentId: "pay_second_plan",
+            amountPaise: 118_000,
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            providerSubscriptionId: ref,
+            status: "ACTIVE",
+        });
+        expect(
+            (
+                await prisma.job.findMany({
+                    where: { type: BILLING_REFUND_TYPE },
+                })
+            ).map((j) => j.payload),
+        ).toEqual([
+            expect.objectContaining({ providerPaymentId: "pay_second_plan" }),
+        ]);
+        expect(
+            (await cancelJobs("PENDING")).map((j) => j.payload),
+        ).toContainEqual(
+            expect.objectContaining({ providerSubscriptionId: fresh.ref }),
+        );
+        expect(
+            await prisma.sarohInvoice.count({
+                where: { providerPaymentId: "pay_second_plan" },
+            }),
+        ).toBe(0);
+    });
+
     it("moved to Free while past due, then Razorpay's retry went through: the period paid, then Free", async () => {
         const ctx = await business();
         const { ref } = await onPaidPlan(ctx, "b");
@@ -667,6 +765,65 @@ describe("a refused provider cancel (17 Oct 2026)", () => {
         expect(await cancelJobs()).toHaveLength(1);
     });
 
+    it("a provider that can't answer: the queue's quick retries, then the long chain, never dropped", async () => {
+        const job = await queued(false);
+        const unanswered = () =>
+            new BillingProviderError(
+                "UNKNOWN",
+                "Razorpay subscription cancellation failed (HTTP 503)",
+            );
+        fake.failCancels.push(unanswered());
+        // Quick retries left: the queue asks again in a moment.
+        await expect(handler().handle(job)).rejects.toThrow("HTTP 503");
+        // The queue's last try: handed to the long chain, not FAILED.
+        fake.failCancels.push(unanswered());
+        await expect(
+            handler().handle({ ...job, attempts: job.maxAttempts - 1 }),
+        ).resolves.toBeUndefined();
+        const next = (await cancelJobs("PENDING")).find((j) => j.id !== job.id);
+        expect(next?.payload).toMatchObject({
+            providerSubscriptionId: `sub_refused_${seq}`,
+            tries: 1,
+            atCycleEnd: false,
+        });
+        expect(next!.runAt.getTime()).toBeGreaterThan(Date.now() + 10 * 60_000);
+    });
+
+    it("a cancel still in flight for a subscription the business is billed through again is withdrawn, never sent", async () => {
+        const ctx = await business();
+        const paid = await onPaidPlan(ctx, "b");
+        // Asked for while it was ending; a payment honoured it since, and
+        // the webhook withdrew only the waiting ones.
+        await prisma.$transaction((tx) =>
+            enqueueProviderCancel(tx, {
+                organizationId: ctx.organizationId,
+                provider: "RAZORPAY",
+                providerSubscriptionId: paid.ref,
+                atCycleEnd: false,
+                tries: 2,
+            }),
+        );
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                type: BILLING_PROVIDER_CANCEL_TYPE,
+                payload: { path: ["providerSubscriptionId"], equals: paid.ref },
+            },
+        });
+        const before = fake.cancelCalls.length;
+        await handler().handle(job);
+        expect(fake.cancelCalls.length).toBe(before);
+        expect(
+            (await cancelJobs("PENDING")).filter((j) => j.id !== job.id),
+        ).toHaveLength(0);
+        // A closing business is never kept billing: that one is sent.
+        await prisma.organization.update({
+            where: { id: ctx.organizationId },
+            data: { lifecycleStatus: "DELETED_RETAINED" },
+        });
+        await handler().handle(job);
+        expect(fake.cancelCalls.at(-1)).toBe(paid.ref);
+    });
+
     it("refused long enough: an operator is told, and it is still asked again", async () => {
         const job = await queued(false, CANCEL_ALERT_AFTER - 1);
         fake.failCancels.push(refused());
@@ -703,6 +860,47 @@ describe("ending what the business leaves (DEC-159)", () => {
                 atCycleEnd: false,
             },
         ]);
+    });
+
+    it("a monthly plan whose next year is already paid is never moved to Free: refused, the paid year kept", async () => {
+        const ctx = await business();
+        const { periodEnd } = await onPaidPlan(ctx, "b");
+        // Monthly B now, a year of C paid by order and waiting to start.
+        const year = await prisma.billingCheckout.create({
+            data: {
+                organizationId: ctx.organizationId,
+                planId: (await row("c")).id,
+                cycle: "year",
+                kind: "SCHEDULED",
+                status: "SCHEDULED",
+                provider: "RAZORPAY",
+                providerSubscriptionId: `order_paid_year_${tag}`,
+                providerPlanId: ONE_TIME_PAYMENT,
+                pricePaise: 118_000,
+                chargeNowPaise: 0,
+                startAt: periodEnd,
+                expiresAt: periodEnd,
+            },
+        });
+        await prisma.job.deleteMany({});
+
+        await expect(
+            checkout.changePlan(ctx, { plan: "free", cycle: "month" }),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: { details: { reason: "paid-year-scheduled" } },
+        });
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: year.id },
+            }),
+        ).toMatchObject({ status: "SCHEDULED", endedReason: null });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            cancelAtPeriodEnd: false,
+            pendingPlanId: null,
+        });
+        expect(await cancelJobs()).toHaveLength(0);
     });
 
     it("a scheduled change's first charge failing before the sweep applies it: PAST_DUE on the new plan, and told", async () => {

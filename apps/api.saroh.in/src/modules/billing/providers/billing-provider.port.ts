@@ -125,6 +125,8 @@ export interface BillingCustomer {
         postalCode: string | null;
     } | null;
     organizationId: string;
+    /** The business's Saroh address (slug), for the customer's notes. */
+    businessSlug?: string | null;
 }
 
 /**
@@ -134,10 +136,18 @@ export interface BillingCustomer {
  */
 export type CustomerCreated = { providerCustomerId: string } | "exists";
 
+/** A customer the provider holds, and the business its notes name. */
+export interface ProviderCustomer {
+    providerCustomerId: string;
+    /** Saroh's `organizationId` note; null: none (made by the provider). */
+    organizationId: string | null;
+}
+
 /**
  * The provider's own customer record for a business: made once at sign-up
- * and kept current (`billing-customer.ts`), never looked up by email or
- * phone, so a business is never handed another's.
+ * and kept current (`billing-customer.ts`). Never handed to a business by
+ * email or phone alone: one the provider already holds for the same
+ * details is adopted only when its notes name the same business.
  */
 export interface ProviderCustomerCapability {
     /** Whether the provider's keys are set here; false: nothing is asked. */
@@ -146,11 +156,25 @@ export interface ProviderCustomerCapability {
         input: BillingCustomer,
         options: { withContact: boolean },
     ): Promise<CustomerCreated>;
+    /**
+     * The customer the provider already holds for these details (the one
+     * `createCustomer` answered `exists` for), with its notes' business.
+     */
+    existingCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<ProviderCustomer>;
+    /** A customer by its id; null when the provider has none by it. */
+    findCustomer(providerCustomerId: string): Promise<ProviderCustomer | null>;
+    /**
+     * Its details as they are now; `exists`: the email and phone are
+     * another customer's, and nothing was changed.
+     */
     updateCustomer(
         providerCustomerId: string,
         input: BillingCustomer,
         options: { withContact: boolean },
-    ): Promise<void>;
+    ): Promise<"updated" | "exists">;
 }
 
 /** The provider's accepted-subscription receipt. */
@@ -336,6 +360,10 @@ export interface ProviderRefundCapability {
         providerPaymentId: string;
         /** Saroh's reference, kept in the refund's notes. */
         reference: string;
+        /** Whose and why, in the refund's notes too (absent: not said). */
+        organizationId?: string | null;
+        providerSubscriptionId?: string | null;
+        reason?: string | null;
     }): Promise<{ providerRefundId: string; amountPaise: number | null }>;
 }
 

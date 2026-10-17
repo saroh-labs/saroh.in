@@ -39,6 +39,7 @@ export const BILLING_PROFILE_SELECT = {
     contactEmail: true,
     phone: true,
     taxId: true,
+    gstRegistered: true,
     gstState: true,
     addressLine1: true,
     addressLine2: true,

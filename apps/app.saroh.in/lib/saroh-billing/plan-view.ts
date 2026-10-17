@@ -293,8 +293,9 @@ export interface CancelOffer {
  * `TRIALING`, `ACTIVE` or `PAST_DUE`, and only while nothing already ends
  * it: not when Free (or another plan) already waits for the period's end,
  * not under a plan given for a while (its own note says where it lands),
- * and not on a year paid once whose next year is paid already (moving to
- * Free would give that scheduled checkout up; an owner decision waits).
+ * and not while a year paid once is scheduled to start, whatever the
+ * cycle now (moving to Free would give that paid year up; the API refuses
+ * it with a 409).
  * See `backend-billing-and-classes.md` › Cancelling a plan.
  */
 export function cancelOffer(input: {
@@ -318,8 +319,12 @@ export function cancelOffer(input: {
     const move = access.pendingMove;
     if (move && move.planId !== move.fromPlanId) return null;
     const yearly = billedCycle(sub) === "year";
+    // A year already paid for and waiting to start (a renewal, or a move
+    // from monthly to yearly): moving to Free would give that paid year up,
+    // so the API refuses it and the button isn't shown. An approved monthly
+    // autopay that hasn't charged yet stops with the rest.
     const scheduled = input.checkouts?.scheduled ?? null;
-    if (yearly && scheduled) return null;
+    if (scheduled && (yearly || scheduled.payment === "ONE_TIME")) return null;
     return {
         planName: billed.name,
         freePlanId: free.id,

@@ -88,14 +88,15 @@ Each is a transaction lock on `hashtext(<key>)`, held until the
 transaction ends. Take it before the transaction's row locks, so it never
 waits while holding one.
 
-| Key                                       | Serialises                                                                                                                                                  | Where                                                                                                                                           |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-120), with the partial unique index behind it                                   | `data-export/data-export.service.ts` (`request`)                                                                                                |
-| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                              | `class-packs/first-pack.ts`                                                                                                                     |
-| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                           | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
-| `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                           | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
-| `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                              | `notifications/provider-alerts.ts` (`wordProvider`)                                                                                             |
-| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086) | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
+| Key                                       | Serialises                                                                                                                                                                                                                                                                                                                    | Where                                                                                                                                           |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-120), with the partial unique index behind it                                                                                                                                                                                                     | `data-export/data-export.service.ts` (`request`)                                                                                                |
+| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                                                                                                                                                                                                | `class-packs/first-pack.ts`                                                                                                                     |
+| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                                                                                                                                                                                             | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
+| `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                                                                                                                                                                                             | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
+| `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                                                                                                                                                                                                | `notifications/provider-alerts.ts` (`wordProvider`)                                                                                             |
+| `billing-customer:<organizationId>`       | Making (or adopting) a business's one customer at Saroh's billing provider (DEC-165), so sign-up's job and a checkout make one. Held across up to three provider calls: `SET LOCAL lock_timeout = '30s'` first, and each id answered is stored at once on its own connection, so a transaction that ends badly never loses it | `billing/billing-customer.ts` (`create`)                                                                                                        |
+| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086)                                                                                                                                                                   | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
 (`test/lock-wait.ts`).
@@ -669,27 +670,34 @@ overrideId, reason }`. Re-read, then decide
   done, authorised with no cycle running is cancelled now — and otherwise
   queues itself again with a growing pause (15 minutes to a day, its count
   in the payload), telling an operator after 8 tries and stopping after 14.
-  `withdrawProviderCancelsInTx` takes back the ones still waiting when a
-  payment is honoured.
+  A provider that can't answer (5xx, 429, the network) gets the queue's
+  quick retries, then joins the same chain from the queue's last try,
+  never dead-lettered. `withdrawProviderCancelsInTx` takes back the ones
+  still waiting when a payment is honoured; one already running checks
+  before it asks the provider and before it queues itself again, and
+  stands down when the business is billed through that subscription again
+  (live, not ending, the business not closing).
 - **`billing.customer.sync`** (DEC-165) makes the business's one customer
   at Saroh's billing provider, or sends its details as they are now:
   queued in the sign-up's transaction, by a Settings › Business save that
   touches billing details and by every checkout, at most one waiting per
-  business (`enqueueBillingCustomerSync`). Skips quietly with no provider
-  keys; retried by the queue; a refusal is logged and dropped
-  (`billing-customer.ts`). Businesses from before are queued by
-  `backfill/billing-customers.cli.ts`.
+  business (`enqueueBillingCustomerSync`), and by an owner's change of
+  email. Skips with no provider keys (a warning in production); retried
+  by the queue (10 tries); a refusal is logged, left as an admin note once,
+  and dropped (`billing-customer.ts`). Businesses from before are queued
+  by `backfill/billing-customers.cli.ts`.
 - **`billing.payment.notes`** (17 Oct 2026) puts Saroh's invoice number,
   business and checkout on the provider's payment once Saroh's invoice
   has its payment id: queued on the invoice's transaction, retried by the
-  queue, a refusal or the last try logged (`billing_payment_notes_failed`)
-  and dropped (`payment-notes.job.ts`).
+  queue (10 tries), a refusal or the last try logged
+  (`billing_payment_notes_failed`) and left as an admin note
+  (`payment-notes.job.ts`).
 - **`billing.refund.double-charge`** (DEC-164) refunds a double charge in
   full through the provider: claimed once per payment by a platform audit
   row on the webhook's transaction, which queues it. A refusal (4xx) is
   never retried: an admin note asks the owner to refund it by hand, in
   the provider's words, with an ERROR log. No answer (5xx, network) is
-  retried by the queue (10 attempts, each failure logged at ERROR), the
+  retried by the queue (20 attempts, about an hour, each failure logged at ERROR), the
   same note on the last. Once refunded it writes a second audit row,
   queues `billing.email` `DOUBLE_CHARGE_REFUNDED` and leaves an admin note
   that it was refunded (`double-charge-refund.job.ts`). The refund is kept

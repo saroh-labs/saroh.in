@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { raiseBillingOpsNoticeInTx } from "./billing-ops-notice";
 import type { BillingProviderFactory } from "./providers/billing-provider.port";
 import {
     BILLING_PROVIDER_FACTORY,
@@ -16,10 +17,15 @@ import {
  * checkout, so the Razorpay dashboard leads back to Saroh.
  *
  * Queued on the invoice's transaction (the outbox) and never in its way: a
- * provider that is down is retried by the queue; a refusal, or the last
- * try, is logged (`billing_payment_notes_failed`) and dropped.
+ * provider that is down is retried by the queue (`PAYMENT_NOTES_MAX_ATTEMPTS`,
+ * about 20 minutes); a refusal, or the last try, is logged
+ * (`billing_payment_notes_failed`) and left as a note on the business in
+ * the admin console, so the payment can be tagged by hand.
  */
 export const BILLING_PAYMENT_NOTES_TYPE = "billing.payment.notes";
+
+/** Tries before the queue gives up (1 s doubling, 5 min cap). */
+export const PAYMENT_NOTES_MAX_ATTEMPTS = 10;
 
 export interface PaymentNotesPayload {
     invoiceId: string;
@@ -33,6 +39,7 @@ export async function enqueuePaymentNotes(
         data: {
             type: BILLING_PAYMENT_NOTES_TYPE,
             organizationId: input.organizationId,
+            maxAttempts: PAYMENT_NOTES_MAX_ATTEMPTS,
             payload: { invoiceId: input.invoiceId },
         },
     });
@@ -88,8 +95,19 @@ export class PaymentNotesHandler {
                     error instanceof Error ? error.message : "unknown error"
                 }`,
             );
-            if (last) return;
-            throw error;
+            if (!last) throw error;
+            await prisma.$transaction((tx) =>
+                raiseBillingOpsNoticeInTx(tx, this.logger, {
+                    code: "billing_payment_notes_given_up",
+                    organizationId: invoice.organizationId,
+                    refs: {
+                        provider: invoice.provider,
+                        payment: invoice.providerPaymentId,
+                        invoice: invoice.number,
+                    },
+                    note: `Saroh couldn't add its invoice number to payment ${invoice.providerPaymentId} at the billing provider${refused ? " (refused)" : ` after ${job.attempts + 1} tries`}. The payment and invoice ${invoice.number} are fine; add the note saroh_invoice=${invoice.number} in the provider's dashboard if you need to match them there.`,
+                }),
+            );
         }
     };
 }

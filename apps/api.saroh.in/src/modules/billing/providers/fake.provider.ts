@@ -15,6 +15,7 @@ import type {
     NextChargeItem,
     ParsedBillingEvent,
     ProviderChargeCapability,
+    ProviderCustomer,
     ProviderCustomerCapability,
     ProviderDisputeEvent,
     ProviderOrderCapability,
@@ -131,9 +132,13 @@ export class FakeProviderOrders implements ProviderOrderCapability {
 
 /**
  * The fake's provider customers, as Razorpay with `fail_existing: "1"`:
- * one per email and phone, a second refused as `exists`; the same email
- * without a phone is a new one. Every create and update recorded; a test
- * turns the keys off with {@link keys}, or queues a failure.
+ * one per email and phone, a second refused as `exists` (and handed back
+ * by {@link existingCustomer}, as `fail_existing: "0"` does); the same
+ * email without a phone is a new one; an update to another's email and
+ * phone is `exists`. Every create and update recorded; a test turns the
+ * keys off with {@link keys}, queues a failure, loses the next create's
+ * answer after making it ({@link loseNextAnswer}), or adds a customer the
+ * provider made itself ({@link addCustomer}).
  */
 export class FakeProviderCustomers implements ProviderCustomerCapability {
     readonly created: { input: BillingCustomer; withContact: boolean }[] = [];
@@ -142,51 +147,116 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
         input: BillingCustomer;
         withContact: boolean;
     }[] = [];
+    readonly looked: string[] = [];
     keys = true;
     failNext: BillingProviderError | null = null;
+    loseNextAnswer = false;
     private readonly byEmailPhone = new Map<string, string>();
+    private readonly byId = new Map<string, string | null>();
 
     configured(): boolean {
         return this.keys;
+    }
+
+    /** A customer the provider holds already, with its notes' business. */
+    addCustomer(providerCustomerId: string, organizationId: string | null) {
+        this.byId.set(providerCustomerId, organizationId);
+    }
+
+    private take(): Promise<never> | null {
+        if (!this.failNext) return null;
+        const error = this.failNext;
+        this.failNext = null;
+        return Promise.reject(error);
+    }
+
+    private key(input: BillingCustomer, withContact: boolean) {
+        const contact = withContact ? input.contact : null;
+        return input.email && contact ? `${input.email}|${contact}` : null;
+    }
+
+    private make(input: BillingCustomer, withContact: boolean): string {
+        let id = `fake_cus_${input.organizationId}`;
+        for (let n = 2; this.byId.has(id); n += 1) {
+            id = `fake_cus_${input.organizationId}_${n}`;
+        }
+        this.byId.set(id, input.organizationId);
+        const key = this.key(input, withContact);
+        if (key) this.byEmailPhone.set(key, id);
+        this.created.push({ input, withContact });
+        return id;
     }
 
     createCustomer(
         input: BillingCustomer,
         options: { withContact: boolean },
     ): Promise<CustomerCreated> {
-        if (this.failNext) {
-            const error = this.failNext;
-            this.failNext = null;
-            return Promise.reject(error);
+        const failed = this.take();
+        if (failed) return failed;
+        const key = this.key(input, options.withContact);
+        if (key && this.byEmailPhone.has(key)) return Promise.resolve("exists");
+        const id = this.make(input, options.withContact);
+        if (this.loseNextAnswer) {
+            this.loseNextAnswer = false;
+            return Promise.reject(
+                new BillingProviderError(
+                    "UNKNOWN",
+                    "Razorpay customer creation failed: network error",
+                ),
+            );
         }
-        const contact = options.withContact ? input.contact : null;
-        if (input.email && contact) {
-            const key = `${input.email}|${contact}`;
-            if (this.byEmailPhone.has(key)) return Promise.resolve("exists");
-            this.byEmailPhone.set(key, input.organizationId);
-        }
-        this.created.push({ input, withContact: options.withContact });
+        return Promise.resolve({ providerCustomerId: id });
+    }
+
+    existingCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<ProviderCustomer> {
+        const failed = this.take();
+        if (failed) return failed;
+        const key = this.key(input, options.withContact);
+        const id =
+            (key && this.byEmailPhone.get(key)) ??
+            this.make(input, options.withContact);
         return Promise.resolve({
-            providerCustomerId: `fake_cus_${input.organizationId}`,
+            providerCustomerId: id,
+            organizationId: this.byId.get(id) ?? null,
         });
+    }
+
+    findCustomer(providerCustomerId: string): Promise<ProviderCustomer | null> {
+        const failed = this.take();
+        if (failed) return failed;
+        this.looked.push(providerCustomerId);
+        return Promise.resolve(
+            this.byId.has(providerCustomerId)
+                ? {
+                      providerCustomerId,
+                      organizationId: this.byId.get(providerCustomerId) ?? null,
+                  }
+                : null,
+        );
     }
 
     updateCustomer(
         providerCustomerId: string,
         input: BillingCustomer,
         options: { withContact: boolean },
-    ): Promise<void> {
-        if (this.failNext) {
-            const error = this.failNext;
-            this.failNext = null;
-            return Promise.reject(error);
+    ): Promise<"updated" | "exists"> {
+        const failed = this.take();
+        if (failed) return failed;
+        const key = this.key(input, options.withContact);
+        const holder = key ? this.byEmailPhone.get(key) : undefined;
+        if (holder && holder !== providerCustomerId) {
+            return Promise.resolve("exists");
         }
+        if (key) this.byEmailPhone.set(key, providerCustomerId);
         this.updated.push({
             providerCustomerId,
             input,
             withContact: options.withContact,
         });
-        return Promise.resolve();
+        return Promise.resolve("updated");
     }
 }
 
@@ -221,7 +291,13 @@ export class FakeProviderPaymentNotes implements ProviderPaymentNotesCapability 
  * with {@link failNext}; a refusal carries Razorpay-like words.
  */
 export class FakeProviderRefunds implements ProviderRefundCapability {
-    readonly refunded: { providerPaymentId: string; reference: string }[] = [];
+    readonly refunded: {
+        providerPaymentId: string;
+        reference: string;
+        organizationId?: string | null;
+        providerSubscriptionId?: string | null;
+        reason?: string | null;
+    }[] = [];
     readonly asked: string[] = [];
     /** What a refund answers it gave back; null: the provider didn't say. */
     amountPaise: number | null = null;
@@ -247,6 +323,9 @@ export class FakeProviderRefunds implements ProviderRefundCapability {
     refundPayment(input: {
         providerPaymentId: string;
         reference: string;
+        organizationId?: string | null;
+        providerSubscriptionId?: string | null;
+        reason?: string | null;
     }): Promise<{ providerRefundId: string; amountPaise: number | null }> {
         this.asked.push(input.providerPaymentId);
         const failure = this.failures.shift();
