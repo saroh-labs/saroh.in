@@ -9,8 +9,9 @@ import { loadEditorContext } from "@/lib/products/editor-data";
 import { newProductHref } from "@/lib/products/links";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import { canAddLocation, locationLine } from "@/lib/stores/business-stores";
 import { pickStorefront } from "@/lib/stores/pick";
-import { listBusinessStores } from "@/lib/stores/service";
+import { readBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "New product" };
 
@@ -21,6 +22,10 @@ export const metadata = { title: "New product" };
  * with more than one, the first question is which. It is asked here as a
  * short list rather than a field on the form, because the answer decides the
  * currency and the categories the form offers.
+ *
+ * The locations are the business's, for every role (16 Oct audit, SEV 4):
+ * a failed read says so, never "No locations yet". The editor is read-only
+ * without `store:write`, and the API decides the create.
  */
 export default async function NewProductPage({
     searchParams,
@@ -28,15 +33,15 @@ export default async function NewProductPage({
     searchParams: Promise<{ storefront?: string }>;
 }) {
     await requireSession();
-    const [{ storefront }, stores, organization, access] = await Promise.all([
+    const [{ storefront }, organization, access] = await Promise.all([
         searchParams,
-        listBusinessStores(),
         resolveActiveOrganization(),
         billingAccessOrNull(),
     ]);
     if (organization?.actions && !organization.actions.includes("store:read")) {
         return <NoProductAccess organization={organization} />;
     }
+    const stores = await readBusinessStores();
     // At the plan's limit, say so before the form, not on Create (UX-036).
     const meter = planMeter(access, "products");
     if (meter?.full) {
@@ -46,10 +51,14 @@ export default async function NewProductPage({
             </PageContainer>
         );
     }
-    const store = pickStorefront(stores, storefront);
+    const store = stores ? pickStorefront(stores, storefront) : null;
 
     if (store) {
-        const context = await loadEditorContext(store, undefined, stores);
+        const context = await loadEditorContext(
+            store,
+            undefined,
+            stores ?? [store],
+        );
         return <ProductEditorV2 {...context} product={null} />;
     }
 
@@ -63,6 +72,8 @@ export default async function NewProductPage({
                 description="A product is made at one location, and priced in that location's currency."
                 stores={stores}
                 hrefFor={newProductHref}
+                detail={locationLine}
+                canCreate={canAddLocation(organization)}
             />
         </PageContainer>
     );

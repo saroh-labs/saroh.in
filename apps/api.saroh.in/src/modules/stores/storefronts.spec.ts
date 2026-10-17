@@ -194,6 +194,41 @@ describe("StorefrontsService", () => {
         );
     });
 
+    it("says how many products each storefront sells and what kind it is", async () => {
+        db.store.findMany!.mockResolvedValueOnce([
+            {
+                id: "st_1",
+                name: "Online",
+                _count: { orders: 3, listings: 12 },
+                settings: { kind: "ONLINE", pausedAt: null },
+            },
+            {
+                id: "st_2",
+                name: "High Street",
+                _count: { orders: 0, listings: 0 },
+                settings: { kind: "SHOP", pausedAt: null },
+            },
+        ]);
+        await expect(service.list("org_1")).resolves.toEqual([
+            {
+                id: "st_1",
+                name: "Online",
+                orderCount: 3,
+                productCount: 12,
+                kind: "ONLINE",
+                paused: false,
+            },
+            {
+                id: "st_2",
+                name: "High Street",
+                orderCount: 0,
+                productCount: 0,
+                kind: "SHOP",
+                paused: false,
+            },
+        ]);
+    });
+
     it("reads money and rates as 2-decimal strings", async () => {
         db.storeSettings.findUnique!.mockResolvedValue({
             fulfilmentTypes: [],

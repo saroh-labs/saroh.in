@@ -284,6 +284,7 @@ export class ImportsService {
                 : await this.existingKeys(storeId, organizationId, entity),
             requiredFields: descriptor.requiredFields,
             keyOf: descriptor.keyOf,
+            normalize: descriptor.normalize,
             validateRow: mrp
                 ? (values) => {
                       const issues = descriptor.validateRow(values);
