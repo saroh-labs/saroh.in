@@ -108,14 +108,15 @@ export class OrganizationProductsController {
     @Get("path")
     suggestPath(
         @OrgContext() ctx: OrganizationContext,
-        @Query("name") name = "",
-        @Query("except") except?: string,
+        @Query("name") name: unknown,
+        @Query("except") except: unknown,
     ) {
         const { organizationId } = this.access.business(ctx);
+        // A repeated query parameter arrives as an array: only a string counts.
         return this.products.suggestPath(
             organizationId,
-            name.slice(0, 300),
-            except,
+            typeof name === "string" ? name.slice(0, 300) : "",
+            typeof except === "string" ? except : undefined,
         );
     }
 
