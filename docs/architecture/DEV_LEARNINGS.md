@@ -5143,3 +5143,13 @@ writes its source, including writes another library makes
 **Fix.** The assertion waits (`await waitFor(...)`).
 
 **Rule.** Focus that a component moves in an effect is asserted with `waitFor`, never synchronously after the event (`docs/patterns/frontend-verification.md`).
+
+### The order Edit panel didn't open on CI's phone run (17 Oct 2026)
+
+**Symptom.** `order-detail.spec.ts` "Add an item before preparing" failed on CI's phone run, twice in a row (no `Edit #` dialog), and passed locally on desk and phone and on development.
+
+**Cause.** The press on "Edit items or address" landed before the built page was ready to answer it, so it did nothing; one press, then a wait for the dialog, never recovers.
+
+**Fix.** The spec presses until the panel opens (`expect(...).toPass`, as `business-settings.spec.ts`'s `openSheet`).
+
+**Rule.** A browser spec that opens a sheet or dialog presses again until it shows, never once and waits (`saroh-browser-tests` skill).
