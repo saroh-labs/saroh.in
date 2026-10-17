@@ -4687,6 +4687,12 @@ Tab still shows it. (`:focus-visible` was tried first; jsdom can't tell
 keyboard focus from any other, so it broke the keyboard test.)
 **Check**: `small-pieces.test.tsx` — "shows no tooltip for focus a press just
 moved there", beside "shows the label as a tooltip on keyboard focus".
+**Fix**: `Tip`'s hint opens only for a pointer over the control or for focus
+the keyboard brought (`:focus-visible`). Focus left by a click, or moved by
+a sheet or dialog, shows nothing. Tab still shows it.
+**Check**: none automatic yet (jsdom has no real `:focus-visible`); checked
+by hand in the quick look. A browser spec for it belongs with the next
+quick-look spec change.
 **Rule**: a hint answers a hover or a keyboard visit, never a focus the app
 moved.
 **Category**: frontend · `docs/patterns/frontend-design-system.md`

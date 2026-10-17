@@ -50,16 +50,16 @@ on:
     # `schedule)` case in the plan step, ONCE EARLY ACCESS IS OPEN.
     #
     # Early access opens at LAUNCH_AT (production vars of saroh.in, accounts
-    # and the workspace: 17 Oct 2026, 16:00 IST = 10:30 UTC) with nobody doing
+    # and the workspace: 17 Oct 2026, 08:00 IST = 02:30 UTC) with nobody doing
     # anything. Accounts opens by its own clock; the site and the workspace
     # need a build made after that instant, and these two runs make it:
     #
-    #   09:45 UTC  starts early on purpose, because GitHub starts schedules
+    #   01:45 UTC  starts early on purpose, because GitHub starts schedules
     #              late (often by many minutes, sometimes an hour). It waits
     #              for LAUNCH_AT, then deploys every app to production from
     #              main. An hour late, it has nothing to wait for and deploys
     #              at once.
-    #   10:35 UTC  the second try: deploys only what the first left unopened
+    #   02:35 UTC  the second try: deploys only what the first left unopened
     #              (apps whose live build differs), so nothing when it worked.
     #
     # A cron line can't name a year, so these would fire every 17 Oct: the
@@ -68,8 +68,8 @@ on:
     # off or moved; move these lines with it). Schedules run from the default
     # branch (main), so this file must be on main before the day.
     schedule:
-        - cron: "45 9 17 10 *"
-        - cron: "35 10 17 10 *"
+        - cron: "45 1 17 10 *"
+        - cron: "35 2 17 10 *"
     workflow_dispatch:
         inputs:
             app:
@@ -142,7 +142,7 @@ jobs:
                       else
                         echo "Waiting ${wait}s for LAUNCH_AT"
                         sleep "$wait"
-                        force=$([ "$SCHEDULE" = "45 9 17 10 *" ] && echo 1 || echo 0)
+                        force=$([ "$SCHEDULE" = "45 1 17 10 *" ] && echo 1 || echo 0)
                         json=$(FORCE=$force node scripts/cf-plan.mjs production | with_ref production)
                       fi ;;
                   esac

@@ -103,12 +103,12 @@
                 "NEXT_PUBLIC_POSTHOG_ANALYTICS": "on",
                 // NEXT_PUBLIC_PLANS is left out (DEC-136): no Plan and
                 // billing and no plan prompt until pricing opens. A build
-                // made at or after LAUNCH_AT (17 Oct 2026, 4:00 pm in India,
-                // 10:30 UTC; the same line as apps/saroh.in and
+                // made at or after LAUNCH_AT (17 Oct 2026, 8:00 am in India,
+                // 02:30 UTC; the same line as apps/saroh.in and
                 // apps/accounts.saroh.in) is given "on" (scripts/cf-env.mjs).
                 // To keep plans hidden past the launch, write
                 // "NEXT_PUBLIC_PLANS": "off" here; to show them sooner, "on".
-                "LAUNCH_AT": "2026-10-17T16:00:00+05:30",
+                "LAUNCH_AT": "2026-10-17T08:00:00+05:30",
                 "NEXT_PUBLIC_VERCEL_ENV": "production",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",
