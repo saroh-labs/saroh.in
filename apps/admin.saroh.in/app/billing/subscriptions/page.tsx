@@ -8,7 +8,7 @@ import { BillingTabs } from "@/components/billing/billing-tabs";
 import { NumberPager } from "@/components/billing/number-pager";
 import { SubscriptionSheet } from "@/components/billing/subscription-sheet";
 import { SubscriptionTable } from "@/components/billing/subscription-table";
-import { FilterBar, FilterSelect } from "@/components/filter-bar";
+import { FilterBar, FilterSelect, FilterText } from "@/components/filter-bar";
 import { getSarohSubscription, listSarohSubscriptions } from "@/lib/billing";
 import type { SarohSubscriptionDetail } from "@/lib/billing-words";
 import {
@@ -23,7 +23,7 @@ import {
     SUBSCRIPTION_VIEWS,
     VIEW_LABEL,
 } from "@/lib/billing-words";
-import { requireStaff } from "@/lib/console";
+import { can, requireStaff } from "@/lib/console";
 import { param } from "@/lib/params";
 
 export const metadata = { title: "Subscriptions · Billing" };
@@ -48,13 +48,14 @@ export default async function BillingSubscriptionsPage({
     const { staff } = gate;
 
     const raw = await searchParams;
+    const q = param(raw.q);
     const status = readStatus(raw.status);
     const plan = param(raw.plan);
     const view = readView(raw.view);
     const page = readPage(raw.page);
     const open = param(raw.open);
-    const filters = { status, plan, view };
-    const filtered = [status, plan, view].some((v) => v !== undefined);
+    const filters = { q, status, plan, view };
+    const filtered = [q, status, plan, view].some((v) => v !== undefined);
     const here = { ...filters, page };
 
     const [result, sheet] = await Promise.all([
@@ -73,6 +74,12 @@ export default async function BillingSubscriptionsPage({
                 <BillingTabs current="/billing/subscriptions" />
 
                 <FilterBar action={BASE} active={filtered}>
+                    <FilterText
+                        label="Business or Razorpay id"
+                        name="q"
+                        defaultValue={q}
+                        placeholder="Name, sub_, cust_, order_ or pay_"
+                    />
                     <FilterSelect
                         label="Show"
                         name="view"
@@ -193,6 +200,8 @@ export default async function BillingSubscriptionsPage({
                         detail={sheet.detail}
                         failed={sheet.failed}
                         closeHref={billingHref(BASE, here)}
+                        canAct={can(staff, "saroh-billing:act")}
+                        canViewAs={can(staff, "organization:view-as")}
                     />
                 ) : null}
             </PageContainer>

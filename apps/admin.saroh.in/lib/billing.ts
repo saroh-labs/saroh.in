@@ -1,4 +1,10 @@
 import type {
+    ActionState,
+    BillingActionPage,
+    EventFilter,
+    ProviderEventPage,
+} from "./billing-action-words";
+import type {
     GstinFilter,
     SarohInvoicePage,
     SarohSubscriptionDetail,
@@ -33,6 +39,7 @@ export function listSarohInvoices(filters: {
 }
 
 export function listSarohSubscriptions(filters: {
+    q?: string;
     status?: SubscriptionStatus;
     plan?: string;
     view?: SubscriptionView;
@@ -58,6 +65,22 @@ export function fetchInvoicesExport(filters: {
     gstin?: GstinFilter;
 }): Promise<Response> {
     return adminFetch(`/billing/invoices/export${query(filters)}`);
+}
+
+/** Billing › Needs action (DEC-166): open or resolved, a page. */
+export function listBillingActions(filters: {
+    state?: ActionState;
+    page?: number;
+}): Promise<BillingActionPage | null> {
+    return getJson<BillingActionPage>(`/billing/actions${query(filters)}`);
+}
+
+/** Billing › Provider events (DEC-166). */
+export function listProviderEvents(filters: {
+    filter?: EventFilter;
+    page?: number;
+}): Promise<ProviderEventPage | null> {
+    return getJson<ProviderEventPage>(`/billing/events${query(filters)}`);
 }
 
 /** One invoice's PDF, as the API sent it. */

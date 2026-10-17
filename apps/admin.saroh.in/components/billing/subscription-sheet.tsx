@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { canEndAutopay, RAZORPAY_LINK_HINT } from "@/lib/billing-action-words";
 import type { SarohSubscriptionDetail } from "@/lib/billing-words";
 import {
     checkoutKindLabel,
@@ -24,23 +25,36 @@ import {
     statusLabel,
 } from "@/lib/billing-words";
 
+import { EndAutopay } from "./billing-controls";
+import { RazorpayId } from "./razorpay-id";
+import { SubscriptionBilling } from "./subscription-billing";
 import { STATUS_TONE } from "./subscription-table";
 
 /**
  * One subscription, read-first in a side sheet (DEC-163): its plan and
  * provider ids, its checkouts and what the billing provider sent, newest
  * first, so an operator can see "Razorpay sent subscription.cancelled at
- * …". Read-only. Closing it goes back to the list with its filters.
+ * …". Since DEC-166 it also carries the business's billing controls —
+ * End autopay, its Razorpay customer, Needs action, double charges,
+ * invoices and refunds — for operators with `saroh-billing:act`, so the
+ * Billing role needs no support session. "Open the business" shows only
+ * to those who may open one. Closing it goes back to the list.
  */
 export function SubscriptionSheet({
     detail,
     failed,
     closeHref,
+    canAct = false,
+    canViewAs = false,
 }: {
     /** Null when the read failed or was refused (`failed` says which). */
     detail: SarohSubscriptionDetail | null;
     failed?: "error" | "refused";
     closeHref: string;
+    /** Holds `saroh-billing:act`: the controls show. */
+    canAct?: boolean;
+    /** Holds `organization:view-as`: "Open the business" shows. */
+    canViewAs?: boolean;
 }) {
     const router = useRouter();
     const sub = detail?.subscription;
@@ -66,13 +80,27 @@ export function SubscriptionSheet({
                     </SheetDescription>
                 </SheetHeader>
 
-                {detail ? <SheetBody detail={detail} /> : null}
+                {detail ? (
+                    <SheetBody
+                        detail={detail}
+                        canAct={canAct}
+                        canViewAs={canViewAs}
+                    />
+                ) : null}
             </SheetContent>
         </Sheet>
     );
 }
 
-function SheetBody({ detail }: { detail: SarohSubscriptionDetail }) {
+function SheetBody({
+    detail,
+    canAct,
+    canViewAs,
+}: {
+    detail: SarohSubscriptionDetail;
+    canAct: boolean;
+    canViewAs: boolean;
+}) {
     const sub = detail.subscription;
     return (
         <div className="mt-5 grid gap-6 text-sm">
@@ -80,13 +108,24 @@ function SheetBody({ detail }: { detail: SarohSubscriptionDetail }) {
                 <Badge variant={STATUS_TONE[sub.status] ?? "neutral"}>
                     {statusLabel(sub.status)}
                 </Badge>
-                <Link
-                    href={`/businesses/${sub.organization.id}`}
-                    className="underline underline-offset-4"
-                >
-                    Open the business
-                </Link>
+                {canViewAs ? (
+                    <Link
+                        href={`/businesses/${sub.organization.id}`}
+                        className="underline underline-offset-4"
+                    >
+                        Open the business
+                    </Link>
+                ) : null}
             </div>
+            {canAct && canEndAutopay(sub) ? (
+                <EndAutopay
+                    subscriptionId={sub.id}
+                    businessName={sub.organization.name}
+                    planName={sub.plan.name}
+                    paidUntil={sub.currentPeriodEnd}
+                />
+            ) : null}
+            <p className="text-muted-foreground">{RAZORPAY_LINK_HINT}</p>
 
             <Facts
                 rows={[
@@ -111,8 +150,14 @@ function SheetBody({ detail }: { detail: SarohSubscriptionDetail }) {
                         sub.termEndsAt ? istDate(sub.termEndsAt) : null,
                     ],
                     ["Provider", sub.provider ?? "None (free plan)"],
-                    ["Provider subscription", mono(sub.providerSubscriptionId)],
-                    ["Provider customer", mono(sub.providerCustomerId)],
+                    [
+                        "Provider subscription",
+                        link(sub.providerSubscriptionId, sub.provider),
+                    ],
+                    [
+                        "Provider customer",
+                        link(sub.providerCustomerId, sub.provider),
+                    ],
                     [
                         "Last invoice",
                         sub.lastInvoice
@@ -121,6 +166,8 @@ function SheetBody({ detail }: { detail: SarohSubscriptionDetail }) {
                     ],
                 ]}
             />
+
+            <SubscriptionBilling detail={detail} canAct={canAct} />
 
             <section className="grid gap-2">
                 <h3 className="font-medium">Checkouts</h3>
@@ -161,8 +208,12 @@ function SheetBody({ detail }: { detail: SarohSubscriptionDetail }) {
                                         Ended: {c.endedReason}
                                     </p>
                                 ) : null}
-                                <p className="break-all font-mono text-[12px] text-muted-foreground">
-                                    {c.provider} · {c.providerSubscriptionId}
+                                <p className="text-muted-foreground">
+                                    {c.provider} ·{" "}
+                                    <RazorpayId
+                                        id={c.providerSubscriptionId}
+                                        provider={c.provider}
+                                    />
                                 </p>
                             </li>
                         ))}
@@ -199,10 +250,8 @@ function SheetBody({ detail }: { detail: SarohSubscriptionDetail }) {
     );
 }
 
-function mono(value: string | null): ReactNode {
-    return value ? (
-        <span className="break-all font-mono text-[12px]">{value}</span>
-    ) : null;
+function link(value: string | null, provider: string | null): ReactNode {
+    return value ? <RazorpayId id={value} provider={provider} /> : null;
 }
 
 /** Label and value rows; a row with nothing to say is left out. */

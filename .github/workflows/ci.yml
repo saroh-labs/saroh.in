@@ -209,6 +209,11 @@ jobs:
       - name: mktemp templates
         run: pnpm run check:mktemp
 
+      # No API db spec queries in its top-level afterAll: the setup ends
+      # the pool first (DEV_LEARNINGS, 17 Oct 2026).
+      - name: Db spec teardown
+        run: pnpm run check:db-teardown
+
       # No tag is stripped by one pattern replace with nothing: the code
       # scanner refuses it, and nothing else runs the scanner before a push.
       - name: Tag stripping

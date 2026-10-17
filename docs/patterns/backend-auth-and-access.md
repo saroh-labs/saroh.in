@@ -574,6 +574,16 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   declares it and `AdminBillingService` checks it again
   (`assertSarohBillingReader`); every read is audited. A tenant path never
   calls it; the business's own invoice list stays its own.
+- **Current** (DEC-166) — **Acting on Saroh's own billing** needs
+  `saroh-billing:act`, which only Platform Owners and Billing hold: mark a
+  Needs-action row resolved, end a business's autopay (its own Cancel
+  plan, run through `CheckoutService` under an operator context holding
+  `billing:manage` alone, so its history shows Saroh support), re-check a
+  double charge's refund, sync its Razorpay customer again, record a hand
+  refund on an invoice. Each is a POST with a reason and an idempotency
+  key, checked on the route and again in the service
+  (`assertSarohBillingActor`), and on the admin ledger. No support-access
+  session: Support, even with one open, is refused (403).
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator

@@ -28,6 +28,30 @@ export interface SarohInvoiceRow {
     billToGstin: string | null;
     provider: string;
     providerPaymentId: string | null;
+    /** The provider's subscription (or a yearly plan's order), DEC-166. */
+    providerSubscriptionId: string | null;
+    providerCustomerId: string | null;
+    /** What the provider says it took; null: it hasn't said. */
+    providerAmountPaise: number | null;
+    /** The provider took another amount than the invoice's total. */
+    amountMismatch: boolean;
+    /** Refunds and disputes recorded on it. */
+    refunds: SarohRefundRow[];
+}
+
+/** A refund or dispute on a Saroh payment (DEC-166). */
+export interface SarohRefundRow {
+    id: string;
+    kind: string;
+    provider: string;
+    providerRefundId: string;
+    providerPaymentId: string;
+    invoiceId: string | null;
+    amountPaise: number | null;
+    status: string;
+    reason: string | null;
+    source: string;
+    createdAt: string;
 }
 
 export interface SarohInvoicePage {
@@ -88,6 +112,33 @@ export interface SarohSubscriptionPage {
 
 export interface SarohSubscriptionDetail {
     subscription: SarohSubscriptionRow;
+    /** The business as the provider's customer, and its last sync. */
+    billingCustomer: {
+        provider: string;
+        providerCustomerId: string | null;
+        syncedAt: string | null;
+        lastError: string | null;
+        contactWithheld: boolean;
+    } | null;
+    /** Its last 12 invoices, with their refunds. */
+    invoices: SarohInvoiceRow[];
+    refunds: SarohRefundRow[];
+    doubleCharges: {
+        providerPaymentId: string;
+        provider: string;
+        amountPaise: number | null;
+        reason: string | null;
+        claimedAt: string;
+        refundedAt: string | null;
+        providerRefundId: string | null;
+    }[];
+    openActions: {
+        id: string;
+        code: string;
+        note: string;
+        refs: Record<string, string>;
+        createdAt: string;
+    }[];
     checkouts: {
         id: string;
         kind: string;
@@ -336,6 +387,18 @@ export function endingLine(row: SarohSubscriptionRow): string | null {
         return `Ends ${istDate(row.currentPeriodEnd)}`;
     }
     return null;
+}
+
+/**
+ * What has been given back on an invoice (DEC-166): its refunds that went
+ * through or are on their way, never a failed one or a dispute.
+ */
+export function refundedPaise(row: {
+    refunds: { kind: string; status: string; amountPaise: number | null }[];
+}): number {
+    return row.refunds
+        .filter((r) => r.kind === "REFUND" && r.status !== "FAILED")
+        .reduce((sum, r) => sum + (r.amountPaise ?? 0), 0);
 }
 
 /** Where an invoice's PDF downloads from, through the console. */

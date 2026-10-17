@@ -10,6 +10,7 @@ import { InvoiceTable } from "@/components/billing/invoice-table";
 import { NumberPager } from "@/components/billing/number-pager";
 import { FilterBar, FilterSelect, FilterText } from "@/components/filter-bar";
 import { listSarohInvoices } from "@/lib/billing";
+import { RAZORPAY_LINK_HINT } from "@/lib/billing-action-words";
 import {
     billingHref,
     formatPaise,
@@ -19,7 +20,7 @@ import {
     readPage,
     recentMonths,
 } from "@/lib/billing-words";
-import { requireStaff } from "@/lib/console";
+import { can, requireStaff } from "@/lib/console";
 import { param } from "@/lib/params";
 
 export const metadata = { title: "Invoices · Billing" };
@@ -72,10 +73,10 @@ export default async function BillingInvoicesPage({
                         }))}
                     />
                     <FilterText
-                        label="Business or invoice"
+                        label="Business, invoice or Razorpay id"
                         name="q"
                         defaultValue={q}
-                        placeholder="Name, address or number"
+                        placeholder="Name, number, pay_, sub_ or cust_"
                     />
                     <FilterSelect
                         label="Buyer GSTIN"
@@ -140,7 +141,16 @@ export default async function BillingInvoicesPage({
                             />
                         ) : (
                             <>
-                                <InvoiceTable rows={result.items} />
+                                <p className="text-sm text-muted-foreground">
+                                    {RAZORPAY_LINK_HINT}
+                                </p>
+                                <InvoiceTable
+                                    rows={result.items}
+                                    canViewAs={can(
+                                        staff,
+                                        "organization:view-as",
+                                    )}
+                                />
                                 <NumberPager
                                     page={result.page}
                                     pages={Math.max(

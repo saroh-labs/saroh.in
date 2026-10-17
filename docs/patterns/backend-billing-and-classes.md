@@ -190,6 +190,22 @@ Rules and edge cases in `PRICING_ROLLOUT.md` › "During the first month".
   cancel mid-period is never refunded, and any other refund is the
   owner's, in Razorpay. CANCELLED goes back to ACTIVE only there
   (a charge the provider took).
+- **What an operator must do is a row, and every refund is on record
+  (DEC-166).** A billing problem Saroh can't solve itself is a
+  `BillingAction` (`billing-actions.ts`), written by every ops notice and
+  listed in Admin › Billing › Needs action. A refund or dispute on a
+  payment Saroh took is a `BillingRefund` (`billing-refunds.ts`): the
+  double-charge job's (AUTO), a hand refund the owner made in Razorpay and
+  an operator recorded on the invoice (MANUAL), Razorpay's `refund.*` and
+  `payment.dispute.*` webhooks (PROVIDER), one row per provider id, its
+  status moved on and never back. **Saroh issues no credit note for a
+  refund on its own invoice**: each raises "a credit note may be needed:
+  ask the CA" in Needs action, and the GST export still lists invoices
+  only. What the provider took is kept on the invoice
+  (`providerAmountPaise`, `invoice-amount.ts`); a total that differs is
+  raised. Operators act with `saroh-billing:act` (end autopay the
+  business's own way, re-check a refund, re-sync the customer, record a
+  refund, mark resolved), never by editing an invoice.
 - A refused provider cancel is never taken as settled
   (`provider-cancel.job.ts`).
 - A checkout lapses at its start date (`checkoutExpiresAt`) and tells the

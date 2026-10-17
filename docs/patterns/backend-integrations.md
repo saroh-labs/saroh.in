@@ -510,6 +510,27 @@ confused")**:
   the invoice. Subscriptions and orders already carry `saroh_ref` (the
   checkout) and the business in their notes.
 
+**Matching Saroh and Razorpay both ways (DEC-166, 17 Oct 2026)**:
+
+- **Read back daily**: `reconcile.paidCharges` (`providers/razorpay-reconcile.ts`,
+  the adapter's own GET handed in, so `call()` is untouched) reads a
+  subscription's paid invoices (`GET /invoices?subscription_id=&count=100`:
+  `payment_id`, `amount_paid`, `paid_at`) or an order's captured payments
+  (`GET /orders/:id/payments`) for `billing.reconcile`.
+- **Refunds and disputes arrive by webhook**: `parseWebhook` reads
+  `payload.refund.entity` on `refund.*` and `payload.dispute.entity` on
+  `payment.dispute.*` into `ParsedBillingEvent.refund` / `.dispute`; the
+  webhook keeps them as `BillingRefund` rows. **Saroh's Razorpay webhook
+  must subscribe to `refund.created`, `refund.processed`, `refund.failed`
+  and `payment.dispute.*`** besides the subscription and order events.
+- **Nothing is dropped silently**: an event that names a subscription or
+  order no Saroh row has, or a charge Saroh can't match, is an ERROR log
+  and a Needs-action row, and stays without `processedAt` ("Not applied"
+  in Admin › Billing › Provider events). Other unmatched events (a
+  `payment.*` Saroh doesn't use) are ignored as before.
+- Unverified: the refund and dispute field names and statuses, and
+  `amount_paid` on subscription invoices, until production's first case.
+
 ## Media storage — **Current**
 
 One R2 bucket per environment in the Saroh labs Cloudflare account:

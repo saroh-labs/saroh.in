@@ -251,10 +251,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    // Before the app closes: closing it ends the shared database pool.
-    await prisma.organization.deleteMany({
-        where: { id: { in: [orgs.a, orgs.b] } },
-    });
+    // No clean-up of rows here: the integration setup truncates every table
+    // after the file, and its afterAll runs first and ends the pool.
     await app?.close();
 });
 

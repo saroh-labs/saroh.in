@@ -271,7 +271,7 @@ export class BillingWebhookService {
                     },
                     data: { processedAt: now },
                 });
-            } else {
+            } else if (!outcome.unapplied) {
                 this.logger.warn(
                     `Billing webhook ${name}/${event.providerEventId} reconcile rejected (${event.type})`,
                 );

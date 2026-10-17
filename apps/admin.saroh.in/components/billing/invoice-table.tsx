@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
 import type { DataColumn } from "@saroh/ui/data-view";
 import { DataView } from "@saroh/ui/data-view";
 import Link from "next/link";
@@ -11,15 +12,19 @@ import {
     gstSplit,
     invoicePdfHref,
     istDate,
+    refundedPaise,
     sourceLabel,
 } from "@/lib/billing-words";
 import { plural } from "@/lib/format";
+
+import { businessBillingHref } from "./action-list";
+import { RazorpayId } from "./razorpay-id";
 
 /*
  * No column sorts: the order is the API's, newest first across every
  * business, and a page sorted in the browser would read as the whole list.
  */
-const COLUMNS: DataColumn<SarohInvoiceRow>[] = [
+const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
     {
         id: "number",
         header: "Invoice",
@@ -41,8 +46,13 @@ const COLUMNS: DataColumn<SarohInvoiceRow>[] = [
         priority: "primary",
         cell: (row) => (
             <div className="min-w-0">
+                {/* Without view-as, its subscription in Billing. */}
                 <Link
-                    href={`/businesses/${row.organization.id}`}
+                    href={
+                        canViewAs
+                            ? `/businesses/${row.organization.id}`
+                            : businessBillingHref(row.organization.slug)
+                    }
                     className="block truncate font-medium underline-offset-4 hover:underline"
                 >
                     {row.organization.name}
@@ -109,15 +119,8 @@ const COLUMNS: DataColumn<SarohInvoiceRow>[] = [
         id: "payment",
         header: "Payment",
         priority: "detail",
-        width: "190px",
-        cell: (row) => (
-            <div className="min-w-0">
-                <p>Paid</p>
-                <p className="truncate font-mono text-[12px] text-muted-foreground">
-                    {row.providerPaymentId ?? "No payment id"}
-                </p>
-            </div>
-        ),
+        width: "220px",
+        cell: (row) => <PaymentCell row={row} />,
     },
     {
         id: "pdf",
@@ -136,13 +139,54 @@ const COLUMNS: DataColumn<SarohInvoiceRow>[] = [
     },
 ];
 
+/**
+ * How it was paid (DEC-166): the payment as a Razorpay link, what Razorpay
+ * took when it differs from the total, and what has been refunded.
+ */
+function PaymentCell({ row }: { row: SarohInvoiceRow }) {
+    const refunded = refundedPaise(row);
+    return (
+        <div className="grid min-w-0 gap-0.5">
+            {row.providerPaymentId ? (
+                <RazorpayId
+                    id={row.providerPaymentId}
+                    provider={row.provider}
+                    className="truncate"
+                />
+            ) : (
+                <span className="text-muted-foreground">No payment id</span>
+            )}
+            {row.amountMismatch && row.providerAmountPaise !== null ? (
+                <div>
+                    <Badge variant="warning">
+                        Razorpay took{" "}
+                        {formatPaise(row.providerAmountPaise, row.currency)}
+                    </Badge>
+                </div>
+            ) : null}
+            {refunded > 0 ? (
+                <span className="text-[12px] text-muted-foreground">
+                    Refunded {formatPaise(refunded, row.currency)}
+                </span>
+            ) : null}
+        </div>
+    );
+}
+
 /** One page of Saroh's invoices, newest first. */
-export function InvoiceTable({ rows }: { rows: SarohInvoiceRow[] }) {
+export function InvoiceTable({
+    rows,
+    canViewAs = false,
+}: {
+    rows: SarohInvoiceRow[];
+    /** Holds `organization:view-as`: a business opens its own page. */
+    canViewAs?: boolean;
+}) {
     return (
         <DataView
             viewId="console-billing-invoices"
             rows={rows}
-            columns={COLUMNS}
+            columns={columns(canViewAs)}
             rowKey={(row) => row.id}
             modes={["table", "list"]}
             noun={{ one: "invoice", other: "invoices" }}

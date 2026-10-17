@@ -692,7 +692,29 @@ overrideId, reason }`. Re-read, then decide
   retried by the queue (10 attempts, each failure logged at ERROR), the
   same note on the last. Once refunded it writes a second audit row,
   queues `billing.email` `DOUBLE_CHARGE_REFUNDED` and leaves an admin note
-  that it was refunded (`double-charge-refund.job.ts`).
+  that it was refunded (`double-charge-refund.job.ts`). The refund is kept
+  as a `BillingRefund` (DEC-166), and an operator's "Check the refund
+  again" queues the job anew with its claim's payload: after a hand
+  refund the provider answers with that refund, so it completes without
+  refunding twice.
+- **`billing.reconcile`** (DEC-166) is the daily self-rescheduling sweep
+  (`billing-reconcile.job.ts`, one PENDING run,
+  `Job_one_pending_billing_reconcile`, restarted with the plan-move sweep's
+  six-hourly check and at boot; `CANCEL_REFUSED`). It reads back what the
+  provider took on every live provider subscription and every one ended or
+  begun in the last 40 days (`reconcile.paidCharges`, at most 400 a run): an
+  invoiced payment keeps the provider's amount and one that differs from
+  the invoice's total is raised; a payment with no invoice and no
+  double-charge claim is raised once (`dedupeKey`). It invoices nothing
+  itself. A reference the provider can't answer is logged and skipped.
+- **Every billing ops notice is also a Needs-action row** (DEC-166,
+  `BillingAction`, `billing-actions.ts`), so a job that gives up on a
+  money problem leaves something Admin › Billing lists across businesses,
+  not only a note on one business. Admin › Jobs may retry a failed
+  `billing.provider.cancel`, `billing.refund.double-charge` or
+  `billing.payment.notes` of a suspended or closing business
+  (`PROTECTIVE_JOB_TYPES` in `admin-operations.service.ts`): they stop or
+  give back money and never act for it.
 - **`billing.email`** (U17) is Saroh's own mail to a business: an
   invoice with its PDF (queued with the invoice), a failed charge (queued by
   the webhook on `pending` or `halted`), a first month or a free trial

@@ -64,7 +64,8 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   `billing`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
-  `lib/deletion-words.ts`, `lib/billing-words.ts`.
+  `lib/deletion-words.ts`, `lib/billing-words.ts`,
+  `lib/billing-action-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -85,6 +86,19 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   every read. The PDF and CSV are proxied by route handlers under
   `app/billing/invoices/`. Amounts arrive in paise from the API; no price
   is ever written in the console.
+- **Billing's queue and controls (DEC-166)**: `/billing/actions` (Needs
+  action: every billing problem an operator must act on, across
+  businesses, oldest open first, with the failed `billing.*` jobs beside
+  it) and `/billing/events` (what the billing provider sent; "Not
+  applied", "No business") read with `saroh-billing:read`. Every write
+  (Mark resolved, End autopay, Check the refund again, Sync again, Record a
+  refund) is an `OperatorDialog` behind `saroh-billing:act`, which only
+  Platform Owners and Billing hold, posted through `lib/billing-actions.ts`.
+  They sit on the subscription sheet, so Billing never needs a support
+  session; "Open the business" shows only with `organization:view-as`.
+  Razorpay ids link to its dashboard (`razorpayDashboardUrl`,
+  `rel="noopener noreferrer"`), one test-mode hint per screen. End autopay
+  asks for the business's name: it is the business's own Cancel plan.
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and
