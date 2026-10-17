@@ -26,7 +26,11 @@ type Tx = Prisma.TransactionClient;
  * - it starts on a date already past (an upgrade or a scheduled change):
  *   its quote is stale, and the plan it would replace has renewed since;
  * - another plan was authorised (a SCHEDULED checkout) or completed since
- *   it was made.
+ *   it was made;
+ * - it was dropped because a late payment put the business back on a plan
+ *   (`plan-reinstated`), or, for a new plan, the business is billed for a
+ *   paid plan through another provider subscription for a period still
+ *   running: honouring it would have it pay twice for one period.
  */
 export async function droppedCheckoutConflictInTx(
     tx: Tx,
@@ -62,6 +66,27 @@ export async function droppedCheckoutConflictInTx(
     });
     if (other?.status === "SCHEDULED") return "another plan was authorised";
     if (other) return "another plan was bought since";
+    if (checkout.endedReason === "plan-reinstated") {
+        return "a late payment had put the business back on its plan";
+    }
+    if (checkout.kind === "NEW") {
+        const billed = await tx.subscription.findFirst({
+            where: {
+                organizationId: checkout.organizationId,
+                status: { not: "CANCELLED" },
+                provider: { not: null },
+                providerSubscriptionId: {
+                    not: checkout.providerSubscriptionId,
+                },
+                currentPeriodEnd: { gt: now },
+                plan: { priceCents: { gt: 0 } },
+            },
+            select: { id: true },
+        });
+        if (billed) {
+            return "it is billed for a plan through another subscription";
+        }
+    }
     return null;
 }
 

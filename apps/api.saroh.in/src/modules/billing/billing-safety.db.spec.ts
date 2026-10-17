@@ -599,6 +599,59 @@ describe("a charge on a subscription Saroh ended or left", () => {
         ).toMatchObject({ source: "RENEWAL" });
     });
 
+    it("halted, a new plan started, then the old one paid through Razorpay's link: the new one paid later is a double charge, refunded, never a second plan", async () => {
+        const ctx = await business();
+        const { ref } = await onPaidPlan(ctx, "b");
+        await deliver(ref, "halted");
+        const fresh = await start(ctx, "c");
+        expect(fresh.kind).toBe("NEW");
+        // The old one is paid: the plan is back, the new checkout dropped.
+        const next = new Date(Date.now() + 50 * DAY);
+        await deliver(ref, "charged", {
+            currentPeriodEnd: next,
+            paymentId: "pay_link",
+        });
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: fresh.id },
+            }),
+        ).toMatchObject({
+            status: "CANCELLED",
+            endedReason: "plan-reinstated",
+        });
+
+        // The dropped checkout is paid anyway (a second tab).
+        await deliver(fresh.ref, "charged", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+            paymentId: "pay_second_plan",
+            amountPaise: 118_000,
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            providerSubscriptionId: ref,
+            status: "ACTIVE",
+        });
+        expect(
+            (
+                await prisma.job.findMany({
+                    where: { type: BILLING_REFUND_TYPE },
+                })
+            ).map((j) => j.payload),
+        ).toEqual([
+            expect.objectContaining({ providerPaymentId: "pay_second_plan" }),
+        ]);
+        expect(
+            (await cancelJobs("PENDING")).map((j) => j.payload),
+        ).toContainEqual(
+            expect.objectContaining({ providerSubscriptionId: fresh.ref }),
+        );
+        expect(
+            await prisma.sarohInvoice.count({
+                where: { providerPaymentId: "pay_second_plan" },
+            }),
+        ).toBe(0);
+    });
+
     it("moved to Free while past due, then Razorpay's retry went through: the period paid, then Free", async () => {
         const ctx = await business();
         const { ref } = await onPaidPlan(ctx, "b");
@@ -703,6 +756,65 @@ describe("a refused provider cancel (17 Oct 2026)", () => {
         await handler().handle(job);
         expect(fake.cancelOptions.at(-1)).toEqual({ atCycleEnd: false });
         expect(await cancelJobs()).toHaveLength(1);
+    });
+
+    it("a provider that can't answer: the queue's quick retries, then the long chain, never dropped", async () => {
+        const job = await queued(false);
+        const unanswered = () =>
+            new BillingProviderError(
+                "UNKNOWN",
+                "Razorpay subscription cancellation failed (HTTP 503)",
+            );
+        fake.failCancels.push(unanswered());
+        // Quick retries left: the queue asks again in a moment.
+        await expect(handler().handle(job)).rejects.toThrow("HTTP 503");
+        // The queue's last try: handed to the long chain, not FAILED.
+        fake.failCancels.push(unanswered());
+        await expect(
+            handler().handle({ ...job, attempts: job.maxAttempts - 1 }),
+        ).resolves.toBeUndefined();
+        const next = (await cancelJobs("PENDING")).find((j) => j.id !== job.id);
+        expect(next?.payload).toMatchObject({
+            providerSubscriptionId: `sub_refused_${seq}`,
+            tries: 1,
+            atCycleEnd: false,
+        });
+        expect(next!.runAt.getTime()).toBeGreaterThan(Date.now() + 10 * 60_000);
+    });
+
+    it("a cancel still in flight for a subscription the business is billed through again is withdrawn, never sent", async () => {
+        const ctx = await business();
+        const paid = await onPaidPlan(ctx, "b");
+        // Asked for while it was ending; a payment honoured it since, and
+        // the webhook withdrew only the waiting ones.
+        await prisma.$transaction((tx) =>
+            enqueueProviderCancel(tx, {
+                organizationId: ctx.organizationId,
+                provider: "RAZORPAY",
+                providerSubscriptionId: paid.ref,
+                atCycleEnd: false,
+                tries: 2,
+            }),
+        );
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                type: BILLING_PROVIDER_CANCEL_TYPE,
+                payload: { path: ["providerSubscriptionId"], equals: paid.ref },
+            },
+        });
+        const before = fake.cancelCalls.length;
+        await handler().handle(job);
+        expect(fake.cancelCalls.length).toBe(before);
+        expect(
+            (await cancelJobs("PENDING")).filter((j) => j.id !== job.id),
+        ).toHaveLength(0);
+        // A closing business is never kept billing: that one is sent.
+        await prisma.organization.update({
+            where: { id: ctx.organizationId },
+            data: { lifecycleStatus: "DELETED_RETAINED" },
+        });
+        await handler().handle(job);
+        expect(fake.cancelCalls.at(-1)).toBe(paid.ref);
     });
 
     it("refused long enough: an operator is told, and it is still asked again", async () => {
