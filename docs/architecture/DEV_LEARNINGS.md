@@ -4712,3 +4712,21 @@ reads, Admin's import chooser lists every location).
 **Rule**: what someone sees comes from the business, what they may change
 from their permissions; never from who owns a location.
 **Category**: frontend · `docs/patterns/backend-auth-and-access.md`
+
+### A Razorpay cancel ended a paid month at once (17 Oct 2026)
+
+**Symptom**: on launch day the owner paid ₹1.18 for Grow's first month,
+stopped the autopay, and was on Free straight away: "The plan has ended".
+Saroh's own Change plan → Free keeps the month; this didn't.
+**Cause**: the webhook only kept the plan for a `cancelled` event when Saroh
+had a move waiting (`runsToMoveDate`). A cancel made at the provider (a UPI
+or bank app, Razorpay's page) has none, so it fell through to
+`status: CANCELLED`, which access reads as Free.
+**Fix**: `billing-webhook.service.ts` — a `cancelled` event with no move
+waiting and a paid period still running sets Free from that period's end
+(`endTermAtInTx`), first month included. `halted` (payments failed for good)
+still ends it at once.
+**Check**: `checkout.db.spec.ts` — "autopay stopped at the provider in the
+first month" and "… mid-period".
+**Rule**: nothing paid for is cut short (DEC-093), whoever ends the autopay.
+**Category**: backend · `docs/patterns/backend-billing-and-classes.md`

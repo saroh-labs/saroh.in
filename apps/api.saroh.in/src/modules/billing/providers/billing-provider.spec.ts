@@ -261,6 +261,88 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         });
     });
 
+    const customer = {
+        name: "Ammi & Sons Foods Pvt. Ltd.",
+        businessName: "Ammi Ki Barni",
+        email: "owner@example.com",
+        contact: "+91 98000 00000",
+        gstin: "27AAPFU0939F1ZV",
+        address: {
+            line1: "12 Hill Road",
+            line2: null,
+            city: "Mumbai",
+            state: "Maharashtra",
+            postalCode: "400050",
+        },
+        organizationId: "org_1",
+    };
+
+    it("makes the business a Razorpay customer with its name, email, phone, GSTIN and address", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "cust_1" } },
+        ]);
+        await expect(
+            provider.customers.ensureCustomer(customer),
+        ).resolves.toEqual({ providerCustomerId: "cust_1" });
+        expect(calls[0]).toEqual({
+            url: "https://api.razorpay.com/v1/customers",
+            method: "POST",
+            body: {
+                name: "Ammi and Sons Foods Pvt. Ltd.",
+                email: "owner@example.com",
+                contact: "+919800000000",
+                gstin: "27AAPFU0939F1ZV",
+                fail_existing: "0",
+                notes: {
+                    organizationId: "org_1",
+                    billing_name: "Ammi & Sons Foods Pvt. Ltd.",
+                    business_name: "Ammi Ki Barni",
+                    email: "owner@example.com",
+                    phone: "+91 98000 00000",
+                    gstin: "27AAPFU0939F1ZV",
+                    billing_address:
+                        "12 Hill Road, Mumbai, Maharashtra, 400050",
+                },
+            },
+        });
+    });
+
+    it("leaves out a phone or GSTIN Razorpay would refuse", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "cust_1" } },
+        ]);
+        await provider.customers.ensureCustomer({
+            ...customer,
+            contact: "12",
+            gstin: "not-a-gstin",
+            address: null,
+        });
+        const body = calls[0]?.body as Record<string, unknown>;
+        expect(body).not.toHaveProperty("contact");
+        expect(body).not.toHaveProperty("gstin");
+    });
+
+    it("puts who is billed in a subscription's notes", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "sub_1", status: "created" } },
+        ]);
+        await provider.createSubscription({
+            planKey: "catalog.grow",
+            planId: "p1",
+            priceCents: 100,
+            currency: "INR",
+            interval: "month",
+            organizationId: "org_1",
+            providerPlanId: "plan_1",
+            customer,
+        });
+        expect((calls[0]?.body as { notes: unknown }).notes).toMatchObject({
+            billing_name: "Ammi & Sons Foods Pvt. Ltd.",
+            gstin: "27AAPFU0939F1ZV",
+            billing_address: "12 Hill Road, Mumbai, Maharashtra, 400050",
+        });
+    });
+
     it("finds a plan made earlier by its reference, page by page", async () => {
         const full = Array.from({ length: 100 }, (_, i) => ({
             id: `plan_x${i}`,

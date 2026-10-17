@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { Logger } from "@nestjs/common";
 
 import type {
+    BillingCustomer,
     BillingEventPhase,
     BillingProvider,
     CancelSubscriptionOptions,
@@ -14,6 +15,7 @@ import type {
     NextChargeItem,
     ParsedBillingEvent,
     ProviderChargeCapability,
+    ProviderCustomerCapability,
     ProviderOrderCapability,
     ProviderPlanCapability,
     ProviderStatusCapability,
@@ -50,6 +52,73 @@ const FIND_PLAN_PAGE_SIZE = 100;
 
 /** The note Saroh's reference travels in on a Razorpay object. */
 const REFERENCE_NOTE = "saroh_ref";
+
+/** Razorpay keeps at most 15 notes, each at most 256 characters. */
+const NOTE_MAX = 250;
+
+function note(value: string | null | undefined): string | null {
+    const v = value?.replace(/\s+/g, " ").trim();
+    return v ? v.slice(0, NOTE_MAX) : null;
+}
+
+/** The address on one line, as Razorpay's notes hold it. */
+function addressLine(c: BillingCustomer): string | null {
+    const a = c.address;
+    if (!a) return null;
+    return note(
+        [a.line1, a.line2, a.city, a.state, a.postalCode]
+            .filter((p) => p?.trim())
+            .join(", "),
+    );
+}
+
+/**
+ * Who is billed, as notes on a subscription, an order or the checkout
+ * window: Razorpay's dashboard and its payment records show them.
+ */
+export function billingNotes(
+    c: BillingCustomer | null | undefined,
+): Record<string, string> {
+    if (!c) return {};
+    const out: Record<string, string> = {};
+    const put = (k: string, v: string | null | undefined) => {
+        const n = note(v);
+        if (n) out[k] = n;
+    };
+    put("billing_name", c.name);
+    put("business_name", c.businessName);
+    put("email", c.email);
+    put("phone", c.contact);
+    put("gstin", c.gstin);
+    put("billing_address", addressLine(c));
+    return out;
+}
+
+/**
+ * A name Razorpay's customer API takes: 3 to 50 characters of letters,
+ * numbers, spaces and . ' / @ ( ) — "&" and the like become spaces.
+ */
+export function razorpayCustomerName(c: BillingCustomer): string | null {
+    const clean = (v: string | null | undefined) =>
+        (v ?? "")
+            .replace(/&/g, " and ")
+            .replace(/[^\p{L}\p{N} .'/@()-]/gu, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 50)
+            .trim();
+    for (const v of [c.name, c.businessName, c.email]) {
+        const n = clean(v);
+        if (n.length >= 3) return n;
+    }
+    return null;
+}
+
+/** A phone Razorpay takes: digits with an optional leading +, 8 to 15. */
+function razorpayContact(raw: string | null): string | null {
+    const v = raw?.replace(/[\s()-]/g, "") ?? "";
+    return /^\+?\d{8,14}$/.test(v) ? v : null;
+}
 
 /**
  * Razorpay PLATFORM billing adapter (S7-005, U15).
@@ -89,6 +158,10 @@ export class RazorpayBillingProvider implements BillingProvider {
 
     readonly orders: ProviderOrderCapability = {
         createOrder: (input) => this.createOrder(input),
+    };
+
+    readonly customers: ProviderCustomerCapability = {
+        ensureCustomer: (input) => this.ensureCustomer(input),
     };
 
     readonly statuses: ProviderStatusCapability = {
@@ -133,6 +206,7 @@ export class RazorpayBillingProvider implements BillingProvider {
                 ...(input.reference
                     ? { [REFERENCE_NOTE]: input.reference }
                     : {}),
+                ...billingNotes(input.customer),
             },
         };
         if (input.providerPlanId) body.plan_id = input.providerPlanId;
@@ -263,6 +337,49 @@ export class RazorpayBillingProvider implements BillingProvider {
     // ── One-time payments and asking how a checkout stands (DEC-093) ────
 
     /** A yearly plan's one payment: an order Checkout pays. */
+    /**
+     * The business as a Razorpay customer: name, email, phone, GSTIN and
+     * the address in its notes. `fail_existing: "0"` hands back the one
+     * Razorpay already has for the same email and phone.
+     */
+    private async ensureCustomer(
+        input: BillingCustomer,
+    ): Promise<{ providerCustomerId: string }> {
+        const name = razorpayCustomerName(input);
+        if (!name) {
+            throw new BillingProviderError(
+                "REFUSED",
+                "Razorpay customer creation skipped: no usable name",
+            );
+        }
+        const email =
+            input.email && input.email.length <= 64 ? input.email : null;
+        const contact = razorpayContact(input.contact);
+        const gstin =
+            input.gstin && /^[0-9A-Z]{15}$/.test(input.gstin)
+                ? input.gstin
+                : null;
+        const res = await this.call("customer creation", "POST", "/customers", {
+            name,
+            ...(email ? { email } : {}),
+            ...(contact ? { contact } : {}),
+            ...(gstin ? { gstin } : {}),
+            fail_existing: "0",
+            notes: {
+                organizationId: input.organizationId,
+                ...billingNotes(input),
+            },
+        });
+        const json = (await res.json()) as { id?: string };
+        if (!json.id) {
+            throw new BillingProviderError(
+                "UNKNOWN",
+                "Razorpay customer creation failed: missing customer id",
+            );
+        }
+        return { providerCustomerId: json.id };
+    }
+
     private async createOrder(
         input: CreateOrderInput,
     ): Promise<{ providerOrderId: string }> {
@@ -274,6 +391,7 @@ export class RazorpayBillingProvider implements BillingProvider {
                 sarohPlanKey: input.planKey,
                 organizationId: input.organizationId,
                 [REFERENCE_NOTE]: input.reference,
+                ...billingNotes(input.customer),
             },
         });
         const json = (await res.json()) as { id?: string };

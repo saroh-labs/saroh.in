@@ -511,6 +511,38 @@ describe("changing a paid plan", () => {
             planId: "free",
         });
     });
+
+    it("autopay stopped at the provider mid-period: the plan runs to the period's end, then Free", async () => {
+        await install(1);
+        const ctx = await business();
+        const { periodEnd } = await onPaidPlan(ctx, "b");
+        const providerSub = (await sub(ctx.organizationId))
+            .providerSubscriptionId;
+        const free = await row("free");
+
+        await expect(deliver(providerSub ?? "", "cancelled")).resolves.toEqual({
+            status: "processed",
+            changed: true,
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            status: "ACTIVE",
+            pendingPlanId: free.id,
+            pendingFrom: periodEnd,
+            cancelAtPeriodEnd: true,
+        });
+        expect(await access.resolve(ctx.organizationId)).toMatchObject({
+            planId: "b",
+        });
+
+        const later = new Date(periodEnd.getTime() + 1000);
+        expect((await sweep.sweep(later)).applied).toBe(1);
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            planId: free.id,
+            status: "ACTIVE",
+            provider: null,
+        });
+    });
 });
 
 describe("renewals and failed payments", () => {
@@ -551,9 +583,11 @@ describe("renewals and failed payments", () => {
     it("is idempotent by event id, and an older event never undoes a newer one", async () => {
         await install(1);
         const ctx = await business();
-        await onPaidPlan(ctx, "b");
+        const { periodEnd } = await onPaidPlan(ctx, "b");
         const providerSub = (await sub(ctx.organizationId))
             .providerSubscriptionId as string;
+        // Ended once the period is over: nothing paid is left to run to.
+        const over = new Date(periodEnd.getTime() + 1000);
 
         const t1 = new Date(Date.now() + 1000);
         const t2 = new Date(Date.now() + 2000);
@@ -561,12 +595,14 @@ describe("renewals and failed payments", () => {
             deliver(providerSub, "cancelled", {
                 eventAt: t2,
                 id: "evt_cancel",
+                now: over,
             }),
         ).resolves.toEqual({ status: "processed", changed: true });
         await expect(
             deliver(providerSub, "cancelled", {
                 eventAt: t2,
                 id: "evt_cancel",
+                now: over,
             }),
         ).resolves.toEqual({ status: "duplicate", changed: false });
         // `activated` from before the cancel, delivered late.
@@ -931,6 +967,37 @@ describe("during the first month (DEC-159)", () => {
             kind: "NEW",
             firstMonth: null,
             payNowTotalPaise: withGstPaise(b.priceCents),
+        });
+    });
+
+    it("autopay stopped at the provider in the first month: the month runs to its end, then Free", async () => {
+        await install(1, BOTH());
+        const ctx = await business();
+        const free = await row("free");
+        const first = await inFirstMonth(ctx, "b");
+
+        await expect(deliver(first.providerSub, "cancelled")).resolves.toEqual({
+            status: "processed",
+            changed: true,
+        });
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            plan: { key: "catalog.b" },
+            status: "TRIALING",
+            pendingPlanId: free.id,
+            pendingFrom: first.ends,
+            cancelAtPeriodEnd: true,
+        });
+        expect(await access.resolve(ctx.organizationId)).toMatchObject({
+            planId: "b",
+        });
+        expect((await sweep.sweep(new Date())).applied).toBe(0);
+
+        const later = new Date(first.ends.getTime() + 1000);
+        expect((await sweep.sweep(later)).applied).toBe(1);
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            planId: free.id,
+            status: "ACTIVE",
+            provider: null,
         });
     });
 
