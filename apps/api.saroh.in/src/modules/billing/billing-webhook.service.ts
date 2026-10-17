@@ -589,6 +589,21 @@ export class BillingWebhookService {
         }
         const org = checkout.organizationId;
         const ref = checkout.providerSubscriptionId;
+        // Still the subscription the business is billed through: not one it
+        // left. The business's return (`reconcileCheckout`) reaches here when
+        // the webhook completed the checkout first; its charge is that same
+        // one, already applied, and must never end the plan just bought.
+        const current = await tx.subscription.findFirst({
+            where: {
+                organizationId: org,
+                provider: checkout.provider,
+                providerSubscriptionId: ref,
+            },
+            select: { id: true },
+        });
+        if (current) {
+            return { result: { status: "ignored", changed: false } };
+        }
         const conflict = await chargeAfterEndConflictInTx(tx, org, ref);
         const sub = await tx.subscription.findUnique({
             where: { organizationId: org },

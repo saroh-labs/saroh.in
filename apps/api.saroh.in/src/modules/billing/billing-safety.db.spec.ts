@@ -490,6 +490,48 @@ describe("a payment on a checkout Saroh dropped (owner, 17 Oct 2026)", () => {
     });
 });
 
+describe("the business's return after the webhook (17 Oct 2026)", () => {
+    it("a charge the confirm reports for a checkout the webhook already completed changes nothing: the plan just bought stays", async () => {
+        const ctx = await business();
+        const end = new Date(Date.now() + 30 * DAY);
+        const c = await start(ctx, "b");
+        await deliver(c.ref, "charged", {
+            currentPeriodEnd: end,
+            paymentId: `pay_race_${tag}`,
+        });
+        const before = await sub(ctx.organizationId);
+        expect(before.providerSubscriptionId).toBe(c.ref);
+        // The business's return asks the provider and reconciles the same
+        // charge, after the webhook completed the checkout.
+        const r = await webhooks.reconcileCheckout(c.id, {
+            type: "subscription.charged",
+            providerEventId: `confirm:${c.id}`,
+            providerSubscriptionId: c.ref,
+            status: "ACTIVE",
+            phase: "charged",
+            eventAt: new Date(),
+            currentPeriodEnd: end,
+            providerPaymentId: `pay_race_${tag}`,
+        });
+        expect(r).toMatchObject({ changed: false });
+        const after = await sub(ctx.organizationId);
+        expect(after).toMatchObject({
+            status: before.status,
+            planId: before.planId,
+            providerSubscriptionId: c.ref,
+            cancelAtPeriodEnd: false,
+            pendingPlanId: null,
+        });
+        expect(
+            (await cancelJobs()).filter(
+                (j) =>
+                    (j.payload as { providerSubscriptionId?: string })
+                        .providerSubscriptionId === c.ref,
+            ),
+        ).toHaveLength(0);
+    });
+});
+
 describe("a charge on a subscription Saroh ended or left", () => {
     it("halted, then paid through Razorpay's link: the plan is back, invoiced, its cancel withdrawn", async () => {
         const ctx = await business();

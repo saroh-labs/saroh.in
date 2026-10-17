@@ -273,7 +273,9 @@ describe("a checkout uses the business's customer", () => {
             where: { organizationId },
             data: { phone: null, taxId: null },
         });
-        const plan = await prisma.plan.findFirstOrThrow();
+        const plan = await prisma.plan.findFirstOrThrow({
+            where: { priceCents: { gt: 0 } },
+        });
         const checkout = (
             at: Date,
             given: { phone?: string; gstin?: string },
