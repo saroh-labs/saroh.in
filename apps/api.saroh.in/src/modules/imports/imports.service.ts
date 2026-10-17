@@ -301,7 +301,6 @@ export class ImportsService {
             fieldLabels: descriptor.fieldLabels,
             normalize: descriptor.normalize,
             keyOf: descriptor.keyOf,
-            normalize: descriptor.normalize,
             validateRow: mrp
                 ? (values) => {
                       const issues = descriptor.validateRow(values);
