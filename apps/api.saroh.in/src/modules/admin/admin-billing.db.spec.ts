@@ -251,10 +251,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    await app?.close();
+    // Before the app closes: closing it ends the shared database pool.
     await prisma.organization.deleteMany({
         where: { id: { in: [orgs.a, orgs.b] } },
     });
+    await app?.close();
 });
 
 function get(path: string, as?: string, headers: Record<string, string> = {}) {
