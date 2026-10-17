@@ -152,6 +152,10 @@ export interface CheckoutHandoff {
         email: string | null;
         contact: string | null;
     };
+    /** Razorpay's customer, for an order's window. */
+    customerId?: string | null;
+    /** Who is billed, kept on Razorpay's payment record. */
+    notes?: Record<string, string>;
 }
 
 export interface CheckoutView {

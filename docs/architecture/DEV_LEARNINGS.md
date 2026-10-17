@@ -4658,3 +4658,75 @@ the two as well, so moving either date runs a test that sees both.
 **Rule**: a test that ties two files together sits where a change to either
 one runs it, or it is written on both sides.
 **Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`
+
+## Two tooltips over one icon button
+
+**Symptom**: hovering the products quick look's Previous button showed
+"Previous (K)" and "Previous product (K)" stacked over each other (owner,
+16 Oct). The variant row's Remove button did the same.
+**Cause**: `IconButton` turns its `label` into a tooltip, and a `<Tip>` was
+also wrapped around it with near-identical words.
+**Fix**: the extra `<Tip>`s are gone. Where a `<Tip>` is wanted (shorter
+words than the accessible label, or why a button is disabled), the button
+sets `tooltip` itself.
+**Check**: `pnpm run check:icon-button-tips` (prepush and CI) fails on a
+`<Tip>` around an `<IconButton>` that doesn't set `tooltip`.
+**Rule**: an icon button is its own tooltip; never wrap it in another.
+**Category**: frontend · `docs/patterns/frontend-design-system.md`
+
+## A hint opened by itself when a sheet opened
+
+**Symptom**: opening a product's quick look showed "Previous product (K)"
+straight away, with no pointer over it (owner, 16 Oct).
+**Cause**: a sheet moves focus to its first control as it opens, and Radix
+opens a tooltip on any focus, keyboard or not.
+**Fix**: `Tip`'s hint opens only for a pointer over the control or for focus
+the keyboard brought (`:focus-visible`). Focus left by a click, or moved by
+a sheet or dialog, shows nothing. Tab still shows it.
+**Check**: none automatic yet (jsdom has no real `:focus-visible`); checked
+by hand in the quick look. A browser spec for it belongs with the next
+quick-look spec change.
+**Rule**: a hint answers a hover or a keyboard visit, never a focus the app
+moved.
+**Category**: frontend · `docs/patterns/frontend-design-system.md`
+
+## Everyone but the owner was told "No locations yet" and "Product not found"
+
+**Symptom**: on Northwind, an Admin's New product and Import said "No
+locations yet" and Edit said "Product not found"; a Member opening Edit got
+the same "not found" instead of the read-only editor (16 Oct audits, SEV 4).
+**Cause**: `listBusinessStores()` started from `GET /stores`, the locations
+the signed-in person OWNS (`StoreOwner`/`StoreMembers`), and only then kept
+the business's. Ownership decided what a role could see, and the edit page
+turned "not in my list" into `notFound()`.
+**Fix**: the list is the business's storefronts (`GET /organizations/:org/
+storefronts`, scoped by the API); a role without `store:read` falls back to
+the locations it was invited to. A failed read throws (`readBusinessStores`
+gives `null`), and the chooser says "Couldn't load your locations", never
+"No locations yet". Edit never calls `notFound()` for a product that exists;
+`store:write` decides read-only.
+**Check**: `lib/stores/business-stores.test.ts` (never asks `GET /stores`
+for a role that can read the business's locations; a failure is not `[]`),
+and `e2e/tests/products-roles.spec.ts` (Admin edits and creates, Member
+reads, Admin's import chooser lists every location).
+**Rule**: what someone sees comes from the business, what they may change
+from their permissions; never from who owns a location.
+**Category**: frontend · `docs/patterns/backend-auth-and-access.md`
+
+### A Razorpay cancel ended a paid month at once (17 Oct 2026)
+
+**Symptom**: on launch day the owner paid ₹1.18 for Grow's first month,
+stopped the autopay, and was on Free straight away: "The plan has ended".
+Saroh's own Change plan → Free keeps the month; this didn't.
+**Cause**: the webhook only kept the plan for a `cancelled` event when Saroh
+had a move waiting (`runsToMoveDate`). A cancel made at the provider (a UPI
+or bank app, Razorpay's page) has none, so it fell through to
+`status: CANCELLED`, which access reads as Free.
+**Fix**: `billing-webhook.service.ts` — a `cancelled` event with no move
+waiting and a paid period still running sets Free from that period's end
+(`endTermAtInTx`), first month included. `halted` (payments failed for good)
+still ends it at once.
+**Check**: `checkout.db.spec.ts` — "autopay stopped at the provider in the
+first month" and "… mid-period".
+**Rule**: nothing paid for is cut short (DEC-093), whoever ends the autopay.
+**Category**: backend · `docs/patterns/backend-billing-and-classes.md`

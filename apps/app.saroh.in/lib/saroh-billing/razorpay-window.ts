@@ -76,10 +76,16 @@ export async function openRazorpayWindow(
                           order_id: handoff.orderId,
                           amount: handoff.amountPaise ?? undefined,
                           currency: handoff.currency,
+                          ...(handoff.customerId
+                              ? { customer_id: handoff.customerId }
+                              : {}),
                       }),
                 name: "Saroh",
                 description,
                 prefill: prefillOf(handoff),
+                ...(handoff.notes && Object.keys(handoff.notes).length > 0
+                    ? { notes: handoff.notes }
+                    : {}),
                 // Razorpay keeps the window open after a failed attempt so
                 // it can be tried again; only success or closing settles.
                 handler: () => settle("paid"),

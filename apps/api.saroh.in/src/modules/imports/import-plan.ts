@@ -79,6 +79,11 @@ export interface PlanInput {
     keyOf: (values: ImportValues) => string | null;
     /** Domain validation, normally the create DTO's own class-validator rules. */
     validateRow: (values: ImportValues) => Omit<RowIssue, "row">[];
+    /**
+     * Puts a row's values in the words the create DTO reads, before they are
+     * checked or written ("draft" → "DRAFT"). Absent: the values as mapped.
+     */
+    normalize?: (values: ImportValues) => ImportValues;
 }
 
 const EMPTY_COUNTS = (): Record<RowOutcome, number> => ({
@@ -123,6 +128,7 @@ export function buildImportPlan(input: PlanInput): ImportPlan {
         requiredFields,
         keyOf,
         validateRow,
+        normalize,
     } = input;
 
     const fileIssues: RowIssue[] = [];
@@ -144,7 +150,8 @@ export function buildImportPlan(input: PlanInput): ImportPlan {
 
     records.forEach((record, index) => {
         const row = index + 1;
-        const values = applyMapping(record, mapping);
+        const mapped = applyMapping(record, mapping);
+        const values = normalize ? normalize(mapped) : mapped;
         const issues: RowIssue[] = [];
 
         for (const field of requiredFields) {

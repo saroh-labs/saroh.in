@@ -33,7 +33,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
-import { gstinProblem, stateCode } from "../invoices/gst-states";
+import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import { authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
@@ -70,6 +70,7 @@ import { PlansService } from "./plans.service";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
 import type {
+    BillingCustomer,
     BillingProvider,
     BillingProviderFactory,
     CheckoutHandoff,
@@ -78,6 +79,7 @@ import {
     BILLING_PROVIDER_FACTORY,
     BillingProviderError,
 } from "./providers/billing-provider.port";
+import { billingNotes } from "./providers/razorpay.provider";
 
 type Tx = Prisma.TransactionClient;
 
@@ -406,7 +408,11 @@ export class CheckoutService {
         ctx: OrganizationContext,
         row: Pick<
             BillingCheckout,
-            "provider" | "providerSubscriptionId" | "providerPlanId"
+            | "provider"
+            | "providerSubscriptionId"
+            | "providerPlanId"
+            | "providerCustomerId"
+            | "billToGstin"
         >,
         amountPaise: number,
     ): Promise<CheckoutHandoff | null> {
@@ -419,20 +425,7 @@ export class CheckoutService {
         }
         const keyId = provider.publicKey?.() ?? null;
         if (!keyId) return null;
-        const [user, profile, org] = await Promise.all([
-            prisma.user.findUnique({
-                where: { id: ctx.userId },
-                select: { email: true, name: true },
-            }),
-            prisma.businessProfile.findUnique({
-                where: { organizationId: ctx.organizationId },
-                select: { phone: true },
-            }),
-            prisma.organization.findUnique({
-                where: { id: ctx.organizationId },
-                select: { name: true },
-            }),
-        ]);
+        const customer = await this.billingCustomer(ctx, row.billToGstin);
         const oneTime = isOneTime(row);
         return {
             provider: row.provider,
@@ -442,11 +435,92 @@ export class CheckoutService {
             amountPaise: oneTime ? amountPaise : null,
             currency: "INR",
             prefill: {
-                name: org?.name ?? user?.name ?? null,
-                email: user?.email ?? null,
-                contact: profile?.phone ?? null,
+                name: customer.name,
+                email: customer.email,
+                contact: customer.contact,
             },
+            // Razorpay's window takes a customer with an order; a
+            // subscription's customer is the one it authorises.
+            customerId: oneTime ? (row.providerCustomerId ?? null) : null,
+            notes: billingNotes(customer),
         };
+    }
+
+    /**
+     * Who Saroh bills: the legal name (else the business's), the owner's
+     * email, the business's phone, the GSTIN given at checkout (else the
+     * profile's) and the registered address.
+     */
+    private async billingCustomer(
+        ctx: OrganizationContext,
+        gstin: string | null,
+    ): Promise<BillingCustomer> {
+        const [user, profile, org] = await Promise.all([
+            prisma.user.findUnique({
+                where: { id: ctx.userId },
+                select: { email: true, name: true },
+            }),
+            prisma.businessProfile.findUnique({
+                where: { organizationId: ctx.organizationId },
+                select: {
+                    phone: true,
+                    legalName: true,
+                    taxId: true,
+                    contactEmail: true,
+                    gstState: true,
+                    addressLine1: true,
+                    addressLine2: true,
+                    city: true,
+                    postalCode: true,
+                },
+            }),
+            prisma.organization.findUnique({
+                where: { id: ctx.organizationId },
+                select: { name: true },
+            }),
+        ]);
+        const businessName = nonEmpty(org?.name);
+        const legal = nonEmpty(profile?.legalName);
+        return {
+            name: legal ?? businessName ?? user?.name ?? "",
+            businessName,
+            email: user?.email ?? profile?.contactEmail ?? null,
+            contact: profile?.phone ?? null,
+            gstin: gstin ?? profile?.taxId ?? null,
+            address: profile?.addressLine1
+                ? {
+                      line1: profile.addressLine1,
+                      line2: profile.addressLine2 ?? null,
+                      city: profile.city ?? null,
+                      state: stateName(profile.gstState),
+                      postalCode: profile.postalCode ?? null,
+                  }
+                : null,
+            organizationId: ctx.organizationId,
+        };
+    }
+
+    /**
+     * The business as the provider's customer, made or found again. Never
+     * in the way of a payment: a refusal is logged and the checkout goes on
+     * with its notes and the window's prefill.
+     */
+    private async providerCustomer(
+        provider: BillingProvider,
+        customer: BillingCustomer,
+    ): Promise<string | null> {
+        if (!provider.customers) return null;
+        try {
+            const made = await provider.customers.ensureCustomer(customer);
+            return made.providerCustomerId;
+        } catch (error) {
+            this.logger.warn(
+                `billing_customer_failed org=${customer.organizationId}: ${
+                    error instanceof Error ? error.message : "unknown"
+                }`,
+            );
+            return null;
+        }
     }
 
     /** Change plan: to Free at once or at period end, else a checkout. */
@@ -860,6 +934,8 @@ export class CheckoutService {
 
         const id = randomUUID();
         const provider = this.providers.get(CATALOGUE_BILLING_PROVIDER);
+        const customer = await this.billingCustomer(ctx, billTo.billToGstin);
+        const customerId = await this.providerCustomer(provider, customer);
         let made: {
             providerSubscriptionId: string;
             providerCustomerId?: string;
@@ -881,6 +957,7 @@ export class CheckoutService {
                     reference: id,
                     organizationId: ctx.organizationId,
                     planKey: target.key,
+                    customer,
                 });
                 made = { providerSubscriptionId: order.providerOrderId };
             } else {
@@ -917,6 +994,7 @@ export class CheckoutService {
                               }
                             : null,
                     reference: id,
+                    customer,
                 });
             }
         } catch (error) {
@@ -959,7 +1037,7 @@ export class CheckoutService {
             providerPlanId: oneTime
                 ? ONE_TIME_PAYMENT
                 : providerPlan.providerPlanId,
-            providerCustomerId: made.providerCustomerId ?? null,
+            providerCustomerId: made.providerCustomerId ?? customerId,
             pricePaise: target.priceCents,
             chargeNowPaise: quote.chargeNowPaise,
             chargeNowGstPaise: quote.chargeNowGstPaise,

@@ -8,9 +8,11 @@ import { CsvImport } from "@/components/stores/csv-import";
 import { requireCan } from "@/lib/access/require-can";
 import { importCustomersHref } from "@/lib/customers/links";
 import { describeImport } from "@/lib/imports/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { canAddLocation } from "@/lib/stores/business-stores";
 import { pickStorefront } from "@/lib/stores/pick";
-import { listBusinessStores } from "@/lib/stores/service";
+import { readBusinessStores } from "@/lib/stores/service";
 
 export const metadata = { title: "Import customers" };
 
@@ -25,11 +27,12 @@ export default async function ImportCustomersPage({
     searchParams: Promise<{ storefront?: string }>;
 }) {
     await requireSession();
-    const [{ storefront }, stores] = await Promise.all([
+    const [{ storefront }, stores, organization] = await Promise.all([
         searchParams,
-        listBusinessStores(),
+        readBusinessStores(),
+        resolveActiveOrganization(),
     ]);
-    const store = pickStorefront(stores, storefront);
+    const store = stores ? pickStorefront(stores, storefront) : undefined;
 
     if (!store) {
         return (
@@ -42,6 +45,7 @@ export default async function ImportCustomersPage({
                     description="A spreadsheet is brought in at one location."
                     stores={stores}
                     hrefFor={importCustomersHref}
+                    canCreate={canAddLocation(organization)}
                 />
             </PageContainer>
         );
