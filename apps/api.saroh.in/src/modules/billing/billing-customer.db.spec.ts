@@ -465,6 +465,7 @@ describe("a checkout uses the business's customer", () => {
                     pricePaise: plan.priceCents,
                     chargeNowPaise: 0,
                     createdAt: at,
+                    completedAt: at,
                     expiresAt: new Date(at.getTime() + DAY),
                     billToPhone: given.phone ?? null,
                     billToGstin: given.gstin ?? null,
