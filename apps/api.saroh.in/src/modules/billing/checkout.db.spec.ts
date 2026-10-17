@@ -583,9 +583,11 @@ describe("renewals and failed payments", () => {
     it("is idempotent by event id, and an older event never undoes a newer one", async () => {
         await install(1);
         const ctx = await business();
-        await onPaidPlan(ctx, "b");
+        const { periodEnd } = await onPaidPlan(ctx, "b");
         const providerSub = (await sub(ctx.organizationId))
             .providerSubscriptionId as string;
+        // Ended once the period is over: nothing paid is left to run to.
+        const over = new Date(periodEnd.getTime() + 1000);
 
         const t1 = new Date(Date.now() + 1000);
         const t2 = new Date(Date.now() + 2000);
@@ -593,12 +595,14 @@ describe("renewals and failed payments", () => {
             deliver(providerSub, "cancelled", {
                 eventAt: t2,
                 id: "evt_cancel",
+                now: over,
             }),
         ).resolves.toEqual({ status: "processed", changed: true });
         await expect(
             deliver(providerSub, "cancelled", {
                 eventAt: t2,
                 id: "evt_cancel",
+                now: over,
             }),
         ).resolves.toEqual({ status: "duplicate", changed: false });
         // `activated` from before the cancel, delivered late.
