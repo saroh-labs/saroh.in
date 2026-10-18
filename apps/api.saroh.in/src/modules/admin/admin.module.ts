@@ -19,6 +19,8 @@ import { AdminPricingController } from "../pricing/admin-pricing.controller";
 import { CatalogueWritesService } from "../pricing/catalogue-writes.service";
 import { CouponsService } from "../pricing/coupons.service";
 import { PricingModule } from "../pricing/pricing.module";
+import { SarohLeadsController } from "../saroh-leads/saroh-leads.controller";
+import { SarohLeadsModule } from "../saroh-leads/saroh-leads.module";
 import { StaffInvitesModule } from "../staff-invites/staff-invites.module";
 import { WaitlistModule } from "../waitlist/waitlist.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
@@ -108,6 +110,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         // Staff invites (U24): the service the console's invite routes use,
         // with the preview and accept a person not yet staff reaches.
         StaffInvitesModule,
+        // Saroh's own sales leads (DEC-169, U20).
+        SarohLeadsModule,
     ],
     controllers: [
         AdminController,
@@ -124,6 +128,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminUsageController,
         AdminBillingController,
         AdminBillingControlsController,
+        SarohLeadsController,
     ],
     providers: [
         IdempotencyService,

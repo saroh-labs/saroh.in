@@ -387,6 +387,22 @@ describe("Team permissions (DEC-169)", () => {
     it("saves a teammate's profile with team write", () => {
         expect(perms("saveProfile")).toEqual([AdminPermission.TeamWrite]);
     });
+
+    // Saroh's own leads (U20): the service scopes each through scopeForStaff.
+    it.each([
+        ["leadsBoard", AdminPermission.SarohLeadsRead],
+        ["leadDetail", AdminPermission.SarohLeadsRead],
+        ["leadLog", AdminPermission.SarohLeadsRead],
+        ["leadWonCandidates", AdminPermission.SarohLeadsRead],
+        ["leadManagers", AdminPermission.SarohLeadsWrite],
+        ["addLead", AdminPermission.SarohLeadsWrite],
+        ["updateLead", AdminPermission.SarohLeadsWrite],
+        ["moveLeadStage", AdminPermission.SarohLeadsWrite],
+        ["assignLead", AdminPermission.SarohLeadsWrite],
+        ["logLeadContact", AdminPermission.SarohLeadsWrite],
+    ])("%s needs %s", (name, permission) => {
+        expect(perms(name)).toEqual([permission]);
+    });
 });
 
 /**

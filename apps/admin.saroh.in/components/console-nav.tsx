@@ -15,6 +15,7 @@ import {
     ScrollText,
     ShieldCheck,
     Tags,
+    Target,
     UserPlus,
     Users,
     Webhook,
@@ -167,6 +168,14 @@ const GROUPS: ConsoleNavGroup[] = [
                 label: "Team",
                 icon: ShieldCheck,
                 permission: "staff:read",
+            },
+            {
+                // Saroh's own sales leads (DEC-169, U20). Account managers
+                // reach their own board here.
+                href: "/leads",
+                label: "Leads",
+                icon: Target,
+                permission: "saroh-leads:read",
             },
             {
                 href: "/waitlist",

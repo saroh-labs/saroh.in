@@ -68,7 +68,7 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   `lib/billing-action-words.ts`, `lib/billing-event-words.ts`, `lib/user-filters.ts`,
   `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
   `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`,
-  `lib/business-words.ts`, `lib/offer-words.ts`.
+  `lib/business-words.ts`, `lib/offer-words.ts`, `lib/saroh-lead-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -140,6 +140,19 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   says why someone can't sign in (`lib/sign-in-words.ts`): an unverified
   email, or a changed sign-in email still held for its 24 hours, which a
   second staff member confirms from the Sign-in tab.
+- **Leads (`/leads`, DEC-169, admin plan U20)** is Saroh's own sales
+  leads as a board by stage (New · Talked · Demo given · In trial · Won ·
+  Lost; on a phone one stage at a time), read with `saroh-leads:read`
+  (`GET /admin/saroh-leads`, scoped: an Account manager's board is their
+  own). A card opens the lead's sheet (`components/team/lead-sheet.tsx`),
+  read when it opens: the Stage control (a radio group, then Move to …;
+  Won asks the business, Lost why; no dragging), Edit details, the calls
+  and visits with Log a call (`log-call-sheet.tsx`), and, for Support and
+  Platform owner on an unowned lead, Give to a manager… (an
+  `OperatorDialog`). Add a lead is a sheet; an email already a lead is
+  refused under the field, saying whose. Writes go through
+  `lib/saroh-lead-actions.ts` and light the card (`useChangeFeedback`).
+  Not the merchant's own Leads.
 - **A business's Overview needs no support session** (admin plan U3):
   `GET /admin/organizations/:id/overview` (`organization:read`, scoped by
   `scopeForStaff`) returns the cards and the tab badges with no personal

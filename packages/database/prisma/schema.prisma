@@ -27,7 +27,7 @@ model User {
 
   // Better Auth stores the email/password credential on the Account row,
   // so the User table no longer carries a password column.
-  emailVerified Boolean @default(false)
+  emailVerified          Boolean   @default(false)
   // When Saroh staff marked this address verified from the console (admin
   // console U9, "Mark verified"). Null: the person proved it themselves, by
   // a code, or it is not verified. Staff-marked verification never counts as
@@ -174,6 +174,8 @@ model Organization {
   stores              Store[]
   memberships         Membership[]
   adminAccessSessions AdminAccessSession[]
+  // Calls and visits Saroh's team logged with this business (DEC-169).
+  sarohContactLogs    SarohContactLog[]
 
   // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
   // a tenant/ownership/billing root — always org-scoped (ADR-001).
@@ -437,7 +439,7 @@ model Organization {
   // the same transaction, or whose profile's owner was deleted; a checkout
   // then makes one for the paying owner.
   billingProfileId         String?
-  billingProfile           BillingProfile?          @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
+  billingProfile           BillingProfile?           @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
   sarohInvoices            SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
   subscriptionAddonCharges SubscriptionAddonCharge[]
@@ -2625,6 +2627,11 @@ model PlatformAdmin {
   staffProfile StaffProfile?  @relation("StaffProfileOf")
   reports      StaffProfile[] @relation("StaffProfileReportsTo")
 
+  // DEC-169, U20: Saroh's own sales leads this teammate owns, and the calls
+  // and visits they logged.
+  sarohLeads       SarohLead[]       @relation("SarohLeadOwner")
+  sarohContactLogs SarohContactLog[] @relation("SarohContactLogAuthor")
+
   grantedByUserId String?
   grantedBy       User?   @relation("PlatformAdminGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
 
@@ -2786,6 +2793,112 @@ model StaffInvite {
   updatedAt DateTime @updatedAt
 
   @@index([email])
+}
+
+// Saroh's own sales lead (DEC-169, admin console U20): someone who may
+// become a paying business, not a business's own Leads (the merchant CRM).
+// It comes from a saroh.in enquiry ("A question before signing up"), the
+// waitlist, or a manager who added it; one lead per person, merged by the
+// normalised email (`emailKey`, the waitlist's rule).
+//
+// `source` is WEBSITE, WAITLIST or ADDED: where it first came from. `stage`
+// is NEW, TALKED, DEMO, TRIAL, WON or LOST. Won names the business it became
+// (`wonOrganizationId`, a plain id like `referredByOrganizationId`: read back
+// through the business's own rules); Lost carries why. All CHECKed in the
+// migration (`saroh-leads/lead-rules.ts` holds the lists).
+//
+// The owner is the one manager working it: the first to record its email
+// (ADDED), or the one Support or a Platform owner gave it to (ASSIGNED).
+// Unowned leads are seen only by staff with every lead in scope. When each
+// email was recorded is kept, so a business counts as brought in by a lead
+// only if the lead had its email before the business was made (U19).
+//
+// Retention: a lead that came from the website and never became a business
+// goes 12 months after the website last saw it, once no waitlist entry with
+// its email is left (`saroh-leads/lead-retention.ts`, the enquiry purge).
+// Not a tenant row: it belongs to Saroh.
+model SarohLead {
+  id String @id @default(cuid())
+
+  /// Who: the business's or the person's name, as known.
+  name     String
+  email    String?
+  emailKey String?   @unique
+  /// When this email was first put on the lead.
+  emailAt  DateTime?
+
+  /// The email the business signed up with, when it isn't `email`.
+  signUpEmail    String?
+  signUpEmailKey String?   @unique
+  signUpEmailAt  DateTime?
+
+  phone String?
+  city  String?
+  /// One of the waitlist's kinds of business (`WAITLIST_KINDS`), if known.
+  kind  String?
+
+  source   String
+  stage    String   @default("NEW")
+  stagedAt DateTime @default(now())
+
+  /// The day to follow up, as the day reads in India.
+  followUpOn DateTime? @db.Date
+  notes      String?
+
+  wonOrganizationId String?
+  wonAt             DateTime?
+  lostReason        String?
+
+  ownerPlatformAdminId String?
+  owner                PlatformAdmin? @relation("SarohLeadOwner", fields: [ownerPlatformAdminId], references: [id], onDelete: SetNull)
+  ownerSince           DateTime?
+  ownedHow             String?
+
+  /// When an enquiry or a waitlist entry last brought this lead in.
+  websiteSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  log SarohContactLog[]
+
+  @@index([ownerPlatformAdminId, stage])
+  @@index([stage, followUpOn])
+  @@index([websiteSeenAt])
+}
+
+// A call, visit or message Saroh's team logged (DEC-169, U20): on a lead, or
+// on a business a manager looks after, with what was said about the product.
+// At least one of `leadId` and `organizationId` (CHECKed). A business's rows
+// carry its organizationId and the org-isolation policy; a lead's have none
+// and are written and read only by the admin console, with no org context.
+model SarohContactLog {
+  id String @id @default(cuid())
+
+  leadId String?
+  lead   SarohLead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Who logged it; null if their team record is gone.
+  platformAdminId String?
+  author          PlatformAdmin? @relation("SarohContactLogAuthor", fields: [platformAdminId], references: [id], onDelete: SetNull)
+  actorUserId     String
+
+  /// CALL, VISIT or MESSAGE (CHECKed).
+  kind       String
+  happenedAt DateTime
+  minutes    Int?
+  summary    String
+  /// What they said about Saroh itself.
+  feedback   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId, happenedAt])
+  @@index([organizationId, happenedAt])
+  @@index([platformAdminId, happenedAt])
 }
 
 // Global, append-only history of staff activity in the Saroh control plane.

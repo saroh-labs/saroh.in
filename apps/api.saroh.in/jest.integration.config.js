@@ -76,6 +76,9 @@ module.exports = {
         // Contact messages: mocked specs in the unit project; only
         // contact-messages.db.spec.ts runs here.
         "<rootDir>/src/modules/contact-messages/(?!.*\\.db\\.spec\\.ts$)",
+        // Saroh's own leads (U20): pure specs in the unit project; only
+        // saroh-leads.db.spec.ts runs here.
+        "<rootDir>/src/modules/saroh-leads/(?!.*\\.db\\.spec\\.ts$)",
         // Plans catalogue U3: pure specs run in the unit project; only the
         // pricing *.db.spec.ts run here.
         "<rootDir>/src/modules/pricing/(?!.*\\.db\\.spec\\.ts$)",

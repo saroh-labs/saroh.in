@@ -42,6 +42,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "A Saroh teammate's record on the console's Team (DEC-169): job, contact, manager code, sealed tax id. Saroh's staff, not a business.",
     StaffInvite:
         "An invitation to join Saroh's team (DEC-169, admin console U24), for someone who may have no account yet. Saroh's staff, not a business.",
+    SarohLead:
+        "Saroh's own sales lead (DEC-169, U20): someone who may become a business, from a saroh.in enquiry, the waitlist or a manager. Saroh's, not a business; the business it became is a plain wonOrganizationId.",
     SignInEmailChange:
         "A sign-in email change Saroh staff made for a person (admin console U9); a person spans businesses, so no organization.",
     AdminOperation:

@@ -137,8 +137,6 @@ export const AWAITING_ENDPOINT: Readonly<
     [AdminPermission.AccountsRead]: "U19/U25: businesses by manager",
     [AdminPermission.AccountsAssign]:
         "U19/U25: assign, reassign, end, share out",
-    [AdminPermission.SarohLeadsRead]: "U20/U21: Saroh's own leads",
-    [AdminPermission.SarohLeadsWrite]: "U20/U21: Saroh's own leads",
     [AdminPermission.CommissionRates]: "U22/U24: the rates sheet",
     // Checked inside the profile read for the tax id (U18) until the
     // earnings and statements routes require it.

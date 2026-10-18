@@ -602,6 +602,24 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   Team permissions no route requires yet are listed in `AWAITING_ENDPOINT`
   with the unit that wires them; `admin.controller.permissions.spec.ts`
   fails on any other unused permission.
+- **Current** (DEC-169, admin console U20) — **Saroh's own sales leads**
+  (`/admin/saroh-leads`, `modules/saroh-leads/`) belong to no business:
+  `SarohLead` is in `NOT_TENANT_OWNED`, and `SarohContactLog` (a call or
+  visit, on a lead or a business) carries the org-isolation policy. Reads
+  need `saroh-leads:read` and writes `saroh-leads:write`, each scoped by
+  `scopeForStaff`: an Account manager reaches only the leads they own
+  (another's, or an unowned one, is a 403), and only Support and Platform
+  owner give unowned leads out (`assign`, a reason, never to oneself:
+  there is no claim). The first to record an email owns the lead (its
+  email and sign-up email are unique, merged by the waitlist's key); a
+  manager adding one that is taken is told whose. Won names a business
+  (an Account manager only one owned by the lead's email), Lost a reason.
+  A saroh.in question ("A question before signing up") and a waitlist
+  entry (not a tool's email gate) make or merge a lead after their own
+  write and never fail it (`lead-intake.ts`); an unconverted website lead
+  goes with its enquiry's 12 months once no waitlist entry holds it, and
+  with a waitlist entry its owner asked to remove (`lead-retention.ts`).
+  Every write is on the ledger with no email in its metadata.
 - **Current** (admin console U9) — **Sign-in help** (`people:sign-in-help`,
   Platform owners and Support, with `organization:pii:read`;
   `admin/admin-sign-in-help.service.ts`). Every write takes a reason and an

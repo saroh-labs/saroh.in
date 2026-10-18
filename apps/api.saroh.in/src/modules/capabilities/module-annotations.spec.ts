@@ -334,6 +334,9 @@ const NEVER: Record<string, string> = {
     // is not staff yet and may belong to no business.
     "staff-invites/staff-invites.controller.ts":
         "joining Saroh's own team, not a tenant surface",
+    // DEC-169, U20: Saroh's own sales leads, which belong to no business.
+    "saroh-leads/saroh-leads.controller.ts":
+        "staff control plane (Saroh's own sales leads), not a tenant surface",
     // DEC-120: an owner takes the business's data whatever it has switched
     // off, and while it is closing or suspended.
     "data-export/data-export.controller.ts":

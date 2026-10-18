@@ -48,6 +48,9 @@ module.exports = {
         // Internal control plane: fixed staff permissions, admin read models,
         // and services with mocked Prisma. Never touch a DB.
         "<rootDir>/src/modules/admin/**/*.spec.ts",
+        // Saroh's own leads (U20): the rules, pure. The rows are in
+        // saroh-leads.db.spec.ts (integration).
+        "<rootDir>/src/modules/saroh-leads/**/*.spec.ts",
         "<rootDir>/src/modules/feature-flags/**/*.spec.ts",
         // #119 Home aggregator: pure ranking with mocked availability + counts.
         "<rootDir>/src/modules/home/**/*.spec.ts",
