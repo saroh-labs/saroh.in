@@ -11,7 +11,13 @@ import {
 } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
 import { AdminStaffService } from "./admin-staff.service";
-import { AmendStaffDto, GrantStaffDto, OperatorReasonDto } from "./dto";
+import {
+    AmendStaffDto,
+    GrantStaffDto,
+    OperatorReasonDto,
+    SaveStaffProfileDto,
+} from "./dto";
+import { taxIdFingerprint } from "./staff-profile";
 
 /**
  * The operator's own team (admin console U2). Granting a colleague access
@@ -116,6 +122,58 @@ export class AdminStaffController {
                     staff,
                     platformAdminId,
                     reason: dto.reason,
+                }),
+        );
+    }
+
+    /**
+     * A teammate's profile (DEC-169, U18). The tax id comes back only as
+     * set or not, or its last 4 characters to a `team:pay` holder (that
+     * read is on the ledger).
+     */
+    @Get("staff/:platformAdminId/profile")
+    @RequireAdminPermission(AdminPermission.TeamRead)
+    profile(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("platformAdminId") platformAdminId: string,
+    ) {
+        return this.staffService.getProfile({ staff, platformAdminId });
+    }
+
+    /**
+     * Save a teammate's profile, with a reason. A tax id left out stays as
+     * it is; one sent replaces it and needs `team:pay` as well.
+     */
+    @Put("staff/:platformAdminId/profile")
+    @RequireAdminPermission(AdminPermission.TeamWrite)
+    saveProfile(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("platformAdminId") platformAdminId: string,
+        @Body() dto: SaveStaffProfileDto,
+    ) {
+        const { idempotencyKey, reason, taxId, ...profile } = dto;
+        return this.idempotency.run(
+            {
+                scope: "admin.staff.profile.save",
+                key: idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            // The stored fingerprint carries a keyed digest of the tax id,
+            // never the tax id or a plain hash a short value could be
+            // guessed back from.
+            {
+                platformAdminId,
+                reason,
+                ...profile,
+                taxId:
+                    taxId === undefined ? undefined : taxIdFingerprint(taxId),
+            },
+            () =>
+                this.staffService.saveProfile({
+                    staff,
+                    platformAdminId,
+                    profile: { ...profile, taxId },
+                    reason,
                 }),
         );
     }

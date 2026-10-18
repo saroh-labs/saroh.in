@@ -38,6 +38,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "The count behind Saroh's own invoice series (U17); Saroh's, shared by every organization it bills.",
     PlatformAdmin: "Saroh staff, not a business.",
     PlatformAdminRoleAssignment: "Saroh staff roles, not a business.",
+    StaffProfile:
+        "A Saroh teammate's record on the console's Team (DEC-169): job, contact, manager code, sealed tax id. Saroh's staff, not a business.",
     AdminOperation:
         "A staff bulk operation (jobs retry, webhook replay) across organizations; no organization of its own.",
     AdminOperationItem: "Child of AdminOperation; no organization.",

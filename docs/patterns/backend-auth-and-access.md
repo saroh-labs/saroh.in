@@ -584,6 +584,24 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   key, checked on the route and again in the service
   (`assertSarohBillingActor`), and on the admin ledger. No support-access
   session: Support, even with one open, is refused (403).
+- **Current** (DEC-169, admin console U18) — **The Account manager role sees
+  only its own.** `ACCOUNT_MANAGER` holds `accounts:read`,
+  `saroh-leads:read` and `saroh-leads:write`, never `organization:read`,
+  `accounts:assign`, `team:write` or `staff:grant`
+  (`admin-permissions.spec.ts`). Every read of leads, contact logs, a team
+  view's businesses, the overview, module state, search or a member page
+  calls `scopeForStaff(staff, permission)` (`modules/admin/staff-scope.ts`):
+  `{kind: "all"}` when any role the person holds grants that permission
+  unscoped, `{kind: "own", platformAdminId}` when only the Account manager
+  role grants it. Until the account-manager link lands (U19/U25),
+  `maySeeOrganization` answers no for own scope. Each such route has a spec:
+  an Account manager reading something not theirs gets 403. A teammate's tax
+  id is sealed under `STAFF_PII_ENC_KEY` and shown only as set, or its last
+  4 characters to `team:pay` holders, each read on the ledger. The role
+  CHECK in the migrations equals `AdminRole` (`admin-role-check.spec.ts`).
+  Team permissions no route requires yet are listed in `AWAITING_ENDPOINT`
+  with the unit that wires them; `admin.controller.permissions.spec.ts`
+  fails on any other unused permission.
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator

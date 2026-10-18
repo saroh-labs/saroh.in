@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
@@ -8,6 +9,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import { prismaErrorCode } from "../../common/prisma-errors";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import type { AdminRole } from "./admin-permissions";
 import {
@@ -16,8 +18,87 @@ import {
     isAdminRole,
     permissionsFor,
 } from "./admin-permissions";
+import type { StaffEngagement, StaffJob } from "./staff-profile";
+import {
+    generateManagerCode,
+    normaliseTaxId,
+    sealTaxId,
+    taxIdLast4,
+} from "./staff-profile";
 
 type Tx = Prisma.TransactionClient;
+
+/**
+ * A teammate's profile as the console sees it (DEC-169, U18). The tax id is
+ * never returned whole: `taxIdSet` says whether one is on file, and
+ * `taxIdLast4` is present only for a `team:pay` holder reading it (each such
+ * read is on the ledger).
+ */
+export interface StaffProfileView {
+    platformAdminId: string;
+    /** False until the first save; the other fields are then empty. */
+    exists: boolean;
+    worksAs: StaffJob | null;
+    workEmail: string | null;
+    phone: string | null;
+    city: string | null;
+    languages: string[];
+    /** `YYYY-MM-DD`. */
+    joinedOn: string | null;
+    reportsToPlatformAdminId: string | null;
+    engagement: StaffEngagement | null;
+    capacity: number | null;
+    /** Generated on the first save, never typed. */
+    managerCode: string | null;
+    onCommission: boolean;
+    emergencyContact: string | null;
+    taxIdSet: boolean;
+    taxIdLast4?: string | null;
+    updatedAt: Date | null;
+}
+
+export interface SaveStaffProfileInput {
+    worksAs: StaffJob;
+    workEmail?: string | null;
+    phone?: string | null;
+    city?: string | null;
+    languages?: string[];
+    joinedOn?: string | null;
+    reportsToPlatformAdminId?: string | null;
+    engagement?: StaffEngagement | null;
+    capacity?: number | null;
+    onCommission?: boolean;
+    emergencyContact?: string | null;
+    /** Absent: the tax id on file stays. Present: replaces it. */
+    taxId?: string;
+}
+
+/** Tries at a fresh manager code when one clashes (31^8 codes: rare). */
+const MANAGER_CODE_TRIES = 5;
+
+const PROFILE_SELECT = {
+    platformAdminId: true,
+    worksAs: true,
+    workEmail: true,
+    phone: true,
+    city: true,
+    languages: true,
+    joinedOn: true,
+    reportsToPlatformAdminId: true,
+    engagement: true,
+    capacity: true,
+    managerCode: true,
+    onCommission: true,
+    emergencyContact: true,
+    taxIdCiphertext: true,
+    taxIdIv: true,
+    taxIdAuthTag: true,
+    updatedAt: true,
+} as const satisfies Prisma.StaffProfileSelect;
+
+type ProfileRow = Prisma.StaffProfileGetPayload<{
+    select: typeof PROFILE_SELECT;
+}>;
 
 export interface StaffMember {
     platformAdminId: string;
@@ -334,6 +415,191 @@ export class AdminStaffService {
     }
 
     /**
+     * A teammate's profile (`team:read`). With `team:pay` the response also
+     * carries the tax id's last 4 characters, and that read is written to the
+     * ledger in the same transaction, so it is never shown unrecorded.
+     */
+    async getProfile(input: {
+        staff: PlatformAdminInfo;
+        platformAdminId: string;
+    }): Promise<StaffProfileView> {
+        const mayPay = input.staff.permissions.includes(
+            AdminPermission.TeamPay,
+        );
+        return prisma.$transaction(async (tx) => {
+            const admin = await this.adminOrThrow(tx, input.platformAdminId);
+            const row = await tx.staffProfile.findUnique({
+                where: { platformAdminId: admin.id },
+                select: PROFILE_SELECT,
+            });
+            if (!row) return emptyProfile(admin.id, mayPay);
+
+            const view = profileView(row);
+            if (!mayPay) return view;
+            const sealed = sealedTaxId(row);
+            if (!sealed) return { ...view, taxIdLast4: null };
+
+            const last4 = taxIdLast4(sealed);
+            await this.audit.write(tx, {
+                actorUserId: input.staff.userId,
+                permission: AdminPermission.TeamPay,
+                action: "staff.tax-id.read",
+                targetType: "platform_admin",
+                targetId: admin.id,
+                outcome: AdminAuditOutcome.Success,
+                metadata: { shown: "last4" },
+            });
+            return { ...view, taxIdLast4: last4 };
+        });
+    }
+
+    /**
+     * Save a teammate's profile (`team:write`, with a reason). The first save
+     * creates it and generates their manager code. A tax id in the save
+     * replaces the one on file and needs `team:pay` too; left out, the one on
+     * file stays. The change and any tax id replacement are on the ledger.
+     */
+    async saveProfile(input: {
+        staff: PlatformAdminInfo;
+        platformAdminId: string;
+        profile: SaveStaffProfileInput;
+        reason: string;
+    }): Promise<StaffProfileView & { created: boolean }> {
+        const reason = requireReason(input.reason);
+        const { profile } = input;
+        const mayPay = input.staff.permissions.includes(
+            AdminPermission.TeamPay,
+        );
+        if (profile.taxId !== undefined && !mayPay) {
+            throw new ForbiddenException(
+                "Only Platform owner and Billing can change a tax id.",
+            );
+        }
+        const taxId =
+            profile.taxId === undefined
+                ? undefined
+                : normaliseTaxId(profile.taxId);
+        if (taxId !== undefined && !/^[A-Z0-9-]{4,32}$/.test(taxId)) {
+            throw new BadRequestException(
+                "A tax id is 4 to 32 letters, digits or hyphens.",
+            );
+        }
+        if (profile.reportsToPlatformAdminId === input.platformAdminId) {
+            throw new BadRequestException("Nobody reports to themselves.");
+        }
+        // Sealed before the transaction: a missing key refuses the save
+        // before anything is written.
+        const sealed = taxId === undefined ? undefined : sealTaxId(taxId);
+        const fields = {
+            worksAs: profile.worksAs,
+            workEmail: textOrNull(profile.workEmail)?.toLowerCase() ?? null,
+            phone: textOrNull(profile.phone),
+            city: textOrNull(profile.city),
+            languages: [
+                ...new Set(
+                    (profile.languages ?? [])
+                        .map((language) => language.trim())
+                        .filter(Boolean),
+                ),
+            ],
+            joinedOn: profile.joinedOn ? calendarDate(profile.joinedOn) : null,
+            reportsToPlatformAdminId: profile.reportsToPlatformAdminId ?? null,
+            engagement: profile.engagement ?? null,
+            capacity: profile.capacity ?? null,
+            onCommission: profile.onCommission ?? false,
+            emergencyContact: textOrNull(profile.emergencyContact),
+        };
+
+        for (let attempt = 1; ; attempt++) {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    const admin = await this.adminOrThrow(
+                        tx,
+                        input.platformAdminId,
+                    );
+                    if (fields.reportsToPlatformAdminId) {
+                        await this.adminOrThrow(
+                            tx,
+                            fields.reportsToPlatformAdminId,
+                            "The person they report to isn't on the team.",
+                        );
+                    }
+                    const taxIdData = sealed
+                        ? {
+                              taxIdCiphertext: sealed.ciphertext,
+                              taxIdIv: sealed.iv,
+                              taxIdAuthTag: sealed.authTag,
+                          }
+                        : {};
+                    const before = await tx.staffProfile.findUnique({
+                        where: { platformAdminId: admin.id },
+                        select: PROFILE_SELECT,
+                    });
+                    const row = before
+                        ? await tx.staffProfile.update({
+                              where: { platformAdminId: admin.id },
+                              data: { ...fields, ...taxIdData },
+                              select: PROFILE_SELECT,
+                          })
+                        : await tx.staffProfile.create({
+                              data: {
+                                  platformAdminId: admin.id,
+                                  managerCode: generateManagerCode(),
+                                  ...fields,
+                                  ...taxIdData,
+                              },
+                              select: PROFILE_SELECT,
+                          });
+
+                    await this.audit.write(tx, {
+                        actorUserId: input.staff.userId,
+                        permission: AdminPermission.TeamWrite,
+                        action: before
+                            ? "staff.profile.updated"
+                            : "staff.profile.created",
+                        targetType: "platform_admin",
+                        targetId: admin.id,
+                        reason,
+                        outcome: AdminAuditOutcome.Success,
+                        // Which fields changed, never their values: the
+                        // ledger is read more widely than the profile.
+                        metadata: {
+                            changed: changedFields(before, fields),
+                            taxIdReplaced: Boolean(sealed),
+                        },
+                    });
+                    if (sealed) {
+                        await this.audit.write(tx, {
+                            actorUserId: input.staff.userId,
+                            permission: AdminPermission.TeamPay,
+                            action:
+                                before && sealedTaxId(before)
+                                    ? "staff.tax-id.replaced"
+                                    : "staff.tax-id.set",
+                            targetType: "platform_admin",
+                            targetId: admin.id,
+                            reason,
+                            outcome: AdminAuditOutcome.Success,
+                        });
+                    }
+                    return { ...profileView(row), created: !before };
+                });
+            } catch (error) {
+                // Two first saves at once, or a manager code that clashed:
+                // the database's unique index decided, so try again (the
+                // second becomes an update, or draws a fresh code).
+                if (
+                    prismaErrorCode(error) === "P2002" &&
+                    attempt < MANAGER_CODE_TRIES
+                ) {
+                    continue;
+                }
+                throw error;
+            }
+        }
+    }
+
+    /**
      * Run a staff change and refuse it if it would take the instance from
      * having a lasting Platform Owner to having none. An instance that never
      * had one (only the break-glass allowlist) may still grant its first.
@@ -371,12 +637,16 @@ export class AdminStaffService {
         return new Set(rows.map((row) => row.role));
     }
 
-    private async adminOrThrow(tx: Tx, platformAdminId: string) {
+    private async adminOrThrow(
+        tx: Tx,
+        platformAdminId: string,
+        notFound = "Staff member not found",
+    ) {
         const admin = await tx.platformAdmin.findUnique({
             where: { id: platformAdminId },
             select: { id: true, revokedAt: true },
         });
-        if (!admin) throw new NotFoundException("Staff member not found");
+        if (!admin) throw new NotFoundException(notFound);
         return admin;
     }
 }
@@ -427,4 +697,98 @@ function requireFuture(value: Date | undefined): Date | undefined {
 
 function sameInstant(a: Date | null, b: Date | null): boolean {
     return (a?.getTime() ?? null) === (b?.getTime() ?? null);
+}
+
+/** Trimmed text, or null when it is missing or blank. */
+function textOrNull(value: string | null | undefined): string | null {
+    const text = value?.trim();
+    if (!text) return null;
+    return text;
+}
+
+function sealedTaxId(row: ProfileRow) {
+    return row.taxIdCiphertext && row.taxIdIv && row.taxIdAuthTag
+        ? {
+              ciphertext: row.taxIdCiphertext,
+              iv: row.taxIdIv,
+              authTag: row.taxIdAuthTag,
+          }
+        : null;
+}
+
+function profileView(row: ProfileRow): StaffProfileView {
+    return {
+        platformAdminId: row.platformAdminId,
+        exists: true,
+        worksAs: row.worksAs as StaffJob,
+        workEmail: row.workEmail,
+        phone: row.phone,
+        city: row.city,
+        languages: row.languages,
+        joinedOn: row.joinedOn?.toISOString().slice(0, 10) ?? null,
+        reportsToPlatformAdminId: row.reportsToPlatformAdminId,
+        engagement: row.engagement as StaffEngagement | null,
+        capacity: row.capacity,
+        managerCode: row.managerCode,
+        onCommission: row.onCommission,
+        emergencyContact: row.emergencyContact,
+        taxIdSet: sealedTaxId(row) !== null,
+        updatedAt: row.updatedAt,
+    };
+}
+
+function emptyProfile(
+    platformAdminId: string,
+    mayPay: boolean,
+): StaffProfileView {
+    return {
+        platformAdminId,
+        exists: false,
+        worksAs: null,
+        workEmail: null,
+        phone: null,
+        city: null,
+        languages: [],
+        joinedOn: null,
+        reportsToPlatformAdminId: null,
+        engagement: null,
+        capacity: null,
+        managerCode: null,
+        onCommission: false,
+        emergencyContact: null,
+        taxIdSet: false,
+        ...(mayPay ? { taxIdLast4: null } : {}),
+        updatedAt: null,
+    };
+}
+
+/** A `YYYY-MM-DD` that is a real date, as the UTC midnight Prisma writes to a DATE. */
+function calendarDate(value: string): Date {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (
+        Number.isNaN(date.getTime()) ||
+        date.toISOString().slice(0, 10) !== value
+    ) {
+        throw new BadRequestException("joinedOn is not a real date.");
+    }
+    return date;
+}
+
+/** The names of the profile fields a save changes; all of them on create. */
+function changedFields(
+    before: ProfileRow | null,
+    after: Record<string, unknown>,
+): string[] {
+    return Object.keys(after).filter((key) => {
+        if (!before) return true;
+        const was = (before as Record<string, unknown>)[key];
+        const now = after[key];
+        if (was instanceof Date || now instanceof Date) {
+            return (
+                (was as Date | null)?.getTime() !==
+                (now as Date | null)?.getTime()
+            );
+        }
+        return JSON.stringify(was) !== JSON.stringify(now);
+    });
 }

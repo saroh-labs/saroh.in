@@ -108,7 +108,8 @@ export type AdminRole =
     | "OPERATIONS"
     | "BILLING"
     | "RELEASE_MANAGER"
-    | "AUDITOR";
+    | "AUDITOR"
+    | "ACCOUNT_MANAGER";
 
 export type AdminPermission =
     | "platform:read"
@@ -143,7 +144,16 @@ export type AdminPermission =
     | "reports:resolve"
     | "organization:legal-hold:lift"
     | "saroh-billing:read"
-    | "saroh-billing:act";
+    | "saroh-billing:act"
+    | "team:read"
+    | "team:write"
+    | "accounts:read"
+    | "accounts:assign"
+    | "saroh-leads:read"
+    | "saroh-leads:write"
+    | "team:pay"
+    | "commission:rates"
+    | "people:sign-in-help";
 
 export type ControlPlaneResult<T> =
     | { ok: true; data: T }

@@ -9,7 +9,11 @@ import { PATH_METADATA } from "@nestjs/common/constants";
 
 import { IDENTITY_ONLY } from "../../common/decorators/identity-only.decorator";
 import { REQUIRE_ADMIN_PERMISSIONS } from "../../common/decorators/require-admin-permission.decorator";
-import { AdminPermission } from "./admin-permissions";
+import {
+    AdminPermission,
+    ALL_ADMIN_PERMISSIONS,
+    AWAITING_ENDPOINT,
+} from "./admin-permissions";
 import { AdminController } from "./admin.controller";
 import { AdminModule } from "./admin.module";
 import { ORGANIZATION_ACCESS_INTENT } from "./organization-access-session.guard";
@@ -363,6 +367,40 @@ describe("Pricing permissions", () => {
             ]);
         },
     );
+});
+
+describe("Team permissions (DEC-169)", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it("reads a teammate's profile with team read", () => {
+        expect(perms("profile")).toEqual([AdminPermission.TeamRead]);
+    });
+
+    // The tax id inside a save also needs team:pay, which the service checks.
+    it("saves a teammate's profile with team write", () => {
+        expect(perms("saveProfile")).toEqual([AdminPermission.TeamWrite]);
+    });
+});
+
+/**
+ * Every permission is a promise an endpoint keeps (admin-permissions.ts).
+ * The Team permissions were added ahead of their routes in U18, each listed
+ * in AWAITING_ENDPOINT with the unit that wires it; nothing else may wait.
+ */
+describe("Every permission is required by some route", () => {
+    const required = new Set(
+        routeHandlers().flatMap(({ handler }) => permissionsOf(handler) ?? []),
+    );
+
+    it("leaves no permission unused but those awaiting a later unit", () => {
+        const unused = ALL_ADMIN_PERMISSIONS.filter(
+            (permission) => !required.has(permission),
+        ).sort();
+        expect(unused).toEqual(Object.keys(AWAITING_ENDPOINT).sort());
+    });
 });
 
 describe("AdminController staff identity", () => {

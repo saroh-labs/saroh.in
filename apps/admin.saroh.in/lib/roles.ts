@@ -13,6 +13,7 @@ export const ROLE_LABEL: Record<AdminRole, string> = {
     BILLING: "Billing",
     RELEASE_MANAGER: "Release manager",
     AUDITOR: "Auditor",
+    ACCOUNT_MANAGER: "Account manager",
 };
 
 /** What each role is for, in one line. The permissions list is the source of truth. */
@@ -25,4 +26,6 @@ export const ROLE_PURPOSE: Record<AdminRole, string> = {
         "Plans, trials and limits, and Saroh's invoices and subscriptions.",
     RELEASE_MANAGER: "Turns capabilities on for one business, then everyone.",
     AUDITOR: "Reads everything but Saroh's invoices, changes nothing.",
+    ACCOUNT_MANAGER:
+        "Looks after their own businesses and works their own sales leads. Sees nothing else.",
 };
