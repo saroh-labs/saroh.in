@@ -88,8 +88,10 @@ export default async function ProductSettingsPage({
                             count: catalogue.categories.length + 1,
                         },
                         { key: "options", count: catalogue.options.length },
-                        { key: "fields", count: fields?.length ?? 0 },
-                        { key: "allergens", count: allergens?.length ?? 0 },
+                        // A list that couldn't be read is "not known" (—),
+                        // never 0.
+                        { key: "fields", count: fields?.length ?? null },
+                        { key: "allergens", count: allergens?.length ?? null },
                         { key: "sku" },
                         { key: "defaults" },
                     ]}
@@ -101,11 +103,11 @@ export default async function ProductSettingsPage({
                     ) : tab === "fields" ? (
                         <FieldsTab
                             catalogue={catalogue}
-                            fields={fields ?? []}
+                            fields={fields}
                         />
                     ) : tab === "allergens" ? (
                         <AllergensTab
-                            allergens={allergens ?? []}
+                            allergens={allergens}
                             canWrite={catalogue.canWrite}
                         />
                     ) : tab === "sku" ? (

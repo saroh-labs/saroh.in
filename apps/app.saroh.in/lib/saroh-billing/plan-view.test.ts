@@ -8,6 +8,7 @@ import type { SarohSubscription } from "./plan";
 import type { AddonsView, RowQuote } from "./plan-view";
 import {
     addonRows,
+    cancelOffer,
     pickerRows,
     waitingMove,
     yearlyOffer,
@@ -1191,6 +1192,155 @@ describe("yourPlan: leaving at the end of what is paid (DEC-159)", () => {
                 action: null,
             },
         ]);
+    });
+});
+
+describe("cancelOffer: Cancel plan (owner, 17 Oct 2026)", () => {
+    const onB = access({
+        plan: { id: "b", name: "Plan B" },
+        pricePaise: 11_100,
+    });
+    const yearlySub = () =>
+        sub({
+            billingCycle: "year",
+            plan: { ...sub().plan, interval: "year", priceCents: 111_000 },
+        });
+    const offer = (over: Partial<Parameters<typeof cancelOffer>[0]> = {}) =>
+        cancelOffer({
+            catalog: CATALOG,
+            subscription: sub(),
+            access: onB,
+            checkouts: null,
+            ...over,
+        });
+
+    it("is offered on a paid plan the business is billed for, with Free to move to", () => {
+        expect(offer()).toEqual({
+            planName: "Plan B",
+            freePlanId: "a",
+            freePlanName: "Plan A",
+            yearly: false,
+        });
+        expect(
+            offer({ subscription: sub({ status: "TRIALING" }) }),
+        ).not.toBeNull();
+        expect(
+            offer({ subscription: sub({ status: "PAST_DUE" }) }),
+        ).not.toBeNull();
+    });
+
+    it("says a year paid once is yearly", () => {
+        expect(offer({ subscription: yearlySub() })?.yearly).toBe(true);
+    });
+
+    it("is drawn by yourPlan, and left out once the plan is ending", () => {
+        const base = {
+            catalog: CATALOG,
+            liveVersion: 3,
+            checkouts: null,
+            addonsHeld: false,
+        };
+        expect(
+            yourPlan({ ...base, access: onB, subscription: sub() }).cancel,
+        ).toMatchObject({ planName: "Plan B" });
+        expect(
+            yourPlan({
+                ...base,
+                access: onB,
+                subscription: sub({ cancelAtPeriodEnd: true }),
+            }).cancel,
+        ).toBeNull();
+    });
+
+    it("is not offered on Free, an ended plan, or one not billed through a provider", () => {
+        const free = sub({
+            plan: {
+                ...sub().plan,
+                key: "catalog.a",
+                name: "Plan A",
+                priceCents: 0,
+            },
+        });
+        expect(offer({ subscription: free })).toBeNull();
+        expect(offer({ subscription: null })).toBeNull();
+        expect(
+            offer({ subscription: sub({ status: "CANCELLED" }) }),
+        ).toBeNull();
+        expect(offer({ subscription: sub({ provider: null }) })).toBeNull();
+        expect(offer({ catalog: null })).toBeNull();
+    });
+
+    it("is not offered while a move to another plan already waits", () => {
+        expect(
+            offer({
+                access: access({
+                    plan: { id: "b", name: "Plan B" },
+                    pricePaise: 11_100,
+                    pendingMove: {
+                        planId: "a",
+                        fromPlanId: "b",
+                        version: 3,
+                        from: "2026-11-01T00:00:00.000Z",
+                        waiting: null,
+                    },
+                }),
+            }),
+        ).toBeNull();
+    });
+
+    it("is not offered under a plan given for a while", () => {
+        expect(
+            offer({
+                access: access({
+                    plan: { id: "c", name: "Plan C" },
+                    pricePaise: 22_200,
+                    planOverride: {
+                        planKey: "c",
+                        expiresAt: "2027-01-03T00:00:00.000Z",
+                    },
+                }),
+            }),
+        ).toBeNull();
+    });
+
+    it("is not offered on a year whose next year is paid already", () => {
+        const scheduled = {
+            id: "co",
+            kind: "SCHEDULED",
+            status: "SCHEDULED",
+            plan: { id: "b", name: "Plan B", version: 3 },
+            cycle: "year",
+            pricePaise: 111_000,
+            startAt: "2026-11-01T00:00:00.000Z",
+            expiresAt: "2026-11-01T00:00:00.000Z",
+            createdAt: "2026-10-01T00:00:00.000Z",
+            payment: "ONE_TIME" as const,
+        };
+        expect(
+            offer({
+                subscription: yearlySub(),
+                checkouts: { open: null, scheduled, term: null },
+            }),
+        ).toBeNull();
+        // Monthly moving to a yearly already paid: the paid year would be
+        // given up, so Cancel isn't offered either.
+        expect(
+            offer({ checkouts: { open: null, scheduled, term: null } }),
+        ).toBeNull();
+        // Monthly: the next autopay approved stops with the rest.
+        expect(
+            offer({
+                checkouts: {
+                    open: null,
+                    scheduled: {
+                        ...scheduled,
+                        cycle: "month",
+                        payment: "AUTOPAY",
+                    },
+                    term: null,
+                },
+            }),
+        ).not.toBeNull();
     });
 });
 

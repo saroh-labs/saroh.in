@@ -161,10 +161,20 @@ export class ImportsService {
         // is refused whole rather than stopping partway; each chunk checks
         // again on its own transaction. Asked for only what fits
         // (`createAtMost`, UX-036), the new rows past it are left out first.
+        // A row that brings an archived product back (its status cell set
+        // to anything but Archived) adds one too, as a restore in the
+        // editor does; a blank status cell leaves it archived.
+        const archived =
+            entity === "products" && organizationId
+                ? await this.archivedSlugs(organizationId, writableRows(plan))
+                : new Set<string>();
         const addsProduct = (r: WritableRow) =>
             entity === "products" &&
-            r.outcome === "CREATE" &&
-            (r.values.status ?? "DRAFT") !== "ARCHIVED";
+            (r.outcome === "CREATE"
+                ? (r.values.status ?? "DRAFT") !== "ARCHIVED"
+                : archived.has(r.key) &&
+                  r.values.status !== undefined &&
+                  r.values.status !== "ARCHIVED");
         const { kept: rows, left: overLimit } = keepFirstNew(
             writableRows(plan),
             entity === "products" ? dto.createAtMost : undefined,
@@ -222,15 +232,24 @@ export class ImportsService {
         };
     }
 
-    /** The columns available to map, for the mapping step. */
-    describe(entity: ImportEntity) {
+    /**
+     * The columns available to map, for the mapping step, a sample file to
+     * start from, and the currency the preview's amounts read in.
+     */
+    async describe(storeId: string, entity: ImportEntity) {
         const d = ENTITY_DESCRIPTORS[entity];
+        const currency =
+            entity === "products"
+                ? await storefrontCurrency(prisma, storeId)
+                : null;
         return {
             entity,
             requiredFields: d.requiredFields,
             mappableFields: d.mappableFields,
             fieldLabels: d.fieldLabels,
             keyLabel: d.keyLabel,
+            sample: d.sample,
+            currency,
         };
     }
 
@@ -259,9 +278,15 @@ export class ImportsService {
 
         // An empty mapping means "you choose": suggest one so the first preview
         // is already informative rather than a wall of missing-field errors.
+        // Only a field the import takes: a column sent for another one (an
+        // older tab's "currency") is left out, as "Don't import" is.
         const mapping =
             Object.keys(dto.mapping).length > 0
-                ? dto.mapping
+                ? Object.fromEntries(
+                      Object.entries(dto.mapping).filter(([, field]) =>
+                          descriptor.mappableFields.includes(field),
+                      ),
+                  )
                 : suggestMapping(
                       parsed.headers,
                       descriptor.mappableFields,
@@ -283,8 +308,9 @@ export class ImportsService {
                 ? new Set(mrp.existing.keys())
                 : await this.existingKeys(storeId, organizationId, entity),
             requiredFields: descriptor.requiredFields,
-            keyOf: descriptor.keyOf,
+            fieldLabels: descriptor.fieldLabels,
             normalize: descriptor.normalize,
+            keyOf: descriptor.keyOf,
             validateRow: mrp
                 ? (values) => {
                       const issues = descriptor.validateRow(values);
@@ -392,16 +418,22 @@ export class ImportsService {
 
         if (entity === "products") {
             const slug = row.key;
+            // A blank cell (or a column not mapped) is no value: a new
+            // product starts without it, and an existing one keeps the one
+            // it has. An import never wipes what a cell doesn't say.
             const data = {
                 name: required(row, "name"),
                 // Rendered as HTML on the product page and the shop, so it
                 // is cleaned here as every editor save cleans it.
-                description: v.description
-                    ? sanitizeRichHtml(v.description).trim() || null
-                    : null,
-                image: v.image ?? null,
+                ...(v.description !== undefined
+                    ? {
+                          description:
+                              sanitizeRichHtml(v.description).trim() || null,
+                      }
+                    : {}),
+                ...(v.image !== undefined ? { image: v.image } : {}),
                 price: required(row, "price"),
-                status: v.status ?? "DRAFT",
+                ...(v.status !== undefined ? { status: v.status } : {}),
                 // Validated per row as the editor's fields are (UX-065);
                 // a blank cell leaves them unset.
                 ...(v.mrp?.trim() ? { mrp: v.mrp.trim() } : {}),
@@ -428,7 +460,17 @@ export class ImportsService {
                     undefined;
                 // The business's product, sold at this storefront (#510).
                 const product = await tx.product.create({
-                    data: { storeId, organizationId, slug, currency, ...data },
+                    data: {
+                        storeId,
+                        organizationId,
+                        slug,
+                        currency,
+                        status: "DRAFT",
+                        ...data,
+                        ...(data.status === "ARCHIVED"
+                            ? { archivedAt: new Date() }
+                            : {}),
+                    },
                     select: { id: true, currency: true },
                 });
                 await listAt(tx, {
@@ -459,6 +501,7 @@ export class ImportsService {
                     where: { organizationId_slug: { organizationId, slug } },
                     select: {
                         id: true,
+                        status: true,
                         currency: true,
                         price: true,
                         mrp: true,
@@ -478,6 +521,16 @@ export class ImportsService {
                     data: {
                         ...data,
                         ...(v.currency ? { currency: v.currency } : {}),
+                        // As the editor does: stamped on the way into the
+                        // archive, cleared on the way out.
+                        ...(data.status === undefined ||
+                        data.status === current.status
+                            ? {}
+                            : data.status === "ARCHIVED"
+                              ? { archivedAt: new Date() }
+                              : current.status === "ARCHIVED"
+                                ? { archivedAt: null }
+                                : {}),
                     },
                     select: { id: true, currency: true },
                 });
@@ -509,15 +562,33 @@ export class ImportsService {
         const email = row.key;
         // "Full name" splits into first and last (UX-065).
         const c = splitFullName(v);
-        const data = {
-            firstName: c.firstName ?? null,
-            lastName: c.lastName ?? null,
-            phone: c.phone ?? null,
-            country: c.country ?? null,
-            state: c.state ?? null,
-            city: c.city ?? null,
-            zipCode: c.zipCode ?? null,
-        };
+        // Only the cells the row fills: a blank one leaves an existing
+        // customer's value as it is (a new customer starts without it).
+        const fields = [
+            "firstName",
+            "lastName",
+            "phone",
+            "country",
+            "state",
+            "city",
+            "zipCode",
+        ] as const;
+        const data: Partial<Record<(typeof fields)[number], string | null>> =
+            {};
+        for (const f of fields) {
+            const value = c[f];
+            if (value !== undefined) data[f] = value;
+        }
+        // A one-word "Full name" is the whole name: no last name is left
+        // over from before.
+        if (
+            v.name?.trim() &&
+            v.firstName === undefined &&
+            v.lastName === undefined &&
+            data.lastName === undefined
+        ) {
+            data.lastName = null;
+        }
         if (row.outcome === "CREATE") {
             await tx.customer.create({
                 data: { storeId, organizationId, email, ...data },
@@ -528,6 +599,22 @@ export class ImportsService {
                 data,
             });
         }
+    }
+
+    /** Of the rows that update a product, the ones whose product is archived. */
+    private async archivedSlugs(
+        organizationId: string,
+        rows: readonly WritableRow[],
+    ): Promise<Set<string>> {
+        const slugs = rows
+            .filter((r) => r.outcome === "UPDATE" && r.values.status)
+            .map((r) => r.key);
+        if (slugs.length === 0) return new Set();
+        const found = await prisma.product.findMany({
+            where: { organizationId, slug: { in: slugs }, status: "ARCHIVED" },
+            select: { slug: true },
+        });
+        return new Set(found.map((p) => p.slug));
     }
 
     private async requireWrite(

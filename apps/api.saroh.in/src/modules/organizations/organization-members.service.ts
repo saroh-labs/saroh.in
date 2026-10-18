@@ -19,6 +19,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { enqueueBillingCustomerSync } from "../billing/billing-customer-sync";
 import { openInvitations } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
 import { overLimit } from "../billing/over-limit.service";
@@ -748,6 +749,12 @@ export class OrganizationMembersService {
                         ...(extrasChanged ? { extraActions: kept } : {}),
                     },
                 });
+                // A change of owners can change whose email the business
+                // is billed at (the first owner's): its customer at Saroh's
+                // billing provider is brought up to date (DEC-165).
+                if (membership.role === "OWNER" || dto.role === "OWNER") {
+                    await enqueueBillingCustomerSync(tx, ctx.organizationId);
+                }
                 // Replaced outright, and dropped entirely for a role that is
                 // not REVIEWER: a stale grant would keep a former reviewer's
                 // access to a site after they were moved off it.
@@ -1072,6 +1079,11 @@ export class OrganizationMembersService {
                         },
                     },
                 });
+                // An owner gone can change whose email the business is
+                // billed at (DEC-165).
+                if (role === "OWNER") {
+                    await enqueueBillingCustomerSync(tx, organizationId);
+                }
                 await tx.siteReviewer.deleteMany({
                     where: { organizationId, userId },
                 });

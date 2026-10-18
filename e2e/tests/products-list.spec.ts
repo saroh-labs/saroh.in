@@ -9,7 +9,8 @@ import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
 /**
  * The Products list and its quick look (#519, #520): search reaches the
  * whole catalogue and says when it finds nothing, a row opens the quick
- * look, Stop selling offers Undo, J at the last product stays put, and
+ * look from the keyboard with its title focused, Archive (in a menu with
+ * Duplicate and Delete) offers Undo, J at the last product stays put, and
  * Duplicate opens a draft copy in the Editor.
  *
  * It runs on Northwind Supply, the base seed — Rye & Co., Pulse Fitness and
@@ -34,14 +35,22 @@ test.describe("Products list", () => {
         await expect(
             page.getByText(`No products match “${nonsense}”`),
         ).toBeVisible();
-        await page.getByRole("button", { name: "Clear search" }).click();
+        // Only a search narrows, so the toolbar's way back says so too; the
+        // empty state's button is the one pressed.
+        await expect(page.locator('[data-slot="list-clear"]')).toHaveText(
+            "Clear search",
+        );
+        await page
+            .getByRole("button", { name: "Clear search" })
+            .and(page.locator(':not([data-slot="list-clear"])'))
+            .click();
         await expect(page).toHaveURL(/\/commerce\/products$/);
         await expect(
             page.getByText(`No products match “${nonsense}”`),
         ).toHaveCount(0);
     });
 
-    test("quick look, Stop selling with Undo, and Duplicate", async ({
+    test("quick look, Archive with Undo, and Duplicate", async ({
         page,
     }, testInfo) => {
         test.setTimeout(120_000);
@@ -61,11 +70,23 @@ test.describe("Products list", () => {
             await page.goto(`/commerce/products?q=${encodeURIComponent(name)}`);
             // The row's own button — its name leads; "More actions for …"
             // beside it only contains it.
+            // From the keyboard: the title takes focus, not the first
+            // button (whose tooltip would open), and Previous and Next say
+            // they do nothing at the only product.
             await page
                 .getByRole("button", { name: new RegExp(`^${name}`) })
-                .click();
+                .focus();
+            await page.keyboard.press("Enter");
             const look = page.getByRole("dialog", { name });
             await expect(look).toBeVisible();
+            await expect(look.getByRole("heading", { name })).toBeFocused();
+            await expect(page.getByRole("tooltip")).toHaveCount(0);
+            await expect(
+                look.getByRole("button", { name: /^Previous product/ }),
+            ).toHaveAttribute("aria-disabled", "true");
+            await expect(
+                look.getByRole("button", { name: /^Next product/ }),
+            ).toHaveAttribute("aria-disabled", "true");
             await expect(look.getByText("1 of 1")).toBeVisible();
             await expect(look.getByText("Live", { exact: true })).toBeVisible();
 
@@ -73,9 +94,19 @@ test.describe("Products list", () => {
             await page.keyboard.press("j");
             await expect(look.getByText("1 of 1")).toBeVisible();
 
-            // Stop selling archives it, and Undo puts it back on sale.
-            await look.getByRole("button", { name: "Stop selling" }).click();
-            await expect(page.getByText(/Stopped selling/)).toBeVisible();
+            // Archive takes it off sale, and Undo puts it back. It sits in
+            // the footer's menu beside Edit, in the row menu's order:
+            // Archive, Duplicate, then Delete.
+            await look.getByRole("button", { name: "More actions" }).click();
+            const items = page.getByRole("menuitem");
+            await expect(items).toHaveCount(3);
+            await expect(items.nth(0)).toContainText("Archive");
+            await expect(items.nth(1)).toHaveText("Duplicate");
+            await expect(items.nth(2)).toHaveText("Delete");
+            await page.getByRole("menuitem", { name: /Archive/ }).click();
+            await expect(
+                page.getByText(/^Archived E2E List Jar/),
+            ).toBeVisible();
             await expect(look.getByText("Archived")).toBeVisible();
             await page.getByRole("button", { name: "Undo" }).click();
             await expect(look.getByText("Live", { exact: true })).toBeVisible();

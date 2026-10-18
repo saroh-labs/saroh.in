@@ -29,13 +29,13 @@ describe("roleName", () => {
 describe("readOnlyBanner", () => {
     it("tells a reader who can change their role", () => {
         expect(readOnlyBanner("Member", false)).toBe(
-            "You're viewing as Member. You can read this product but not change it. An owner or admin can change this in Settings › Team.",
+            "You're signed in as Member. You can look, but not change anything. An owner or admin can change this in Settings › Team.",
         );
     });
 
     it("tells a stock-only role the one section it can change", () => {
         expect(readOnlyBanner("Packer", true)).toMatch(
-            /^You're viewing as Packer\. .* Only the Stock section below can be changed\.$/,
+            /^You're signed in as Packer\. You can change stock counts here, in the Stock section below\. /,
         );
     });
 });

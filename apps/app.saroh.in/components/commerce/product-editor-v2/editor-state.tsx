@@ -1,6 +1,7 @@
 "use client";
 
-import { showError, showSuccess } from "@saroh/ui/toast";
+import type { ToastId } from "@saroh/ui/toast";
+import { dismissToast, showErrorToast, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -67,12 +68,26 @@ interface EditorApi {
     saving: SectionKey[];
     report: (key: SectionKey, state: SectionState) => void;
     register: (key: SectionKey, handle: SectionHandle) => () => void;
-    saveSections: (keys: SectionKey[]) => Promise<void>;
+    /** Saves the ones that can; true when every one asked for saved. */
+    saveSections: (keys: SectionKey[]) => Promise<boolean>;
+    /**
+     * A section's refusal as a toast that stays until that section next
+     * saves (products audit, 16 Oct 2026): a stale error never sits beside
+     * "Variants saved."
+     */
+    sayError: (key: SectionKey, message: string, description?: string) => void;
     discard: (key: SectionKey) => void;
     /** Every section's part of a new product, merged. */
     collectAll: () => ProductPatch;
     /** The saves that need the new product's id; false if any failed. */
     afterCreateAll: (productId: string) => Promise<boolean>;
+    /**
+     * Creating: how many times Create was pressed with something missing.
+     * Basics marks what is (Name, Price) and takes the keyboard to the first.
+     */
+    createTries: number;
+    /** Create was pressed with something missing. */
+    triedCreate: () => void;
 }
 
 const EditorContext = createContext<EditorApi | null>(null);
@@ -112,7 +127,27 @@ export function ProductEditorProvider({
         Partial<Record<SectionKey, SectionState>>
     >({});
     const [saving, setSaving] = useState<SectionKey[]>([]);
+    const [createTries, setCreateTries] = useState(0);
+    const triedCreate = useCallback(() => setCreateTries((n) => n + 1), []);
     const handles = useRef(new Map<SectionKey, SectionHandle>());
+    const errorToasts = useRef(new Map<SectionKey, ToastId[]>());
+
+    const sayError = useCallback(
+        (key: SectionKey, message: string, description?: string) => {
+            const id = showErrorToast(message, description);
+            if (id === undefined) return;
+            errorToasts.current.set(key, [
+                ...(errorToasts.current.get(key) ?? []),
+                id,
+            ]);
+        },
+        [],
+    );
+
+    const clearErrors = useCallback((key: SectionKey) => {
+        for (const id of errorToasts.current.get(key) ?? []) dismissToast(id);
+        errorToasts.current.delete(key);
+    }, []);
     // Read inside saveSections, which runs after the states it was asked
     // about were rendered.
     const statesRef = useRef(states);
@@ -155,7 +190,7 @@ export function ProductEditorProvider({
                 dirty.map((k) => [k, current[k]?.problem ?? ""]),
             );
             const { savable, stuck } = partitionSections(dirty, problems);
-            if (savable.length === 0) return;
+            if (savable.length === 0) return false;
             setSaving(savable);
             const saved: SectionKey[] = [];
             try {
@@ -165,10 +200,14 @@ export function ProductEditorProvider({
                     const handle = handles.current.get(k);
                     if (!handle) continue;
                     try {
-                        if (await handle.save()) saved.push(k);
+                        if (await handle.save()) {
+                            saved.push(k);
+                            clearErrors(k);
+                        }
                     } catch {
                         // A save that threw never reached the API's answer.
-                        showError(
+                        sayError(
+                            k,
                             `Couldn't save ${names[k].toLowerCase()}. The connection dropped. Your changes are still here, so try again.`,
                         );
                     }
@@ -176,7 +215,7 @@ export function ProductEditorProvider({
             } finally {
                 setSaving([]);
             }
-            if (saved.length === 0) return;
+            if (saved.length === 0) return false;
             router.refresh();
             const only = saved.length === 1 ? saved[0] : undefined;
             showSuccess(
@@ -187,8 +226,9 @@ export function ProductEditorProvider({
                     names,
                 ),
             );
+            return saved.length === savable.length && stuck.length === 0;
         },
-        [router, names],
+        [router, names, clearErrors, sayError],
     );
 
     const discard = useCallback((key: SectionKey) => {
@@ -229,9 +269,12 @@ export function ProductEditorProvider({
             report,
             register,
             saveSections,
+            sayError,
             discard,
             collectAll,
             afterCreateAll,
+            createTries,
+            triedCreate,
         }),
         [
             mode,
@@ -244,9 +287,12 @@ export function ProductEditorProvider({
             report,
             register,
             saveSections,
+            sayError,
             discard,
             collectAll,
             afterCreateAll,
+            createTries,
+            triedCreate,
         ],
     );
     return (

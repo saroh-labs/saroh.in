@@ -7,7 +7,11 @@ import {
     requestOrigin,
     safeDestination,
 } from "./origins";
-import { existingUserSignUpHook, sessionCookieDomain } from "./server";
+import {
+    existingUserSignUpHook,
+    sessionCookieDomain,
+    userDatabaseHooks,
+} from "./server";
 
 describe("origins", () => {
     it("matches a trusted *.saroh.in origin (with or without path)", () => {
@@ -541,5 +545,53 @@ describe("existingUserSignUpHook: a sign-up for an address that has an account",
             "asha@example.com",
         );
         logged.mockRestore();
+    });
+});
+
+describe("userDatabaseHooks: telling the host of a user's change of email", () => {
+    type Hook = (row: unknown, context: unknown) => Promise<unknown>;
+    const hooksOf = (told: (u: { id: string }) => void) => {
+        const user = userDatabaseHooks({ onUserEmailChanged: told })
+            .databaseHooks?.user;
+        return {
+            before: user?.update?.before as unknown as Hook,
+            after: user?.update?.after as unknown as Hook,
+        };
+    };
+
+    it("tells the host once, after an update that wrote the email", async () => {
+        const told = vi.fn();
+        const { before, after } = hooksOf(told);
+        const request = {};
+        await before({ email: "new@example.com" }, request);
+        await after({ id: "user_1", email: "new@example.com" }, request);
+        await after({ id: "user_1" }, request);
+        expect(told).toHaveBeenCalledTimes(1);
+        expect(told).toHaveBeenCalledWith({ id: "user_1" });
+    });
+
+    it("says nothing for an update that left the email alone, or another request's", async () => {
+        const told = vi.fn();
+        const { before, after } = hooksOf(told);
+        const a = {};
+        const b = {};
+        await before({ name: "Asha" }, a);
+        await after({ id: "user_1" }, a);
+        await before({ email: "new@example.com" }, b);
+        await after({ id: "user_2" }, a);
+        expect(told).not.toHaveBeenCalled();
+    });
+
+    it("never fails the change when the host throws", async () => {
+        const { before, after } = hooksOf(() => {
+            throw new Error("queue down");
+        });
+        const request = {};
+        await before({ email: "new@example.com" }, request);
+        await expect(after({ id: "user_1" }, request)).resolves.toBeUndefined();
+    });
+
+    it("adds no hook the host didn't ask for", () => {
+        expect(userDatabaseHooks({})).toEqual({});
     });
 });

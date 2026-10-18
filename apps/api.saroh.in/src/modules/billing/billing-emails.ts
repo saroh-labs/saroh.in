@@ -169,6 +169,46 @@ export function paymentFailedEmail(input: {
 }
 
 /**
+ * A payment that charged the business twice for one period, given back in
+ * full (DEC-164, owner 17 Oct 2026). Sent once Razorpay took the refund;
+ * the money reaches the account it came from, usually in 5 to 7 working
+ * days (Razorpay's normal refund).
+ */
+export function doubleChargeRefundedEmail(input: {
+    businessName: string;
+    amount: string | null;
+}): RenderedEmail {
+    const what = input.amount ? `the ${input.amount}` : "the payment";
+    return {
+        subject: `We've refunded a payment for ${input.businessName}`,
+        html: wrap("We've refunded a payment", [
+            `${input.businessName} was charged twice for the same period of its Saroh plan, so we've refunded ${what} in full. Nothing else changes: your plan stays as it is.`,
+            "The money goes back to the card, bank account or UPI app it came from, usually within 5 to 7 working days. If it hasn't arrived by then, reply to this email and we'll look into it.",
+        ]),
+    };
+}
+
+/**
+ * Saroh support ended the business's autopay (DEC-166, owner 17 Oct 2026:
+ * a cancel keeps the plan to the end of the paid period). Nothing more is
+ * charged; the plan runs to `endsOn`, then the business is on Free.
+ */
+export function autopayEndedEmail(input: {
+    businessName: string;
+    planName: string;
+    endsOn: string;
+}): RenderedEmail {
+    return {
+        subject: `We've stopped autopay for ${input.businessName}`,
+        html: wrap("Your autopay has been stopped", [
+            `We've stopped the autopay for ${input.businessName}'s ${input.planName} plan. Nothing more will be charged.`,
+            `${input.businessName} keeps ${input.planName} until ${input.endsOn}, which is already paid for, and then moves to the Free plan. Everything you made is kept.`,
+            "If you didn't ask for this, reply to this email. You can choose a plan again in Settings › Plan whenever you're ready.",
+        ]),
+    };
+}
+
+/**
  * A free trial ends soon and the first charge follows (U16 queues it).
  * Only a trial that cost nothing: a paid first month says so instead
  * ({@link firstMonthEndingEmail}).

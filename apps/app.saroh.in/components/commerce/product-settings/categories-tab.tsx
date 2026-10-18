@@ -5,9 +5,9 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import { NameDialog } from "@/components/shared/name-dialog";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import type { CatalogueView, CategoryRemoval } from "@/lib/products/settings";
 import {
     addCategory,
@@ -19,10 +19,16 @@ import {
 
 import { listTable } from "@/components/shared/list-toolbar";
 import { cn } from "@saroh/ui/lib/utils";
+import { TextLink } from "@saroh/ui/text-link";
 import { CategoryMergeSheet } from "./category-merge-sheet";
-import { TabIntro } from "./product-settings";
+import { SettingsReadOnly, TabIntro } from "./product-settings";
 
 const NAME_MAX = 40;
+
+/** The Products list narrowed to one category. */
+export function categoryProductsHref(categoryId: string): string {
+    return `/commerce/products?category=${encodeURIComponent(categoryId)}`;
+}
 type Category = CatalogueView["categories"][number];
 
 /**
@@ -36,13 +42,20 @@ type Category = CatalogueView["categories"][number];
 export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
     const router = useRouter();
     const { categories, uncategorizedCount, canWrite } = catalogue;
-    const exists = (name: string, except?: string) =>
-        name.trim().toLowerCase() === "uncategorized" ||
-        categories.some(
-            (c) =>
-                c.id !== except &&
-                c.name.toLowerCase() === name.trim().toLowerCase(),
-        );
+    const [justAdded, setJustAdded] = useState<string | null>(null);
+    const addedRow = useRef<HTMLLIElement>(null);
+    useEffect(() => {
+        addedRow.current?.scrollIntoView({ block: "nearest" });
+    }, [justAdded, categories.length]);
+    /** The stored name a typed one clashes with, or "" when it is free. */
+    const exists = (name: string, except?: string): string =>
+        name.trim().toLowerCase() === "uncategorized"
+            ? "Uncategorized"
+            : (categories.find(
+                  (c) =>
+                      c.id !== except &&
+                      c.name.toLowerCase() === name.trim().toLowerCase(),
+              )?.name ?? "");
 
     /** An Undo: the call, then the list as it now is. `showUndo` says how it went. */
     async function undone(work: Promise<{ ok: boolean; error?: string }>) {
@@ -60,6 +73,8 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
             showError(res.error);
             return false;
         }
+        // It lands in alphabetical order: marked, and brought into view.
+        setJustAdded(res.data.id);
         router.refresh();
         showUndo(`${name} added.`, () => undone(removeCategory(res.data.id)));
         return true;
@@ -122,7 +137,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 !name
                     ? "A category needs a name."
                     : exists(name)
-                      ? `There is already a category called ${name}.`
+                      ? `${exists(name)} already exists.`
                       : name.length > NAME_MAX
                         ? `Keep it under ${NAME_MAX} characters.`
                         : ""
@@ -140,10 +155,14 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
             >
                 What each product is, one per product. They drive the
                 shop&apos;s filters and your reports. To group products for the
-                website, use collections.
+                website, use{" "}
+                <TextLink href="/commerce/products?tab=collections">
+                    collections
+                </TextLink>
+                .
             </TabIntro>
 
-            {canWrite ? null : <ReadOnlyNote />}
+            {canWrite ? null : <SettingsReadOnly />}
 
             {categories.length === 0 ? (
                 <EmptyState
@@ -163,9 +182,12 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                 {categories.map((c) => (
                     <li
                         key={c.id}
+                        ref={c.id === justAdded ? addedRow : undefined}
+                        data-just-added={c.id === justAdded ? "" : undefined}
                         className={cn(
                             "flex flex-wrap items-center gap-2.5",
                             listTable.rowStill,
+                            c.id === justAdded && "bg-muted/60",
                         )}
                     >
                         <div className="min-w-0 flex-[1_1_200px]">
@@ -173,7 +195,17 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                                 {c.name}
                             </p>
                             <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                {count(c.productCount, "product")}
+                                {c.productCount > 0 ? (
+                                    <TextLink
+                                        href={categoryProductsHref(c.id)}
+                                        className="text-[12px]"
+                                        aria-label={`${count(c.productCount, "product")} in ${c.name}`}
+                                    >
+                                        {count(c.productCount, "product")}
+                                    </TextLink>
+                                ) : (
+                                    "No products"
+                                )}
                             </p>
                         </div>
                         {canWrite ? (
@@ -244,12 +276,21 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                             Uncategorized
                         </p>
                         <p className="mt-0.5 text-[12px] text-muted-foreground">
-                            {count(uncategorizedCount, "product")}
+                            {uncategorizedCount > 0 ? (
+                                <TextLink
+                                    href={categoryProductsHref("none")}
+                                    className="text-[12px]"
+                                    aria-label={`${count(uncategorizedCount, "product")} with no category`}
+                                >
+                                    {count(uncategorizedCount, "product")}
+                                </TextLink>
+                            ) : (
+                                "No products"
+                            )}
                         </p>
                     </div>
                     <span className="text-[12px] text-muted-foreground">
-                        Always there. Where products go when their category is
-                        removed
+                        Products with no category. Always here.
                     </span>
                 </li>
             </ul>

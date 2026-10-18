@@ -10,6 +10,9 @@ export const MOMENT_KEYS = [
     "first-booking",
     "orders-10",
     "orders-100",
+    // Not a moment told: Product settings › Defaults' suggestions, put away
+    // with "Not now" for the whole business (products audit, 16 Oct 2026).
+    "defaults-suggestions",
 ] as const;
 
 export type MomentKey = (typeof MOMENT_KEYS)[number];

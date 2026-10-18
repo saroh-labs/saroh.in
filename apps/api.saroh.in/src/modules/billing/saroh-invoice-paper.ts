@@ -145,12 +145,15 @@ export function sarohInvoicePaper(
                 : null,
         },
         // The buyer's state is the place of supply's, so the two can never
-        // disagree (Rule 46(e)).
+        // disagree (Rule 46(e)). Their email and phone, when the invoice
+        // has them (17 Oct 2026), under the address.
         billedTo: {
             name: invoice.billToName,
             detail:
                 [
-                    invoice.billToAddress ?? invoice.billToEmail,
+                    invoice.billToAddress,
+                    invoice.billToEmail,
+                    invoice.billToPhone,
                     pos ? `State: ${pos}` : null,
                 ]
                     .filter((x): x is string => Boolean(x))

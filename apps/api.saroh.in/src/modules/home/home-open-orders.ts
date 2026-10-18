@@ -1,5 +1,6 @@
 import type { prisma } from "@saroh/database";
 import { Prisma } from "@saroh/database";
+import { DateTime } from "luxon";
 
 import {
     LATE_THRESHOLD_SELECT,
@@ -17,22 +18,45 @@ type Db = typeof prisma;
 
 /** What Home's open-orders source reads. */
 export interface OpenOrders {
-    /** Every open order: the Orders list's Open tab count. */
+    /**
+     * The open orders that need attention soon (DEC-163): late, or due today
+     * or tomorrow.
+     */
     count: number;
+    /** The rest of the Orders list's Open tab: in progress, due later. */
+    later: number;
     evidence: HomeEvidence[];
     /** The worst of what `count` holds past `evidence`, when anything. */
     moreTone?: HomeTone;
 }
 
 /**
- * Open orders (the Orders list's own predicate, `open-orders.ts`), the late
- * ones first and then oldest first, so a late order is never folded into
- * "N more" behind five that are merely due (H-1). Late is `lateSql`, the
- * rule the list's Late filter runs, read against each storefront's
- * thresholds; the row's words (`openOrderWords`) run the same rule.
+ * The moment that splits "soon" from "later" (DEC-163): the start of the day
+ * after tomorrow in the business's zone. An order that would turn late
+ * before it is late now, or due today or tomorrow — the "Due today" and "Due
+ * tomorrow" its row's tag says (`home-order-rows.ts`).
+ */
+export function soonCutoff(now: Date, zone: string): Date {
+    return DateTime.fromJSDate(now, { zone })
+        .startOf("day")
+        .plus({ days: 2 })
+        .toJSDate();
+}
+
+/**
+ * Open orders (the Orders list's own predicate, `open-orders.ts`) that need
+ * attention soon (DEC-163): late, or due today or tomorrow. "Due" is the
+ * moment it turns late, so "late by the day after tomorrow" is `lateSql`
+ * read at {@link soonCutoff} — the rule the list's Late filter runs, against
+ * each storefront's thresholds; the row's words (`openOrderWords`) run the
+ * same rule. An order due further out, or one that never turns late (on its
+ * way), stays in Orders and is counted in `later`, so Home can say how many
+ * more are in progress without listing a busy kitchen's every order.
  *
- * One read picks the rows and counts them — every open order, and how many
- * are late — so "N more" can say whether any it stands for is late. Its money
+ * The late ones first and then oldest first, so a late order is never folded
+ * into "N more" behind five that are merely due (H-1). One read picks the
+ * rows and counts them — every open order, the soon ones, and how many are
+ * late — so "N more" can say whether any it stands for is late. Its money
  * only to someone who reads orders. A staff member's Home reads only their
  * storefronts' (F11, `storeIds`); absent or null, every storefront's.
  */
@@ -46,24 +70,37 @@ export async function readOpenOrders(
         storeIds?: readonly string[] | null;
     },
 ): Promise<OpenOrders> {
-    const picked = await db.$queryRaw<
-        { id: string; late: boolean; total: number; lates: number }[]
+    const read = await db.$queryRaw<
+        {
+            id: string;
+            late: boolean;
+            soon: boolean;
+            open: number;
+            total: number;
+            lates: number;
+        }[]
     >(Prisma.sql`WITH candidates AS (
-        SELECT o.id, o."createdAt", ${lateSql(view.now)} AS late
+        SELECT o.id, o."createdAt", ${lateSql(view.now)} AS late,
+            ${lateSql(soonCutoff(view.now, view.zone))} AS soon
         FROM "Order" o
         ${lateSettingsJoin()}
         WHERE ${openOrderSql(organizationId)}${storeSql(view.storeIds, "o")}
     )
-    SELECT id, late,
-        (COUNT(*) OVER ())::int AS total,
+    SELECT id, late, soon,
+        (COUNT(*) OVER ())::int AS open,
+        (COUNT(*) FILTER (WHERE soon) OVER ())::int AS total,
         (COUNT(*) FILTER (WHERE late) OVER ())::int AS lates
     FROM candidates
-    ORDER BY late DESC, "createdAt" ASC, id ASC
+    ORDER BY soon DESC, late DESC, "createdAt" ASC, id ASC
     LIMIT ${EVIDENCE_LIMIT}`);
-    if (picked.length === 0) return { count: 0, evidence: [] };
+    if (read.length === 0) return { count: 0, later: 0, evidence: [] };
 
-    const count = picked[0].total;
-    const lates = picked[0].lates;
+    const count = read[0].total;
+    const later = read[0].open - count;
+    const lates = read[0].lates;
+    // Soon ones sort first, so a later one picked only fills the limit.
+    const picked = read.filter((p) => p.soon);
+    if (picked.length === 0) return { count: 0, later, evidence: [] };
     const shownLate = picked.filter((p) => p.late).length;
 
     const rows = await db.order.findMany({
@@ -109,6 +146,7 @@ export async function readOpenOrders(
     const hidden = count - evidence.length;
     return {
         count,
+        later,
         evidence,
         ...(hidden > 0 ? { moreTone: lates > shownLate ? "bad" : "due" } : {}),
     };

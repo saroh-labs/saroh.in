@@ -8,7 +8,8 @@
  * maker's email, 10 Oct, is NOT YET in the owner's doc: a minimal factual
  * addition for the owner to review; the referral code cookie, 13 Oct
  * (DEC-156), the owner's agreed sentence, rev 74; page visits, 14 Oct
- * (DEC-160), the owner's agreed wording). Published VERBATIM at
+ * (DEC-160), the owner's agreed wording; Razorpay registers each business
+ * at sign-up, 17 Oct (DEC-165), the owner's agreed wording). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -61,7 +62,7 @@ Only the companies that help us run Saroh, each for its own job, and only what t
 
 | Company | What for |
 | --- | --- |
-| Razorpay | Taking your payments to Saroh. Your own Razorpay or Cashfree account takes your customers' payments to you |
+| Razorpay | Billing you for Saroh: we register your business with Razorpay when you sign up (business and billing name, owner's email, phone, GSTIN and billing address) and keep it up to date, and Razorpay takes your payments to Saroh. Your own Razorpay or Cashfree account takes your customers' payments to you |
 | Cashfree | Your customers' payments, when you connect it |
 | Amazon Web Services (SES) | Sending the emails Saroh sends, from India |
 | Google (Workspace) | Our mailboxes, when you write to us |

@@ -69,10 +69,12 @@ export function DataView<TRow>({
     toolbarAttention,
     toolbarMore,
     onClearFilters,
+    clearLabel,
     countLabel,
     hideModeToggle = false,
     onRowClick,
     selectable = false,
+    rowLabel,
     bulkActions,
     emptyState,
     paging,
@@ -336,6 +338,7 @@ export function DataView<TRow>({
                                         className={cn(
                                             listTable.th,
                                             col.numeric && "text-right",
+                                            col.tableClassName,
                                         )}
                                     >
                                         {col.sortValue ? (
@@ -422,7 +425,7 @@ export function DataView<TRow>({
                                                 onCheckedChange={() =>
                                                     toggleRow(key)
                                                 }
-                                                aria-label={`Select ${noun.one}`}
+                                                aria-label={`Select ${rowLabel?.(row) ?? noun.one}`}
                                             />
                                         </td>
                                     ) : null}
@@ -433,6 +436,7 @@ export function DataView<TRow>({
                                                 key={col.id}
                                                 className={cn(
                                                     listTable.td,
+                                                    col.tableClassName,
                                                     col.numeric &&
                                                         listTable.numeric,
                                                     // Money is the figure people
@@ -735,6 +739,7 @@ export function DataView<TRow>({
                 }
                 attention={toolbarAttention}
                 more={toolbarMore}
+                clearLabel={clearLabel}
                 onClear={
                     // The list's own search and subset, and whatever the
                     // screen says it has narrowed itself.
@@ -902,23 +907,32 @@ export function DataView<TRow>({
                         </span>
                     ) : null}
                     <div className="ml-auto flex flex-wrap gap-[7px]">
-                        {bulkActions?.map((action) => (
-                            <button
-                                key={action.id}
-                                type="button"
-                                onClick={() =>
-                                    action.run(selectedRows, clearSelection)
-                                }
-                                className={cn(
-                                    "h-8 cursor-pointer rounded-md px-3 text-[0.8125rem] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground coarse:h-11 coarse:px-4 coarse:text-sm",
-                                    action.tone === "destructive"
-                                        ? "bg-[#B3261E] text-white hover:bg-[#8F1E18] active:bg-[#741812]"
-                                        : "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/20",
-                                )}
-                            >
-                                {action.label}
-                            </button>
-                        ))}
+                        {bulkActions
+                            ?.filter((action) => !action.hidden?.(selectedRows))
+                            .map((action) => (
+                                <button
+                                    key={action.id}
+                                    type="button"
+                                    onClick={() =>
+                                        action.run(selectedRows, clearSelection)
+                                    }
+                                    className={cn(
+                                        "h-8 cursor-pointer rounded-md px-3 text-[0.8125rem] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground coarse:h-11 coarse:px-4 coarse:text-sm",
+                                        action.tone === "destructive"
+                                            ? "bg-[#B3261E] text-white hover:bg-[#8F1E18] active:bg-[#741812]"
+                                            : action.tone ===
+                                                "destructive-outline"
+                                              ? // The bar is Ink (Paper in dark): a red
+                                                // that holds its contrast on each.
+                                                "border border-[#F2B8B5]/60 text-[#F2B8B5] hover:bg-[#F2B8B5]/10 active:bg-[#F2B8B5]/20 dark:border-[#B3261E]/50 dark:text-[#B3261E] dark:hover:bg-[#B3261E]/10 dark:active:bg-[#B3261E]/15"
+                                              : "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/20",
+                                    )}
+                                >
+                                    {typeof action.label === "function"
+                                        ? action.label(selectedRows)
+                                        : action.label}
+                                </button>
+                            ))}
                         <button
                             type="button"
                             onClick={clearSelection}

@@ -52,6 +52,7 @@ import { promisesToMove } from "./open-promises";
 import type { ProductScope } from "./product-access";
 import { ProductAccess } from "./product-access";
 import { duplicateProduct } from "./product-duplicate";
+import { pathHolder, pathTakenMessage } from "./product-path";
 import type { MrpJudged } from "./product-rules";
 import {
     assertDetailsCoherent,
@@ -182,6 +183,12 @@ function isSlugClash(error: unknown): boolean {
     // must be the slug.
     return meta === undefined || JSON.stringify(meta).includes("slug");
 }
+
+/** Two saves took one path at the same moment: the second is told to retry. */
+const PATH_RACED = {
+    message: "Another product took this path a moment ago. Try again.",
+    field: "slug",
+};
 
 /**
  * Postgres gave up on the transaction over a lock: a deadlock (40P01) or a
@@ -453,6 +460,25 @@ export class ProductsService {
         return readPriceHistory(organizationId, "PRODUCT", productId, page);
     }
 
+    /**
+     * The path a product named `name` would get (`product-path.ts`): its
+     * own, or — when another product of the business has it — the first
+     * free number on it, with the holder's name. New product shows it as
+     * the name is typed; `except` leaves the product being edited out.
+     */
+    async suggestPath(
+        organizationId: string,
+        name: string,
+        except?: string,
+    ): Promise<{ path: string; holder: string | null }> {
+        const base = slugify(name);
+        if (!base) return { path: "", holder: null };
+        const holder = await pathHolder(organizationId, base, except);
+        return holder
+            ? { path: holder.free, holder: holder.name }
+            : { path: base, holder: null };
+    }
+
     /** Store-route alias of `createIn`: made and listed at `storeId`. */
     async create(storeId: string, userId: string, dto: CreateProductDto) {
         return this.createIn(
@@ -464,14 +490,19 @@ export class ProductsService {
     /** A new catalogue product, listed at the scope's storefront. */
     async createIn(scope: ProductScope, dto: CreateProductDto) {
         const { organizationId, storeId } = scope;
-        const slug = slugify(dto.slug ?? dto.name);
-        if (!slug) {
+        const asked = slugify(dto.slug ?? dto.name);
+        if (!asked) {
             throw new BadRequestException({
                 message: "That name has no letters or numbers in it. Add some.",
                 field: "slug",
             });
         }
-        await this.assertSlugFree(organizationId, slug);
+        // A path typed by hand is kept or refused; one made from the name
+        // takes the first free number instead ("packing-tape-2"), so a name
+        // another product has never dead-ends New product (16 Oct 2026).
+        let slug = asked;
+        if (dto.slug) await this.assertSlugFree(organizationId, asked);
+        else slug = (await pathHolder(organizationId, asked))?.free ?? asked;
         await this.assertCategoryOf(organizationId, dto.categoryId);
         await this.assertOptionOf(organizationId, dto.optionId);
         // GST is part of MRP: the MRP is compared with the amount to pay
@@ -599,10 +630,7 @@ export class ProductsService {
             });
         } catch (error) {
             if (!isSlugClash(error)) throw error;
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
+            throw new ConflictException(PATH_RACED);
         }
         if (dto.customFields) {
             await saveProductFieldValues(
@@ -740,10 +768,7 @@ export class ProductsService {
             return { id: productId };
         } catch (error) {
             if (!isSlugClash(error)) throw error;
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
+            throw new ConflictException(PATH_RACED);
         }
     }
 
@@ -985,10 +1010,7 @@ export class ProductsService {
                 });
             } catch (error) {
                 if (!isSlugClash(error)) throw error;
-                throw new ConflictException({
-                    message: "That address is already used by another product",
-                    field: "slug",
-                });
+                throw new ConflictException(PATH_RACED);
             }
         }
         // Custom fields and allergens save on their own; any section can
@@ -1127,20 +1149,20 @@ export class ProductsService {
     }
 
     /**
-     * Product slugs are unique per business (#510,
-     * @@unique([organizationId, slug])).
+     * Product paths (slugs) are unique per business (#510,
+     * @@unique([organizationId, slug])): a taken one is refused naming the
+     * product that has it and a free one to use (`product-path.ts`).
      */
     private async assertSlugFree(
         organizationId: string,
         slug: string,
     ): Promise<void> {
-        const existing = await prisma.product.findUnique({
-            where: { organizationId_slug: { organizationId, slug } },
-        });
-        if (existing) {
+        const holder = await pathHolder(organizationId, slug);
+        if (holder) {
             throw new ConflictException({
-                message: "That slug is already taken",
+                message: pathTakenMessage(holder.name, holder.free),
                 field: "slug",
+                free: holder.free,
             });
         }
     }

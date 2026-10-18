@@ -12,6 +12,8 @@
  * shaping video is left out: a video must be an uploaded file.
  */
 
+import { RYE_CAKE_PHOTOS } from "./catalog-photos";
+
 export interface RyePhoto {
     url: string;
     alt: string;
@@ -77,6 +79,8 @@ export const PHOTOS: Record<string, readonly RyePhoto[]> = {
             creditUrl: "https://unsplash.com/@k_savchev",
         },
     ],
+    // The custom cakes and their extras (`bakery-cakes.ts`).
+    ...RYE_CAKE_PHOTOS,
 };
 
 export interface RyeReview {

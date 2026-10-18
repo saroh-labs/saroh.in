@@ -234,6 +234,32 @@ describe("access from the catalogue (DB, U12)", () => {
         ).resolves.toMatchObject({ products: 11, invoicing: false });
     });
 
+    it("never keeps a grandfathered business that pays for a dearer plan on the override's (owner, 17 Oct)", async () => {
+        const until = new Date(Date.now() + 10 * DAY);
+        // Grandfathered Grow, paying for Pro: Pro, and no override ending.
+        const paysPro = await org("Pays Pro");
+        await subscribe(paysPro.id, "pro");
+        await planOverride(paysPro.id, "grow", until);
+        const a = await access.resolve(paysPro.id);
+        expect(a).toMatchObject({ planId: "pro", basePlanId: "pro" });
+        // Pro's "No cap", never Grow's 222.
+        expect(a.entitlements.products).toBe(true);
+        expect(a.planOverride).toBeNull();
+        await expect(access.planEnding(paysPro.id)).resolves.toBeNull();
+
+        // Given Pro, paying for Grow: Pro until the override ends.
+        const paysGrow = await org("Pays Grow");
+        await subscribe(paysGrow.id, "grow");
+        await planOverride(paysGrow.id, "pro", until);
+        const b = await access.resolve(paysGrow.id);
+        expect(b).toMatchObject({ planId: "pro", basePlanId: "grow" });
+        expect(b.planOverride?.planKey).toBe("pro");
+        await expect(access.planEnding(paysGrow.id)).resolves.toMatchObject({
+            planId: "pro",
+            nextPlanId: "grow",
+        });
+    });
+
     it("follows a pending move once its date has passed", async () => {
         const o = await org("Moved");
         const sub = await subscribe(o.id, "free");

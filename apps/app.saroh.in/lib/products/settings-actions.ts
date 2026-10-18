@@ -95,6 +95,36 @@ export async function addOptionValue(optionId: string, value: string) {
     );
 }
 
+/** A value's new name; it changes on every variant that uses it. */
+export async function renameOptionValue(
+    optionId: string,
+    valueId: string,
+    value: string,
+) {
+    return send<{
+        id: string;
+        value: string;
+        previousValue: string;
+        variantCount: number;
+    }>(
+        `/options/${encodeURIComponent(optionId)}/values/${encodeURIComponent(valueId)}`,
+        "PATCH",
+        { value },
+    );
+}
+
+/** Every value of the option, in the order customers pick from. */
+export async function reorderOptionValues(
+    optionId: string,
+    valueIds: string[],
+) {
+    return send<{ id: string; valueIds: string[]; previousValueIds: string[] }>(
+        `/options/${encodeURIComponent(optionId)}/values/order`,
+        "PUT",
+        { valueIds },
+    );
+}
+
 export async function removeOptionValue(optionId: string, valueId: string) {
     return send<{ id: string; value: string }>(
         `/options/${encodeURIComponent(optionId)}/values/${encodeURIComponent(valueId)}`,

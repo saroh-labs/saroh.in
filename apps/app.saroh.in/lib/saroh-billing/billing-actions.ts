@@ -16,8 +16,9 @@ import type {
 /**
  * Settings › Plan and billing's writes (plans catalogue U15–U17): quote a
  * change, make it, hold add-ons. Only keys go to the API — a plan id, a
- * cycle, a coupon code, the bill-to state, GSTIN and registered address, an
- * add-on and how many;
+ * cycle, a coupon code, the bill-to state, GSTIN and registered address
+ * (and a name, email or phone the business had none of), an add-on and
+ * how many;
  * every amount is the server's (KTD-18). Actions take any input, so each
  * is checked again here.
  */
@@ -49,6 +50,17 @@ export interface ChangeInput {
     billingState?: string;
     gstin?: string;
     registeredAddress?: AddressInput;
+    /** Asked only when the business has none (17 Oct 2026). */
+    billingName?: string;
+    billingEmail?: string;
+    phone?: string;
+}
+
+/** The typed words of a field, trimmed and capped; blank is none. */
+function text(value: unknown, max: number): string | undefined {
+    return typeof value === "string" && value.trim()
+        ? value.trim().slice(0, max)
+        : undefined;
 }
 
 const ADDRESS_LIMITS: Record<keyof AddressInput, number> = {
@@ -74,8 +86,17 @@ function cleanAddress(value: unknown): AddressInput | undefined {
 
 function clean(input: unknown): ChangeInput | null {
     if (!input || typeof input !== "object") return null;
-    const { plan, cycle, coupon, billingState, gstin, registeredAddress } =
-        input as Record<string, unknown>;
+    const {
+        plan,
+        cycle,
+        coupon,
+        billingState,
+        gstin,
+        registeredAddress,
+        billingName,
+        billingEmail,
+        phone,
+    } = input as Record<string, unknown>;
     if (typeof plan !== "string" || !PLAN_ID.test(plan)) return null;
     if (cycle !== "month" && cycle !== "year") return null;
     const out: ChangeInput = { plan, cycle };
@@ -90,6 +111,12 @@ function clean(input: unknown): ChangeInput | null {
     }
     const address = cleanAddress(registeredAddress);
     if (address) out.registeredAddress = address;
+    const name = text(billingName, 200);
+    if (name) out.billingName = name;
+    const email = text(billingEmail, 254);
+    if (email) out.billingEmail = email;
+    const tel = text(phone, 32);
+    if (tel) out.phone = tel;
     return out;
 }
 

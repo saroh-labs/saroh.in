@@ -12,9 +12,11 @@ import { EmptyState } from "@saroh/ui/data-state";
 
 import {
     formatList,
+    IN_PROGRESS_HREF,
+    inProgressLabel,
     needLine,
-    needTitle,
     needsState,
+    needTitle,
     seeAllLabel,
     shownNeeds,
     thingsLabel,
@@ -52,12 +54,18 @@ import { useInlineActions } from "./use-inline-actions";
 export function NeedsYou({
     needs,
     total,
+    inProgress = 0,
     unavailable,
     next,
 }: {
     needs: readonly HomeNeed[];
     /** How many things need doing; a "3 more" row stands for three. */
     total: number;
+    /**
+     * Open orders due after tomorrow, left to Orders (DEC-163): one quiet
+     * link beside the count, never a row or a note of its own.
+     */
+    inProgress?: number;
     unavailable: readonly HomeUnavailable[];
     /** After "Nothing needs you.": the next booking today, or the quiet. */
     next: string;
@@ -82,6 +90,15 @@ export function NeedsYou({
                 <span className="text-[12.5px] text-muted-foreground">
                     {thingsLabel(openTotal(total, doneHere))}
                 </span>
+                {inProgress > 0 ? (
+                    <TextLink
+                        href={IN_PROGRESS_HREF}
+                        tone="muted"
+                        className="text-[12.5px] coarse:min-h-11"
+                    >
+                        {inProgressLabel(inProgress, total)}
+                    </TextLink>
+                ) : null}
             </div>
 
             {state === "clear" ? (

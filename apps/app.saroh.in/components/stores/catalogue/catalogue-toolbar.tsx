@@ -10,6 +10,8 @@ import type { ListQuery } from "@/lib/products/list-query";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
 
 const ANY = "";
+/** `?category=none`: the products with no category. */
+const UNCATEGORIZED = "none";
 
 const STATUSES: { value: ProductStatus | typeof ANY; label: string }[] = [
     { value: ANY, label: "All statuses" },
@@ -77,7 +79,13 @@ export function CatalogueFilters({
                 any="All categories"
                 things="categories"
                 empty="No categories yet"
-                choices={choices.categories}
+                choices={
+                    choices.categories && [
+                        ...choices.categories,
+                        // Settings › Categories links its Uncategorized here.
+                        { id: UNCATEGORIZED, name: "Uncategorized" },
+                    ]
+                }
                 value={query.category}
                 onPick={(category) => go({ category })}
             />
@@ -92,7 +100,7 @@ export function CatalogueFilters({
                     value={query.storefront}
                     onChange={(storefront) => go({ storefront })}
                     noun={{ one: "product", other: "products" }}
-                    note="A filter, not a scope. The catalogue belongs to the business, and a location decides what it sells from it."
+                    note="Shows what this location sells. Products belong to the business."
                 />
             ) : null}
         </>
@@ -109,7 +117,24 @@ export function CatalogueMoreFilters({
     choices,
 }: ToolbarProps & { choices: FilterChoices }) {
     return (
-        <MoreFilters title="Filter products" count={query.collection ? 1 : 0}>
+        <MoreFilters
+            title="Filter products"
+            count={(query.collection ? 1 : 0) + (query.option ? 1 : 0)}
+        >
+            {query.option ? (
+                // Only reached from Settings › Options' count, so only
+                // offered while it narrows.
+                <ChoiceFilter
+                    wide
+                    label="Option"
+                    any="All options"
+                    things="options"
+                    empty="No options yet"
+                    choices={choices.options ?? null}
+                    value={query.option}
+                    onPick={(option) => go({ option })}
+                />
+            ) : null}
             <ChoiceFilter
                 wide
                 label="Collection"
@@ -130,6 +155,7 @@ export const catalogueNarrowed = (query: ListQuery) =>
         query.q,
         query.status,
         query.category,
+        query.option,
         query.collection,
         query.storefront,
     ].some(Boolean);

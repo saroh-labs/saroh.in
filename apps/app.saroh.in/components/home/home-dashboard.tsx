@@ -134,6 +134,7 @@ export function HomeDashboard({
                     <NeedsYou
                         needs={home.needs}
                         total={home.needsTotal}
+                        inProgress={home.ordersInProgress}
                         unavailable={home.unavailable}
                         next={nextLine(home.upcoming, now)}
                     />

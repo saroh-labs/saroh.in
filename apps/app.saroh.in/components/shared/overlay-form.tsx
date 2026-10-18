@@ -86,6 +86,9 @@ function firstControl(body: Element | null | undefined): HTMLElement | null {
 
 const INVALID = '[aria-invalid="true"]:not([disabled])';
 
+/** A field that asks for the keyboard on opening, ahead of the first. */
+const AUTOFOCUS = "[data-autofocus]:not([disabled]):not([readonly])";
+
 /**
  * The last control pressed. A press doesn't focus a button everywhere
  * (Safari), so "what had the keyboard" alone would lose the opener there.
@@ -204,13 +207,18 @@ export function useOverlayFrame({
                 if (pending) event.preventDefault();
             },
             onOpenAutoFocus: (event: Event) => {
+                const body = form.current?.querySelector("[data-overlay-body]");
+                // A field marked for it takes the keyboard first, its value
+                // selected (the stock sheet's first count, not a name).
+                const marked = body?.querySelector<HTMLElement>(AUTOFOCUS);
                 const first =
-                    firstControl(
-                        form.current?.querySelector("[data-overlay-body]"),
-                    ) ?? form.current?.querySelector<HTMLElement>(FIRST_FIELD);
+                    marked ??
+                    firstControl(body) ??
+                    form.current?.querySelector<HTMLElement>(FIRST_FIELD);
                 if (!first) return;
                 event.preventDefault();
                 first.focus();
+                if (marked instanceof HTMLInputElement) marked.select();
             },
             ...(hasTrigger
                 ? {}

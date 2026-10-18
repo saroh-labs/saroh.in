@@ -1,9 +1,7 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { X } from "lucide-react";
 import { useId } from "react";
 
 import type { SheetSize } from "@/lib/products/stock-sheet";
@@ -12,24 +10,26 @@ import { Label } from "@saroh/ui/label";
 import { MoneyInput } from "@saroh/ui/money-input";
 
 /**
- * The sheet's column heads on the desk: size · price · on hand · warn at ·
- * remove. A phone has no heads; each row labels its own boxes (T7).
+ * The sheet's column heads on the desk: variant · price · on hand · warn
+ * at. A phone has no heads; each row labels its own boxes (T7). There is
+ * no remove: a sheet for typing counts never deletes a variant (Products
+ * audit, 16 Oct 2026). That is the editor's Variants section, which asks.
  */
 export const ROW =
-    "hidden grid-cols-[minmax(0,1.4fr)_84px_64px_64px_26px] items-center gap-1.5 sm:grid";
-/** Untracked: size · price · remove. */
+    "hidden grid-cols-[minmax(0,1.4fr)_84px_64px_64px] items-center gap-1.5 sm:grid";
+/** Untracked: variant · price. */
 export const PRICE_ROW =
-    "hidden grid-cols-[minmax(0,1.4fr)_96px_26px] items-center gap-1.5 sm:grid";
+    "hidden grid-cols-[minmax(0,1.4fr)_96px] items-center gap-1.5 sm:grid";
 
 /*
- * A size's own row. On a phone (below `sm`) the size has the first line
- * beside its 44px remove button, and its boxes share the second, each
- * labelled; the desk keeps one row under the heads above.
+ * A variant's own row. On a phone (below `sm`) its name has the first
+ * line and its boxes share the second, each labelled; the desk keeps one
+ * row under the heads above.
  */
 const SIZE_ROW =
-    "grid grid-cols-[repeat(3,minmax(0,1fr))_44px] items-end gap-1.5 sm:grid-cols-[minmax(0,1.4fr)_84px_64px_64px_26px] sm:items-center";
+    "grid grid-cols-[repeat(3,minmax(0,1fr))] items-end gap-1.5 sm:grid-cols-[minmax(0,1.4fr)_84px_64px_64px] sm:items-center";
 const SIZE_PRICE_ROW =
-    "grid grid-cols-[minmax(0,1fr)_44px] items-end gap-1.5 sm:grid-cols-[minmax(0,1.4fr)_96px_26px] sm:items-center";
+    "grid grid-cols-1 items-end gap-1.5 sm:grid-cols-[minmax(0,1.4fr)_96px] sm:items-center";
 /** A box and, on a phone, its label above it. */
 const FIELD = "grid min-w-0 gap-1 sm:contents";
 const PHONE_LABEL = "text-[11.5px] text-muted-foreground sm:hidden";
@@ -37,10 +37,10 @@ const PHONE_LABEL = "text-[11.5px] text-muted-foreground sm:hidden";
 const LOCKED = "bg-muted text-muted-foreground";
 
 /**
- * One size in the stock sheet (#523): its name and price (read-only
+ * One variant in the stock sheet (#523): its name and price (read-only
  * without `store:write`), what is on hand — the sum of its storefronts,
  * each with its own box, when there is more than one — and when to warn.
- * A size with open orders can't be removed, and says why.
+ * Named by the product's own option ("Shade 1 name").
  */
 export function SheetSizeRow({
     size: s,
@@ -51,6 +51,7 @@ export function SheetSizeRow({
     hasVariants,
     productPrice,
     currency,
+    optionName,
     onSize,
     onPrice,
     onShelf,
@@ -61,10 +62,12 @@ export function SheetSizeRow({
     split: boolean;
     canWrite: boolean;
     hasVariants: boolean;
-    /** The product's price, as edited: a size's blank price. */
+    /** The product's price, as edited: a variant's blank price. */
     productPrice: string;
     /** The product's currency, for the price box. */
     currency: string;
+    /** The product's option ("Shade"); "Variant" when it has none. */
+    optionName?: string | null;
     onSize: (patch: Partial<SheetSize>) => void;
     /** The product's own price, for a product sold as itself. */
     onPrice: (price: string) => void;
@@ -76,28 +79,10 @@ export function SheetSizeRow({
         0,
     );
     const first = s.shelves.at(0);
-    const canRemove = canWrite && s.variantId !== null && promised === 0;
     const nameLocked = !canWrite || s.variantId === null;
     const id = useId();
-    const label = s.title || "Size";
-    // Drawn twice, one per layout, so the tab order follows the eye: on a
-    // phone it sits beside the name, on the desk at the row's end.
-    const remove = (className: string) => (
-        <Button
-            type="button"
-            variant="outline"
-            disabled={!canRemove}
-            onClick={() => onSize({ removed: true })}
-            aria-label={
-                promised > 0
-                    ? `${s.title} has open orders, so it can't be removed`
-                    : `Remove ${s.title || "this size"}`
-            }
-            className={cn("p-0 text-destructive-subtle-foreground", className)}
-        >
-            <X aria-hidden className="size-3" />
-        </Button>
-    );
+    const word = optionName?.trim() ? optionName.trim() : "Variant";
+    const label = s.title || word;
 
     return (
         <div>
@@ -106,13 +91,12 @@ export function SheetSizeRow({
                     value={s.title}
                     onChange={(e) => onSize({ title: e.target.value })}
                     readOnly={nameLocked}
-                    aria-label={`Size ${i + 1} name`}
+                    aria-label={`${word} ${i + 1} name`}
                     className={cn(
                         counts && "col-span-3 sm:col-span-1",
                         nameLocked && LOCKED,
                     )}
                 />
-                {remove("size-11 sm:hidden")}
                 {s.variantId === null && hasVariants ? (
                     // Counted as a whole: each size keeps its own price.
                     <span />
@@ -130,7 +114,7 @@ export function SheetSizeRow({
                             }
                             readOnly={!canWrite}
                             placeholder={s.variantId ? productPrice : undefined}
-                            aria-label={`${s.title || "Size"} price${s.variantId ? ", blank for the product's" : ""}`}
+                            aria-label={`${label} price${s.variantId ? ", blank for the product's" : ""}`}
                             className={cn(!canWrite && LOCKED)}
                         />
                     </div>
@@ -146,6 +130,8 @@ export function SheetSizeRow({
                             </Label>
                             <Input
                                 id={`${id}-on-hand`}
+                                data-on-hand={split ? undefined : ""}
+                                data-autofocus={split ? undefined : ""}
                                 value={
                                     split ? String(sum) : (first?.onHand ?? "0")
                                 }
@@ -170,7 +156,7 @@ export function SheetSizeRow({
                                 htmlFor={`${id}-warn`}
                                 className={PHONE_LABEL}
                             >
-                                Warn at
+                                Low stock at
                             </Label>
                             <Input
                                 id={`${id}-warn`}
@@ -184,7 +170,6 @@ export function SheetSizeRow({
                         </div>
                     </>
                 ) : null}
-                {remove("hidden size-[26px] coarse:size-11 sm:inline-flex")}
             </div>
             {counts && split
                 ? s.shelves.map((x) => (
@@ -203,6 +188,8 @@ export function SheetSizeRow({
                               </span>
                           </span>
                           <Input
+                              data-on-hand=""
+                              data-autofocus=""
                               value={x.onHand}
                               onChange={(e) =>
                                   onShelf(x.storeId, e.target.value)

@@ -96,15 +96,21 @@ an earlier seed left; connect real test keys in Settings › Providers instead.
 ### Showcase (the product film's world)
 
 ```bash
-pnpm --filter @saroh/database db:seed:showcase   # base seed, then eight businesses on top
+pnpm --filter @saroh/database db:seed:showcase   # base seed, then the showcase businesses on top
 pnpm --filter @saroh/database db:seed:reset      # removes both
 ```
 
 This runs the base seed first, then adds more to Northwind (about 50 products,
 500 customers, 500 orders, 120 contacts and 40 leads) and adds seven more
 businesses — Pulse, Prana, CarePoint, Lumen and Kavi Dental each with one
-published site at `<slug>.saroh.app.localhost`, Rye & Co. with its own, and
-the boutique without one:
+published site at `<slug>.saroh.app.localhost`, and Rye & Co. and the
+boutique with their own. Pulse, CarePoint, Rye & Co. and Leela & Loom each
+have a journal at `/blog` (24–30 posts in Help, News and Articles, photos
+inside the posts; `journal.ts`, `<business>-posts.ts`) linked from the menu,
+and Pulse, CarePoint and Leela & Loom 90 days of Insights traffic that
+counts their paid orders and enquiries and follows the festival calendar
+(`traffic.ts`; the product records no traffic source, so neither does the
+seed):
 
 - **Pulse Fitness** (a gym): personal training, assessments, classes and a
   free trial, about 490 bookings. Four people on the diary (`pulse.ts`): the
@@ -123,12 +129,33 @@ the boutique without one:
   classes" (₹999): about 30 sold, one about to run out, one run out unused. One
   open course, a few invoices written by hand, notes on three people. About
   770 invoices. `checkPulse` stops the run if any of these states is missing.
+  Commerce is on (the gym sells at its counter, `pulse-shop.ts`): a "Front
+  desk" storefront with 30 products — house-labelled supplements by flavour
+  or size (whey 1 kg and 2 kg, isolate, plant protein, creatine, pre-workout,
+  BCAA, electrolytes, protein bars single or by the box, peanut butter,
+  multivitamin, omega-3), gear (shakers and bottles by colour, gloves and
+  belts by size, wraps, bands, rope, roller, mat, towel, bag) and Pulse
+  T-shirts (S–XXL) and tanks (S–XL) in four and two colours — photographed,
+  with MRP and GST by HSN, counted per variant (two sold out, some low), and
+  about 140 counter orders a month for 90 days from about 100 members (by
+  their contact's email, so their page shows them), two open today holding
+  stock, one in a hundred returned. With Commerce on, a member's page reads
+  as a shop with a diary: Orders beside Bookings, "Subscriptions" rather
+  than "Membership". `checkPulseShop` checks it.
 - **Prana Yoga** (a studio): studio classes, and live online classes whose
   bookings carry a meeting link. Four courses — one running, one online
   starting soon, one finished, one draft — with 30 enrolments; three class
   packs (one retired) with 45 sold and the classes spent on real bookings.
-- **CarePoint Clinic**: doctors' appointments (one of them by video) and 260
-  patients, about 340 bookings. No Payments, so no billing.
+- **CarePoint Clinic** (5th Cross, Malleshwaram): doctors' appointments
+  (one of them by video) and 260 patients, about 620 bookings from 90 days
+  back to 3 weeks ahead. Payments is on with the stand-in Razorpay
+  (`carepoint-billing.ts`): a third of visits, and every teleconsultation,
+  paid online at booking (the booking's own invoice, marked paid); the rest
+  billed at the desk after the visit, mostly paid there by UPI, cash or card,
+  a few due or overdue — about 150 paid consultations a month, exempt, in
+  INV-0001…, each naming the patient's contact so their account on the site
+  shows their visits and bills (nothing medical is stored).
+  `checkCarePoint` checks it.
 - **Lumen Studio** (a design studio): 30 leads and 3 posts.
 - **Leela & Loom** (a beauty and dresses boutique, owned by `demo@saroh.dev`;
   #471): the store the products screens are filmed in. Thirty products —
@@ -138,8 +165,17 @@ the boutique without one:
   variant (one sold out, a few low, eight open orders holding stock), and 81
   verified-purchase reviews behind delivered orders — some replied to, one
   hidden. Its catalogue is fixed; its orders and reviews are rewritten each
-  run and checked (`checkBoutique`). Before filming, run
-  `node scripts/check-demo-images.mjs` to confirm every photo still loads.
+  run and checked (`checkBoutique`). Behind them, three months of trade
+  (`boutique-history.ts`): about 150 orders a month from about 100 paying
+  customers, delivered by courier with tracking or collected on Commercial
+  Street, a few cancelled and refunded, WELCOME100, MONSOON20 and GLOW15
+  redeemed in their windows, numbered LL-1001… in the order they were placed.
+  Its site, `leela-and-loom.saroh.app.localhost` (`boutique-site.ts`): home
+  (new in, testimonials, the journal), four collections, about and visit us,
+  the shop at `/shop` selling from its storefront (now a shop with an address,
+  hours, collection and ₹79 delivery free over ₹1,499; `SITE_SHOP` is on for
+  it). Before filming, run `node scripts/check-demo-images.mjs` to confirm
+  every photo still loads.
 - **Rye & Co.** (an artisan bakery on Hill Road, Bengaluru, owned by
   `demo@saroh.dev`; Nisha Kulkarni works the counter as a Member; `bakery.ts`):
   the business the invoices, orders, subscriptions and customer screens are
@@ -177,8 +213,16 @@ the boutique without one:
   multigrain loaf (untracked) is marked Sold out by hand at Hill Road. Four
   collections: Bread (automatic, from Breads), Weekend bakes, Gifts and New
   this week. The stock log and resolved checks are rewritten whole each run,
-  so a take is undone by re-seeding. `checkRye` stops the run if any of these
-  states is missing.
+  so a take is undone by re-seeding. Custom cakes (`bakery-cakes.ts`):
+  eight cakes made after the order with 48 hours' notice — chocolate truffle,
+  red velvet, black forest, rasmalai (always eggless), lemon & blueberry,
+  coffee walnut, vanilla & seasonal fruit and a theme cake — by size with an
+  eggless twin where the recipe allows, never counted, and candles, number
+  candles, a topper and a message plaque; five cake orders placed this
+  morning for delivery two to five days out, paid, the day, theme and message
+  in the order's note (an order has no due date). They take order numbers in
+  the order placed; the films' orders keep their ids. `checkRye` stops the
+  run if any of these states is missing.
 
 - **Kavi Dental** (a dental clinic on 12th Main, Indiranagar, owned by
   `demo@saroh.dev`; Divya Kamath works the desk as a Member; `clinic.ts`,
@@ -212,6 +256,169 @@ the boutique without one:
   any of these states is missing, and `clinic.test.ts` plans the clinic for
   every half hour's `now` over months and across Diwali, month, year and
   financial-year boundaries to prove it works on any day.
+- **Ammi Ki Barni** (a home pickle kitchen in Nishatganj, Lucknow, owned by
+  `demo@saroh.dev`; Faizan Khan takes the orders as an Admin; `achaar.ts`,
+  on the Grow plan): 35 products — pickles in 250 g / 500 g / 1 kg jars (some
+  in mustard or sesame oil), winter pickles waiting for November, Diwali and
+  Eid boxes, and masalas, papad and aam papad counted on the shelf (one sold
+  out, two low). The pickles are made after the order comes in and count no
+  stock, so about 40 open orders sit in New or Preparing with "Pick-up Sat 18
+  Oct" or "Faizan delivers Tue 20 Oct" in their notes. About 460 orders over
+  three months from 105 customers (one-timers to weekly regulars), mostly
+  pick-up and local delivery, paid by UPI or cash at the handover; a few
+  cancelled, refunded, uncollected or delivered and not yet paid; Diwali
+  bulk orders. 40 reviews, an "Achaar ka Dabba" monthly box with 50 ongoing
+  and 50 ended subscribers and their invoices, enquiries from the site's "Ask
+  Ammi" form as leads, two QR codes with their scans, and 90 days of site
+  traffic that agrees with the orders. Its site
+  (`ammi-ki-barni.saroh.app.localhost`) has six pages and a journal of 30
+  posts in Help, News and Articles. `checkAchaar` stops the run if a designed
+  state is missing.
+- **Margin Books & Café** (an independent bookshop with a café corner on
+  Prabhat Road, Pune, owned by `demo@saroh.dev`; Siddharth Kale is a Member;
+  `pagdandi.ts`, on Pro): 93 products — public-domain classics in Paperback,
+  Hardcover, used and Hindi/Marathi/Bengali editions, books by fictional Pune
+  writers (one, _Kasba Peth Rains_, on pre-order until 1 Nov, its paid orders
+  waiting), stationery with many variants (a notebook in 24, inks in 12) and
+  café things. Book covers are generated SVGs
+  (`scripts/demo-covers/generate-pagdandi-covers.mjs` →
+  `pagdandi-covers.ts`). About 500 orders, nearly half at the counter to
+  walk-ins; Thursday author evenings and a Saturday story hour with ~320
+  bookings; a Book of the Month club with 50 ongoing and 50 ended members;
+  reviews, enquiries, QR codes, traffic and a 30-post journal as above, at
+  `margin-books.saroh.app.localhost`. `checkPagdandi` guards its states.
+  Both are written by `demo-shop.ts`; run `node scripts/check-demo-images.mjs`
+  before filming either.
+
+- **Golden Hour Weddings** (a wedding photography and planning studio on Lake Palace
+  Road, Udaipur, with a Jaipur desk; owned by `demo@saroh.dev`, Meher Bhati
+  plans as a Member; `frame-vow.ts`, `frame-vow-data.ts`, the engine in
+  `studio.ts`): GST-registered in Rajasthan (prefix GH, prices include 18%:
+  SAC 998385 photography, 998386 prints and albums, 998596 planning). Four
+  people on the diary (Kabir Shekhawat, Ishaan Mathur, Meher, Tanvi Purohit)
+  and ten services: a free planning call (studio or video), engagement,
+  pre-wedding, haldi & mehendi and wedding day (25% deposit), maternity,
+  newborn, family and couple sessions paid in full online, corporate half
+  days billed after. Fifteen couples' jobs — a 25% advance invoice holds each
+  date, the 75% balance is invoiced once the edit is delivered (paid, or for
+  Sanya & Vivek overdue and being chased), planning invoices itemise décor and
+  catering by the plate on the final count — plus three quotes as draft
+  invoices, about 330 bookings (weddings booked months ahead), 16 products
+  (a 27-variant album by size · cover · pages, canvas, cotton-rag prints,
+  sheesham frames, edit packs; décor, catering per plate, DJ and mehendi as
+  quoted-only products) with about 175 print and album orders and 20 reviews,
+  33 enquiries across New enquiry → Call done → Quote sent → Advance paid →
+  Booked → Delivered (15 from the site's form), notes, 30 posts (Help, News,
+  Articles) and 90 days of Insights. Site at
+  `golden-hour-weddings.saroh.app.localhost`: home, portfolio, packages, planning,
+  enquire, about, journal. `checkFrameVow` stops the run if a designed state
+  is missing.
+- **Loop Local Media** (a five-person social-media and local-marketing agency at
+  Shekhar Central, Palasia, Indore; owned by `demo@saroh.dev`, Nikita Rathi
+  as a Member; `pixel-chai.ts`, `pixel-chai-data.ts`): GST-registered in
+  Madhya Pradesh (prefix LL, SAC 998361, shoots 998385, print 998912). Monthly
+  retainers as plans — Listing care ₹2,999, Starter ₹14,999, Growth ₹27,999,
+  Pro ₹44,999 — with about 100 subscriptions over 18 months: 51 running (two
+  paused, one whose renewal failed), 50 ended (some moved up a plan), every
+  period invoiced. A free 20-minute audit call, a strategy workshop and a
+  Google profile clean-up paid online, reel shoot days billed after; brand
+  kits and festive packs billed by hand and a proposal as a draft; standees,
+  table tents and print packs ordered online; 26 leads (13 from the site),
+  notes, 30 posts and 90 days of Insights. Site at
+  `loop-local-media.saroh.app.localhost`: home, work, plans, audit, contact,
+  journal. `checkPixelChai` stops the run if a designed state is missing.
+  Their photos are Unsplash images every one of which was looked at
+  (`studio-photos.ts`, checked by `node scripts/check-demo-images.mjs`);
+  album covers, a catering card, standees and a sample report are drawn by
+  `scripts/demo-art/studio-art.mjs` and carried as `data:` URIs.
+- **Aarohan Academy** (a NEET/JEE coaching centre on Gopalpura Bypass,
+  Jaipur, owned by `demo@saroh.dev`; Vikram Choudhary, the director, signs in
+  as Admin and Kavita Saini, the admissions counsellor, as Member;
+  `shiksha.ts`, `shiksha-data.ts`, `shiksha-posts.ts`): GST-registered in
+  Rajasthan (prefix AA, SAC 999293 at 18%, prices include GST). Batches are
+  class-style services with 40 seats and weekly times (NEET Class 11 morning,
+  NEET Class 12 and JEE Class 11 evening, Class 9–10 weekends) that the site's
+  timetable reads; the free demo class and the counselling call are booked
+  online. Courses: the JEE Main crash course running, IELTS starting after
+  Diwali, Spoken English finished, the next one a draft — each enrolment
+  invoiced. About 50 students on monthly fee plans (some renewals failed or
+  overdue) and as many who have left; 42 on the ₹96,000 yearly programme pay
+  four ₹24,000 instalments, raised by hand each quarter (some overdue, one
+  voided, one draft after a scholarship). Six faculty on the diary with their
+  hours. 175 students, each with their parent written on their record as a
+  note; 40 admissions enquiries in the pipeline (Enquiry → Counselling call →
+  Demo class attended → Admitted, or lost), most from the site's form; about
+  200 shop orders of study modules and test-series books (subject × Hindi or
+  English medium), T-shirts, lab coats and OMR packs. A published site
+  (`aarohan-academy`) with courses, batches and timetable, results, faculty,
+  admissions, a demo-class page, and 27 posts in Help, News and Articles;
+  three QR codes with daily scans; ~4 months of site traffic with the results
+  day and admissions opening in it. What is missing for a real coaching
+  centre: a parent login (or a parent linked to a student), batch attendance,
+  quizzes and test marks, an instalment plan (instalments are invoices raised
+  by hand) and a batch as something a student is on (not a booking).
+- **Baithak Cowork** (a small coworking space on Baner Road, Pune, owned by
+  `demo@saroh.dev`; Rhea Deshpande, community manager, is Admin and Omkar
+  Pawar, front desk, Member; `desk42.ts`, `desk42-data.ts`,
+  `desk42-posts.ts`) — a CONCEPT demo of what a coworking space can do on
+  Saroh today. GST-registered in Maharashtra (prefix BC, SAC 997212 at 18%).
+  The day pass is a service with 20 places a weekday (the hot desks), also
+  bought ten at a time as a Flexi 10 pack; the Sahyadri meeting room and the
+  call booth are one-to-one services by the hour (two hours is two
+  bookings), every online booking paid with its tax invoice. Memberships are
+  monthly plans — hot desk, dedicated desk, virtual office: 36 on one (a
+  failed renewal, one paused, one ending) and 21 who left; 50 on at once
+  would be more than a 34-desk space holds. About 110 café, locker, printing
+  and merch orders; 22 membership enquiries; 26 posts. What is missing:
+  desks and rooms as resources (which desk, a floor plan, a 90-minute room
+  booking), member credits (the dedicated desk's four room hours a month),
+  check-in at the door, guest passes, and the virtual office's mail.
+
+    Both are drawn from photos hot-linked from Unsplash (checked by
+    `scripts/check-demo-images.mjs`) and pictures the seed draws —
+    covers, uniforms, timetables, the results card, the floor plan —
+    rendered by `scripts/demo-assets/render-demo-assets.mjs` into
+    `apps/app.saroh.in/public/demo/`, so they show only while the local app
+    runs at `https://app.saroh.localhost`. `checkShiksha` and `checkDesk42`
+    stop the run if a designed state is missing.
+
+- **Gulmohar Salon & Bridal** (a unisex salon and bridal studio on Prithviraj
+  Road, C-Scheme, Jaipur, owned by `demo@saroh.dev` as Noor Siddiqui on the
+  diary; Kavya Rathore keeps the desk as a Member; `salon-*.ts` on the shared
+  `diary-shop*.ts`): GST-registered in Rajasthan (prefix GS), services 18%
+  SAC 999721, prices inclusive. Twenty-seven services from a ₹100 threading
+  to a ₹28,000 bridal package — colour, keratin, smoothening, engagement and
+  bridal makeup and bridal mehendi take a 50% deposit online, the balance
+  billed at the desk — and seven people on the diary with their own weeks,
+  one off this week, booked per person so two stylists cut at once. About
+  950 bookings over three months and three weeks ahead (no-shows, late
+  cancels, a few nobody has marked), packs of 5 blow-dries and 6 facials
+  (one nearly out of time), a Blow-dry Club and a Men's Grooming Club the
+  desk books (52 members, 50 who left), a counter of 36 products — a cream
+  colour in 28 shades and a lacquer in 18, each with a drawn swatch — with
+  orders, stock and 34 reviews; the scenes: Aarti's trial done and her
+  wedding-day makeup and mehendi booked with deposits, Nidhi's PPD allergy,
+  Megha's booking-page note that she is pregnant, Sana's engagement
+  cancelled late with the deposit kept. A published site
+  (`gulmohar-salon`: home, services & prices, bridal with an enquiry form, team,
+  journal, visit us) with 27 posts in Help, News and Articles; 90 days of
+  Insights rollups. `checkDiaryShop` stops the run if a designed state is
+  missing.
+- **Stride Physio** (a physiotherapy clinic on CMH Road, Indiranagar, owned
+  by `demo@saroh.dev` as Dr. Ananya Krishnan; Dr. Rohit Menon on the diary;
+  Shruti Gowda on the desk as a Member; `physio-*.ts`): not GST-registered,
+  so plain receipts (INV-0001…). Assessments, follow-ups, sports and
+  post-surgery rehab, home visits with travel buffers, video follow-ups, dry
+  needling, and a six-session knee programme sold as one order (some
+  stopped after visit 3). Courses of visits weighted so most people stop
+  after the third, packs of 6 and 10, a Keep Moving plan (50 members, 48
+  who left), about 890 bookings; patients' Needs attention after ACL
+  surgery, diabetic, a pacemaker (no IFT), blood thinners, and a pregnant
+  patient's booking-page note. A counter of supports by size and side,
+  bands by strength and tape by colour. Site `stride-physio` (home,
+  conditions, treatments & prices, team, a 28-post journal, contact with
+  "Ask a physio"). The drawn images live in `apps/app.saroh.in/public/demo/`
+  (`scripts/demo-swatches/`), served from `https://app.saroh.localhost/demo/`.
 
 Every business keeps time in Asia/Kolkata (`BusinessProfile.timezone`). The
 showcase code is in `packages/database/src/seed/showcase/`. It uses a seeded
@@ -228,21 +435,32 @@ seats an open course still holds), no booking made after a closure was put up
 stands inside it, and every class spent from a pack was one
 the pack could pay for; it stops with the failing rows if not. Rows it wrote
 for Mirror & Co. and the earlier Rye & Co. (`seed_sc_rye_`; today's is
-`seed_sc_rc_`), the earlier line-up, are removed.
+`seed_sc_rc_`), the earlier line-up, are removed. A business renamed since a
+database was seeded (`RENAMED_BUSINESSES`: a site at its old address) is
+removed and written again under its new name.
+
+No seeded person can be rung or emailed for real. Every phone is
+`+91 00000 NNNNN` (a business's own line, E.164 `+9100000NNNNN`): fixtures
+carry fixed ones, generated people get theirs from `dummyPhone()` in
+`seed/helpers.ts`, the same person keeping one number everywhere. Customer,
+contact and booker emails are `@example.com`; staff sign in on `@saroh.dev`.
+`showcase/contact-check.ts` stops the run if a seeded row or a site's words
+break either rule (turning an older database's numbers into dummies first),
+and `seed/contact-details.test.ts` checks the seed's source.
 
 #### Demo accounts
 
 Every account's password is `demo-password-123` on a local database (the
 `SEED_PASSWORD` you set anywhere else), and every email is verified.
 
-| Email                | Business and role                                                                                                                                                                                                                                                                                                                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `demo@saroh.dev`     | Northwind OWNER · Leela & Loom OWNER · Rye & Co. OWNER · Kavi Dental OWNER · Pulse Fitness OWNER · Prana Yoga ADMIN · CarePoint Clinic MEMBER · Lumen Studio REVIEWER (its site only) — plus the base seed's Monsoon and Whitefield sites, OWNER                                                                                                                                                     |
-| `admin@saroh.dev`    | Northwind ADMIN · Pulse Fitness ADMIN                                                                                                                                                                                                                                                                                                                                                                |
-| `member@saroh.dev`   | Northwind MEMBER · Prana Yoga MEMBER                                                                                                                                                                                                                                                                                                                                                                 |
-| `reviewer@saroh.dev` | Northwind REVIEWER (base seed)                                                                                                                                                                                                                                                                                                                                                                       |
-| Business owners      | `radhika.bhat@` (Prana) · `meera.nair@` (CarePoint) · `aditi.rao@` (Lumen), all `@saroh.dev`                                                                                                                                                                                                                                                                                                         |
-| Staff                | Northwind: `suresh.gowda@`, `anita.fernandes@` · Pulse: `kabir.sethi@`, `ritika.nair@`, `imran.shaikh@`, `deepa.hegde@` · Prana: `anand.murthy@`, `leela.krishnan@`, `farah.siddiqui@` · CarePoint: `pooja.shetty@` (ADMIN), `arjun.rao@`, `sara.thomas@` · Lumen: `vikram.iyer@`, `sana.merchant@`, `rohan.pillai@` · Rye & Co.: `nisha.kulkarni@` (MEMBER) · Kavi Dental: `divya.kamath@` (MEMBER) |
+| Email                | Business and role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demo@saroh.dev`     | Northwind OWNER · Leela & Loom OWNER · Rye & Co. OWNER · Kavi Dental OWNER · Aarohan Academy OWNER · Baithak Cowork OWNER · Gulmohar Salon & Bridal OWNER · Stride Physio OWNER · Pulse Fitness OWNER · Prana Yoga ADMIN · CarePoint Clinic MEMBER · Lumen Studio REVIEWER (its site only) — plus the base seed's Monsoon and Whitefield sites, OWNER                                                                                                                                                                                                                                                                                    |
+| `admin@saroh.dev`    | Northwind ADMIN · Pulse Fitness ADMIN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `member@saroh.dev`   | Northwind MEMBER · Prana Yoga MEMBER                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `reviewer@saroh.dev` | Northwind REVIEWER (base seed)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Business owners      | `radhika.bhat@` (Prana) · `meera.nair@` (CarePoint) · `aditi.rao@` (Lumen), all `@saroh.dev`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Staff                | Northwind: `suresh.gowda@`, `anita.fernandes@` · Pulse: `kabir.sethi@`, `ritika.nair@`, `imran.shaikh@`, `deepa.hegde@` · Prana: `anand.murthy@`, `leela.krishnan@`, `farah.siddiqui@` · CarePoint: `pooja.shetty@` (ADMIN), `arjun.rao@`, `sara.thomas@` · Lumen: `vikram.iyer@`, `sana.merchant@`, `rohan.pillai@` · Rye & Co.: `nisha.kulkarni@` (MEMBER) · Kavi Dental: `divya.kamath@` (MEMBER) · Aarohan Academy: `vikram.choudhary@` (ADMIN), `kavita.saini@` (MEMBER) · Baithak Cowork: `rhea.deshpande@` (ADMIN), `omkar.pawar@` (MEMBER) · Gulmohar Salon: `kavya.rathore@` (MEMBER) · Stride Physio: `shruti.gowda@` (MEMBER) |
 
 CarePoint is a Member's view on purpose. A Member's role today reads the
 business, its team and its sites but not contacts or bookings, so the clinic

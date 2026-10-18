@@ -50,15 +50,27 @@ export function PausedBanner({ view }: { view: PausedView | null }) {
 /**
  * One line saying why something is paused, where it is listed or edited:
  * the words and the way back, never only a tag or a hover (four scenes).
+ * While plans aren't shown (DEC-136) there is no plan to point to: with
+ * `hiddenPlans` it says that line instead, so a paused, read-only page is
+ * never left without a reason.
  */
 export function PausedNote({
     children,
     className,
+    hiddenPlans,
 }: {
     children: React.ReactNode;
     className?: string;
+    /** What to say while plans are hidden; left out, nothing is drawn. */
+    hiddenPlans?: React.ReactNode;
 }) {
-    if (!plansShown()) return null;
+    if (!plansShown()) {
+        return hiddenPlans ? (
+            <Notice tone="warning" role="note" className={className}>
+                {hiddenPlans}
+            </Notice>
+        ) : null;
+    }
     return (
         <Notice tone="warning" role="note" className={className}>
             {children}{" "}

@@ -199,6 +199,16 @@ each with why it stops there:
   (DEC-067) are `home-refunds-failed.ts`, called once. The refunds-owed read (to
   `home-money-sources.ts` once D13 has landed there) is the next seam.
 
+- `billing/billing-webhook.service.ts` (about 1,360; 1,034 before 17 Oct)
+  — the one transaction each provider event is applied in: a checkout's
+  completion, the subscription's own events, and since DEC-164 a payment
+  after Saroh let go (`onDroppedCheckout`, `onLeftCheckout`,
+  `chargedAfterCancel`). What decides those is already out
+  (`paid-after-end.ts`, `double-charge.ts`, `double-charge-refund.job.ts`, `plan-moves.ts`,
+  `change-timing.ts`); the three handlers share `completeCheckout`,
+  `renewed` and the outcome type, and are the next seam (a class of their
+  own handed those two).
+
 Added or grown past 400 by the Products and Stock release (#510–#531), each
 with why it stops there:
 

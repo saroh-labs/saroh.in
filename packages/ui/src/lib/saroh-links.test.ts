@@ -50,7 +50,8 @@ describe("sarohFooterLinks", () => {
 
     it("sends Help to the old help site until Help publishes", () => {
         const links = sarohFooterLinks(new Date("2026-10-16T23:59:59+05:30"));
-        expect(links.map((l) => l.label)).toEqual(["Privacy", "Terms", "Help"]);
+        // Privacy republishes on 17 Oct too (DEC-165).
+        expect(links.map((l) => l.label)).toEqual(["Terms", "Help"]);
         expect(links.at(-1)?.href).toBe(SAROH_OLD_HELP_URL);
     });
 

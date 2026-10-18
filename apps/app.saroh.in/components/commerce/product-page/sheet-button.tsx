@@ -1,5 +1,6 @@
 "use client";
 
+import type { ButtonProps } from "@saroh/ui/button";
 import { Button } from "@saroh/ui/button";
 import { Pencil } from "lucide-react";
 import { useState } from "react";
@@ -14,9 +15,11 @@ import { PhotosSheet } from "./sheets/photos-sheet";
 export type SheetKind = "details" | "description" | "photos";
 
 /**
- * An "Edit" beside a panel of the product page. It opens that panel's quick
- * sheet over the page rather than leaving for the editor — the same split as
- * the editor's sections, so a small fix stays a small act.
+ * A button on the product page that opens one of its quick sheets over the
+ * page rather than leaving for the editor — the same split as the editor's
+ * sections, so a small fix stays a small act and is finished where it was
+ * started (owner, 10 Oct). The panels' "Edit", the draft checklist's "Add
+ * photos" and the Customer view's notes all open their sheet through this.
  */
 export function SheetButton({
     kind,
@@ -25,6 +28,10 @@ export function SheetButton({
     product,
     storeId,
     categories = [],
+    variant = "outline",
+    size = "xs",
+    icon = true,
+    className = "gap-[5px]",
 }: {
     kind: SheetKind;
     label: string;
@@ -33,20 +40,25 @@ export function SheetButton({
     product: ProductDetail;
     storeId: string;
     categories?: { id: string; name: string }[];
+    variant?: ButtonProps["variant"];
+    size?: ButtonProps["size"];
+    /** The pencil before the label; off for a checklist's "Add photos". */
+    icon?: boolean;
+    className?: string;
 }) {
     const [open, setOpen] = useState(false);
     const common = { open, onOpenChange: setOpen, product, storeId };
     return (
         <>
             <Button
-                size="xs"
+                size={size}
                 type="button"
-                variant="outline"
+                variant={variant}
                 onClick={() => setOpen(true)}
                 aria-label={ariaLabel ?? label}
-                className="gap-[5px]"
+                className={className}
             >
-                <Pencil className="size-3" aria-hidden />
+                {icon ? <Pencil className="size-3" aria-hidden /> : null}
                 {label}
             </Button>
             {kind === "details" ? (

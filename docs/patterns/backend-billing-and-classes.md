@@ -67,6 +67,40 @@ paper view. Written by the billing webhook with the charge, once per
 charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
 invoices (U17)".
 
+**Who Saroh bills, before it charges (owner, 17 Oct 2026).** Every
+checkout that charges or sets up autopay — all but a move to Free; a first
+month, an upgrade, a renewal, a scheduled change, a year paid once — is
+refused before anything is made at the provider until the business has a
+billing name (legal name, else its name), an email (the owner's, else the
+profile's contact email), a whole registered address (first line, city,
+six-digit PIN) and a state. `billing/billing-details.ts` is the one rule:
+a 400 with `details.field` (`billingName`, `billingEmail`, `addressLine1`,
+`city`, `postalCode`, `billingState`, `phone`) and `details.missing`; the
+quote's `billingDetails: { missing, phone }` tells the change-plan dialog
+what to ask, in place. A GSTIN stays optional, a phone "if available".
+What was missing and given is kept: the address, state and legal name on
+the profile (never over what it has), an email or phone on the checkout
+(`BillingCheckout.billToEmail`, `billToPhone`), since the profile's phone
+is the one its website shows. The invoice carries the billing email and
+the phone (`SarohInvoice.billToEmail`, `billToPhone`) and prints them under
+the address. The Razorpay customer is brought up to date when it is found
+again (`PUT /customers/:id`, `backend-integrations.md`).
+
+**Cancelling a plan (owner, 17 Oct 2026).** "Cancel plan" under Your plan
+(`components/settings/plan-billing/cancel-plan.tsx`, owner only, offered
+by `cancelOffer` in `lib/saroh-billing/plan-view.ts`) is the same move to
+Free as the plan picker's: `GET` then `POST /billing/change-plan` with
+Free, so the date it says is the quote's `effectiveAt`. Words per payment
+kind are `cancelWords` (`quote-words.ts`). There is no undo: the plan it
+is on quotes `NONE` until it ends, and taking a pending Free back would
+need a new autopay at the provider, since the old one was told to end.
+Not offered under a plan given for a while, on a plan already ending, or
+while a year paid once is scheduled to start, whatever the cycle now. The
+API refuses that move too (`toFree`: 409 `paid-year-scheduled`): a
+SCHEDULED one-time checkout is paid at authorisation, and dropping it
+would keep a year's money for a year never given. It can be cancelled
+once it has started, or refunded by hand.
+
 **How a plan is paid (DEC-093, DEC-161, #803).** Monthly is autopay; one
 approval covers the catalogue's `autopay.charges` monthly charges (12
 today, 2 to 1,200, edited in Admin › Plans › Offers). It is read from the
@@ -140,6 +174,60 @@ Saroh refunds nothing, so nothing paid for is cut short:
   Its `cancelled` event must not move the plan early (`runsToMoveDate`).
 
 Rules and edge cases in `PRICING_ROLLOUT.md` › "During the first month".
+
+**Never Free while the provider charges, never a plan nobody pays for
+(owner, 17 Oct 2026; DEC-164).**
+
+- `leavesWithCycle(sub, chargesStartAt, now)` is false whenever the
+  provider subscription hasn't started charging — a first month, or an
+  upgrade's or a checkout's whose `startAt` is still ahead
+  (`charges-start.ts`). Pass both.
+- A payment after Saroh let go of what it was for is settled by
+  `paid-after-end.ts`: honoured (plan and invoice) when nothing conflicts;
+  otherwise the autopay is stopped, no invoice written, and the double
+  charge refunded in full automatically through Razorpay
+  (`double-charge.ts` claims it once per payment,
+  `double-charge-refund.job.ts` refunds, emails and notes it; DEC-164,
+  latest). A refused refund is never retried: the owner refunds it by hand
+  from the admin note. A double charge is the only refund Saroh sends: a
+  cancel mid-period is never refunded, and any other refund is the
+  owner's, in Razorpay. CANCELLED goes back to ACTIVE only there
+  (a charge the provider took).
+- **What an operator must do is a row, and every refund is on record
+  (DEC-166).** A billing problem Saroh can't solve itself is a
+  `BillingAction` (`billing-actions.ts`), written by every ops notice and
+  listed in Admin › Billing › Needs action. A refund or dispute on a
+  payment Saroh took is a `BillingRefund` (`billing-refunds.ts`): the
+  double-charge job's (AUTO), a hand refund the owner made in Razorpay and
+  an operator recorded on the invoice (MANUAL), Razorpay's `refund.*` and
+  `payment.dispute.*` webhooks (PROVIDER), one row per provider id, its
+  status moved on and never back. **Saroh issues no credit note for a
+  refund on its own invoice**: each raises "a credit note may be needed:
+  ask the CA" in Needs action, and the GST export still lists invoices
+  only. What the provider took is kept on the invoice
+  (`providerAmountPaise`, `invoice-amount.ts`); a total that differs is
+  raised. Operators act with `saroh-billing:act` (end autopay the
+  business's own way, re-check a refund, re-sync the customer, record a
+  refund, mark resolved), never by editing an invoice.
+- A refused provider cancel is never taken as settled
+  (`provider-cancel.job.ts`).
+- A checkout lapses at its start date (`checkoutExpiresAt`) and tells the
+  provider (`expireBy`); one approved after its start is stale.
+- A renewal (RENEW) or a move that ends the plan, ended at the provider
+  before it starts, leaves the move to Free on the same date, never a
+  cleared one.
+- A scheduled change's first charge failing (`pending`) applies the move,
+  then PAST_DUE and the payment-failed email, whichever ran first.
+- A `plan` override never takes away a dearer plan the business pays for:
+  the plan read is the dearer of the two (`effectivePlanId` with
+  `planPriceOf`), and an override that dearer plan shadows is not reported.
+- A renewal's invoice is billed to the business as it is now (its profile's
+  GSTIN and state); the checkout's are for its own first charge.
+- A suspended business, still billed, may always pay less: change-plan and
+  add-ons are `@LifecycleWrite("lower-charges")` and ask `new` themselves
+  for anything that charges more.
+- `POST …/billing/subscribe` and `…/billing/cancel` are retired (410); every
+  change goes through `change-plan`.
 
 Trials, coupons and add-ons (U16) ride the same path: a coupon is
 redeemed and its discount invoiced with the charge it comes off, never at

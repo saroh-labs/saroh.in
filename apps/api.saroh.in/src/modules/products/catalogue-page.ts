@@ -50,6 +50,9 @@ const DEFAULT_PAGE = 50;
 /** The sizes a list with numbered pages offers; any other is refused. */
 export const CATALOGUE_PAGE_SIZES = [10, 25, 50, 100] as const;
 
+/** `?category=none`: the products with no category (Uncategorized). */
+export const UNCATEGORIZED = "none";
+
 export class CatalogueQueryDto {
     @IsOptional()
     @IsIn(PRODUCT_STATUSES, { message: "Unknown status" })
@@ -70,10 +73,15 @@ export class CatalogueQueryDto {
     @IsIn(CATALOGUE_VIEWS, { message: "Unknown view" })
     view?: CatalogueView;
 
-    /** In this category or one inside it. */
+    /** In this category or one inside it; "none" is Uncategorized. */
     @IsOptional()
     @IsString()
     category?: string;
+
+    /** Choosing its variants by this option (Settings › Options' count). */
+    @IsOptional()
+    @IsString()
+    option?: string;
 
     /** Shown in this collection now. */
     @IsOptional()
@@ -244,12 +252,21 @@ export async function cataloguePage(
     if (query.view === "needs") {
         narrow.push({ id: { in: needs.map((n) => n.productId) } });
     }
-    if (query.category) {
+    if (query.category === UNCATEGORIZED) {
+        narrow.push({ categoryId: null });
+    } else if (query.category) {
         const found = await prisma.category.count({
             where: { id: query.category, organizationId },
         });
         if (found === 0) throw new NotFoundException("Category not found");
         narrow.push({ categoryId: { in: tree.within(query.category) } });
+    }
+    if (query.option) {
+        const found = await prisma.productOption.count({
+            where: { id: query.option, organizationId },
+        });
+        if (found === 0) throw new NotFoundException("Option not found");
+        narrow.push({ optionId: query.option });
     }
     if (query.collection) {
         const collection = collections.find((c) => c.id === query.collection);
@@ -332,8 +349,9 @@ export async function cataloguePage(
 
 /**
  * What needs restocking at `storefronts`, among the products in `base` that
- * count stock and are listed there — published or draft, never archived,
- * the same scope as the Stock screen's "Needs you". Every shelf is judged
+ * count stock and are listed there — never archived, and a draft only
+ * when short for orders already placed (no customer can buy it yet) — the
+ * same scope as the Stock screen's "Needs you". Every shelf is judged
  * where the storefront sells it (and, for a variant, sells that variant);
  * a storefront that sells it with no shelf yet reads 0, as on Stock.
  * A product a lower plan paused (#800) is hidden from the site: it needs
@@ -363,6 +381,9 @@ export async function catalogueNeeds(
                 id: true,
                 name: true,
                 createdAt: true,
+                // A draft needs someone only for orders already placed.
+                status: true,
+                option: { select: { name: true } },
                 variants: {
                     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                     select: { id: true, title: true },

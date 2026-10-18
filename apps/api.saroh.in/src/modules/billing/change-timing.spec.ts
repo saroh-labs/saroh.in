@@ -95,6 +95,15 @@ describe("leavesWithCycle", () => {
         expect(leavesWithCycle({ status: "PAST_DUE" })).toBe(true);
         expect(leavesWithCycle({ status: "TRIALING" })).toBe(false);
     });
+
+    it("ends at once a provider subscription whose first charge is still ahead (an upgrade's)", () => {
+        const now = new Date("2026-10-17T00:00:00Z");
+        const ahead = new Date("2026-10-30T00:00:00Z");
+        const past = new Date("2026-10-01T00:00:00Z");
+        expect(leavesWithCycle({ status: "ACTIVE" }, ahead, now)).toBe(false);
+        expect(leavesWithCycle({ status: "ACTIVE" }, past, now)).toBe(true);
+        expect(leavesWithCycle({ status: "ACTIVE" }, null, now)).toBe(true);
+    });
 });
 
 describe("runsToMoveDate", () => {

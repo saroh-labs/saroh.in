@@ -223,7 +223,11 @@ export async function checkShowcase(
                         AND i."bookingId" IS NULL
                     WHEN 'BOOKING' THEN bk."organizationId" = i."organizationId"
                         AND bk."contactId" = i."contactId"
-                        AND i.total * 100 = (bk.snapshot->'service'->>'priceCents')::numeric
+                        -- Its price, or only the deposit when that is what
+                        -- was paid online (E8, the snapshot's deposit).
+                        AND i.total * 100 = COALESCE(
+                            (bk.snapshot->'deposit'->>'cents')::numeric,
+                            (bk.snapshot->'service'->>'priceCents')::numeric)
                         AND i."orderId" IS NULL AND i."subscriptionId" IS NULL
                         AND i."courseEnrollmentId" IS NULL AND i."packPurchaseId" IS NULL
                     WHEN 'ORDER' THEN o."organizationId" = i."organizationId"
@@ -236,7 +240,10 @@ export async function checkShowcase(
     );
 
     // Capacity: at every confirmed booking's time, the confirmed bookings on
-    // that service plus the seats open courses still hold there fit.
+    // that service plus the seats open courses still hold there fit. A
+    // one-to-one somebody takes is booked per person (U3, `booking-slots.ts`
+    // `perPerson`): its capacity is each person's, so two stylists can each
+    // cut hair at ten — "people booked in two places at once" holds that.
     fail(
         "bookings over their service's capacity",
         await prisma.$queryRaw<Row[]>`
@@ -258,6 +265,9 @@ export async function checkShowcase(
                        AND h."startAt" < b."endAt" AND h."endAt" > b."startAt") AS held
                 FROM "Booking" b JOIN "Service" s ON s.id = b."serviceId"
                 WHERE b."organizationId" = ANY(${orgs}) AND b.status = 'CONFIRMED'
+                  AND NOT (s.capacity = 1 AND b."staffId" IS NOT NULL
+                       AND EXISTS (SELECT 1 FROM "StaffService" x
+                           WHERE x."serviceId" = s.id))
             )
             SELECT id, capacity, confirmed::int, held::int FROM load
             WHERE confirmed + held > capacity`,
@@ -409,10 +419,11 @@ export async function checkShowcase(
     fail(
         "class sessions with more than one instructor",
         await prisma.$queryRaw<Row[]>`
-            SELECT "serviceId", "startAt" FROM "Booking"
-            WHERE "organizationId" = ANY(${orgs})
-            GROUP BY "serviceId", "startAt"
-            HAVING COUNT(DISTINCT COALESCE("staffId", '')) > 1`,
+            SELECT b."serviceId", b."startAt" FROM "Booking" b
+            JOIN "Service" s ON s.id = b."serviceId"
+            WHERE b."organizationId" = ANY(${orgs}) AND s.capacity > 1
+            GROUP BY b."serviceId", b."startAt"
+            HAVING COUNT(DISTINCT COALESCE(b."staffId", '')) > 1`,
     );
     fail(
         "weekly hours that end before they start or overlap",
@@ -967,6 +978,24 @@ export async function checkRye(
         "exactly one possible match": counts.possibleMatches === 1,
         "an order today whose line holds an allergen on the customer's Needs attention":
             counts.allergyOrders >= 1,
+        // The custom cakes (bakery-cakes.ts): made to order, never counted.
+        "eight custom cakes, made to order and not counted": await has(
+            prisma.$queryRaw<Row[]>`
+                SELECT CASE WHEN COUNT(*) >= 8 THEN 1 ELSE 0 END AS n
+                FROM "Product" p JOIN "Category" c ON c.id = p."categoryId"
+                WHERE p."organizationId" = ${orgId} AND c.slug = 'cakes'
+                  AND NOT p."stockTracked" AND p.image IS NOT NULL`,
+        ),
+        "custom-cake orders to come, paid, with the day and words in a note":
+            await has(prisma.$queryRaw<Row[]>`
+                SELECT CASE WHEN COUNT(*) >= 4 THEN 1 ELSE 0 END AS n
+                FROM "Order" WHERE "organizationId" = ${orgId}
+                  AND id LIKE 'seed_sc_rc_order_cake%' AND stage IN ('NEW', 'PREPARING')
+                  AND "paymentStatus" = 'PAID' AND notes IS NOT NULL`),
+        "a journal of 24 or more posts": await has(prisma.$queryRaw<Row[]>`
+            SELECT CASE WHEN COUNT(*) >= 24 THEN 1 ELSE 0 END AS n
+            FROM "Post" p JOIN "Site" s ON s.id = p."siteId"
+            WHERE s."organizationId" = ${orgId} AND p."currentPublicationId" IS NOT NULL`),
     }).flatMap(([what, ok]) => (ok ? [] : [what]));
     if (missing.length > 0) failures.push(`missing: ${missing.join("; ")}`);
     // The stock films' shelves, log, checks and collections (#526).

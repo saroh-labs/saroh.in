@@ -16,7 +16,6 @@ import { Chip } from "@/components/shared/chip";
 import { ChoiceGroup } from "@/components/shared/choice-group";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";
-import { Tip } from "@saroh/ui/tooltip";
 import { FieldHelp } from "./fields";
 
 export const VARIANT_GRID =
@@ -116,15 +115,13 @@ export function VariantRowView({
                     placeholder={productPrice}
                     aria-label={`Variant ${i + 1} price, blank uses the product's`}
                 />
-                <Tip label={`Remove ${title || "this variant"}`}>
-                    <IconButton
-                        label={`Remove ${title || "this variant"}`}
-                        icon={<Trash2 aria-hidden className="size-[15px]" />}
-                        disabled={locked}
-                        onClick={onRemove}
-                        className="text-muted-foreground"
-                    />
-                </Tip>
+                <IconButton
+                    label={`Remove ${title || "this variant"}`}
+                    icon={<Trash2 aria-hidden className="size-[15px]" />}
+                    disabled={locked}
+                    onClick={onRemove}
+                    className="text-muted-foreground"
+                />
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">
                 <TextLink

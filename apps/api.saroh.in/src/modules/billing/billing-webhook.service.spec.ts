@@ -12,6 +12,8 @@ jest.mock("@saroh/database", () => {
         update: jest.fn(),
     };
     const billingWebhookEvent = { createMany: jest.fn(), update: jest.fn() };
+    // Needs action (DEC-166): an unmatched event is raised there.
+    const billingAction = { createMany: jest.fn(() => ({ count: 1 })) };
     // No checkout owns these provider subscriptions (U15).
     const billingCheckout = { findUnique: jest.fn(() => null) };
     // Merchant delegates — present ONLY so we can assert billing never uses them.
@@ -24,6 +26,7 @@ jest.mock("@saroh/database", () => {
     const client: Record<string, unknown> = {
         subscription,
         billingWebhookEvent,
+        billingAction,
         billingCheckout,
         // The row lock the reconcile takes.
         $queryRaw: jest.fn(() => []),
@@ -243,7 +246,7 @@ describe("BillingWebhookService state machine", () => {
         expectNoMerchantAccess();
     });
 
-    it("ignores a verified event with no matching subscription", async () => {
+    it("raises an event for a subscription Saroh has no row for, and leaves it not applied (DEC-166)", async () => {
         const { service } = makeService();
         onSubscription(null);
         bweCreate.mockResolvedValue({ count: 1 });
@@ -255,6 +258,18 @@ describe("BillingWebhookService state machine", () => {
 
         expect(result).toEqual({ status: "ignored", changed: false });
         expect(subUpdate).not.toHaveBeenCalled();
+        // Not applied: Provider events lists it, and Needs action has it.
+        expect(bweUpdate).not.toHaveBeenCalled();
+        expect(prisma.billingAction.createMany).toHaveBeenCalledWith({
+            data: [
+                expect.objectContaining({
+                    organizationId: null,
+                    code: "billing_webhook_unmatched",
+                    dedupeKey: "webhook-unmatched:RAZORPAY:evt_1",
+                }),
+            ],
+            skipDuplicates: true,
+        });
         // The inbox still records it (org id null since unresolved).
         expect(bweCreate).toHaveBeenCalledWith(
             expect.objectContaining({

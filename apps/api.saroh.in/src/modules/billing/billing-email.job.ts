@@ -12,7 +12,9 @@ import type { BillingEmailPayload } from "./billing-email-payload";
 import { parseBillingEmailPayload } from "./billing-email-payload";
 import type { RenderedEmail } from "./billing-emails";
 import {
+    autopayEndedEmail,
     domainEmail,
+    doubleChargeRefundedEmail,
     firstMonthEndingEmail,
     invoiceEmail,
     moveDownEmail,
@@ -157,6 +159,34 @@ export class BillingEmailHandler {
         if (p.kind === "PRICE_CHANGE") return this.priceChange(job, p);
         if (p.kind === "MOVE_DOWN") return this.moveDown(job, p);
         if (p.kind === "DOMAIN") return this.domain(job, p);
+        if (p.kind === "DOUBLE_CHARGE_REFUNDED") {
+            const key = `saroh-billing:refunded:${p.providerPaymentId}`;
+            return this.once(job, p.organizationId, key, async () => {
+                const org = await prisma.organization.findUnique({
+                    where: { id: p.organizationId },
+                    select: { name: true },
+                });
+                return doubleChargeRefundedEmail({
+                    businessName: org?.name ?? "your business",
+                    amount:
+                        p.amountPaise !== null ? money(p.amountPaise) : null,
+                });
+            });
+        }
+        if (p.kind === "AUTOPAY_ENDED") {
+            const key = `saroh-billing:autopay-ended:${p.subscriptionId}:${p.endsAt}`;
+            return this.once(job, p.organizationId, key, async () => {
+                const org = await prisma.organization.findUnique({
+                    where: { id: p.organizationId },
+                    select: { name: true },
+                });
+                return autopayEndedEmail({
+                    businessName: org?.name ?? "your business",
+                    planName: p.planName,
+                    endsOn: day(new Date(p.endsAt)),
+                });
+            });
+        }
         if (p.kind === "RENEWAL") {
             // 3 days before an autopay charge (#804), re-read as the sweep
             // read it (`renewal-reminder.ts`).

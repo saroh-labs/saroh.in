@@ -2,6 +2,8 @@ import type { PausedCut } from "@/lib/billing/paused";
 import { pausedByCut } from "@/lib/billing/paused";
 import { count } from "@/lib/format/plural";
 
+import type { NeedDetail } from "./needs-you";
+import { optionWord } from "./needs-you";
 import type {
     CatalogueListing,
     CatalogueProduct,
@@ -112,7 +114,8 @@ export function priceRange(
  * The row's second line, as the design writes it: "2 variants · SKU ·
  * where it sells". A product without variants says nothing about them —
  * never "0 variants" — so it reads as its SKU (if any) and its
- * storefronts. `places` is left out when the view needn't say where.
+ * storefronts. One variant says nothing either: it is the product.
+ * `places` is left out when the view needn't say where.
  */
 export function rowFacts(
     row: Pick<CatalogueRow, "variantCount" | "sku" | "places">,
@@ -120,7 +123,8 @@ export function rowFacts(
 ): { variants: string | null; sku: string | null; places: string | null } {
     const n = row.variantCount;
     return {
-        variants: n > 0 ? count(n, "variant") : null,
+        // One variant is the product itself: saying "1 variant" adds nothing.
+        variants: n > 1 ? count(n, "variant") : null,
         sku: row.sku?.trim() ? row.sku : null,
         places:
             showPlaces && row.places.length > 0
@@ -133,28 +137,63 @@ export function rowFacts(
 export type StockTone = "plain" | "warn" | "danger" | "muted";
 
 /**
- * The Inventory column: "30 in stock", "Out of stock", "Not tracked",
- * "Sold out". Coloured by what can be sold: nothing to sell is danger, at or
- * under the product's own warning level is the accent, else plain. `null`
- * stock means nothing here counts it, never a failed read: the stock comes
- * in the catalogue read itself, and that read failing fails the page (its
+ * The Stock column says what can be sold, and the worst shelf (the
+ * Products audit, 16 Oct): "0 to sell · 156 promised", "2 short for
+ * orders", "167 to sell · 1 shade out", "Out at Online", and plain
+ * "18 to sell" when every shelf is fine. "In stock" is never said: on hand
+ * that is already promised isn't stock anyone can buy.
+ *
+ * The colour comes from the same rule as Needs you — the API's `need` for
+ * this product, judged shelf by shelf — so the row, the quick look and
+ * Needs you agree: short and out are danger, low the accent, and a product
+ * Needs you leaves out (a draft, a paused one) stays calm. `null` stock
+ * means nothing here counts it, never a failed read: the stock comes in
+ * the catalogue read itself, and that read failing fails the page (its
  * error boundary), so no row ever shows a guessed zero or "Not tracked".
  */
 export function stockWords(
-    row: Pick<CatalogueRow, "stock" | "canSell" | "lowStockAlert" | "soldOut">,
+    row: Pick<CatalogueRow, "stock" | "canSell" | "promised" | "soldOut">,
+    need: NeedDetail | null = null,
 ): { text: string; tone: StockTone } {
     if (row.stock === null || row.canSell === null) {
         return row.soldOut
             ? { text: "Sold out", tone: "danger" }
             : { text: "Not tracked", tone: "muted" };
     }
-    if (row.stock <= 0) return { text: "Out of stock", tone: "danger" };
-    const text = `${row.stock} in stock`;
-    if (row.canSell <= 0) return { text, tone: "danger" };
-    if (row.lowStockAlert !== null && row.lowStockAlert > 0) {
-        if (row.canSell <= row.lowStockAlert) return { text, tone: "warn" };
+    const toSell = `${row.canSell} to sell`;
+    const nothing =
+        row.promised > 0
+            ? `0 to sell · ${row.promised} promised`
+            : "Out of stock";
+    if (!need) {
+        return row.canSell > 0
+            ? { text: toSell, tone: "plain" }
+            : { text: nothing, tone: "muted" };
     }
-    return { text, tone: "plain" };
+    if (need.kind === "short") {
+        return { text: `${need.short} short for orders`, tone: "danger" };
+    }
+    const tone: StockTone = need.kind === "out" ? "danger" : "warn";
+    const word = need.kind === "out" ? "out" : "low";
+    // Only some shelves: name the worst — its variants, or its places.
+    if (need.where?.length) {
+        const variants = need.variants?.worst ?? 0;
+        if (variants > 0) {
+            return {
+                text: `${toSell} · ${variants} ${optionWord(need.option, variants)} ${word}`,
+                tone,
+            };
+        }
+        const places = need.places ?? need.where;
+        const at =
+            places.length === 1 ? places[0] : `${places.length} locations`;
+        return {
+            text: `${need.kind === "out" ? "Out" : "Low"} at ${at}`,
+            tone,
+        };
+    }
+    if (need.kind === "out") return { text: nothing, tone };
+    return { text: toSell, tone };
 }
 
 /** Two letters from the product's words: "Rye & caraway loaf" → "RC". */

@@ -9,9 +9,9 @@ import { ProductsService } from "./products.service";
 /**
  * A business sells in one currency (DEC-030, amended 2026-09-26). Saving a
  * product without a currency keeps the one it has; changing it while a
- * storefront that sells it uses another is refused, from the editor's PUT,
- * a CSV import or a duplicate. A new product takes the storefront's, else
- * the business's — never a USD guess.
+ * storefront that sells it uses another is refused, from the editor's PUT
+ * or a duplicate; a CSV import takes no currency column. A new product
+ * takes the storefront's, else the business's — never a USD guess.
  */
 const tag = `${process.pid}-${Date.now()}`;
 
@@ -151,26 +151,33 @@ describe("A product's currency (DB)", () => {
         expect(after.price.toString()).toBe("42");
     });
 
-    it("an import update changing a listed product's currency is refused", async () => {
+    it("an import's currency column is left out: a listed product keeps its currency", async () => {
+        // A business sells in one currency (DEC-030), so the import no
+        // longer takes a currency column; one mapped by an older tab is
+        // dropped like "Don't import". The refusal to change a listed
+        // product's currency still guards the editor's PUT (above).
         const { id } = await products.create(market, ownerId, {
             name: "Kashmiri kahwa",
             price: "80.00",
         });
-        await expect(
-            imports.apply(market, ownerId, "products", {
-                csv: csv([
-                    ["name", "price", "currency"],
-                    ["Kashmiri kahwa", "1.00", "USD"],
-                ]),
-                mapping: {
-                    name: "name",
-                    price: "price",
-                    currency: "currency",
-                },
-                policy: "UPDATE",
-            }),
-        ).rejects.toThrow(ConflictException);
-        expect(await currencyOf(id)).toBe("INR");
+        await imports.apply(market, ownerId, "products", {
+            csv: csv([
+                ["name", "price", "currency"],
+                ["Kashmiri kahwa", "90.00", "USD"],
+            ]),
+            mapping: {
+                name: "name",
+                price: "price",
+                currency: "currency",
+            },
+            policy: "UPDATE",
+        });
+        const after = await prisma.product.findUniqueOrThrow({
+            where: { id },
+            select: { currency: true, price: true },
+        });
+        expect(after.currency).toBe("INR");
+        expect(after.price.toString()).toBe("90");
     });
 
     it("a duplicate isn't listed at a storefront in another currency", async () => {

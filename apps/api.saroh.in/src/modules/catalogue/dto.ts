@@ -66,6 +66,25 @@ export class AddOptionValueDto {
     value!: string;
 }
 
+/** A value's new name; it changes on every variant that uses it. */
+export class RenameOptionValueDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "A value can't be empty." })
+    @MaxLength(OPTION_VALUE_MAX, {
+        message: `Keep it under ${OPTION_VALUE_MAX} characters.`,
+    })
+    value!: string;
+}
+
+/** Every value of the option, in the order customers pick from. */
+export class ReorderOptionValuesDto {
+    @IsArray()
+    @ArrayMaxSize(500)
+    @IsString({ each: true })
+    valueIds!: string[];
+}
+
 export const DEFAULT_KEYS_MAX = 500;
 
 export class DefaultsEntryInput {
@@ -83,8 +102,8 @@ export class DefaultsEntryInput {
     @IsOptional()
     @ValidateIf((_o, v) => v !== null)
     @Type(() => Number)
-    @IsInt({ message: "Warn at must be a whole number, zero or more." })
-    @Min(0, { message: "Warn at must be a whole number, zero or more." })
+    @IsInt({ message: "Low stock at must be a whole number, zero or more." })
+    @Min(0, { message: "Low stock at must be a whole number, zero or more." })
     lowStockAlert?: number | null;
 
     @IsOptional()

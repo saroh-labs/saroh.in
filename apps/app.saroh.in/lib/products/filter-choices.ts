@@ -14,13 +14,20 @@ export interface FilterChoice {
 export interface FilterChoices {
     categories: FilterChoice[] | null;
     collections: FilterChoice[] | null;
+    /** Read only while the list is narrowed to one (`?option=`). */
+    options?: FilterChoice[] | null;
 }
 
 export function choicesFrom(
     categories: readonly FilterChoice[] | null,
     collections: readonly FilterChoice[] | null,
+    options?: readonly FilterChoice[] | null,
 ): FilterChoices {
     const names = (rows: readonly FilterChoice[] | null) =>
         rows?.map((r) => ({ id: r.id, name: r.name })) ?? null;
-    return { categories: names(categories), collections: names(collections) };
+    return {
+        categories: names(categories),
+        collections: names(collections),
+        ...(options === undefined ? {} : { options: names(options) }),
+    };
 }

@@ -20,7 +20,9 @@ const QUIET: Record<string, Table> = {
     contactAttention: { count: 0, findMany: [] },
 };
 
-type Rows = (args?: unknown) => Promise<{ id: string }[]>;
+type Rows = (
+    args?: unknown,
+) => Promise<{ id: string; late?: boolean; soon?: boolean }[]>;
 type Count = (args?: unknown) => Promise<number>;
 
 export function quietLastDay<T extends object>(db: T): T {
@@ -32,19 +34,31 @@ export function quietLastDay<T extends object>(db: T): T {
         }
     }
     // Open orders are picked in one raw read (`home-open-orders.ts`, H-1):
-    // answer it from the spec's own order mocks — its rows, oldest first as
-    // given, and its count — so a spec that mocks `order.findMany` and
-    // `order.count` reads open orders as it did. Late is the row's own
-    // (`openOrderWords`); the raw read's lateness is covered against a real
+    // answer it from the spec's own order mocks — its rows, as given, and
+    // its count — so a spec that mocks `order.findMany` and `order.count`
+    // reads open orders as it did. A row is late or due by tomorrow
+    // (DEC-163) unless it says `soon: false`, and late only when it says
+    // `late: true`; the raw read's own lateness is covered against a real
     // Postgres (`home.open-orders.db.spec.ts`).
     const client = db as Record<string, unknown>;
     const order = tables.order as { findMany?: Rows; count?: Count };
     client.$queryRaw ??= async () => {
         const rows = (await order.findMany?.({})) ?? [];
-        const total = (await order.count?.({})) ?? rows.length;
-        return rows
-            .slice(0, 5)
-            .map((r) => ({ id: r.id, late: false, total, lates: 0 }));
+        const open = (await order.count?.({})) ?? rows.length;
+        const later = rows.filter((r) => r.soon === false).length;
+        const lates = rows.filter((r) => r.late === true).length;
+        const sorted = [
+            ...rows.filter((r) => r.soon !== false),
+            ...rows.filter((r) => r.soon === false),
+        ];
+        return sorted.slice(0, 5).map((r) => ({
+            id: r.id,
+            late: r.late === true,
+            soon: r.soon !== false,
+            open,
+            total: open - later,
+            lates,
+        }));
     };
     return db;
 }

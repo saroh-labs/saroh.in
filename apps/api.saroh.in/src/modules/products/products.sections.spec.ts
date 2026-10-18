@@ -275,12 +275,13 @@ describe("Products v2: sections, photos, overview (DB)", () => {
             expect(after.description).not.toMatch(/script|onerror|alert/);
         });
 
-        it("names a slug another product has, and nothing else as one", async () => {
+        it("names the product whose path an edit takes, and nothing else as a clash", async () => {
             await expect(put({ slug: "night-cream" })).rejects.toThrow(
                 ConflictException,
             );
+            // Its holder named and the next free path offered — never "slug".
             await expect(put({ slug: "night-cream" })).rejects.toThrow(
-                "That slug is already taken",
+                "Night Cream already uses this path. Try night-cream-2.",
             );
             // A write that fails for another reason is not called a clash.
             const other = await put({ price: "not money" }).catch(
@@ -288,7 +289,9 @@ describe("Products v2: sections, photos, overview (DB)", () => {
             );
             expect(other).toBeInstanceOf(Error);
             expect(other).not.toBeInstanceOf(ConflictException);
-            expect(String(other)).not.toMatch(/slug is already taken/);
+            expect(String(other)).not.toMatch(
+                /already uses this path|took this path|slug is already taken/,
+            );
         });
 
         it("hands back a description saved before saves were cleaned, clean", async () => {

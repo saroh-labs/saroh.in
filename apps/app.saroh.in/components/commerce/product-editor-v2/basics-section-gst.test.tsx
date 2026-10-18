@@ -34,6 +34,13 @@ const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: vi.fn(),
     showError: (...args: unknown[]) => showError(...args) as unknown,
+    showErrorToast: (...args: unknown[]) => showError(...args) as unknown,
+    dismissToast: vi.fn(),
+}));
+
+// New product asks the API for its path; nothing here creates one.
+vi.mock("@/lib/products/path-actions", () => ({
+    suggestProductPath: vi.fn(() => Promise.resolve(null)),
 }));
 
 // The category picker opens a popover of its own; it isn't under test.

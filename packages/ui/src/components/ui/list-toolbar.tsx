@@ -66,6 +66,8 @@ export interface ListToolbarProps extends Omit<
      * counts): "Clear filters" then ends the row.
      */
     onClear?: () => void;
+    /** What the clear says: "Clear filters", or "Clear search" when only a search narrows. */
+    clearLabel?: string;
     /**
      * At most ONE `AttentionToggle`, after the dropdowns: the one-press
      * way to what needs the merchant now ("Needs you 4").
@@ -87,6 +89,7 @@ export function ListToolbar({
     filters,
     more,
     onClear,
+    clearLabel = "Clear filters",
     attention,
     end,
     count,
@@ -175,7 +178,7 @@ export function ListToolbar({
                                     onClick={onClear}
                                     className="min-w-0 rounded-sm px-1 text-[13px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground active:text-muted-foreground"
                                 >
-                                    Clear filters
+                                    {clearLabel}
                                 </Button>
                             ) : null}
                         </div>

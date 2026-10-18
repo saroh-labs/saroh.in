@@ -29,6 +29,7 @@ import {
 import { seedPlanId } from "../pricing";
 import { deleteSeeded } from "../run";
 import { seedStandInPaymentProvider } from "../stand-in-providers";
+import { checkAchaar, seedAchaar } from "./achaar";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
 import { RYE, seedBakery } from "./bakery";
 import type { BillingContext, InvoiceRows, InvoiceSpec, Seen } from "./billing";
@@ -40,6 +41,8 @@ import {
     planSubscriptions,
 } from "./billing";
 import { checkBoutique, seedBoutique } from "./boutique";
+import { checkCarePoint, seedCarePointBilling } from "./carepoint-billing";
+import { CAREPOINT_POSTS } from "./carepoint-posts";
 import type { RyeCounts } from "./check";
 import { checkRye, checkShowcase } from "./check";
 import type { KaviCounts } from "./clinic";
@@ -47,10 +50,12 @@ import { checkKavi, KAVI, seedClinic } from "./clinic";
 import { KAVI_DESK } from "./clinic-data";
 import type { OrderStatus, PaymentStatus, SellableProduct } from "./commerce";
 import { planOrders, toPaise, upsertCatalog } from "./commerce";
+import { checkDummyContacts, scrubSeededPhones } from "./contact-check";
 import type { LeadSpec } from "./crm";
 import { planLeads, upsertPipeline } from "./crm";
 import type { ModuleKey, OrgRole, ShowcaseBusiness, TeamMember } from "./data";
 import {
+    CAREPOINT,
     LEAD_TIMELINE,
     LUMEN_POSTS,
     NORTHWIND,
@@ -60,6 +65,7 @@ import {
     NORTHWIND_NEW_CATEGORIES,
     NORTHWIND_NEW_PRODUCTS,
     PULSE,
+    RENAMED_BUSINESSES,
     RETIRED_BUSINESS_KEYS,
     ROLE_ACCOUNTS,
     SHOWCASE_BUSINESSES,
@@ -68,11 +74,28 @@ import {
     staffEmail,
     TIMEZONE,
 } from "./data";
+import type { Desk42Counts } from "./desk42";
+import { checkDesk42, seedDesk42 } from "./desk42";
+import { seedDiaryShop } from "./diary-shop";
+import { checkDiaryShop } from "./diary-shop-check";
+import { checkFrameVow, seedFrameVow } from "./frame-vow";
+import type { JournalPost } from "./journal";
+import { seedJournal } from "./journal";
+import { checkPagdandi, seedPagdandi } from "./pagdandi";
 import type { Person } from "./people";
 import { earliest, hashKey, istAt, makePeople } from "./people";
+import { MOTION } from "./physio-data";
+import { checkPixelChai, seedPixelChai } from "./pixel-chai";
 import type { PulseCounts } from "./pulse";
 import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
+import { PULSE_POSTS } from "./pulse-posts";
+import { checkPulseShop, seedPulseShop } from "./pulse-shop";
 import { createRng } from "./random";
+import { NOOR } from "./salon-data";
+import type { ShikshaCounts } from "./shiksha";
+import { checkShiksha, seedShiksha } from "./shiksha";
+import type { TrafficKind } from "./traffic";
+import { writeTraffic } from "./traffic";
 
 /**
  * Lay the showcase over the base seed.
@@ -208,9 +231,102 @@ export async function seedShowcase(
             deskUserId: await ensureTeamMember(ctx, KAVI_DESK),
         }),
     );
+    // The service studios (vertical demos): a wedding photography and
+    // planning studio, and a social-media agency on retainers. Meher Bhati
+    // and Nikita Rathi work their diaries as Members.
+    const frameVow = await seedFrameVow({
+        prisma,
+        now,
+        demoUserId: ctx.demoUserId,
+        memberUserId: await ensureTeamMember(ctx, {
+            first: "Meher",
+            last: "Bhati",
+            role: "MEMBER",
+        }),
+    });
+    businesses.push(frameVow);
+    const pixelChai = await seedPixelChai({
+        prisma,
+        now,
+        demoUserId: ctx.demoUserId,
+        memberUserId: await ensureTeamMember(ctx, {
+            first: "Nikita",
+            last: "Rathi",
+            role: "MEMBER",
+        }),
+    });
+    businesses.push(pixelChai);
+    // Two demo shops: Ammi Ki Barni, a home pickle kitchen in Lucknow
+    // (Faizan Khan takes the orders as an Admin), and Margin Books, a
+    // bookshop with a café corner in Pune (Siddharth Kale, a Member).
+    businesses.push(
+        await seedAchaar({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            staffUserId: await ensureTeamMember(ctx, {
+                first: "Faizan",
+                last: "Khan",
+                role: "ADMIN",
+            }),
+            staffRole: "ADMIN",
+        }),
+        await seedPagdandi({
+            prisma,
+            now,
+            demoUserId: ctx.demoUserId,
+            staffUserId: await ensureTeamMember(ctx, {
+                first: "Siddharth",
+                last: "Kale",
+                role: "MEMBER",
+            }),
+            staffRole: "MEMBER",
+        }),
+    );
+    // Two vertical demos (unit 4): a coaching centre in Jaipur and a
+    // coworking space in Pune, each linking its own payers.
+    const vertical = {
+        prisma,
+        now,
+        demoUserId: ctx.demoUserId,
+        teamUser: (person: TeamMember) => ensureTeamMember(ctx, person),
+    };
+    const shiksha = await seedShiksha(vertical);
+    const desk42 = await seedDesk42(vertical);
+    businesses.push(shiksha, desk42);
+    const linksOwnPayers = new Set([
+        RYE.orgId,
+        KAVI.orgId,
+        shiksha.id,
+        desk42.id,
+        frameVow.id,
+        pixelChai.id,
+    ]);
+    // A salon and bridal studio in Jaipur and a physio clinic in
+    // Indiranagar: diaries with several people, packs, memberships the desk
+    // books, a counter, and a journal (`diary-shop*.ts`).
+    const diaryShops = [NOOR, MOTION];
+    for (const biz of diaryShops) {
+        businesses.push(
+            await seedDiaryShop(
+                {
+                    prisma,
+                    now,
+                    demoUserId: ctx.demoUserId,
+                    deskUserId: await ensureTeamMember(ctx, {
+                        ...biz.desk,
+                        role: "MEMBER",
+                    }),
+                },
+                biz,
+            ),
+        );
+    }
     for (const business of SHOWCASE_BUSINESSES) {
+        const orgId = await seedBusiness(ctx, business, roleUsers);
+        await seedExtras(ctx, business, orgId);
         businesses.push({
-            id: await seedBusiness(ctx, business, roleUsers),
+            id: orgId,
             name: business.name,
             prefix: sid(business.key, ""),
         });
@@ -234,11 +350,14 @@ export async function seedShowcase(
     // Rye & Co. and Kavi Dental link their own (their films count them).
     await linkSeededPayers(
         prisma,
-        businesses
-            .map((b) => b.id)
-            .filter((id) => id !== RYE.orgId && id !== KAVI.orgId),
+        businesses.map((b) => b.id).filter((id) => !linksOwnPayers.has(id)),
     );
     const counts = await checkShowcase(prisma, now, businesses);
+    const scrubbed = await scrubSeededPhones(prisma);
+    if (scrubbed > 0) {
+        console.log(`[showcase] made ${scrubbed} stale phone numbers dummies`);
+    }
+    await checkDummyContacts(prisma);
     await checkBoutique(prisma);
     const pulse = businesses.find((b) => b.name === PULSE.name);
     const pulseCounts: PulseCounts | null = pulse
@@ -246,6 +365,38 @@ export async function seedShowcase(
         : null;
     const ryeCounts: RyeCounts = await checkRye(prisma, RYE.orgId, now);
     const kaviCounts: KaviCounts = await checkKavi(prisma, KAVI.orgId, now);
+    const studioCounts = {
+        "Golden Hour Weddings": await checkFrameVow(prisma, frameVow.id, now),
+        "Loop Local Media": await checkPixelChai(prisma, pixelChai.id, now),
+    };
+    const demoShopCounts = [
+        await checkAchaar(prisma, now),
+        await checkPagdandi(prisma, now),
+    ];
+    const shikshaCounts: ShikshaCounts = await checkShiksha(
+        prisma,
+        shiksha.id,
+        now,
+    );
+    const desk42Counts: Desk42Counts = await checkDesk42(
+        prisma,
+        desk42.id,
+        now,
+    );
+    const pulseShop = pulse
+        ? await checkPulseShop(prisma, pulse.id, now)
+        : null;
+    const carepoint = businesses.find((b) => b.name === CAREPOINT.name);
+    const carepointCounts = carepoint
+        ? await checkCarePoint(prisma, carepoint.id, now)
+        : null;
+    const diaryShopCounts = [];
+    for (const biz of diaryShops) {
+        diaryShopCounts.push({
+            name: biz.name,
+            counts: await checkDiaryShop(prisma, biz, now),
+        });
+    }
     const jobsAfter = await countJobs(prisma);
     if (jobsAfter !== jobsBefore) {
         throw new Error(
@@ -261,6 +412,28 @@ export async function seedShowcase(
     console.table(ryeCounts);
     console.log("[showcase] Kavi Dental, as its films need it:");
     console.table(kaviCounts);
+    console.log(
+        "[showcase] Golden Hour Weddings and Loop Local Media, as their demos need them:",
+    );
+    console.table(studioCounts);
+    console.log("[showcase] Ammi Ki Barni and Margin Books:");
+    console.table(demoShopCounts);
+    console.log("[showcase] Aarohan Academy, as its demo needs it:");
+    console.table(shikshaCounts);
+    console.log("[showcase] Baithak Cowork, as its demo needs it:");
+    console.table(desk42Counts);
+    if (pulseShop) {
+        console.log("[showcase] Pulse Fitness's front desk:");
+        console.table(pulseShop);
+    }
+    if (carepointCounts) {
+        console.log("[showcase] CarePoint Clinic's bills and journal:");
+        console.table(carepointCounts);
+    }
+    for (const { name, counts } of diaryShopCounts) {
+        console.log(`[showcase] ${name}, as its demos need it:`);
+        console.table(counts);
+    }
 
     console.log(
         `[showcase] done in ${((Date.now() - started) / 1000).toFixed(1)}s. ` +
@@ -282,6 +455,15 @@ async function retireBusinesses(ctx: Context) {
     let removed = 0;
     for (const key of RETIRED_BUSINESS_KEYS) {
         removed += await deleteSeeded(ctx.prisma, sid(key, ""));
+    }
+    for (const { key, slug } of RENAMED_BUSINESSES) {
+        const site = await ctx.prisma.site.findUnique({
+            where: { id: sid(key, "site") },
+            select: { slug: true },
+        });
+        if (site && site.slug !== slug) {
+            removed += await deleteSeeded(ctx.prisma, sid(key, ""));
+        }
     }
     const orphans = await ctx.prisma.user.findMany({
         where: {
@@ -1200,7 +1382,7 @@ async function seedBusiness(
               now,
               services: biz.services,
               target: biz.bookings,
-              fromDay: -60,
+              fromDay: biz.diaryFromDay ?? -60,
               toDay: 21,
               contacts: people.length,
               prospects: leadContactIndexes,
@@ -1556,6 +1738,87 @@ function findEnquiryForm(
         }
     }
     return null;
+}
+
+// --- What some businesses have beyond the shared shape ----------------------
+
+/** A business's journal on its site, and the season its traffic follows. */
+const EXTRAS: Readonly<
+    Record<string, { posts: readonly JournalPost[]; kind: TrafficKind }>
+> = {
+    pulse: { posts: PULSE_POSTS, kind: "gym" },
+    carepoint: { posts: CAREPOINT_POSTS, kind: "clinic" },
+};
+
+/**
+ * Pulse's front desk (`pulse-shop.ts`) and CarePoint's bills
+ * (`carepoint-billing.ts`), once the business's diary and invoices exist;
+ * then each one's journal, and its traffic written again to count the
+ * orders and follow the season.
+ */
+async function seedExtras(
+    ctx: Context,
+    biz: ShowcaseBusiness,
+    orgId: string,
+): Promise<void> {
+    const extras = EXTRAS[biz.key] as (typeof EXTRAS)[string] | undefined;
+    if (!extras) return;
+    const { prisma, now } = ctx;
+    if (biz.key === PULSE.key) {
+        await seedPulseShop(prisma, {
+            orgId,
+            now,
+            ownerUserId: ctx.demoUserId,
+        });
+    }
+    if (biz.key === CAREPOINT.key) {
+        const desk = await prisma.membership.findMany({
+            where: { organizationId: orgId, role: { in: ["OWNER", "ADMIN"] } },
+            select: { userId: true },
+            orderBy: { id: "asc" },
+        });
+        await seedCarePointBilling(prisma, {
+            orgId,
+            now,
+            sellerName: biz.name,
+            sellerAddress: printedAddress(biz.registeredAddress),
+            deskUserIds: desk.map((m) => m.userId),
+        });
+    }
+    const site = await prisma.site.findUniqueOrThrow({
+        where: {
+            organizationId_slug: { organizationId: orgId, slug: biz.site.slug },
+        },
+        select: { id: true },
+    });
+    const author = biz.owner
+        ? (
+              await prisma.user.findUniqueOrThrow({
+                  where: { email: staffEmail(biz.owner) },
+                  select: { id: true },
+              })
+          ).id
+        : ctx.demoUserId;
+    await seedJournal(prisma, {
+        siteId: site.id,
+        orgId,
+        authorId: author,
+        now,
+        posts: extras.posts,
+        id: (...parts) => sid(biz.key, ...parts),
+    });
+    await writeTraffic(prisma, {
+        orgId,
+        now,
+        kind: extras.kind,
+        paths: biz.analytics.paths,
+        trendBase: biz.analytics.trendBase,
+        trendSlope: 0.25,
+        weekendFactor: biz.analytics.weekendFactor,
+        idFor: (iso, k) => sid(biz.key, "agg", iso, k),
+        idPrefix: sid(biz.key, "agg", ""),
+        noiseOffset: hashKey(biz.key) % 1000,
+    });
 }
 
 // --- Lumen's posts ----------------------------------------------------------

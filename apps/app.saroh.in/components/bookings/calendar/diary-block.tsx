@@ -92,7 +92,7 @@ export function DiaryBlock({
     const mark = owes ? (
         <span
             data-to-pay=""
-            className="shrink-0 whitespace-nowrap rounded-[4px] border border-current px-1 text-[11px] font-medium leading-[14px] opacity-90"
+            className="shrink-0 whitespace-nowrap rounded-[4px] border border-current px-1 text-[11px] font-medium leading-[14px]"
         >
             {owes}
         </span>

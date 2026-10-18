@@ -24,14 +24,20 @@ import { Fragment } from "react";
 
 import type { DataColumn } from "@/components/shared/data-view/types";
 import { formatMoneyMajor } from "@/lib/format/money";
-import { ratingLabel, rowRating } from "@/lib/product-reviews/describe";
+import { rowRating } from "@/lib/product-reviews/describe";
 import type { ProductRating } from "@/lib/product-reviews/service";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { rowFacts, stockWords } from "@/lib/products/catalogue";
+import type { NeedDetail } from "@/lib/products/needs-you";
 
 import { IconButton } from "@saroh/ui/icon-button";
 import { ProductThumb } from "./product-thumb";
 import { STATUS_LABEL, STATUS_VARIANT, TONE_TEXT } from "./tones";
+
+/** The status in words, for the folded second line: "Live", "Paused". */
+function statusWord(r: CatalogueRow): string {
+    return r.paused ? "Paused" : STATUS_LABEL[r.status];
+}
 
 /** The row's price: the variants' range when they differ. */
 export function priceText(row: CatalogueRow): string {
@@ -50,12 +56,15 @@ export function catalogueColumns({
     many,
     filtered,
     ratingById,
+    needById = new Map(),
 }: {
     /** More than one storefront: rows say where they sell. */
     many: boolean;
     /** Narrowed to one storefront: rows needn't say. */
     filtered: boolean;
     ratingById: Map<string, ProductRating>;
+    /** What Needs you says about each product: the Stock cell agrees. */
+    needById?: Map<string, NeedDetail>;
 }): DataColumn<CatalogueRow>[] {
     return [
         {
@@ -87,12 +96,25 @@ export function catalogueColumns({
                                         key="rating"
                                         aria-label={`Rated ${rating.average} from ${count(rating.count, "review")}`}
                                     >
-                                        ★ {ratingLabel(rating)}
+                                        ★ {rating.average.toFixed(1)} (
+                                        {rating.count})
                                     </span>
                                 ) : null,
                             ].filter((p) => p !== null);
-                            return parts.length > 0 ? (
+                            // On a narrow desk (924 px) Status folds into
+                            // this line, so Product · Stock · Price · ⋯ fit.
+                            const status = (
+                                <span
+                                    key="status"
+                                    className="hidden min-[760px]:inline min-[1100px]:hidden"
+                                >
+                                    {statusWord(r)}
+                                    {parts.length > 0 ? " · " : ""}
+                                </span>
+                            );
+                            return (
                                 <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                                    {status}
                                     {parts.map((p, i) => (
                                         <Fragment key={i}>
                                             {i > 0 ? " · " : null}
@@ -100,7 +122,7 @@ export function catalogueColumns({
                                         </Fragment>
                                     ))}
                                 </span>
-                            ) : null;
+                            );
                         })()}
                     </span>
                 </span>
@@ -111,6 +133,8 @@ export function catalogueColumns({
             header: "Status",
             priority: "secondary",
             width: "118px",
+            // Folded into the product's second line below 1100 px.
+            tableClassName: "hidden min-[1100px]:table-cell",
             cell: (r) =>
                 // Past the plan's limit (#800): hidden from the site, so its
                 // status there is not what the list would otherwise say.
@@ -133,13 +157,13 @@ export function catalogueColumns({
             id: "inventory",
             header: "Stock",
             priority: "secondary",
-            width: "128px",
+            width: "164px",
             cell: (r) => {
-                const s = stockWords(r);
+                const s = stockWords(r, needById.get(r.id) ?? null);
                 return (
                     <span
                         className={cn(
-                            "whitespace-nowrap text-[12.5px]",
+                            "text-balance text-[12.5px]",
                             TONE_TEXT[s.tone],
                         )}
                     >

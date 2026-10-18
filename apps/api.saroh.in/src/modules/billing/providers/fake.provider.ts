@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type {
+    BillingCustomer,
     BillingEventPhase,
     BillingProvider,
     BillingProviderFactory,
@@ -10,12 +11,22 @@ import type {
     CreateProviderPlanInput,
     CreateSubscriptionInput,
     CreateSubscriptionResult,
+    CustomerCreated,
     NextChargeItem,
     ParsedBillingEvent,
     ProviderChargeCapability,
+    ProviderCustomer,
+    ProviderCustomerCapability,
+    ProviderDisputeEvent,
     ProviderOrderCapability,
+    ProviderPaidCharge,
+    ProviderPaymentNotesCapability,
     ProviderPlanCapability,
+    ProviderReconcileCapability,
+    ProviderRefundCapability,
+    ProviderRefundEvent,
     ProviderStatusCapability,
+    SubscriptionStanding,
     SubscriptionStatus,
     WebhookHeaders,
 } from "./billing-provider.port";
@@ -120,6 +131,245 @@ export class FakeProviderOrders implements ProviderOrderCapability {
 }
 
 /**
+ * The fake's provider customers, as Razorpay with `fail_existing: "1"`:
+ * one per email and phone, a second refused as `exists` (and handed back
+ * by {@link existingCustomer}, as `fail_existing: "0"` does); the same
+ * email without a phone is a new one; an update to another's email and
+ * phone is `exists`. Every create and update recorded; a test turns the
+ * keys off with {@link keys}, queues a failure, loses the next create's
+ * answer after making it ({@link loseNextAnswer}), or adds a customer the
+ * provider made itself ({@link addCustomer}).
+ */
+export class FakeProviderCustomers implements ProviderCustomerCapability {
+    readonly created: { input: BillingCustomer; withContact: boolean }[] = [];
+    readonly updated: {
+        providerCustomerId: string;
+        input: BillingCustomer;
+        withContact: boolean;
+    }[] = [];
+    readonly looked: string[] = [];
+    keys = true;
+    failNext: BillingProviderError | null = null;
+    loseNextAnswer = false;
+    private readonly byEmailPhone = new Map<string, string>();
+    private readonly byId = new Map<string, string | null>();
+
+    configured(): boolean {
+        return this.keys;
+    }
+
+    /** A customer the provider holds already, with its notes' business. */
+    addCustomer(providerCustomerId: string, organizationId: string | null) {
+        this.byId.set(providerCustomerId, organizationId);
+    }
+
+    private take(): Promise<never> | null {
+        if (!this.failNext) return null;
+        const error = this.failNext;
+        this.failNext = null;
+        return Promise.reject(error);
+    }
+
+    private key(input: BillingCustomer, withContact: boolean) {
+        const contact = withContact ? input.contact : null;
+        return input.email && contact ? `${input.email}|${contact}` : null;
+    }
+
+    private make(input: BillingCustomer, withContact: boolean): string {
+        let id = `fake_cus_${input.organizationId}`;
+        for (let n = 2; this.byId.has(id); n += 1) {
+            id = `fake_cus_${input.organizationId}_${n}`;
+        }
+        this.byId.set(id, input.organizationId);
+        const key = this.key(input, withContact);
+        if (key) this.byEmailPhone.set(key, id);
+        this.created.push({ input, withContact });
+        return id;
+    }
+
+    createCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<CustomerCreated> {
+        const failed = this.take();
+        if (failed) return failed;
+        const key = this.key(input, options.withContact);
+        if (key && this.byEmailPhone.has(key)) return Promise.resolve("exists");
+        const id = this.make(input, options.withContact);
+        if (this.loseNextAnswer) {
+            this.loseNextAnswer = false;
+            return Promise.reject(
+                new BillingProviderError(
+                    "UNKNOWN",
+                    "Razorpay customer creation failed: network error",
+                ),
+            );
+        }
+        return Promise.resolve({ providerCustomerId: id });
+    }
+
+    existingCustomer(
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<ProviderCustomer> {
+        const failed = this.take();
+        if (failed) return failed;
+        const key = this.key(input, options.withContact);
+        const id =
+            (key && this.byEmailPhone.get(key)) ??
+            this.make(input, options.withContact);
+        return Promise.resolve({
+            providerCustomerId: id,
+            organizationId: this.byId.get(id) ?? null,
+        });
+    }
+
+    findCustomer(providerCustomerId: string): Promise<ProviderCustomer | null> {
+        const failed = this.take();
+        if (failed) return failed;
+        this.looked.push(providerCustomerId);
+        return Promise.resolve(
+            this.byId.has(providerCustomerId)
+                ? {
+                      providerCustomerId,
+                      organizationId: this.byId.get(providerCustomerId) ?? null,
+                  }
+                : null,
+        );
+    }
+
+    updateCustomer(
+        providerCustomerId: string,
+        input: BillingCustomer,
+        options: { withContact: boolean },
+    ): Promise<"updated" | "exists"> {
+        const failed = this.take();
+        if (failed) return failed;
+        const key = this.key(input, options.withContact);
+        const holder = key ? this.byEmailPhone.get(key) : undefined;
+        if (holder && holder !== providerCustomerId) {
+            return Promise.resolve("exists");
+        }
+        if (key) this.byEmailPhone.set(key, providerCustomerId);
+        this.updated.push({
+            providerCustomerId,
+            input,
+            withContact: options.withContact,
+        });
+        return Promise.resolve("updated");
+    }
+}
+
+/**
+ * The fake's payment notes (17 Oct 2026): every call recorded; a test
+ * queues a failure with {@link failNext}.
+ */
+export class FakeProviderPaymentNotes implements ProviderPaymentNotesCapability {
+    readonly set: {
+        providerPaymentId: string;
+        notes: Record<string, string>;
+    }[] = [];
+    failNext: BillingProviderError | null = null;
+
+    setPaymentNotes(input: {
+        providerPaymentId: string;
+        notes: Record<string, string>;
+    }): Promise<void> {
+        if (this.failNext) {
+            const error = this.failNext;
+            this.failNext = null;
+            return Promise.reject(error);
+        }
+        this.set.push(input);
+        return Promise.resolve();
+    }
+}
+
+/**
+ * The fake's refunds (DEC-164): one per payment, however often asked, as
+ * Razorpay refuses to refund more than was paid. A test queues failures
+ * with {@link failNext}; a refusal carries Razorpay-like words.
+ */
+export class FakeProviderRefunds implements ProviderRefundCapability {
+    readonly refunded: {
+        providerPaymentId: string;
+        reference: string;
+        organizationId?: string | null;
+        providerSubscriptionId?: string | null;
+        reason?: string | null;
+    }[] = [];
+    readonly asked: string[] = [];
+    /** What a refund answers it gave back; null: the provider didn't say. */
+    amountPaise: number | null = null;
+    private readonly failures: BillingProviderError[] = [];
+
+    failNext(...kinds: ("REFUSED" | "UNKNOWN")[]): void {
+        this.failures.push(
+            ...kinds.map((kind) =>
+                kind === "REFUSED"
+                    ? new BillingProviderError(
+                          kind,
+                          "Razorpay payment refund failed (HTTP 400): invalid request sent",
+                          "invalid request sent",
+                      )
+                    : new BillingProviderError(
+                          kind,
+                          "Razorpay payment refund failed: network error",
+                      ),
+            ),
+        );
+    }
+
+    refundPayment(input: {
+        providerPaymentId: string;
+        reference: string;
+        organizationId?: string | null;
+        providerSubscriptionId?: string | null;
+        reason?: string | null;
+    }): Promise<{ providerRefundId: string; amountPaise: number | null }> {
+        this.asked.push(input.providerPaymentId);
+        const failure = this.failures.shift();
+        if (failure) return Promise.reject(failure);
+        if (
+            !this.refunded.some(
+                (r) => r.providerPaymentId === input.providerPaymentId,
+            )
+        ) {
+            this.refunded.push(input);
+        }
+        return Promise.resolve({
+            providerRefundId: `fake_rfnd_${input.providerPaymentId}`,
+            amountPaise: this.amountPaise,
+        });
+    }
+}
+
+/**
+ * What the fake says it took on a subscription or order (DEC-166): set per
+ * reference by a test, else nothing. A test makes it fail with
+ * {@link failNext}.
+ */
+export class FakeProviderReconcile implements ProviderReconcileCapability {
+    readonly asked: { ref: string; oneTime: boolean }[] = [];
+    private readonly byRef = new Map<string, ProviderPaidCharge[]>();
+    failNext: BillingProviderError | null = null;
+
+    set(ref: string, charges: ProviderPaidCharge[]): void {
+        this.byRef.set(ref, charges);
+    }
+
+    paidCharges(ref: string, oneTime: boolean): Promise<ProviderPaidCharge[]> {
+        this.asked.push({ ref, oneTime });
+        if (this.failNext) {
+            const error = this.failNext;
+            this.failNext = null;
+            return Promise.reject(error);
+        }
+        return Promise.resolve(this.byRef.get(ref) ?? []);
+    }
+}
+
+/**
  * What the fake says a checkout stands at when asked (DEC-093): set per
  * reference by a test, else still waiting. Every question is recorded.
  */
@@ -130,6 +380,13 @@ export class FakeProviderStatuses implements ProviderStatusCapability {
 
     set(ref: string, status: CheckoutStatus): void {
         this.byRef.set(ref, status);
+    }
+
+    /** What `subscriptionStanding` answers, per reference; else `unknown`. */
+    readonly standings = new Map<string, SubscriptionStanding>();
+
+    subscriptionStanding(ref: string): Promise<SubscriptionStanding> {
+        return Promise.resolve(this.standings.get(ref) ?? "unknown");
     }
 
     checkoutStatus(ref: string, oneTime: boolean): Promise<CheckoutStatus> {
@@ -164,11 +421,17 @@ export class FakeBillingProvider implements BillingProvider {
     readonly plans = new FakeProviderPlans();
     readonly charges = new FakeProviderCharges();
     readonly orders = new FakeProviderOrders();
+    readonly customers = new FakeProviderCustomers();
     readonly statuses = new FakeProviderStatuses();
+    readonly paymentNotes = new FakeProviderPaymentNotes();
+    readonly refunds = new FakeProviderRefunds();
+    readonly reconcile = new FakeProviderReconcile();
     /** The public key Checkout would open with; null: no window. */
     publicKeyValue: string | null = null;
     /** The next `createSubscription` fails with this, once. */
     failNextCreate: BillingProviderError | null = null;
+    /** The next `cancelSubscription` calls fail with these, in order. */
+    readonly failCancels: BillingProviderError[] = [];
 
     constructor(
         readonly name = "RAZORPAY",
@@ -223,7 +486,8 @@ export class FakeBillingProvider implements BillingProvider {
     ): Promise<void> {
         this.cancelCalls.push(providerSubscriptionId);
         this.cancelOptions.push(options);
-        return Promise.resolve();
+        const failure = this.failCancels.shift();
+        return failure ? Promise.reject(failure) : Promise.resolve();
     }
 
     verifyWebhook(rawBody: Buffer, headers: WebhookHeaders): boolean {
@@ -253,6 +517,10 @@ export class FakeBillingProvider implements BillingProvider {
             eventAt?: string;
             currentPeriodEnd?: string | null;
             providerPaymentId?: string;
+            paymentAmountPaise?: number;
+            providerCustomerId?: string;
+            refund?: ProviderRefundEvent;
+            dispute?: ProviderDisputeEvent;
         };
         return {
             type: body.type ?? "unknown",
@@ -271,6 +539,14 @@ export class FakeBillingProvider implements BillingProvider {
             ...(body.providerPaymentId
                 ? { providerPaymentId: body.providerPaymentId }
                 : {}),
+            ...(typeof body.paymentAmountPaise === "number"
+                ? { paymentAmountPaise: body.paymentAmountPaise }
+                : {}),
+            ...(body.providerCustomerId
+                ? { providerCustomerId: body.providerCustomerId }
+                : {}),
+            ...(body.refund ? { refund: body.refund } : {}),
+            ...(body.dispute ? { dispute: body.dispute } : {}),
         };
     }
 }

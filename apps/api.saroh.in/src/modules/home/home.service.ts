@@ -289,6 +289,7 @@ export class HomeService {
         const skip = <T>(value: T): Promise<T> => Promise.resolve(value);
 
         const noEvidence = { count: 0, evidence: [] as HomeEvidence[] };
+        const noOpenOrders: OpenOrders = { ...noEvidence, later: 0 };
         const noRefunds: typeof noEvidence & { reason?: RefundReason } =
             noEvidence;
         const canReadInvoices = holds(input, "invoice:read");
@@ -341,9 +342,9 @@ export class HomeService {
                               money: holds(input, "order:read"),
                               storeIds: stores,
                           }),
-                      noEvidence,
+                      noOpenOrders,
                   )
-                : skip<OpenOrders>(noEvidence),
+                : skip<OpenOrders>(noOpenOrders),
             available.has("APPOINTMENTS")
                 ? guard<HomeSchedule>(
                       { moduleKey: "APPOINTMENTS", label: "Schedule" },
@@ -605,9 +606,11 @@ export class HomeService {
             // is sending them at a door that does not open.
             if (active.has("COMMERCE")) {
                 if (open.count > 0) {
+                    // Only the ones late or due by tomorrow (DEC-163); the
+                    // rest are `ordersInProgress`.
                     actions.push({
                         code: "COMMERCE_OPEN_ORDERS",
-                        title: `Fulfil ${open.count} open order${open.count === 1 ? "" : "s"}`,
+                        title: `Fulfil ${open.count} order${open.count === 1 ? "" : "s"} due by tomorrow`,
                         href: "/commerce/orders",
                         severity: "OVERDUE",
                         moduleKey: "COMMERCE",
@@ -615,7 +618,7 @@ export class HomeService {
                         evidence: open.evidence,
                         ...(open.moreTone ? { moreTone: open.moreTone } : {}),
                     });
-                } else {
+                } else if (open.later === 0) {
                     actions.push({
                         code: "COMMERCE_SUGGEST_PRODUCT",
                         title: "Add a product to your catalog",
@@ -697,6 +700,9 @@ export class HomeService {
             upcoming,
             unavailable,
             ...flattenNeeds(actions, zone),
+            // Only beside a list that holds the open orders: a Home whose
+            // Commerce is off or not ready says nothing about them.
+            ordersInProgress: active.has("COMMERCE") ? open.later : 0,
             today,
             lastDay,
             week: thisWeek,
@@ -733,6 +739,7 @@ export class HomeService {
             unavailable,
             needs: [],
             needsTotal: 0,
+            ordersInProgress: 0,
             today: null,
             lastDay: lastDayHeader(now, zone),
             // No `week` at all (F7): not even an empty one travels to a
