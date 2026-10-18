@@ -37,6 +37,11 @@ export interface OverviewOffer {
 }
 
 export interface OverviewPlan {
+    /**
+     * Its Saroh subscription, for the Billing tab's link to the
+     * subscription sheet (U5); null with none. An id, never a detail.
+     */
+    subscriptionId: string | null;
     /** On the catalogue: the plan now, a plan override winning. */
     effective: EffectivePlan | null;
     /** The plan's name now, on or off the catalogue; null with no plan. */
@@ -302,6 +307,7 @@ export class AdminOrganizationOverviewService {
         const catalogue = access.source === "catalogue" ? access : null;
 
         return {
+            subscriptionId: subscription?.id ?? null,
             effective,
             name: effective?.name ?? subscription?.plan.name ?? null,
             basePlanName:

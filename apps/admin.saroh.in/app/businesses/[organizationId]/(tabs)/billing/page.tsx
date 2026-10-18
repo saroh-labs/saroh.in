@@ -1,16 +1,21 @@
-import {
-    CatalogueActions,
-    PlanOverrideDialog,
-} from "@/components/business/catalogue-actions";
-import { CataloguePlan } from "@/components/business/catalogue-plan";
-import { PlanActions, RevokeLimit } from "@/components/business/plan-actions";
-import { SessionTab } from "@/components/business/session-tab";
-import { Facts, Panel } from "@/components/panel";
+import { PermissionDeniedState } from "@saroh/ui/data-state";
+
+import type { BillingSide } from "@/components/business/billing/billing-tab";
+import { BillingTab } from "@/components/business/billing/billing-tab";
+import { PlanDetail } from "@/components/business/billing/plan-detail";
+import { Panel } from "@/components/panel";
+import { FailedPanel } from "@/components/states/failed-panel";
+import { getSarohSubscription } from "@/lib/billing";
 import type { BusinessTabProps } from "@/lib/business-page";
-import { businessGate, readPlans, tabTitle } from "@/lib/business-page";
-import type { BusinessPlan } from "@/lib/businesses";
+import {
+    businessGate,
+    readOverview,
+    readSummary,
+    tabTitle,
+} from "@/lib/business-page";
 import { can } from "@/lib/console";
-import { asWords, camelToWords, formatDate } from "@/lib/format";
+import type { StaffIdentity } from "@/lib/control-plane";
+import type { BusinessOverview } from "@/lib/overview-words";
 
 export async function generateMetadata({ params }: BusinessTabProps) {
     const { organizationId } = await params;
@@ -18,255 +23,98 @@ export async function generateMetadata({ params }: BusinessTabProps) {
 }
 
 /**
- * Billing (admin plan U2): Plan and limits — what its plan gives, what
- * applies after overrides, how much is in use — and the plan, limit and
- * catalogue controls each operator's permissions allow. U5 rebuilds it.
+ * Billing (admin plan U5, R6): its plan, the offers running, who it is
+ * billed to (its billing profile, DEC-167), its limits and extras and its
+ * last invoice, with links to the subscription sheet and Sync with
+ * Razorpay…. The rows read without a support session (R10): the plan from
+ * the Overview's read (`organization:read`), who pays and the invoices
+ * from Saroh's billing (`saroh-billing:read`, Platform owners and Billing
+ * only). Give a custom offer… opens the offer sheet over the tab.
+ *
+ * Inside a support session, the plan's detail follows (`PlanDetail`):
+ * every catalogue row, the limits in use and the older plan controls.
  */
-export default async function BillingTab({ params }: BusinessTabProps) {
+export default async function BillingTabPage({ params }: BusinessTabProps) {
     const gate = await businessGate();
     if (!gate.ok) return null;
     const { staff } = gate;
     const { organizationId } = await params;
-    const subscriptionWrite = can(staff, "subscription:override");
-    const pricingOverride = can(staff, "pricing:override");
-    const pricingPrice = pricingOverride && can(staff, "pricing:publish");
-    const plans = can(staff, "subscription:read") ? await readPlans() : [];
+
+    let overview: BusinessOverview | null | undefined;
+    try {
+        overview = await readOverview(organizationId);
+    } catch {
+        overview = undefined;
+    }
+    if (overview === undefined || overview?.plan.status === "failed") {
+        return (
+            <FailedPanel
+                things="its billing"
+                reassurance="The rest of the page is current."
+            />
+        );
+    }
+    if (overview === null) {
+        return (
+            <PermissionDeniedState
+                title="This business isn't one of yours"
+                description="Your access covers the businesses you look after."
+            />
+        );
+    }
+
+    const plan = overview.plan.data;
+    const [summary, side] = await Promise.all([
+        readSummary(organizationId),
+        billingSide(staff, plan.subscriptionId),
+    ]);
 
     return (
-        <SessionTab staff={staff} organizationId={organizationId}>
-            {(view) => {
-                const id = view.facts.id;
-                return (
-                    <Panel
-                        title="Plan and limits"
-                        description="What its plan gives, what applies now after overrides, and how much is in use."
-                        data={view.plan}
-                    >
-                        {(plan) => (
-                            <div className="grid gap-4">
-                                {plan.catalogue ? (
-                                    <CataloguePlan
-                                        organizationId={id}
-                                        plan={plan}
-                                        catalogue={plan.catalogue}
-                                        canOverride={pricingOverride}
-                                        canSetPrice={pricingPrice}
-                                        canRaise={subscriptionWrite}
-                                    />
-                                ) : (
-                                    <Facts
-                                        rows={[
-                                            [
-                                                "Plan",
-                                                plan.subscription
-                                                    ? `${plan.subscription.plan.name} (v${plan.subscription.plan.version})`
-                                                    : "No plan yet, so they get the free basics",
-                                            ],
-                                            [
-                                                "Catalogue",
-                                                LEGACY_REASON[
-                                                    plan.legacyReason ?? ""
-                                                ] ?? "Not on the catalogue",
-                                            ],
-                                            [
-                                                "Status",
-                                                plan.subscription
-                                                    ? asWords(
-                                                          plan.subscription
-                                                              .status,
-                                                      )
-                                                    : "—",
-                                            ],
-                                            [
-                                                plan.subscription?.status ===
-                                                "TRIALING"
-                                                    ? "Trial ends"
-                                                    : "Period ends",
-                                                formatDate(
-                                                    plan.subscription
-                                                        ?.currentPeriodEnd,
-                                                ),
-                                            ],
-                                        ]}
-                                    />
-                                )}
-                                {plan.limits.length > 0 && (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full min-w-[440px] text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left text-[12px] uppercase tracking-[0.08em] text-muted-foreground">
-                                                    <th className="py-2 pr-3 font-semibold">
-                                                        {plan.catalogue
-                                                            ? "Other limits"
-                                                            : "Limit"}
-                                                    </th>
-                                                    <th className="py-2 pr-3 text-right font-semibold">
-                                                        In use
-                                                    </th>
-                                                    <th className="py-2 pr-3 text-right font-semibold">
-                                                        Allowed
-                                                    </th>
-                                                    <th className="py-2 font-semibold" />
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {plan.limits.map((limit) => (
-                                                    <tr
-                                                        key={limit.key}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-2 pr-3">
-                                                            {camelToWords(
-                                                                limit.key,
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 pr-3 text-right tabular-nums">
-                                                            {limit.usage ?? (
-                                                                <span className="text-muted-foreground">
-                                                                    Not measured
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 pr-3 text-right tabular-nums">
-                                                            {describeLimit(
-                                                                limit.effective,
-                                                            )}
-                                                            {limit.override && (
-                                                                <span className="block text-[12.5px] text-muted-foreground">
-                                                                    raised until{" "}
-                                                                    {formatDate(
-                                                                        limit
-                                                                            .override
-                                                                            .expiresAt,
-                                                                    )}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 text-right">
-                                                            {limit.override &&
-                                                                subscriptionWrite && (
-                                                                    <RevokeLimit
-                                                                        organizationId={
-                                                                            id
-                                                                        }
-                                                                        overrideId={
-                                                                            limit
-                                                                                .override
-                                                                                .id
-                                                                        }
-                                                                        label={camelToWords(
-                                                                            limit.key,
-                                                                        )}
-                                                                        expiresAt={
-                                                                            limit
-                                                                                .override
-                                                                                .expiresAt
-                                                                        }
-                                                                    />
-                                                                )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                                {subscriptionWrite && (
-                                    <PlanActions
-                                        organizationId={id}
-                                        plans={plans}
-                                        currentPlanId={
-                                            plan.subscription?.plan.id ?? null
-                                        }
-                                        subscriptionStatus={
-                                            plan.subscription?.status ?? null
-                                        }
-                                        numericLimits={raisableLimits(plan)}
-                                        catalogueLive={Boolean(
-                                            plan.liveCatalogue,
-                                        )}
-                                    />
-                                )}
-                                {pricingOverride &&
-                                    plan.legacyReason === "no-plan" &&
-                                    plan.liveCatalogue && (
-                                        <div className="flex flex-wrap gap-2">
-                                            <PlanOverrideDialog
-                                                organizationId={id}
-                                                plans={plan.liveCatalogue.plans}
-                                                current={null}
-                                                defaultPlanId={
-                                                    plan.liveCatalogue.plans[0]
-                                                        ?.id ?? ""
-                                                }
-                                            />
-                                        </div>
-                                    )}
-                                {pricingOverride && plan.catalogue && (
-                                    <CatalogueActions
-                                        organizationId={id}
-                                        catalogue={plan.catalogue}
-                                        canSetPrice={pricingPrice}
-                                        canMove={
-                                            plan.catalogue.liveVersion !==
-                                                null &&
-                                            plan.subscription?.plan.key.startsWith(
-                                                "catalog.",
-                                            ) === true &&
-                                            plan.subscription.status !==
-                                                "CANCELLED" &&
-                                            plan.subscription.plan.version <
-                                                plan.catalogue.liveVersion
-                                        }
-                                    />
-                                )}
-                            </div>
-                        )}
-                    </Panel>
-                );
-            }}
-        </SessionTab>
+        <div className="grid gap-5">
+            <Panel
+                title="Billing"
+                description="What they are on, what they get, who pays and what was last charged."
+                data={{ status: "ok" as const, data: plan }}
+            >
+                {(p) => (
+                    <BillingTab
+                        organizationId={organizationId}
+                        businessName={summary?.name ?? "this business"}
+                        plan={p}
+                        usage={
+                            overview.usage.status === "ok"
+                                ? overview.usage.data
+                                : null
+                        }
+                        billedTo={overview.billedTo}
+                        side={side}
+                        canOffer={
+                            summary?.lifecycleStatus !== "DELETED_RETAINED" &&
+                            (can(staff, "pricing:override") ||
+                                can(staff, "subscription:override"))
+                        }
+                        canSync={can(staff, "saroh-billing:act")}
+                    />
+                )}
+            </Panel>
+            {can(staff, "organization:view-as") && (
+                <PlanDetail staff={staff} organizationId={organizationId} />
+            )}
+        </div>
     );
 }
 
-/** Why the catalogue doesn't reach a business yet, in words. */
-const LEGACY_REASON: Record<string, string> = {
-    "no-plan":
-        "Not yet: no subscription or plan override, so they get the free basics",
-    "unmapped-plan": "Not yet — its billing plan has no catalogue plan",
-    "no-catalogue": "No catalogue version is live, or it can't be read",
-    "unknown-plan": "Its plan isn't in the version it is on",
-};
-
-/**
- * What an operator may raise for a while (`subscription:override`): every
- * numeric limit its plan sets — the catalogue rows by id and the keys no row
- * covers.
- */
-function raisableLimits(
-    plan: BusinessPlan,
-): { key: string; label: string; planValue: number }[] {
-    const rows = (plan.catalogue?.modules ?? []).flatMap((m) =>
-        m.planState === "on" && m.planLimit !== null
-            ? [{ key: m.moduleId, label: m.name, planValue: m.planLimit }]
-            : [],
-    );
-    const keys = plan.limits.flatMap((limit) =>
-        typeof limit.planValue === "number"
-            ? [
-                  {
-                      key: limit.key,
-                      label: camelToWords(limit.key),
-                      planValue: limit.planValue,
-                  },
-              ]
-            : [],
-    );
-    return [...rows, ...keys];
-}
-
-function describeLimit(value: number | boolean | null): string {
-    if (value === null) return "No limit";
-    if (typeof value === "boolean") return value ? "Included" : "Not included";
-    return String(value);
+/** Who pays and the last invoice, for a `saroh-billing:read` holder. */
+async function billingSide(
+    staff: StaffIdentity,
+    subscriptionId: string | null,
+): Promise<BillingSide> {
+    if (!can(staff, "saroh-billing:read")) return { status: "hidden" };
+    if (!subscriptionId) return { status: "none" };
+    try {
+        const detail = await getSarohSubscription(subscriptionId);
+        return detail ? { status: "ok", detail } : { status: "hidden" };
+    } catch {
+        return { status: "failed" };
+    }
 }

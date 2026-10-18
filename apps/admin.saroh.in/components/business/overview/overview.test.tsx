@@ -67,6 +67,7 @@ import { UsageCard } from "./usage-card";
 
 // Made-up plans, prices and limits: nothing here is a real one.
 const plan: OverviewPlan = {
+    subscriptionId: "sub_row",
     effective: {
         id: "grow",
         name: "Plan B",

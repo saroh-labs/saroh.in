@@ -654,6 +654,16 @@ emailVerifiedByStaffAt === null`, read through `emailVerifiedBySelf`
   row in `guardedStaffChange`. A second accept by the same person answers
   `already-joined` and writes nothing; anyone already on the team is refused
   (`ALREADY_ON_TEAM`).
+- **Current** (admin console U5) — **A staff override is a gift.** The
+  offer sheet gives a plan until a date, a custom price (`pricing:override`
+  and `pricing:publish`), one module, a higher limit or a longer trial
+  (`subscription:override`; a trial only while TRIALING and not billed by a
+  provider), each checked first by `POST organizations/:id/overrides/preview`
+  (`admin-offer-preview.ts`), which runs the write's checks and reads the
+  business through `CatalogueAccessService.resolve(…, whatIf)` without
+  writing anything. Taking a module away (`kind: "remove"`) is a Platform
+  owner's alone and refused for a row the plan they pay for, or an add-on
+  they bought, includes (`assertMayTakeAway`, in the write and the dry run).
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator

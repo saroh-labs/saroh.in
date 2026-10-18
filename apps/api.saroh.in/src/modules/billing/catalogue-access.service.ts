@@ -158,6 +158,17 @@ export interface PlanEnding {
 
 const SHOWN_MS = PLAN_ENDING_SHOWN_DAYS * 24 * 60 * 60 * 1000;
 
+/**
+ * An override set as it would be (admin plan U5, the offer's dry run):
+ * rows a write would revoke left out, the row it would write added. Never
+ * written: `resolve` reads it in memory only.
+ */
+export interface WhatIf {
+    add?: readonly OverrideRow[];
+    /** True for a live row the write would revoke. */
+    drop?: (row: OverrideRow) => boolean;
+}
+
 /** Parsed snapshots by version row id: versions never change once written. */
 const parsedVersions = new Map<string, Catalog>();
 
@@ -230,6 +241,9 @@ export function newestPlanOverride(
  * that isn't in it, reads the business off its own row (or the free floor)
  * and logs why; a plan override naming a plan the version doesn't have is
  * ignored and logged, never read as Free.
+ *
+ * `whatIf` reads it as a write would leave it ({@link WhatIf}), for an
+ * operator's dry run; nothing is written.
  */
 @Injectable()
 export class CatalogueAccessService {
@@ -243,6 +257,7 @@ export class CatalogueAccessService {
     async resolve(
         organizationId: string,
         now: Date = new Date(),
+        whatIf?: WhatIf,
     ): Promise<BusinessAccess> {
         const [subscription, rows] = await Promise.all([
             prisma.subscription.findUnique({
@@ -286,7 +301,12 @@ export class CatalogueAccessService {
                 select: OVERRIDE_SELECT,
             }),
         ]);
-        const overrideRows = rows as OverrideRow[];
+        const overrideRows = whatIf
+            ? [
+                  ...(rows as OverrideRow[]).filter((r) => !whatIf.drop?.(r)),
+                  ...(whatIf.add ?? []),
+              ]
+            : (rows as OverrideRow[]);
         const raises = liveRaises(overrideRows);
         const planOverride = newestPlanOverride(overrideRows, now);
 

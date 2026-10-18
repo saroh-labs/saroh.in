@@ -23,6 +23,9 @@ const actions = vi.hoisted(() => ({
     switchOnModuleAction: vi.fn(),
     setModuleAction: vi.fn(),
     repairModulesAction: vi.fn(),
+    // The offer sheet (U5) reads its options when it opens.
+    offerOptionsAction: vi.fn(() => new Promise(() => undefined)),
+    previewOfferAction: vi.fn(),
 }));
 vi.mock("@/lib/business-actions", () => actions);
 
@@ -349,12 +352,18 @@ describe("ModuleRows", () => {
         expect(switchOn.hasAttribute("disabled")).toBe(false);
     });
 
-    it("links Give this module… to the Billing tab until the offer sheet", () => {
+    it("opens the offer sheet from Give this module…, not another page", () => {
         renderRows([commerceLocked]);
-        const link = within(rowOf("COMMERCE")).getByRole("link", {
-            name: "Give this module…",
-        });
-        expect(link.getAttribute("href")).toBe("/businesses/org_1/billing");
+        expect(within(rowOf("COMMERCE")).queryByRole("link")).toBeNull();
+        fireEvent.click(
+            within(rowOf("COMMERCE")).getByRole("button", {
+                name: "Give this module…",
+            }),
+        );
+        expect(
+            screen.getByRole("dialog", { name: "Give a custom offer" }),
+        ).toBeTruthy();
+        expect(actions.offerOptionsAction).toHaveBeenCalledWith("org_1");
     });
 
     it("shows the plan-limits note once, above the rows", () => {

@@ -59,6 +59,14 @@ export default async function BusinessLayout({
                     canViewAs={canViewAs}
                     canLifecycle={can(staff, "organization:lifecycle:write")}
                     canLiftHold={can(staff, "organization:legal-hold:lift")}
+                    canOffer={
+                        can(staff, "pricing:override") ||
+                        can(staff, "subscription:override")
+                    }
+                    canTakeAway={
+                        staff.roles.includes("PLATFORM_OWNER") &&
+                        can(staff, "pricing:override")
+                    }
                     badges={overviewBadges(overview?.badges)}
                 />
                 {children}

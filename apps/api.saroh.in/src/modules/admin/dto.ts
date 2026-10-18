@@ -21,6 +21,8 @@ import type { ContactTopic } from "../contact-messages/dto";
 import { CONTACT_TOPICS } from "../contact-messages/dto";
 import type { DeployApp, DeployEnvironment } from "./admin-deployments";
 import { DEPLOY_APPS, DEPLOY_ENVIRONMENTS } from "./admin-deployments";
+import type { PreviewKind } from "./admin-offers";
+import { PREVIEW_KINDS } from "./admin-offers";
 import { AdminRole } from "./admin-permissions";
 import type { PeopleFilter } from "./sign-in-help-rules";
 import { PEOPLE_FILTERS } from "./sign-in-help-rules";
@@ -648,6 +650,42 @@ export class PlanOverrideDto extends OperatorReasonDto {
 
     @IsISO8601()
     expiresAt!: string;
+}
+
+/**
+ * The dry run of a custom offer or of Take away a module… (admin console
+ * U5, R5): the offer as filled in so far. No reason or idempotency key: it
+ * writes nothing, and the write that follows takes both.
+ */
+export class OfferPreviewDto {
+    @IsIn(PREVIEW_KINDS)
+    kind!: PreviewKind;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    planKey?: string;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(100_000_000)
+    pricePaise?: number;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    moduleKey?: string;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(1_000_000)
+    value?: number;
+
+    @IsOptional()
+    @IsISO8601()
+    expiresAt?: string;
 }
 
 /** Move one business to the live catalogue version, now or at its renewal. */

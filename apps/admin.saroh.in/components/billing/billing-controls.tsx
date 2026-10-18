@@ -91,13 +91,16 @@ export function RecheckRefund({
 export function SyncCustomer({
     organizationId,
     onDone,
+    trigger = "Sync again",
 }: {
     organizationId: string;
     onDone?: OnDone;
+    /** The button's words: "Sync with Razorpay…" on a business's Billing tab. */
+    trigger?: string;
 }) {
     return (
         <OperatorDialog
-            trigger="Sync again"
+            trigger={trigger}
             triggerVariant="outline"
             title="Sync the Razorpay customer again"
             effect="Saroh sends the billing profile's legal name, email, phone and GSTIN to its customer at the billing provider, in the background. The profile may bill other businesses too; they share the one customer. A refusal shows here as the last error."

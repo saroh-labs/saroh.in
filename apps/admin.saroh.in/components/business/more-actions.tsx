@@ -15,6 +15,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 
 import type { LifecycleStatus } from "@/lib/businesses";
+import { useChangeFeedback } from "@/lib/use-change-feedback";
 
 import type { LifecycleChoice } from "./lifecycle-actions";
 import {
@@ -23,6 +24,7 @@ import {
     lifecycleChoices,
     lifecycleNote,
 } from "./lifecycle-actions";
+import { TakeAwaySheet } from "./take-away-sheet";
 
 /** The rows whose dialog is destructive, drawn as such in the menu. */
 const TAKES_DOWN = new Set<LifecycleChoice>([
@@ -38,8 +40,9 @@ const TAKES_DOWN = new Set<LifecycleChoice>([
  * Suspend…, Schedule deletion… and the rest of the lifecycle — each a row
  * that opens its `OperatorDialog`. A row shows only to an operator who
  * holds its permission (`canLifecycle`, `canLiftHold`); the API refuses
- * regardless. When a legal hold or a deletion leaves less to offer, one
- * line in the menu says why.
+ * regardless. Take away a module… (U5) is a Platform owner's alone
+ * (`canTakeAway`): not an offer, so not in the offer sheet. When a legal
+ * hold or a deletion leaves less to offer, one line in the menu says why.
  */
 export function MoreActions({
     organizationId,
@@ -48,6 +51,7 @@ export function MoreActions({
     held = false,
     canLifecycle = false,
     canLiftHold = false,
+    canTakeAway = false,
 }: {
     organizationId: string;
     name: string;
@@ -58,8 +62,12 @@ export function MoreActions({
     canLifecycle?: boolean;
     /** Holds `organization:legal-hold:lift` (a Platform Owner). */
     canLiftHold?: boolean;
+    /** A Platform owner: Take away a module… (U5). */
+    canTakeAway?: boolean;
 }) {
     const [chosen, setChosen] = useState<LifecycleChoice | null>(null);
+    const [takingAway, setTakingAway] = useState(false);
+    const feedback = useChangeFeedback();
     const choices = canLifecycle
         ? lifecycleChoices({ status, held, canLiftHold })
         : [];
@@ -85,6 +93,11 @@ export function MoreActions({
                     <DropdownMenuItem onSelect={() => void copyId()}>
                         Copy id
                     </DropdownMenuItem>
+                    {canTakeAway && (
+                        <DropdownMenuItem onSelect={() => setTakingAway(true)}>
+                            Take away a module…
+                        </DropdownMenuItem>
+                    )}
                     {(choices.length > 0 || note) && <DropdownMenuSeparator />}
                     {choices.map((choice) => (
                         <DropdownMenuItem
@@ -106,6 +119,14 @@ export function MoreActions({
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
+            {takingAway && (
+                <TakeAwaySheet
+                    organizationId={organizationId}
+                    businessName={name}
+                    onOpenChange={setTakingAway}
+                    onDone={(message) => feedback.report({ message })}
+                />
+            )}
             {chosen && (
                 <LifecycleDialog
                     key={chosen}

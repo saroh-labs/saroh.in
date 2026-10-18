@@ -3,12 +3,12 @@
 import type { ReactNode } from "react";
 
 import type { PlanOption } from "@/lib/businesses";
-import { formatDate } from "@/lib/format";
 import type { OverviewPanel, OverviewPlan } from "@/lib/overview-words";
 import {
     billedToLine,
     offerLine,
     overviewNextCharge,
+    overviewPlanWords,
     priceLine,
 } from "@/lib/overview-words";
 import { useChangeFeedback } from "@/lib/use-change-feedback";
@@ -98,7 +98,9 @@ export function PlanCard({
             {(p) => {
                 const planName = (id: string) =>
                     p.livePlans?.find((x) => x.id === id)?.name ?? id;
-                const rows: [string, ReactNode][] = [["Plan", planWords(p)]];
+                const rows: [string, ReactNode][] = [
+                    ["Plan", overviewPlanWords(p)],
+                ];
                 const price = priceLine(p);
                 if (price) rows.push(["Pays", price]);
                 rows.push(["Next charge", overviewNextCharge(p)]);
@@ -132,16 +134,4 @@ export function PlanCard({
             }}
         </OverviewCard>
     );
-}
-
-/** "Plan C until 3 Nov 2026 · base plan Plan A", or "No plan yet". */
-function planWords(p: OverviewPlan): string {
-    if (!p.name) return "No plan yet, so they get the free basics";
-    if (!p.effective?.override) return p.name;
-    const until = p.overrideEndsAt
-        ? `until ${formatDate(p.overrideEndsAt)}`
-        : "until removed";
-    return p.basePlanName && p.basePlanName !== p.name
-        ? `${p.name} ${until} · base plan ${p.basePlanName}`
-        : `${p.name} ${until}`;
 }

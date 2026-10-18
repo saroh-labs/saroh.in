@@ -3,7 +3,6 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Notice } from "@saroh/ui/notice";
-import Link from "next/link";
 import { useState } from "react";
 
 import { ModuleToggle } from "@/components/business/module-actions";
@@ -22,9 +21,10 @@ import { dependencyWords, missingAccess, STATE_PILL } from "@/lib/module-fix";
 import { undoReason } from "@/lib/releases";
 import { useChangeFeedback } from "@/lib/use-change-feedback";
 
+import { OfferSheet } from "../offer-sheet";
 import { FixSheet } from "./fix-sheet";
 
-/** "Give this module…" until the offer sheet (U5) opens it from here. */
+/** A module their plan doesn't include: the offer sheet, prefilled (U5). */
 export const GIVE_MODULE = "Give this module…";
 
 /**
@@ -34,6 +34,10 @@ export const GIVE_MODULE = "Give this module…";
  * fix opens its sheet, one at a time; after it the row flips to the state
  * the API reads back, lights for two seconds, and a release turned on for
  * this business offers Undo (R9).
+ *
+ * A module their plan doesn't include offers Give this module…, the
+ * offer sheet (U5) opened on One module with this module picked; after it
+ * the row lights the same way.
  *
  * Their own switch stays on each row for operators who may change it
  * (`organization:modules:write`): Turn off where it is on, Turn on where
@@ -66,6 +70,8 @@ export function ModuleRows({
 }) {
     const feedback = useChangeFeedback();
     const [openKey, setOpenKey] = useState<string | null>(null);
+    // "Give this module…": the row whose module the offer sheet gives.
+    const [givingKey, setGivingKey] = useState<string | null>(null);
     // Rows as the API read them back after a fix, until the page's own
     // refresh brings a new state.
     const [fixed, setFixed] = useState<Record<string, BusinessModuleState>>({});
@@ -80,6 +86,7 @@ export function ModuleRows({
         permission === undefined || permissions.includes(permission);
     const modulesWrite = may("organization:modules:write");
     const open = rows.find((row) => row.moduleKey === openKey) ?? null;
+    const giving = rows.find((row) => row.moduleKey === givingKey) ?? null;
 
     function flip(moduleKey: string, row: BusinessModuleState | null) {
         if (row) setFixed((now) => ({ ...now, [moduleKey]: row }));
@@ -198,9 +205,12 @@ export function ModuleRows({
                             <div className="flex flex-wrap items-start gap-2 sm:justify-end">
                                 <FixControl
                                     row={row}
-                                    organizationId={organizationId}
                                     allowed={may(row.fix?.permission)}
-                                    onOpen={() => setOpenKey(row.moduleKey)}
+                                    onOpen={() =>
+                                        row.fix?.kind === "plan"
+                                            ? setGivingKey(row.moduleKey)
+                                            : setOpenKey(row.moduleKey)
+                                    }
                                 />
                                 {modulesWrite &&
                                     switchedOn !== undefined &&
@@ -220,6 +230,20 @@ export function ModuleRows({
                     );
                 })}
             </ul>
+            {giving && (
+                <OfferSheet
+                    key={giving.moduleKey}
+                    organizationId={organizationId}
+                    businessName={businessName}
+                    start={{ kind: "module", registry: giving.moduleKey }}
+                    onOpenChange={(next) => {
+                        if (!next) setGivingKey(null);
+                    }}
+                    onDone={(message) =>
+                        feedback.report({ message, rowId: giving.moduleKey })
+                    }
+                />
+            )}
             {open && (
                 <FixSheet
                     key={open.moduleKey}
@@ -248,15 +272,13 @@ function switchFromState(row: BusinessModuleState): boolean | undefined {
     return undefined;
 }
 
-/** The row's one fix: a button opening its sheet, a link, or nothing. */
+/** The row's one fix: a button opening its sheet, or nothing. */
 function FixControl({
     row,
-    organizationId,
     allowed,
     onOpen,
 }: {
     row: BusinessModuleState;
-    organizationId: string;
     allowed: boolean;
     onOpen: () => void;
 }) {
@@ -277,22 +299,6 @@ function FixControl({
         );
     }
 
-    if (fix.kind === "plan") {
-        // The offer sheet is U5's; until then, the Billing tab gives it.
-        return (
-            <div className="flex flex-col items-start gap-1 sm:items-end">
-                <Button asChild size="sm" variant="outline">
-                    <Link href={`/businesses/${organizationId}/billing`}>
-                        {GIVE_MODULE}
-                    </Link>
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                    Opens Billing, where their plan and offers are.
-                </p>
-            </div>
-        );
-    }
-
     return (
         <Button
             type="button"
@@ -301,11 +307,13 @@ function FixControl({
             onClick={onOpen}
             aria-haspopup="dialog"
         >
-            {fix.kind === "release"
-                ? "Turn on for this business…"
-                : fix.kind === "switch-on"
-                  ? "Switch on for them…"
-                  : "Only they can do this…"}
+            {fix.kind === "plan"
+                ? GIVE_MODULE
+                : fix.kind === "release"
+                  ? "Turn on for this business…"
+                  : fix.kind === "switch-on"
+                    ? "Switch on for them…"
+                    : "Only they can do this…"}
         </Button>
     );
 }

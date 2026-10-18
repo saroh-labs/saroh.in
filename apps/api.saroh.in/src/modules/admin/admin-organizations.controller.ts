@@ -22,6 +22,7 @@ import {
     ChangePlanDto,
     ListOrganizationsDto,
     ModuleOverrideDto,
+    OfferPreviewDto,
     OpenAdminAccessSessionDto,
     OperatorReasonDto,
     PlanOverrideDto,
@@ -391,6 +392,35 @@ export class AdminOrganizationsController {
                     overrideId,
                 }),
         );
+    }
+
+    /**
+     * What the offer sheet can give this business, and Take away a module…
+     * can take (admin console U5, R5): each kind with why not, and what to
+     * pick from. Writes nothing.
+     */
+    @Get("organizations/:organizationId/offers")
+    @RequireAdminPermission(AdminPermission.PricingOverride)
+    offers(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+    ) {
+        return this.overrides.offers(staff, organizationId);
+    }
+
+    /**
+     * The dry run of a custom offer or of Take away a module… (U5, R5):
+     * what the write would refuse, or what the business would see. Writes
+     * nothing — no override, no ledger row — so it takes no idempotency key.
+     */
+    @Post("organizations/:organizationId/overrides/preview")
+    @RequireAdminPermission(AdminPermission.PricingOverride)
+    previewOffer(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: OfferPreviewDto,
+    ) {
+        return this.overrides.preview(staff, organizationId, dto);
     }
 
     /** Grant, remove, or set the limit of one catalogue row (pricing U11). */

@@ -13,8 +13,10 @@ import type { ControlPlaneResult } from "./control-plane";
 import {
     adminWrite,
     clearFlagOverride,
+    getJson,
     setFlagOverride,
 } from "./control-plane";
+import type { OfferDraft, OfferOptions, OfferPreview } from "./offer-words";
 
 /**
  * Server Actions for operator actions on one business (plan U4–U5). Thin:
@@ -248,6 +250,49 @@ export async function moduleOverrideAction(
             input,
             "Could not save the override.",
         ),
+    );
+}
+
+/**
+ * What the offer sheet and Take away a module… can offer this business
+ * (admin plan U5): a read, made when a sheet opens. A refusal says so in
+ * words; an outage says to try again.
+ */
+export async function offerOptionsAction(
+    organizationId: string,
+): Promise<ControlPlaneResult<OfferOptions>> {
+    try {
+        const data = await getJson<OfferOptions>(
+            `${base(organizationId)}/offers`,
+        );
+        return data
+            ? { ok: true, data }
+            : {
+                  ok: false,
+                  status: 403,
+                  error: "Your access doesn't cover giving offers.",
+              };
+    } catch {
+        return {
+            ok: false,
+            error: "Couldn't load what can be offered. Nothing has changed; try again in a moment.",
+        };
+    }
+}
+
+/**
+ * The offer's dry run (U5): what the API would refuse, in its words, or
+ * what the business would see. It writes nothing, so it refreshes nothing.
+ */
+export async function previewOfferAction(
+    organizationId: string,
+    draft: OfferDraft,
+): Promise<ControlPlaneResult<OfferPreview>> {
+    return adminWrite<OfferPreview>(
+        `${base(organizationId)}/overrides/preview`,
+        "POST",
+        draft,
+        "Couldn't check what they'd see. Try again in a moment.",
     );
 }
 

@@ -27,6 +27,8 @@ export interface OverviewOffer {
 }
 
 export interface OverviewPlan {
+    /** Its Saroh subscription, for the subscription sheet's link (U5). */
+    subscriptionId: string | null;
     effective: EffectivePlan | null;
     name: string | null;
     basePlanName: string | null;
@@ -140,6 +142,18 @@ export function overviewBadges(
         out.notes = { count: badges.notes.count };
     }
     return out;
+}
+
+/** "Plan C until 3 Nov 2026 · base plan Plan A", or "No plan yet". */
+export function overviewPlanWords(p: OverviewPlan): string {
+    if (!p.name) return "No plan yet, so they get the free basics";
+    if (!p.effective?.override) return p.name;
+    const until = p.overrideEndsAt
+        ? `until ${formatDate(p.overrideEndsAt)}`
+        : "until removed";
+    return p.basePlanName && p.basePlanName !== p.name
+        ? `${p.name} ${until} · base plan ${p.basePlanName}`
+        : `${p.name} ${until}`;
 }
 
 /** "₹123.45 a month", and that it is a custom price until when. */

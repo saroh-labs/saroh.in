@@ -7,12 +7,11 @@ import {
     catalogueMoveAction,
     moduleOverrideAction,
     planOverrideAction,
-    priceOverrideAction,
     removeOverrideAction,
 } from "@/lib/business-actions";
 import type { BusinessCatalogue } from "@/lib/businesses";
 import { formatDate, todayIso } from "@/lib/format";
-import { endOfDayIso, rupeesToPaise } from "@/lib/overrides";
+import { endOfDayIso } from "@/lib/overrides";
 
 import { OperatorDialog } from "../operator-dialog";
 import { done } from "./plan-actions";
@@ -71,25 +70,24 @@ function UntilField({
 }
 
 /**
- * One business's exceptions to its catalogue plan (pricing U11): grant or
- * remove a module, set a limit, a custom price, a plan until a date, and a
- * move to the live version. Each goes through `OperatorDialog`, so each has
- * a reason, and the API checks, applies and records it.
+ * One business's exceptions to its catalogue plan (pricing U11): set a
+ * limit up or down, a plan until a date, and a move to the live version.
+ * Each goes through `OperatorDialog`, so each has a reason, and the API
+ * checks, applies and records it. Grant a module and a custom price are
+ * the offer sheet's now, and removing a module is Take away a module…
+ * (admin plan U5): an offer is a gift, and taking away is a Platform
+ * owner's alone.
  */
 export function CatalogueActions({
     organizationId,
     catalogue,
-    canSetPrice,
     canMove,
 }: {
     organizationId: string;
     catalogue: BusinessCatalogue;
-    /** `pricing:publish` too: a custom price is a price change. */
-    canSetPrice: boolean;
     /** It has a catalogue subscription on an earlier version than the live one. */
     canMove: boolean;
 }) {
-    const off = catalogue.modules.filter((m) => m.state !== "on");
     const on = catalogue.modules.filter((m) => m.state === "on");
     const limitable = on.filter((m) => m.limitable);
     const describe = (limit: number | null, per: string) =>
@@ -97,59 +95,6 @@ export function CatalogueActions({
 
     return (
         <div className="flex flex-wrap gap-2">
-            <OperatorDialog
-                trigger="Grant a module"
-                title="Grant a module"
-                effect="The business gets this module whatever its plan says, until the date you set or until someone removes the override. With no limit."
-                fields={
-                    <>
-                        <ModuleSelect
-                            id="grant-module"
-                            modules={off.map((m) => ({
-                                ...m,
-                                note: "not on its plan",
-                            }))}
-                        />
-                        <UntilField id="grant-until" />
-                    </>
-                }
-                submitLabel="Grant module"
-                disabled={off.length === 0}
-                disabledReason="Every module is already on."
-                onSubmit={({ reason, idempotencyKey, values }) =>
-                    moduleOverrideAction(organizationId, {
-                        reason,
-                        idempotencyKey,
-                        kind: "grant",
-                        moduleKey: values.moduleKey ?? "",
-                        expiresAt: endOfDayIso(values.until ?? ""),
-                    })
-                }
-            />
-            <OperatorDialog
-                trigger="Remove a module"
-                title="Remove a module"
-                effect="The module disappears from this business's workspace even though its plan includes it. Nothing is deleted; removing the override brings it back."
-                fields={
-                    <>
-                        <ModuleSelect id="remove-module" modules={on} />
-                        <UntilField id="remove-until" />
-                    </>
-                }
-                submitLabel="Remove module"
-                destructive
-                disabled={on.length === 0}
-                disabledReason="No module is on."
-                onSubmit={({ reason, idempotencyKey, values }) =>
-                    moduleOverrideAction(organizationId, {
-                        reason,
-                        idempotencyKey,
-                        kind: "remove",
-                        moduleKey: values.moduleKey ?? "",
-                        expiresAt: endOfDayIso(values.until ?? ""),
-                    })
-                }
-            />
             <OperatorDialog
                 trigger="Set a limit"
                 title="Set a limit"
@@ -195,46 +140,6 @@ export function CatalogueActions({
                     })
                 }
             />
-            {canSetPrice && (
-                <OperatorDialog
-                    trigger="Custom price"
-                    title="Set a custom price"
-                    effect="What this business pays a month before GST, instead of its plan's price. Refused while a billing provider manages its subscription."
-                    fields={
-                        <>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="price-rupees">
-                                    Price a month, before GST (₹)
-                                </Label>
-                                <Input
-                                    id="price-rupees"
-                                    name="rupees"
-                                    inputMode="decimal"
-                                    autoComplete="off"
-                                    required
-                                />
-                            </div>
-                            <UntilField id="price-until" />
-                        </>
-                    }
-                    submitLabel="Set price"
-                    onSubmit={async ({ reason, idempotencyKey, values }) => {
-                        const pricePaise = rupeesToPaise(values.rupees ?? "");
-                        if (pricePaise === null) {
-                            return {
-                                ok: false,
-                                error: "Write the price in rupees, like 1250 or 1250.50.",
-                            };
-                        }
-                        return priceOverrideAction(organizationId, {
-                            reason,
-                            idempotencyKey,
-                            pricePaise,
-                            expiresAt: endOfDayIso(values.until ?? ""),
-                        });
-                    }}
-                />
-            )}
             <PlanOverrideDialog
                 organizationId={organizationId}
                 plans={catalogue.plans}

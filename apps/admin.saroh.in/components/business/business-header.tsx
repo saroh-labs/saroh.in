@@ -9,6 +9,7 @@ import { planLine } from "@/lib/plan-words";
 import type { BusinessTab, BusinessTabBadge } from "./business-tabs";
 import { BusinessTabs } from "./business-tabs";
 import { CloseAccess } from "./close-access";
+import { GiveOffer } from "./give-offer";
 import { LegalHoldNotice } from "./legal-hold-notice";
 import {
     ATTENTION_LABEL,
@@ -26,8 +27,9 @@ import { ViewAsBusiness } from "./open-access";
  * anything else the operator might act on), and the tabs.
  *
  * It stands on the directory row alone, so it draws without a support
- * session. Give a custom offer… joins the actions in U5; it is left out
- * until then rather than drawn as a button that does nothing.
+ * session. Give a custom offer… (U5) shows to an operator who may give
+ * one (`pricing:override` or `subscription:override`); Take away a
+ * module… sits under ⋯ for a Platform owner.
  */
 export function BusinessHeader({
     summary,
@@ -37,6 +39,8 @@ export function BusinessHeader({
     canViewAs,
     canLifecycle,
     canLiftHold,
+    canOffer = false,
+    canTakeAway = false,
     badges,
 }: {
     summary: BusinessRow;
@@ -52,10 +56,16 @@ export function BusinessHeader({
     canLifecycle: boolean;
     /** Holds `organization:legal-hold:lift`. */
     canLiftHold: boolean;
+    /** Holds `pricing:override` or `subscription:override` (U5). */
+    canOffer?: boolean;
+    /** A Platform owner: Take away a module… (U5). */
+    canTakeAway?: boolean;
     /** Each tab's count or "needs you" (U3); none until then. */
     badges?: Partial<Record<BusinessTab, BusinessTabBadge>>;
 }) {
     const held = hold !== null || summary.legalHold === true;
+    // A deleted business takes no offer; the API refuses one too.
+    const deleted = summary.lifecycleStatus === "DELETED_RETAINED";
     return (
         <>
             <PageHeader
@@ -90,6 +100,12 @@ export function BusinessHeader({
                             ) : (
                                 <ViewAsBusiness organizationId={summary.id} />
                             ))}
+                        {canOffer && !deleted && (
+                            <GiveOffer
+                                organizationId={summary.id}
+                                businessName={summary.name}
+                            />
+                        )}
                         <MoreActions
                             organizationId={summary.id}
                             name={summary.name}
@@ -97,6 +113,7 @@ export function BusinessHeader({
                             held={held}
                             canLifecycle={canLifecycle}
                             canLiftHold={canLiftHold}
+                            canTakeAway={canTakeAway && !deleted}
                         />
                     </div>
                 }

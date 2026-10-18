@@ -68,7 +68,7 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   `lib/billing-action-words.ts`, `lib/user-filters.ts`,
   `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
   `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`,
-  `lib/business-words.ts`.
+  `lib/business-words.ts`, `lib/offer-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -141,6 +141,24 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   fix the operator lacks the permission for shows disabled, saying why.
   Writes go through `moduleReleaseAction` / `switchOnModuleAction`, which
   read the module's state back so the row flips to the truth.
+- **A custom offer is a gift, with a dry run** (admin plan U5, R5): Give a
+  custom offer… (the header, the Billing tab, a Modules row's Give this
+  module…) opens `OfferSheet`: a plan until a date, a custom price, one
+  module, a higher limit, or a longer trial (shown only while they are in
+  one). It reads `GET …/offers` (each kind with why not, in the API's
+  words) and, as the operator types, `POST …/overrides/preview`, the API's
+  dry run, which writes nothing; "What they'll see" is its answer, and the
+  confirm names the action. The sheet keeps the `OperatorDialog` contract
+  (a reason of four characters, one idempotency key per attempt) and
+  confirms through the existing write for its kind. **Take away a
+  module…** is not an offer: under ⋯ for a Platform owner only, refused
+  by the API for a module their paid plan includes (`TakeAwaySheet`).
+- **A business's Billing tab needs no support session** (U5, R6): its
+  plan, offers running, who it is billed to (this business's billing
+  profile only, DEC-167, with Sync with Razorpay… for `saroh-billing:act`),
+  limits and extras, and the last invoice with links to the subscription
+  sheet. Who pays and the invoices need `saroh-billing:read`; the plan's
+  detail and its older controls follow inside a support session.
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and

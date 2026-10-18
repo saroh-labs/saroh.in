@@ -15,7 +15,7 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  */
 const PAGE = `${urls.ADMIN_URL}/businesses/${NORTHWIND_ORG}/modules`;
 
-/** The fixes that open a sheet (Give this module… is a link until U5). */
+/** The fixes that open a gate sheet (Give this module… opens the offer sheet). */
 const FIX =
     /^(Turn on for this business…|Switch on for them…|Only they can do this…)$/;
 
