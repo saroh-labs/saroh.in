@@ -92,9 +92,15 @@ export function PlanHead({
                 <span className="col-start-1 row-start-1 min-w-0 truncate text-[13.5px] font-semibold">
                     {name}
                     {plan.retired && (
-                        <span className="font-normal text-muted-foreground">
+                        <span
+                            className="font-normal text-muted-foreground"
+                            title="Retired: not on the pricing page"
+                        >
                             {" "}
                             (retired)
+                            <span className="sr-only">
+                                : not on the pricing page
+                            </span>
                         </span>
                     )}
                 </span>
