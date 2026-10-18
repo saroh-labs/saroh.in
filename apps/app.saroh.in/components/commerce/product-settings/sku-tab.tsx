@@ -18,13 +18,12 @@ import { patternProblem } from "@/lib/products/sku-pattern";
 
 import { CheckRow } from "@/components/shared/check-row";
 import { listTable } from "@/components/shared/list-toolbar";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Tip } from "@saroh/ui/tooltip";
-import { TabIntro, useUnsaved } from "./product-settings";
+import { SettingsReadOnly, TabIntro, useUnsaved } from "./product-settings";
 
 const TOKENS = [
     { t: "{NAME3}", what: "first 3 letters of the name" },
@@ -38,8 +37,10 @@ const SHOWN = 8;
 /**
  * How the editor suggests a SKU. Only a suggestion: the field stays
  * editable, and SKUs that already exist are never rewritten. The preview
- * names every variant as the pattern would, and a pattern that would give
- * two the same SKU is refused with the part that would fix it.
+ * names every variant as the pattern would. Two that come out alike are
+ * advice, never a block: the editor adds -2, -3 to tell them apart, so Save
+ * is always there. A pattern that is wrong on its own is said only once it
+ * has been changed, and turning suggestions off never checks it.
  */
 export function SkuTab({
     settings,
@@ -51,7 +52,7 @@ export function SkuTab({
     canWrite: boolean;
 }) {
     const router = useRouter();
-    const { setDirty } = useUnsaved();
+    const { report } = useUnsaved();
     const [saved, setSaved] = useState({
         pattern: settings.pattern,
         suggest: settings.suggest,
@@ -60,19 +61,17 @@ export function SkuTab({
     const [suggest, setSuggest] = useState(settings.suggest);
     const [preview, setPreview] = useState(initialPreview);
     const [pending, start] = useTransition();
+    const field = useRef<HTMLInputElement>(null);
 
-    const dirty = pattern !== saved.pattern || suggest !== saved.suggest;
+    const touched = pattern !== saved.pattern;
+    const changed = (touched ? 1 : 0) + (suggest !== saved.suggest ? 1 : 0);
+    const dirty = changed > 0;
     const saveBar = useRef<HTMLDivElement>(null);
     useBottomBarInset(saveBar, dirty && canWrite);
-    const own = patternProblem(pattern);
-    // The server's check includes clashes; its answer is for the pattern
-    // it was asked about, so a stale one is not shown.
-    const problem = own || (preview?.problem ?? "");
-
-    useEffect(() => {
-        setDirty(dirty);
-        return () => setDirty(false);
-    }, [dirty, setDirty]);
+    // Only a pattern the owner changed can be wrong on screen, and only
+    // while it is used: with suggestions off, Save keeps the saved one.
+    const problem = touched && suggest ? patternProblem(pattern) : "";
+    const advice = problem ? "" : (preview?.advice ?? "");
 
     useEffect(() => {
         if (patternProblem(pattern)) return;
@@ -89,53 +88,74 @@ export function SkuTab({
     }, [pattern]);
 
     const rows = preview?.rows ?? [];
-    const counts: Partial<Record<string, number>> = {};
-    for (const r of rows) counts[r.next] = (counts[r.next] ?? 0) + 1;
+
+    /** Resolves true once saved; the leave guard's Save and leave too. */
+    async function persist(): Promise<boolean> {
+        if (!dirty) return true;
+        if (problem) {
+            field.current?.focus();
+            return false;
+        }
+        const before = saved;
+        // Off, a pattern that is wrong on its own isn't sent: the saved one stays.
+        const next = patternProblem(pattern) ? saved.pattern : pattern.trim();
+        const res = await runAction(() => saveSkuPattern(next, suggest));
+        if (!res) return false;
+        if (!res.ok) {
+            showError(res.error);
+            return false;
+        }
+        setSaved({ pattern: res.data.pattern, suggest: res.data.suggest });
+        setPattern(res.data.pattern);
+        router.refresh();
+        showUndo(
+            res.data.suggest
+                ? `Saved. The editor suggests ${rows[0]?.next ?? "them"}-style SKUs.`
+                : "Saved. The editor stops suggesting SKUs.",
+            () =>
+                start(async () => {
+                    const undo = await runAction(() =>
+                        saveSkuPattern(before.pattern, before.suggest),
+                    );
+                    if (!undo) return;
+                    if (!undo.ok) return showError(undo.error);
+                    setSaved(before);
+                    setPattern(before.pattern);
+                    setSuggest(before.suggest);
+                    router.refresh();
+                }),
+        );
+        return true;
+    }
+
+    const persistRef = useRef(persist);
+    useEffect(() => {
+        persistRef.current = persist;
+    });
+    useEffect(() => {
+        report(changed, () => persistRef.current());
+        return () => report(0);
+    }, [changed, report]);
 
     function save() {
-        if (problem || !dirty) return;
-        const before = saved;
         start(async () => {
-            const res = await runAction(() =>
-                saveSkuPattern(pattern.trim(), suggest),
-            );
-            if (!res) return;
-            if (!res.ok) {
-                showError(res.error);
-                return;
-            }
-            setSaved({ pattern: res.data.pattern, suggest: res.data.suggest });
-            router.refresh();
-            showUndo(
-                `Pattern saved. The editor suggests ${rows[0]?.next ?? "it"}-style SKUs.`,
-                () =>
-                    start(async () => {
-                        const undo = await runAction(() =>
-                            saveSkuPattern(before.pattern, before.suggest),
-                        );
-                        if (!undo) return;
-                        if (!undo.ok) return showError(undo.error);
-                        setSaved(before);
-                        setPattern(before.pattern);
-                        setSuggest(before.suggest);
-                        router.refresh();
-                    }),
-            );
+            await runAction(persist);
         });
     }
 
     return (
         <section>
-            <TabIntro title="SKU pattern">
+            <TabIntro title="SKUs">
                 How the editor suggests a SKU for a new product or variant. It
                 is only a suggestion. The field stays editable, and SKUs you
                 already have are never rewritten.
             </TabIntro>
-            {canWrite ? null : <ReadOnlyNote />}
+            {canWrite ? null : <SettingsReadOnly />}
 
             <div className="rounded-[12px] border border-border bg-card px-4 py-3.5">
                 <Field label="Pattern" className="space-y-[5px]">
                     <Input
+                        ref={field}
                         value={pattern}
                         disabled={!canWrite}
                         spellCheck={false}
@@ -177,6 +197,13 @@ export function SkuTab({
                         className="mt-[9px] text-[12px] leading-[1.45] text-destructive"
                     >
                         {problem}
+                    </p>
+                ) : advice && suggest ? (
+                    <p
+                        role="status"
+                        className="mt-[9px] text-pretty text-[12px] leading-[1.45] text-foreground/75"
+                    >
+                        {advice}
                     </p>
                 ) : null}
                 <CheckRow
@@ -243,11 +270,9 @@ export function SkuTab({
                             <span
                                 className={cn(
                                     "min-w-0 break-all font-mono text-[12px] font-medium",
-                                    (counts[r.next] ?? 0) > 1
-                                        ? "text-destructive"
-                                        : r.next === r.now
-                                          ? "text-muted-foreground"
-                                          : "text-foreground",
+                                    r.next === r.now
+                                        ? "text-muted-foreground"
+                                        : "text-foreground",
                                 )}
                             >
                                 {r.next || <AbsentValue says="None" />}
@@ -274,10 +299,11 @@ export function SkuTab({
                             problem ? "text-destructive" : "text-foreground/75",
                         )}
                     >
-                        {problem ||
-                            (suggest
-                                ? `New products get SKUs like ${rows[0]?.next ?? "…"}.`
-                                : "The editor stops suggesting SKUs.")}
+                        {problem
+                            ? "The pattern above needs a fix."
+                            : suggest
+                              ? `New products get SKUs like ${rows[0]?.next ?? "…"}.`
+                              : "The editor stops suggesting SKUs."}
                     </span>
                     <Button
                         variant="outline"
@@ -294,12 +320,11 @@ export function SkuTab({
                     <Button
                         size="sm"
                         type="button"
-                        disabled={!!problem}
                         onClick={save}
                         busy={pending}
                         busyLabel="Saving…"
                     >
-                        Save pattern
+                        Save
                     </Button>
                 </div>
             ) : null}

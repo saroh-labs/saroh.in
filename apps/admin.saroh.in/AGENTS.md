@@ -60,10 +60,12 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   (180 days after it was deleted, `lib/deletion-words.ts`).
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
-  `waitlist`, `deployments`, `usage`, `business-reports`, `contact-messages`) import `next/headers`; a client component takes types from them,
+  `waitlist`, `deployments`, `usage`, `business-reports`, `contact-messages`,
+  `billing`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
-  `lib/deletion-words.ts`.
+  `lib/deletion-words.ts`, `lib/billing-words.ts`,
+  `lib/billing-action-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -74,6 +76,29 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   counts it), sorted by the API across all businesses (Most / Least) and
   paged by number. It reads with `organization:read`, the directory's
   permission, so it adds none (DEC-039).
+- **Billing (`/billing/invoices`, `/billing/subscriptions`, DEC-163)** shows
+  every invoice Saroh issued (with the filtered set's totals, each PDF and a
+  month's CSV for GST) and every business's Saroh subscription (a row opens
+  its checkouts and the provider's events in a side sheet). Read-only. It
+  needs `saroh-billing:read`, which only Platform Owners and Billing hold
+  (owner, 17 Oct: never Support, Operations, Release manager or Auditor);
+  the API checks it on the route and again in the service, and records
+  every read. The PDF and CSV are proxied by route handlers under
+  `app/billing/invoices/`. Amounts arrive in paise from the API; no price
+  is ever written in the console.
+- **Billing's queue and controls (DEC-166)**: `/billing/actions` (Needs
+  action: every billing problem an operator must act on, across
+  businesses, oldest open first, with the failed `billing.*` jobs beside
+  it) and `/billing/events` (what the billing provider sent; "Not
+  applied", "No business") read with `saroh-billing:read`. Every write
+  (Mark resolved, End autopay, Check the refund again, Sync again, Record a
+  refund) is an `OperatorDialog` behind `saroh-billing:act`, which only
+  Platform Owners and Billing hold, posted through `lib/billing-actions.ts`.
+  They sit on the subscription sheet, so Billing never needs a support
+  session; "Open the business" shows only with `organization:view-as`.
+  Razorpay ids link to its dashboard (`razorpayDashboardUrl`,
+  `rel="noopener noreferrer"`), one test-mode hint per screen. End autopay
+  asks for the business's name: it is the business's own Cancel plan.
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and

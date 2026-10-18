@@ -4,6 +4,7 @@ import type { Override } from "./overrides";
 import {
     effectivePlanId,
     orderOverrides,
+    planPriceOf,
     priceOverridePaise,
 } from "./overrides";
 import type { Catalog, LimitPeriod, OffState } from "./schema";
@@ -80,7 +81,13 @@ export function resolveAccess(
     const { catalog, now } = input;
     const overrides = input.overrides ?? [];
     const planIds = new Set(catalog.plans.map((p) => p.id));
-    const planId = effectivePlanId(input.planId, overrides, now, planIds);
+    const planId = effectivePlanId(
+        input.planId,
+        overrides,
+        now,
+        planIds,
+        planPriceOf(catalog),
+    );
     const plan = catalog.plans.find((p) => p.id === planId);
     const mod = catalog.modules.find((m) => m.id === moduleId);
 
@@ -222,6 +229,7 @@ export function businessPricePaise(input: AccessInput): number {
         input.overrides ?? [],
         input.now,
         new Set(input.catalog.plans.map((p) => p.id)),
+        planPriceOf(input.catalog),
     );
     return input.catalog.plans.find((p) => p.id === planId)?.pricePaise ?? 0;
 }

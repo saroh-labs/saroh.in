@@ -51,6 +51,12 @@ const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
         "Keep autopay",
     ],
     [
+        "a Saroh plan (17 Oct 2026)",
+        "components/settings/plan-billing/cancel-plan.tsx",
+        '"Cancel plan"',
+        "`Keep ${offer.planName}`",
+    ],
+    [
         "an invoice",
         "components/invoices/invoice-actions.tsx",
         "Cancel with a credit note",

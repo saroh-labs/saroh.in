@@ -6,7 +6,8 @@ import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import type { ToastId } from "@saroh/ui/toast";
+import { dismissToast, showErrorToast, showSuccess } from "@saroh/ui/toast";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,6 +20,7 @@ import { createProduct } from "@/lib/products/actions";
 import { readOnlyBanner, sectionJumps } from "@/lib/products/editor-labels";
 import type { SectionKey } from "@/lib/products/editor-sections";
 import {
+    createdMessage,
     joinAnd,
     partitionSections,
     saveHint,
@@ -162,7 +164,14 @@ function EditorBody({
         saveSections,
         collectAll,
         afterCreateAll,
+        triedCreate,
     } = useEditor();
+    // Create's refusals, cleared once it is created.
+    const createErrors = useRef<ToastId[]>([]);
+    const sayCreateError = (message: string) => {
+        const id = showErrorToast(message);
+        if (id !== undefined) createErrors.current.push(id);
+    };
     // A stock-only role changes the Stock section and nothing else.
     const canEdit = canWrite || canStock;
     const jumpNames = sectionJumps(allergens.length > 0);
@@ -200,10 +209,26 @@ function EditorBody({
         lost: creating
             ? "The product isn't created yet, so nothing you've entered will be kept."
             : `Your changes to ${joinAnd(dirty.map((k) => names[k]))} will be lost.`,
+        // Every changed section can save on its own: "Save and leave".
+        save:
+            !creating && canEdit && savable.length > 0 && stuck.length === 0
+                ? () => saveSections(savable)
+                : undefined,
     });
 
     async function create() {
-        if (!canWrite || createBad || creatingNow) return;
+        if (!canWrite || creatingNow) return;
+        // Never off for "not filled in yet": pressed, it marks what is
+        // missing and takes the keyboard there (frontend-forms).
+        if (createBad) {
+            triedCreate();
+            const first = SECTION_ORDER.find((k) => problems[k]);
+            if (first && first !== "basics")
+                document
+                    .getElementById(`sec-${first}`)
+                    ?.scrollIntoView({ block: "start" });
+            return;
+        }
         setCreatingNow(true);
         const input = collectAll();
         let res: Awaited<ReturnType<typeof createProduct>>;
@@ -217,25 +242,28 @@ function EditorBody({
             });
         } catch {
             setCreatingNow(false);
-            showError(UNREACHED);
+            sayCreateError(UNREACHED);
             return;
         }
         if (!res.ok) {
             setCreatingNow(false);
             // At the plan's products limit (U13): its notice, not a toast.
             if (res.plan) showPlanRefusal(res.plan);
-            else showError(res.error);
+            else sayCreateError(res.error);
             return;
         }
         const photosOk = await afterCreateAll(res.data.id);
+        for (const id of createErrors.current) dismissToast(id);
+        createErrors.current = [];
         showSuccess(
-            `${
-                createStatus === "PUBLISHED"
-                    ? "Created and live on the shop."
-                    : "Created as a draft."
-            } Add variants and stock on the right if it needs them.${
-                photosOk ? "" : " The photos didn't save. Add them again."
-            }`,
+            createdMessage({
+                live: createStatus === "PUBLISHED",
+                // Variants are picked from the business's first option
+                // until another is chosen (`VariantsSection`).
+                optionName: options.at(0)?.name ?? null,
+                tracksStock: businessTracks,
+                photosOk,
+            }),
         );
         router.replace(productEditHref(storeId, res.data.id));
     }
@@ -250,12 +278,14 @@ function EditorBody({
               : "It will be created as a draft. Only the team will see it."
         : saveHint(dirty, stuck, names);
     const showHeaderSave = canWrite && (creating || dirty.length > 1);
+    // Creating, the button is never off: pressed early, it says what is
+    // missing. Busy only while it creates.
     const headerOff = creating
-        ? createBad || creatingNow
+        ? false
         : savable.length === 0 || saving.length > 0;
     // Cmd/Ctrl+S: what the header's button does, when it could be pressed.
     useSaveShortcut(() => {
-        if (headerOff) return;
+        if (headerOff || creatingNow) return;
         if (creating) void create();
         else void saveSections(savable);
     }, canWrite);
@@ -317,6 +347,8 @@ function EditorBody({
                                 size="sm"
                                 type="button"
                                 disabled={headerOff}
+                                busy={creating && creatingNow}
+                                busyLabel="Creating…"
                                 onClick={() =>
                                     creating
                                         ? void create()
@@ -324,11 +356,9 @@ function EditorBody({
                                 }
                             >
                                 {creating
-                                    ? creatingNow
-                                        ? "Creating…"
-                                        : createStatus === "PUBLISHED"
-                                          ? "Create and publish"
-                                          : "Create draft"
+                                    ? createStatus === "PUBLISHED"
+                                        ? "Create and publish"
+                                        : "Create draft"
                                     : saving.length > 0
                                       ? "Saving…"
                                       : "Save all"}
@@ -446,6 +476,11 @@ function EditorBody({
                                         canWrite,
                                         canStock,
                                     })}
+                                    opt={(
+                                        options.find(
+                                            (o) => o.id === product.optionId,
+                                        ) ?? options.at(0)
+                                    )?.name.toLowerCase()}
                                 />
                             ) : null}
                         </>

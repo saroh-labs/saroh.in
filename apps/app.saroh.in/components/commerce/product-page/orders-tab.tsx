@@ -104,8 +104,8 @@ export function ProductOrdersTab({
             {rows.length === 0 ? (
                 <TabState
                     icon={ShoppingBag}
-                    title="Nothing open"
-                    description="No open order holds this product's stock right now."
+                    title="No open orders"
+                    description="None holds this product's stock right now."
                 >
                     <StateLink href={`${here}&orders=recent`}>
                         See recent orders
@@ -279,7 +279,8 @@ function heldBy(orders: OverviewOrder[], productName: string): string {
         }
     }
     const entries = Object.entries(held);
-    if (entries.length === 0) return "No open orders.";
+    // None open: the empty state below says so, once.
+    if (entries.length === 0) return "";
     const total = entries.reduce((sum, [, n]) => sum + n, 0);
     const parts = entries.map(([title, n]) => `${title} ${n}`).join(", ");
     return `These hold the ${total} promised: ${parts}.`;

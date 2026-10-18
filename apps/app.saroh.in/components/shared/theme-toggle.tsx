@@ -66,6 +66,8 @@ export function ThemeToggle() {
                 }
                 icon={<Icon className="size-4" />}
                 onClick={() => setTheme(isDark ? "light" : "dark")}
+                // The short Tip above is the tooltip; the label stays long.
+                tooltip={false}
             />
         </Tip>
     );

@@ -1,6 +1,13 @@
 import "reflect-metadata";
 
-import { ENTITY_DESCRIPTORS, isImportEntity, splitFullName } from "./entities";
+import {
+    ENTITY_DESCRIPTORS,
+    isImportEntity,
+    normalizeMoney,
+    normalizeStatus,
+    splitFullName,
+} from "./entities";
+import { buildImportPlan, suggestMapping } from "./import-plan";
 
 const products = ENTITY_DESCRIPTORS.products;
 const customers = ENTITY_DESCRIPTORS.customers;
@@ -36,18 +43,58 @@ describe("products descriptor", () => {
         );
     });
 
-    it("rejects a non-numeric price using the DTO's own message", () => {
+    it("rejects a non-numeric price in the merchant's words", () => {
         const issues = products.validateRow({ name: "Chair", price: "twenty" });
-        expect(issues).toHaveLength(1);
-        expect(issues[0].field).toBe("price");
-        // The message comes from CreateProductDto, not from a copy here.
-        expect(issues[0].message).toMatch(/2 decimals/);
+        expect(issues).toEqual([
+            { field: "price", message: "Price isn't a number." },
+        ]);
     });
 
     it("rejects more than two decimal places", () => {
         expect(
             products.validateRow({ name: "Chair", price: "20.005" }),
-        ).toHaveLength(1);
+        ).toEqual([
+            { field: "price", message: "Price has more than 2 decimals." },
+        ]);
+    });
+
+    it("says a price below 0 is one, not that it isn't a number", () => {
+        expect(products.validateRow({ name: "Chair", price: "-5" })).toEqual([
+            { field: "price", message: "Price can't be less than 0." },
+        ]);
+        expect(
+            products.validateRow({ name: "Chair", price: "5", mrp: "-1" }),
+        ).toEqual([{ field: "mrp", message: "MRP can't be less than 0." }]);
+    });
+
+    it("names the statuses it takes, and the one it was given", () => {
+        expect(
+            products.validateRow({
+                name: "Chair",
+                price: "5",
+                status: "pending",
+            }),
+        ).toEqual([
+            {
+                field: "status",
+                message:
+                    "Status is Draft, Live or Archived. 'pending' isn't one.",
+            },
+        ]);
+    });
+
+    it("says a too-long field in words, never the developer's", () => {
+        const issues = products.validateRow({
+            name: "Chair",
+            price: "5",
+            description: "x".repeat(5001),
+        });
+        expect(issues).toEqual([
+            {
+                field: "description",
+                message: "Description is longer than 5000 characters.",
+            },
+        ]);
     });
 
     it("rejects a missing name via the DTO", () => {
@@ -61,51 +108,100 @@ describe("products descriptor", () => {
             price: "20.00",
             slug: "Oak Chair!",
         });
-        expect(issues.some((i) => i.field === "slug")).toBe(true);
-    });
-});
-
-describe("product status in any case (products audit, 16 Oct)", () => {
-    const status = (raw: string) =>
-        products.normalize?.({ name: "Chair", price: "20", status: raw })
-            .status;
-
-    it("reads the list's words and other tools' in any case", () => {
-        expect(status("draft")).toBe("DRAFT");
-        expect(status(" Live ")).toBe("PUBLISHED");
-        expect(status("ACTIVE")).toBe("PUBLISHED");
-        expect(status("published")).toBe("PUBLISHED");
-        expect(status("Hidden")).toBe("ARCHIVED");
-        expect(status("archived")).toBe("ARCHIVED");
-    });
-
-    it("passes a normalised row and names the accepted words for any other", () => {
-        expect(
-            products.validateRow({
-                name: "Chair",
-                price: "20",
-                status: "DRAFT",
-            }),
-        ).toEqual([]);
-        const issues = products.validateRow({
-            name: "Chair",
-            price: "20",
-            status: status("pending") ?? "",
-        });
         expect(issues).toEqual([
             {
-                field: "status",
+                field: "slug",
                 message:
-                    "Status is Draft, Live or Archived. 'pending' isn't one.",
+                    "Path uses only lower-case letters, numbers and hyphens.",
             },
         ]);
     });
+});
 
-    it("labels the field in the list's words", () => {
-        expect(products.fieldLabels.status).toBe(
-            "Status: Draft, Live or Archived",
+describe("products: a spreadsheet's way of writing values", () => {
+    it("takes status in any case, and the words other tools use", () => {
+        expect(normalizeStatus(" draft ")).toBe("DRAFT");
+        expect(normalizeStatus("DRAFT")).toBe("DRAFT");
+        expect(normalizeStatus("Live")).toBe("PUBLISHED");
+        expect(normalizeStatus("active")).toBe("PUBLISHED");
+        expect(normalizeStatus("Published")).toBe("PUBLISHED");
+        expect(normalizeStatus("Archived")).toBe("ARCHIVED");
+        expect(normalizeStatus("hidden")).toBe("ARCHIVED");
+        expect(normalizeStatus(" pending ")).toBe("pending");
+    });
+
+    it("takes the rupee sign and thousands commas off an amount", () => {
+        expect(normalizeMoney("₹1,299")).toBe("1299");
+        expect(normalizeMoney("₹ 1,20,000.50")).toBe("120000.50");
+        expect(normalizeMoney("Rs. 450")).toBe("450");
+        expect(normalizeMoney("INR 1,234,567")).toBe("1234567");
+        expect(normalizeMoney(" 99 ")).toBe("99");
+        expect(normalizeMoney("450/-")).toBe("450");
+        // A comma that isn't a thousands one is left for the check to name.
+        expect(normalizeMoney("1,5")).toBe("1,5");
+    });
+
+    it("plans a lower-case-status file with rupee amounts as ready", () => {
+        const plan = buildImportPlan({
+            records: [
+                { Name: "Kraft Tape 48mm", Price: "₹120", Status: "draft" },
+                { Name: "Bubble Wrap", Price: "1,450", Status: "Live" },
+                { Name: "Gloves", Price: "80", Status: "hidden" },
+            ],
+            mapping: { Name: "name", Price: "price", Status: "status" },
+            policy: "SKIP",
+            existingKeys: new Set(),
+            requiredFields: products.requiredFields,
+            fieldLabels: products.fieldLabels,
+            normalize: products.normalize,
+            keyOf: products.keyOf,
+            validateRow: products.validateRow,
+        });
+        expect(plan.counts).toMatchObject({ CREATE: 3, ERROR: 0 });
+        expect(plan.rows.map((r) => [r.values.price, r.values.status])).toEqual(
+            [
+                ["120", "DRAFT"],
+                ["1450", "PUBLISHED"],
+                ["80", "ARCHIVED"],
+            ],
         );
     });
+
+    it("doesn't offer currency: a business sells in one", () => {
+        expect(products.mappableFields).not.toContain("currency");
+    });
+});
+
+describe("sample files", () => {
+    for (const [entity, d] of Object.entries(ENTITY_DESCRIPTORS)) {
+        it(`${entity}: every heading is matched, and the example rows pass`, () => {
+            const [headers, ...rows] = d.sample;
+            const mapping = suggestMapping(
+                headers,
+                d.mappableFields,
+                d.aliases,
+            );
+            expect(Object.keys(mapping)).toEqual([...headers]);
+            for (const field of d.requiredFields) {
+                expect(Object.values(mapping)).toContain(field);
+            }
+            const plan = buildImportPlan({
+                records: rows.map((cells) =>
+                    Object.fromEntries(headers.map((h, i) => [h, cells[i]])),
+                ),
+                mapping,
+                policy: "SKIP",
+                existingKeys: new Set(),
+                requiredFields: d.requiredFields,
+                fieldLabels: d.fieldLabels,
+                normalize: d.normalize,
+                keyOf: d.keyOf,
+                validateRow: d.validateRow,
+            });
+            expect(plan.issueGroups).toEqual([]);
+            expect(plan.counts.CREATE).toBe(rows.length);
+        });
+    }
 });
 
 describe("customers descriptor", () => {
@@ -148,7 +244,10 @@ describe("human labels and the full name (UX-065)", () => {
             }
         }
         expect(customers.fieldLabels.zipCode).toBe("Postcode / PIN");
-        expect(products.keyLabel).toBe("the product's web address");
+        expect(products.keyLabel).toBe("the product's name");
+        expect(products.fieldLabels.status).toBe(
+            "Status: Draft, Live or Archived",
+        );
     });
 
     it("splits a full name into first and last", () => {

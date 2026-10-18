@@ -8,9 +8,9 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
 import { STOCK_CHECKS_HREF, stockLogHref } from "@/lib/products/links";
-import { orderRef } from "@/lib/products/overview-words";
+import { orderRef, weekWords } from "@/lib/products/overview-words";
 import { signed } from "@/lib/stock/levels";
-import { changeTone, weekLine } from "@/lib/stock/product-stock";
+import { changeTone } from "@/lib/stock/product-stock";
 import type { StockCheck, StockLogEntry } from "@/lib/stock/service";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Notice } from "@saroh/ui/notice";
@@ -121,7 +121,7 @@ export function RecentChanges({
                 <>
                     {week ? (
                         <p className="px-[18px] pb-1 text-[12.5px] text-muted-foreground">
-                            {weekLine(week, now)}
+                            {weekWords(week, now)}
                         </p>
                     ) : null}
                     <ul className="px-[18px] pb-2 pt-1">

@@ -179,13 +179,21 @@ export function windingDown(status: string): boolean {
  *   open or winding down.
  * - `takeout`: the business taking its own data away ("Download your
  *   data"). Open in every state whose members may open the business.
+ * - `lower-charges`: what the business pays Saroh, changed by a route that
+ *   may only lower it here (a move to Free or a cheaper plan, fewer
+ *   add-ons; 17 Oct 2026). Open while Saroh still charges it or it is
+ *   winding down, so a suspended business — billed all the same — can
+ *   always stop paying. The route asks `new` itself for anything that
+ *   charges more (`CheckoutService.changePlan`, `AddonsService.set`).
  */
-export type LifecycleWriteClass = "new" | "wind-down" | "takeout";
+export type LifecycleWriteClass =
+    "new" | "wind-down" | "takeout" | "lower-charges";
 
 export const LIFECYCLE_WRITE_CLASSES: readonly LifecycleWriteClass[] = [
     "new",
     "wind-down",
     "takeout",
+    "lower-charges",
 ];
 
 /** May a write of this class go ahead in this state? */
@@ -200,6 +208,10 @@ export function lifecycleAllows(
             return true;
         case "wind-down":
             return decision.activity !== "closed";
+        case "lower-charges":
+            return (
+                decision.billing === "charges" || decision.activity !== "closed"
+            );
         case "new":
             return decision.activity === "open";
     }

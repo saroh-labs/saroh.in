@@ -897,6 +897,13 @@ export interface SeedSite {
         isHome?: boolean;
         sections: readonly SeedSection[];
     }[];
+    /** Menu links after the pages: the journal (`/blog`), the shop. */
+    navigationExtra?: readonly { label: string; href: string }[];
+    /**
+     * Bumped when what the published site shows changes, so a database
+     * seeded before gets a new Publication (one is never rewritten).
+     */
+    revision?: string;
 }
 
 /**
@@ -915,7 +922,7 @@ export const SUBMISSIONS: readonly {
     {
         contact: 0,
         daysAgo: 12,
-        phone: "98450 11223",
+        phone: "+91 00000 00064",
         message:
             "We open a second cafe next month. Can you quote 200 units of the 12oz cups with lids, delivered to Indiranagar?",
     },
@@ -928,7 +935,7 @@ export const SUBMISSIONS: readonly {
     {
         contact: 8,
         daysAgo: 8,
-        phone: "99001 45678",
+        phone: "+91 00000 00094",
         message:
             "Looking for wholesale pricing on food-safe pouches for dry goods, roughly 5,000 a month.",
     },
@@ -941,7 +948,7 @@ export const SUBMISSIONS: readonly {
     {
         contact: 15,
         daysAgo: 3,
-        phone: "98860 33445",
+        phone: "+91 00000 00079",
         message:
             "Enquiring about steel fittings and pallet strapping for a plant in Peenya. Can someone call?",
     },

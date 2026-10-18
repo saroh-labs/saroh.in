@@ -1,3 +1,4 @@
+import { dummyPhone } from "../helpers";
 import { CITIES, COMPANY_SUFFIXES, FIRST_NAMES, LAST_NAMES } from "./data";
 import type { Rng } from "./random";
 
@@ -57,8 +58,15 @@ export interface Person {
 
 const MOBILE_PREFIXES = ["98", "99", "97", "96", "90", "88", "70", "63"];
 
+/**
+ * A generated person's phone, "+91 00000 NNNNN" (`dummyPhone`). It still draws
+ * a ten-digit mobile from `rng`, as it always has, so every stream that
+ * follows plans what it did; that draw only keys the dummy.
+ */
 export const phoneNumber = (rng: Rng) =>
-    `${rng.pick(MOBILE_PREFIXES)}${rng.int(100, 999)} ${rng.int(10000, 99999)}`;
+    dummyPhone(
+        `${rng.pick(MOBILE_PREFIXES)}${rng.int(100, 999)} ${rng.int(10000, 99999)}`,
+    );
 
 const local = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
 

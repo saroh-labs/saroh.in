@@ -10,7 +10,7 @@ import { BillingProviderError } from "./billing-provider.port";
 import { CashfreeBillingProvider } from "./cashfree.provider";
 import { FakeBillingProvider } from "./fake.provider";
 import { DefaultBillingProviderFactory } from "./provider.factory";
-import { RazorpayBillingProvider } from "./razorpay.provider";
+import { RazorpayBillingProvider, retryAfterMs } from "./razorpay.provider";
 
 /** Wrap `process.env` in a proxy that records every string key read. */
 function recordEnvReads(): { reads: string[]; restore: () => void } {
@@ -211,12 +211,24 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         delete globalThis.process.env[KEY_SECRET];
     });
 
-    function recorded(answers: { status: number; body?: unknown }[]): {
+    function recorded(
+        answers: {
+            status: number;
+            body?: unknown;
+            headers?: Record<string, string>;
+        }[],
+    ): {
         provider: RazorpayBillingProvider;
         calls: { url: string; method: string; body: unknown }[];
+        waits: number[];
     } {
         const provider = new RazorpayBillingProvider();
         const calls: { url: string; method: string; body: unknown }[] = [];
+        const waits: number[] = [];
+        provider.sleepFn = (ms) => {
+            waits.push(ms);
+            return Promise.resolve();
+        };
         provider.fetchFn = (input, init) => {
             calls.push({
                 url: String(input),
@@ -230,10 +242,11 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             return Promise.resolve(
                 new Response(JSON.stringify(a.body ?? {}), {
                     status: a.status,
+                    ...(a.headers ? { headers: a.headers } : {}),
                 }),
             );
         };
-        return { provider, calls };
+        return { provider, calls, waits };
     }
 
     it("makes a plan with the amount it is given, per month or year, and Saroh's reference", async () => {
@@ -275,14 +288,15 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             postalCode: "400050",
         },
         organizationId: "org_1",
+        businessSlug: "ammi-ki-barni",
     };
 
-    it("makes the business a Razorpay customer with its name, email, phone, GSTIN and address", async () => {
+    it("makes the business a Razorpay customer once: name, email, phone, GSTIN; only its ids in the notes", async () => {
         const { provider, calls } = recorded([
             { status: 200, body: { id: "cust_1" } },
         ]);
         await expect(
-            provider.customers.ensureCustomer(customer),
+            provider.customers.createCustomer(customer, { withContact: true }),
         ).resolves.toEqual({ providerCustomerId: "cust_1" });
         expect(calls[0]).toEqual({
             url: "https://api.razorpay.com/v1/customers",
@@ -292,34 +306,197 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
                 email: "owner@example.com",
                 contact: "+919800000000",
                 gstin: "27AAPFU0939F1ZV",
-                fail_existing: "0",
+                fail_existing: "1",
+                // Notes are create-only: only what never changes, so the
+                // dashboard never shows a stale name, GSTIN or address.
                 notes: {
                     organizationId: "org_1",
-                    billing_name: "Ammi & Sons Foods Pvt. Ltd.",
-                    business_name: "Ammi Ki Barni",
-                    email: "owner@example.com",
-                    phone: "+91 98000 00000",
-                    gstin: "27AAPFU0939F1ZV",
-                    billing_address:
-                        "12 Hill Road, Mumbai, Maharashtra, 400050",
+                    saroh_business: "ammi-ki-barni",
                 },
             },
         });
+    });
+
+    it("answers `exists` when Razorpay has a customer with the same email and phone", async () => {
+        const { provider } = recorded([
+            {
+                status: 400,
+                body: {
+                    error: {
+                        code: "BAD_REQUEST_ERROR",
+                        description: "Customer already exists for the merchant",
+                    },
+                },
+            },
+        ]);
+        await expect(
+            provider.customers.createCustomer(customer, { withContact: true }),
+        ).resolves.toBe("exists");
+    });
+
+    it("any other refusal is REFUSED, keeping only the status", async () => {
+        const { provider } = recorded([
+            {
+                status: 400,
+                body: { error: { description: "secret detail" } },
+            },
+        ]);
+        const made = provider.customers.createCustomer(customer, {
+            withContact: true,
+        });
+        await expect(made).rejects.toMatchObject({ kind: "REFUSED" });
+        await expect(made).rejects.not.toThrow(/secret detail/);
+    });
+
+    it("made without the phone, it sends none", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "cust_2" } },
+        ]);
+        await provider.customers.createCustomer(customer, {
+            withContact: false,
+        });
+        expect(calls[0]?.body).not.toHaveProperty("contact");
+        expect(
+            (calls[0]?.body as { notes: Record<string, string> }).notes,
+        ).not.toHaveProperty("phone");
+    });
+
+    it("finds the customer Razorpay holds for the same email and phone with fail_existing 0, and whose its notes say it is", async () => {
+        const { provider, calls } = recorded([
+            {
+                status: 200,
+                body: { id: "cust_1", notes: { organizationId: "org_1" } },
+            },
+            { status: 200, body: { id: "cust_9", notes: [] } },
+        ]);
+        await expect(
+            provider.customers.existingCustomer(customer, {
+                withContact: true,
+            }),
+        ).resolves.toEqual({
+            providerCustomerId: "cust_1",
+            organizationId: "org_1",
+        });
+        expect(calls[0]).toMatchObject({
+            url: "https://api.razorpay.com/v1/customers",
+            method: "POST",
+            body: { fail_existing: "0", contact: "+919800000000" },
+        });
+        // Made by Razorpay itself (no notes: an empty array).
+        await expect(
+            provider.customers.existingCustomer(customer, {
+                withContact: true,
+            }),
+        ).resolves.toEqual({
+            providerCustomerId: "cust_9",
+            organizationId: null,
+        });
+    });
+
+    it("fetches a customer by id; one Razorpay doesn't have is null", async () => {
+        const { provider, calls } = recorded([
+            {
+                status: 200,
+                body: { id: "cust_old", notes: { organizationId: "org_1" } },
+            },
+            {
+                status: 400,
+                body: {
+                    error: { description: "The id provided does not exist" },
+                },
+            },
+        ]);
+        await expect(
+            provider.customers.findCustomer("cust_old"),
+        ).resolves.toEqual({
+            providerCustomerId: "cust_old",
+            organizationId: "org_1",
+        });
+        expect(calls[0]).toMatchObject({
+            url: "https://api.razorpay.com/v1/customers/cust_old",
+            method: "GET",
+        });
+        await expect(
+            provider.customers.findCustomer("cust_gone"),
+        ).resolves.toBeNull();
+    });
+
+    it("an update to an email and phone another customer has is `exists`; any other 400 is REFUSED", async () => {
+        const { provider } = recorded([
+            {
+                status: 400,
+                body: {
+                    error: {
+                        description: "Customer already exists for the merchant",
+                    },
+                },
+            },
+            { status: 400, body: { error: { description: "secret detail" } } },
+        ]);
+        await expect(
+            provider.customers.updateCustomer("cust_1", customer, {
+                withContact: true,
+            }),
+        ).resolves.toBe("exists");
+        const refused = provider.customers.updateCustomer("cust_1", customer, {
+            withContact: true,
+        });
+        await expect(refused).rejects.toMatchObject({ kind: "REFUSED" });
+        await expect(refused).rejects.not.toThrow(/secret detail/);
+    });
+
+    it("brings the customer up to date by PUT: name, email, phone and GSTIN", async () => {
+        const { provider, calls } = recorded([
+            { status: 200 },
+            { status: 200 },
+        ]);
+        await provider.customers.updateCustomer("cust_1", customer, {
+            withContact: true,
+        });
+        await provider.customers.updateCustomer("cust_1", customer, {
+            withContact: false,
+        });
+        expect(calls[0]).toEqual({
+            url: "https://api.razorpay.com/v1/customers/cust_1",
+            method: "PUT",
+            body: {
+                name: "Ammi and Sons Foods Pvt. Ltd.",
+                email: "owner@example.com",
+                contact: "+919800000000",
+                gstin: "27AAPFU0939F1ZV",
+            },
+        });
+        expect(calls[1]?.body).not.toHaveProperty("contact");
     });
 
     it("leaves out a phone or GSTIN Razorpay would refuse", async () => {
         const { provider, calls } = recorded([
             { status: 200, body: { id: "cust_1" } },
         ]);
-        await provider.customers.ensureCustomer({
-            ...customer,
-            contact: "12",
-            gstin: "not-a-gstin",
-            address: null,
-        });
+        await provider.customers.createCustomer(
+            {
+                ...customer,
+                contact: "12",
+                gstin: "not-a-gstin",
+                address: null,
+            },
+            { withContact: true },
+        );
         const body = calls[0]?.body as Record<string, unknown>;
         expect(body).not.toHaveProperty("contact");
         expect(body).not.toHaveProperty("gstin");
+    });
+
+    it("is configured only where Saroh's key id and secret are set", () => {
+        const provider = new RazorpayBillingProvider();
+        expect(provider.customers.configured()).toBe(true);
+        const secret = globalThis.process.env.SAROH_RAZORPAY_KEY_SECRET;
+        delete globalThis.process.env.SAROH_RAZORPAY_KEY_SECRET;
+        try {
+            expect(provider.customers.configured()).toBe(false);
+        } finally {
+            globalThis.process.env.SAROH_RAZORPAY_KEY_SECRET = secret;
+        }
     });
 
     it("puts who is billed in a subscription's notes", async () => {
@@ -435,6 +612,29 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         expect(calls[0]?.body).toMatchObject({ total_count: 12 });
     });
 
+    it("links a subscription to the business's customer when it has one", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "sub_c", status: "created" } },
+            { status: 200, body: { id: "sub_n", status: "created" } },
+        ]);
+        const input = {
+            planKey: "catalog.b",
+            planId: "row_b",
+            priceCents: 22_200,
+            currency: "INR",
+            interval: "month" as const,
+            organizationId: "org_1",
+            providerPlanId: "plan_b",
+        };
+        await provider.createSubscription({
+            ...input,
+            providerCustomerId: "cust_1",
+        });
+        await provider.createSubscription(input);
+        expect(calls[0]?.body).toMatchObject({ customer_id: "cust_1" });
+        expect(calls[1]?.body).not.toHaveProperty("customer_id");
+    });
+
     it("makes a yearly plan's one payment as an order for the amount given (DEC-093)", async () => {
         const { provider, calls } = recorded([
             { status: 200, body: { id: "order_1" } },
@@ -469,9 +669,25 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         const { provider, calls } = recorded([
             { status: 200, body: { status: "created" } },
             { status: 200, body: { status: "authenticated" } },
+            { status: 200, body: { items: [] } },
             {
                 status: 200,
-                body: { status: "active", paid_count: 1, current_end: end },
+                body: {
+                    status: "active",
+                    paid_count: 1,
+                    current_end: end,
+                    customer_id: "cust_1",
+                },
+            },
+            {
+                status: 200,
+                body: {
+                    items: [
+                        { status: "issued", payment_id: null },
+                        { status: "paid", payment_id: "pay_2" },
+                        { status: "paid", payment_id: "pay_1" },
+                    ],
+                },
             },
             { status: 200, body: { status: "cancelled" } },
         ]);
@@ -483,20 +699,179 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         await expect(ask()).resolves.toEqual({
             phase: "authenticated",
             status: "IGNORED",
+            providerPaymentId: null,
         });
+        // A subscription names no payment: its latest paid invoice does.
         await expect(ask()).resolves.toEqual({
             phase: "charged",
             status: "ACTIVE",
             currentPeriodEnd: new Date(end * 1000),
+            providerCustomerId: "cust_1",
+            providerPaymentId: "pay_2",
         });
         await expect(ask()).resolves.toEqual({
             phase: "cancelled",
             status: "CANCELLED",
         });
-        expect(calls[0]).toMatchObject({
-            url: "https://api.razorpay.com/v1/subscriptions/sub_1",
-            method: "GET",
+        expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+            "GET https://api.razorpay.com/v1/subscriptions/sub_1",
+            "GET https://api.razorpay.com/v1/subscriptions/sub_1",
+            "GET https://api.razorpay.com/v1/invoices?subscription_id=sub_1",
+            "GET https://api.razorpay.com/v1/subscriptions/sub_1",
+            "GET https://api.razorpay.com/v1/invoices?subscription_id=sub_1",
+            "GET https://api.razorpay.com/v1/subscriptions/sub_1",
+        ]);
+    });
+
+    it("still answers how a subscription stands when its invoices can't be read", async () => {
+        const { provider } = recorded([
+            { status: 200, body: { status: "active", paid_count: 1 } },
+            { status: 503 },
+        ]);
+        await expect(
+            provider.statuses.checkoutStatus("sub_1", false),
+        ).resolves.toMatchObject({ phase: "charged", providerPaymentId: null });
+    });
+
+    it("puts Saroh's ids on a payment's notes, keeping the ones it had, at most 15", async () => {
+        const had = Object.fromEntries(
+            Array.from({ length: 14 }, (_, i) => [`k${i}`, `v${i}`]),
+        );
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "pay_1", notes: had } },
+            { status: 200, body: { id: "pay_1" } },
+        ]);
+        await provider.paymentNotes.setPaymentNotes({
+            providerPaymentId: "pay_1",
+            notes: {
+                saroh_invoice: "SA/26-27/0005",
+                organizationId: "org_1",
+                saroh_checkout: "chk_1",
+            },
         });
+        expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+            "GET https://api.razorpay.com/v1/payments/pay_1",
+            "PATCH https://api.razorpay.com/v1/payments/pay_1",
+        ]);
+        const sent = (calls[1]!.body as { notes: Record<string, string> })
+            .notes;
+        expect(Object.keys(sent)).toHaveLength(15);
+        expect(sent).toMatchObject({
+            k0: "v0",
+            saroh_invoice: "SA/26-27/0005",
+            organizationId: "org_1",
+            saroh_checkout: "chk_1",
+        });
+    });
+
+    it("refunds a payment in full, once: one already refunded answers with its refund", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { amount: 118_000, amount_refunded: 0 } },
+            { status: 200, body: { id: "rfnd_1", amount: 118_000 } },
+            {
+                status: 200,
+                body: { amount: 118_000, amount_refunded: 118_000 },
+            },
+            { status: 200, body: { items: [{ id: "rfnd_1" }] } },
+        ]);
+        const input = { providerPaymentId: "pay_1", reference: "refund:pay_1" };
+        await expect(provider.refunds.refundPayment(input)).resolves.toEqual({
+            providerRefundId: "rfnd_1",
+            amountPaise: 118_000,
+        });
+        await expect(provider.refunds.refundPayment(input)).resolves.toEqual({
+            providerRefundId: "rfnd_1",
+            amountPaise: 118_000,
+        });
+        expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+            "GET https://api.razorpay.com/v1/payments/pay_1",
+            "POST https://api.razorpay.com/v1/payments/pay_1/refund",
+            "GET https://api.razorpay.com/v1/payments/pay_1",
+            "GET https://api.razorpay.com/v1/payments/pay_1/refunds",
+        ]);
+        // The whole payment: no amount sent.
+        expect(calls[1]!.body).toEqual({
+            speed: "normal",
+            receipt: "refund:pay_1",
+            notes: { saroh_ref: "refund:pay_1" },
+        });
+    });
+
+    it("names the business, its subscription and why in the refund's notes", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { amount: 118_000, amount_refunded: 0 } },
+            { status: 200, body: { id: "rfnd_1", amount: 118_000 } },
+        ]);
+        await provider.refunds.refundPayment({
+            providerPaymentId: "pay_1",
+            reference: "refund:pay_1",
+            organizationId: "org_1",
+            providerSubscriptionId: "sub_1",
+            reason: "double_charge",
+        });
+        expect(calls[1]?.body).toMatchObject({
+            notes: {
+                saroh_ref: "refund:pay_1",
+                organizationId: "org_1",
+                saroh_subscription: "sub_1",
+                saroh_reason: "double_charge",
+            },
+        });
+    });
+
+    it("a refund Razorpay refuses (4xx) is REFUSED with Razorpay's own words; a 5xx is UNKNOWN", async () => {
+        const { provider } = recorded([
+            { status: 200, body: { amount: 118_000, amount_refunded: 0 } },
+            {
+                status: 400,
+                body: {
+                    error: {
+                        code: "BAD_REQUEST_ERROR",
+                        description: "invalid request sent",
+                    },
+                },
+            },
+            { status: 200, body: { amount: 118_000, amount_refunded: 0 } },
+            { status: 502 },
+        ]);
+        const input = { providerPaymentId: "pay_1", reference: "refund:pay_1" };
+        const refused = await provider.refunds
+            .refundPayment(input)
+            .catch((e: unknown) => e);
+        expect(refused).toBeInstanceOf(BillingProviderError);
+        expect(refused).toMatchObject({
+            kind: "REFUSED",
+            said: "invalid request sent",
+            message:
+                "Razorpay payment refund failed (HTTP 400): invalid request sent",
+        });
+        await expect(
+            provider.refunds.refundPayment(input),
+        ).rejects.toMatchObject({ kind: "UNKNOWN" });
+    });
+
+    it("reads the customer a webhook's subscription or payment bills", () => {
+        const provider = new RazorpayBillingProvider();
+        expect(
+            provider.parseWebhook({
+                event: "subscription.charged",
+                payload: {
+                    subscription: {
+                        entity: { id: "sub_1", customer_id: "cust_1" },
+                    },
+                    payment: { entity: { id: "pay_1" } },
+                },
+            }),
+        ).toMatchObject({ providerCustomerId: "cust_1" });
+        expect(
+            provider.parseWebhook({
+                event: "order.paid",
+                payload: {
+                    order: { entity: { id: "order_1" } },
+                    payment: { entity: { id: "pay_1", customer_id: "cust_2" } },
+                },
+            }),
+        ).toMatchObject({ providerCustomerId: "cust_2" });
     });
 
     it("reads an order as paid only once Razorpay says so, with the payment that paid it", async () => {
@@ -545,7 +920,7 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
                     created_at: 1_790_000_000,
                     payload: {
                         order: { entity: { id: "order_1" } },
-                        payment: { entity: { id: "pay_1" } },
+                        payment: { entity: { id: "pay_1", amount: 118000 } },
                     },
                 },
                 { "x-razorpay-event-id": "evt_o1" },
@@ -556,6 +931,7 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             status: "ACTIVE",
             phase: "charged",
             providerPaymentId: "pay_1",
+            paymentAmountPaise: 118000,
         });
     });
 
@@ -563,6 +939,65 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         expect(new RazorpayBillingProvider().publicKey()).toBe(
             "rzp_test_platform",
         );
+    });
+
+    it("tells Razorpay until when a subscription may be authorised (expire_by)", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "sub_x", status: "created" } },
+        ]);
+        const expireBy = new Date("2026-10-18T10:00:00Z");
+        await provider.createSubscription({
+            planKey: "catalog.grow",
+            planId: "p1",
+            priceCents: 100,
+            currency: "INR",
+            interval: "month",
+            organizationId: "org_1",
+            providerPlanId: "plan_1",
+            expireBy,
+        });
+        expect(calls[0]!.body).toMatchObject({
+            expire_by: Math.floor(expireBy.getTime() / 1000),
+        });
+    });
+
+    it("reads where a subscription stands when a cancel is refused", async () => {
+        const { provider } = recorded(
+            [
+                "created",
+                "authenticated",
+                "pending",
+                "halted",
+                "cancelled",
+                "expired",
+                "completed",
+            ]
+                .map((status) => ({ status: 200, body: { status } }))
+                .concat([
+                    {
+                        status: 200,
+                        body: { status: "active", remaining_count: 3 },
+                    } as never,
+                    {
+                        status: 200,
+                        body: { status: "active", remaining_count: 0 },
+                    } as never,
+                ]),
+        );
+        const ask = () => provider.statuses.subscriptionStanding("sub_1");
+        const seen = [];
+        for (let i = 0; i < 9; i++) seen.push(await ask());
+        expect(seen).toEqual([
+            "created",
+            "authorised",
+            "failing",
+            "failing",
+            "ended",
+            "ended",
+            "ended",
+            "running",
+            "last-cycle",
+        ]);
     });
 
     it("cancels at the cycle's end unless told now", async () => {
@@ -578,10 +1013,40 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         ]);
     });
 
+    it("asks again after a 429's Retry-After, within bounds", async () => {
+        const { provider, calls, waits } = recorded([
+            { status: 429, headers: { "Retry-After": "3" } },
+            { status: 429, headers: { "Retry-After": "600" } },
+            { status: 200, body: { id: "plan_1" } },
+        ]);
+        await expect(
+            provider.plans.createPlan({
+                reference: "r",
+                name: "n",
+                amountPaise: 1,
+                currency: "INR",
+                period: "month",
+            }),
+        ).resolves.toEqual({ providerPlanId: "plan_1" });
+        expect(calls).toHaveLength(3);
+        // 3 s as asked; 10 minutes is capped at 10 s.
+        expect(waits).toEqual([3_000, 10_000]);
+        expect(retryAfterMs(null)).toBe(2_000);
+        expect(
+            retryAfterMs(
+                new Date(Date.UTC(2026, 9, 17, 0, 0, 5)).toUTCString(),
+                Date.UTC(2026, 9, 17),
+            ),
+        ).toBe(5_000);
+    });
+
     it("classifies a 4xx as REFUSED and a 5xx or 429 as UNKNOWN, keeping only the status", async () => {
         const { provider } = recorded([
             { status: 400, body: { error: { description: "secret detail" } } },
             { status: 503 },
+            // Still rate limited after asking twice more.
+            { status: 429 },
+            { status: 429 },
             { status: 429 },
         ]);
         const plan = {

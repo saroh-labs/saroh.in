@@ -70,7 +70,7 @@ export class CategoriesService {
                 field: "slug",
             });
         }
-        // The name first: "already a category called Serums" is the answer a
+        // The name first: "Serums already exists." is the answer a
         // merchant can act on; a clashing address follows from it.
         await this.assertNameFree(organizationId, dto.name);
         await this.assertSlugFree(organizationId, slug);
@@ -357,7 +357,7 @@ export class CategoriesService {
             throw new ConflictException({
                 message: exceptId
                     ? "That name is taken. Use Merge to combine them."
-                    : `There is already a category called ${clash.name}.`,
+                    : `${clash.name} already exists.`,
                 field: "name",
             });
         }

@@ -7,6 +7,7 @@ jest.mock("../billing/online-payments-plan", () => ({
 import { quietLastDay } from "../../../test/home-quiet-db";
 import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
+import { soonCutoff } from "./home-open-orders";
 import { HomeService } from "./home.service";
 
 type View = {
@@ -47,6 +48,8 @@ interface Fixture {
         };
     }[];
     orderCount?: number;
+    /** R34's not-collected orders (`payOnHandover` reads); none by default. */
+    uncollected?: unknown[];
     bookings?: {
         id: string;
         startAt: Date;
@@ -91,14 +94,16 @@ function build(views: View[], fixture: Fixture = {}) {
             count: jest.fn((args?: { where?: { payOnHandover?: boolean } }) =>
                 Promise.resolve(
                     args?.where?.payOnHandover === true
-                        ? 0
+                        ? (fixture.uncollected?.length ?? 0)
                         : (fixture.orderCount ?? orders.length),
                 ),
             ),
             findMany: jest.fn(
                 (args?: { where?: { payOnHandover?: boolean } }) =>
                     Promise.resolve(
-                        args?.where?.payOnHandover === true ? [] : orders,
+                        args?.where?.payOnHandover === true
+                            ? (fixture.uncollected ?? [])
+                            : orders,
                     ),
             ),
         },
@@ -636,5 +641,162 @@ describe("HomeService schedule", () => {
         );
         const model = await svc.build(INPUT);
         expect(model.upcoming[0]?.who).toBe("Kavya Bhat");
+    });
+});
+
+/**
+ * DEC-163: Needs you lists an open order only when it is late or due today
+ * or tomorrow; the rest are in progress, said once as `ordersInProgress`.
+ * Which orders are "soon" is the raw read's (`lateSql` at `soonCutoff`,
+ * covered against Postgres); here each mocked row says it, and the words
+ * on the row are `openOrderWords` reading the real clock below.
+ */
+describe("Home lists only the orders that need attention soon (DEC-163)", () => {
+    // Noon in Mumbai.
+    const NOON = new Date("2026-10-16T06:30:00.000Z");
+    const HOUR = 3_600_000;
+    const COMMERCE: View[] = [
+        { key: "COMMERCE", label: "Sell", readiness: "ACTIVE" },
+    ];
+
+    beforeEach(() => {
+        jest.useFakeTimers({
+            now: NOON,
+            doNotFake: [
+                "setTimeout",
+                "clearTimeout",
+                "setInterval",
+                "clearInterval",
+                "setImmediate",
+                "clearImmediate",
+                "nextTick",
+                "queueMicrotask",
+                "hrtime",
+                "performance",
+            ],
+        });
+    });
+    afterEach(() => jest.useRealTimers());
+
+    /** A local delivery (late after 24 hours), placed `ago` before noon. */
+    function delivery(
+        id: string,
+        ago: number,
+        flags: { late?: boolean; soon?: boolean } = {},
+    ) {
+        return {
+            ...OPEN_ORDER,
+            ...flags,
+            id,
+            orderId: id.toUpperCase(),
+            createdAt: new Date(NOON.getTime() - ago),
+            status: "PENDING",
+            paymentStatus: "PAID",
+            stage: "NEW",
+            fulfilment: "LOCAL_DELIVERY",
+        };
+    }
+
+    const openRows = (needs: { code: string; id: string }[]) =>
+        needs.filter((n) => n.code === "COMMERCE_OPEN_ORDERS");
+
+    it("lists a late order", async () => {
+        const svc = build(COMMERCE, {
+            orders: [delivery("late1", 30 * HOUR, { late: true })],
+        });
+        const model = await svc.build(INPUT);
+        const rows = openRows(model.needs);
+        expect(rows).toHaveLength(1);
+        expect(model.needs[0]).toMatchObject({
+            id: "COMMERCE_OPEN_ORDERS:late1",
+            tone: "bad",
+        });
+        expect(model.needs[0].tag).toMatch(/^Late · /);
+        expect(model.ordersInProgress).toBe(0);
+    });
+
+    it("lists an order due tomorrow", async () => {
+        // Placed 4 hours ago: late at 8 am tomorrow.
+        const svc = build(COMMERCE, { orders: [delivery("tmrw", 4 * HOUR)] });
+        const model = await svc.build(INPUT);
+        expect(openRows(model.needs)).toEqual([
+            expect.objectContaining({
+                id: "COMMERCE_OPEN_ORDERS:tmrw",
+                tag: "Due tomorrow",
+            }),
+        ]);
+        expect(model.needsTotal).toBe(1);
+        expect(model.ordersInProgress).toBe(0);
+    });
+
+    it("leaves an order due in 3 days off the list, counted as in progress", async () => {
+        const svc = build(COMMERCE, {
+            orders: [
+                delivery("late1", 30 * HOUR, { late: true }),
+                delivery("tmrw", 4 * HOUR),
+                delivery("later1", HOUR, { soon: false }),
+                delivery("later2", HOUR, { soon: false }),
+            ],
+        });
+        const model = await svc.build(INPUT);
+        expect(openRows(model.needs).map((n) => n.id)).toEqual([
+            "COMMERCE_OPEN_ORDERS:late1",
+            "COMMERCE_OPEN_ORDERS:tmrw",
+        ]);
+        expect(model.needsTotal).toBe(2);
+        expect(model.ordersInProgress).toBe(2);
+        const action = model.actions.find(
+            (a) => a.code === "COMMERCE_OPEN_ORDERS",
+        );
+        // The rail's Orders badge counts what needs doing soon, too.
+        expect(action?.count).toBe(2);
+    });
+
+    it("says nothing needs doing when every open order is due later, and suggests no product", async () => {
+        const svc = build(COMMERCE, {
+            orders: [delivery("later1", HOUR, { soon: false })],
+        });
+        const model = await svc.build(INPUT);
+        expect(openRows(model.needs)).toEqual([]);
+        expect(model.ordersInProgress).toBe(1);
+        expect(model.actions.map((a) => a.code)).not.toContain(
+            "COMMERCE_SUGGEST_PRODUCT",
+        );
+    });
+
+    it("keeps an order not collected on its own row, whatever its open orders", async () => {
+        const svc = build(COMMERCE, {
+            orders: [delivery("later1", HOUR, { soon: false })],
+            uncollected: [
+                {
+                    ...delivery("unc1", 5 * 24 * HOUR),
+                    fulfilment: "PICKUP",
+                    payOnHandover: true,
+                    paymentStatus: "UNPAID",
+                    customerId: "cus_1",
+                    walkInName: null,
+                },
+            ],
+        });
+        const model = await svc.build(INPUT);
+        expect(model.needs.map((n) => n.code)).toEqual([
+            "COMMERCE_UNCOLLECTED_ORDERS",
+        ]);
+        expect(model.needs[0].title).toMatch(/hasn't collected order/);
+        expect(model.ordersInProgress).toBe(1);
+    });
+});
+
+describe("soonCutoff (DEC-163)", () => {
+    it("is the start of the day after tomorrow, in the business's zone", () => {
+        // 11:50 pm on the 16th in Mumbai: still the 16th there.
+        const now = new Date("2026-10-16T18:20:00.000Z");
+        expect(soonCutoff(now, "Asia/Kolkata").toISOString()).toBe(
+            "2026-10-17T18:30:00.000Z",
+        );
+        // The same instant is already the 17th in Auckland.
+        expect(soonCutoff(now, "Pacific/Auckland").toISOString()).toBe(
+            "2026-10-18T11:00:00.000Z",
+        );
     });
 });

@@ -32,8 +32,8 @@ export class VariantStockInput {
     quantity!: number;
 
     @Type(() => Number)
-    @IsInt({ message: "Warn at must be a whole number" })
-    @Min(0, { message: "Warn at can't be negative" })
+    @IsInt({ message: "Low stock at must be a whole number" })
+    @Min(0, { message: "Low stock at can't be negative" })
     lowStockAlert!: number;
 }
 

@@ -27,3 +27,19 @@ export async function giveBusinessDetails(
         },
     });
 }
+
+/**
+ * Give a test business all Saroh needs before it charges for a plan (17
+ * Oct 2026, `billing/billing-details.ts`): its registered address and
+ * state, and a contact email for a spec whose owner is no real user. Its
+ * name is the organization's.
+ */
+export async function giveBillingDetails(
+    organizationId: string,
+): Promise<void> {
+    await giveBusinessDetails(organizationId);
+    await prisma.businessProfile.updateMany({
+        where: { organizationId, contactEmail: null },
+        data: { contactEmail: "billing@example.com" },
+    });
+}

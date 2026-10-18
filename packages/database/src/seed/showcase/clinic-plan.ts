@@ -325,7 +325,7 @@ export function planKavi(input: KaviPlanInput): KaviWorld {
         first: p.first,
         last: p.last,
         email: p.email,
-        phone: `+91 ${p.phone}`,
+        phone: p.phone,
     }));
     const people = [...fixed, ...generated];
 

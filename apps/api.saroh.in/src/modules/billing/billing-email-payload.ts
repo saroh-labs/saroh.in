@@ -16,6 +16,27 @@ export type BillingEmailPayload =
           final: boolean;
       }
     | {
+          /** A double charge given back in full (DEC-164). */
+          kind: "DOUBLE_CHARGE_REFUNDED";
+          organizationId: string;
+          /** The payment refunded: one email per payment. */
+          providerPaymentId: string;
+          /** What was refunded, in paise, when the provider said. */
+          amountPaise: number | null;
+      }
+    | {
+          /**
+           * Saroh support ended the business's autopay (DEC-166): it keeps
+           * its plan to the end of what is paid, then moves to Free.
+           */
+          kind: "AUTOPAY_ENDED";
+          organizationId: string;
+          subscriptionId: string;
+          planName: string;
+          /** When the plan moves to Free, ISO: one email per end. */
+          endsAt: string;
+      }
+    | {
           kind: "TRIAL_ENDING";
           organizationId: string;
           subscriptionId: string;
@@ -157,6 +178,24 @@ export function parseBillingEmailPayload(
         typeof p.eventKey === "string"
     ) {
         return { ...(p as object), final: p.final === true } as never;
+    }
+    if (
+        p.kind === "DOUBLE_CHARGE_REFUNDED" &&
+        typeof p.providerPaymentId === "string"
+    ) {
+        return {
+            ...(p as object),
+            amountPaise:
+                typeof p.amountPaise === "number" ? p.amountPaise : null,
+        } as never;
+    }
+    if (
+        p.kind === "AUTOPAY_ENDED" &&
+        typeof p.subscriptionId === "string" &&
+        typeof p.planName === "string" &&
+        typeof p.endsAt === "string"
+    ) {
+        return p as unknown as BillingEmailPayload;
     }
     if (
         p.kind === "TRIAL_ENDING" &&

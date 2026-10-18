@@ -15,6 +15,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { enqueueBillingCustomerSync } from "../billing/billing-customer-sync";
 import { FREE_PLAN_ID } from "../billing/catalogue-access.service";
 import {
     addressProblem,
@@ -172,6 +173,10 @@ export class OrganizationOnboardingService {
             await startOnFreePlan(tx, organization.id, {
                 planId: FREE_PLAN_ID,
             });
+
+            // Its one customer at Saroh's billing provider (DEC-165), made
+            // by a job after the commit: never in the way of signing up.
+            await enqueueBillingCustomerSync(tx, organization.id);
 
             this.logger.log(
                 `Onboarded organization ${organization.id} (${organization.slug}) with OWNER ${userId}`,

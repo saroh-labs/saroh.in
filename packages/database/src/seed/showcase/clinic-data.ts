@@ -53,10 +53,10 @@ export const KAVI_ADDRESS = {
 export const KAVI_ADDRESS_PRINTED =
     "12th Main, Indiranagar, Bengaluru 560038, Karnataka";
 
-/** The desk's number (Book Kavi Dental: "Call +91 80 4099 2210"). */
-export const KAVI_PHONE = "+91 80 4099 2210";
+/** The desk's number (Book Kavi Dental: "Call +91 00000 00005"). */
+export const KAVI_PHONE = "+91 00000 00005";
 /** The same number as the business profile stores it (E.164, DEC-053). */
-export const KAVI_PHONE_E164 = "+918040992210";
+export const KAVI_PHONE_E164 = "+910000000005";
 
 /** Open 9am–7pm Monday to Saturday, and Sunday mornings. */
 export const KAVI_OPENING_HOURS = [
@@ -280,7 +280,7 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
         first: "Rahul",
         last: "Verma",
         email: "rahul.verma@example.com",
-        phone: "+91 98451 22019",
+        phone: "+91 00000 00068",
         attention: [
             {
                 kind: "MEDICAL",
@@ -301,7 +301,7 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
         first: "Farah",
         last: "Khan",
         email: "farah.k@example.com",
-        phone: "+91 99001 45566",
+        phone: "+91 00000 00093",
         attention: [
             {
                 kind: "MEDICAL",
@@ -316,7 +316,7 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
         first: "Vikram",
         last: "Rao",
         email: "vikram.rao@example.com",
-        phone: "+91 98860 77120",
+        phone: "+91 00000 00083",
         attention: [],
     },
     {
@@ -324,7 +324,7 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
         first: "Leela",
         last: "Menon",
         email: "leela.m@example.com",
-        phone: "+91 97400 31188",
+        phone: "+91 00000 00034",
         attention: [
             {
                 kind: "ACCESS",

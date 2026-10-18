@@ -23,6 +23,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { authorize } from "../organizations/organization-policy";
 import { queueAddonChargesInTx } from "./addon-charges";
 import { assertBillingMayStart } from "./business-closing";
@@ -161,9 +162,11 @@ export class AddonsService {
             const held =
                 sub.addons.find((a) => a.addonId === addonId)?.quantity ?? 0;
             if (quantity === held) return null;
-            // More is a charge: never for a closing or deleted business (#921).
+            // More is a charge: never for a closing or deleted business
+            // (#921), nor a suspended one (its route is `lower-charges`).
             if (quantity > held) {
                 await assertBillingMayStart(tx, ctx.organizationId);
+                await assertWorkspaceWrite(ctx.organizationId, "new");
             }
             // Less is always allowed; more only where the plan can take it.
             const problem =

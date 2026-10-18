@@ -7,9 +7,9 @@
  */
 import { gstPaise } from "@saroh/pricing-catalog";
 
+import { checkoutAddress } from "./billing-details";
 import { periodWords } from "./billing-email.job";
 import { invoiceEmail, paymentFailedEmail } from "./billing-emails";
-import { checkoutAddress } from "./checkout.service";
 import { addonInvoiceName } from "./offers";
 import {
     sarohInvoicePaper,
@@ -273,6 +273,7 @@ describe("sarohInvoicePaper", () => {
         sellerEmail: null,
         billToName: "Test Bakery",
         billToEmail: null,
+        billToPhone: null,
         billToAddress: "2 Shop Lane",
         billToState: "29",
         billToGstin: null,
@@ -382,6 +383,21 @@ describe("sarohInvoicePaper", () => {
         expect(elsewhere.billedTo.detail).toBe(
             "2 Shop Lane\nState: Karnataka (29)",
         );
+    });
+
+    it("prints the buyer's email and phone under the address, when it has them", () => {
+        const view = sarohInvoicePaper({
+            ...base,
+            billToEmail: "owner@example.com",
+            billToPhone: "+919845012345",
+        });
+        expect(view.billedTo.detail).toBe(
+            "2 Shop Lane\nowner@example.com\n+919845012345\nState: Karnataka (29)",
+        );
+        expect(
+            sarohInvoicePaper({ ...base, billToEmail: "owner@example.com" })
+                .billedTo.detail,
+        ).toBe("2 Shop Lane\nowner@example.com\nState: Karnataka (29)");
     });
 
     it("an unregistered buyer is billed without a GSTIN", () => {
@@ -618,7 +634,7 @@ describe("checkoutAddress (Rule 46(e))", () => {
         return null;
     };
 
-    it("needs the address when a GSTIN is given, and not otherwise", () => {
+    it("needs the address when it is required, and not otherwise", () => {
         expect(field(() => checkoutAddress(undefined, true))).toBe(
             "addressLine1",
         );

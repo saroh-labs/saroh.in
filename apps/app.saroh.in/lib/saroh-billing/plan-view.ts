@@ -118,13 +118,22 @@ export interface ChangeQuote {
      */
     addonsEnding?: EndingAddon[];
     /**
-     * Whether the business has its registered address on its profile.
-     * False: the dialog asks for it, required with a GSTIN (Saroh's invoice
-     * to a registered buyer carries their address, CGST Rule 46(e)). An API
-     * from before it sends none, which asks nothing.
+     * Whether the business has its registered address on its profile,
+     * whole. False: the dialog asks for it (Saroh's invoice prints it, CGST
+     * Rule 46(e)). An API from before it sends none, which asks nothing.
      */
     registeredAddress?: boolean;
+    /**
+     * Who Saroh bills (17 Oct 2026): what the business must give before
+     * the payment opens — a name, an email, its registered address, its
+     * state — and whether it has a phone (asked for, optional, when not).
+     * An API from before it sends none: only `registeredAddress` is read.
+     */
+    billingDetails?: { missing: BillingDetail[]; phone: boolean };
 }
+
+/** What Saroh needs before it charges for a plan (17 Oct 2026). */
+export type BillingDetail = "name" | "email" | "address" | "state";
 
 /** An add-on that ends with a plan change, and how many are held. */
 export interface EndingAddon {
@@ -261,6 +270,67 @@ export interface YourPlanView {
      * on the page, never started again — that would be a second mandate.
      */
     pending: PendingCheckout | null;
+    /**
+     * "Cancel plan" (owner, 17 Oct 2026): offered while the business is on
+     * a paid plan it is billed for and isn't already leaving. Null: no
+     * such button. Who may press it (`billing:manage`) is the page's.
+     */
+    cancel: CancelOffer | null;
+}
+
+/** What "Cancel plan" needs: the plan kept until the end, and Free's id. */
+export interface CancelOffer {
+    planName: string;
+    freePlanId: string;
+    freePlanName: string;
+    /** A year paid once (no autopay), else monthly autopay. */
+    yearly: boolean;
+}
+
+/**
+ * Whether "Cancel plan" is offered (owner, 17 Oct 2026). Only a paid
+ * catalogue plan the business is billed for through a provider, on
+ * `TRIALING`, `ACTIVE` or `PAST_DUE`, and only while nothing already ends
+ * it: not when Free (or another plan) already waits for the period's end,
+ * not under a plan given for a while (its own note says where it lands),
+ * and not while a year paid once is scheduled to start, whatever the
+ * cycle now (moving to Free would give that paid year up; the API refuses
+ * it with a 409).
+ * See `backend-billing-and-classes.md` › Cancelling a plan.
+ */
+export function cancelOffer(input: {
+    catalog: Catalog | null;
+    subscription: SarohSubscription | null;
+    access: Pick<BillingAccessView, "plan" | "pendingMove" | "planOverride">;
+    checkouts: CheckoutsView | null;
+}): CancelOffer | null {
+    const { catalog, subscription: sub, access } = input;
+    if (!catalog || !sub) return null;
+    if (!["TRIALING", "ACTIVE", "PAST_DUE"].includes(sub.status)) return null;
+    if (!sub.provider || sub.plan.priceCents <= 0) return null;
+    if (sub.cancelAtPeriodEnd) return null;
+    const billedId = catalogPlanIdForKey(sub.plan.key);
+    const billed = catalog.plans.find((p) => p.id === billedId);
+    if (!billed || billed.pricePaise <= 0) return null;
+    const free = catalog.plans.find((p) => p.pricePaise === 0 && !p.retired);
+    if (!free) return null;
+    const override = access.planOverride;
+    if (override !== null && override.planKey !== billedId) return null;
+    const move = access.pendingMove;
+    if (move && move.planId !== move.fromPlanId) return null;
+    const yearly = billedCycle(sub) === "year";
+    // A year already paid for and waiting to start (a renewal, or a move
+    // from monthly to yearly): moving to Free would give that paid year up,
+    // so the API refuses it and the button isn't shown. An approved monthly
+    // autopay that hasn't charged yet stops with the rest.
+    const scheduled = input.checkouts?.scheduled ?? null;
+    if (scheduled && (yearly || scheduled.payment === "ONE_TIME")) return null;
+    return {
+        planName: billed.name,
+        freePlanId: free.id,
+        freePlanName: free.name,
+        yearly,
+    };
 }
 
 export interface PendingCheckout {
@@ -582,6 +652,7 @@ export function yourPlan(input: {
                   handoff: open.handoff ?? null,
               }
             : null,
+        cancel: cancelOffer(input),
     };
 }
 

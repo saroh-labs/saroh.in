@@ -83,6 +83,18 @@ beforeEach(() => {
 });
 afterEach(() => s.unmount());
 
+describe("links and marks", () => {
+    it("links each count to the products, and collections to Collections", () => {
+        render();
+        const hrefs = Array.from(document.querySelectorAll("a")).map((a) =>
+            a.getAttribute("href"),
+        );
+        expect(hrefs).toContain("/commerce/products?category=c1");
+        expect(hrefs).toContain("/commerce/products?tab=collections");
+        expect(s.text()).toContain("Products with no category. Always here.");
+    });
+});
+
 describe("the list", () => {
     it("shows every category with nothing open", () => {
         render();
@@ -104,7 +116,7 @@ describe("the list", () => {
     it("has no actions for a role that can only read", () => {
         render(catalogue({ canWrite: false }));
         expect(s.text()).toContain("Serums");
-        expect(s.text()).toContain("Your role can read these settings");
+        expect(s.text()).toContain("You can see these but not change them");
         expect(s.button("New category")).toBeUndefined();
         for (const verb of ["Rename", "Merge", "Delete"])
             expect(s.button(`${verb} Serums`)).toBeUndefined();
@@ -180,11 +192,11 @@ describe("New category", () => {
         await s.submit(s.dialog());
         expect(s.dialog()?.textContent).toContain("A category needs a name.");
         s.type(input, "serums");
-        expect(s.dialog()?.textContent).toContain(
-            "There is already a category called serums.",
-        );
+        expect(s.dialog()?.textContent).toContain("Serums already exists.");
         s.type(input, "Uncategorized");
-        expect(s.dialog()?.textContent).toContain("There is already");
+        expect(s.dialog()?.textContent).toContain(
+            "Uncategorized already exists.",
+        );
         s.type(input, "x".repeat(41));
         expect(s.dialog()?.textContent).toContain(
             "Keep it under 40 characters.",
@@ -271,16 +283,18 @@ describe("Merge", () => {
             s.sheet()?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
         ).find((r) => r.textContent === name);
 
-    it("opens a sheet that asks where the products go", () => {
+    it("opens a sheet that asks where the products go", async () => {
         open();
         expect(s.title(s.sheet())).toBe("Merge Serums");
         expect(radio("Lip care")).toBeDefined();
         expect(radio("Uncategorized")).toBeDefined();
         expect(radio("Serums")).toBeUndefined();
-        expect(s.sheet()?.textContent).toContain(
-            "Pick where its products should go.",
-        );
-        expect(s.button("Merge category", s.sheet())?.disabled).toBe(true);
+        // Merge stays on; pressed with nothing picked, it says so.
+        expect(s.button("Merge category", s.sheet())?.disabled).toBe(false);
+        expect(s.sheet()?.textContent).not.toContain("Pick where");
+        await s.submit(s.sheet());
+        expect(s.sheet()?.textContent).toContain("Pick where its products go.");
+        expect(actions.mergeCategory).not.toHaveBeenCalled();
         // The row is still a row behind it.
         expect(s.button("Rename Serums")).toBeDefined();
     });

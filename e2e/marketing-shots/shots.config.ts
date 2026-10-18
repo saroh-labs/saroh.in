@@ -1423,7 +1423,7 @@ export const SHOTS: Shot[] = [
         alt: "Home at Rye & Co. (demo bakery): what needs doing today, from late orders to a failed renewal",
         caption:
             "Home at Rye & Co.: nine things that need Priya, from late orders to a failed renewal",
-        gap: 'The owner is "Demo", not Priya, and the list holds 16 things, not nine.',
+        gap: 'The owner is "Demo", not Priya, and the list holds 18 things, not nine.',
     },
     {
         key: "s-orders",

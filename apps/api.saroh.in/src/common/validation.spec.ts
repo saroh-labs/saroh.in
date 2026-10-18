@@ -7,7 +7,6 @@ import {
     CreateAutomationRuleDto,
     UpdateAutomationRuleDto,
 } from "../modules/automations/dto";
-import { CancelSubscriptionDto } from "../modules/billing/dto";
 import { CreateServiceDto, UpdateServiceDto } from "../modules/bookings/dto";
 import { SetAccountUpdatesDto } from "../modules/communications/dto";
 import { CreatePostDto, UpdatePostDto } from "../modules/content/dto";
@@ -94,12 +93,6 @@ const BOOLEAN_FIELDS: {
         what: "whether an automation rule keeps running",
         dto: UpdateAutomationRuleDto,
         field: "enabled",
-        rest: {},
-    },
-    {
-        what: "whether a subscription change applies now",
-        dto: CancelSubscriptionDto,
-        field: "immediate",
         rest: {},
     },
     {

@@ -69,12 +69,20 @@ export function orderOverrides(
         );
 }
 
-/** The plan a business is on once a live `plan` override is applied. */
+/**
+ * The plan a business is on once a live `plan` override is applied: the
+ * newest live one, unless the plan the business is billed for (`planId`)
+ * costs more (owner, 17 Oct 2026). An override is a gift — a grandfathered
+ * plan, a waitlist's months — and never takes away a dearer plan the
+ * business pays for. Without `priceOf` (no prices to compare) the override
+ * wins, as before.
+ */
 export function effectivePlanId(
     planId: string,
     overrides: readonly Override[],
     now: Date,
     knownPlanIds?: ReadonlySet<string>,
+    priceOf?: (planId: string) => number | undefined,
 ): string {
     let out = planId;
     for (const o of orderOverrides(overrides, now)) {
@@ -82,7 +90,22 @@ export function effectivePlanId(
         if (knownPlanIds && !knownPlanIds.has(o.planKey)) continue;
         out = o.planKey;
     }
+    if (out !== planId && priceOf) {
+        const billed = priceOf(planId);
+        const granted = priceOf(out);
+        if (billed !== undefined && granted !== undefined && billed > granted) {
+            return planId;
+        }
+    }
     return out;
+}
+
+/** A catalogue's plan prices, for {@link effectivePlanId}. */
+export function planPriceOf(catalog: {
+    plans: readonly { id: string; pricePaise: number }[];
+}): (planId: string) => number | undefined {
+    const prices = new Map(catalog.plans.map((p) => [p.id, p.pricePaise]));
+    return (id) => prices.get(id);
 }
 
 /** A custom monthly price, if one applies: the newest live `price` override. */

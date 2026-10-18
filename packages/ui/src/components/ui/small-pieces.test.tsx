@@ -328,6 +328,17 @@ describe("IconButton", () => {
         );
     });
 
+    it("shows no tooltip for focus a press just moved there (a sheet opening)", async () => {
+        render(<IconButton label="Previous product" icon={<svg />} />);
+        // A click elsewhere opened a sheet, which then focused this button.
+        fireEvent.pointerDown(document.body);
+        fireEvent.focus(
+            screen.getByRole("button", { name: "Previous product" }),
+        );
+        await new Promise((r) => setTimeout(r, 500));
+        expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
     it("is 44px on touch at every size, with the pointer, hover, pressed and ring", () => {
         for (const size of ["xs", "sm", "md"] as const) {
             const { unmount } = render(

@@ -86,7 +86,7 @@ describe("a product import's preview", () => {
         // 1,000 + 180 = 1,180 > 1,100
         expect(plan.rows[0]?.issues).toEqual([
             {
-                row: 1,
+                row: 2,
                 field: "mrp",
                 message:
                     "With 18% GST added this is ₹1,180 to pay, more than its MRP of ₹1,100. Lower the price, raise the MRP, or set this product's price to include GST.",

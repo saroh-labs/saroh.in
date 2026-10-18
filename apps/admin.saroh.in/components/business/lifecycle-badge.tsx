@@ -38,4 +38,6 @@ export const ATTENTION_LABEL: Record<AttentionReason, string> = {
     DELETION_CLEANUP: "Deletion clean-up unfinished",
     // Past its window; the business page lists the refunds (#921).
     DELETION_WAITING_REFUNDS: "Deletion waiting on refunds",
+    // An open row in Billing › Needs action (DEC-166).
+    BILLING_ACTION: "Billing needs action",
 };

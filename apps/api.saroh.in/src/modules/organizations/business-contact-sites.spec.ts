@@ -7,6 +7,12 @@
 const mockEnv: Record<string, string | undefined> = { NODE_ENV: "test" };
 jest.mock("../../env", () => ({ env: mockEnv, declaredNodeEnv: "test" }));
 
+// The billing customer's sync job (DEC-165) has its own db spec.
+const mockEnqueueBillingCustomerSync = jest.fn();
+jest.mock("../billing/billing-customer-sync", () => ({
+    enqueueBillingCustomerSync: (...args: unknown[]) =>
+        mockEnqueueBillingCustomerSync(...args),
+}));
 jest.mock("@saroh/database", () => {
     const prisma = {
         organization: { findUnique: jest.fn(), update: jest.fn() },

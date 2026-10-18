@@ -1,6 +1,8 @@
 import { acrossStorefronts } from "@/lib/stock/levels";
 
 import type { CatalogueRow } from "./catalogue";
+import type { NeedDetail } from "./needs-you";
+import { optionWord } from "./needs-you";
 import type { ListStock } from "./service";
 
 /**
@@ -115,6 +117,26 @@ export function stockLine(t: QuickStock["total"]): string {
     );
 }
 
+/**
+ * The drawer's headline: what can be sold, and the exception Needs you
+ * names — "167 can sell · 1 of 28 shades out" — so the one shade that's
+ * out is said before anyone scrolls to it. Without one, `stockLine`.
+ */
+export function stockHeadline(
+    t: QuickStock["total"],
+    need: NeedDetail | null,
+): string {
+    const worst = need?.variants?.worst ?? 0;
+    const of = need?.variants?.of ?? 0;
+    if (need && need.kind !== "short" && need.where?.length && worst > 0) {
+        return (
+            `${t.canSell} can sell · ${worst} of ${of} ` +
+            `${optionWord(need.option, of)} ${need.kind === "out" ? "out" : "low"}`
+        );
+    }
+    return stockLine(t);
+}
+
 /** A shelf's line: "2 short · 1 on hand, 3 promised" or "12 can sell · 12 on hand". */
 export function shelfLine(s: QuickShelf): string {
     if (s.short > 0) {
@@ -140,9 +162,63 @@ export function shortTitle(short: number): string {
     return `${short} short for orders already placed.`;
 }
 
-/** The design shows each variant when there are several, or one is short. */
-export function showShelves(stock: QuickStock): boolean {
-    return stock.shelves.length > 1 || stock.total.short > 0;
+/**
+ * Each variant shows when there are several, or one is short; and someone
+ * who counts stock always gets the Add row, even for a product with one
+ * shelf — Restock lands here, so it must be able to add.
+ */
+export function showShelves(stock: QuickStock, canStock = false): boolean {
+    return (
+        stock.shelves.length > 1 ||
+        stock.total.short > 0 ||
+        (canStock && stock.shelves.length === 1)
+    );
+}
+
+/** Short first, then nothing to sell, then low; the rest after. */
+function needRank(s: QuickShelf): number {
+    if (s.short > 0) return 0;
+    if (s.canSell <= 0) return 1;
+    if (s.warnAt > 0 && s.canSell <= s.warnAt) return 2;
+    return 3;
+}
+
+/** Whether a shelf needs someone (short, out or low). */
+export function shelfNeeds(s: QuickShelf): boolean {
+    return needRank(s) < 3;
+}
+
+/**
+ * The shelves that need someone first (short, out, low), then the rest in
+ * the catalogue's order — a 26th shade that's out isn't below the fold.
+ */
+export function orderShelves(shelves: readonly QuickShelf[]): QuickShelf[] {
+    return shelves
+        .map((s, i) => ({ s, i }))
+        .sort((a, b) => needRank(a.s) - needRank(b.s) || a.i - b.i)
+        .map(({ s }) => s);
+}
+
+/** Healthy shelves shown before "Show all 28 shades". */
+export const HEALTHY_SHOWN = 6;
+
+/**
+ * The shelves the drawer shows: every one that needs someone, and the
+ * first six healthy ones until it is opened; `hidden` is how many wait.
+ */
+export function foldShelves(
+    ordered: readonly QuickShelf[],
+    open: boolean,
+): { shown: QuickShelf[]; hidden: number } {
+    const needing = ordered.filter(shelfNeeds);
+    const healthy = ordered.filter((s) => !shelfNeeds(s));
+    if (open || healthy.length <= HEALTHY_SHOWN) {
+        return { shown: [...ordered], hidden: 0 };
+    }
+    return {
+        shown: [...needing, ...healthy.slice(0, HEALTHY_SHOWN)],
+        hidden: healthy.length - HEALTHY_SHOWN,
+    };
 }
 
 /**
@@ -203,4 +279,42 @@ export function readAdd(raw: string): number | null {
     if (!/^\d+$/.test(text)) return null;
     const n = Number(text);
     return n > 0 ? n : null;
+}
+
+/**
+ * Whether the business's online shop is live: true, false, or null when
+ * the website couldn't be read. Words about the website say it only when
+ * true; "unknown" claims neither.
+ */
+export type SellsOnline = boolean | null;
+
+/**
+ * The one true line under Archive, Publish or Sell again, in the quick
+ * look's menu. Only claims the website when the online shop is live.
+ */
+export function sellLine(selling: boolean, online: SellsOnline): string {
+    if (selling) {
+        return online === true
+            ? "Hides it from your website and the counter. Nothing is deleted."
+            : online === false
+              ? "Takes it off sale at the counter. Nothing is deleted."
+              : "Takes it off sale. Nothing is deleted.";
+    }
+    return online === true
+        ? "Shows it on your website and at the counter."
+        : online === false
+          ? "Puts it on sale at the counter."
+          : "Puts it on sale.";
+}
+
+/** The toast after Publish, Sell again or Archive: it echoes the state. */
+export function statusToast(
+    status: "PUBLISHED" | "ARCHIVED",
+    names: readonly string[],
+): string {
+    const one = names.length === 1 ? names[0] : undefined;
+    if (status === "ARCHIVED") {
+        return one ? `Archived ${one}.` : `Archived ${names.length} products.`;
+    }
+    return one ? `${one} is live.` : `${names.length} products are live.`;
 }

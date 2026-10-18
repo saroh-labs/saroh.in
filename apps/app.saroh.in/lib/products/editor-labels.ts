@@ -19,10 +19,11 @@ export { roleName } from "@/lib/organizations/role-name";
  * `store:write`) is told the one section it can change.
  */
 export function readOnlyBanner(role: string, stockOnly: boolean): string {
-    const line = `You're viewing as ${role}. You can read this product but not change it. ${WHO_CAN_CHANGE}`;
-    return stockOnly
-        ? `${line} Only the Stock section below can be changed.`
-        : line;
+    // The product page's words (`overview-words.ts`), so the two agree.
+    const does = stockOnly
+        ? "You can change stock counts here, in the Stock section below."
+        : "You can look, but not change anything.";
+    return `You're signed in as ${role}. ${does} ${WHO_CAN_CHANGE}`;
 }
 
 /** Whether this person can change a section: everything, or Stock alone. */
@@ -54,13 +55,13 @@ export function detailsCopy(sellsFood: boolean): DetailsCopy {
               jump: "Ready and allergens",
               how: {
                   label: "When it is ready",
-                  placeholder: "Baked each morning. Collect from 7am.",
+                  placeholder: "e.g. Made fresh each morning",
                   help: "One line under the price. Every size shares it.",
                   field: "When it is ready",
               },
               materials: {
                   label: "Ingredients",
-                  placeholder: "Wheat flour, water, salt…",
+                  placeholder: "e.g. what goes into it",
                   field: "Ingredients",
               },
               saves: "Saves the ready line, ingredients, allergens and how it's fulfilled.",
@@ -70,14 +71,13 @@ export function detailsCopy(sellsFood: boolean): DetailsCopy {
               jump: SECTION_JUMPS.details,
               how: {
                   label: "How to use or care for it",
-                  placeholder: "Two drops, morning and night, on clean skin.",
+                  placeholder: "e.g. how to use it, or how to care for it",
                   help: "One line under the price. Every variant shares it.",
                   field: "How to use",
               },
               materials: {
                   label: "Ingredients or material",
-                  placeholder:
-                      "Aqua, Ethyl ascorbic acid, Glycerin… or 100% linen",
+                  placeholder: "e.g. what it is made of",
                   field: "Ingredients or material",
               },
               saves: "Saves how to use it, what it is made of and how it's fulfilled.",

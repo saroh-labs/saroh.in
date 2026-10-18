@@ -107,7 +107,7 @@ export async function setProductSoldOut(
 }
 
 /**
- * On sale, a draft, or archived — the list's Stop selling and Sell again.
+ * On sale, a draft, or archived — the list's Archive and Sell again.
  * Only the status is sent: the whole-product PUT also wants the slug, which
  * a list row doesn't carry, so it refused every one of these.
  */

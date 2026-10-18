@@ -6,7 +6,7 @@ export default function Loading() {
     return (
         <PageLoading
             shape="form"
-            width="form"
+            width="default"
             breadcrumb={[
                 "Sell",
                 <Link key="1" href="/commerce/products">

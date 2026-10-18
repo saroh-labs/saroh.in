@@ -340,10 +340,17 @@ test.describe("order detail", () => {
         const id = await freshOrder(page, "PICKUP", { paid: false });
         await page.goto(`/commerce/orders/${id}`);
 
-        await page
-            .getByRole("button", { name: "Edit items or address" })
-            .click();
+        // A press before the page is ready does nothing (CI's phone run,
+        // 17 Oct): pressed again until the panel opens.
         const panel = page.getByRole("dialog", { name: /^Edit #/ });
+        await expect(async () => {
+            if (!(await panel.isVisible())) {
+                await page
+                    .getByRole("button", { name: "Edit items or address" })
+                    .click();
+            }
+            await expect(panel).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 20_000 });
         const add = panel.getByLabel("Add an item");
         await expect(add).toBeVisible();
         // The first of the seed's own products on offer that isn't sold out:

@@ -54,6 +54,7 @@ import { CommunicationsService } from "../communications/communications.service"
 import { PostsService } from "../content/posts.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
+import { ImportsService } from "../imports/imports.service";
 import type { CreateOrderDto } from "../orders/dto";
 import { OrdersService } from "../orders/orders.service";
 import { OrganizationMembersService } from "../organizations/organization-members.service";
@@ -84,6 +85,7 @@ const storeFlags = {
 const stores = new StoresService(storeFlags);
 const productAccess = new ProductAccess(stores);
 const products = new ProductsService(stores, undefined, productAccess);
+const imports = new ImportsService(stores);
 const orders = new OrdersService(stores);
 const posts = new PostsService();
 const members = new OrganizationMembersService(new AuditService());
@@ -238,6 +240,60 @@ describe("products (DB, U13)", () => {
         await expect(
             products.patchIn(scope, first.id, { name: "Rye loaf" }),
         ).resolves.toBeDefined();
+    });
+
+    it("an import row that brings a product back from the archive counts as one more", async () => {
+        const b = await business("free");
+        const scope = await scopeOf(b);
+        for (let i = 0; i < 3; i++) {
+            await products.createIn(scope, { name: `Loaf ${i}`, price: "10" });
+        }
+        await products.createIn(scope, {
+            name: "Old",
+            price: "10",
+            status: "ARCHIVED",
+        });
+        const restore = {
+            csv: "name,slug,price,status\nOld,old,12,Draft\n",
+            mapping: {
+                name: "name",
+                slug: "slug",
+                price: "price",
+                status: "status",
+            },
+            policy: "UPDATE" as const,
+        };
+        const body = await refused(
+            imports.apply(b.storeId, b.ownerId, "products", restore),
+        );
+        expect(body.details).toMatchObject({ code: "PLAN_LIMIT_REACHED" });
+        const old = await prisma.product.findFirstOrThrow({
+            where: { organizationId: b.orgId, slug: "old" },
+            select: { status: true },
+        });
+        expect(old.status).toBe("ARCHIVED");
+
+        // Asked for only what fits, the row is left out, not written.
+        await expect(
+            imports.apply(b.storeId, b.ownerId, "products", {
+                ...restore,
+                createAtMost: 0,
+            }),
+        ).resolves.toMatchObject({ updated: 0, overLimit: 1 });
+
+        // A blank status cell leaves it archived: an update, no room asked.
+        await expect(
+            imports.apply(b.storeId, b.ownerId, "products", {
+                ...restore,
+                csv: "name,slug,price,status\nOld,old,12,\n",
+            }),
+        ).resolves.toMatchObject({ updated: 1 });
+        await expect(
+            prisma.product.findFirstOrThrow({
+                where: { organizationId: b.orgId, slug: "old" },
+                select: { status: true },
+            }),
+        ).resolves.toEqual({ status: "ARCHIVED" });
     });
 
     it("refuses nothing with the switch off", async () => {

@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import {
     Sheet,
@@ -10,21 +9,24 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@saroh/ui/sheet";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { FailedRead } from "@/components/shared/failed-read";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { orderHref } from "@/lib/orders/links";
-import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import {
     customersSee,
     ORDER_STATUS_LABEL,
 } from "@/lib/products/overview-rules";
+import { optionNoun } from "@/lib/products/overview-words";
 import { untrackedShort } from "@/lib/products/tracking";
+import type { ProductStock } from "@/lib/stock/product-stock";
 import { TextLink } from "@saroh/ui/text-link";
+
+import { DrawerAddStock } from "./drawer-add-stock";
+import { StockSheetButton } from "./sheets/stock-sheet";
 
 export const WORD_BADGE = {
     IN_STOCK: "success",
@@ -34,7 +36,10 @@ export const WORD_BADGE = {
 
 /**
  * One variant's own page, over the product page: its price and photo, its
- * stock, the open orders holding it, and what the people who bought it said.
+ * stock — with "+N · Add" for anyone who may count stock, so a sold-out
+ * one is restocked where it is shown — the open orders holding it, and
+ * what the people who bought it said. Edit opens the page's stock sheet
+ * on it, not the editor.
  */
 export function VariantDrawer({
     overview,
@@ -42,6 +47,7 @@ export function VariantDrawer({
     variantId,
     onClose,
     counts = true,
+    stock: shelves = null,
 }: {
     overview: ProductOverview;
     storeId: string;
@@ -49,12 +55,13 @@ export function VariantDrawer({
     onClose: () => void;
     /** The product counts stock (Track stock, #515). */
     counts?: boolean;
+    /** Its shelves, for the stock sheet; null when unread. */
+    stock?: ProductStock | null;
 }) {
     const { product, stock } = overview;
     const money = (amount: string) =>
         formatMoneyMajor(amount, product.currency);
-    const edit = (section: "variants" | "stock") =>
-        productEditHref(storeId, product.id, section);
+    const noun = optionNoun(product.option?.name);
     const open = product.variants.find((v) => v.id === variantId) ?? null;
     const openLine =
         open && counts
@@ -98,10 +105,17 @@ export function VariantDrawer({
                                     variant.
                                 </SheetDescription>
                             </div>
-                            {overview.canWrite ? (
-                                <Button size="sm" asChild variant="outline">
-                                    <Link href={edit("variants")}>Edit</Link>
-                                </Button>
+                            {overview.canWrite ||
+                            (counts && overview.canStock) ? (
+                                <StockSheetButton
+                                    overview={overview}
+                                    storeId={storeId}
+                                    stock={shelves}
+                                    counts={counts}
+                                    label="Edit"
+                                    size="sm"
+                                    first={[open.id]}
+                                />
                             ) : null}
                         </SheetHeader>
                         <div className="flex flex-col gap-5 px-[18px] pb-[22px] pt-4 text-[13px]">
@@ -154,7 +168,7 @@ export function VariantDrawer({
                                                 value={openLine.canSell}
                                             />
                                             <Tile
-                                                label="Warn at"
+                                                label="Low stock at"
                                                 value={openLine.warnAt}
                                             />
                                         </div>
@@ -166,6 +180,21 @@ export function VariantDrawer({
                                             Customers see:{" "}
                                             {customersSee(openLine)}
                                         </Badge>
+                                        {overview.canStock ? (
+                                            <DrawerAddStock
+                                                productId={product.id}
+                                                variantId={open.id}
+                                                title={open.title}
+                                                storeId={overview.storefront.id}
+                                                storeName={
+                                                    (product.storefronts ?? [])
+                                                        .length > 1
+                                                        ? overview.storefront
+                                                              .name
+                                                        : null
+                                                }
+                                            />
+                                        ) : null}
                                     </>
                                 ) : (
                                     <p className="text-muted-foreground">
@@ -183,8 +212,9 @@ export function VariantDrawer({
                                     <>
                                         {mineOrders.length === 0 ? (
                                             <EmptyState
+                                                data-ph-mask=""
                                                 size="inline"
-                                                title="No open orders for this size"
+                                                title={`No open orders for this ${noun}`}
                                             />
                                         ) : (
                                             <ul>
@@ -255,8 +285,9 @@ export function VariantDrawer({
                                 {reviews ? (
                                     mineReviews.length === 0 ? (
                                         <EmptyState
+                                            data-ph-mask=""
                                             size="inline"
-                                            title="No reviews from people who bought this size yet"
+                                            title={`No reviews from people who bought this ${noun} yet`}
                                         />
                                     ) : (
                                         <ul className="flex flex-col gap-2">

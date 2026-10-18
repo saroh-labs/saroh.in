@@ -111,6 +111,8 @@ export function LinesStep({
                                     variant="outline"
                                     onClick={() => onBump(line.key, 1)}
                                     disabled={room === 0}
+                                    // Spent: the Tip says why, alone.
+                                    tooltip={room !== 0}
                                 />
                             </Tip>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
