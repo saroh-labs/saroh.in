@@ -48,7 +48,7 @@ export function ConsoleDrawer({
                 <SheetHeader className="px-4 pb-2 pt-4 text-left">
                     <SheetTitle className="text-[15px]">Console</SheetTitle>
                     <SheetDescription className="text-[12.5px]">
-                        The instance, not a business.
+                        Saroh itself, not a business.
                     </SheetDescription>
                 </SheetHeader>
                 <div className="flex flex-col gap-5 px-3 pb-5">

@@ -1,10 +1,9 @@
-import { EmptyState } from "@saroh/ui/data-state";
-
+import { HistoryList } from "@/components/business/history-list";
 import { SessionTab } from "@/components/business/session-tab";
 import { Panel } from "@/components/panel";
 import type { BusinessTabProps } from "@/lib/business-page";
 import { businessGate, tabTitle } from "@/lib/business-page";
-import { asWords, formatDateTime } from "@/lib/format";
+import { mergeHistory } from "@/lib/business-words";
 
 export async function generateMetadata({ params }: BusinessTabProps) {
     const { organizationId } = await params;
@@ -12,8 +11,9 @@ export async function generateMetadata({ params }: BusinessTabProps) {
 }
 
 /**
- * History (admin plan U2): what the business did itself, and every operator
- * action on it with the reason given — two lists, never merged.
+ * History (admin plan U6): what the business did itself and what Saroh's
+ * team did to it, merged into one list, newest first. Staff lines carry
+ * who and why, so it reads inside a support session.
  */
 export default async function HistoryTab({ params }: BusinessTabProps) {
     const gate = await businessGate();
@@ -24,85 +24,29 @@ export default async function HistoryTab({ params }: BusinessTabProps) {
     return (
         <SessionTab staff={staff} organizationId={organizationId}>
             {(view) => {
+                const missing = [
+                    view.activity.status === "failed"
+                        ? "the business's own activity"
+                        : null,
+                    view.operatorActions.status === "failed"
+                        ? "what Saroh's team did"
+                        : null,
+                ].filter((side): side is string => side !== null);
+                const rows = mergeHistory(
+                    view.activity.status === "ok" ? view.activity.data : [],
+                    view.operatorActions.status === "ok"
+                        ? view.operatorActions.data
+                        : [],
+                );
                 return (
-                    <div className="grid gap-6 xl:grid-cols-2">
-                        <Panel
-                            title="What the business did"
-                            description="Its own recent activity. What operators did to it is a separate list."
-                            data={view.activity}
-                        >
-                            {(rows) =>
-                                rows.length === 0 ? (
-                                    <EmptyState title="No recorded activity yet" />
-                                ) : (
-                                    <Timeline
-                                        rows={rows.map((row) => ({
-                                            id: row.id,
-                                            title: asWords(row.action),
-                                            detail: `${row.actor ?? (row.actorUserId.startsWith("system:") ? "Saroh, automatically" : "Someone")}${row.outcome === "SUCCESS" ? "" : ` · ${asWords(row.outcome)}`}`,
-                                            at: row.createdAt,
-                                        }))}
-                                    />
-                                )
-                            }
-                        </Panel>
-                        <Panel
-                            title="What operators did"
-                            description="Every operator action on this business, with the reason given."
-                            data={view.operatorActions}
-                        >
-                            {(rows) =>
-                                rows.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Nothing yet.
-                                    </p>
-                                ) : (
-                                    <Timeline
-                                        rows={rows.map((row) => ({
-                                            id: row.id,
-                                            title: asWords(row.action),
-                                            detail: [
-                                                row.reason,
-                                                row.actor ?? "An operator",
-                                            ]
-                                                .filter(Boolean)
-                                                .join(" · "),
-                                            at: row.createdAt,
-                                        }))}
-                                    />
-                                )
-                            }
-                        </Panel>
-                    </div>
+                    <Panel
+                        title="History"
+                        description="What the business did, and what Saroh's team did to it, newest first. Each change by the team shows who made it and why."
+                    >
+                        {() => <HistoryList rows={rows} missing={missing} />}
+                    </Panel>
                 );
             }}
         </SessionTab>
-    );
-}
-
-function Timeline({
-    rows,
-}: {
-    rows: { id: string; title: string; detail: string; at: string }[];
-}) {
-    return (
-        <ol className="grid gap-3">
-            {rows.map((row) => (
-                <li key={row.id} className="grid gap-0.5">
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                        <span className="text-sm font-medium">{row.title}</span>
-                        <time
-                            dateTime={row.at}
-                            className="font-mono text-[12px] text-muted-foreground"
-                        >
-                            {formatDateTime(row.at)}
-                        </time>
-                    </div>
-                    <p className="break-words text-[13px] text-muted-foreground">
-                        {row.detail}
-                    </p>
-                </li>
-            ))}
-        </ol>
     );
 }

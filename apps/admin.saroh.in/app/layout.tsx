@@ -39,7 +39,7 @@ export const metadata: Metadata = {
         default: "Saroh console",
         template: "%s · Saroh console",
     },
-    description: "The operator console for a Saroh instance.",
+    description: "Saroh's operator console.",
     // The console is never for a search engine. The same is said in a
     // header on every answer, the redirect to sign-in among them
     // (`withPrivateApp` in middleware.ts, next.config, public/_headers).

@@ -67,7 +67,8 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
   `lib/billing-action-words.ts`, `lib/user-filters.ts`,
   `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
-  `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`.
+  `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`,
+  `lib/business-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -143,7 +144,17 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and
-  asks for a reason.
+  asks for a reason. When it lapses is kept beside it
+  (`accessUntilCookieName`), so the header reads "Open until hh:mm" (India's
+  time) by Close support access.
+- **Website and payments and Team (admin plan U6) stand without a session**
+  on the Overview's read: each site and whether it is published, the
+  payments connection (only the business can publish or connect, so those
+  rows offer Copy steps), and each person's name, role and what it can do
+  (`lib/business-words.ts`). Trackers, emails, invitations and Change role…
+  / Remove… need the session; Notes and History do too. History is one
+  list, the business's own activity and Saroh's team's actions merged
+  newest first (`mergeHistory`).
 - **Dark by default, not following the system**, on the shared tokens. No
   accent is overridden — the console's Saffron is the base dark one.
 - **`Badge` renders a `<div>`.** Never put one inside `<p>` or `<span>`; the

@@ -128,8 +128,8 @@ export default async function TeamPage() {
                             ))}
                             <p className="text-[13px] text-muted-foreground">
                                 Roles and permissions are part of Saroh&rsquo;s
-                                code, the same on every instance. Who holds them
-                                is up to this instance.
+                                code, the same everywhere Saroh runs. Who holds
+                                them is decided here.
                             </p>
                         </CardContent>
                     </Card>

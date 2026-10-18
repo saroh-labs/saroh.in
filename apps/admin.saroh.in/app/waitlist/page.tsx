@@ -69,7 +69,7 @@ export default async function WaitlistPage({
                 <PageHeader
                     breadcrumb={["Instance", "Waitlist"]}
                     title="Waitlist"
-                    description="People who asked to hear when this instance was ready for them. Inviting them is what opens signup."
+                    description="People who asked to hear when Saroh was ready for them. Inviting them is what opens signup."
                     actions={
                         canInvite && waitingHere.length > 0 ? (
                             <InviteBatch ids={waitingHere} />
@@ -112,7 +112,7 @@ export default async function WaitlistPage({
                     <p className="max-w-[68ch] text-sm text-muted-foreground">
                         Nobody can be invited yet.{" "}
                         {summary.inviteBlocker ??
-                            "This instance isn't set up to send invites."}
+                            "Invite emails aren't set up yet, so none can be sent."}
                     </p>
                 )}
 

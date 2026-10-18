@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
 import type { BusinessModuleState } from "./businesses";
-import { accessCookieName, getModuleState } from "./businesses";
+import {
+    accessCookieName,
+    accessUntilCookieName,
+    getModuleState,
+} from "./businesses";
 import type { ControlPlaneResult } from "./control-plane";
 import {
     adminWrite,
@@ -50,13 +54,21 @@ export async function openAccessAction(
     );
     if (!result.ok) return result;
 
-    (await cookies()).set(accessCookieName(organizationId), result.data.id, {
+    const jar = await cookies();
+    const options = {
         httpOnly: true,
         secure: true,
         sameSite: "strict",
         path: "/",
         expires: new Date(result.data.expiresAt),
-    });
+    } as const;
+    jar.set(accessCookieName(organizationId), result.data.id, options);
+    // When it lapses, for "Open until hh:mm" beside Close support access.
+    jar.set(
+        accessUntilCookieName(organizationId),
+        result.data.expiresAt,
+        options,
+    );
     revalidatePath(`/businesses/${organizationId}`, "layout");
     return { ok: true, data: null };
 }
@@ -78,6 +90,7 @@ export async function closeAccessAction(
         if (!result.ok) return result;
     }
     jar.delete(accessCookieName(organizationId));
+    jar.delete(accessUntilCookieName(organizationId));
     revalidatePath(`/businesses/${organizationId}`, "layout");
     return { ok: true, data: null };
 }

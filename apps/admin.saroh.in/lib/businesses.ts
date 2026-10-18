@@ -452,6 +452,29 @@ export function accessCookieName(organizationId: string): string {
     return `console_access_${organizationId.replace(/[^A-Za-z0-9_-]/g, "")}`;
 }
 
+/**
+ * The cookie beside it holding when that session lapses (admin plan U6,
+ * R16: "Open until hh:mm" by Close support access). httpOnly too, set and
+ * cleared with the session's own.
+ */
+export function accessUntilCookieName(organizationId: string): string {
+    return `${accessCookieName(organizationId)}_until`;
+}
+
+/**
+ * When this operator's support session on the business lapses, as the API
+ * said when it opened; null when unknown (a session opened before this was
+ * kept) or none is open.
+ */
+export async function getAccessUntil(
+    organizationId: string,
+): Promise<string | null> {
+    const jar = await cookies();
+    if (!jar.get(accessCookieName(organizationId))?.value) return null;
+    const until = jar.get(accessUntilCookieName(organizationId))?.value;
+    return until && !Number.isNaN(Date.parse(until)) ? until : null;
+}
+
 export type BusinessViewResult =
     | { status: "ok"; view: BusinessView; sessionId: string }
     /** No open session, or the one we held has closed or expired. */

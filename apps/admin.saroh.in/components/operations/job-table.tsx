@@ -29,7 +29,7 @@ const COLUMNS: DataColumn<JobRow>[] = [
             <div className="min-w-0">
                 <p className="truncate font-mono text-[13px]">{row.type}</p>
                 <p className="truncate text-[13px] text-muted-foreground">
-                    {row.organization?.name ?? "The instance"}
+                    {row.organization?.name ?? "Saroh itself"}
                 </p>
             </div>
         ),

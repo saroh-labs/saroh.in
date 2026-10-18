@@ -9,7 +9,10 @@ export async function generateMetadata({ params }: BusinessTabProps) {
     return { title: await tabTitle("Notes", organizationId) };
 }
 
-/** Notes (admin plan U2): for the next operator; the business never sees them. */
+/**
+ * Notes (admin plan U6): for the next person on Saroh's team; the business
+ * never sees them. They read inside a support session.
+ */
 export default async function NotesTab({ params }: BusinessTabProps) {
     const gate = await businessGate();
     if (!gate.ok) return null;
@@ -23,7 +26,7 @@ export default async function NotesTab({ params }: BusinessTabProps) {
                 return (
                     <Panel
                         title="Notes"
-                        description="For the next operator. The business never sees them."
+                        description="For the next person on Saroh's team. The business never sees them."
                         data={view.notes}
                     >
                         {(notes) => (

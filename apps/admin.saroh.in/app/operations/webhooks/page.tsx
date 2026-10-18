@@ -51,7 +51,7 @@ export default async function WebhooksPage({
                 <PageHeader
                     breadcrumb={["Operations", "Webhooks"]}
                     title="Webhooks"
-                    description="What payment providers told this instance, and what it did about it."
+                    description="What payment providers told Saroh, and what it did about it."
                     actions={
                         canReplay && failedHere.length > 0 ? (
                             <BulkAction

@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/admin-shell";
 import { BusinessHeader } from "@/components/business/business-header";
 import {
     businessGate,
+    readAccessUntil,
     readOverview,
     readSummary,
     readView,
@@ -42,6 +43,7 @@ export default async function BusinessLayout({
         ? await readView(organizationId).catch(() => null)
         : null;
     const open = view?.status === "ok";
+    const until = open ? await readAccessUntil(organizationId) : null;
     // The tabs' counts and "needs you" (U3): from the Overview's read, made
     // once per request with the tab's. A failed read leaves them off.
     const overview = await readOverview(organizationId).catch(() => null);
@@ -53,6 +55,7 @@ export default async function BusinessLayout({
                     summary={summary}
                     hold={open ? (view.view.facts.legalHold ?? null) : null}
                     session={open ? "open" : "closed"}
+                    sessionUntil={until}
                     canViewAs={canViewAs}
                     canLifecycle={can(staff, "organization:lifecycle:write")}
                     canLiftHold={can(staff, "organization:legal-hold:lift")}

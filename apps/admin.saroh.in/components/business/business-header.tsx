@@ -33,6 +33,7 @@ export function BusinessHeader({
     summary,
     hold = null,
     session,
+    sessionUntil = null,
     canViewAs,
     canLifecycle,
     canLiftHold,
@@ -43,6 +44,8 @@ export function BusinessHeader({
     hold?: LegalHoldFacts | null;
     /** The operator's support session on this business. */
     session: "open" | "closed";
+    /** When an open session lapses, for "Open until hh:mm". */
+    sessionUntil?: string | null;
     /** Holds `organization:view-as`. */
     canViewAs: boolean;
     /** Holds `organization:lifecycle:write`. */
@@ -80,7 +83,10 @@ export function BusinessHeader({
                     <div className="flex flex-wrap items-center gap-2">
                         {canViewAs &&
                             (session === "open" ? (
-                                <CloseAccess organizationId={summary.id} />
+                                <CloseAccess
+                                    organizationId={summary.id}
+                                    until={sessionUntil}
+                                />
                             ) : (
                                 <ViewAsBusiness organizationId={summary.id} />
                             ))}

@@ -5,12 +5,15 @@ import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { useState, useTransition } from "react";
 
+import { EmptyPanel } from "@/components/states/empty-panel";
 import { addNoteAction } from "@/lib/business-actions";
 import { formatDateTime } from "@/lib/format";
+import { useChangeFeedback } from "@/lib/use-change-feedback";
 
 /**
- * Operator notes on the business: what the next person to open it should
- * know. Only operators ever see them; the business never does.
+ * Notes on the business (admin plan U6): what the next person on Saroh's
+ * team to open it should know. Only Saroh's team ever sees them; the
+ * business never does. Newest first, as the API sends them.
  */
 export function NotesPanel({
     organizationId,
@@ -30,11 +33,20 @@ export function NotesPanel({
     const [body, setBody] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const feedback = useChangeFeedback();
 
     return (
         <div className="grid gap-4">
             {notes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No notes yet.</p>
+                <EmptyPanel
+                    size="inline"
+                    title="No notes yet"
+                    description={
+                        canWrite
+                            ? "Add one for the next person who opens this business."
+                            : undefined
+                    }
+                />
             ) : (
                 <ul className="grid gap-3">
                     {notes.map((note) => (
@@ -47,7 +59,7 @@ export function NotesPanel({
                             </p>
                             <p className="font-mono text-[12px] text-muted-foreground">
                                 {formatDateTime(note.createdAt)} ·{" "}
-                                {note.author ?? "An operator"}
+                                {note.author ?? "Someone on Saroh's team"}
                             </p>
                         </li>
                     ))}
@@ -69,6 +81,7 @@ export function NotesPanel({
                                 return;
                             }
                             setBody("");
+                            feedback.report({ message: "Note added." });
                         });
                     }}
                 >

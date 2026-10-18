@@ -24,7 +24,7 @@ export function FirstRun() {
             description={
                 canEdit
                     ? "Start from the starter catalogue (Free, Grow and Pro with their rows, every price ₹0 and no limits) or from one blank plan. Either way it's a draft: businesses see nothing until you publish."
-                    : "Nothing has been published on this instance, and there's no draft to look at."
+                    : "Nothing has been published yet, and there's no draft to look at."
             }
             note={
                 canEdit

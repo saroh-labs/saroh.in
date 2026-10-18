@@ -60,7 +60,7 @@ function Board({ view }: { view: DeploymentsView }) {
         <>
             <AutoRefresh active={anyInFlight(view.rows)} everyMs={15_000} />
             {!view.configured && (
-                <Notice title="Deploys are off on this instance">
+                <Notice title="Deploys are off here">
                     The API holds no deploy token (SITE_DEPLOY_GITHUB_TOKEN), so
                     nothing can be deployed or read from here. Merges still
                     deploy.

@@ -10,15 +10,16 @@ import type { StaffIdentity } from "@/lib/control-plane";
 import { OpenAccessCard } from "./open-access";
 
 /**
- * Without `organization:view-as`: the no-access panel, inside the tab, in
- * the words the page used before it had tabs.
+ * Without `organization:view-as`: the no-access panel, inside the tab
+ * (admin plan U6, R16: what it needs, and what the rest of the page still
+ * shows).
  */
 export function NeedsSupportRole() {
     return (
         <PermissionDeniedState
-            title="Opening a business needs support access"
-            description="Your access covers the directory, not a business's own details."
-            note="A Platform Owner can add the Support role to your access."
+            title="This part needs support access"
+            description="It shows the business's own details. Your access covers its Overview and Modules, not those."
+            note="A Platform owner can add the Support role to your access."
         />
     );
 }

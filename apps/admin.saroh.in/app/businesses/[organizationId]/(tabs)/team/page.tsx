@@ -1,207 +1,122 @@
-import { SessionTab } from "@/components/business/session-tab";
+import { PermissionDeniedState } from "@saroh/ui/data-state";
+import { notFound } from "next/navigation";
+
+import { OpenAccessCard } from "@/components/business/open-access";
+import { TeamRows } from "@/components/business/team-rows";
 import { Panel } from "@/components/panel";
-import {
-    ChangeRole,
-    InvitationActions,
-    RemoveMember,
-} from "@/components/people/person-actions";
+import { FailedPanel } from "@/components/states/failed-panel";
 import type { BusinessTabProps } from "@/lib/business-page";
-import { businessGate, tabTitle } from "@/lib/business-page";
+import {
+    businessGate,
+    readOverview,
+    readSummary,
+    readView,
+    tabTitle,
+} from "@/lib/business-page";
 import { can } from "@/lib/console";
-import { asWords, formatDate, plural } from "@/lib/format";
 
 export async function generateMetadata({ params }: BusinessTabProps) {
     const { organizationId } = await params;
     return { title: await tabTitle("Team", organizationId) };
 }
 
+const DESCRIPTION = "Who belongs to this business, and what each role can do.";
+
 /**
- * Team (admin plan U2): who belongs to this business and their role in it,
- * its waiting invitations, and Change role… and Remove… for an operator
- * who may change its people and read their details. U6 rebuilds it.
+ * Team (admin plan U6, R8): each person, their role and what it can do.
+ *
+ * Names and roles come from the Overview's read, so they show without a
+ * support session (R10). Inside one, the rows come from the business's
+ * own read: emails where the operator may read personal data, waiting
+ * invitations, and Change role… and Remove… for an operator who may
+ * change its people and read their details.
  */
 export default async function TeamTab({ params }: BusinessTabProps) {
     const gate = await businessGate();
     if (!gate.ok) return null;
     const { staff } = gate;
     const { organizationId } = await params;
-    const peopleWrite =
+    const canViewAs = can(staff, "organization:view-as");
+    const canChange =
         can(staff, "organization:people:write") &&
         can(staff, "organization:pii:read");
+
+    const [summary, result] = await Promise.all([
+        readSummary(organizationId),
+        canViewAs ? readView(organizationId) : null,
+    ]);
+    if (result?.status === "not-found") notFound();
+    const businessName = summary?.name ?? "this business";
+
+    if (result?.status === "ok") {
+        const { view } = result;
+        return (
+            <Panel title="Team" description={DESCRIPTION} data={view.people}>
+                {(people) => (
+                    <TeamRows
+                        organizationId={view.facts.id}
+                        businessName={view.facts.name}
+                        members={people.members.map((m) => ({
+                            key: m.membershipId,
+                            userId: m.userId,
+                            name: m.name,
+                            email: m.email,
+                            emailVerified: m.emailVerified,
+                            role: m.role,
+                        }))}
+                        invitations={people.invitations}
+                        canChange={canChange}
+                    />
+                )}
+            </Panel>
+        );
+    }
+
+    // No support session: names and roles from the Overview's read.
+    let overview;
+    try {
+        overview = await readOverview(organizationId);
+    } catch {
+        overview = undefined;
+    }
     return (
-        <SessionTab staff={staff} organizationId={organizationId}>
-            {(view) => {
-                const { facts } = view;
-                const id = facts.id;
-                return (
-                    <Panel
-                        title="People"
-                        description="Who belongs to this business, and their role in it."
-                        data={view.people}
-                    >
-                        {(people) => (
-                            <div className="grid gap-4">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full min-w-[560px] text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-[12px] uppercase tracking-[0.08em] text-muted-foreground">
-                                                <th className="py-2 pr-3 font-semibold">
-                                                    Person
-                                                </th>
-                                                <th className="py-2 pr-3 font-semibold">
-                                                    Role
-                                                </th>
-                                                <th className="py-2 pr-3 font-semibold">
-                                                    Email
-                                                </th>
-                                                {peopleWrite && (
-                                                    <th className="py-2 font-semibold">
-                                                        <span className="sr-only">
-                                                            Actions
-                                                        </span>
-                                                    </th>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {people.members.map((member) => {
-                                                const label =
-                                                    member.name ??
-                                                    member.email ??
-                                                    "this person";
-                                                return (
-                                                    <tr
-                                                        key={
-                                                            member.membershipId
-                                                        }
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="py-2 pr-3">
-                                                            {member.name ?? (
-                                                                <span className="text-muted-foreground">
-                                                                    No name
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 pr-3">
-                                                            {asWords(
-                                                                member.role,
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 pr-3">
-                                                            {member.email ? (
-                                                                <span className="break-all">
-                                                                    {
-                                                                        member.email
-                                                                    }
-                                                                    {!member.emailVerified && (
-                                                                        <span className="text-muted-foreground">
-                                                                            {" "}
-                                                                            ·
-                                                                            not
-                                                                            verified
-                                                                        </span>
-                                                                    )}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-muted-foreground">
-                                                                    Hidden
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        {peopleWrite && (
-                                                            <td className="py-1">
-                                                                <div className="flex justify-end gap-1">
-                                                                    <ChangeRole
-                                                                        organizationId={
-                                                                            id
-                                                                        }
-                                                                        userId={
-                                                                            member.userId
-                                                                        }
-                                                                        name={
-                                                                            label
-                                                                        }
-                                                                        role={
-                                                                            member.role
-                                                                        }
-                                                                    />
-                                                                    <RemoveMember
-                                                                        organizationId={
-                                                                            id
-                                                                        }
-                                                                        userId={
-                                                                            member.userId
-                                                                        }
-                                                                        name={
-                                                                            label
-                                                                        }
-                                                                        business={
-                                                                            facts.name
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {people.invitations.length > 0 && (
-                                    <div className="grid gap-2">
-                                        <p className="text-sm font-medium">
-                                            {plural(
-                                                people.invitations.length,
-                                                "invitation",
-                                            )}{" "}
-                                            waiting
-                                        </p>
-                                        <ul className="grid gap-1.5">
-                                            {people.invitations.map(
-                                                (invite) => (
-                                                    <li
-                                                        key={invite.id}
-                                                        className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                                                    >
-                                                        <span className="min-w-0 break-all">
-                                                            {invite.email ??
-                                                                "Hidden"}{" "}
-                                                            as{" "}
-                                                            {asWords(
-                                                                invite.role,
-                                                            )}{" "}
-                                                            · expires{" "}
-                                                            {formatDate(
-                                                                invite.expiresAt,
-                                                            )}
-                                                        </span>
-                                                        {peopleWrite && (
-                                                            <InvitationActions
-                                                                organizationId={
-                                                                    id
-                                                                }
-                                                                invitationId={
-                                                                    invite.id
-                                                                }
-                                                                label={
-                                                                    invite.email ??
-                                                                    "this person"
-                                                                }
-                                                            />
-                                                        )}
-                                                    </li>
-                                                ),
-                                            )}
-                                        </ul>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </Panel>
-                );
-            }}
-        </SessionTab>
+        <div className="grid gap-5">
+            {overview === undefined ? (
+                <FailedPanel
+                    things="the team"
+                    reassurance="The rest of the page is current."
+                />
+            ) : overview === null ? (
+                <PermissionDeniedState
+                    title="This business isn't one of yours"
+                    description="Your access covers the businesses you look after."
+                />
+            ) : (
+                <Panel
+                    title="Team"
+                    description={DESCRIPTION}
+                    data={overview.team}
+                >
+                    {(team) => (
+                        <TeamRows
+                            organizationId={organizationId}
+                            businessName={businessName}
+                            members={team.members.map((m, i) => ({
+                                key: `member-${i}`,
+                                name: m.name,
+                                role: m.role,
+                            }))}
+                            canChange={false}
+                        />
+                    )}
+                </Panel>
+            )}
+            {result?.status === "needs-access" && (
+                <OpenAccessCard
+                    organizationId={organizationId}
+                    lead="Their emails, waiting invitations and the controls to change their roles need support access."
+                />
+            )}
+        </div>
     );
 }

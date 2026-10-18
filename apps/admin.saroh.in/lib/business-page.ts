@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import {
+    getAccessUntil,
     getBusinessOverview,
     getBusinessSummary,
     getBusinessView,
@@ -30,6 +31,11 @@ export const readSummary = cache((organizationId: string) =>
 /** The business's details behind the support session. Throws on an outage. */
 export const readView = cache((organizationId: string) =>
     getBusinessView(organizationId),
+);
+
+/** When the operator's support session lapses; null when unknown. */
+export const readAccessUntil = cache((organizationId: string) =>
+    getAccessUntil(organizationId),
 );
 
 /** Each module's true state (U1); a failed panel on a refusal or outage. */

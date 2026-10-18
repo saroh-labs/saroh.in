@@ -24,7 +24,7 @@ export function AppsMenu({ instance }: { instance: InstanceApps }) {
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Other apps on this instance"
+                    aria-label="Saroh's other apps"
                 >
                     <LayoutGrid className="size-4" />
                 </Button>

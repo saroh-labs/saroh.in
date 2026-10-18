@@ -138,7 +138,7 @@ function StatePanel({ view }: { view: BusinessView }) {
     return (
         <Panel
             title="State"
-            description="Where this business stands on the instance."
+            description="Where this business stands with Saroh."
         >
             {() => (
                 <Facts

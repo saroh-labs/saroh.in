@@ -1,19 +1,24 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { EmptyState } from "@saroh/ui/data-state";
 
+import { ChangedRow } from "@/components/changed-row";
+import { EmptyPanel } from "@/components/states/empty-panel";
 import { siteTrackersAction } from "@/lib/business-actions";
+import { trackerState } from "@/lib/business-words";
 import type { SiteTrackersRow } from "@/lib/businesses";
-import { formatDateTime, plural } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
+import { undoReason } from "@/lib/releases";
+import { useChangeFeedback } from "@/lib/use-change-feedback";
 
 import { OperatorDialog } from "../operator-dialog";
 
 /**
- * Each of a business's sites and its trackers (#897). Staff holding
- * `organization:trackers:write` can switch a site's trackers off — none
- * load, whatever the plan, and the business can't turn one on — and back
- * on. Only staff can switch them back on. The API refuses anyone else.
+ * Each of a business's sites and its trackers (#897, admin plan U6, R7).
+ * A site's trackers are Allowed, or "Switched off by Saroh": none load,
+ * whatever the plan, and the business can't turn one on. Staff holding
+ * `organization:trackers:write` switch them off… and on…, with a reason;
+ * the row lights and Undo puts it back (R9). The API refuses anyone else.
  */
 export function SiteTrackers({
     organizationId,
@@ -24,64 +29,118 @@ export function SiteTrackers({
     sites: SiteTrackersRow[];
     canSwitch: boolean;
 }) {
+    const feedback = useChangeFeedback();
     if (sites.length === 0) {
-        return <EmptyState title="No sites yet" />;
+        return (
+            <EmptyPanel
+                size="inline"
+                title="No sites yet"
+                description="Trackers belong to a site, and this business has none."
+            />
+        );
     }
+
+    async function change(
+        site: SiteTrackersRow,
+        switchOn: boolean,
+        input: { reason: string; idempotencyKey: string },
+    ) {
+        const result = await siteTrackersAction(organizationId, site.id, {
+            ...input,
+            switchOn,
+        });
+        if (!result.ok) return result;
+        feedback.report({
+            rowId: site.id,
+            message: switchOn
+                ? `Trackers switched back on for ${site.name}.`
+                : `Trackers switched off for ${site.name}.`,
+            undo: async () => {
+                const undone = await siteTrackersAction(
+                    organizationId,
+                    site.id,
+                    {
+                        reason: undoReason(input.reason),
+                        idempotencyKey: crypto.randomUUID(),
+                        switchOn: !switchOn,
+                    },
+                );
+                return undone.ok ? { ok: true } : { ok: false };
+            },
+        });
+        return result;
+    }
+
     return (
-        <ul className="grid gap-3">
-            {sites.map((site) => (
-                <li
-                    key={site.id}
-                    className="flex flex-wrap items-start justify-between gap-3"
-                >
-                    <div className="grid min-w-0 gap-0.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="truncate text-sm font-medium">
-                                {site.name}
-                            </span>
-                            {site.switchedOff ? (
-                                <Badge variant="error">Switched off</Badge>
-                            ) : (
-                                <Badge variant="outline">On</Badge>
+        <ul className="grid">
+            {sites.map((site) => {
+                const tracker = trackerState(site);
+                return (
+                    <ChangedRow
+                        as="li"
+                        key={site.id}
+                        changed={feedback.isHighlighted(site.id)}
+                        data-site={site.id}
+                        className="flex flex-wrap items-start justify-between gap-3 border-b py-3 last:border-0"
+                    >
+                        <div className="grid min-w-0 flex-1 basis-64 gap-0.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="truncate text-sm font-medium">
+                                    {site.name}
+                                </span>
+                                <Badge
+                                    variant={tracker.tone}
+                                    data-tracker-state={
+                                        site.switchedOff ? "off" : "allowed"
+                                    }
+                                >
+                                    {tracker.state}
+                                </Badge>
+                            </div>
+                            <p className="break-words text-[12.5px] text-muted-foreground">
+                                {site.subdomain ? `${site.subdomain} · ` : ""}
+                                {tracker.text}
+                            </p>
+                            {site.switchedOff && (
+                                <p className="break-words text-[12.5px] text-muted-foreground">
+                                    {formatDateTime(site.switchedOff.at)} by{" "}
+                                    {site.switchedOffBy ??
+                                        "someone on Saroh's team"}
+                                    {site.switchedOff.reason
+                                        ? ` · ${site.switchedOff.reason}`
+                                        : ""}
+                                </p>
                             )}
                         </div>
-                        <p className="break-words text-[12.5px] text-muted-foreground">
-                            {site.subdomain ? `${site.subdomain} · ` : ""}
-                            {plural(site.trackersOn, "tracker")} on
-                        </p>
-                        {site.switchedOff && (
-                            <p className="break-words text-[12.5px] text-muted-foreground">
-                                {formatDateTime(site.switchedOff.at)} by{" "}
-                                {site.switchedOffBy ?? "an operator"}
-                                {site.switchedOff.reason
-                                    ? ` · ${site.switchedOff.reason}`
-                                    : ""}
-                            </p>
+                        {canSwitch && (
+                            <SwitchTrackers
+                                site={site}
+                                onSubmit={(switchOn, input) =>
+                                    change(site, switchOn, input)
+                                }
+                            />
                         )}
-                    </div>
-                    {canSwitch && (
-                        <SwitchTrackers
-                            organizationId={organizationId}
-                            site={site}
-                        />
-                    )}
-                </li>
-            ))}
+                    </ChangedRow>
+                );
+            })}
         </ul>
     );
 }
 
 function SwitchTrackers({
-    organizationId,
     site,
+    onSubmit,
 }: {
-    organizationId: string;
     site: SiteTrackersRow;
+    onSubmit: (
+        switchOn: boolean,
+        input: { reason: string; idempotencyKey: string },
+    ) => Promise<{ ok: boolean; error?: string }>;
 }) {
     const off = site.switchedOff !== null;
     return (
         <OperatorDialog
-            trigger={off ? "Switch back on" : "Switch off"}
+            trigger={off ? "Switch on…" : "Switch off…"}
             triggerVariant={off ? "outline" : "ghost"}
             title={
                 off
@@ -96,11 +155,7 @@ function SwitchTrackers({
             submitLabel={off ? "Switch back on" : "Switch off trackers"}
             destructive={!off}
             onSubmit={({ reason, idempotencyKey }) =>
-                siteTrackersAction(organizationId, site.id, {
-                    reason,
-                    idempotencyKey,
-                    switchOn: off,
-                })
+                onSubmit(off, { reason, idempotencyKey })
             }
         />
     );

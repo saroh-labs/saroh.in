@@ -17,9 +17,10 @@ import { useState, useTransition } from "react";
 import { openAccessAction } from "@/lib/business-actions";
 
 /**
- * Opening a business's page means opening a support session: read-only,
- * thirty minutes, bound to a written reason, and on the record. Nothing about
- * the business beyond its directory row is shown until it is open.
+ * Opening a support session: thirty minutes to read a business's own
+ * details (its team's emails, notes, trackers, history), bound to a written
+ * reason, and on the record. The header, Overview and Modules stand on the
+ * directory's read and need none.
  *
  * The common reasons are one tap away; the reason still goes on the record
  * exactly as it reads in the field, so an operator can add detail first.
@@ -80,7 +81,7 @@ export function OpenAccess({
                     id="access-reason"
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="Or write your own, e.g. Owner emailed: bookings page shows no slots"
+                    placeholder="Or write your own, e.g. Owner emailed: the booking page shows no times"
                     rows={3}
                     minLength={4}
                     maxLength={500}
@@ -102,26 +103,37 @@ export function OpenAccess({
     );
 }
 
-/** What a support session is, in the words the card and the dialog share. */
-function WhatAccessIs() {
+/**
+ * What a support session is, in the words the card and the dialog share
+ * (admin plan U6, R16). A session opens the business's own details to
+ * read; it changes nothing by itself. Overview, Modules, plan and usage
+ * need none, and every change is a control of its own, with its reason.
+ */
+export function WhatAccessIs() {
     return (
         <p className="max-w-[68ch] text-sm text-muted-foreground">
-            A business&rsquo;s details are its own, so every look inside one is
-            on the record: pick or write a reason, and the details open
-            read-only for thirty minutes, written into the audit trail with your
-            name and reason. You see what an operator needs — what they see,
-            people, modules, plan, trackers, activity — and never the
-            business&rsquo;s own customers.
+            A business&rsquo;s own details are private, so every look at them is
+            on the record. Pick or write a reason and they open to read for
+            thirty minutes, kept in the audit trail with your name and reason.
+            You see their team&rsquo;s emails, notes, trackers and history.
+            Never their customers. Overview, Modules, the plan and usage need no
+            support access.
         </p>
     );
 }
 
 /**
  * The support-access card, inside a tab whose details need a session (admin
- * plan U2): the rest of the page — the header, the other tabs — stands
- * without one.
+ * plan U2): the rest of the page, the header and the other tabs, stands
+ * without one. `lead` says what this tab would add.
  */
-export function OpenAccessCard({ organizationId }: { organizationId: string }) {
+export function OpenAccessCard({
+    organizationId,
+    lead,
+}: {
+    organizationId: string;
+    lead?: string;
+}) {
     return (
         <Card>
             <CardHeader>
@@ -130,6 +142,7 @@ export function OpenAccessCard({ organizationId }: { organizationId: string }) {
                 </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3">
+                {lead && <p className="max-w-[68ch] text-sm">{lead}</p>}
                 <WhatAccessIs />
                 <OpenAccess organizationId={organizationId} />
             </CardContent>

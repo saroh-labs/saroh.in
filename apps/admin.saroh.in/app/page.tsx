@@ -54,19 +54,19 @@ export default async function DashboardPage() {
         <AdminShell staff={staff}>
             <PageContainer width="wide">
                 <PageHeader
-                    breadcrumb={["Instance", "Health"]}
+                    breadcrumb={["Saroh", "Health"]}
                     title="Health"
                     description={
                         health
                             ? `Checked ${formatDateTime(health.checkedAt)}. Each check keeps its place whether it is working or not.`
-                            : "Whether the machinery behind this instance is working."
+                            : "Whether the machinery behind Saroh is working."
                     }
                 />
 
                 <HealthBoard board={health} />
 
                 <h2 className="pt-2 font-display text-[20px] font-semibold tracking-[-0.02em]">
-                    This instance
+                    Across Saroh
                 </h2>
                 <p className="-mt-4 text-[13.5px] text-muted-foreground">
                     Totals across every business. No business&rsquo;s own

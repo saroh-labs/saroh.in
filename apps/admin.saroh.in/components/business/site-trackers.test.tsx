@@ -15,6 +15,14 @@ import { SiteTrackers } from "./site-trackers";
 const actions = vi.hoisted(() => ({ siteTrackersAction: vi.fn() }));
 vi.mock("@/lib/business-actions", () => actions);
 
+const toast = vi.hoisted(() => ({
+    showSuccess: vi.fn(),
+    showError: vi.fn(),
+    showUndo: vi.fn(),
+    dismissToasts: vi.fn(),
+}));
+vi.mock("@saroh/ui/toast", () => toast);
+
 const on: SiteTrackersRow = {
     id: "site_1",
     name: "Northwind",
@@ -42,13 +50,11 @@ afterEach(cleanup);
 describe("SiteTrackers", () => {
     it("shows a switched-off site with who and why", () => {
         render(<SiteTrackers organizationId="org_1" sites={[off]} canSwitch />);
-        expect(screen.getByText("Switched off")).toBeTruthy();
+        expect(screen.getByText("Switched off by Saroh")).toBeTruthy();
         expect(
             screen.getByText(/by Asha · Pixel account reported for misuse/),
         ).toBeTruthy();
-        expect(
-            screen.getByRole("button", { name: "Switch back on" }),
-        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Switch on…" })).toBeTruthy();
     });
 
     it("hides the switch from staff without the permission", () => {
@@ -67,7 +73,7 @@ describe("SiteTrackers", () => {
 
     it("switches off only after a reason is given, then sends it", async () => {
         render(<SiteTrackers organizationId="org_1" sites={[on]} canSwitch />);
-        fireEvent.click(screen.getByRole("button", { name: "Switch off" }));
+        fireEvent.click(screen.getByRole("button", { name: "Switch off…" }));
 
         const submit = await screen.findByRole("button", {
             name: "Switch off trackers",
@@ -102,15 +108,11 @@ describe("SiteTrackers", () => {
             error: "Could not switch the trackers back on.",
         });
         render(<SiteTrackers organizationId="org_1" sites={[off]} canSwitch />);
-        fireEvent.click(screen.getByRole("button", { name: "Switch back on" }));
+        fireEvent.click(screen.getByRole("button", { name: "Switch on…" }));
         fireEvent.change(await screen.findByLabelText(/Reason/), {
             target: { value: "Owner fixed the account" },
         });
-        const confirm = screen
-            .getAllByRole("button", { name: "Switch back on" })
-            .at(-1);
-        if (!confirm) throw new Error("no confirm button");
-        fireEvent.click(confirm);
+        fireEvent.click(screen.getByRole("button", { name: "Switch back on" }));
 
         expect((await screen.findByRole("alert")).textContent).toContain(
             "Could not switch the trackers back on.",

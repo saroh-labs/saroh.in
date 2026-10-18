@@ -1,9 +1,17 @@
+import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
+
 import { SessionTab } from "@/components/business/session-tab";
 import { SiteTrackers } from "@/components/business/site-trackers";
-import { Panel } from "@/components/panel";
+import { WebsiteTab } from "@/components/business/website-tab";
 import { EmptyPanel } from "@/components/states/empty-panel";
+import { FailedPanel } from "@/components/states/failed-panel";
 import type { BusinessTabProps } from "@/lib/business-page";
-import { businessGate, tabTitle } from "@/lib/business-page";
+import {
+    businessGate,
+    readOverview,
+    readSummary,
+    tabTitle,
+} from "@/lib/business-page";
 import { can } from "@/lib/console";
 
 export async function generateMetadata({ params }: BusinessTabProps) {
@@ -12,48 +20,71 @@ export async function generateMetadata({ params }: BusinessTabProps) {
 }
 
 /**
- * Website and payments (admin plan U2): each site's own trackers, and the
- * switch for an operator holding `organization:trackers:write`. Its live
- * sites and whether it takes payments are in What they see, on Overview,
- * until U6 rebuilds this tab around them.
+ * Website and payments (admin plan U6, R7): each site and whether it is
+ * published, the payments connection, and each site's trackers.
+ *
+ * Sites and payments come from the Overview's read (`organization:read`,
+ * no support session, R10). Trackers name who switched them off and why,
+ * so they read inside a support session, with the switch for an operator
+ * holding `organization:trackers:write`.
  */
-export default async function WebsiteTab({ params }: BusinessTabProps) {
+export default async function WebsiteTabPage({ params }: BusinessTabProps) {
     const gate = await businessGate();
     if (!gate.ok) return null;
     const { staff } = gate;
     const { organizationId } = await params;
+
+    const [summary, overview] = await Promise.all([
+        readSummary(organizationId),
+        readOverview(organizationId).catch(() => undefined),
+    ]);
+    if (overview === undefined) {
+        return (
+            <FailedPanel
+                things="their website and payments"
+                reassurance="The rest of the page is current."
+            />
+        );
+    }
+    if (overview === null) {
+        return (
+            <PermissionDeniedState
+                title="This business isn't one of yours"
+                description="Your access covers the businesses you look after."
+            />
+        );
+    }
+
     const trackersWrite = can(staff, "organization:trackers:write");
     return (
-        <SessionTab staff={staff} organizationId={organizationId}>
-            {(view) => {
-                const { facts } = view;
-                const id = facts.id;
-                return (
-                    <>
-                        {" "}
-                        {view.sites ? (
-                            <Panel
-                                title="Trackers"
-                                description="Each site's own trackers. Switched off, none load, whatever the plan, until Saroh switches them back on."
-                                data={view.sites}
-                            >
-                                {(sites) => (
-                                    <SiteTrackers
-                                        organizationId={id}
-                                        sites={sites}
-                                        canSwitch={trackersWrite}
-                                    />
-                                )}
-                            </Panel>
-                        ) : (
+        <WebsiteTab
+            businessName={summary?.name ?? "there"}
+            website={overview.website}
+            trackers={
+                <SessionTab staff={staff} organizationId={organizationId}>
+                    {(view) =>
+                        !view.sites ? (
                             <EmptyPanel
+                                size="inline"
                                 title="No trackers to show"
-                                description="Its sites and their trackers couldn't be read from this API."
+                                description="Its sites' trackers couldn't be read from this API."
                             />
-                        )}
-                    </>
-                );
-            }}
-        </SessionTab>
+                        ) : view.sites.status === "failed" ? (
+                            <FailedState
+                                size="inline"
+                                title="Couldn't load the trackers"
+                                description="Nothing has been changed. Reload to try again."
+                            />
+                        ) : (
+                            <SiteTrackers
+                                organizationId={view.facts.id}
+                                sites={view.sites.data}
+                                canSwitch={trackersWrite}
+                            />
+                        )
+                    }
+                </SessionTab>
+            }
+        />
     );
 }
