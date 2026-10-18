@@ -214,10 +214,10 @@ describe("a paid checkout is refused until who Saroh bills is whole", () => {
             await refusedField(nameless, { plan: "c", cycle: "month" }),
         ).toBe("billingName");
 
-        const ctx = await onProfile("Bare Shop", { billingEmail: "" });
-        const base = { plan: "c", cycle: "month" as const };
-        expect(await refusedField(ctx, base)).toBe("billingEmail");
-        const withEmail = { ...base, billingEmail: "accounts@example.com" };
+        // A profile always has its billing email (a CHECK holds it), so
+        // the first thing a bare profile lacks is its address.
+        const ctx = await onProfile("Bare Shop");
+        const withEmail = { plan: "c", cycle: "month" as const };
         expect(await refusedField(ctx, withEmail)).toBe("addressLine1");
         expect(
             await refusedField(ctx, {
@@ -247,7 +247,7 @@ describe("a paid checkout is refused until who Saroh bills is whole", () => {
                 where: { id: ctx.profileId },
             }),
         ).toMatchObject({
-            billingEmail: "",
+            billingEmail: "accounts@example.com",
             addressLine1: null,
             gstState: null,
         });
@@ -419,32 +419,5 @@ describe("what a checkout was given", () => {
         expect(fake.createCalls[0]?.customer).toMatchObject({
             name: "Mill Road Traders LLP",
         });
-    });
-
-    it("an email given that the owner bills another profile to is a 409", async () => {
-        const ctx = await onProfile("Bare Shop", { billingEmail: "" });
-        await prisma.billingProfile.create({
-            data: {
-                ownerUserId: ctx.userId,
-                legalName: "Other Entity LLP",
-                billingEmail: "taken@example.com",
-                provider: "RAZORPAY",
-            },
-        });
-        const error: unknown = await checkout
-            .changePlan(ctx, {
-                plan: "c",
-                cycle: "month",
-                billingEmail: "Taken@Example.com",
-                billingState: "Maharashtra",
-                registeredAddress: ADDRESS,
-            })
-            .then(
-                () => null,
-                (e: unknown) => e,
-            );
-        expect(error).toMatchObject({ status: 409 });
-        expect(fieldOf(error)).toBe("billingEmail");
-        expect(fake.createCalls).toHaveLength(0);
     });
 });

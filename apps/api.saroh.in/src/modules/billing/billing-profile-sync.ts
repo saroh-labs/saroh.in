@@ -18,7 +18,20 @@ export interface BillingProfileSyncPayload {
     billingProfileId: string;
 }
 
-type JobTx = Pick<Prisma.TransactionClient, "job">;
+type JobTx = Pick<Prisma.TransactionClient, "job" | "$queryRaw">;
+
+/**
+ * The business this transaction is scoped to, if any. A profile spans
+ * businesses, so its job names none of its own; but written inside one
+ * business's transaction under RLS, the Job policy takes only that
+ * business's rows (and an unscoped one outside it), so the job carries the
+ * business it was queued from. The job syncs the whole profile either way.
+ */
+async function scopedOrganizationId(tx: JobTx): Promise<string | null> {
+    const rows = await tx.$queryRaw<{ id: string | null }[]>`
+        SELECT NULLIF(current_setting('app.current_organization_id', true), '') AS id`;
+    return rows[0]?.id ?? null;
+}
 
 /**
  * Queue the sync on the caller's transaction (the outbox), so a sign-up or
@@ -41,9 +54,11 @@ export async function enqueueBillingProfileSync(
     });
     if (waiting) return;
     const payload: BillingProfileSyncPayload = { billingProfileId };
+    const organizationId = await scopedOrganizationId(tx);
     await tx.job.create({
         data: {
             type: BILLING_PROFILE_SYNC_TYPE,
+            organizationId,
             maxAttempts: BILLING_PROFILE_SYNC_MAX_ATTEMPTS,
             payload: { ...payload },
         },

@@ -5170,3 +5170,13 @@ rule stands for the profile's own fields.
 **Fix.** The release went from a branch that is development with main merged in (#977), so GitHub saw no conflict. Once it merged, main contains development again, and the next release has one base. Main is never merged into development (owner).
 
 **Rule.** Work branches start from development or a batch made from it, never from main; unit worktrees are created from the batch branch by name. `pnpm run check:branch-base` (in `scripts/prepush.sh`) refuses a branch holding a commit main has and development doesn't (`docs/patterns/devops-tooling-and-deploy.md` › Branches, batches and pull requests).
+
+### A job with no business was refused under RLS (18 Oct 2026)
+
+**Symptom.** The batch gate's integration run under RLS failed 276 tests with `new row violates row-level security policy for table "Job"`, plus a CHECK on `BillingProfile` and one on `BillingCheckout`; the plain integration run passed.
+
+**Cause.** `billing.profile.sync` was queued with no `organizationId`, since a billing profile spans businesses, but it is queued inside a business's transaction, where the Job policy takes only that business's rows. Two specs made rows the migrations' CHECKs refuse (a profile with an empty email, an UPGRADE checkout with no start). The unit agents ran their specs only without RLS, and `db push` has no CHECKs.
+
+**Fix.** The enqueue reads the transaction's business (`current_setting('app.current_organization_id')`) and records it on the job, or none outside one; the specs were made true to the constraints.
+
+**Rule.** A job written inside a business's transaction carries that business's id, even when its work spans businesses. Every unit's specs are run with `TEST_RLS=on` before the unit lands, not only in the gate (`docs/patterns/backend-jobs.md`, `.agents/skills/saroh-migrations/SKILL.md`).

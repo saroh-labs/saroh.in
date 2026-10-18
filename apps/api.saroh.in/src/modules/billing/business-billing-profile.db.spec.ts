@@ -125,6 +125,8 @@ async function onPaidPlanWithPaymentWaiting(organizationId: string) {
             planId: plan.id,
             cycle: "month",
             kind: "UPGRADE",
+            // Only a NEW checkout has no start (BillingCheckout_start_shape).
+            startAt: new Date(),
             provider: "RAZORPAY",
             providerSubscriptionId: uniq("sub_"),
             providerPlanId: uniq("plan_"),
