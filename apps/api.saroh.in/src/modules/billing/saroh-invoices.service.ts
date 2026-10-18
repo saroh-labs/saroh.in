@@ -516,8 +516,9 @@ export class SarohInvoicesService {
 
         // A checkout made on a billing profile saved what it was given to
         // the profile: the profile alone says who is billed. One made
-        // before profiles keeps the state and GSTIN it was given.
-        const given = buyer.fromProfile ? null : charge.billTo;
+        // before profiles keeps the state and GSTIN it was given, even on
+        // a business that has a profile since.
+        const given = buyer.checkoutOnProfile ? null : charge.billTo;
         const billToGstin = given?.gstin ?? buyer.gstin;
         const billToState =
             given?.state ?? (given?.gstin ? given.gstin.slice(0, 2) : null);
@@ -737,6 +738,12 @@ interface Buyer {
     billingProfileId: string | null;
     /** Read from a billing profile (else the business's own details). */
     fromProfile: boolean;
+    /**
+     * Read from the profile the charge's checkout itself was made on. A
+     * checkout made before profiles (no billingProfileId) is not, even
+     * when the business has a profile now.
+     */
+    checkoutOnProfile: boolean;
     name: string;
     email: string | null;
     phone: string | null;
@@ -811,6 +818,7 @@ async function buyerInTx(
     return {
         billingProfileId: profile.id,
         fromProfile: true,
+        checkoutOnProfile: profile.id === checkout?.billingProfileId,
         name: buyerName(profile.legalName, org?.name),
         email: nonEmpty(profile.billingEmail),
         phone: nonEmpty(profile.phone),
@@ -876,6 +884,7 @@ async function buyerBeforeProfilesInTx(
     return {
         billingProfileId: null,
         fromProfile: false,
+        checkoutOnProfile: false,
         name: buyerName(business?.legalName, orgName),
         email,
         phone: nonEmpty(business?.phone) ?? nonEmpty(checkout?.billToPhone),

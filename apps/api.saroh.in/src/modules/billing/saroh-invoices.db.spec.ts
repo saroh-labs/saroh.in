@@ -453,6 +453,41 @@ describe("a plan's charges", () => {
         });
     });
 
+    it("a checkout made before profiles keeps the GSTIN it was given, though the business has a profile since", async () => {
+        const ctx = await business({ gstState: "29" });
+        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        const given = gstin("27");
+        // As a checkout written before profiles: none of its own, and the
+        // state and GSTIN it was given kept on it.
+        await prisma.billingCheckout.update({
+            where: { id: r.checkout.id },
+            data: {
+                billingProfileId: null,
+                billToState: "27",
+                billToGstin: given,
+            },
+        });
+        const profiles = gstin("29");
+        await prisma.billingProfile.update({
+            where: { id: ctx.billingProfileId },
+            data: { gstin: profiles, gstState: "29" },
+        });
+
+        await deliver(`fake_sub_${r.checkout.id}`, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+
+        const [invoice] = await invoicesOf(ctx.organizationId);
+        expect(invoice).toMatchObject({
+            billToGstin: given,
+            billToState: "27",
+            placeOfSupply: "27",
+            taxType: "INTER",
+        });
+        expect(invoice!.billToGstin).not.toBe(profiles);
+    });
+
     it("after the profile's GSTIN is edited, the next invoice carries it and an earlier one keeps the old (AE3)", async () => {
         const ctx = await business({ gstState: "29" });
         const old = gstin("27");

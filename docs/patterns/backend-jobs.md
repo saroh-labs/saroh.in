@@ -73,6 +73,12 @@
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
 - **Current** — **Advisory locks have a registry** (below). A new
   `pg_advisory_xact_lock` adds its row in the same change.
+- **Current** (18 Oct 2026) — **A job written inside a business's transaction
+  carries that business's `organizationId`,** even when its work spans
+  businesses: the `Job` RLS policy refuses one with none there.
+  `billing.profile.sync` reads it from the transaction
+  (`scopedOrganizationId`, `billing/billing-profile-sync.ts`), and queues with
+  none only outside one.
 - **Current** (DEC-122) — **A job that deletes asks about the legal hold.**
   A business on legal hold (`organizations/legal-hold.ts`) keeps every row
   and file. A sweep reads the held ids once a run (`heldOrganizationIds`)

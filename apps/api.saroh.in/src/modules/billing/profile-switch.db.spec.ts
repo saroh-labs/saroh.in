@@ -663,3 +663,85 @@ describe("a payment for a plan waiting", () => {
         expect(await billedTo(ctx.organizationId)).toBe(a);
     });
 });
+
+describe("a profile the caller may not choose, on a paid business", () => {
+    let customers = 0;
+    let cancels = 0;
+
+    /** What a refused choice must leave alone. */
+    async function untouched(
+        ctx: OrganizationContext,
+        a: string,
+        calls: number,
+    ) {
+        expect(fake.createCalls).toHaveLength(calls);
+        expect(fake.customers.created).toHaveLength(customers);
+        expect(fake.cancelCalls).toHaveLength(cancels);
+        expect(
+            await prisma.billingCheckout.count({
+                where: {
+                    organizationId: ctx.organizationId,
+                    OR: [{ status: "OPEN" }, { kind: "SCHEDULED" }],
+                },
+            }),
+        ).toBe(0);
+        expect(await billedTo(ctx.organizationId)).toBe(a);
+    }
+
+    it("refuses another user's profile as not found, and starts nothing", async () => {
+        const { ctx, a } = await business();
+        await onPaidPlan(ctx, new Date(Date.now() + 16 * DAY));
+        const stranger = await prisma.user.create({
+            data: { email: `stranger-${seq}-${tag}@example.com` },
+        });
+        const theirs = await prisma.billingProfile.create({
+            data: {
+                ownerUserId: stranger.id,
+                legalName: "Someone Else Pvt Ltd",
+                billingEmail: `stranger-billing-${seq}-${tag}@example.com`,
+                provider: "RAZORPAY",
+            },
+        });
+        const calls = fake.createCalls.length;
+        customers = fake.customers.created.length;
+        cancels = fake.cancelCalls.length;
+
+        await expect(profiles.choose(ctx, theirs.id)).rejects.toMatchObject({
+            status: 404,
+            response: { details: { field: "billingProfile" } },
+        });
+        await untouched(ctx, a, calls);
+    });
+
+    it("refuses an Admin (billing:read only) before any provider call", async () => {
+        const { ctx, a, b } = await business();
+        await onPaidPlan(ctx, new Date(Date.now() + 16 * DAY));
+        const admin = await prisma.user.create({
+            data: { email: `admin-${seq}-${tag}@example.com` },
+        });
+        await prisma.membership.create({
+            data: {
+                organizationId: ctx.organizationId,
+                userId: admin.id,
+                role: "ADMIN",
+            },
+        });
+        const asAdmin: OrganizationContext = {
+            organizationId: ctx.organizationId,
+            userId: admin.id,
+            role: "ADMIN",
+            roleKey: "ADMIN",
+            actions: resolveCapabilities("ADMIN", null, []),
+        };
+        expect([...asAdmin.actions!]).toContain("billing:read");
+        expect([...asAdmin.actions!]).not.toContain("billing:manage");
+        const calls = fake.createCalls.length;
+        customers = fake.customers.created.length;
+        cancels = fake.cancelCalls.length;
+
+        await expect(profiles.choose(asAdmin, b)).rejects.toMatchObject({
+            status: 403,
+        });
+        await untouched(ctx, a, calls);
+    });
+});
