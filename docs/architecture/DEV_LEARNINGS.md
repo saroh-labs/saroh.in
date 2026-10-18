@@ -5190,3 +5190,13 @@ rule stands for the profile's own fields.
 **Fix.** The repoint checks the profile exists (else adopts, leaves the pointer and raises `billing_profile_gone`), account deletion raises `billing_profile_owner_left`; `discount-running` 409; no profile applies at once; handoff and quote profile gated on `billing:manage` and ownership; one profile is the default; `pnpm run check:migration-fold` runs the migration on fixtures.
 
 **Rule.** A data migration that moves rows gets a check against fixtures beside the replay (`check:migration-fold` is the example); an id column without a foreign key is checked before it is written to one that has one (`docs/patterns/backend-billing-and-classes.md`).
+
+### A profile was refused the customer its owner's other business already had (18 Oct 2026)
+
+**Symptom.** On saroh.io the billing-profile backfill's second run still queued one profile, whose sync failed with "the provider has a customer with these details": the seeded demo owner's profile (no phone, one of the owner's twelve businesses on it).
+
+**Cause.** Under DEC-165 each business had its own Razorpay customer, with the owner's email. The profile's create was refused as a duplicate, and the customer Razorpay handed back named, in its notes, another business of the same owner that is on no profile yet. Adoption took a customer only for a business on the profile, so this one counted as someone else's; without a phone to withhold, the retry was refused too.
+
+**Fix.** A profile may also adopt a customer for a business its owner owns (OWNER membership) that is on no profile yet. Never one naming another profile, another owner's business or a business on another profile, nor one another profile holds (`billing/billing-customer.ts`, `isOwn`). The owner's memberships are read outside the business's RLS context (`outsideOrgContext`), because a checkout runs scoped to one business and Membership is isolated per business, so inside it only that business's membership would be seen. The fake provider now refuses the same email with no phone as Razorpay does.
+
+**Rule.** A read that spans an owner's businesses (memberships, anything org-isolated) is made with `outsideOrgContext`, and its spec runs one path scoped to a single business under `TEST_RLS=on`. A job runs with no context, so a job-only test passes either way (`docs/patterns/backend-data-and-money.md`, cross-business reads).

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { outsideOrgContext, prisma } from "@saroh/database";
 
 import { env } from "../../env";
 import { stateName } from "../invoices/gst-states";
@@ -35,7 +35,8 @@ import {
  *   provider and kept, unless another profile already holds it. One the
  *   provider holds for the same email and phone is this profile's when its
  *   notes name it (an earlier try whose answer was lost), or, made per
- *   business before profiles, one of its businesses.
+ *   business before profiles, one of its businesses or one its owner owns
+ *   that is on no profile yet ({@link isOwn}).
  * - **Kept current**: the same job runs whenever the profile is saved and
  *   sends the legal name, billing email, phone and GSTIN. The address
  *   can't be updated on a customer (its notes are create-only); it stays
@@ -233,6 +234,7 @@ export class BillingCustomers {
         customers: ProviderCustomerCapability,
     ): Promise<{ providerCustomerId: string; adopted: boolean }> {
         const customer = await profileCustomerOf(billingProfileId);
+        const owned = await ownedBusinessIds(customer.ownerUserId);
         return prisma.$transaction(
             async (tx) => {
                 // A waiter gives up (and its job retries) rather than
@@ -255,10 +257,27 @@ export class BillingCustomers {
                         select: { id: true },
                     })
                 ).map((o) => o.id);
+                // The owner's businesses on no profile yet: each made its
+                // customer per business before profiles (DEC-165), and
+                // that customer is the owner's, so the profile may take it.
+                // Placed or not is read here, under the lock.
+                const unplaced = owned.length
+                    ? (
+                          await tx.organization.findMany({
+                              where: {
+                                  id: { in: owned },
+                                  billingProfileId: null,
+                              },
+                              select: { id: true },
+                          })
+                      ).map((o) => o.id)
+                    : [];
+                const adoptable = [...new Set([...businesses, ...unplaced])];
                 const known = await this.knownCustomer(
                     tx,
                     billingProfileId,
                     businesses,
+                    adoptable,
                     customers,
                 );
                 if (known) {
@@ -278,7 +297,7 @@ export class BillingCustomers {
                         { withContact: true },
                     );
                     if (
-                        isOwn(existing, billingProfileId, businesses) &&
+                        isOwn(existing, billingProfileId, adoptable) &&
                         !(await heldByAnother(
                             tx,
                             billingProfileId,
@@ -286,7 +305,8 @@ export class BillingCustomers {
                         ))
                     ) {
                         // Its own, from a try whose answer was lost (or one
-                        // of its businesses', made before profiles).
+                        // of its businesses', or one its owner owns on no
+                        // profile, made before profiles).
                         await this.store(
                             billingProfileId,
                             existing.providerCustomerId,
@@ -340,7 +360,8 @@ export class BillingCustomers {
      * A customer the provider made for one of the profile's businesses at
      * an earlier payment (before DEC-165): a subscription's, else a latest
      * checkout's — still at the provider, its notes naming no other profile
-     * or business, and held by no other profile here.
+     * and no business but one in `adoptable` ({@link isOwn}), and held by no
+     * other profile here.
      */
     private async knownCustomer(
         tx: Pick<
@@ -349,6 +370,7 @@ export class BillingCustomers {
         >,
         billingProfileId: string,
         businesses: string[],
+        adoptable: string[],
         customers: ProviderCustomerCapability,
     ): Promise<string | null> {
         if (businesses.length === 0) return null;
@@ -384,7 +406,7 @@ export class BillingCustomers {
             if (!found) continue;
             if (
                 (found.billingProfileId || found.organizationId) &&
-                !isOwn(found, billingProfileId, businesses)
+                !isOwn(found, billingProfileId, adoptable)
             ) {
                 continue;
             }
@@ -415,22 +437,42 @@ export class BillingCustomers {
 }
 
 /**
- * Whether a provider's customer is this profile's: its notes name the
+ * Whether a provider's customer may be this profile's: its notes name the
  * profile, or (made per business before profiles, naming no profile) one
- * of the businesses billed to it.
+ * of `adoptable` — the businesses billed to it, and those its owner owns
+ * (an OWNER membership) that are on no profile yet. Never one whose notes
+ * name another profile, a business the owner doesn't own, or a business
+ * on another profile; and the caller still checks no other profile holds
+ * it ({@link heldByAnother}).
  */
 function isOwn(
     found: ProviderCustomer,
     billingProfileId: string,
-    businesses: string[],
+    adoptable: string[],
 ): boolean {
     if (found.billingProfileId) {
         return found.billingProfileId === billingProfileId;
     }
     return (
         found.organizationId !== null &&
-        businesses.includes(found.organizationId)
+        adoptable.includes(found.organizationId)
     );
+}
+
+/**
+ * The businesses the profile's owner owns. Memberships are isolated per
+ * business under RLS, and a checkout runs in one business's context, so
+ * this cross-business read is made outside it (as `sites/site-address.ts`
+ * does): inside, only that business's membership would be seen.
+ */
+async function ownedBusinessIds(ownerUserId: string): Promise<string[]> {
+    const rows = await outsideOrgContext(() =>
+        prisma.membership.findMany({
+            where: { userId: ownerUserId, role: "OWNER" },
+            select: { organizationId: true },
+        }),
+    );
+    return rows.map((r) => r.organizationId);
 }
 
 async function heldByAnother(

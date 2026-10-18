@@ -9,7 +9,9 @@
  * - a provider that can't answer is retried; a refusal is not, and is an
  *   operator's note once on each business billed to the profile;
  * - a customer made before profiles (at a payment, or per business) is
- *   adopted when it is one of the profile's businesses';
+ *   adopted when it is one of the profile's businesses', or of a business
+ *   its owner owns on no profile yet (never another owner's, or one on
+ *   another profile);
  * - DEC-165's queued `billing.customer.sync` jobs sync the business's
  *   profile;
  * - a checkout uses the profile's customer, and makes it only when missing.
@@ -392,6 +394,113 @@ describe("customers made before profiles are kept", () => {
     });
 });
 
+describe("a customer made for another business of the same owner (DEC-165) is adopted", () => {
+    /**
+     * An owner whose profile (no phone, as saroh.io's seeded owner's) has
+     * business A, and business B on no profile; B's customer was made per
+     * business before profiles, with the profile's billing email and no
+     * phone, so Razorpay refuses the profile its own.
+     */
+    async function ownerWithTwo() {
+        const p = await profile({ phone: null });
+        await prisma.membership.create({
+            data: {
+                organizationId: p.organizationId,
+                userId: p.ownerUserId,
+                role: "OWNER",
+            },
+        });
+        const b = await business(null, "Asha's Bakery");
+        const email = (await row(p.billingProfileId)).billingEmail;
+        const customer = uniq("cust_b_");
+        return { ...p, b: b.id, email, customer };
+    }
+
+    const legacyCustomer = (
+        o: { customer: string; email: string },
+        notes: { organizationId: string; billingProfileId?: string },
+    ) =>
+        fake.customers.addCustomer(o.customer, notes, {
+            email: o.email,
+            contact: null,
+        });
+
+    const owns = (organizationId: string, userId: string, role = "OWNER") =>
+        prisma.membership.create({ data: { organizationId, userId, role } });
+
+    /** Refused, recorded on the profile and A, and nothing taken over. */
+    async function refused(o: Awaited<ReturnType<typeof ownerWithTwo>>) {
+        await handler.handle(await job(o.billingProfileId));
+        expect(fake.customers.created).toHaveLength(0);
+        expect(await row(o.billingProfileId)).toMatchObject({
+            providerCustomerId: null,
+            lastError: "the provider has a customer with these details",
+        });
+        expect(await opsNotes(o.organizationId)).toHaveLength(1);
+    }
+
+    it("B owned by the profile's owner, on no profile: its customer is the profile's, none made", async () => {
+        const o = await ownerWithTwo();
+        await owns(o.b, o.ownerUserId);
+        legacyCustomer(o, { organizationId: o.b });
+        await handler.handle(await job(o.billingProfileId));
+        expect(fake.customers.created).toHaveLength(0);
+        expect(await row(o.billingProfileId)).toMatchObject({
+            providerCustomerId: o.customer,
+            lastError: null,
+        });
+        expect(fake.customers.updated).toEqual([
+            expect.objectContaining({ providerCustomerId: o.customer }),
+        ]);
+    });
+
+    it("B owned by someone else (the profile's owner only a member there): not adopted", async () => {
+        const o = await ownerWithTwo();
+        const other = await prisma.user.create({
+            data: { email: `${uniq("other-")}@example.com`, name: "Ravi" },
+        });
+        await owns(o.b, other.id);
+        await owns(o.b, o.ownerUserId, "MEMBER");
+        legacyCustomer(o, { organizationId: o.b });
+        await refused(o);
+    });
+
+    it("B on another profile of the same owner: not adopted", async () => {
+        const o = await ownerWithTwo();
+        await owns(o.b, o.ownerUserId);
+        const q = await profile({ ownerUserId: o.ownerUserId });
+        await prisma.organization.update({
+            where: { id: o.b },
+            data: { billingProfileId: q.billingProfileId },
+        });
+        legacyCustomer(o, { organizationId: o.b });
+        await refused(o);
+    });
+
+    it("notes naming another profile (and B): not adopted", async () => {
+        const o = await ownerWithTwo();
+        await owns(o.b, o.ownerUserId);
+        const q = await profile({ ownerUserId: o.ownerUserId });
+        legacyCustomer(o, {
+            organizationId: o.b,
+            billingProfileId: q.billingProfileId,
+        });
+        await refused(o);
+    });
+
+    it("one another profile already holds is never taken", async () => {
+        const o = await ownerWithTwo();
+        await owns(o.b, o.ownerUserId);
+        legacyCustomer(o, { organizationId: o.b });
+        const q = await profile({ ownerUserId: o.ownerUserId });
+        await prisma.billingProfile.update({
+            where: { id: q.billingProfileId },
+            data: { providerCustomerId: o.customer },
+        });
+        await refused(o);
+    });
+});
+
 describe("DEC-165's billing.customer.sync jobs still queued", () => {
     it("sync the profile the business is billed to", async () => {
         const p = await profile();
@@ -530,6 +639,44 @@ describe("a checkout uses the profile's customer", () => {
         const r = await paidCheckout(p.organizationId, p.ownerUserId);
         expect(r.kind).not.toBe("TO_FREE");
         expect(fake.createCalls.at(-1)?.providerCustomerId ?? null).toBeNull();
+    });
+
+    it("adopts a customer made for another business of the owner, on no profile, from a checkout scoped to one business", async () => {
+        // Under TEST_RLS=on the checkout runs in A's context, where B's
+        // memberships are hidden: the owner's businesses are read outside it.
+        const p = await profile({ phone: null });
+        await prisma.membership.create({
+            data: {
+                organizationId: p.organizationId,
+                userId: p.ownerUserId,
+                role: "OWNER",
+            },
+        });
+        const b = await business(null, "Asha's Bakery");
+        await prisma.membership.create({
+            data: {
+                organizationId: b.id,
+                userId: p.ownerUserId,
+                role: "OWNER",
+            },
+        });
+        const customer = uniq("cust_b_");
+        fake.customers.addCustomer(
+            customer,
+            { organizationId: b.id },
+            {
+                email: (await row(p.billingProfileId)).billingEmail,
+                contact: null,
+            },
+        );
+        await paidCheckout(p.organizationId, p.ownerUserId);
+        expect(fake.customers.created).toHaveLength(0);
+        expect(fake.createCalls.at(-1)).toMatchObject({
+            providerCustomerId: customer,
+        });
+        expect((await row(p.billingProfileId)).providerCustomerId).toBe(
+            customer,
+        );
     });
 
     it("names the first business on the profile in the customer's notes", async () => {
