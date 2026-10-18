@@ -5153,3 +5153,13 @@ writes its source, including writes another library makes
 **Fix.** The spec presses until the panel opens (`expect(...).toPass`, as `business-settings.spec.ts`'s `openSheet`).
 
 **Rule.** A browser spec that opens a sheet or dialog presses again until it shows, never once and waits (`saroh-browser-tests` skill).
+
+### The release PR showed a conflict that wasn't there (18 Oct 2026)
+
+**Symptom.** Release PR #976 (development → main) showed "conflicting" on GitHub and ran no CI, although a local merge of development into main was clean.
+
+**Cause.** Main and development had two merge bases. The demo-business units of #972 were cut on 16 Oct from main (its #956 release merge commit) instead of from the batch, so that main-only commit reached development, while development's own history (#973) had reached main through #971. GitHub's mergeability check fails on such a criss-cross even when git merges it cleanly.
+
+**Fix.** The release went from a branch that is development with main merged in (#977), so GitHub saw no conflict. Once it merged, main contains development again, and the next release has one base. Main is never merged into development (owner).
+
+**Rule.** Work branches start from development or a batch made from it, never from main; unit worktrees are created from the batch branch by name. `pnpm run check:branch-base` (in `scripts/prepush.sh`) refuses a branch holding a commit main has and development doesn't (`docs/patterns/devops-tooling-and-deploy.md` › Branches, batches and pull requests).

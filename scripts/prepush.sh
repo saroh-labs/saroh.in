@@ -822,6 +822,7 @@ fi
 # that goes through turbo first waits for one build of what the affected
 # packages import (test_deps), then runs with --only, so no two turbo runs
 # ever build the same package at the same time.
+bg_step branch-base pnpm run check:branch-base
 bg_step routes pnpm run check:routes
 bg_step catalog-lock pnpm run check:catalog-lock
 bg_step edge-headers pnpm run check:edge-headers
