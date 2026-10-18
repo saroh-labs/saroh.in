@@ -862,6 +862,7 @@ bg_step e2e-covers pnpm run check:e2e-covers
 bg_step merchant-site-tracking pnpm run check:merchant-site-tracking
 bg_step migration-ids pnpm run check:migration-ids
 bg_step mktemp pnpm run check:mktemp
+bg_step date-inputs pnpm run check:date-inputs
 bg_step db-teardown pnpm run check:db-teardown
 bg_step icon-button-tips pnpm run check:icon-button-tips
 bg_step tag-strip pnpm run check:tag-strip

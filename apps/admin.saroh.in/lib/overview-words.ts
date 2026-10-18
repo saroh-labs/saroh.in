@@ -175,8 +175,8 @@ export function overviewNextCharge(plan: OverviewPlan): string {
             ? `${istDate(at)} · autopay, which runs out soon`
             : `${istDate(at)} · autopay`;
     }
-    if (how === "PAID_FOR_YEAR") return "None · paid for the year";
-    return "None";
+    if (how === "PAID_FOR_YEAR") return "Paid for the year";
+    return "No charge due";
 }
 
 /** Who pays, for a `saroh-billing:read` holder. */
@@ -211,14 +211,19 @@ export function offerLine(
     }
 }
 
-/** "3 of 5", "3 of 5 a month", "3, no limit", "Not measured". */
+const COUNT = new Intl.NumberFormat("en-IN");
+const count = (n: number) => COUNT.format(n);
+
+/** "3 of 5", "3 of 2,500 a month", "3, no limit", "Not measured". */
 export function usageLine(row: OverviewUsageRow): string {
     const per = row.per ? ` a ${row.per}` : "";
     if (row.used === null) {
-        return row.limit === null ? "No limit" : `Up to ${row.limit}${per}`;
+        return row.limit === null
+            ? "No limit"
+            : `Up to ${count(row.limit)}${per}`;
     }
-    if (row.limit === null) return `${row.used}, no limit`;
-    return `${row.used} of ${row.limit}${per}`;
+    if (row.limit === null) return `${count(row.used)}, no limit`;
+    return `${count(row.used)} of ${count(row.limit)}${per}`;
 }
 
 const MEMBER_ROLE: Record<string, string> = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
+import { DateInput } from "@saroh/ui/date-picker";
 import { Label } from "@saroh/ui/label";
 import {
     Sheet,
@@ -193,13 +193,15 @@ function TakeAwayForm({
                             <Label htmlFor={`${id}-until`}>
                                 Until (optional)
                             </Label>
-                            <Input
+                            <DateInput
                                 id={`${id}-until`}
-                                type="date"
+                                className="w-full"
                                 min={todayIso()}
                                 value={until}
-                                onChange={(e) => setUntil(e.target.value)}
+                                onValueChange={setUntil}
                                 disabled={pending}
+                                clearable
+                                placeholder="No end date"
                             />
                             <p className="text-xs text-muted-foreground">
                                 Leave it empty and it stays away until someone

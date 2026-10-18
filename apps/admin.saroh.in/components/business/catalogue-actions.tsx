@@ -1,5 +1,6 @@
 "use client";
 
+import { DateInput } from "@saroh/ui/date-picker";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 
@@ -53,12 +54,14 @@ function UntilField({
             <Label htmlFor={id}>
                 {required ? "Until" : "Until (optional)"}
             </Label>
-            <Input
+            <DateInput
                 id={id}
+                className="w-full"
                 name="until"
-                type="date"
                 min={todayIso()}
                 required={required}
+                clearable={!required}
+                placeholder={required ? "Pick a date" : "No end date"}
             />
             {!required && (
                 <p className="text-xs text-muted-foreground">
@@ -275,16 +278,23 @@ export function PlanOverrideDialog({
             disabled={plans.length === 0}
             disabledReason="The live catalogue has no plan to put it on."
             onSubmit={({ reason, idempotencyKey, values }) =>
-                done(
-                    planOverrideAction(organizationId, {
-                        reason,
-                        idempotencyKey,
-                        planKey: values.planKey ?? "",
-                        expiresAt: endOfDayIso(values.until ?? "") ?? "",
-                    }),
-                    onDone,
-                    `On ${nameOf(values.planKey ?? "")} until ${formatDate(endOfDayIso(values.until ?? "") ?? null)}.`,
-                )
+                // The date picker posts a hidden field, which the browser
+                // doesn't check as required.
+                !values.until
+                    ? Promise.resolve({
+                          ok: false as const,
+                          error: "Pick the day it ends.",
+                      })
+                    : done(
+                          planOverrideAction(organizationId, {
+                              reason,
+                              idempotencyKey,
+                              planKey: values.planKey ?? "",
+                              expiresAt: endOfDayIso(values.until) ?? "",
+                          }),
+                          onDone,
+                          `On ${nameOf(values.planKey ?? "")} until ${formatDate(endOfDayIso(values.until) ?? null)}.`,
+                      )
             }
         />
     );

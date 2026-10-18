@@ -88,3 +88,101 @@ export function DatePicker({
         </Popover>
     );
 }
+
+/** "2026-11-30" as a local day, or undefined when it isn't one. */
+export function dateFromIso(iso: string | null | undefined): Date | undefined {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+    if (!m) return undefined;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** A local day as "2026-11-30". */
+export function isoFromDate(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export interface DateInputProps extends Omit<
+    DatePickerProps,
+    "value" | "onValueChange" | "disabledDays"
+> {
+    /** The day as "YYYY-MM-DD"; "" for none. Leave out to let it hold its own. */
+    value?: string;
+    /** The first day shown when `value` is left out. */
+    defaultValue?: string;
+    onValueChange?: (iso: string) => void;
+    /** The earliest and latest day it takes, as "YYYY-MM-DD". */
+    min?: string;
+    max?: string;
+    /** Posted with a form under this name, as "YYYY-MM-DD" ("" for none). */
+    name?: string;
+    required?: boolean;
+    /** Offers "Clear" for an optional day. */
+    clearable?: boolean;
+}
+
+/**
+ * The shadcn date picker for a day kept as "YYYY-MM-DD": what an
+ * `<input type="date">` gave a form (a string, `min`/`max`, a `name` to
+ * post), with the product's own field instead of each browser's. Use it
+ * for every date field; `check:date-inputs` refuses `type="date"`.
+ */
+export function DateInput({
+    value,
+    defaultValue,
+    onValueChange,
+    min,
+    max,
+    name,
+    required,
+    clearable,
+    placeholder = "Pick a date",
+    ...rest
+}: DateInputProps) {
+    const [own, setOwn] = React.useState(defaultValue ?? "");
+    const iso = value ?? own;
+    const change = (next: string) => {
+        if (value === undefined) setOwn(next);
+        onValueChange?.(next);
+    };
+    const before = dateFromIso(min);
+    const after = dateFromIso(max);
+    const disabledDays = [
+        ...(before ? [{ before }] : []),
+        ...(after ? [{ after }] : []),
+    ];
+    return (
+        <span className="flex min-w-0 items-center gap-1.5">
+            <DatePicker
+                {...rest}
+                placeholder={placeholder}
+                value={dateFromIso(iso)}
+                onValueChange={(d) => change(d ? isoFromDate(d) : "")}
+                disabledDays={disabledDays.length ? disabledDays : undefined}
+            />
+            {clearable && iso && !rest.disabled ? (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => change("")}
+                    aria-label={
+                        rest["aria-label"]
+                            ? `Clear ${rest["aria-label"]}`
+                            : "Clear the date"
+                    }
+                >
+                    Clear
+                </Button>
+            ) : null}
+            {name ? (
+                <input
+                    type="hidden"
+                    name={name}
+                    value={iso}
+                    required={required}
+                />
+            ) : null}
+        </span>
+    );
+}

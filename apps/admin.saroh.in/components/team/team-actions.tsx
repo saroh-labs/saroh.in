@@ -1,5 +1,6 @@
 "use client";
 
+import { DateInput, isoFromDate } from "@saroh/ui/date-picker";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 
@@ -44,15 +45,23 @@ function RolePicker({ selected = [] }: { selected?: AdminRole[] }) {
     );
 }
 
+/** Today, as the date picker writes it. */
+function todayIsoLocal(): string {
+    return isoFromDate(new Date());
+}
+
 function ExpiryField({ defaultValue }: { defaultValue?: string }) {
     return (
         <div className="grid gap-1.5">
             <Label htmlFor="staff-expiry">Access ends (optional)</Label>
-            <Input
+            <DateInput
                 id="staff-expiry"
+                className="w-full"
                 name="expiresOn"
-                type="date"
                 defaultValue={defaultValue}
+                min={todayIsoLocal()}
+                clearable
+                placeholder="No end date"
             />
             <p className="text-[13px] text-muted-foreground">
                 Leave empty for access that lasts until someone revokes it.

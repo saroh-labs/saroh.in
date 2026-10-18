@@ -47,6 +47,28 @@ const toast = vi.hoisted(() => ({
     dismissToasts: vi.fn(),
 }));
 vi.mock("@saroh/ui/toast", () => toast);
+// The shadcn date picker opens a calendar in a popover; jsdom can't lay
+// one out. A plain field stands in, the real one is the browser spec's.
+vi.mock("@saroh/ui/date-picker", () => ({
+    DateInput: ({
+        id,
+        value,
+        onValueChange,
+        disabled,
+    }: {
+        id?: string;
+        value?: string;
+        onValueChange?: (v: string) => void;
+        disabled?: boolean;
+    }) => (
+        <input
+            id={id}
+            value={value ?? ""}
+            disabled={disabled}
+            onChange={(e) => onValueChange?.(e.target.value)}
+        />
+    ),
+}));
 
 vi.mock("next/link", () => ({
     default: ({ href, children, ...rest }: Record<string, unknown>) => (
@@ -196,6 +218,25 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("OfferSheet", () => {
+    it("offers only the plans above theirs, and says so on the top plan", async () => {
+        openSheet();
+        const s = await sheet();
+        const plan = s.getByLabelText("Plan");
+        expect(
+            [...plan.querySelectorAll("option")].map((o) => o.textContent),
+        ).toEqual(["Plan C"]);
+        cleanup();
+
+        actions.offerOptionsAction.mockResolvedValue({
+            ok: true,
+            data: options({ planName: "Plan C" }),
+        });
+        openSheet();
+        const top = await sheet();
+        expect(top.queryByLabelText("Plan")).toBeNull();
+        expect(top.getByText(/They are on the top plan already/)).toBeTruthy();
+    });
+
     it("dry-runs a plan until a date, names the action, and confirms it with the reason", async () => {
         actions.previewOfferAction.mockResolvedValue({
             ok: true,

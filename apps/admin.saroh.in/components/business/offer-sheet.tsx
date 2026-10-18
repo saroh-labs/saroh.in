@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { DateInput } from "@saroh/ui/date-picker";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -126,11 +127,22 @@ export function OfferSheet({
     );
 }
 
+/**
+ * A plan until a date is a gift: only the plans above the one they pay
+ * for, in the catalogue's order (cheapest first). Their own plan, or one
+ * below it, would change nothing they see (the dry run says so too).
+ */
+function plansAbove(options: OfferOptions): OfferOptions["plans"] {
+    const at = options.plans.findIndex((p) => p.name === options.planName);
+    return at < 0
+        ? options.plans.filter((p) => p.name !== options.planName)
+        : options.plans.slice(at + 1);
+}
+
 function firstFields(options: OfferOptions, start?: OfferStart): OfferFields {
-    const offPlan = options.plans.find((p) => p.name !== options.planName);
     return {
         ...EMPTY_FIELDS,
-        planKey: (offPlan ?? options.plans.at(0))?.id ?? "",
+        planKey: plansAbove(options).at(0)?.id ?? "",
         moduleKey:
             (start?.registry
                 ? rowForRegistry(options, start.registry)
@@ -324,12 +336,12 @@ function KindFields({
     const until = (label: string, hint?: string) => (
         <div className="grid gap-1.5">
             <Label htmlFor={`${id}-until`}>{label}</Label>
-            <Input
+            <DateInput
                 id={`${id}-until`}
-                type="date"
+                className="w-full"
                 min={todayIso()}
                 value={fields.until}
-                onChange={(e) => set({ until: e.target.value })}
+                onValueChange={(v) => set({ until: v })}
                 disabled={disabled}
             />
             {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -338,6 +350,14 @@ function KindFields({
 
     switch (kind) {
         case "plan":
+            if (plansAbove(options).length === 0) {
+                return (
+                    <p className="text-[13px] text-muted-foreground">
+                        They are on the top plan already. A higher limit or one
+                        module may be what they need.
+                    </p>
+                );
+            }
             return (
                 <div className="grid gap-3">
                     <div className="grid gap-1.5">
@@ -349,7 +369,7 @@ function KindFields({
                             onChange={(e) => set({ planKey: e.target.value })}
                             disabled={disabled}
                         >
-                            {options.plans.map((p) => (
+                            {plansAbove(options).map((p) => (
                                 <option key={p.id} value={p.id}>
                                     {p.name}
                                 </option>

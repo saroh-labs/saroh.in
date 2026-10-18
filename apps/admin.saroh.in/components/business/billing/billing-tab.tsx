@@ -86,7 +86,10 @@ export function BillingTab({
                         <span className="text-muted-foreground">
                             {[
                                 priceLine(plan),
-                                `next charge ${overviewNextCharge(plan)}`,
+                                plan.nextCharge.how === "AUTOPAY" &&
+                                plan.nextCharge.at
+                                    ? `next charge ${overviewNextCharge(plan)}`
+                                    : overviewNextCharge(plan).toLowerCase(),
                             ]
                                 .filter(Boolean)
                                 .join(" · ")}
