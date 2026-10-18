@@ -199,7 +199,7 @@ function profileWrite(
 
 type ProfileTx = Pick<
     Prisma.TransactionClient,
-    "billingProfile" | "job" | "organization"
+    "billingProfile" | "job" | "organization" | "$queryRaw"
 >;
 
 /** 409 when the owner already has another profile with this email. */
