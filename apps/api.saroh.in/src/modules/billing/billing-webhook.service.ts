@@ -833,9 +833,21 @@ export class BillingWebhookService {
             if (!sub) return { result: { status: "ignored", changed: false } };
             // The same plan again at its term's end (DEC-093's one-tap
             // renewal): the term running now finishes on its own — its last
-            // charges are still owed — so nothing is told to stop.
+            // charges are still owed — so nothing is told to stop. The
+            // same plan on another billing profile (U6) is no renewal: the
+            // old profile's autopay must end with its period, or both
+            // would charge.
+            const billedTo = await tx.organization.findUnique({
+                where: { id: org },
+                select: { billingProfileId: true },
+            });
+            const switching =
+                Boolean(checkout.billingProfileId) &&
+                checkout.billingProfileId !== billedTo?.billingProfileId;
             const renewal =
-                sub.plan.key === plan.key && sub.billingCycle === cycle;
+                !switching &&
+                sub.plan.key === plan.key &&
+                sub.billingCycle === cycle;
             await tx.billingCheckout.update({
                 where: { id: checkout.id },
                 data: { status: "SCHEDULED" },

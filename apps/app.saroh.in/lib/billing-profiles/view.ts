@@ -4,6 +4,7 @@ import type {
     BillingValues,
 } from "@/lib/organizations/setup-billing";
 import { addressLine, NO_BILLING } from "@/lib/organizations/setup-billing";
+import type { CheckoutHandoff } from "@/lib/saroh-billing/plan-view";
 
 /**
  * Who Saroh bills for this business, as its Plan & billing shows it
@@ -40,6 +41,41 @@ export interface BusinessBillingProfile {
     current: CurrentBillingProfile | null;
     mine: OwnBillingProfile[];
     businessesOnCurrent: number | null;
+    /** A move to another profile at the renewal (U6); absent or null: none. */
+    pendingSwitch?: PendingSwitch | null;
+}
+
+/**
+ * A paid plan moving to another profile at its renewal (DEC-167, U6): that
+ * profile's legal name, the date, and whether its payment is authorised.
+ */
+export interface PendingSwitch {
+    legalName: string;
+    at: string | null;
+    authorised: boolean;
+}
+
+/** The payment a switch at the renewal waits on, given once. */
+export interface SwitchAuthorise {
+    at: string;
+    legalName: string;
+    authorisationUrl: string | null;
+    handoff: CheckoutHandoff | null;
+}
+
+/**
+ * What choosing a profile did (`POST …/billing/profile/choose`, and a new
+ * one used): `applied` from now, `scheduled` from the renewal once
+ * authorised, `kept` a waiting switch given up, `none` nothing to do.
+ */
+export interface BillingProfileChosen extends BusinessBillingProfile {
+    outcome: "applied" | "scheduled" | "kept" | "none";
+    authorise: SwitchAuthorise | null;
+}
+
+/** The Change sheet's word once a paid plan's switch is made. */
+export function switchStartedSays(legalName: string, on: string): string {
+    return `From ${on}, Saroh bills ${legalName}. Authorise the payment to finish.`;
 }
 
 /** The row's label, and what a business with none reads. */

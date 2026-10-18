@@ -50,6 +50,7 @@ const providers = new FakeBillingProviderFactory(
 const user = { id: "user_1", email: "asha@example.com" } as never;
 const billingProfile = new BusinessBillingProfileService(
     new BillingProfilesService(),
+    new CheckoutService(new PlansService(), providers),
 );
 
 /** Each write that changes what the business pays, by its route. */

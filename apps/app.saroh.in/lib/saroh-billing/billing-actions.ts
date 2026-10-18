@@ -5,9 +5,11 @@ import { toFailure } from "@/lib/api/failure";
 import { apiFetch, orgBase } from "@/lib/api/http";
 
 import type {
+    BillingProfileChosen,
     BusinessBillingProfile,
     OwnBillingProfile,
     ProfileEdit,
+    SwitchAuthorise,
 } from "@/lib/billing-profiles/view";
 
 import { cleanHandoff } from "./handoff";
@@ -396,33 +398,78 @@ export async function billingProfileViewAction(): Promise<
     );
 }
 
-/** Bill the business to one of the owner's profiles. */
+/**
+ * The payment a paid plan's switch waits on (U6): its page only if
+ * secure, its window only as `cleanHandoff` reads it. Anything else is none.
+ */
+function cleanAuthorise(value: unknown): SwitchAuthorise | null {
+    if (!value || typeof value !== "object") return null;
+    const v = value as Record<string, unknown>;
+    if (typeof v.at !== "string" || typeof v.legalName !== "string") {
+        return null;
+    }
+    return {
+        at: v.at,
+        legalName: v.legalName,
+        authorisationUrl: securePage(v.authorisationUrl),
+        handoff: cleanHandoff(v.handoff),
+    };
+}
+
+/** What choosing did, with its payment (if any) checked. */
+function chosen<T extends BillingProfileChosen>(
+    res: ApiResult<T>,
+): ApiResult<T> {
+    if (!res.ok) return res;
+    return {
+        ok: true,
+        data: { ...res.data, authorise: cleanAuthorise(res.data.authorise) },
+    };
+}
+
+/**
+ * Bill the business to one of the owner's profiles, or keep the one it is
+ * on (which gives up a switch still waiting): at once, or for a paid plan
+ * from its renewal, once the payment is authorised (`authorise`).
+ */
 export async function chooseBillingProfileAction(
     billingProfileId: unknown,
-): Promise<ApiResult<BusinessBillingProfile>> {
+): Promise<ApiResult<BillingProfileChosen>> {
     if (
         typeof billingProfileId !== "string" ||
         !PROFILE_ID.test(billingProfileId)
     ) {
         return { ok: false, error: PROFILE_FAILED, field: "billingProfile" };
     }
-    return send<BusinessBillingProfile>(
-        "/billing/profile/choose",
-        PROFILE_FAILED,
-        { method: "POST", body: JSON.stringify({ billingProfileId }) },
+    return chosen(
+        await send<BillingProfileChosen>(
+            "/billing/profile/choose",
+            PROFILE_FAILED,
+            { method: "POST", body: JSON.stringify({ billingProfileId }) },
+        ),
     );
 }
 
-/** A new profile for the owner, and (`use`) the business's from now. */
+/**
+ * A new profile for the owner, and (`use`) the business's, as choosing it
+ * would. `notMoved`: made, but a paid plan's switch couldn't start; why.
+ */
 export async function createBillingProfileAction(
     input: unknown,
     use: unknown,
-): Promise<ApiResult<BusinessBillingProfile & { created: string }>> {
+): Promise<
+    ApiResult<
+        BillingProfileChosen & { created: string; notMoved?: string | null }
+    >
+> {
     const profile = cleanProfile(input);
-    return send<BusinessBillingProfile & { created: string }>(
-        "/billing/profile",
-        PROFILE_FAILED,
-        {
+    return chosen(
+        await send<
+            BillingProfileChosen & {
+                created: string;
+                notMoved?: string | null;
+            }
+        >("/billing/profile", PROFILE_FAILED, {
             method: "POST",
             body: JSON.stringify({
                 legalName: profile.legalName ?? "",
@@ -432,7 +479,7 @@ export async function createBillingProfileAction(
                 ),
                 use: use === true,
             }),
-        },
+        }),
     );
 }
 

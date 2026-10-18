@@ -1,11 +1,10 @@
 import {
-    ConflictException,
+    HttpException,
     Injectable,
     Logger,
     NotFoundException,
     Optional,
 } from "@nestjs/common";
-import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -24,6 +23,14 @@ import {
     BillingProfilesService,
     createBillingProfileInTx,
 } from "./billing-profiles.service";
+import { CheckoutService } from "./checkout.service";
+import type { ProfileMove } from "./profile-switch";
+import {
+    pendingSwitchOf,
+    profileMoveInTx,
+    profileSwitchStateInTx,
+} from "./profile-switch";
+import type { CheckoutHandoff } from "./providers/billing-provider.port";
 
 /**
  * A business's billing profile as its Plan & billing shows it (DEC-167,
@@ -37,12 +44,14 @@ import {
  * - **Another owner's profile** on this business (several owners may hold
  *   one) is named, never shown: its legal name only. Theirs to edit; this
  *   owner may bill the business to one of their own instead.
- * - **Choosing applies at once** while the business pays nothing at the
- *   provider. A business with a live paid subscription is billed to its
- *   profile's customer until the period ends: a switch then waits for the
- *   renewal (U6), and until that lands this refuses with
- *   `switch-at-renewal`. A payment waiting to be authorised is on the
- *   current profile's customer too, so it is refused while one is open.
+ * - **Choosing applies at once** while nothing more is charged at the
+ *   provider. A business whose subscription renews is billed to its
+ *   profile's customer until the period ends: the switch waits for the
+ *   renewal, authorised now on the new profile (U6, `profile-switch.ts`),
+ *   and the business keeps its profile until the renewal applies it.
+ *   Choosing the profile it keeps again gives up a switch still waiting.
+ *   A payment for a plan waiting to be authorised is refused
+ *   (`checkout-waiting`).
  */
 
 /** The profile on the business: in full when it is the caller's. */
@@ -56,56 +65,37 @@ export interface BusinessBillingProfileView {
     mine: BillingProfileView[];
     /** Businesses billed to the current profile, when it is the caller's. */
     businessesOnCurrent: number | null;
+    /**
+     * A move to another profile at the renewal (U6): that profile's legal
+     * name (whoever's it is), the date, and whether its payment is
+     * authorised yet. Null when none is in play.
+     */
+    pendingSwitch: {
+        legalName: string;
+        at: string | null;
+        authorised: boolean;
+    } | null;
 }
 
-/** The refusal's code for a paid business, until U6's switch lands. */
-export const SWITCH_AT_RENEWAL = "switch-at-renewal";
-export const SWITCH_AT_RENEWAL_MESSAGE =
-    "You can move a paid plan to another billing profile at its next renewal.";
-export const CHECKOUT_WAITING = "checkout-waiting";
-export const CHECKOUT_WAITING_MESSAGE =
-    "A payment is waiting under this billing profile. Finish it or let it lapse, then choose another.";
-
-type Tx = Prisma.TransactionClient;
-
-function refuseSwitch(code: string, message: string): never {
-    throw new ConflictException({
-        message,
-        details: { field: "billingProfile", code },
-    });
+/** What choosing (or making and using) a profile did. */
+export interface BillingProfileChosen extends BusinessBillingProfileView {
+    /**
+     * `applied`: billed to it from now; `scheduled`: from the renewal,
+     * once the payment is authorised on it (`authorise`); `kept`: a switch
+     * waiting for authorisation given up; `none`: nothing to do.
+     */
+    outcome: "applied" | "scheduled" | "kept" | "none";
+    /** The payment to authorise on the new profile, for `scheduled`. */
+    authorise: {
+        at: string;
+        legalName: string;
+        /** Given once, here; Saroh doesn't keep it. */
+        authorisationUrl: string | null;
+        handoff: CheckoutHandoff | null;
+    } | null;
 }
 
-/**
- * Refused when the business may not be moved to another profile now: a
- * live subscription at the provider (paid, billed to the current
- * profile's customer), or a checkout waiting for authorisation.
- */
-async function assertMayChooseNow(
-    tx: Pick<Tx, "subscription" | "billingCheckout">,
-    organizationId: string,
-): Promise<void> {
-    const [subscription, waiting] = await Promise.all([
-        tx.subscription.findUnique({
-            where: { organizationId },
-            select: { status: true, providerSubscriptionId: true },
-        }),
-        tx.billingCheckout.findFirst({
-            where: {
-                organizationId,
-                status: { in: ["OPEN", "SCHEDULED"] },
-            },
-            select: { id: true },
-        }),
-    ]);
-    if (
-        subscription &&
-        subscription.status !== "CANCELLED" &&
-        subscription.providerSubscriptionId
-    ) {
-        refuseSwitch(SWITCH_AT_RENEWAL, SWITCH_AT_RENEWAL_MESSAGE);
-    }
-    if (waiting) refuseSwitch(CHECKOUT_WAITING, CHECKOUT_WAITING_MESSAGE);
-}
+export { CHECKOUT_WAITING, CHECKOUT_WAITING_MESSAGE } from "./profile-switch";
 
 @Injectable()
 export class BusinessBillingProfileService {
@@ -113,13 +103,14 @@ export class BusinessBillingProfileService {
 
     constructor(
         private readonly profiles: BillingProfilesService,
+        private readonly checkouts: CheckoutService,
         @Optional() private readonly audit?: AuditService,
     ) {}
 
     /** Who Saroh bills for the business, and the caller's profiles. */
     async view(ctx: OrganizationContext): Promise<BusinessBillingProfileView> {
         authorize(ctx, "billing:manage");
-        const [org, mine] = await Promise.all([
+        const [org, mine, state] = await Promise.all([
             prisma.organization.findUnique({
                 where: { id: ctx.organizationId },
                 select: {
@@ -133,15 +124,32 @@ export class BusinessBillingProfileService {
                 },
             }),
             this.profiles.listMine(ctx.userId),
+            profileSwitchStateInTx(prisma, ctx.organizationId),
         ]);
         if (!org) throw new NotFoundException("Business not found");
+        const pending = pendingSwitchOf(state);
+        const pendingSwitch = pending
+            ? {
+                  legalName: await legalNameOf(pending.billingProfileId),
+                  at: pending.at?.toISOString() ?? null,
+                  authorised: pending.authorised,
+              }
+            : null;
         const on = org.billingProfile;
-        if (!on) return { current: null, mine, businessesOnCurrent: null };
+        if (!on) {
+            return {
+                current: null,
+                mine,
+                businessesOnCurrent: null,
+                pendingSwitch,
+            };
+        }
         if (on.ownerUserId !== ctx.userId) {
             return {
                 current: { legalName: on.legalName, mine: false },
                 mine,
                 businessesOnCurrent: null,
+                pendingSwitch,
             };
         }
         const own =
@@ -151,77 +159,86 @@ export class BusinessBillingProfileService {
             current: { ...own, mine: true },
             mine,
             businessesOnCurrent: own.businesses,
+            pendingSwitch,
         };
     }
 
     /**
-     * Bill the business to one of the caller's profiles. Anyone else's is
-     * a 404, as if it didn't exist. Applied at once on a business with no
-     * paid plan at the provider; a paid one is the 409 above.
+     * Bill the business to one of the caller's profiles (anyone else's is
+     * a 404, as if it didn't exist), or keep the one it is billed to now.
+     * At once when nothing more is charged at the provider; a business
+     * whose plan renews moves at the renewal, once the payment is
+     * authorised on the new profile (`authorise`).
      */
     async choose(
         ctx: OrganizationContext,
         billingProfileId: string,
-    ): Promise<BusinessBillingProfileView> {
+        now: Date = new Date(),
+    ): Promise<BillingProfileChosen> {
         authorize(ctx, "billing:manage");
-        const from = await prisma.$transaction(async (tx) => {
-            const mine = await tx.billingProfile.findFirst({
-                where: { id: billingProfileId, ownerUserId: ctx.userId },
-                select: { id: true },
-            });
-            if (!mine) throw profileNotFound();
+        const move = await prisma.$transaction(async (tx) => {
             const org = await tx.organization.findUnique({
                 where: { id: ctx.organizationId },
                 select: { billingProfileId: true },
             });
             if (!org) throw new NotFoundException("Business not found");
-            // Already its profile: nothing to do, nothing to refuse.
-            if (org.billingProfileId === mine.id) return undefined;
-            await assertMayChooseNow(tx, ctx.organizationId);
-            await tx.organization.update({
-                where: { id: ctx.organizationId },
-                data: { billingProfileId: mine.id },
-            });
-            return org.billingProfileId;
+            // Its own profile may be kept whoever's it is; any other must
+            // be the caller's.
+            if (org.billingProfileId !== billingProfileId) {
+                const mine = await tx.billingProfile.findFirst({
+                    where: { id: billingProfileId, ownerUserId: ctx.userId },
+                    select: { id: true },
+                });
+                if (!mine) throw profileNotFound();
+            }
+            return profileMoveInTx(
+                tx,
+                ctx.organizationId,
+                billingProfileId,
+                now,
+            );
         });
-        if (from !== undefined) {
-            await this.recordChosen(ctx, from, billingProfileId, "chosen");
-        }
-        return this.view(ctx);
+        return this.settle(ctx, move, billingProfileId, "chosen", now);
     }
 
     /**
      * A new profile for the caller, made from Plan & billing; with `use`,
-     * the business is billed to it in the same transaction (or neither, so
-     * a paid business's refusal leaves no profile behind).
+     * the business is moved to it as `choose` would (or neither, so a
+     * refusal leaves no profile behind). A switch at the renewal that
+     * can't be started at the provider leaves the profile made, and says
+     * why in `notMoved`: it can be chosen again.
      */
     async create(
         ctx: OrganizationContext,
         input: BillingProfileInput,
         use: boolean,
-    ): Promise<BusinessBillingProfileView & { created: string }> {
+        now: Date = new Date(),
+    ): Promise<
+        BillingProfileChosen & { created: string; notMoved: string | null }
+    > {
         authorize(ctx, "billing:manage");
-        let made: { id: string; from: string | null };
+        let made: { id: string; move: ProfileMove | null };
         try {
             made = await prisma.$transaction(async (tx) => {
                 const org = await tx.organization.findUnique({
                     where: { id: ctx.organizationId },
-                    select: { billingProfileId: true },
+                    select: { id: true },
                 });
                 if (!org) throw new NotFoundException("Business not found");
-                if (use) await assertMayChooseNow(tx, ctx.organizationId);
                 const profile = await createBillingProfileInTx(
                     tx,
                     ctx.userId,
                     input,
                 );
-                if (use) {
-                    await tx.organization.update({
-                        where: { id: ctx.organizationId },
-                        data: { billingProfileId: profile.id },
-                    });
-                }
-                return { id: profile.id, from: org.billingProfileId };
+                const move = use
+                    ? await profileMoveInTx(
+                          tx,
+                          ctx.organizationId,
+                          profile.id,
+                          now,
+                      )
+                    : null;
+                return { id: profile.id, move };
             });
         } catch (error) {
             throw billingEmailRaceAsTaken(error);
@@ -239,8 +256,92 @@ export class BusinessBillingProfileService {
             outcome: AuditOutcome.Success,
             metadata: { fields: sentFields(input), used: use },
         });
-        if (use) await this.recordChosen(ctx, made.from, made.id, "created");
-        return { ...(await this.view(ctx)), created: made.id };
+        if (!made.move) {
+            return {
+                ...(await this.view(ctx)),
+                outcome: "none",
+                authorise: null,
+                created: made.id,
+                notMoved: null,
+            };
+        }
+        try {
+            const chosen = await this.settle(
+                ctx,
+                made.move,
+                made.id,
+                "created",
+                now,
+            );
+            return { ...chosen, created: made.id, notMoved: null };
+        } catch (error) {
+            if (!(error instanceof HttpException)) throw error;
+            return {
+                ...(await this.view(ctx)),
+                outcome: "none",
+                authorise: null,
+                created: made.id,
+                notMoved: refusalMessage(error),
+            };
+        }
+    }
+
+    /** Carry out what `profileMoveInTx` decided, and say it. */
+    private async settle(
+        ctx: OrganizationContext,
+        move: ProfileMove,
+        to: string,
+        via: "chosen" | "created",
+        now: Date,
+    ): Promise<BillingProfileChosen> {
+        const said = async (
+            outcome: BillingProfileChosen["outcome"],
+            authorise: BillingProfileChosen["authorise"] = null,
+        ): Promise<BillingProfileChosen> => ({
+            ...(await this.view(ctx)),
+            outcome,
+            authorise,
+        });
+        switch (move.kind) {
+            case "none":
+                return said("none");
+            case "applied":
+                await this.recordChosen(ctx, move.from, to, via);
+                return said("applied");
+            case "kept":
+                // The business stays where it is; the switch is gone.
+                await this.recordChosen(
+                    ctx,
+                    move.dropped,
+                    to,
+                    "switch-given-up",
+                );
+                return said("kept");
+            case "schedule": {
+                const started = await this.checkouts.startProfileSwitch(
+                    ctx,
+                    {
+                        billingProfileId: to,
+                        plan: move.plan,
+                        startAt: move.startAt,
+                    },
+                    now,
+                );
+                await this.recordChosen(
+                    ctx,
+                    move.from,
+                    to,
+                    `${via}-at-renewal`,
+                    move.startAt,
+                );
+                return said("scheduled", {
+                    at: move.startAt.toISOString(),
+                    legalName: await legalNameOf(to),
+                    authorisationUrl: started.authorisationUrl,
+                    handoff: started.handoff,
+                });
+            }
+        }
     }
 
     /**
@@ -280,10 +381,16 @@ export class BusinessBillingProfileService {
         ctx: OrganizationContext,
         from: string | null,
         to: string,
-        via: "chosen" | "created",
+        via:
+            | "chosen"
+            | "created"
+            | "switch-given-up"
+            | "chosen-at-renewal"
+            | "created-at-renewal",
+        at?: Date,
     ): Promise<void> {
         this.logger.log(
-            `billing_profile_chosen org=${ctx.organizationId} from=${from ?? "none"} to=${to}`,
+            `billing_profile_chosen org=${ctx.organizationId} from=${from ?? "none"} to=${to} via=${via}`,
         );
         await this.audit?.record({
             action: AuditAction.BillingProfileChoose,
@@ -294,7 +401,9 @@ export class BusinessBillingProfileService {
             targetId: ctx.organizationId,
             outcome: AuditOutcome.Success,
             // Ids only: a profile's details are its owner's (R2).
-            metadata: { from, to, via },
+            metadata: at
+                ? { from, to, via, at: at.toISOString() }
+                : { from, to, via },
         });
     }
 }
@@ -311,4 +420,21 @@ function profileNotFound(): NotFoundException {
         message: "That billing profile isn't one of yours. Choose another.",
         details: { field: "billingProfile" },
     });
+}
+
+/** A profile's legal name, whoever's it is: what a switch names. */
+async function legalNameOf(billingProfileId: string): Promise<string> {
+    const p = await prisma.billingProfile.findUnique({
+        where: { id: billingProfileId },
+        select: { legalName: true },
+    });
+    return p?.legalName ?? "";
+}
+
+/** A refusal's words, as the API sends them. */
+function refusalMessage(error: HttpException): string {
+    const body = error.getResponse();
+    if (typeof body === "string") return body;
+    const message = (body as { message?: unknown }).message;
+    return typeof message === "string" ? message : error.message;
 }

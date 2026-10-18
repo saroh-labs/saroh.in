@@ -22,6 +22,7 @@ import type { BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import {
     autopayCharges,
     catalogPlanIdForKey,
+    gstPaise,
     withGstPaise,
 } from "@saroh/pricing-catalog";
 
@@ -88,6 +89,7 @@ import {
     planTrialDays,
 } from "./offers";
 import { PlansService } from "./plans.service";
+import { profileSwitchStateInTx, renewalProfileOf } from "./profile-switch";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
 import type {
@@ -374,7 +376,7 @@ export class CheckoutService {
             input,
             now,
         );
-        const party = await readBillingParty(prisma, ctx.organizationId);
+        const party = await this.partyFor(ctx.organizationId, quote.kind);
         return {
             ...this.quoteView(target, quote, coupon, addonsEnding),
             ...billingDetailsView(party),
@@ -569,7 +571,7 @@ export class CheckoutService {
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
         const { target, quote, subscription, coupon, addonsEnding } =
             await this.resolve(ctx.organizationId, input, now);
-        const party = await readBillingParty(prisma, ctx.organizationId);
+        const party = await this.partyFor(ctx.organizationId, quote.kind);
         const view = {
             ...this.quoteView(target, quote, coupon, addonsEnding),
             ...billingDetailsView(party),
@@ -638,6 +640,95 @@ export class CheckoutService {
             { ...billTo, billingProfileId: profileId },
             coupon,
         );
+    }
+
+    /**
+     * Who a change is billed to: the business's billing profile, or —
+     * for a change that starts at the renewal while the business is
+     * moving to another profile then (U6) — that one, so one scheduled
+     * checkout carries both (`profile-switch.ts`).
+     */
+    private async partyFor(
+        organizationId: string,
+        kind: ChangeKind,
+    ): Promise<BillingParty> {
+        const atRenewal = kind === "SCHEDULED" || kind === "RENEW";
+        const moving = atRenewal
+            ? renewalProfileOf(
+                  await profileSwitchStateInTx(prisma, organizationId),
+              )
+            : null;
+        return readBillingParty(prisma, organizationId, moving);
+    }
+
+    /**
+     * Move a paid business to another of its owner's billing profiles at
+     * its next renewal (DEC-167, R13, U6; `profile-switch.ts` decided it):
+     * a SCHEDULED checkout for `plan` — the plan it is on, or the one it
+     * is already moving to — starting at `startAt`, on the new profile's
+     * customer. Authorised like any other checkout; the business stays on
+     * its profile until the renewal applies it.
+     */
+    async startProfileSwitch(
+        ctx: OrganizationContext,
+        input: { billingProfileId: string; plan: Plan; startAt: Date },
+        now: Date = new Date(),
+    ): Promise<Extract<ChangePlanResult, { checkout: CheckoutView }>> {
+        authorize(ctx, "billing:manage");
+        const { plan, startAt } = input;
+        const party = await readBillingParty(
+            prisma,
+            ctx.organizationId,
+            input.billingProfileId,
+        );
+        const missing = missingBillingDetails(party);
+        if (missing.length) {
+            throw new BadRequestException({
+                message: `That billing profile needs its ${missing.join(", ")} before Saroh can bill it. Edit it, then choose it again.`,
+                details: { field: "billingProfile", missing },
+            });
+        }
+        const price = plan.priceCents;
+        const oneTime = plan.interval === "year";
+        const total = withGstPaise(price);
+        const catalog = await catalogueOfVersion(prisma, plan.version);
+        // The plan's next charge, as it is today, from the date: nothing
+        // is taken now but autopay's refundable check.
+        const quote: ChangeQuote = {
+            kind: "SCHEDULED",
+            pricePaise: price,
+            gstPaise: gstPaise(price),
+            totalPaise: total,
+            chargeNowPaise: 0,
+            chargeNowGstPaise: 0,
+            chargeNowTotalPaise: 0,
+            startAt,
+            effectiveAt: startAt,
+            trialEndsAt: null,
+            firstMonth: null,
+            discountPaise: 0,
+            discountCharges: 0,
+            firstChargePaise: price,
+            firstChargeGstPaise: gstPaise(price),
+            firstChargeTotalPaise: total,
+            discountTotalPaise: 0,
+            payment: oneTime ? "ONE_TIME" : "AUTOPAY",
+            termCharges: oneTime ? 1 : autopayCharges(catalog),
+            payNowTotalPaise: oneTime ? total : 0,
+            mandateCheck: oneTime ? "NONE" : "REFUNDED",
+        };
+        const view = {
+            ...this.quoteView(plan, quote),
+            ...billingDetailsView(party),
+        };
+        const result = await this.checkout(ctx, plan, quote, view, now, {
+            billToState: null,
+            billToGstin: null,
+            billingProfileId: input.billingProfileId,
+        });
+        if (result.kind === "TO_FREE")
+            throw new Error("a switch is a checkout");
+        return result;
     }
 
     /**

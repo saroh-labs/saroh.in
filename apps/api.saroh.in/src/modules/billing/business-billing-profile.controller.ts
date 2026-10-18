@@ -18,7 +18,10 @@ import {
     UpdateBillingProfileDto,
 } from "./billing-profile.dto";
 import type { BillingProfileView } from "./billing-profiles.service";
-import type { BusinessBillingProfileView } from "./business-billing-profile.service";
+import type {
+    BillingProfileChosen,
+    BusinessBillingProfileView,
+} from "./business-billing-profile.service";
 import { BusinessBillingProfileService } from "./business-billing-profile.service";
 
 /**
@@ -42,12 +45,15 @@ export class BusinessBillingProfileController {
         return this.profile.view(ctx);
     }
 
-    /** Bill the business to one of the caller's profiles. */
+    /**
+     * Bill the business to one of the caller's profiles (or keep its own):
+     * at once, or from the renewal once authorised (U6, `authorise`).
+     */
     @Post("choose")
     choose(
         @OrgContext() ctx: OrganizationContext,
         @Body() dto: ChooseBillingProfileDto,
-    ): Promise<BusinessBillingProfileView> {
+    ): Promise<BillingProfileChosen> {
         return this.profile.choose(ctx, dto.billingProfileId);
     }
 
@@ -56,7 +62,9 @@ export class BusinessBillingProfileController {
     create(
         @OrgContext() ctx: OrganizationContext,
         @Body() dto: CreateBusinessBillingProfileDto,
-    ): Promise<BusinessBillingProfileView & { created: string }> {
+    ): Promise<
+        BillingProfileChosen & { created: string; notMoved: string | null }
+    > {
         const { use, ...input } = dto;
         return this.profile.create(ctx, input, use === true);
     }

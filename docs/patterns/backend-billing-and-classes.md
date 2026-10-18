@@ -78,6 +78,24 @@ keep what they were issued with. Settings › Business (`BusinessProfile`)
 stays the business's own seller identity, for the business's own
 invoices; it is not Saroh's bill-to.
 
+**Switching a paid business's profile waits for the renewal (R13, U6).**
+Choosing another profile applies at once only while nothing more is
+charged at the provider (Free, a plan ending, a year paid once). A
+business whose subscription renews gets a SCHEDULED checkout for the same
+plan and cycle on the new profile's customer, starting at the period's end
+(`billing/profile-switch.ts` decides, `CheckoutService.startProfileSwitch`
+makes it); authorised, the webhook tells the old autopay to end with its
+period (a same-plan checkout on another profile is never a "renewal"), and
+`applyDueMoveInTx` repoints `Organization.billingProfileId` as it adopts
+the checkout, with an audit row. Unauthorised, it lapses like any checkout
+and nothing changes. A plan change and a switch before one renewal are one
+checkout: a switch after an authorised plan change is made for that plan
+and supersedes it once authorised; a change starting at the renewal while
+a switch is in play is made on the profile it moves to. Choosing the
+profile it keeps gives up a switch still waiting; once authorised (the old
+autopay told to end) staying is a switch back, authorised again. A payment
+for a plan waiting is a 409 `checkout-waiting`.
+
 **What Saroh needs before it charges (owner, 17 Oct 2026; the profile's
 since 18 Oct).** Every checkout that charges or sets up autopay — all but
 a move to Free; a first month, an upgrade, a renewal, a scheduled change, a

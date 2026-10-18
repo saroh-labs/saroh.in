@@ -6,6 +6,7 @@ import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ViewerDate } from "@/components/shared/viewer-date";
 import type { BusinessBillingProfile } from "@/lib/billing-profiles/view";
 import {
     BILLED_TO,
@@ -34,6 +35,9 @@ const CHANGE_ID = "billing-profile-change";
  * - **Another owner's profile**: its legal name only, and "Bill to one of
  *   my profiles".
  * - **None** yet: "Choose who Saroh bills", the Change sheet its action.
+ * - **Moving at the renewal** (a paid plan, U6): "Moves to <legal name>
+ *   on <date>", saying when its payment still needs authorising, and
+ *   "Cancel move", the Change sheet with the profile it is on chosen.
  * - **Couldn't be read** (`null`): said, never drawn as none.
  */
 export function BillingProfilePanel({
@@ -73,6 +77,16 @@ export function BillingProfilePanel({
         current === null ? (
             <Button id={CHANGE_ID} type="button" onClick={() => show("change")}>
                 Choose
+            </Button>
+        ) : current.mine && view.pendingSwitch ? (
+            <Button
+                id={CHANGE_ID}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => show("change")}
+            >
+                Cancel move
             </Button>
         ) : current.mine ? (
             <div className="flex flex-wrap gap-2">
@@ -150,6 +164,25 @@ export function BillingProfilePanel({
                             </p>
                         </>
                     )}
+                    {view.pendingSwitch ? (
+                        <p
+                            className="mt-1.5 font-medium text-foreground [overflow-wrap:anywhere]"
+                            data-pending-switch=""
+                        >
+                            Moves to {view.pendingSwitch.legalName}
+                            {view.pendingSwitch.at ? (
+                                <>
+                                    {" "}
+                                    on{" "}
+                                    <ViewerDate iso={view.pendingSwitch.at} />
+                                </>
+                            ) : null}
+                            .
+                            {view.pendingSwitch.authorised
+                                ? null
+                                : " Authorise the payment to finish, under Your plan."}
+                        </p>
+                    ) : null}
                 </div>
                 <div className="justify-self-start sm:justify-self-end">
                     {action}

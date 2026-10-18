@@ -1,6 +1,7 @@
-import type { Prisma } from "@saroh/database";
+import type { BillingCheckout, Prisma } from "@saroh/database";
 import { unsyncedCatalogueVersions } from "@saroh/database";
 
+import { AuditAction, AuditOutcome } from "../audit/audit.service";
 import { clearAddonsInTx, endAddonsNotOfferedInTx } from "./addon-charges";
 import type { HeldAddon } from "./addons-ending";
 import { periodEnd } from "./checkout-quote";
@@ -180,6 +181,9 @@ export async function applyDueMoveInTx(
             where: { id: scheduled.id },
             data: { status: "COMPLETED", completedAt: now },
         });
+        // Authorised on another billing profile (U6): the business is
+        // billed to it from this period on.
+        await repointBillingProfileInTx(tx, sub.organizationId, scheduled);
         // The old one was told to end with the period; make sure it has.
         if (
             sub.provider &&
@@ -213,4 +217,49 @@ export async function applyDueMoveInTx(
     // Add-ons the plan it is on now isn't offered end with the old one.
     const endedAddons = await endAddonsNotOfferedInTx(tx, sub.id);
     return { applied: true, planId: target.id, endedAddons };
+}
+
+/**
+ * A scheduled checkout made on another billing profile than the business's
+ * (DEC-167, U6) points the business at it as it takes over, on the same
+ * transaction, with its audit row: from this period, Saroh's invoices are
+ * addressed to that profile. The old profile keeps what it was billed.
+ */
+async function repointBillingProfileInTx(
+    tx: Tx,
+    organizationId: string,
+    checkout: Pick<
+        BillingCheckout,
+        "id" | "billingProfileId" | "createdByUserId"
+    >,
+): Promise<void> {
+    const to = checkout.billingProfileId;
+    if (!to) return;
+    const org = await tx.organization.findUnique({
+        where: { id: organizationId },
+        select: { billingProfileId: true },
+    });
+    if (!org || org.billingProfileId === to) return;
+    await tx.organization.update({
+        where: { id: organizationId },
+        data: { billingProfileId: to },
+    });
+    await tx.auditEvent.create({
+        data: {
+            action: AuditAction.BillingProfileChoose,
+            // Whoever authorised the move; the renewal only carries it out.
+            actorUserId: checkout.createdByUserId ?? "system:billing-renewal",
+            organizationId,
+            targetType: "organization",
+            targetId: organizationId,
+            outcome: AuditOutcome.Success,
+            // Ids only: a profile's details are its owner's (R2).
+            metadata: {
+                from: org.billingProfileId,
+                to,
+                via: "renewal",
+                checkoutId: checkout.id,
+            },
+        },
+    });
 }

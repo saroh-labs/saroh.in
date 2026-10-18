@@ -6,8 +6,9 @@
  *   profiles; an Admin is refused before anything is read (AE6);
  * - another owner's profile on the business is its legal name only;
  * - choosing one of the caller's profiles applies at once on Free, is a
- *   409 `switch-at-renewal` on a paid plan (U6 replaces it), and anyone
- *   else's is a 404;
+ *   409 `checkout-waiting` while a payment for a plan waits, and anyone
+ *   else's is a 404 (a paid plan's switch at the renewal is
+ *   `profile-switch.db.spec.ts`);
  * - a new profile made in place, used for the business or not, with the
  *   one-email-per-owner 409;
  * - an edit says how many businesses it changes (AE3), and is the
@@ -28,12 +29,22 @@ import {
 } from "./billing-profiles.service";
 import {
     BusinessBillingProfileService,
-    SWITCH_AT_RENEWAL,
-    SWITCH_AT_RENEWAL_MESSAGE,
+    CHECKOUT_WAITING,
+    CHECKOUT_WAITING_MESSAGE,
 } from "./business-billing-profile.service";
+import { CheckoutService } from "./checkout.service";
+import { PlansService } from "./plans.service";
+import {
+    FakeBillingProvider,
+    FakeBillingProviderFactory,
+} from "./providers/fake.provider";
 
 const service = new BusinessBillingProfileService(
     new BillingProfilesService(),
+    new CheckoutService(
+        new PlansService(),
+        new FakeBillingProviderFactory(new FakeBillingProvider("RAZORPAY")),
+    ),
     new AuditService(),
 );
 
@@ -85,8 +96,11 @@ function as(
     };
 }
 
-/** Put the business on a paid plan at the provider. */
-async function onPaidPlan(organizationId: string) {
+/**
+ * Put the business on a paid plan at the provider, with a payment for
+ * another plan waiting to be authorised.
+ */
+async function onPaidPlanWithPaymentWaiting(organizationId: string) {
     const plan = await prisma.plan.create({
         data: {
             key: uniq("grow-"),
@@ -103,6 +117,19 @@ async function onPaidPlan(organizationId: string) {
             provider: "RAZORPAY",
             providerSubscriptionId: uniq("sub_"),
             currentPeriodEnd: new Date(Date.now() + 20 * 86_400_000),
+        },
+    });
+    await prisma.billingCheckout.create({
+        data: {
+            organizationId,
+            planId: plan.id,
+            cycle: "month",
+            kind: "UPGRADE",
+            provider: "RAZORPAY",
+            providerSubscriptionId: uniq("sub_"),
+            providerPlanId: uniq("plan_"),
+            pricePaise: 99900,
+            expiresAt: new Date(Date.now() + 86_400_000),
         },
     });
 }
@@ -177,7 +204,12 @@ describe("choosing a profile for the business", () => {
         const org = await business(a.id);
 
         const view = await service.choose(as("OWNER", owner.id, org.id), b.id);
-        expect(view.current).toMatchObject({ id: b.id, mine: true });
+        expect(view).toMatchObject({
+            current: { id: b.id, mine: true },
+            outcome: "applied",
+            authorise: null,
+            pendingSwitch: null,
+        });
         const after = await prisma.organization.findUniqueOrThrow({
             where: { id: org.id },
         });
@@ -231,19 +263,19 @@ describe("choosing a profile for the business", () => {
         expect(after.billingProfileId).toBe(a.id);
     });
 
-    it("refuses on a paid plan with switch-at-renewal, and changes nothing (until U6)", async () => {
+    it("refuses with checkout-waiting while a payment for a plan waits, and changes nothing", async () => {
         const owner = await person();
         const a = await profileOf(owner.id);
         const b = await profileOf(owner.id, { legalName: "Asha Fitness" });
         const org = await business(a.id);
-        await onPaidPlan(org.id);
+        await onPaidPlanWithPaymentWaiting(org.id);
 
         const tried = service.choose(as("OWNER", owner.id, org.id), b.id);
         await expect(tried).rejects.toBeInstanceOf(ConflictException);
         await expect(tried).rejects.toMatchObject({
             response: {
-                message: SWITCH_AT_RENEWAL_MESSAGE,
-                details: { field: "billingProfile", code: SWITCH_AT_RENEWAL },
+                message: CHECKOUT_WAITING_MESSAGE,
+                details: { field: "billingProfile", code: CHECKOUT_WAITING },
             },
         });
         const after = await prisma.organization.findUniqueOrThrow({
@@ -253,7 +285,7 @@ describe("choosing a profile for the business", () => {
         // The profile it is already on is no switch.
         await expect(
             service.choose(as("OWNER", owner.id, org.id), a.id),
-        ).resolves.toMatchObject({ current: { id: a.id } });
+        ).resolves.toMatchObject({ current: { id: a.id }, outcome: "none" });
     });
 });
 
@@ -334,11 +366,11 @@ describe("a new profile made in place", () => {
         ).toBe(1);
     });
 
-    it("on a paid plan, used for the business, is refused whole: no profile is left", async () => {
+    it("used for a business with a payment waiting, is refused whole: no profile is left", async () => {
         const owner = await person();
         const a = await profileOf(owner.id);
         const org = await business(a.id);
-        await onPaidPlan(org.id);
+        await onPaidPlanWithPaymentWaiting(org.id);
         await expect(
             service.create(
                 as("OWNER", owner.id, org.id),
@@ -346,7 +378,7 @@ describe("a new profile made in place", () => {
                 true,
             ),
         ).rejects.toMatchObject({
-            response: { details: { code: SWITCH_AT_RENEWAL } },
+            response: { details: { code: CHECKOUT_WAITING } },
         });
         expect(
             await prisma.billingProfile.count({

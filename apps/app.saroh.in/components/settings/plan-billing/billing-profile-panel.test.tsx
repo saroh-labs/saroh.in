@@ -5,8 +5,10 @@
  * profile used by several businesses says how many before Save (AE3);
  * another owner's profile is its legal name only; a business with none
  * reads "Choose who Saroh bills"; a refusal stays in the open sheet, under
- * the field it is about. Made-up profiles. Hidden for an Admin:
- * `plan-owner-only.test.tsx`.
+ * the field it is about. A paid plan's switch waits for its renewal (U6):
+ * the sheet then says from when and opens the payment to authorise, and
+ * the row says the move is pending, with a way to cancel it. Made-up
+ * profiles. Hidden for an Admin: `plan-owner-only.test.tsx`.
  */
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -17,6 +19,7 @@ import type {
     BusinessBillingProfile,
     OwnBillingProfile,
 } from "@/lib/billing-profiles/view";
+import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
 
 import { BillingProfilePanel } from "./billing-profile-panel";
 
@@ -29,7 +32,10 @@ vi.mock("next/navigation", () => ({
 const chooseBillingProfileAction = vi.fn();
 const createBillingProfileAction = vi.fn();
 const updateBillingProfileAction = vi.fn();
+const confirmCheckoutAction = vi.fn();
 vi.mock("@/lib/saroh-billing/billing-actions", () => ({
+    confirmCheckoutAction: (...a: unknown[]) =>
+        confirmCheckoutAction(...a) as unknown,
     chooseBillingProfileAction: (...a: unknown[]) =>
         chooseBillingProfileAction(...a) as unknown,
     createBillingProfileAction: (...a: unknown[]) =>
@@ -37,10 +43,16 @@ vi.mock("@/lib/saroh-billing/billing-actions", () => ({
     updateBillingProfileAction: (...a: unknown[]) =>
         updateBillingProfileAction(...a) as unknown,
 }));
+const openRazorpayWindow = vi.fn();
+vi.mock("@/lib/saroh-billing/razorpay-window", () => ({
+    openRazorpayWindow: (...a: unknown[]) =>
+        openRazorpayWindow(...a) as unknown,
+}));
 const showError = vi.fn();
+const showSuccess = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => showError(...a) as unknown,
-    showSuccess: vi.fn(),
+    showSuccess: (...a: unknown[]) => showSuccess(...a) as unknown,
     showInfo: vi.fn(),
 }));
 
@@ -91,7 +103,10 @@ beforeEach(() => {
         chooseBillingProfileAction,
         createBillingProfileAction,
         updateBillingProfileAction,
+        confirmCheckoutAction,
+        openRazorpayWindow,
         showError,
+        showSuccess,
     ]) {
         fn.mockReset();
     }
@@ -253,10 +268,10 @@ describe("Change: who Saroh bills", () => {
         expect(refresh).toHaveBeenCalled();
     });
 
-    it("says a paid plan moves at its renewal under the choices, the sheet open", async () => {
+    it("says a payment waiting under the choices, the sheet open", async () => {
         draw(mine(FOODS));
         const said =
-            "You can move a paid plan to another billing profile at its next renewal.";
+            "A payment is waiting under this billing profile. Finish it or let it lapse, then choose another.";
         chooseBillingProfileAction.mockResolvedValue({
             ok: false,
             error: said,
@@ -293,5 +308,125 @@ describe("Change: who Saroh bills", () => {
         expect(sheet()?.textContent).toContain(
             "You already have a billing profile with this email.",
         );
+    });
+});
+
+describe("a paid plan moving at its renewal (U6)", () => {
+    const RENEWS = "2026-11-05T04:30:00.000Z";
+    const on = () => formatDate(RENEWS, viewerTimeZone());
+    const HANDOFF = {
+        provider: "RAZORPAY",
+        keyId: "rzp_test_key",
+        subscriptionId: "sub_switch",
+        orderId: null,
+        amountPaise: null,
+        currency: "INR",
+        prefill: { name: "Asha Fitness", email: null, contact: null },
+        customerId: null,
+        notes: {},
+    };
+    const scheduled = (handoff: typeof HANDOFF | null) => ({
+        ok: true,
+        data: {
+            ...mine(FOODS),
+            pendingSwitch: {
+                legalName: "Asha Fitness",
+                at: RENEWS,
+                authorised: false,
+            },
+            outcome: "scheduled",
+            authorise: {
+                at: RENEWS,
+                legalName: "Asha Fitness",
+                authorisationUrl: null,
+                handoff,
+            },
+        },
+    });
+
+    it("says from when Saroh bills the new profile, and asks for the payment", async () => {
+        draw(mine(FOODS));
+        chooseBillingProfileAction.mockResolvedValue(scheduled(HANDOFF));
+        await press(button("Change", host));
+        await press(choice("Asha Fitness"));
+        await submit();
+        expect(chooseBillingProfileAction).toHaveBeenCalledWith("bprof_mh");
+        expect(sheet()?.textContent).toContain(
+            `From ${on()}, Saroh bills Asha Fitness. Authorise the payment to finish.`,
+        );
+        expect(refresh).toHaveBeenCalled();
+
+        openRazorpayWindow.mockResolvedValue("paid");
+        confirmCheckoutAction.mockResolvedValue({
+            ok: true,
+            data: { state: "scheduled" },
+        });
+        await press(button("Authorise payment", sheet()));
+        expect(openRazorpayWindow).toHaveBeenCalledWith(
+            HANDOFF,
+            "Your plan, billed to Asha Fitness",
+        );
+        expect(confirmCheckoutAction).toHaveBeenCalled();
+        expect(showSuccess).toHaveBeenCalledWith(
+            `Authorised. From ${on()}, Saroh bills Asha Fitness.`,
+        );
+        expect(sheet()).toBeNull();
+    });
+
+    it("says so when no payment window can open, and nothing was charged", async () => {
+        draw(mine(FOODS));
+        chooseBillingProfileAction.mockResolvedValue(scheduled(null));
+        await press(button("Change", host));
+        await press(choice("Asha Fitness"));
+        await submit();
+        await press(button("Authorise payment", sheet()));
+        expect(showError).toHaveBeenCalledWith(
+            "Razorpay's payment window couldn't open, so nothing was charged.",
+            "The move is kept under Your plan: continue the payment from there.",
+        );
+    });
+
+    it("shows the pending move on the row, and Cancel move keeps the profile it is on", async () => {
+        draw({
+            ...mine(FOODS),
+            pendingSwitch: {
+                legalName: "Asha Fitness",
+                at: RENEWS,
+                authorised: false,
+            },
+        });
+        const row = host.querySelector("[data-pending-switch]");
+        expect(row?.textContent).toContain(`Moves to Asha Fitness on ${on()}.`);
+        expect(row?.textContent).toContain("Authorise the payment to finish");
+        expect(() => button("Change", host)).toThrow();
+
+        chooseBillingProfileAction.mockResolvedValue({
+            ok: true,
+            data: { ...mine(FOODS), outcome: "kept", authorise: null },
+        });
+        await press(button("Cancel move", host));
+        expect(sheet()?.textContent).toContain(
+            "Choose Asha Foods LLP to cancel the move to Asha Fitness.",
+        );
+        await submit();
+        expect(chooseBillingProfileAction).toHaveBeenCalledWith("bprof_ka");
+        expect(showSuccess).toHaveBeenCalledWith(
+            "The move to Asha Fitness is cancelled. Saroh keeps billing Asha Foods LLP.",
+        );
+        expect(refresh).toHaveBeenCalled();
+        expect(sheet()).toBeNull();
+    });
+
+    it("an authorised move says only where and when", () => {
+        draw({
+            ...mine(FOODS),
+            pendingSwitch: {
+                legalName: "Asha Fitness",
+                at: RENEWS,
+                authorised: true,
+            },
+        });
+        const row = host.querySelector("[data-pending-switch]");
+        expect(row?.textContent).toBe(`Moves to Asha Fitness on ${on()}.`);
     });
 });
