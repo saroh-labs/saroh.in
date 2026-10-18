@@ -3,11 +3,18 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 // Mock the database package so the service never touches a real Postgres. The
 // `$transaction` mock simply invokes its callback with the same mocked client,
 // so we can assert every write happens inside the one transaction.
-// The first business's billing profile (DEC-167) has its own db spec.
+// Billing profiles (DEC-167) have their own db specs: here the choice
+// answers what each test says (none, so the first is made, by default).
 const mockFirstBillingProfile = jest.fn();
+const mockChosenBillingProfile = jest.fn();
 jest.mock("../billing/billing-profiles.service", () => ({
+    ...jest.requireActual<typeof import("../billing/billing-profiles.service")>(
+        "../billing/billing-profiles.service",
+    ),
     firstBillingProfileInTx: (...args: unknown[]) =>
         mockFirstBillingProfile(...args) as unknown,
+    chosenBillingProfileInTx: (...args: unknown[]) =>
+        mockChosenBillingProfile(...args) as unknown,
 }));
 jest.mock("@saroh/database", () => {
     const client = {
@@ -103,22 +110,21 @@ describe("OrganizationOnboardingService.onboard", () => {
         profileCreate.mockResolvedValue({ id: "bp_1" });
         membershipCreate.mockResolvedValue({ id: "mem_1" });
         referringBusiness.mockResolvedValue(null);
+        mockChosenBillingProfile.mockResolvedValue(null);
     });
 
-    describe("the first business's billing profile (DEC-167)", () => {
-        const profileFindFirst = (
-            prisma as unknown as { billingProfile: { findFirst: jest.Mock } }
-        ).billingProfile.findFirst;
-
-        it("makes the owner's first profile in the sign-up's transaction", async () => {
-            profileFindFirst.mockResolvedValueOnce(null);
-
+    describe("who Saroh bills for it (DEC-167, R6, R7)", () => {
+        it("makes the owner's first profile in the sign-up's transaction when nothing was chosen and they have none", async () => {
             await service.onboard("user_1", { name: "Acme" });
 
-            expect(profileFindFirst).toHaveBeenCalledWith({
-                where: { ownerUserId: "user_1" },
-                select: { id: true },
-            });
+            expect(mockChosenBillingProfile).toHaveBeenCalledWith(
+                expect.anything(),
+                "user_1",
+                {
+                    billingProfileId: undefined,
+                    newBillingProfile: undefined,
+                },
+            );
             expect(mockFirstBillingProfile).toHaveBeenCalledTimes(1);
             expect(mockFirstBillingProfile).toHaveBeenCalledWith(
                 expect.anything(),
@@ -126,12 +132,107 @@ describe("OrganizationOnboardingService.onboard", () => {
             );
         });
 
-        it("makes none for an owner who has a profile already: a later business chooses", async () => {
-            profileFindFirst.mockResolvedValueOnce({ id: "bprof_1" });
+        it("bills a later business to the profile chosen, and makes no other", async () => {
+            mockChosenBillingProfile.mockResolvedValueOnce("bprof_1");
 
-            await service.onboard("user_1", { name: "Acme" });
+            await service.onboard("user_1", {
+                name: "Acme",
+                billingProfileId: "bprof_1",
+            });
 
+            expect(mockChosenBillingProfile).toHaveBeenCalledWith(
+                expect.anything(),
+                "user_1",
+                { billingProfileId: "bprof_1", newBillingProfile: undefined },
+            );
+            expect(orgCreate).toHaveBeenCalledWith({
+                data: {
+                    name: "Acme",
+                    slug: "acme",
+                    kind: "BUSINESS",
+                    billingProfileId: "bprof_1",
+                },
+                select: { id: true, slug: true },
+            });
             expect(mockFirstBillingProfile).not.toHaveBeenCalled();
+        });
+
+        it("passes a new profile's details on to be made with the business", async () => {
+            mockChosenBillingProfile.mockResolvedValueOnce("bprof_new");
+            const newBillingProfile = {
+                legalName: "Asha Foods LLP",
+                billingEmail: "accounts@example.com",
+            };
+
+            await service.onboard("user_1", {
+                name: "Acme",
+                newBillingProfile,
+            });
+
+            expect(mockChosenBillingProfile).toHaveBeenCalledWith(
+                expect.anything(),
+                "user_1",
+                { billingProfileId: undefined, newBillingProfile },
+            );
+            expect(
+                (
+                    orgCreate.mock.calls[0] as [
+                        { data: Record<string, unknown> },
+                    ]
+                )[0].data.billingProfileId,
+            ).toBe("bprof_new");
+        });
+
+        it("creates nothing when the choice is refused", async () => {
+            mockChosenBillingProfile.mockRejectedValueOnce(
+                new BadRequestException({
+                    message: "Choose who Saroh bills for this business.",
+                    details: { field: "billingProfile" },
+                }),
+            );
+
+            await expect(
+                service.onboard("user_1", { name: "Acme" }),
+            ).rejects.toMatchObject({
+                response: { details: { field: "billingProfile" } },
+            });
+            expect(orgCreate).not.toHaveBeenCalled();
+            expect(membershipCreate).not.toHaveBeenCalled();
+            expect(record).not.toHaveBeenCalled();
+        });
+
+        it("reads a new profile's email lost to the database's unique index as the 409 the check gives", async () => {
+            transaction.mockRejectedValueOnce(
+                Object.assign(new Error("Unique constraint failed"), {
+                    code: "P2002",
+                    meta: { modelName: "BillingProfile" },
+                }),
+            );
+
+            await expect(
+                service.onboard("user_1", {
+                    name: "Acme",
+                    newBillingProfile: {
+                        legalName: "Asha Foods LLP",
+                        billingEmail: "accounts@example.com",
+                    },
+                }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: { details: { field: "billingEmail" } },
+            });
+        });
+
+        it("leaves another unique index's error as it is", async () => {
+            const slugRace = Object.assign(new Error("Unique"), {
+                code: "P2002",
+                meta: { modelName: "Organization", target: ["slug"] },
+            });
+            transaction.mockRejectedValueOnce(slugRace);
+
+            await expect(
+                service.onboard("user_1", { name: "Acme" }),
+            ).rejects.toBe(slugRace);
         });
     });
 

@@ -6,6 +6,7 @@ import { expect, test } from "@playwright/test";
 import { stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import {
+    answerBilling,
     answerFirst,
     answerKind,
     answerName,
@@ -98,18 +99,19 @@ test.describe("setup is three short steps (DEC-070, DEC-130)", () => {
             page.getByRole("radiogroup", { name: SETUP_QUESTIONS.first }),
         ).toHaveCount(0);
         // Asha has businesses already, so this is "Set up another" and
-        // counts setup's own three steps (a new account's counts four:
+        // counts setup's own steps, with who Saroh bills since she has a
+        // billing profile (a new account's counts four:
         // `signup-from-marketing.spec.ts`). No eyebrow calls it "Last step"
         // (the panel's sentence about what the last step opens is fine).
         await expect(
-            page.getByText("Set up another · Step 1 of 3", { exact: true }),
+            page.getByText("Set up another · Step 1 of 4", { exact: true }),
         ).toBeVisible();
         await expect(page.getByText("Last step", { exact: true })).toHaveCount(
             0,
         );
         await expect(page.getByRole("progressbar")).toHaveAttribute(
             "aria-valuetext",
-            "Step 1 of 3",
+            "Step 1 of 4",
         );
         await expect(page.getByText(/Signed in as/)).toBeVisible();
 
@@ -183,8 +185,10 @@ test.describe("setup is three short steps (DEC-070, DEC-130)", () => {
         await expect(page.getByText(/Signed in as/)).toBeVisible();
         await sideways();
 
-        // The browser's own Back is the step before, with what was typed,
-        // and a reload keeps both.
+        // The browser's own Back is the step before (who Saroh bills, then
+        // the name), with what was typed, and a reload keeps both.
+        await page.goBack();
+        await expect(setupHeading(page, SETUP_QUESTIONS.billing)).toBeVisible();
         await page.goBack();
         await expect(page.getByLabel("What is it called?")).toHaveValue(name);
         await page.reload();
@@ -198,6 +202,8 @@ test.describe("setup is three short steps (DEC-070, DEC-130)", () => {
         await continueSetup(page);
         await expect(page.getByLabel("What is it called?")).toHaveValue(name);
         await continueSetup(page);
+        // Who Saroh bills is never kept across a reload: asked again.
+        await answerBilling(page);
 
         await answerFirst(page, { goal: /Decide later/ });
         expect(await kindOf(page, name)).toEqual({

@@ -70,6 +70,16 @@ pattern files refer back here.
       from it (each with the fields its gate checks), and the form, the
       panel beside it, the count above the heading and the progress bar
       all read that. A test in each app pins the same four strings.
+    - **One step only some are asked** (DEC-167, R7): "Who does Saroh
+      bill for this business?", between the name and what to do first,
+      for an owner who has a billing profile already (the page reads
+      `GET /billing-profiles`). Their profiles (legal name, GSTIN or "No
+      GSTIN", address, billing email), then "New billing profile" with
+      its fields inline; none is chosen for them, and Continue asks until
+      one is. Someone with none isn't asked: their first profile is made
+      from the business. Every step function takes `billing`; the plan's
+      own three steps and their strings are unchanged. Its answers stay
+      out of the tab's draft.
     - **One form.** Every step's answers live in one react-hook-form, and
       only the step on show is drawn. Back and Continue lose nothing, and
       Back never asks.

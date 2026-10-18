@@ -22,6 +22,7 @@ import {
 import type { SocialNetwork } from "@saroh/block-contract";
 import { MAP_LINK_MAX, SOCIAL_INPUT_MAX } from "@saroh/block-contract";
 
+import { NewBillingProfileDto } from "../billing/billing-profile.dto";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { GST_PRICE_MODES } from "../invoices/gst-price";
 import {
@@ -201,6 +202,24 @@ export class OnboardOrganizationDto {
     @IsOptional()
     @IsString()
     referralCode?: string;
+
+    /**
+     * Who Saroh bills for it (DEC-167, R7): one of the caller's own billing
+     * profiles. An owner who has a profile already must choose, this or
+     * {@link newBillingProfile}; one who has none gets their first from the
+     * business's details. Whose it is is checked by the service: another
+     * person's is a 404, as if it didn't exist.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    billingProfileId?: string;
+
+    /** Or a new profile, made with the business in its transaction. */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => NewBillingProfileDto)
+    newBillingProfile?: NewBillingProfileDto;
 }
 
 const DIGITS_MESSAGE = `The counter is ${MIN_COUNTER_DIGITS} to ${MAX_COUNTER_DIGITS} digits.`;

@@ -4,11 +4,22 @@ import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormField, FormItem } from "@saroh/ui/form";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from "react";
 import { useForm, useWatch } from "react-hook-form";
 
 import { PAGE_FORM, toFirstErrorIn } from "@/lib/hooks/page-form";
 import { addressFromName } from "@/lib/organizations/address";
+import type {
+    BillingProfileOption,
+    SetupBilling,
+} from "@/lib/organizations/setup-billing";
+import { NO_BILLING } from "@/lib/organizations/setup-billing";
 import { defaultGoal, setupGoals } from "@/lib/organizations/setup-plan";
 import type { SetupDraft, SetupValues } from "@/lib/organizations/setup-steps";
 import {
@@ -29,6 +40,7 @@ import {
     writeSetupDraft,
 } from "@/lib/organizations/setup-steps";
 
+import { SetupBillingStep, toChoices } from "./setup-billing-step";
 import { createFromSetup } from "./setup-create";
 import { SetupFoot } from "./setup-foot";
 import { SetupGoalChoice } from "./setup-goal-choice";
@@ -50,6 +62,9 @@ import { fieldsOf, useSetupWalk } from "./use-setup-walk";
  *     changes words and defaults only.
  *  2. Its name and web address, your own name if the account has none, and
  *     where it is.
+ *  …  Who Saroh bills for it (DEC-167, R7), only for an owner who has a
+ *     billing profile already: one of theirs, or a new one. None is
+ *     chosen for them.
  *  3. What will you do first? The step's button creates the business, turns
  *     that first thing on with its defaults and opens it: a new product, a
  *     new service, the site ready to publish, a new contact.
@@ -107,6 +122,7 @@ function startingAnswers(
         address: "",
         country: "IN",
         goal: defaultGoal("BUSINESS"),
+        ...NO_BILLING,
         ...draft?.values,
         // A name the page came with (an invite) stands until one is typed.
         name: typed === "" ? (defaultName ?? "") : typed,
@@ -123,6 +139,7 @@ function SetupSteps({
     defaultName,
     arrival,
     note,
+    billingProfiles,
     ready,
 }: SetupFormProps & {
     /** In the browser, with the tab's draft read. */
@@ -130,8 +147,17 @@ function SetupSteps({
 }) {
     const router = useRouter();
     const [draft] = useState(() => (ready ? readSetupDraft(email) : null));
+    // Who Saroh bills is asked only of an owner with a profile (DEC-167).
+    const billing = useMemo<SetupBilling | null>(
+        () =>
+            billingProfiles && billingProfiles.length > 0
+                ? { profiles: billingProfiles }
+                : null,
+        [billingProfiles],
+    );
+    const asksBilling = billing !== null;
     const form = useForm<SetupValues>({
-        resolver: zodResolver(setupSchema(needsName)),
+        resolver: zodResolver(setupSchema(needsName, billing)),
         ...PAGE_FORM,
         defaultValues: startingAnswers(draft, defaultName),
     });
@@ -165,7 +191,7 @@ function SetupSteps({
         go,
         back,
         showProblemOn,
-    } = useSetupWalk({ ready, needsName, form });
+    } = useSetupWalk({ ready, needsName, billing, form });
 
     // The web address follows the name until it is edited.
     useEffect(() => {
@@ -224,10 +250,13 @@ function SetupSteps({
         // Left by the browser's Back while the address was being asked.
         if (current.current !== from) return;
         if (!ok) {
+            if (from === "billing" && toChoices(form, formRef.current)) {
+                return;
+            }
             toFirstErrorIn(formRef.current);
             return;
         }
-        const next = stepAfter(from);
+        const next = stepAfter(from, asksBilling);
         if (next) go(next);
     }
 
@@ -236,6 +265,7 @@ function SetupSteps({
             needsName,
             checkout,
             invite,
+            billing: asksBilling,
             // The business exists: the draft has done its work.
             onMade: () => {
                 made.current = true;
@@ -260,7 +290,7 @@ function SetupSteps({
 
     /** Create pressed over an answer an earlier step would refuse. */
     function onRefused() {
-        const stuck = firstUnanswered(form.getValues(), needsName);
+        const stuck = firstUnanswered(form.getValues(), needsName, billing);
         if (stuck) showProblemOn(stuck);
     }
 
@@ -274,7 +304,7 @@ function SetupSteps({
         }
     }
 
-    const before = stepBefore(step);
+    const before = stepBefore(step, asksBilling);
     // The choices' own names: the heading is the question each answers.
     const headingId = stepHeadingId(step);
 
@@ -293,7 +323,7 @@ function SetupSteps({
                     className="label mb-3 text-muted-foreground"
                     data-ph-unmask=""
                 >
-                    {stepEyebrow(step, another)}
+                    {stepEyebrow(step, another, asksBilling)}
                 </p>
 
                 {/* One step, and only this one. Keyed, so each arrives as
@@ -351,6 +381,14 @@ function SetupSteps({
                             />
                         ) : null}
 
+                        {step === "billing" && billing ? (
+                            <SetupBillingStep
+                                billing={billing}
+                                labelledBy={headingId}
+                                describedBy={STEP_LEAD_ID}
+                            />
+                        ) : null}
+
                         {step === "first" ? (
                             <FormField
                                 control={form.control}
@@ -375,8 +413,8 @@ function SetupSteps({
                 </SetupStepFrame>
 
                 <SetupFoot
-                    position={stepPosition(step, another)}
-                    count={stepCount(step, another)}
+                    position={stepPosition(step, another, asksBilling)}
+                    count={stepCount(step, another, asksBilling)}
                     primary={stepPrimary(step, kind)}
                     busy={busy}
                     holding={holding}
@@ -414,4 +452,10 @@ interface SetupFormProps {
     arrival?: React.ReactNode;
     /** Said on every step: the plan or the invite the create will act on. */
     note?: React.ReactNode;
+    /**
+     * The owner's billing profiles (DEC-167). With any, setup asks who
+     * Saroh bills for the business; with none, it isn't asked, and the
+     * first is made from the business.
+     */
+    billingProfiles?: readonly BillingProfileOption[];
 }

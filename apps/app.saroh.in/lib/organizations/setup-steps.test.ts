@@ -140,6 +140,56 @@ describe("the step in the address", () => {
     });
 });
 
+describe("who Saroh bills, asked of an owner with a profile (DEC-167)", () => {
+    const billing = {
+        profiles: [
+            {
+                id: "bprof_1",
+                legalName: "Asha Foods LLP",
+                gstin: null,
+                address: null,
+                billingEmail: "accounts@example.com",
+            },
+        ],
+    };
+
+    it("is a step between the name and what to do first, only when asked", () => {
+        expect(stepAfter("name", true)).toBe("billing");
+        expect(stepAfter("billing", true)).toBe("first");
+        expect(stepBefore("first", true)).toBe("billing");
+        expect(stepAfter("name")).toBe("first");
+        expect(stepOfField("billingChoice")).toBe("billing");
+        expect(stepOfField("billEmail")).toBe("billing");
+        expect(stepFromQuery("billing")).toBe("billing");
+    });
+
+    it("counts it when asked, and leaves the plan's own steps as they are", () => {
+        expect(stepEyebrow("billing", true, true)).toBe(
+            "Set up another · Step 3 of 4",
+        );
+        expect(stepCount("first", true, true)).toBe("Step 4 of 4");
+        expect(stepCount("first", false, true)).toBe("Step 5 of 5");
+        expect(planFor("billing").current).toBe(3);
+        expect(stepHeading("billing", "BUSINESS")).toBe(
+            "Who does Saroh bill for this business?",
+        );
+        expect(stepLead("billing", true)).toMatch(/\.$/);
+        expect(stepLead("billing", true)).not.toMatch(/[—;]/);
+    });
+
+    it("holds the last step back until it is answered", () => {
+        expect(firstUnanswered(ANSWERED, false, billing)).toBe("billing");
+        expect(openStep("first", ANSWERED, false, billing)).toBe("billing");
+        const chosen = { ...ANSWERED, billingChoice: "bprof_1" };
+        expect(firstUnanswered(chosen, false, billing)).toBeNull();
+        expect(openStep("first", chosen, false, billing)).toBe("first");
+    });
+
+    it("an address for it where it isn't asked opens the step after it", () => {
+        expect(openStep("billing", ANSWERED, false)).toBe("first");
+    });
+});
+
 describe("which step may be shown", () => {
     it("finds the first step with an answer its gate would refuse", () => {
         expect(firstUnanswered(ANSWERED, false)).toBeNull();

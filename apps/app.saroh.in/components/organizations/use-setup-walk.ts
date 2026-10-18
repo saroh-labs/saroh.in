@@ -4,19 +4,19 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
 import { toFirstErrorIn } from "@/lib/hooks/page-form";
+import type { SetupBilling } from "@/lib/organizations/setup-billing";
 import type { SetupStepId, SetupValues } from "@/lib/organizations/setup-steps";
 import {
+    fieldsOfStep,
     openStep,
-    SETUP_STEPS,
     stepBefore,
-    stepIndex,
 } from "@/lib/organizations/setup-steps";
 
 import { useSetupStep } from "./setup-step-context";
 
 /** The answers a step asks for. */
 export function fieldsOf(step: SetupStepId) {
-    return SETUP_STEPS[stepIndex(step)]?.fields ?? [];
+    return fieldsOfStep(step);
 }
 
 /**
@@ -36,11 +36,14 @@ export function fieldsOf(step: SetupStepId) {
 export function useSetupWalk({
     ready,
     needsName,
+    billing,
     form,
 }: {
     /** In the browser, with the tab's draft read. */
     ready: boolean;
     needsName: boolean;
+    /** Who Saroh bills, when it is asked (DEC-167). */
+    billing: SetupBilling | null;
     form: UseFormReturn<SetupValues>;
 }) {
     const { step, moves, go, back } = useSetupStep();
@@ -51,14 +54,14 @@ export function useSetupWalk({
 
     useLayoutEffect(() => {
         if (!ready) return;
-        const open = openStep(step, form.getValues(), needsName);
+        const open = openStep(step, form.getValues(), needsName, billing);
         if (open === step) return;
         if (moves > 0) {
             toProblem.current = true;
             void form.trigger([...fieldsOf(open)]);
         }
         go(open, "replace");
-    }, [ready, step, moves, needsName, form, go]);
+    }, [ready, step, moves, needsName, billing, form, go]);
 
     const shown = useRef<SetupStepId | null>(null);
     /** The step on show now, for work that outlives a render. */
@@ -67,7 +70,9 @@ export function useSetupWalk({
         current.current = step;
         if (!ready) return;
         // About to give way to an earlier step: it was never shown.
-        if (openStep(step, form.getValues(), needsName) !== step) return;
+        if (openStep(step, form.getValues(), needsName, billing) !== step) {
+            return;
+        }
         const from = shown.current;
         shown.current = step;
         if (toProblem.current) {
@@ -78,7 +83,7 @@ export function useSetupWalk({
             // one must not open scrolled past its question.
             headingRef.current?.focus();
         }
-    }, [step, ready, needsName, form]);
+    }, [step, ready, needsName, billing, form]);
 
     /** Show the step a problem is on, with the keyboard on the problem. */
     function showProblemOn(to: SetupStepId) {
@@ -87,7 +92,7 @@ export function useSetupWalk({
             return;
         }
         toProblem.current = true;
-        if (stepBefore(step) === to) back(to);
+        if (stepBefore(step, billing !== null) === to) back(to);
         else go(to, "replace");
     }
 

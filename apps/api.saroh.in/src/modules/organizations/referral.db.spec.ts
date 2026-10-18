@@ -147,10 +147,17 @@ describe("who referred a business (real database, DEC-156)", () => {
         });
 
         for (const userId of [rye.ownerId, teammate]) {
+            // Rye's owner has a billing profile already, so chooses it
+            // (DEC-167); the teammate has none and gets their first.
+            const mine = await prisma.billingProfile.findFirst({
+                where: { ownerUserId: userId },
+                select: { id: true },
+            });
             const made = await onboarding.onboard(userId, {
                 name: "Rye Second Shop",
                 address: uniq("rye-two-"),
                 referralCode: rye.code,
+                ...(mine ? { billingProfileId: mine.id } : {}),
             });
             expect(
                 (await referral(made.id)).referredByOrganizationId,

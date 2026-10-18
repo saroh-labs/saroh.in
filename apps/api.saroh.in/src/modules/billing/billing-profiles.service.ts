@@ -354,6 +354,90 @@ export async function firstBillingProfileInTx(
     return made.id;
 }
 
+/** What a new business is billed to, as setup sends it (R7, U4). */
+export interface BillingProfileChoice {
+    /** One of the caller's own profiles. */
+    billingProfileId?: string;
+    /** Or a new one, made with the business. */
+    newBillingProfile?: BillingProfileInput;
+}
+
+/** The plain message for an owner with profiles who chose none (R7). */
+export const BILLING_PROFILE_CHOICE_NEEDED =
+    "Choose who Saroh bills for this business.";
+
+/**
+ * The profile a new business is billed to (R6, R7), on the onboarding's
+ * transaction, so the business and its profile are made, or not, together:
+ *
+ * - one of the caller's own profiles, by id; anyone else's is a 404 (as
+ *   if it didn't exist), and so is one that doesn't;
+ * - or a new one, made here with its sync queued (a billing email the
+ *   caller already uses is the 409 of {@link createBillingProfileInTx});
+ * - neither, from an owner who has profiles: a 400 naming the choice,
+ *   since a charged invoice's GST details can't be changed afterwards and
+ *   none is picked for them;
+ * - neither, from someone with no profile yet: null, and their first is
+ *   made from the business's details once it exists
+ *   ({@link firstBillingProfileInTx}).
+ */
+export async function chosenBillingProfileInTx(
+    tx: ProfileTx,
+    ownerUserId: string,
+    choice: BillingProfileChoice,
+): Promise<string | null> {
+    if (choice.billingProfileId && choice.newBillingProfile) {
+        refuse(
+            "Choose one of your billing profiles or a new one, not both.",
+            "billingProfile",
+        );
+    }
+    if (choice.billingProfileId) {
+        const mine = await tx.billingProfile.findFirst({
+            where: { id: choice.billingProfileId, ownerUserId },
+            select: { id: true },
+        });
+        if (!mine) {
+            throw new NotFoundException({
+                message:
+                    "That billing profile isn't one of yours. Choose another.",
+                details: { field: "billingProfile" },
+            });
+        }
+        return mine.id;
+    }
+    if (choice.newBillingProfile) {
+        const made = await createBillingProfileInTx(
+            tx,
+            ownerUserId,
+            choice.newBillingProfile,
+        );
+        return made.id;
+    }
+    const hasProfile = await tx.billingProfile.findFirst({
+        where: { ownerUserId },
+        select: { id: true },
+    });
+    if (hasProfile) refuse(BILLING_PROFILE_CHOICE_NEEDED, "billingProfile");
+    return null;
+}
+
+/**
+ * A write that lost the race to the one-email-per-owner index, read as the
+ * same 409 the check before it gives. Only that index's violation: another
+ * unique index (a business's address) keeps its own error.
+ */
+export function billingEmailRaceAsTaken(error: unknown): unknown {
+    if (prismaErrorCode(error) !== "P2002") return error;
+    const meta = (error as { meta?: unknown }).meta;
+    const said = JSON.stringify(meta ?? {});
+    return /BillingProfile|billing_profile|billingEmail|billing_email/.test(
+        said,
+    )
+        ? emailTaken()
+        : error;
+}
+
 @Injectable()
 export class BillingProfilesService {
     private readonly logger = new Logger(BillingProfilesService.name);

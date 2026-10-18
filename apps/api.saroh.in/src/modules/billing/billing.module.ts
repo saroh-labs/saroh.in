@@ -18,6 +18,7 @@ import {
 import { BILLING_CUSTOMER_SYNC_TYPE } from "./billing-customer-sync";
 import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
 import { BILLING_PROFILE_SYNC_TYPE } from "./billing-profile-sync";
+import { BillingProfilesController } from "./billing-profiles.controller";
 import { BillingProfilesService } from "./billing-profiles.service";
 import {
     BILLING_RECONCILE_TYPE,
@@ -117,7 +118,13 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         JobsModule,
         forwardRef(() => OrganizationsModule),
     ],
-    controllers: [PlansController, BillingController, BillingWebhookController],
+    controllers: [
+        PlansController,
+        BillingController,
+        BillingWebhookController,
+        // The caller's own billing profiles, for setting up a business.
+        BillingProfilesController,
+    ],
     providers: [
         PlansService,
         SubscriptionsService,

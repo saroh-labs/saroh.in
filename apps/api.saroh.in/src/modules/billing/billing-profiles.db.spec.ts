@@ -8,7 +8,8 @@
  *   profile's customer once and then keeps it current;
  * - an edit says how many businesses it changes;
  * - the first business gets its owner's first profile at sign-up, and a
- *   save of Settings › Business no longer touches billing.
+ *   save of Settings › Business no longer touches billing (a later
+ *   business's choice is `organization-onboarding-billing.db.spec.ts`).
  *
  * Integration project (TEST_DATABASE_URL).
  */
@@ -386,27 +387,6 @@ describe("the first business's profile (R6, F1)", () => {
                 where: { type: BILLING_CUSTOMER_SYNC_TYPE },
             }),
         ).toBe(0);
-    });
-
-    it("a later business of an owner with a profile gets none until it is chosen (U4)", async () => {
-        const owner = await person();
-        await onboard(owner.id);
-        await prisma.job.deleteMany({});
-        const later = await onboard(owner.id, "Asha's Bakery");
-
-        expect(
-            await prisma.billingProfile.count({
-                where: { ownerUserId: owner.id },
-            }),
-        ).toBe(1);
-        expect(
-            (
-                await prisma.organization.findUniqueOrThrow({
-                    where: { id: later.id },
-                })
-            ).billingProfileId,
-        ).toBeNull();
-        expect(await syncJobs()).toHaveLength(0);
     });
 
     it("is made once: asked again for the same owner and email it hands back the profile, queueing nothing", async () => {

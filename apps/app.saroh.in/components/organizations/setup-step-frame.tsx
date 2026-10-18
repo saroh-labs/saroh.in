@@ -6,6 +6,7 @@ import type { SetupStepId } from "@/lib/organizations/setup-steps";
 export function stepHeadingId(step: SetupStepId): string {
     if (step === "kind") return "kind-label";
     if (step === "first") return "goal-label";
+    if (step === "billing") return "billing-heading";
     return "name-heading";
 }
 
