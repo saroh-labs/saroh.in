@@ -11,6 +11,7 @@ import {
     DialogTitle,
 } from "@saroh/ui/dialog";
 import { focusFirstError } from "@saroh/ui/field";
+import { Notice } from "@saroh/ui/notice";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { LoaderCircle } from "lucide-react";
@@ -542,10 +543,7 @@ export function ChangePlanDialog({
                 ) : null}
 
                 {profileRefused ? (
-                    <div
-                        role="alert"
-                        className="grid gap-2 rounded-lg border border-border px-3.5 py-3 text-[13px]"
-                    >
+                    <Notice tone="warning" role="alert">
                         <p className="text-pretty">{profileRefused.error}</p>
                         {profileRefused.profile.code === "profile-not-yours" ? (
                             <p>
@@ -561,7 +559,7 @@ export function ChangePlanDialog({
                                 </Button>
                             </p>
                         ) : null}
-                    </div>
+                    </Notice>
                 ) : null}
 
                 {choosing ? (
