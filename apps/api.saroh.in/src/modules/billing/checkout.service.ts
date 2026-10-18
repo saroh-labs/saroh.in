@@ -41,7 +41,6 @@ import { clearAddonsInTx } from "./addon-charges";
 import type { EndingAddon } from "./addons-ending";
 import { addonsEndingWith } from "./addons-ending";
 import { BillingCustomers } from "./billing-customer";
-import { enqueueBillingCustomerSync } from "./billing-customer-sync";
 import type {
     BillingDetail,
     BillingDetailsSent,
@@ -57,6 +56,7 @@ import {
     nonEmpty,
     readBillingParty,
 } from "./billing-details";
+import { enqueueBusinessProfileSync } from "./billing-profile-sync";
 import type { Term } from "./billing-term";
 import {
     isOneTime,
@@ -343,7 +343,7 @@ export class CheckoutService {
         this.customers = new BillingCustomers(providers, this.logger);
     }
 
-    /** The business's one customer at the provider (DEC-165). */
+    /** The business's billing profile's customer at the provider (DEC-167). */
     private readonly customers: BillingCustomers;
 
     async quote(
@@ -1015,16 +1015,23 @@ export class CheckoutService {
         const expiresAt = checkoutExpiresAt(stored, quote.startAt, now);
         const provider = this.providers.get(CATALOGUE_BILLING_PROVIDER);
         const customer = await this.billingCustomer(ctx, billTo);
-        // Every checkout's order or subscription is linked to the business's
-        // one customer at the provider (DEC-165: made at sign-up, made now
-        // if it hasn't been), so its dashboard shows who it bills from the
-        // start, paid or not. A refusal leaves the notes and the window's
-        // prefill to say it; a provider that can't answer stops here, as a
-        // subscription made without the customer would have the provider
-        // make a second one of its own.
+        // Every checkout's order or subscription is linked to the customer
+        // of the billing profile the business is billed to (DEC-167: made
+        // by a job when the profile was, made now if it hasn't been), so
+        // the provider's dashboard shows who it bills from the start, paid
+        // or not. A business with no profile, or a refusal, leaves the
+        // notes and the window's prefill to say it; a provider that can't
+        // answer stops here, as a subscription made without the customer
+        // would have the provider make a second one of its own.
         let customerId: string | null;
         try {
-            customerId = await this.customers.idFor(ctx.organizationId);
+            const billedTo = await prisma.organization.findUnique({
+                where: { id: ctx.organizationId },
+                select: { billingProfileId: true },
+            });
+            customerId = await this.customers.idFor(
+                billedTo?.billingProfileId ?? null,
+            );
         } catch (error) {
             this.logger.warn(
                 `billing_checkout_customer_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
@@ -1157,7 +1164,7 @@ export class CheckoutService {
                 await assertBillingMayStart(tx, ctx.organizationId);
                 await this.dropOpenCheckout(tx, ctx.organizationId);
                 // Details given at checkout reach the provider's customer.
-                await enqueueBillingCustomerSync(tx, ctx.organizationId);
+                await enqueueBusinessProfileSync(tx, ctx.organizationId);
                 return tx.billingCheckout.create({ data });
             });
         } catch (error) {

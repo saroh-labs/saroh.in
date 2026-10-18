@@ -3,11 +3,11 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 // Mock the database package so the service never touches a real Postgres. The
 // `$transaction` mock simply invokes its callback with the same mocked client,
 // so we can assert every write happens inside the one transaction.
-// The billing customer's sync job (DEC-165) has its own db spec.
-const mockEnqueueBillingCustomerSync = jest.fn();
-jest.mock("../billing/billing-customer-sync", () => ({
-    enqueueBillingCustomerSync: (...args: unknown[]) =>
-        mockEnqueueBillingCustomerSync(...args),
+// The first business's billing profile (DEC-167) has its own db spec.
+const mockFirstBillingProfile = jest.fn();
+jest.mock("../billing/billing-profiles.service", () => ({
+    firstBillingProfileInTx: (...args: unknown[]) =>
+        mockFirstBillingProfile(...args) as unknown,
 }));
 jest.mock("@saroh/database", () => {
     const client = {
@@ -29,6 +29,10 @@ jest.mock("@saroh/database", () => {
         },
         membership: {
             create: jest.fn(),
+        },
+        // The owner's billing profiles (DEC-167): none, unless a test says.
+        billingProfile: {
+            findFirst: jest.fn().mockResolvedValue(null),
         },
     };
     return {
@@ -99,6 +103,36 @@ describe("OrganizationOnboardingService.onboard", () => {
         profileCreate.mockResolvedValue({ id: "bp_1" });
         membershipCreate.mockResolvedValue({ id: "mem_1" });
         referringBusiness.mockResolvedValue(null);
+    });
+
+    describe("the first business's billing profile (DEC-167)", () => {
+        const profileFindFirst = (
+            prisma as unknown as { billingProfile: { findFirst: jest.Mock } }
+        ).billingProfile.findFirst;
+
+        it("makes the owner's first profile in the sign-up's transaction", async () => {
+            profileFindFirst.mockResolvedValueOnce(null);
+
+            await service.onboard("user_1", { name: "Acme" });
+
+            expect(profileFindFirst).toHaveBeenCalledWith({
+                where: { ownerUserId: "user_1" },
+                select: { id: true },
+            });
+            expect(mockFirstBillingProfile).toHaveBeenCalledTimes(1);
+            expect(mockFirstBillingProfile).toHaveBeenCalledWith(
+                expect.anything(),
+                { ownerUserId: "user_1", organizationId: "org_1" },
+            );
+        });
+
+        it("makes none for an owner who has a profile already: a later business chooses", async () => {
+            profileFindFirst.mockResolvedValueOnce({ id: "bprof_1" });
+
+            await service.onboard("user_1", { name: "Acme" });
+
+            expect(mockFirstBillingProfile).not.toHaveBeenCalled();
+        });
     });
 
     describe("who referred it (DEC-156)", () => {

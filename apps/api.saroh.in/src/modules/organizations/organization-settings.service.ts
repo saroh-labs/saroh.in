@@ -15,7 +15,6 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { enqueueBillingCustomerSync } from "../billing/billing-customer-sync";
 import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
@@ -576,14 +575,9 @@ export class OrganizationSettingsService {
                     update: written,
                 });
             }
-            // Who Saroh bills changed: its customer at the billing
-            // provider is brought up to date by a job (DEC-165).
-            if (
-                dto.name !== undefined ||
-                Object.keys(written).some((k) => BILLING_FIELDS.has(k))
-            ) {
-                await enqueueBillingCustomerSync(tx, ctx.organizationId);
-            }
+            // Settings › Business is the business's own seller identity,
+            // not who Saroh bills (DEC-167): its billing profile is, and a
+            // save here leaves its customer at the provider alone.
 
             const organization = await tx.organization.findUnique(read);
             if (!organization) {
@@ -934,20 +928,6 @@ export class OrganizationSettingsService {
  * never blanks the other five. An explicit empty string is preserved — that is
  * how the UI clears a field — while `undefined` (absent) is dropped.
  */
-/** The profile fields the provider's customer is made of (DEC-165). */
-const BILLING_FIELDS = new Set([
-    "legalName",
-    "contactEmail",
-    "phone",
-    "taxId",
-    "gstRegistered",
-    "gstState",
-    "addressLine1",
-    "addressLine2",
-    "city",
-    "postalCode",
-]);
-
 function reduceProfile(profile: ProfileData | undefined): ProfileData {
     if (!profile) return {};
     const data: ProfileData = {};

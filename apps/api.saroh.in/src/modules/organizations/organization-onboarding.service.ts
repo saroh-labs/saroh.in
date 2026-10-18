@@ -15,7 +15,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { enqueueBillingCustomerSync } from "../billing/billing-customer-sync";
+import { firstBillingProfileInTx } from "../billing/billing-profiles.service";
 import { FREE_PLAN_ID } from "../billing/catalogue-access.service";
 import {
     addressProblem,
@@ -174,9 +174,21 @@ export class OrganizationOnboardingService {
                 planId: FREE_PLAN_ID,
             });
 
-            // Its one customer at Saroh's billing provider (DEC-165), made
-            // by a job after the commit: never in the way of signing up.
-            await enqueueBillingCustomerSync(tx, organization.id);
+            // The owner's first business gets their first billing profile
+            // from its details (DEC-167, R6), whose customer at Saroh's
+            // billing provider is made by a job after the commit: never in
+            // the way of signing up. An owner who has profiles already
+            // chooses one for a later business (U4); until then it has none.
+            const hasProfile = await tx.billingProfile.findFirst({
+                where: { ownerUserId: userId },
+                select: { id: true },
+            });
+            if (!hasProfile) {
+                await firstBillingProfileInTx(tx, {
+                    ownerUserId: userId,
+                    organizationId: organization.id,
+                });
+            }
 
             this.logger.log(
                 `Onboarded organization ${organization.id} (${organization.slug}) with OWNER ${userId}`,

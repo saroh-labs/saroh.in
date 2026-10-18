@@ -2,7 +2,6 @@ import type { Auth } from "@saroh/auth";
 import { createAuth, VERIFICATION_OTP_EXPIRY_SECONDS } from "@saroh/auth";
 
 import { signedUp } from "../../modules/analytics/product-milestones";
-import { enqueueOwnedBusinessesSync } from "../../modules/billing/billing-customer-sync";
 import {
     sendChangeEmailConfirmationEmail,
     sendDeleteAccountEmail,
@@ -39,11 +38,6 @@ export const auth: Auth = createAuth({
     // The `signed_up` product milestone (DEC-125): the user's id, nothing
     // else. A no-op unless PostHog is on.
     onUserCreated: ({ id }) => signedUp(id),
-    // The owner's email is each business's billing email: its customer at
-    // Saroh's billing provider is brought up to date (DEC-165).
-    onUserEmailChanged: async ({ id }) => {
-        await enqueueOwnedBusinessesSync(id);
-    },
     // A 5xx inside Better Auth, which answers /api/auth/* itself and so
     // never reaches AllExceptionsFilter. Never a 4xx.
     onServerError: reportAuthServerError,

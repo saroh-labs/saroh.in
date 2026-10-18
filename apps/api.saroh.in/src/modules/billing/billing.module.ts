@@ -11,9 +11,14 @@ import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AddonsSyncHandler, BILLING_ADDONS_SYNC_TYPE } from "./addon-charges";
 import { AddonsService } from "./addons.service";
-import { BillingCustomerSyncHandler } from "./billing-customer";
+import {
+    BillingCustomerSyncHandler,
+    BillingProfileSyncHandler,
+} from "./billing-customer";
 import { BILLING_CUSTOMER_SYNC_TYPE } from "./billing-customer-sync";
 import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
+import { BILLING_PROFILE_SYNC_TYPE } from "./billing-profile-sync";
+import { BillingProfilesService } from "./billing-profiles.service";
 import {
     BILLING_RECONCILE_TYPE,
     BillingReconcileHandler,
@@ -131,6 +136,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         MovesApplyHandler,
         PaymentNotesHandler,
         BillingCustomerSyncHandler,
+        BillingProfileSyncHandler,
+        BillingProfilesService,
         // The daily match of what the provider took (DEC-166).
         BillingReconcileHandler,
         SarohInvoicesService,
@@ -171,6 +178,7 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         private readonly refund: DoubleChargeRefundHandler,
         private readonly paymentNotes: PaymentNotesHandler,
         private readonly customerSync: BillingCustomerSyncHandler,
+        private readonly profileSync: BillingProfileSyncHandler,
         private readonly reconcile: BillingReconcileHandler,
     ) {}
 
@@ -199,9 +207,14 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
             BILLING_PAYMENT_NOTES_TYPE,
             this.paymentNotes.handle,
         );
+        // DEC-165's per-business job, kept to drain into the profile's.
         this.registry.register(
             BILLING_CUSTOMER_SYNC_TYPE,
             this.customerSync.handle,
+        );
+        this.registry.register(
+            BILLING_PROFILE_SYNC_TYPE,
+            this.profileSync.handle,
         );
         this.registry.register(BILLING_RECONCILE_TYPE, this.reconcile.handle);
         if (env.NODE_ENV === "test") return;

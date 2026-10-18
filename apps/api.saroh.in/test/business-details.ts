@@ -31,8 +31,9 @@ export async function giveBusinessDetails(
 /**
  * Give a test business all Saroh needs before it charges for a plan (17
  * Oct 2026, `billing/billing-details.ts`): its registered address and
- * state, and a contact email for a spec whose owner is no real user. Its
- * name is the organization's.
+ * state, a contact email for a spec whose owner is no real user, and the
+ * billing profile it is billed to (DEC-167). Its name is the
+ * organization's.
  */
 export async function giveBillingDetails(
     organizationId: string,
@@ -42,4 +43,50 @@ export async function giveBillingDetails(
         where: { organizationId, contactEmail: null },
         data: { contactEmail: "billing@example.com" },
     });
+    await giveBillingProfile(organizationId);
+}
+
+/**
+ * Give a test business the billing profile Saroh bills (DEC-167), when it
+ * has none: owned by a user of its own (a spec's owner is often no real
+ * user), billed to the business's details. Its customer at the provider is
+ * made by the first checkout, as for a profile whose job hasn't run.
+ * Answers the profile's id.
+ */
+export async function giveBillingProfile(
+    organizationId: string,
+): Promise<string> {
+    const org = await prisma.organization.findUniqueOrThrow({
+        where: { id: organizationId },
+        select: { name: true, billingProfileId: true },
+    });
+    if (org.billingProfileId) return org.billingProfileId;
+    const business = await prisma.businessProfile.findUnique({
+        where: { organizationId },
+    });
+    const owner = await prisma.user.create({
+        data: {
+            email: `billing-${organizationId}@example.com`.toLowerCase(),
+            name: "Billing Owner",
+        },
+    });
+    const profile = await prisma.billingProfile.create({
+        data: {
+            ownerUserId: owner.id,
+            legalName: business?.legalName || org.name,
+            gstState: business?.gstState ?? null,
+            addressLine1: business?.addressLine1 ?? null,
+            city: business?.city ?? null,
+            postalCode: business?.postalCode ?? null,
+            billingEmail: (
+                business?.contactEmail ?? "billing@example.com"
+            ).toLowerCase(),
+            provider: "RAZORPAY",
+        },
+    });
+    await prisma.organization.update({
+        where: { id: organizationId },
+        data: { billingProfileId: profile.id },
+    });
+    return profile.id;
 }
