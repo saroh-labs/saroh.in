@@ -13,7 +13,7 @@
         "check:edge-headers": "node scripts/check-edge-headers.mjs",
         "check:security-headers": "node scripts/check-security-headers.mjs",
         "check:copy": "node scripts/check-app-copy.mjs",
-        "check:e2e-covers": "node scripts/e2e-affected.mjs --check",
+        "check:e2e-covers": "node --test scripts/e2e-affected.test.mjs && node scripts/e2e-affected.mjs --check",
         "check:formats": "node scripts/check-formats.mjs",
         "check:merchant-site-tracking": "node scripts/check-merchant-site-tracking.mjs",
         "check:migration-fold": "pnpm --filter @saroh/database db:verify:migration-fold",
