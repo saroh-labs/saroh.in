@@ -15,6 +15,7 @@ import { formatDate, todayIso } from "@/lib/format";
 import { endOfDayIso, rupeesToPaise } from "@/lib/overrides";
 
 import { OperatorDialog } from "../operator-dialog";
+import { done } from "./plan-actions";
 
 const selectClass =
     "h-[38px] w-full rounded-md border border-input bg-field px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11";
@@ -316,16 +317,24 @@ export function PlanOverrideDialog({
     plans,
     current,
     defaultPlanId,
+    trigger,
+    onDone,
 }: {
     organizationId: string;
     plans: { id: string; name: string }[];
     current: { planKey: string; expiresAt: string | null } | null;
     defaultPlanId: string;
+    /** The button's words; "Put on a plan" or "Change plan override". */
+    trigger?: string;
+    /** After it went through: the screen's feedback (U3, R9). */
+    onDone?: (message: string) => void;
 }) {
     const nameOf = (id: string) => plans.find((p) => p.id === id)?.name ?? id;
     return (
         <OperatorDialog
-            trigger={current ? "Change plan override" : "Put on a plan"}
+            trigger={
+                trigger ?? (current ? "Change plan override" : "Put on a plan")
+            }
             title={
                 current
                     ? "Change or extend the plan override"
@@ -361,12 +370,16 @@ export function PlanOverrideDialog({
             disabled={plans.length === 0}
             disabledReason="The live catalogue has no plan to put it on."
             onSubmit={({ reason, idempotencyKey, values }) =>
-                planOverrideAction(organizationId, {
-                    reason,
-                    idempotencyKey,
-                    planKey: values.planKey ?? "",
-                    expiresAt: endOfDayIso(values.until ?? "") ?? "",
-                })
+                done(
+                    planOverrideAction(organizationId, {
+                        reason,
+                        idempotencyKey,
+                        planKey: values.planKey ?? "",
+                        expiresAt: endOfDayIso(values.until ?? "") ?? "",
+                    }),
+                    onDone,
+                    `On ${nameOf(values.planKey ?? "")} until ${formatDate(endOfDayIso(values.until ?? "") ?? null)}.`,
+                )
             }
         />
     );

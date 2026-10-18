@@ -38,7 +38,7 @@ test.describe("a business's page", () => {
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
         // By role: while the tab streams in, its copy waits in a hidden node.
         await expect(
-            page.getByRole("heading", { name: "Summary", exact: true }),
+            page.getByRole("heading", { name: "Plan and access", exact: true }),
         ).toBeVisible();
         await expect(
             page.getByRole("button", { name: "View as the business…" }),

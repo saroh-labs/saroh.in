@@ -66,7 +66,8 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
   `lib/billing-action-words.ts`, `lib/user-filters.ts`,
-  `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`.
+  `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
+  `lib/overview-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -118,6 +119,14 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   says why someone can't sign in (`lib/sign-in-words.ts`): an unverified
   email, or a changed sign-in email still held for its 24 hours, which a
   second staff member confirms from the Sign-in tab.
+- **A business's Overview needs no support session** (admin plan U3):
+  `GET /admin/organizations/:id/overview` (`organization:read`, scoped by
+  `scopeForStaff`) returns the cards and the tab badges with no personal
+  data: team names and roles (never emails), activity as action and time
+  (never who or why), notes as a count and date, offers without reasons,
+  and who it is billed to only for `saroh-billing:read`. The layout reads
+  it once for the badges (`readOverview`); each card's action opens over
+  Overview and highlights the card after a write (`useChangeFeedback`).
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and

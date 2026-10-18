@@ -169,6 +169,8 @@ const NEVER: Record<string, string> = {
         "staff control plane, not a tenant surface",
     "admin/admin-organizations.controller.ts":
         "staff control plane, not a tenant surface",
+    "admin/admin-organization-overview.controller.ts":
+        "staff control plane, not a tenant surface",
     "admin/admin-people.controller.ts":
         "staff control plane, not a tenant surface",
     "admin/admin-staff.controller.ts":

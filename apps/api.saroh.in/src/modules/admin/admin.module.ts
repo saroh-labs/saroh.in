@@ -42,6 +42,8 @@ import { AdminMachineryController } from "./admin-machinery.controller";
 import { AdminMachineryService } from "./admin-machinery.service";
 import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminOperationsService } from "./admin-operations.service";
+import { AdminOrganizationOverviewController } from "./admin-organization-overview.controller";
+import { AdminOrganizationOverviewService } from "./admin-organization-overview.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsController } from "./admin-organizations.controller";
 import { AdminOrganizationsService } from "./admin-organizations.service";
@@ -106,6 +108,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
     controllers: [
         AdminController,
         AdminOrganizationsController,
+        AdminOrganizationOverviewController,
         AdminStaffController,
         AdminPeopleController,
         AdminMachineryController,
@@ -125,6 +128,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminAuditService,
         AdminMetricsService,
         AdminOrganizationViewService,
+        AdminOrganizationOverviewService,
         AdminBusinessModulesService,
         AdminOrganizationsService,
         AdminLifecycleService,

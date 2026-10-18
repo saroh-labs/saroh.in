@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 
 import type { AdminPermission } from "./control-plane";
 import { adminFetch, getJson } from "./control-plane";
+import type { BusinessOverview } from "./overview-words";
 import type { EffectivePlan, UsageNote } from "./plan-words";
 
 /**
@@ -422,6 +423,20 @@ export async function getModuleState(
     } catch {
         return { status: "failed" };
     }
+}
+
+/**
+ * A business's Overview (admin plan U3): the cards and the tab badges in
+ * one read, with `organization:read` and no support session. `null` on a
+ * refusal (403/401): the caller draws no Overview and no badges. Throws on
+ * an outage, so the tab says it failed rather than that there is nothing.
+ */
+export function getBusinessOverview(
+    organizationId: string,
+): Promise<BusinessOverview | null> {
+    return getJson<BusinessOverview>(
+        `/organizations/${encodeURIComponent(organizationId)}/overview`,
+    );
 }
 
 export function listPlans(): Promise<PlanOption[] | null> {

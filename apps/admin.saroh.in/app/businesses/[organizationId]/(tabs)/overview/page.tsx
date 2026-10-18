@@ -1,34 +1,29 @@
+import { PermissionDeniedState } from "@saroh/ui/data-state";
 import type { ReactNode } from "react";
 
 import { DeletionPanels } from "@/components/business/deletion-panels";
 import { LifecycleBadge } from "@/components/business/lifecycle-badge";
+import { ActivityCard } from "@/components/business/overview/activity-card";
+import { ModulesCard } from "@/components/business/overview/modules-card";
+import { PlanCard } from "@/components/business/overview/plan-card";
+import { SiteCard } from "@/components/business/overview/site-card";
+import { TeamCard } from "@/components/business/overview/team-card";
+import { UsageCard } from "@/components/business/overview/usage-card";
 import { ReferredBy } from "@/components/business/referred-by";
-import { SessionTab } from "@/components/business/session-tab";
-import { WhatTheySee } from "@/components/business/what-they-see";
 import { Facts, Panel } from "@/components/panel";
+import { FailedPanel } from "@/components/states/failed-panel";
 import type { BusinessTabProps } from "@/lib/business-page";
 import {
     businessGate,
-    readModuleState,
-    readSummary,
+    readOverview,
+    readPlans,
+    readView,
     tabTitle,
 } from "@/lib/business-page";
-import type {
-    BusinessModulesState,
-    BusinessRow,
-    BusinessView,
-    Panel as PanelResult,
-} from "@/lib/businesses";
+import type { BusinessView } from "@/lib/businesses";
 import { can } from "@/lib/console";
 import { dataKeptLine, legalHoldLine } from "@/lib/deletion-words";
-import {
-    formatDate,
-    formatDateTime,
-    formatRelative,
-    plural,
-} from "@/lib/format";
-import { moduleLabel } from "@/lib/modules";
-import { planLine } from "@/lib/plan-words";
+import { formatDate, formatDateTime, plural } from "@/lib/format";
 
 export async function generateMetadata({ params }: BusinessTabProps) {
     const { organizationId } = await params;
@@ -36,100 +31,99 @@ export async function generateMetadata({ params }: BusinessTabProps) {
 }
 
 /**
- * Overview (admin plan U2): the directory row's summary, which any staff
- * member who may open the business reads without a support session, then
- * What they see, its state and its way out, which need one. U3 rebuilds
- * this tab as one view from a single read.
+ * Overview (admin plan U3, R2): the business at a glance, from one read
+ * (`GET …/overview`) that needs `organization:read` and no support session,
+ * so Operations, Billing and Release staff see it as Support does. It
+ * carries no personal data: names and roles, never emails; activity without
+ * who or why; notes as a count. Each card's action opens over Overview.
  */
 export default async function OverviewTab({ params }: BusinessTabProps) {
     const gate = await businessGate();
     if (!gate.ok) return null;
     const { staff } = gate;
     const { organizationId } = await params;
-    const summary = await readSummary(organizationId);
-    if (!summary) return null;
-    const moduleState = can(staff, "organization:view-as")
-        ? await readModuleState(organizationId)
+
+    let overview;
+    try {
+        overview = await readOverview(organizationId);
+    } catch {
+        overview = undefined;
+    }
+    if (overview === undefined) {
+        return (
+            <FailedPanel
+                things="the overview"
+                reassurance="The rest of the page is current."
+            />
+        );
+    }
+    if (overview === null) {
+        // Refused: an Account manager on a business that isn't theirs.
+        return (
+            <PermissionDeniedState
+                title="This business isn't one of yours"
+                description="Your access covers the businesses you look after."
+            />
+        );
+    }
+
+    const canChangePlan = can(staff, "subscription:override");
+    const legacyPlans =
+        canChangePlan &&
+        can(staff, "subscription:read") &&
+        overview.plan.status === "ok" &&
+        !overview.plan.data.livePlans
+            ? await readPlans()
+            : [];
+
+    // Inside an open support session only: where it stands and its way
+    // out, which carry reasons. Without one they are simply absent.
+    const session = can(staff, "organization:view-as")
+        ? await readView(organizationId).catch(() => null)
         : null;
+    const view = session?.status === "ok" ? session.view : null;
 
     return (
         <div className="grid gap-6">
-            <SummaryPanel summary={summary} />
-            <SessionTab staff={staff} organizationId={organizationId}>
-                {(view) => (
-                    <OverviewDetails
-                        view={view}
-                        moduleState={moduleState ?? { status: "failed" }}
-                    />
-                )}
-            </SessionTab>
-        </div>
-    );
-}
-
-/** What the directory row says, readable without a session. */
-function SummaryPanel({ summary }: { summary: BusinessRow }) {
-    return (
-        <Panel
-            title="Summary"
-            description="What the directory says about this business."
-        >
-            {() => (
-                <Facts
-                    rows={[
-                        [
-                            "Plan",
-                            planLine(
-                                summary.effectivePlan ?? null,
-                                summary.plan?.name,
-                            ),
-                        ],
-                        ["People", plural(summary.members, "person", "people")],
-                        [
-                            "Switched on",
-                            summary.enabledModules.length > 0
-                                ? summary.enabledModules
-                                      .map(moduleLabel)
-                                      .join(", ")
-                                : "Nothing yet",
-                        ],
-                        ["Last active", formatRelative(summary.lastActiveAt)],
-                        ["Joined", formatDate(summary.createdAt)],
-                        [
-                            "Address and id",
-                            <span key="id" className="font-mono text-[12.5px]">
-                                {summary.slug} · {summary.id}
-                            </span>,
-                        ],
-                    ]}
+            <div className="grid gap-6 lg:grid-cols-2">
+                <PlanCard
+                    organizationId={organizationId}
+                    plan={overview.plan}
+                    billedTo={overview.billedTo}
+                    canOverride={can(staff, "pricing:override")}
+                    canChangePlan={canChangePlan}
+                    legacyPlans={legacyPlans}
                 />
-            )}
-        </Panel>
-    );
-}
-
-function OverviewDetails({
-    view,
-    moduleState,
-}: {
-    view: BusinessView;
-    moduleState: PanelResult<BusinessModulesState>;
-}) {
-    return (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="grid min-w-0 content-start gap-6">
-                <Panel
-                    title="What they see"
-                    description="Their live site, and what they can use now."
-                >
-                    {() => <WhatTheySee view={view} modules={moduleState} />}
-                </Panel>
+                <UsageCard
+                    organizationId={organizationId}
+                    usage={overview.usage}
+                    canRaise={canChangePlan}
+                />
+                <ModulesCard
+                    organizationId={organizationId}
+                    modules={overview.modules}
+                />
+                <SiteCard
+                    organizationId={organizationId}
+                    website={overview.website}
+                />
+                <TeamCard
+                    organizationId={organizationId}
+                    team={overview.team}
+                />
+                <ActivityCard
+                    organizationId={organizationId}
+                    activity={overview.activity}
+                    notes={overview.notes}
+                />
             </div>
-            <aside className="grid min-w-0 content-start gap-6">
-                <StatePanel view={view} />
-                {/* Its way out (#921): refunds it waits on, and the trail. */}
-                <DeletionPanels view={view} />
-            </aside>
+            {view && (
+                <div className="grid gap-6 lg:grid-cols-2">
+                    <StatePanel view={view} />
+                    {/* Its way out (#921): refunds it waits on, and the trail. */}
+                    <DeletionPanels view={view} />
+                </div>
+            )}
         </div>
     );
 }

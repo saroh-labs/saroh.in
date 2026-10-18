@@ -4,8 +4,14 @@ import type { ReactNode } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
 import { BusinessHeader } from "@/components/business/business-header";
-import { businessGate, readSummary, readView } from "@/lib/business-page";
+import {
+    businessGate,
+    readOverview,
+    readSummary,
+    readView,
+} from "@/lib/business-page";
 import { can } from "@/lib/console";
+import { overviewBadges } from "@/lib/overview-words";
 
 /**
  * A business's page (admin plan U2): the header and the tabs over each
@@ -36,6 +42,9 @@ export default async function BusinessLayout({
         ? await readView(organizationId).catch(() => null)
         : null;
     const open = view?.status === "ok";
+    // The tabs' counts and "needs you" (U3): from the Overview's read, made
+    // once per request with the tab's. A failed read leaves them off.
+    const overview = await readOverview(organizationId).catch(() => null);
 
     return (
         <AdminShell staff={staff}>
@@ -47,6 +56,7 @@ export default async function BusinessLayout({
                     canViewAs={canViewAs}
                     canLifecycle={can(staff, "organization:lifecycle:write")}
                     canLiftHold={can(staff, "organization:legal-hold:lift")}
+                    badges={overviewBadges(overview?.badges)}
                 />
                 {children}
             </PageContainer>

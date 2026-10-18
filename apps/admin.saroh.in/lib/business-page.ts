@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import {
+    getBusinessOverview,
     getBusinessSummary,
     getBusinessView,
     getModuleState,
@@ -34,6 +35,14 @@ export const readView = cache((organizationId: string) =>
 /** Each module's true state (U1); a failed panel on a refusal or outage. */
 export const readModuleState = cache((organizationId: string) =>
     getModuleState(organizationId),
+);
+
+/**
+ * The Overview's one read (U3): its cards, and the badges the layout puts
+ * on the tabs. Throws on an outage; null on a refusal.
+ */
+export const readOverview = cache((organizationId: string) =>
+    getBusinessOverview(organizationId),
 );
 
 /** The plans an operator may move a business to; none when unread. */

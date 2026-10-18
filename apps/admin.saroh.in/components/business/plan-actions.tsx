@@ -61,6 +61,7 @@ export function PlanActions({
     subscriptionStatus,
     numericLimits,
     catalogueLive,
+    onDone,
 }: {
     organizationId: string;
     /** The old plans (`/admin/plans`); catalogue plans are never in it. */
@@ -70,6 +71,8 @@ export function PlanActions({
     numericLimits: { key: string; label: string; planValue: number }[];
     /** A catalogue version is live on this instance. */
     catalogueLive: boolean;
+    /** After a write went through: the screen's feedback (U3, R9). */
+    onDone?: (message: string) => void;
 }) {
     const blocked = legacyPickerBlocked(plans.length, catalogueLive);
     const trialing = subscriptionStatus === "TRIALING";
@@ -93,11 +96,15 @@ export function PlanActions({
                     disabled={blocked === "none"}
                     disabledReason="No plan is offered on this instance yet."
                     onSubmit={({ reason, idempotencyKey, values }) =>
-                        changePlanAction(organizationId, {
-                            reason,
-                            idempotencyKey,
-                            planId: values.planId ?? "",
-                        })
+                        done(
+                            changePlanAction(organizationId, {
+                                reason,
+                                idempotencyKey,
+                                planId: values.planId ?? "",
+                            }),
+                            onDone,
+                            "Plan changed.",
+                        )
                     }
                 />
             )}
@@ -130,90 +137,136 @@ export function PlanActions({
                     }
                     submitLabel={trialing ? "Extend trial" : "Start trial"}
                     onSubmit={({ reason, idempotencyKey, values }) =>
-                        trialAction(organizationId, {
-                            reason,
-                            idempotencyKey,
-                            days: Number(values.days),
-                            planId:
-                                values.planId === ""
-                                    ? undefined
-                                    : values.planId,
-                        })
+                        done(
+                            trialAction(organizationId, {
+                                reason,
+                                idempotencyKey,
+                                days: Number(values.days),
+                                planId:
+                                    values.planId === ""
+                                        ? undefined
+                                        : values.planId,
+                            }),
+                            onDone,
+                            trialing ? "Trial extended." : "Trial started.",
+                        )
                     }
                 />
             )}
             {numericLimits.length > 0 && (
-                <OperatorDialog
-                    trigger="Raise a limit"
-                    title="Raise a limit for a while"
-                    effect="Only this business, only upwards, and only until the date you set. It is written into the trail with your name on it."
-                    fields={
-                        <>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="limit-key">Limit</Label>
-                                <select
-                                    id="limit-key"
-                                    name="key"
-                                    className={selectClass}
-                                    required
-                                >
-                                    {numericLimits.map((limit) => (
-                                        <option
-                                            key={limit.key}
-                                            value={limit.key}
-                                        >
-                                            {limit.label} (plan allows{" "}
-                                            {limit.planValue})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="limit-value">
-                                        New limit
-                                    </Label>
-                                    <Input
-                                        id="limit-value"
-                                        name="value"
-                                        type="number"
-                                        inputMode="numeric"
-                                        min={1}
-                                        required
-                                    />
-                                </div>
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="limit-days">
-                                        For how many days
-                                    </Label>
-                                    <Input
-                                        id="limit-days"
-                                        name="days"
-                                        type="number"
-                                        inputMode="numeric"
-                                        min={1}
-                                        max={365}
-                                        defaultValue={30}
-                                        required
-                                    />
-                                </div>
-                            </div>
-                        </>
-                    }
-                    submitLabel="Raise limit"
-                    onSubmit={({ reason, idempotencyKey, values }) =>
-                        raiseLimitAction(organizationId, {
-                            reason,
-                            idempotencyKey,
-                            key: values.key ?? "",
-                            value: Number(values.value),
-                            days: Number(values.days),
-                        })
-                    }
+                <RaiseLimitDialog
+                    organizationId={organizationId}
+                    limits={numericLimits}
+                    onDone={onDone}
                 />
             )}
         </div>
     );
+}
+
+/**
+ * Raise a limit for a while (`subscription:override`): only upwards, only
+ * this business, only until a date. The Billing tab's plan controls and the
+ * Overview's usage card ("Raise a limit…", U3) open the same dialog, over
+ * the screen it was opened from.
+ */
+export function RaiseLimitDialog({
+    organizationId,
+    limits,
+    trigger = "Raise a limit",
+    onDone,
+}: {
+    organizationId: string;
+    limits: { key: string; label: string; planValue: number }[];
+    trigger?: string;
+    /** After it went through: the screen's feedback (U3, R9). */
+    onDone?: (message: string) => void;
+}) {
+    const labelOf = (key: string | undefined) =>
+        limits.find((l) => l.key === key)?.label ?? "The limit";
+    return (
+        <OperatorDialog
+            trigger={trigger}
+            title="Raise a limit for a while"
+            effect="Only this business, only upwards, and only until the date you set. It is written into the trail with your name on it."
+            fields={
+                <>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="limit-key">Limit</Label>
+                        <select
+                            id="limit-key"
+                            name="key"
+                            className={selectClass}
+                            required
+                        >
+                            {limits.map((limit) => (
+                                <option key={limit.key} value={limit.key}>
+                                    {limit.label} (plan allows {limit.planValue}
+                                    )
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="limit-value">New limit</Label>
+                            <Input
+                                id="limit-value"
+                                name="value"
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                required
+                            />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="limit-days">
+                                For how many days
+                            </Label>
+                            <Input
+                                id="limit-days"
+                                name="days"
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                max={365}
+                                defaultValue={30}
+                                required
+                            />
+                        </div>
+                    </div>
+                </>
+            }
+            submitLabel="Raise limit"
+            onSubmit={({ reason, idempotencyKey, values }) =>
+                done(
+                    raiseLimitAction(organizationId, {
+                        reason,
+                        idempotencyKey,
+                        key: values.key ?? "",
+                        value: Number(values.value),
+                        days: Number(values.days),
+                    }),
+                    onDone,
+                    `${labelOf(values.key)} raised to ${values.value ?? ""} for ${values.days ?? ""} days.`,
+                )
+            }
+        />
+    );
+}
+
+/**
+ * A write's result, passed on; when it went through, `onDone` hears what
+ * changed, in the past tense, for the screen's toast and highlight.
+ */
+export async function done<T extends { ok: boolean }>(
+    write: Promise<T>,
+    onDone: ((message: string) => void) | undefined,
+    message: string,
+): Promise<T> {
+    const result = await write;
+    if (result.ok) onDone?.(message);
+    return result;
 }
 
 /** End a raised limit before it lapses. */
