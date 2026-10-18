@@ -67,7 +67,7 @@ export default async function BusinessesPage({
                 <PageHeader
                     breadcrumb={["Instance", "Businesses"]}
                     title="Businesses"
-                    description="Every business on this instance. A row opens everything about that one."
+                    description="Every business on Saroh. A row opens everything about that one."
                 />
 
                 <FilterBar action="/businesses" active={filtered}>

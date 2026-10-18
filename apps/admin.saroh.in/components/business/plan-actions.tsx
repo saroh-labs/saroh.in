@@ -94,7 +94,7 @@ export function PlanActions({
                     }
                     submitLabel="Change plan"
                     disabled={blocked === "none"}
-                    disabledReason="No plan is offered on this instance yet."
+                    disabledReason="No plan is on offer yet."
                     onSubmit={({ reason, idempotencyKey, values }) =>
                         done(
                             changePlanAction(organizationId, {

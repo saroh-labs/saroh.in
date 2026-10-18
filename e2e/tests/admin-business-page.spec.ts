@@ -65,8 +65,9 @@ test.describe("a business's page", () => {
                 page.getByRole("button", { name: "More actions" }),
             ).toBeVisible();
             // A tab that reads the business's details asks for a session
-            // inside itself.
-            if (path !== "overview") {
+            // inside itself. Overview and Modules (U4: each module's state,
+            // no personal data) read without one.
+            if (path !== "overview" && path !== "modules") {
                 await expect(
                     page.getByRole("button", { name: "Open support access" }),
                 ).toBeVisible();

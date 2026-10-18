@@ -150,7 +150,7 @@ function StatePanel({ view }: { view: BusinessView }) {
                                 status={facts.lifecycleStatus}
                             />,
                         ],
-                        ["On this instance since", formatDate(facts.createdAt)],
+                        ["Here since", formatDate(facts.createdAt)],
                         ...(facts.referredBy
                             ? ([
                                   [

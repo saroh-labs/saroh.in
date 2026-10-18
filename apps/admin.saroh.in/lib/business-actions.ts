@@ -3,9 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
-import { accessCookieName } from "./businesses";
+import type { BusinessModuleState } from "./businesses";
+import { accessCookieName, getModuleState } from "./businesses";
 import type { ControlPlaneResult } from "./control-plane";
-import { adminWrite } from "./control-plane";
+import {
+    adminWrite,
+    clearFlagOverride,
+    setFlagOverride,
+} from "./control-plane";
 
 /**
  * Server Actions for operator actions on one business (plan U4–U5). Thin:
@@ -323,6 +328,82 @@ export async function repairModulesAction(
             "Could not repair modules.",
         ),
     );
+}
+
+/**
+ * A module fix's outcome (admin plan U4): the module's state as the API now
+ * resolves it, so its row flips to the truth and not to a guess. Null when
+ * the write took but the state couldn't be read back; the refresh follows.
+ */
+export type ModuleFixResult = ControlPlaneResult<{
+    row: BusinessModuleState | null;
+}>;
+
+async function rowAfter(
+    organizationId: string,
+    moduleKey: string,
+    result: ControlPlaneResult<unknown>,
+): Promise<ModuleFixResult> {
+    if (!result.ok) return result;
+    revalidatePath("/releases", "layout");
+    const state = await getModuleState(organizationId);
+    const row =
+        state.status === "ok"
+            ? (state.data.modules.find((m) => m.moduleKey === moduleKey) ??
+              null)
+            : null;
+    return { ok: true, data: { row } };
+}
+
+/**
+ * A module's release for this one business (the Modules tab's "Turn on for
+ * this business…", and its Undo): an override of the release's flag, the
+ * same write Releases › Who has it makes (`flags:publish`). `enabled: null`
+ * clears the override, so the business follows the default again.
+ */
+export async function moduleReleaseAction(
+    organizationId: string,
+    moduleKey: string,
+    flagKey: string,
+    input: Reasoned & { enabled: boolean | null },
+): Promise<ModuleFixResult> {
+    const written =
+        input.enabled === null
+            ? await clearFlagOverride(
+                  flagKey,
+                  organizationId,
+                  input.reason,
+                  input.idempotencyKey,
+              )
+            : await setFlagOverride(
+                  flagKey,
+                  organizationId,
+                  input.enabled,
+                  input.reason,
+                  input.idempotencyKey,
+              );
+    return rowAfter(
+        organizationId,
+        moduleKey,
+        refresh(organizationId, written),
+    );
+}
+
+/**
+ * "Switch on for them…": the business's own module switch, the write
+ * `ModuleToggle` makes (`organization:modules:write`), read back as the
+ * module's state.
+ */
+export async function switchOnModuleAction(
+    organizationId: string,
+    moduleKey: string,
+    input: Reasoned,
+): Promise<ModuleFixResult> {
+    const written = await setModuleAction(organizationId, moduleKey, {
+        ...input,
+        enabled: true,
+    });
+    return rowAfter(organizationId, moduleKey, written);
 }
 
 /** Staff kill switch for one site's trackers (#897): off, or back on. */

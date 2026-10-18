@@ -67,7 +67,7 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
   `lib/billing-action-words.ts`, `lib/user-filters.ts`,
   `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
-  `lib/overview-words.ts`.
+  `lib/overview-words.ts`, `lib/module-fix.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -127,6 +127,14 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   and who it is billed to only for `saroh-billing:read`. The layout reads
   it once for the badges (`readOverview`); each card's action opens over
   Overview and highlights the card after a write (`useChangeFeedback`).
+- **A business's Modules tab (admin plan U4) needs no support session.**
+  Its rows are each module's true state (`GET …/modules/state`), and each
+  row's one fix opens a sheet listing the gates: Turn on for this business
+  (a release override, `flags:publish`, with Undo), Switch on for them
+  (`organization:modules:write`), or Only they can do this (Copy steps). A
+  fix the operator lacks the permission for shows disabled, saying why.
+  Writes go through `moduleReleaseAction` / `switchOnModuleAction`, which
+  read the module's state back so the row flips to the truth.
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and
