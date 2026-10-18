@@ -63,7 +63,9 @@ SELECT DISTINCT ON (m."organizationId")
        lower(btrim(u."email")) AS email,
        o."createdAt" AS org_created,
        COALESCE(NULLIF(btrim(bp."legalName"), ''), o."name") AS legal_name,
-       NULLIF(btrim(bp."taxId"), '') AS gstin
+       -- A GSTIN only while the business says it is GST-registered, as
+       -- Saroh's invoices and the provider customer read it.
+       CASE WHEN bp."gstRegistered" THEN NULLIF(btrim(bp."taxId"), '') END AS gstin
   FROM "Membership" m
   JOIN "User" u ON u."id" = m."userId"
   JOIN "Organization" o ON o."id" = m."organizationId"
