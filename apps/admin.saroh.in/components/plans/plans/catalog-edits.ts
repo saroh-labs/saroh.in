@@ -145,6 +145,45 @@ export function patchIncluded(
     m.cells[planId] = next;
 }
 
+/** What the pricing table says for a row with no cap. */
+export const NO_LIMIT_TEXT = "No limit";
+
+/**
+ * The Plans grid's limit editor: a new cap (null for none) on an included
+ * cell. The comparison-table words and the card line follow it while they
+ * only said the old number ("111" → "222", "11 things" → "22 things", "No
+ * limit" ↔ a number); words of the operator's own ("Up to 11 a month") are
+ * left alone for the feature's wording to change.
+ */
+export function setLimit(
+    catalog: Catalog,
+    moduleId: string,
+    planId: string,
+    limit: number | null,
+): void {
+    const m = catalog.modules.find((x) => x.id === moduleId);
+    if (!m) return;
+    const c = cellOf(m, planId);
+    if (!c.inc || c.limit === limit) return;
+    const was = c.limit;
+    const said = (t: string) =>
+        was == null
+            ? t === NO_LIMIT_TEXT
+            : t === String(was) || t === formatCount(was);
+    const now = limit == null ? NO_LIMIT_TEXT : formatCount(limit);
+    const patch: Partial<Omit<IncludedCell, "inc">> = { limit };
+    if (said(c.text)) patch.text = now;
+    if (was != null && limit != null) {
+        for (const old of new Set([String(was), formatCount(was)])) {
+            if (c.card.startsWith(`${old} `)) {
+                patch.card = `${now}${c.card.slice(old.length)}`;
+                break;
+            }
+        }
+    }
+    patchIncluded(catalog, moduleId, planId, patch);
+}
+
 /** "123 a month", as the matrix cell says it after "Limit". */
 export function limitWords(cell: Cell): string | null {
     if (!cell.inc || cell.limit == null) return null;

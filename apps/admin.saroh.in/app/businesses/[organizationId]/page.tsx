@@ -456,7 +456,7 @@ function Business({
                                             "Plan",
                                             plan.subscription
                                                 ? `${plan.subscription.plan.name} (v${plan.subscription.plan.version})`
-                                                : "No plan — the free floor applies",
+                                                : "No plan yet, so they get the free basics",
                                         ],
                                         [
                                             "Catalogue",
@@ -840,7 +840,7 @@ function Timeline({
 /** Why the catalogue doesn't reach a business yet, in words. */
 const LEGACY_REASON: Record<string, string> = {
     "no-plan":
-        "Not yet — no subscription or plan override, so the free floor applies",
+        "Not yet: no subscription or plan override, so they get the free basics",
     "unmapped-plan": "Not yet — its billing plan has no catalogue plan",
     "no-catalogue": "No catalogue version is live, or it can't be read",
     "unknown-plan": "Its plan isn't in the version it is on",

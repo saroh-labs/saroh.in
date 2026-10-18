@@ -65,7 +65,7 @@ export function planWords(plan: BusinessPlan): string {
     if (plan.effective) return planLine(plan.effective);
     return plan.subscription
         ? plan.subscription.plan.name
-        : "No plan — the free floor applies";
+        : "No plan yet, so they get the free basics";
 }
 
 /**

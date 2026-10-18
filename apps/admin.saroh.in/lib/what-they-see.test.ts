@@ -66,7 +66,7 @@ describe("planWords", () => {
     it("names the plan they are on", () => {
         expect(planWords(plan())).toBe("Growth");
     });
-    it("falls back to the subscription's plan, then the free floor", () => {
+    it("falls back to the subscription's plan, then the free basics", () => {
         expect(
             planWords(
                 plan({
@@ -88,7 +88,7 @@ describe("planWords", () => {
             ),
         ).toBe("Pro");
         expect(planWords(plan({ effective: null }))).toBe(
-            "No plan — the free floor applies",
+            "No plan yet, so they get the free basics",
         );
     });
 });
