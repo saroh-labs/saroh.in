@@ -188,7 +188,7 @@ describe("the feature sheet", () => {
         expect(soft.getAttribute("aria-checked")).toBe("mixed");
         expect(s.getByText("Soft on Plan B; hard on Plan A")).toBeTruthy();
 
-        fireEvent.change(s.getByLabelText("Counted, on every plan"), {
+        fireEvent.change(s.getByLabelText("Counted, for every plan at once"), {
             target: { value: "month" },
         });
         fireEvent.click(soft);
@@ -202,6 +202,23 @@ describe("the feature sheet", () => {
         expect(things(c, "b")).toMatchObject({ per: "month", soft: true });
         // No cap on Plan C: counted the same, never soft.
         expect(things(c, "c")).toMatchObject({ per: "month", soft: false });
+    });
+
+    it("counts it differently on one plan, and says the plans differ", async () => {
+        open();
+        openFeature("Things");
+        fireEvent.change(
+            line("Things", "a").getByLabelText("Counted on Plan A"),
+            { target: { value: "month" } },
+        );
+        const s = sheet("Things");
+        expect(
+            s.getByText("A limit, counted differently by plan · Group one"),
+        ).toBeTruthy();
+
+        const c = await saved();
+        expect(things(c, "a")).toMatchObject({ per: "month" });
+        expect(things(c, "b")).toMatchObject({ per: "" });
     });
 
     it("ticks a plan off and on again with live's words, and switches Locked and Hidden", async () => {

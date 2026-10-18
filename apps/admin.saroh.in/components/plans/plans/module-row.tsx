@@ -1,6 +1,6 @@
 "use client";
 
-import type { Cell, IncludedCell } from "@saroh/pricing-catalog";
+import type { Cell, IncludedCell, LimitPeriod } from "@saroh/pricing-catalog";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
@@ -8,7 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { forwardRef, useId } from "react";
 
 import { LIMIT_HINT, parseLimit } from "./catalog-edits";
-import { FIELD, Field, NumberField, SMALL_FIELD } from "./fields";
+import { FIELD, Field, NumberField, SELECT, SMALL_FIELD } from "./fields";
 
 /**
  * One plan's line in the feature sheet (admin redesign U12, R21; the Plans
@@ -16,11 +16,11 @@ import { FIELD, Field, NumberField, SMALL_FIELD } from "./fields";
  * was on the live version, who it reaches and how much they use, and
  * either what the plan gets (the comparison table's words, the plan card's
  * line, the limit and whether that cap is soft) or how it shows when the
- * plan hasn't got it (Locked | Hidden). How the feature is counted is the
- * sheet's, once for every plan.
+ * plan hasn't got it (Locked | Hidden). How it is counted is set here for
+ * this plan; the sheet can also set it for every plan at once.
  */
 
-export type CellPatch = Partial<Omit<IncludedCell, "inc" | "limit" | "per">>;
+export type CellPatch = Partial<Omit<IncludedCell, "inc" | "limit">>;
 
 export interface ModuleRowProps {
     /** The plan's name. */
@@ -166,6 +166,30 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                             error={errors.limit}
                             disabled={disabled}
                         />
+                        <Field label={`Counted on ${plan}`} small>
+                            {(a) => (
+                                <select
+                                    {...a}
+                                    value={cell.per}
+                                    disabled={disabled}
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        if (v !== "" && v !== "month") return;
+                                        const per: LimitPeriod = v;
+                                        onPatch({ per });
+                                    }}
+                                    className={cn(
+                                        FIELD,
+                                        SMALL_FIELD,
+                                        SELECT,
+                                        "bg-card px-2",
+                                    )}
+                                >
+                                    <option value="">In total</option>
+                                    <option value="month">Each month</option>
+                                </select>
+                            )}
+                        </Field>
                         {cell.limit != null && (
                             <div className="col-span-full flex items-start gap-2.5">
                                 <Switch

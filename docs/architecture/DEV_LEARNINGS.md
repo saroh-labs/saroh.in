@@ -5230,3 +5230,13 @@ rule stands for the profile's own fields.
 **Fix.** `markVerified` (`admin/admin-sign-in-help.service.ts`) does what a first code sign-in does: in the same transaction it deletes the `credential` account and every session, and the ledger row says whether a password was removed (`unprovenSignInRemoved`, `sessionsEnded`). Provider accounts stay. The dialog tells staff the person signs in with a code and can set a new password. `admin-people.db.spec.ts` checks it, plain and under `TEST_RLS=on`.
 
 **Rule.** Anything outside Better Auth that marks an address verified removes the password and sessions set before the address was proven, as `revokeUnprovenAccountAccess` does. An audit metadata key never contains `password`, `credential`, `token` or `secret` (`SECRET_BEARING_KEY` refuses the write).
+
+### A redesign took away per-plan counting (19 Oct 2026)
+
+**Symptom.** In the admin plan editor's new feature sheet (U12), how a feature's limit is counted (in total or each month) could only be set for every plan at once. Before, each plan set its own. The owner: "we should have full control, I thought we are only improving the UI and not changing the functionality".
+
+**Cause.** The unit's agent folded the per-plan "Counted" select into one "on every plan" control to match the mock, and flagged it only in its report.
+
+**Fix.** Each plan's line in the feature sheet has "Counted on <plan>" again (`components/plans/plans/module-row.tsx`); "Counted, for every plan at once" stays as a shortcut and shows "Differs by plan" when they differ. `sheets.test.tsx` checks a single plan can count differently.
+
+**Rule.** A redesign changes how a screen looks and reads, never what it can do. Every control the old screen had is still reachable on the new one; a unit that thinks a capability should go stops and asks the owner before building it, and the brief says so.

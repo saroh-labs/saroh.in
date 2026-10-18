@@ -139,10 +139,10 @@ export function FeatureSheet({
                         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
                             {limitRow && counted !== null && (
                                 <Field
-                                    label="Counted, on every plan"
+                                    label="Counted, for every plan at once"
                                     note={
                                         counted === "mixed"
-                                            ? "The plans count it differently. Pick one for all."
+                                            ? "The plans count it differently. Each plan below can count it its own way, or pick one here for all."
                                             : null
                                     }
                                     className="w-[220px] max-w-full"
