@@ -5220,3 +5220,13 @@ rule stands for the profile's own fields.
 **Fix.** `components/releases/releases.test.tsx` mocks `@saroh/ui/dropdown-menu` with plain buttons (`role="menuitem"`). The real menu is covered by the browser spec `e2e/tests/admin-releases.spec.ts`. A dialog opened from a menu is a controlled `OperatorDialog` (`open`, `onOpenChange`, no `trigger`), and the menu doesn't hand the focus back to ⋯ while one is open (`onCloseAutoFocus`).
 
 **Rule.** A vitest that opens a Radix menu mocks the menu, and leaves the real menu to the browser spec. A test that suddenly takes seconds is usually jsdom's `getComputedStyle`: profile it with `--pool=forks --execArgv=--cpu-prof` before raising the timeout.
+
+### Mark verified kept a password nobody had proven (19 Oct 2026)
+
+**Symptom.** The owner, reviewing U9's Mark verified, asked what happens if the account wasn't the person's own. Anyone can sign up with someone else's email and set a password; Better Auth then refuses that password until the address is proven. When staff pressed Mark verified, `emailVerified` became true and the stranger's password started working. When the real owner later signed in with a code, nothing was removed, because Better Auth's `revokeUnprovenAccountAccess` only runs for an address that is still unverified.
+
+**Cause.** Mark verified set `emailVerified` and nothing else. Staff can check the mailbox is the caller's; they can't know who set the password on an address nobody had proven. Nothing records who set a password, so there is nothing to "track"; the only safe answer is to treat it as unproven.
+
+**Fix.** `markVerified` (`admin/admin-sign-in-help.service.ts`) does what a first code sign-in does: in the same transaction it deletes the `credential` account and every session, and the ledger row says whether a password was removed (`unprovenSignInRemoved`, `sessionsEnded`). Provider accounts stay. The dialog tells staff the person signs in with a code and can set a new password. `admin-people.db.spec.ts` checks it, plain and under `TEST_RLS=on`.
+
+**Rule.** Anything outside Better Auth that marks an address verified removes the password and sessions set before the address was proven, as `revokeUnprovenAccountAccess` does. An audit metadata key never contains `password`, `credential`, `token` or `secret` (`SECRET_BEARING_KEY` refuses the write).

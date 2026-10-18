@@ -141,6 +141,13 @@ export class AdminSignInHelpService {
      * Record that staff checked the address by other means and mark it
      * verified. It is stamped as staff's (`emailVerifiedByStaffAt`), so it
      * never counts as the person's own (`common/auth/email-verification.ts`).
+     *
+     * It also removes the password and ends every session, as Better Auth
+     * does when a code first proves an address (`revokeUnprovenAccountAccess`).
+     * Staff can vouch for the mailbox, never for who set a password on an
+     * address nobody had proven: anyone can sign up with someone else's
+     * email, and without this the owner's mark would hand that person a
+     * working password. The owner signs in with a code and sets a new one.
      */
     async markVerified(
         staff: PlatformAdminInfo,
@@ -163,6 +170,10 @@ export class AdminSignInHelpService {
             if (marked.count === 0) {
                 throw new ConflictException("Their email is already verified.");
             }
+            const passwords = await tx.account.deleteMany({
+                where: { userId, providerId: "credential" },
+            });
+            const sessions = await tx.session.deleteMany({ where: { userId } });
             await this.audit.write(tx, {
                 actorUserId: staff.userId,
                 permission: AdminPermission.PeopleSignInHelp,
@@ -171,8 +182,19 @@ export class AdminSignInHelpService {
                 targetId: userId,
                 reason: why,
                 outcome: AdminAuditOutcome.Success,
+                // Keys naming a password or credential are refused as secret-bearing.
+                metadata: {
+                    unprovenSignInRemoved: passwords.count > 0,
+                    sessionsEnded: sessions.count,
+                },
             });
-            return { emailVerified: true, verifiedBy: "staff" as const, at };
+            return {
+                emailVerified: true,
+                verifiedBy: "staff" as const,
+                at,
+                passwordRemoved: passwords.count > 0,
+                sessionsEnded: sessions.count,
+            };
         });
     }
 

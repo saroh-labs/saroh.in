@@ -421,6 +421,52 @@ describe("Mark verified (U9)", () => {
         expect(emailVerifiedBySelf(proven)).toBe(true);
         expect((await people.detail(user.id)).verifiedBy).toBe("self");
     });
+
+    it("removes a password set before the address was proven and ends every session", async () => {
+        // Anyone can sign up with someone else's email: staff vouch for the
+        // mailbox, never for whoever set the password.
+        const user = await person("squat", { emailVerified: false });
+        await prisma.account.create({
+            data: {
+                id: `cred-${tag}-${++seq}`,
+                accountId: user.id,
+                providerId: "credential",
+                userId: user.id,
+                password: "not-a-real-hash",
+            },
+        });
+        await prisma.account.create({
+            data: {
+                id: `google-${tag}-${++seq}`,
+                accountId: `google-${tag}-${seq}`,
+                providerId: "google",
+                userId: user.id,
+            },
+        });
+        await session(user.id);
+
+        const result = await help.markVerified(
+            supportStaff,
+            user.id,
+            "Checked on a call",
+        );
+        expect(result).toMatchObject({
+            passwordRemoved: true,
+            sessionsEnded: 1,
+        });
+        const accounts = await prisma.account.findMany({
+            where: { userId: user.id },
+        });
+        expect(accounts.map((a) => a.providerId)).toEqual(["google"]);
+        expect(await prisma.session.count({ where: { userId: user.id } })).toBe(
+            0,
+        );
+        expect(await ledger(SignInHelpAction.MarkedVerified, user.id)).toEqual([
+            expect.objectContaining({
+                metadata: { unprovenSignInRemoved: true, sessionsEnded: 1 },
+            }),
+        ]);
+    });
 });
 
 describe("Change sign-in email (U9)", () => {

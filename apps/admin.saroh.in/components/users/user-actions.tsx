@@ -74,11 +74,14 @@ export function UserActions({
                 title={`Mark ${email} verified`}
                 effect={
                     <>
-                        Only once you've checked the address is theirs. It is
-                        recorded as verified by Saroh staff, never as their own
-                        proof: it doesn't count for a staff invite or for who
-                        brought a business in. It becomes theirs when they next
-                        sign in with a code.
+                        Only once you've checked the address is theirs. Any
+                        password on the account is removed and they're signed
+                        out everywhere: it was set before anyone proved the
+                        address, so it may not be theirs. They sign in with a
+                        code and can set a new password. It is recorded as
+                        verified by Saroh staff, never as their own proof: it
+                        doesn't count for a staff invite or for who brought a
+                        business in until they next sign in with a code.
                     </>
                 }
                 disabled={emailVerified || held}
