@@ -317,6 +317,40 @@ export function sendChangeEmailConfirmationEmail(
     return Promise.resolve();
 }
 
+/**
+ * Saroh staff changed this account's sign-in email (admin console U9). Sent
+ * to the OLD address, naming the new one only masked (`maskEmail`), so the
+ * mailbox's owner can tell it wasn't them without the notice handing out
+ * where the account went. The new address gets no code for 24 hours unless
+ * a second staff member confirms, so there is time to answer.
+ */
+export function sendSignInEmailChangedNotice(
+    to: string,
+    maskedNewEmail: string,
+): Promise<void> {
+    const html = signInEmailChangedEmail(maskedNewEmail);
+    if (!transporter) {
+        console.info(`[Sign-in email changed] (no SMTP) notice to ${to}`);
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: "Your Saroh sign-in email was changed",
+        html,
+    });
+    return Promise.resolve();
+}
+
+/** The notice's body; the masked address is escaped like any value. */
+export function signInEmailChangedEmail(maskedNewEmail: string): string {
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Your sign-in email was changed</h2>
+  <p>Saroh support changed the email you sign in to Saroh with, at your request, to ${esc(maskedNewEmail)}. This address won't sign you in any more.</p>
+  <p>If you didn't ask for this, reply to this email or write to Saroh support straight away. The new address can't sign in for 24 hours unless a second person at Saroh confirms the change, so there is time to stop it.</p>
+</div>`;
+}
+
 /** Confirm account deletion. Irreversible, so it always requires this link. */
 export function sendDeleteAccountEmail(
     to: string,

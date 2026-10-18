@@ -11,9 +11,25 @@ import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { ORG_ACTIONS } from "../organizations/organization-actions";
 import { OrganizationMembersService } from "../organizations/organization-members.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import type {
+    PersonHistoryItem,
+    PersonRow,
+    SignInState,
+} from "./admin-people-reads";
+import {
+    peopleWhere,
+    personHistory,
+    personRow,
+    personSelect,
+    signInState,
+} from "./admin-people-reads";
 import { AdminPermission } from "./admin-permissions";
+import type { PeopleFilter } from "./sign-in-help-rules";
 
-const SEARCH_LIMIT = 25;
+export type { PersonRow } from "./admin-people-reads";
+
+/** Rows the Users list shows at once, searched or not. */
+export const LIST_LIMIT = 50;
 /** How many accounts "Newest sign-ups" lists (owner, 9 Oct). */
 export const RECENT_LIMIT = 25;
 
@@ -24,17 +40,6 @@ export interface RecentSignup {
     email: string;
     createdAt: Date;
     businesses: { id: string; name: string }[];
-}
-
-export interface PersonRow {
-    id: string;
-    name: string | null;
-    email: string;
-    emailVerified: boolean;
-    createdAt: Date;
-    businesses: number;
-    lastSeenAt: Date | null;
-    isStaff: boolean;
 }
 
 export interface PersonDetail extends PersonRow {
@@ -53,6 +58,8 @@ export interface PersonDetail extends PersonRow {
         ipAddress: string | null;
         userAgent: string | null;
     }[];
+    /** The Sign-in tab, and why they can't sign in if anything stops them. */
+    signIn: SignInState;
 }
 
 /**
@@ -73,26 +80,34 @@ export class AdminPeopleService {
         private readonly audit: AdminAuditService,
     ) {}
 
-    async search(q: string): Promise<PersonRow[]> {
-        const term = q.trim();
-        if (term.length < 2) {
+    /**
+     * The Users list (U9): a search, the chips, or both. With neither, the
+     * newest accounts first; with a search, by email. At most
+     * {@link LIST_LIMIT} rows.
+     */
+    async search(
+        input: { q?: string; filters?: readonly PeopleFilter[] } = {},
+    ): Promise<PersonRow[]> {
+        const term = input.q?.trim() ?? "";
+        if (term.length === 1) {
             throw new BadRequestException(
                 "Search with at least two characters.",
             );
         }
         const users = await prisma.user.findMany({
-            where: {
-                OR: [
-                    { id: term },
-                    { email: { contains: term, mode: "insensitive" } },
-                    { name: { contains: term, mode: "insensitive" } },
-                ],
-            },
+            where: peopleWhere(term, input.filters ?? []),
             select: personSelect,
-            orderBy: { email: "asc" },
-            take: SEARCH_LIMIT,
+            orderBy: term
+                ? [{ email: "asc" }]
+                : [{ createdAt: "desc" }, { id: "desc" }],
+            take: LIST_LIMIT,
         });
-        return Promise.all(users.map((user) => this.row(user)));
+        return Promise.all(users.map((user) => personRow(user)));
+    }
+
+    /** What staff did to this person (the History tab). */
+    history(userId: string): Promise<PersonHistoryItem[]> {
+        return personHistory(userId);
     }
 
     /**
@@ -166,7 +181,8 @@ export class AdminPeopleService {
 
         const { memberships, sessions, ...base } = user;
         return {
-            ...(await this.row(base)),
+            ...(await personRow({ ...base, memberships })),
+            signIn: await signInState(base),
             memberships: memberships.map((row) => ({
                 organizationId: row.organization.id,
                 organizationName: row.organization.name,
@@ -341,44 +357,6 @@ export class AdminPeopleService {
             ...entry,
         });
     }
-
-    private async row(user: PersonRecord): Promise<PersonRow> {
-        const lastSession = await prisma.session.findFirst({
-            where: { userId: user.id },
-            select: { updatedAt: true },
-            orderBy: { updatedAt: "desc" },
-        });
-        return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            emailVerified: user.emailVerified,
-            createdAt: user.createdAt,
-            businesses: user._count.memberships,
-            lastSeenAt: lastSession?.updatedAt ?? null,
-            isStaff: user.platformAdmin?.revokedAt === null,
-        };
-    }
-}
-
-const personSelect = {
-    id: true,
-    name: true,
-    email: true,
-    emailVerified: true,
-    createdAt: true,
-    _count: { select: { memberships: true } },
-    platformAdmin: { select: { revokedAt: true } },
-} as const;
-
-interface PersonRecord {
-    id: string;
-    name: string | null;
-    email: string;
-    emailVerified: boolean;
-    createdAt: Date;
-    _count: { memberships: number };
-    platformAdmin: { revokedAt: Date | null } | null;
 }
 
 /**

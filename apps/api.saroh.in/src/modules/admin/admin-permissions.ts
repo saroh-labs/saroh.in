@@ -113,7 +113,9 @@ export const AdminPermission = {
     // Set the commission rates. Platform Owners only. The rates live in the
     // database, never in code.
     CommissionRates: "commission:rates",
-    // Help a person sign in: send a code, change a sign-in email.
+    // Help a person sign in (U9): send a code, mark an email verified,
+    // change a sign-in email or confirm another's change. Platform owners
+    // and Support.
     PeopleSignInHelp: "people:sign-in-help",
 } as const;
 
@@ -141,7 +143,6 @@ export const AWAITING_ENDPOINT: Readonly<
     // Checked inside the profile read for the tax id (U18) until the
     // earnings and statements routes require it.
     [AdminPermission.TeamPay]: "U22/U24: earnings, statements, Mark paid",
-    [AdminPermission.PeopleSignInHelp]: "U9: sign-in help",
 });
 
 const ROLE_PERMISSIONS = {

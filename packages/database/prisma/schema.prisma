@@ -28,6 +28,13 @@ model User {
   // Better Auth stores the email/password credential on the Account row,
   // so the User table no longer carries a password column.
   emailVerified Boolean @default(false)
+  // When Saroh staff marked this address verified from the console (admin
+  // console U9, "Mark verified"). Null: the person proved it themselves, by
+  // a code, or it is not verified. Staff-marked verification never counts as
+  // the person's own (attribution, staff invites): read it through
+  // `emailVerifiedBySelf` (api `common/auth/email-verification.ts`). Cleared
+  // when they next prove the mailbox with a code, and on a change of address.
+  emailVerifiedByStaffAt DateTime?
 
   // "Help improve Saroh": whether this person shares how they use the
   // workspace, as masked session recordings (DEC-125). Null: never chosen,
@@ -79,7 +86,43 @@ model User {
   // businesses (DEC-167).
   billingProfiles BillingProfile[] @relation("BillingProfileOwner")
 
+  // Sign-in email changes staff made for them (admin console U9).
+  signInEmailChanges SignInEmailChange[]
+
   @@index([email])
+}
+
+// SignInEmailChange — Saroh staff changed a person's sign-in email from the
+// console (admin console U9, "Change sign-in email…"). Saroh's record, not a
+// business's: no organizationId and no row-level policy (rls-coverage.test.ts
+// lists it in NOT_TENANT_OWNED).
+//
+// The takeover safeguard: the new address gets no sign-in code, and the
+// person can start no session, until `codeHeldUntil` (24 hours after the
+// change) — unless a second, different staff member confirms first
+// (`confirmedByUserId`, CHECKed apart from `requestedByUserId`). A row only
+// holds while it is the person's latest and its `newEmail` is still their
+// address. `codeSentAt` is when the held code went out, by the confirm or by
+// the `people.sign-in-email.release` job.
+model SignInEmailChange {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  oldEmail          String
+  newEmail          String
+  // Staff user ids, not foreign keys: the record outlives a staff account.
+  requestedByUserId String
+  reason            String
+  codeHeldUntil     DateTime
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+  codeSentAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([newEmail])
 }
 
 // Organization: the sole tenant root (DEC-005 / ADR-001). Owns Stores and

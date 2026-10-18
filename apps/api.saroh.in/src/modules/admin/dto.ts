@@ -22,6 +22,8 @@ import { CONTACT_TOPICS } from "../contact-messages/dto";
 import type { DeployApp, DeployEnvironment } from "./admin-deployments";
 import { DEPLOY_APPS, DEPLOY_ENVIRONMENTS } from "./admin-deployments";
 import { AdminRole } from "./admin-permissions";
+import type { PeopleFilter } from "./sign-in-help-rules";
+import { PEOPLE_FILTERS } from "./sign-in-help-rules";
 import type { StaffEngagement, StaffJob } from "./staff-profile";
 import { STAFF_ENGAGEMENTS, STAFF_JOBS } from "./staff-profile";
 
@@ -420,12 +422,41 @@ export class SaveStaffProfileDto extends OperatorReasonDto {
     taxId?: string;
 }
 
+/**
+ * The Users list (U9): an optional search and the chips, as
+ * `?q=…&filter=owners,unverified`. With neither, the newest accounts.
+ */
 export class SearchPeopleDto {
+    @IsOptional()
     @Transform(trim)
     @IsString()
     @MinLength(2)
     @MaxLength(200)
-    q!: string;
+    q?: string;
+
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string"
+            ? value
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter((part) => part.length > 0)
+            : value,
+    )
+    @IsArray()
+    @ArrayMaxSize(PEOPLE_FILTERS.length)
+    @IsIn(PEOPLE_FILTERS, { each: true })
+    filter?: PeopleFilter[];
+}
+
+/** Change a person's sign-in email (U9). */
+export class ChangeSignInEmailDto extends OperatorReasonDto {
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsEmail({}, { message: "Enter a whole email address" })
+    @MaxLength(254)
+    email!: string;
 }
 
 export class ChangeMemberRoleDto extends OperatorReasonDto {

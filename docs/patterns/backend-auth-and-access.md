@@ -602,6 +602,39 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   Team permissions no route requires yet are listed in `AWAITING_ENDPOINT`
   with the unit that wires them; `admin.controller.permissions.spec.ts`
   fails on any other unused permission.
+- **Current** (admin console U9) — **Sign-in help** (`people:sign-in-help`,
+  Platform owners and Support, with `organization:pii:read`;
+  `admin/admin-sign-in-help.service.ts`). Every write takes a reason and an
+  idempotency key and is on the admin ledger in its transaction.
+    - **Send a sign-in code** goes through the API's own Better Auth
+      (`auth.api.sendVerificationOTP`, type `sign-in`, via
+      `common/auth/sign-in-code-sender.ts`), never a mail of the console's.
+      At most 3 to one person and 20 from one staff member an hour, counted
+      from the ledger under `admin-sign-in-code:<userId>`; a refusal is a
+      429 saying when, on the ledger as DENIED.
+    - **Mark verified** sets `emailVerified` and stamps
+      `User.emailVerifiedByStaffAt`. **Staff-verified is never the
+      person's own**: self-verified is `emailVerified &&
+emailVerifiedByStaffAt === null`, read through `emailVerifiedBySelf`
+      (`common/auth/email-verification.ts`). An account manager's
+      attribution and a staff invite's acceptance read that, never
+      `emailVerified` alone. The stamp is cleared when the person next
+      proves the mailbox with a code (`@saroh/auth` `onMailboxProven`, on
+      `/sign-in/email-otp` and `/email-otp/verify-email` only) and when staff
+      change the address.
+    - **Change sign-in email** (`PUT people/:id/email`) is the takeover
+      path, so: an address another account uses is refused (409); an owner
+      of a business on a paid plan (live subscription billed by a provider
+      or on a priced plan) is changed only by a Platform owner (403,
+      DENIED on the ledger); the new address starts unverified and every
+      session ends; the old address is told with the new one masked; and a
+      `SignInEmailChange` row holds the new address for 24 hours. While it
+      holds, Better Auth sends it no code (`verification-otp.ts`) and starts
+      the person no session by any way in (`@saroh/auth` `mayStartSession`,
+      `sign-in-holds.ts`). A second, different staff member may confirm
+      (`POST people/:id/email/confirm`, CHECKed in the migration), which
+      sends the code at once; otherwise `people.sign-in-email.release`
+      sends it when the hold ends.
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator

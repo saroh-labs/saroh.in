@@ -154,6 +154,23 @@ export interface CreateAuthOptions {
      */
     onUserCreated?: (user: { id: string }) => void;
     /**
+     * Asked before any session is made for a user, however they signed in
+     * (a code, a password, a provider). False refuses the session, and with
+     * it the sign-in. The API holds a person whose sign-in email Saroh staff
+     * just changed (admin console U9): nobody signs in to the new address
+     * until the hold ends or a second staff member confirms. A throw refuses
+     * too: a hold that can't be checked is not assumed lifted.
+     */
+    mayStartSession?: (user: { id: string }) => Promise<boolean> | boolean;
+    /**
+     * Told after a session starts because the person proved their mailbox
+     * with a code ({@link MAILBOX_PROOF_PATHS}), never a password or a
+     * provider. The API clears a staff-marked verification then: the
+     * address is now theirs by their own proof. Whatever it throws is
+     * swallowed: it can't fail a sign-in.
+     */
+    onMailboxProven?: (user: { id: string }) => Promise<void> | void;
+    /**
      * Told when Better Auth answered a request 5xx: the thrown value and the
      * status, for the host's error reporter. Never told about an expected
      * outcome (a wrong password, an unverified email, a rate limit, a failed
@@ -337,8 +354,12 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
  * fail the write.
  */
 export function userDatabaseHooks(
-    opts: Pick<CreateAuthOptions, "onUserCreated">,
+    opts: Pick<
+        CreateAuthOptions,
+        "onUserCreated" | "mayStartSession" | "onMailboxProven"
+    >,
 ): Pick<BetterAuthOptions, "databaseHooks"> {
+    const hooks: NonNullable<BetterAuthOptions["databaseHooks"]> = {};
     const user: NonNullable<
         NonNullable<BetterAuthOptions["databaseHooks"]>["user"]
     > = {};
@@ -355,7 +376,68 @@ export function userDatabaseHooks(
             },
         };
     }
-    return Object.keys(user).length > 0 ? { databaseHooks: { user } } : {};
+    if (Object.keys(user).length > 0) hooks.user = user;
+    const session = sessionHooks(opts);
+    if (session) hooks.session = session;
+    return Object.keys(hooks).length > 0 ? { databaseHooks: hooks } : {};
+}
+
+/**
+ * The endpoints whose session is the person's own proof of their mailbox:
+ * signing in with an emailed code, and verifying an address with one.
+ * Never a password or a provider's sign-in.
+ */
+export const MAILBOX_PROOF_PATHS: readonly string[] = [
+    "/sign-in/email-otp",
+    "/email-otp/verify-email",
+];
+
+function sessionHooks(
+    opts: Pick<CreateAuthOptions, "mayStartSession" | "onMailboxProven">,
+): NonNullable<BetterAuthOptions["databaseHooks"]>["session"] | null {
+    const { mayStartSession, onMailboxProven } = opts;
+    if (!mayStartSession && !onMailboxProven) return null;
+    return {
+        create: {
+            ...(mayStartSession
+                ? {
+                      before: async (row: { userId: string }) => {
+                          try {
+                              if (await mayStartSession({ id: row.userId })) {
+                                  return;
+                              }
+                          } catch (error) {
+                              console.error(
+                                  "[auth] mayStartSession failed; the session is refused.",
+                                  error instanceof Error
+                                      ? error.name
+                                      : "unknown error",
+                              );
+                          }
+                          return false;
+                      },
+                  }
+                : {}),
+            ...(onMailboxProven
+                ? {
+                      after: async (
+                          row: { userId: string },
+                          context: { path?: string } | null,
+                      ) => {
+                          if (
+                              !MAILBOX_PROOF_PATHS.includes(context?.path ?? "")
+                          )
+                              return;
+                          try {
+                              await onMailboxProven({ id: row.userId });
+                          } catch {
+                              // Never a sign-in's problem.
+                          }
+                      },
+                  }
+                : {}),
+        },
+    };
 }
 
 export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {

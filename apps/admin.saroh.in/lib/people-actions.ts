@@ -26,16 +26,85 @@ function refresh<T>(paths: string[], result: ControlPlaneResult<T>) {
     return result;
 }
 
+/** A user's page and every tab under it. */
+function refreshUser<T>(userId: string, result: ControlPlaneResult<T>) {
+    if (result.ok) {
+        revalidatePath(`/users/${userId}`, "layout");
+        revalidatePath("/users");
+    }
+    return result;
+}
+
+const person = (id: string) => `/people/${encodeURIComponent(id)}`;
+
 const org = (id: string) => `/organizations/${encodeURIComponent(id)}`;
 
 export async function endSessionsAction(userId: string, input: Reasoned) {
-    return refresh(
-        [`/people/${userId}`],
+    return refreshUser(
+        userId,
         await adminWrite(
-            `/people/${encodeURIComponent(userId)}/end-sessions`,
+            `${person(userId)}/end-sessions`,
             "POST",
             input,
             "Could not end their sessions.",
+        ),
+    );
+}
+
+/** Send a sign-in code through the API's Better Auth (U9). */
+export async function sendSignInCodeAction(userId: string, input: Reasoned) {
+    return refreshUser(
+        userId,
+        await adminWrite<{ sent: true; to: string }>(
+            `${person(userId)}/sign-in-code`,
+            "POST",
+            input,
+            "Couldn't send a sign-in code.",
+        ),
+    );
+}
+
+/** Mark their email verified, as staff's word (U9). */
+export async function markVerifiedAction(userId: string, input: Reasoned) {
+    return refreshUser(
+        userId,
+        await adminWrite(
+            `${person(userId)}/mark-verified`,
+            "POST",
+            input,
+            "Couldn't mark their email verified.",
+        ),
+    );
+}
+
+/** Change their sign-in email; the new address's code is held (U9). */
+export async function changeSignInEmailAction(
+    userId: string,
+    input: Reasoned & { email: string },
+) {
+    return refreshUser(
+        userId,
+        await adminWrite<{ changeId: string; codeHeldUntil: string }>(
+            `${person(userId)}/email`,
+            "PUT",
+            input,
+            "Couldn't change their sign-in email.",
+        ),
+    );
+}
+
+/** A second staff member confirms a held change (U9). */
+export async function confirmSignInEmailAction(
+    userId: string,
+    input: Reasoned,
+) {
+    return refreshUser(
+        userId,
+        await adminWrite(
+            `${person(userId)}/email/confirm`,
+            "POST",
+            input,
+            "Couldn't confirm the change.",
         ),
     );
 }
@@ -46,7 +115,7 @@ export async function changeMemberRoleAction(
     input: Reasoned & { role: string },
 ) {
     return refresh(
-        [`/businesses/${organizationId}`, `/people/${userId}`],
+        [`/businesses/${organizationId}`, `/users/${userId}`],
         await adminWrite(
             `${org(organizationId)}/members/${encodeURIComponent(userId)}/role`,
             "PUT",
@@ -62,7 +131,7 @@ export async function removeMemberAction(
     input: Reasoned,
 ) {
     return refresh(
-        [`/businesses/${organizationId}`, `/people/${userId}`],
+        [`/businesses/${organizationId}`, `/users/${userId}`],
         await adminWrite(
             `${org(organizationId)}/members/${encodeURIComponent(userId)}`,
             "DELETE",

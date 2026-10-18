@@ -65,7 +65,8 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
-  `lib/billing-action-words.ts`.
+  `lib/billing-action-words.ts`, `lib/user-filters.ts`,
+  `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -104,6 +105,19 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   Razorpay ids link to its dashboard (`razorpayDashboardUrl`,
   `rel="noopener noreferrer"`), one test-mode hint per screen. End autopay
   asks for the business's name: it is the business's own Cancel plan.
+- **Users (`/users`, admin console U9, R13; People until then, and
+  `/people` redirects)** lists everyone with an account: a search and the
+  chips No business yet · Email not verified · Owners · Joined this week
+  (toggles, `aria-pressed`, any number at once, in the address through
+  `lib/user-filters.ts`). A user's page has the tabs Overview · Businesses ·
+  Sign-in · History (`app/users/[userId]/…`, the person read once per
+  request by the cached `getPerson`). The header's sign-in help (Send a
+  sign-in code, Mark verified…, Change sign-in email…, Sign out
+  everywhere…, Copy id) shows only with `people:sign-in-help`; Sign out
+  everywhere also needs `organization:people:write`. The Overview's banner
+  says why someone can't sign in (`lib/sign-in-words.ts`): an unverified
+  email, or a changed sign-in email still held for its 24 hours, which a
+  second staff member confirms from the Sign-in tab.
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and

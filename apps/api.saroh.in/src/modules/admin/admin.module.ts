@@ -1,6 +1,7 @@
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 
+import { SignInCodeSender } from "../../common/auth/sign-in-code-sender";
 import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
 import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
@@ -47,6 +48,10 @@ import { AdminOrganizationsService } from "./admin-organizations.service";
 import { AdminOverridesService } from "./admin-overrides.service";
 import { AdminPeopleController } from "./admin-people.controller";
 import { AdminPeopleService } from "./admin-people.service";
+import {
+    AdminSignInHelpService,
+    SIGN_IN_EMAIL_RELEASE_TYPE,
+} from "./admin-sign-in-help.service";
 import { AdminSiteTrackersService } from "./admin-site-trackers.service";
 import { AdminStaffController } from "./admin-staff.controller";
 import { AdminStaffService } from "./admin-staff.service";
@@ -72,6 +77,7 @@ import {
     SECURITY_LOG_RETENTION_TYPE,
     SecurityLogRetentionHandler,
 } from "./security-log-retention.handler";
+import { SignInEmailReleaseHandler } from "./sign-in-email-release.handler";
 
 /** How often a stopped deletion chain is looked for and restarted. */
 const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
@@ -126,6 +132,11 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminSiteTrackersService,
         AdminStaffService,
         AdminPeopleService,
+        // Sign-in help (U9): codes through Better Auth, and the end of a
+        // changed sign-in email's 24-hour hold.
+        AdminSignInHelpService,
+        SignInCodeSender,
+        SignInEmailReleaseHandler,
         AdminMachineryService,
         AdminOperationsService,
         AdminHealthService,
@@ -162,6 +173,7 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
         private readonly cleanup: OrganizationDeletionCleanupHandler,
         private readonly retentionErase: OrganizationRetentionEraseHandler,
         private readonly securityLogs: SecurityLogRetentionHandler,
+        private readonly signInRelease: SignInEmailReleaseHandler,
     ) {}
 
     /**
@@ -185,6 +197,10 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
         this.registry.register(
             SECURITY_LOG_RETENTION_TYPE,
             this.securityLogs.handle,
+        );
+        this.registry.register(
+            SIGN_IN_EMAIL_RELEASE_TYPE,
+            this.signInRelease.handle,
         );
         if (env.NODE_ENV === "test") return;
         await this.deletion.schedule(new Date());
