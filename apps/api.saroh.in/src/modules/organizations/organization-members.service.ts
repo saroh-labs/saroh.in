@@ -3,6 +3,7 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
@@ -19,6 +20,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { noticeIfProfileOwnerLeftInTx } from "../billing/billing-profile-owner";
 import { openInvitations } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
 import { overLimit } from "../billing/over-limit.service";
@@ -160,6 +162,8 @@ export const LAST_OWNER_CANT_LEAVE =
 
 @Injectable()
 export class OrganizationMembersService {
+    private readonly logger = new Logger(OrganizationMembersService.name);
+
     constructor(private readonly audit: AuditService) {}
 
     /** Everyone in the org, with a reviewer's granted sites. */
@@ -760,6 +764,14 @@ export class OrganizationMembersService {
                             : {}),
                     },
                 });
+                if (membership.role === "OWNER" && dto.role !== "OWNER") {
+                    // No longer an owner: if the business is billed to their
+                    // profile, operators are told (DEC-167). Billing stays.
+                    await noticeIfProfileOwnerLeftInTx(tx, this.logger, {
+                        organizationId: ctx.organizationId,
+                        userId,
+                    });
+                }
                 for (const siteId of siteIds) {
                     await tx.siteReviewer.upsert({
                         where: { siteId_userId: { siteId, userId } },
@@ -1072,6 +1084,14 @@ export class OrganizationMembersService {
                         },
                     },
                 });
+                if (role === "OWNER") {
+                    // As a demotion: billing stays on their profile, and
+                    // operators are told (DEC-167).
+                    await noticeIfProfileOwnerLeftInTx(tx, this.logger, {
+                        organizationId,
+                        userId,
+                    });
+                }
                 await tx.siteReviewer.deleteMany({
                     where: { organizationId, userId },
                 });

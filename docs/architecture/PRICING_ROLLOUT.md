@@ -89,17 +89,20 @@ release time.
    rewritten. The series restarts every financial year
    (`SA/26-27/0001`: prefix, financial year, then a count of at least four
    digits that runs the whole year, DEC-162).
-10. **Billing safety and one customer per business (DEC-164, DEC-165)**,
+10. **Billing safety and one customer per billing profile (DEC-164,
+    DEC-167, which replaced DEC-165's one per business on 18 Oct 2026)**,
     in this order:
     1. **API first, with its migrations**
-       (`20261124110000_billing_customer` among them), and healthy, before
+       (`20261124110000_billing_customer` and
+       `20261126100000_billing_profiles` among them), and healthy, before
        any web app: the app's change-plan sends billing details an older
        API refuses (`forbidNonWhitelisted`), and an older app is refused
        by the new API for details it never sends.
     2. **Stop the old API before the new one starts** (as
        `PRODUCTS_STOCK_ROLLOUT.md` does): an old worker that leases a
-       `billing.refund.double-charge`, `billing.payment.notes` or
-       `billing.customer.sync` job has no handler for it and dead-letters it.
+       `billing.refund.double-charge`, `billing.payment.notes`,
+       `billing.customer.sync` or `billing.profile.sync` job has no handler
+       for it and dead-letters it.
     3. **Confirm `SAROH_RAZORPAY_KEY_ID` and `SAROH_RAZORPAY_KEY_SECRET` are
        set** on the new API. Without them every customer sync is skipped
        (a `billing_customer_skipped` warning in production) and the
@@ -109,22 +112,29 @@ release time.
        Razorpay row says each business is registered with Razorpay) before
        any existing business's details are sent there: saroh.in is static,
        and a dated page changes only with a deploy.
-    6. **Run the billing-customers backfill** only after 1–5:
+    6. **Run the billing profiles backfill** only after 1–5, twice:
 
         ```bash
         DATABASE_URL=... DATABASE_TARGET_CONFIRM=<database> \
-          pnpm --filter @saroh/database exec tsx src/backfill/billing-customers.cli.ts
+          pnpm --filter @saroh/database exec tsx src/backfill/billing-profiles.cli.ts
         ```
 
-        A business that paid before has the customer Razorpay made at its
-        payment adopted (checked at Razorpay, then brought up to date), not
-        a second one. Run it again once the jobs have run: `queued now: 0`,
-        and a sync that failed is queued again.
+        It queues `billing.profile.sync` for every billing profile without
+        a Razorpay customer. A profile the migration made from a business
+        that already had one keeps it; one whose businesses paid before has
+        the customer Razorpay made at payment adopted (checked at Razorpay,
+        then brought up to date), not a second. Run it again once the jobs
+        have run: `queued now: 0`, and a sync that failed is queued again.
+        It also prints how many businesses have no billing profile yet (the
+        migration leaves one unplaced when its legal name or GSTIN differs
+        from its owner's first business): nothing is queued for them, and
+        an owner chooses a profile in Plan & billing before the business
+        can pay.
 
     7. **Check for dead-lettered billing jobs**: any `FAILED` job whose type
        starts `billing.` (its `lastError` says why). Re-queue a refund,
        payment-notes or customer sync that failed for want of a handler or
-       a provider that was down; a failed customer sync is re-queued by the
+       a provider that was down; a failed profile sync is re-queued by the
        backfill.
 
 ## How a plan override reads (U5)

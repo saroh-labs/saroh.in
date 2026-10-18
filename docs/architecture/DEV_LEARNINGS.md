@@ -5134,6 +5134,13 @@ leaving queue it too.
 writes its source, including writes another library makes
 (`backend-integrations.md`, Razorpay customer).
 
+**Since (18 Oct 2026).** DEC-167 replaced DEC-165's customer per business
+with one per billing profile, which holds its own billing email: an
+account email change and a change of owners no longer touch billing, so
+`onUserEmailChanged` and the owner-change queueing were taken out, and
+the customer follows the profile's saves (`billing.profile.sync`). The
+rule stands for the profile's own fields.
+
 ### The contact form's focus test flaked on CI (17 Oct 2026)
 
 **Symptom.** `contact-form.test.tsx` "send another message" failed on CI (focus still on `<body>`) and passed locally and on development.

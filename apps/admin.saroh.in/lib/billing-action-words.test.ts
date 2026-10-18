@@ -90,6 +90,9 @@ describe("words", () => {
         expect(actionLabel("billing_credit_note_may_be_needed")).toBe(
             "Credit note may be needed",
         );
+        expect(actionLabel("billing_profile_owner_left")).toBe(
+            "Billed to someone no longer an owner",
+        );
         expect(actionLabel("billing_something_new")).toBe(
             "Billing needs a look",
         );

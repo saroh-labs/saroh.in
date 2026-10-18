@@ -677,15 +677,17 @@ overrideId, reason }`. Re-read, then decide
   before it asks the provider and before it queues itself again, and
   stands down when the business is billed through that subscription again
   (live, not ending, the business not closing).
-- **`billing.customer.sync`** (DEC-165) makes the business's one customer
-  at Saroh's billing provider, or sends its details as they are now:
-  queued in the sign-up's transaction, by a Settings › Business save that
-  touches billing details and by every checkout, at most one waiting per
-  business (`enqueueBillingCustomerSync`), and by an owner's change of
-  email. Skips with no provider keys (a warning in production); retried
-  by the queue (10 tries); a refusal is logged, left as an admin note once,
-  and dropped (`billing-customer.ts`). Businesses from before are queued
-  by `backfill/billing-customers.cli.ts`.
+- **`billing.profile.sync`** (DEC-167) makes a billing profile's one
+  customer at Saroh's billing provider, or sends its details as they are
+  now: queued in the transaction that made or saved the profile (sign-up,
+  a profile's edit, a checkout's details step) and by an operator's Sync
+  again, at most one waiting per profile (`enqueueBillingProfileSync`).
+  Skips with no provider keys (a warning in production); retried by the
+  queue (10 tries); a refusal is logged, left as an admin note once, and
+  dropped (`billing-customer.ts`). Profiles from before are queued by
+  `backfill/billing-profiles.cli.ts`. DEC-165's **`billing.customer.sync`**
+  stays registered for jobs already queued: it syncs the business's
+  profile, and does nothing for a business without one.
 - **`billing.payment.notes`** (17 Oct 2026) puts Saroh's invoice number,
   business and checkout on the provider's payment once Saroh's invoice
   has its payment id: queued on the invoice's transaction, retried by the

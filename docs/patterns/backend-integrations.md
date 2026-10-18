@@ -429,71 +429,81 @@ transaction as its row and ignores one older than the last applied
   whichever of the two lands second changes nothing (the invoice is keyed
   once per charge). Rate-limited per business; an unanswered call is
   "still waiting", never a reason to pay again.
-- **The business as Razorpay's customer: one per business, made at
-  sign-up (DEC-165, owner, 17 Oct 2026)** (`billing-customer.ts`,
-  `customers` capability). Its id is kept on `BillingCustomer`
-  (organization × provider) and copied to every checkout, subscription and
-  Saroh invoice; it is never looked up by email or phone.
-    - **Made** by the `billing.customer.sync` job, queued in the sign-up's
-      transaction: `POST /customers` with the billing name, the owner's email,
-      the phone and the GSTIN (the profile's only while `gstRegistered`, as
-      on the invoice), `notes` holding only what never changes
-      (`organizationId`, `saroh_business`: the slug; notes are create-only,
-      so a billing snapshot there would go stale — it stays on each
-      subscription's or order's notes), and `fail_existing: "1"`. Razorpay
-      refuses a second customer with the same email and phone (400
+- **The billing profile as Razorpay's customer: one per profile (DEC-167,
+  owner, 18 Oct 2026; it replaced DEC-165's one per business, which
+  Razorpay's email-and-phone rule left 17 of 32 saroh.io businesses
+  without)** (`billing-customer.ts`, `customers` capability). A business is
+  billed to one `BillingProfile` (owned by a user; legal name, GSTIN,
+  address with state, billing email, phone), which keeps the customer's id;
+  every checkout, subscription and Saroh invoice copies it, with the
+  profile's id beside it. It is never looked up by email or phone.
+  Settings › Business is the business's own seller identity and is
+  separate: saving it touches no customer.
+    - **Made** by the `billing.profile.sync` job (`billing-profile-sync.ts`),
+      queued in the transaction that made or saved the profile: `POST
+/customers` with the profile's legal name, billing email, phone and
+      GSTIN, `notes` holding only what never changes (`billing_profile_id`,
+      `saroh_owner`, and `saroh_business`: the first business's slug; notes
+      are create-only, so a billing snapshot there would go stale — it stays
+      on each subscription's or order's notes), and `fail_existing: "1"`.
+      Razorpay refuses a second customer with the same email and phone (400
       "Customer already exists for the merchant", checked in test mode 17
-      Oct 2026; the same email without a phone makes a new one). Saroh then
-      asks which one with the same create and `fail_existing: "0"` (which
-      "fetches details of the existing customer", per Razorpay's docs; not
-      yet run in test mode): **its notes' `organizationId` is this
-      business's** — an earlier try whose answer was lost — and it is
-      adopted; **another's** (an owner's second business) and this one is
-      made **without the phone** (`contactWithheld`; the phone stays in
-      Saroh and is never sent on an update). Never adopted by email or phone
-      alone.
-    - **Adopted, not made twice**: a business that paid before DEC-165 has
-      the customer Razorpay made at its payment (`Subscription`, else its
-      latest `BillingCheckout`, `providerCustomerId`). The job checks it
-      with `GET /customers/:id` (an unknown id is a 400), skips one another
-      business holds or whose notes name another, adopts it and sends the
-      current details by `PUT`.
-    - **Never lost**: the advisory lock's transaction only holds the lock
-      (`SET LOCAL lock_timeout`); each id is stored the moment Razorpay
-      answers it, on its own connection, only where none is stored.
-    - **Kept current**: Settings › Business (the name, legal name, contact
-      email, phone, GSTIN, state or registered address) and every checkout
-      (its details step) queue the same job, at most one waiting per
-      business; it sends `PUT /customers/:id` with the name, email, phone and
-      GSTIN (PUT takes the GSTIN, checked in test mode). **The address can't
-      be updated**: a customer's notes are create-only (a PUT leaves them as
-      they were, checked in test mode), so the current address is on each
-      subscription's or order's notes and on Saroh's invoice. The owner's
-      change of email queues it for every business they own (Better Auth's
-      `user.update.after` hook, `onUserEmailChanged`), and so does a new
-      owner. A `PUT` refused because the email and phone are another
-      customer's (the owner's other business, saved since) is sent again
-      without the phone, withheld from then on; any other refusal is an
-      admin note (`billing_customer_refused`), once until it is fixed.
-    - **A checkout** uses the stored id, and makes the customer then only
-      when the sign-up's job hasn't (under a per-business advisory lock, so
-      the two never make two): `customer_id` on `POST /subscriptions`, and on
-      the window for an order. A refusal is logged
-      (`billing_customer_refused`) and the checkout goes on with the notes
-      and the prefill; a provider that can't answer stops the checkout with
-      a 503 "try again" **before** the subscription is made — made without
-      `customer_id`, Razorpay would make a second customer of its own.
+      Oct 2026). Saroh then asks which one with `fail_existing: "0"`: **its
+      notes name this profile** (an earlier try whose answer was lost), or,
+      made per business before profiles, one of its businesses — it is
+      adopted; **anyone else's** and this one is made **without the phone**
+      (`contactWithheld`; the phone stays in Saroh). Never adopted by email
+      or phone alone. An owner's two profiles can't share a billing email
+      (the service asks before saving; the database holds it unique per
+      owner).
+    - **Adopted, not made twice**: a profile whose businesses paid before
+      DEC-165 has the customer Razorpay made at payment (their
+      `Subscription`, else latest `BillingCheckout`, `providerCustomerId`).
+      The job checks it with `GET /customers/:id`, skips one another profile
+      holds or whose notes name another, adopts it and sends the current
+      details by `PUT`.
+    - **Never lost**: the advisory lock's transaction (per profile) only
+      holds the lock (`SET LOCAL lock_timeout`); each id is stored the
+      moment Razorpay answers it, on its own connection, only where none is
+      stored.
+    - **Kept current**: saving the profile (and a checkout's details step,
+      which writes the profile) queues the same job, at most one waiting
+      per profile; it sends `PUT /customers/:id` with the name, email,
+      phone and GSTIN. **The address can't be updated**: the current
+      address is on each subscription's or order's notes and on Saroh's
+      invoice. An account email change or a change of owners touches no
+      customer: the profile holds its own billing email. A profile's owner
+      who stops being an owner of a business on it leaves billing as it is
+      and raises one Needs action (`billing_profile_owner_left`,
+      `billing-profile-owner.ts`). A `PUT` refused because the email and
+      phone are another customer's is sent again without the phone; any
+      other refusal is an admin note (`billing_customer_refused`) on each
+      business on the profile, once until it is fixed.
+    - **A checkout** uses the profile's stored id, and makes the customer
+      then only when the job hasn't (under the same per-profile lock):
+      `customer_id` on `POST /subscriptions`, and on the window for an
+      order. A business with no profile can't check out until an owner
+      chooses one. A refusal is logged (`billing_customer_refused`) and the
+      checkout goes on with the notes and the prefill; a provider that
+      can't answer stops the checkout with a 503 "try again" **before** the
+      subscription is made — made without `customer_id`, Razorpay would
+      make a second customer of its own.
     - **No keys, nothing asked**: where Saroh's Razorpay key id and secret
       aren't set (local, CI) the job skips (`billing_customer_skipped`, a
       warning in production) and the first checkout there makes it. A
       provider that can't answer is retried by the queue (10 tries; a 429
       is asked again after its `Retry-After`, at most 10 s, twice, in the
-      adapter's `call`); the last error is kept on the row (`lastError`), a
-      refusal logged (`billing_customer_sync_failed`) and not retried.
-    - **Businesses from before**: `backfill/billing-customers.cli.ts`
-      (`packages/database`) queues the job for every business without a
-      customer; idempotent. Its order in a release: `PRICING_ROLLOUT.md`
-      step 10.
+      adapter's `call`); the last error is kept on the profile
+      (`lastError`), a refusal logged and not retried. DEC-165's queued
+      `billing.customer.sync` jobs still run: their handler syncs the
+      business's profile.
+    - **Profiles from before**: `backfill/billing-profiles.cli.ts`
+      (`packages/database`) queues the job for every profile without a
+      customer and counts the businesses left without a profile;
+      idempotent. Its order in a release: `PRICING_ROLLOUT.md` step 10.
+    - **Admin**: the subscription sheet shows the profile, its customer and
+      the other businesses on it; a `cust_` search finds every business on
+      the profile; "Sync again" queues `billing.profile.sync` for it.
 
 **After Saroh lets go (17 Oct 2026, DEC-164)**: a subscription is made with
 `expire_by` (the checkout's `expiresAt`); a refused cancel asks

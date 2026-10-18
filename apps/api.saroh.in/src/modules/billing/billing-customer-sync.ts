@@ -1,9 +1,9 @@
 import type { Prisma } from "@saroh/database";
 
 /**
- * DEC-165's per-business sync, kept so jobs already queued (and an
- * operator's Sync again, until the admin console moves to profiles) still
- * run: its handler now syncs the business's billing profile
+ * DEC-165's per-business sync, kept so jobs already queued still run (an
+ * operator's Sync again queues `billing.profile.sync` since 18 Oct 2026):
+ * its handler now syncs the business's billing profile
  * (`billing-customer.ts`), and does nothing for a business without one.
  * New code queues `billing.profile.sync` (`billing-profile-sync.ts`).
  */
