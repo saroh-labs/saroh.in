@@ -450,7 +450,7 @@ describe("Needs action: mark resolved (DEC-166)", () => {
         const ctx = await business();
         await prisma.$transaction((tx) =>
             raiseBillingOpsNoticeInTx(tx, new Logger("spec"), {
-                code: "billing_spec_notice",
+                code: "billing_credit_note_may_be_needed",
                 organizationId: ctx.organizationId,
                 refs: { payment: "pay_spec1" },
                 note: "Refund it by hand.",
@@ -462,7 +462,11 @@ describe("Needs action: mark resolved (DEC-166)", () => {
             items: { id: string; code: string; organization: { id: string } }[];
             openCount: number;
         };
-        const row = listed.items.find((i) => i.code === "billing_spec_notice");
+        const row = listed.items.find(
+            (i) =>
+                i.code === "billing_credit_note_may_be_needed" &&
+                i.organization.id === ctx.organizationId,
+        );
         expect(row?.organization.id).toBe(ctx.organizationId);
         expect(listed.openCount).toBeGreaterThanOrEqual(1);
 

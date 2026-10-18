@@ -121,25 +121,185 @@ export const RAZORPAY_LINK_HINT =
 
 // ── Words ────────────────────────────────────────────────────────────────
 
-const ACTION_LABEL: Record<string, string> = {
-    billing_double_charge_refund_given_up: "Refund a double charge by hand",
-    billing_double_charge_refund_owed: "Double charge to find and refund",
-    billing_provider_cancel_stuck: "Provider won't cancel a subscription",
-    billing_provider_cancel_given_up: "Cancel a subscription by hand",
-    billing_paid_on_dropped_checkout: "Paid on a dropped checkout",
-    billing_webhook_unmatched: "Provider event matches no business",
-    billing_reconcile_payment_unmatched: "Payment with no Saroh invoice",
-    saroh_invoice_amount_mismatch: "Invoice total differs from payment",
-    billing_credit_note_may_be_needed: "Credit note may be needed",
-    billing_refund_failed: "Refund failed",
-    billing_dispute_open: "Payment disputed",
-    billing_customer_refused: "Razorpay refused the customer",
-    billing_profile_owner_left: "Billed to someone no longer an owner",
+/**
+ * Every code the API raises a billing action with, in its order. Mirrors
+ * `BILLING_ACTION_CODES` in
+ * `apps/api.saroh.in/src/modules/billing/billing-actions.ts`;
+ * `billing-event-words.test.ts` reads that list and fails when the two
+ * differ, so a new code can't reach Needs action without words.
+ */
+export const BILLING_ACTION_CODES = [
+    "billing_double_charge_refund_owed",
+    "billing_double_charge_refund_given_up",
+    "billing_provider_cancel_stuck",
+    "billing_provider_cancel_given_up",
+    "billing_webhook_unmatched",
+    "billing_reconcile_payment_unmatched",
+    "saroh_invoice_amount_mismatch",
+    "billing_credit_note_may_be_needed",
+    "billing_refund_failed",
+    "billing_dispute_open",
+    "billing_customer_refused",
+    "billing_payment_notes_given_up",
+    "billing_profile_owner_left",
+    "billing_profile_gone",
+] as const;
+export type BillingActionCode = (typeof BILLING_ACTION_CODES)[number];
+
+/**
+ * The one fix a row offers (R28):
+ * - `recheck`: Check the refund again (needs the payment's id);
+ * - `razorpay`: open the id at `ref` in Razorpay's dashboard;
+ * - `subscription`: open the business's subscription in Billing;
+ * - `invoice`: find the invoice in Billing › Invoices;
+ * - `resolve`: nothing to open; do it, then Mark resolved.
+ */
+export type ActionFix =
+    | { kind: "recheck"; label: string }
+    | { kind: "razorpay"; label: string; ref: string }
+    | { kind: "subscription"; label: string }
+    | { kind: "invoice"; label: string }
+    | { kind: "resolve"; label: string };
+
+export type ActionTone = "danger" | "warning" | "neutral";
+
+export interface ActionWords {
+    /** What it is about, in a few words: the row's title. */
+    label: string;
+    /** What happened, in one sentence. */
+    what: string;
+    tone: ActionTone;
+    fix: ActionFix;
+}
+
+const OPEN_SUBSCRIPTION: ActionFix = {
+    kind: "subscription",
+    label: "Open the subscription",
 };
+
+const ACTION_WORDS: Record<BillingActionCode, ActionWords> = {
+    billing_double_charge_refund_owed: {
+        label: "Double charge to find and refund",
+        what: "A business paid twice for one plan, and Saroh couldn't refund the extra payment by itself.",
+        tone: "danger",
+        fix: { kind: "recheck", label: "Check the refund again" },
+    },
+    billing_double_charge_refund_given_up: {
+        label: "Refund a double charge by hand",
+        what: "Saroh stopped trying to refund a second payment for the same plan.",
+        tone: "danger",
+        fix: { kind: "recheck", label: "Check the refund again" },
+    },
+    billing_provider_cancel_stuck: {
+        label: "Provider won't cancel a subscription",
+        what: "Razorpay keeps refusing to cancel a subscription, so it may go on charging.",
+        tone: "warning",
+        fix: {
+            kind: "razorpay",
+            label: "Check it in Razorpay",
+            ref: "providerSubscription",
+        },
+    },
+    billing_provider_cancel_given_up: {
+        label: "Cancel a subscription by hand",
+        what: "Saroh stopped asking Razorpay to cancel a subscription after a week of refusals.",
+        tone: "danger",
+        fix: {
+            kind: "razorpay",
+            label: "Cancel it in Razorpay",
+            ref: "providerSubscription",
+        },
+    },
+    billing_webhook_unmatched: {
+        label: "Provider event matches no business",
+        what: "Razorpay sent an event Saroh couldn't match to any business.",
+        tone: "warning",
+        fix: { kind: "razorpay", label: "Find it in Razorpay", ref: "payment" },
+    },
+    billing_reconcile_payment_unmatched: {
+        label: "Payment with no Saroh invoice",
+        what: "Razorpay took a payment that no Saroh invoice records.",
+        tone: "warning",
+        fix: { kind: "razorpay", label: "Find it in Razorpay", ref: "payment" },
+    },
+    saroh_invoice_amount_mismatch: {
+        label: "Invoice total differs from payment",
+        what: "Razorpay took a different amount from the invoice's total.",
+        tone: "warning",
+        fix: { kind: "invoice", label: "Open the invoice" },
+    },
+    billing_credit_note_may_be_needed: {
+        label: "Credit note may be needed",
+        what: "Money went back on a paid invoice, so the CA may need a credit note for it.",
+        tone: "neutral",
+        fix: { kind: "resolve", label: "Ask the CA, then mark it resolved" },
+    },
+    billing_refund_failed: {
+        label: "Refund failed",
+        what: "Razorpay couldn't send a refund back to the business.",
+        tone: "danger",
+        fix: {
+            kind: "razorpay",
+            label: "Refund it in Razorpay",
+            ref: "payment",
+        },
+    },
+    billing_dispute_open: {
+        label: "Payment disputed",
+        what: "A business's bank disputed a payment to Saroh.",
+        tone: "danger",
+        fix: {
+            kind: "razorpay",
+            label: "Answer it in Razorpay",
+            ref: "dispute",
+        },
+    },
+    billing_customer_refused: {
+        label: "Razorpay refused the customer",
+        what: "Razorpay refused the business's billing details for its customer record.",
+        tone: "warning",
+        fix: OPEN_SUBSCRIPTION,
+    },
+    billing_payment_notes_given_up: {
+        label: "Invoice number missing in Razorpay",
+        what: "Saroh couldn't add its invoice number to a payment at Razorpay, though the payment and invoice are fine.",
+        tone: "neutral",
+        fix: { kind: "razorpay", label: "Add it in Razorpay", ref: "payment" },
+    },
+    billing_profile_owner_left: {
+        label: "Billed to someone no longer an owner",
+        what: "The business is billed to the profile of someone who is no longer its owner.",
+        tone: "warning",
+        fix: OPEN_SUBSCRIPTION,
+    },
+    billing_profile_gone: {
+        label: "Billing profile gone",
+        what: "The billing profile a plan change needed was removed before the change ran.",
+        tone: "warning",
+        fix: OPEN_SUBSCRIPTION,
+    },
+};
+
+/** Words for a code the console doesn't know yet: still a row to act on. */
+const UNKNOWN_ACTION: ActionWords = {
+    label: "Billing needs a look",
+    what: "Saroh's billing met something it couldn't settle by itself.",
+    tone: "warning",
+    fix: OPEN_SUBSCRIPTION,
+};
+
+export function isBillingActionCode(code: string): code is BillingActionCode {
+    return (BILLING_ACTION_CODES as readonly string[]).includes(code);
+}
+
+/** How Needs action says a code: title, one sentence, tone and fix. */
+export function actionWords(code: string): ActionWords {
+    return isBillingActionCode(code) ? ACTION_WORDS[code] : UNKNOWN_ACTION;
+}
 
 /** What a billing action is about, in a few words. */
 export function actionLabel(code: string): string {
-    return ACTION_LABEL[code] ?? "Billing needs a look";
+    return actionWords(code).label;
 }
 
 /** Whether "Check the refund again" fits this action. */
@@ -225,4 +385,30 @@ export function canEndAutopay(sub: {
         sub.status !== "CANCELLED" &&
         !sub.freeChosenAt
     );
+}
+
+// ── Failed billing jobs ──────────────────────────────────────────────────
+
+const JOB_LABEL: Record<string, string> = {
+    "billing.email": "Send a billing email",
+    "billing.customer.sync": "Sync the Razorpay customer",
+    "billing.profile.sync": "Sync a billing profile",
+    "billing.provider.cancel": "Cancel at Razorpay",
+    "billing.refund.double-charge": "Refund a double charge",
+    "billing.payment.notes": "Add the invoice number in Razorpay",
+    "billing.reconcile": "Check payments against invoices",
+    "billing.addons.sync": "Sync add-ons",
+    "billing.moves.apply": "Apply plan changes",
+    "billing.provider-plans.sync": "Sync plans to Razorpay",
+    "billing.free-rows.start": "Start Free plans",
+};
+
+/** What a failed billing job was doing, in words; its type if unknown. */
+export function jobLabel(type: string): string {
+    return JOB_LABEL[type] ?? type;
+}
+
+/** Where a job opens in Operations › Jobs, by its type. */
+export function jobsHref(type: string): string {
+    return `/operations/jobs?status=FAILED&type=${encodeURIComponent(type)}`;
 }

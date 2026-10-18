@@ -1,14 +1,11 @@
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { ActionList, FailedJobList } from "@/components/billing/action-list";
+import { NeedsActionQueue } from "@/components/billing/needs-action-queue";
 import { NumberPager } from "@/components/billing/number-pager";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { listBillingActions } from "@/lib/billing";
-import {
-    RAZORPAY_LINK_HINT,
-    readActionState,
-} from "@/lib/billing-action-words";
+import { readActionState } from "@/lib/billing-action-words";
 import { billingHref, readPage } from "@/lib/billing-words";
 import { can, requireStaff } from "@/lib/console";
 import { param } from "@/lib/params";
@@ -23,9 +20,11 @@ const BASE = "/billing/actions";
  * cancel the provider keeps refusing, a payment Saroh never matched, an
  * invoice whose total isn't what was taken, a credit note to ask the CA
  * about. Open or resolved, and the search, are picked in Billing's
- * toolbar. Reading needs `saroh-billing:read`; Mark resolved and Check the
- * refund again need `saroh-billing:act`. The failed billing jobs follow,
- * since the Billing role has no Jobs screen.
+ * toolbar. Each row says what happened in one sentence and offers its one
+ * fix (R28, `lib/billing-action-words.ts`). Reading needs
+ * `saroh-billing:read`; Mark resolved and Check the refund again need
+ * `saroh-billing:act`. The failed billing jobs follow: Retry (`jobs:retry`)
+ * runs one again in place, and Open in Jobs (`jobs:read`) goes to it.
  */
 export default async function BillingActionsPage({
     searchParams,
@@ -36,6 +35,8 @@ export default async function BillingActionsPage({
     if (!gate.ok) return gate.screen;
     const { staff } = gate;
     const canAct = can(staff, "saroh-billing:act");
+    const canRetry = can(staff, "jobs:retry");
+    const canOpenJobs = can(staff, "jobs:read");
 
     const raw = await searchParams;
     const state = readActionState(raw.state);
@@ -57,65 +58,44 @@ export default async function BillingActionsPage({
         );
     }
 
-    return (
-        <>
-            {result.items.length === 0 && page === 1 ? (
-                q ? (
-                    <EmptyPanel
-                        kind="no-results"
-                        things="billing problems"
-                        cause="search"
-                        query={q}
-                        clearHref={billingHref(BASE, { state: stateParam })}
-                    />
-                ) : state === "open" ? (
-                    <EmptyPanel
-                        title="Nothing needs action"
-                        description="A row appears when Saroh's billing meets something it can't settle by itself."
-                    />
-                ) : (
-                    <EmptyPanel
-                        title="Nothing resolved yet"
-                        description="A row moves here once someone marks it resolved, with what they did."
-                    />
-                )
-            ) : (
-                <>
-                    <p className="text-sm text-muted-foreground">
-                        {RAZORPAY_LINK_HINT}
-                    </p>
-                    <ActionList items={result.items} canAct={canAct} />
-                    <NumberPager
-                        page={result.page}
-                        pages={Math.max(
-                            1,
-                            Math.ceil(result.total / result.limit),
-                        )}
-                        hasNext={result.page * result.limit < result.total}
-                        href={(p) =>
-                            billingHref(BASE, { state: stateParam, q, page: p })
-                        }
-                    />
-                </>
-            )}
+    const empty =
+        page !== 1 ? (
+            <EmptyPanel
+                title="Nothing on this page"
+                description="Go back to the first page."
+            />
+        ) : q ? (
+            <EmptyPanel
+                kind="no-results"
+                things="billing problems"
+                cause="search"
+                query={q}
+                clearHref={billingHref(BASE, { state: stateParam })}
+            />
+        ) : state === "resolved" ? (
+            <EmptyPanel
+                title="Nothing resolved yet"
+                description="A row moves here once someone marks it resolved, with what they did."
+            />
+        ) : undefined;
 
-            <section className="grid gap-2">
-                <h2 className="font-medium">Failed billing jobs</h2>
-                {result.failedJobs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No billing job has failed.
-                    </p>
-                ) : (
-                    <>
-                        <p className="text-sm text-muted-foreground">
-                            They are retried from Operations › Jobs, which
-                            Billing doesn&apos;t open: ask Operations or a
-                            Platform Owner.
-                        </p>
-                        <FailedJobList jobs={result.failedJobs} />
-                    </>
-                )}
-            </section>
-        </>
+    return (
+        <NeedsActionQueue
+            items={result.items}
+            failedJobs={result.failedJobs}
+            canAct={canAct}
+            canRetry={canRetry}
+            canOpenJobs={canOpenJobs}
+            empty={empty}
+        >
+            <NumberPager
+                page={result.page}
+                pages={Math.max(1, Math.ceil(result.total / result.limit))}
+                hasNext={result.page * result.limit < result.total}
+                href={(p) =>
+                    billingHref(BASE, { state: stateParam, q, page: p })
+                }
+            />
+        </NeedsActionQueue>
     );
 }

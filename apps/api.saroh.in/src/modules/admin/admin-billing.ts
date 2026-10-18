@@ -36,6 +36,12 @@ export function istDay(at: Date): string {
     return new Date(at.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
+// ── Invoice status ───────────────────────────────────────────────────────
+
+/** Billing › Invoices' status chips (R29), as the API takes them. */
+export const INVOICE_STATUSES = ["paid", "unpaid", "refunded"] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+
 // ── The month's GST export ───────────────────────────────────────────────
 
 /** What the export reads of one invoice. */

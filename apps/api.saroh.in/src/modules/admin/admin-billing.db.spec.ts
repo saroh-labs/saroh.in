@@ -746,6 +746,122 @@ describe("Admin › Billing: one page (R25, R26)", () => {
     });
 });
 
+describe("Admin › Billing › Invoices: Paid, Unpaid, Refunded (R29)", () => {
+    const st = { org: "", refunded: "", short: "", lost: "", pending: "" };
+    const slug = `billing-c-${tag}`;
+
+    beforeAll(async () => {
+        st.org = (
+            await prisma.organization.create({
+                data: { name: "Billing C", slug },
+            })
+        ).id;
+        st.refunded = await invoice(st.org, 11, null);
+        st.short = await invoice(st.org, 12, null);
+        st.lost = await invoice(st.org, 13, null);
+        st.pending = await invoice(st.org, 14, null);
+        // Razorpay took less than invoice 12's total.
+        await prisma.sarohInvoice.update({
+            where: { id: st.short },
+            data: { providerAmountPaise: 100 },
+        });
+        const refund = (
+            invoiceId: string,
+            kind: string,
+            status: string,
+            n: number,
+        ) =>
+            prisma.billingRefund.create({
+                data: {
+                    organizationId: st.org,
+                    provider: "RAZORPAY",
+                    kind,
+                    providerRefundId: `rfnd_${tag}_${n}`,
+                    providerPaymentId: `pay_${tag}_${n}`,
+                    invoiceId,
+                    amountPaise: 500,
+                    status,
+                    source: "PROVIDER",
+                },
+            });
+        await refund(st.refunded, "REFUND", "PROCESSED", 11);
+        await refund(st.lost, "DISPUTE", "LOST", 13);
+        // A refund still pending gives nothing back yet.
+        await refund(st.pending, "REFUND", "PENDING", 14);
+    });
+
+    async function ids(query: string): Promise<{
+        ids: string[];
+        statusCounts: Record<string, number>;
+    }> {
+        const res = await get(`/billing/invoices${query}`, people.billing);
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {
+            items: { id: string }[];
+            statusCounts: Record<string, number>;
+        };
+        return {
+            ids: body.items.map((i) => i.id),
+            statusCounts: body.statusCounts,
+        };
+    }
+
+    it("Unpaid is an invoice Razorpay took less for, and nothing else", async () => {
+        const { ids: unpaid } = await ids("?status=unpaid");
+        expect(unpaid).toContain(st.short);
+        for (const other of [st.refunded, st.lost, st.pending, invoices.a]) {
+            expect(unpaid).not.toContain(other);
+        }
+    });
+
+    it("Refunded is a processed refund or a lost dispute, never a pending refund", async () => {
+        const { ids: refunded } = await ids("?status=refunded");
+        expect(refunded).toEqual(
+            expect.arrayContaining([st.refunded, st.lost]),
+        );
+        expect(refunded).not.toContain(st.pending);
+        expect(refunded).not.toContain(st.short);
+    });
+
+    it("Paid is the rest", async () => {
+        const { ids: paid } = await ids("?status=paid");
+        expect(paid).toEqual(
+            expect.arrayContaining([invoices.a, invoices.b, st.pending]),
+        );
+        for (const other of [st.refunded, st.lost, st.short]) {
+            expect(paid).not.toContain(other);
+        }
+    });
+
+    it("counts each status under the other filters, whatever status is picked", async () => {
+        const all = await ids(`?q=${slug}`);
+        const picked = await ids(`?q=${slug}&status=unpaid`);
+        expect(all.statusCounts).toEqual({ paid: 1, unpaid: 1, refunded: 2 });
+        expect(picked.statusCounts).toEqual(all.statusCounts);
+        expect(picked.ids).toEqual([st.short]);
+    });
+
+    it("the export keeps the status filter", async () => {
+        const res = await get(
+            "/billing/invoices/export?month=2026-10&status=refunded",
+            people.billing,
+        );
+        expect(res.status).toBe(200);
+        const csv = await res.text();
+        expect(csv).toContain("Buyer 11");
+        expect(csv).toContain("Buyer 13");
+        expect(csv).not.toContain("Buyer 12");
+        expect(csv).not.toContain("Buyer 1,");
+    });
+
+    it("refuses a status it doesn't know", async () => {
+        expect(
+            (await get("/billing/invoices?status=overdue", people.billing))
+                .status,
+        ).toBe(400);
+    });
+});
+
 describe("the business's own invoice list stays its own", () => {
     it("returns only business A's invoices to business A's owner", async () => {
         const service = new SarohInvoicesService();

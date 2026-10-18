@@ -65,7 +65,7 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
-  `lib/billing-action-words.ts`, `lib/user-filters.ts`,
+  `lib/billing-action-words.ts`, `lib/billing-event-words.ts`, `lib/user-filters.ts`,
   `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
   `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`,
   `lib/business-words.ts`, `lib/offer-words.ts`.
@@ -112,6 +112,21 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   Razorpay ids link to its dashboard (`razorpayDashboardUrl`,
   `rel="noopener noreferrer"`), one test-mode hint per screen. End autopay
   asks for the business's name: it is the business's own Cancel plan.
+  **Needs action in words (admin plan U16, R28)**: each row is its code's
+  title, one sentence and one fix (`actionWords`, from
+  `BILLING_ACTION_CODES`, which mirrors the API's list in
+  `billing/billing-actions.ts`; `billing-event-words.test.ts` reads the
+  API's list and fails on a code without words, and the API's raise
+  functions take only listed codes). The API's note stays under "What
+  Saroh recorded". A failed billing job's Retry goes through the one job
+  retry (`POST /admin/jobs/retry`, `jobs:retry`, so Billing alone doesn't
+  see it) and the row stays in place, lit, saying it was queued; Open in
+  Jobs needs `jobs:read`. Provider events read in words
+  (`eventWords`, an unknown type falls back to its code) with Handled /
+  Not applied / No business. Invoices have Paid · Unpaid · Refunded chips
+  (`status`; Unpaid is Razorpay taking less than the total, Refunded a
+  processed refund or a lost dispute, the API's `invoiceStatusWhere`), each
+  with its count, and Export for the CA keeps every filter.
 - **Users (`/users`, admin console U9, R13; People until then, and
   `/people` redirects)** lists everyone with an account: a search and the
   chips No business yet · Email not verified · Owners · Joined this week

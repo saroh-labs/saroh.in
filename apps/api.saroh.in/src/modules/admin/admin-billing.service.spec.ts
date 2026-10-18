@@ -4,7 +4,11 @@ jest.mock("@saroh/database", () => ({
             findMany: jest.fn(),
             findUnique: jest.fn(),
             aggregate: jest.fn(),
+            count: jest.fn(),
+            // Prisma's field reference for "less than the total" (R29).
+            fields: { totalPaise: "totalPaise" },
         },
+        billingRefund: { findMany: jest.fn(() => Promise.resolve([])) },
         subscription: {
             findMany: jest.fn(),
             findUnique: jest.fn(),
@@ -168,6 +172,7 @@ describe("the service checks the permission itself", () => {
             _count: { _all: 3 },
             _sum: { taxablePaise: 300, taxPaise: 54, totalPaise: 354 },
         });
+        db.sarohInvoice.count.mockResolvedValue(1);
         const page = await service.listInvoices(staffAs(AdminRole.Billing), {
             month: "2026-10",
             gstin: "yes",
@@ -179,6 +184,7 @@ describe("the service checks the permission itself", () => {
             taxPaise: 54,
             totalPaise: 354,
         });
+        expect(page.statusCounts).toEqual({ paid: 1, unpaid: 1, refunded: 1 });
         expect(db.sarohInvoice.findMany).toHaveBeenCalledWith(
             expect.objectContaining({ skip: 50, take: 50 }),
         );

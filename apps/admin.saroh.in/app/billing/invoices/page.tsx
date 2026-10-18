@@ -2,18 +2,23 @@ import { buttonVariants } from "@saroh/ui/button";
 import { PermissionDeniedState } from "@saroh/ui/data-state";
 import { StatCard } from "@saroh/ui/stat-card";
 
-import { InvoiceTable } from "@/components/billing/invoice-table";
+import {
+    InvoiceStatusChips,
+    InvoiceTable,
+} from "@/components/billing/invoice-table";
 import { NumberPager } from "@/components/billing/number-pager";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { listSarohInvoices } from "@/lib/billing";
 import { RAZORPAY_LINK_HINT } from "@/lib/billing-action-words";
-import { clearHref } from "@/lib/billing-filters";
+import { clearHref, invoicesExportHref } from "@/lib/billing-filters";
+import type { GstinFilter, InvoiceStatus } from "@/lib/billing-words";
 import {
     billingHref,
     formatPaise,
     monthLabel,
     readGstin,
+    readInvoiceStatus,
     readMonth,
     readPage,
 } from "@/lib/billing-words";
@@ -24,9 +29,10 @@ export const metadata = { title: "Invoices · Billing" };
 
 /**
  * Every invoice Saroh issued to a business for its plan (DEC-163), newest
- * first, with the filtered set's totals and the month's CSV for GST
- * filing. The month and GSTIN are picked in Billing's toolbar and apply at
- * once. Read-only. Needs `saroh-billing:read` (Platform Owners and
+ * first, with the filtered set's totals and the month's CSV for the CA
+ * (R29). Paid · Unpaid · Refunded are chips; the month and GSTIN are
+ * picked in Billing's toolbar. Each applies at once, and the export keeps
+ * them all. Read-only. Needs `saroh-billing:read` (Platform Owners and
  * Billing); the API checks it again and records every read.
  */
 export default async function BillingInvoicesPage({
@@ -42,12 +48,13 @@ export default async function BillingInvoicesPage({
     const month = readMonth(raw.month);
     const q = param(raw.q);
     const gstin = readGstin(raw.gstin);
+    const status = readInvoiceStatus(raw.status);
     const page = readPage(raw.page);
-    const filters = { month, q, gstin };
+    const filters = { month, q, gstin, status };
     const result = await listSarohInvoices({ ...filters, page }).catch(
         () => undefined,
     );
-    const filtered = [month, q, gstin].some((v) => v !== undefined);
+    const filtered = [month, q, gstin, status].some((v) => v !== undefined);
 
     if (result === undefined) return <FailedPanel things="invoices" />;
     if (result === null) {
@@ -82,7 +89,10 @@ export default async function BillingInvoicesPage({
                 />
             </div>
 
-            <ExportRow month={month} q={q} gstin={gstin} />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <InvoiceStatusChips counts={result.statusCounts} />
+                <ExportRow {...filters} />
+            </div>
 
             {result.items.length === 0 && page === 1 ? (
                 filtered ? (
@@ -129,38 +139,34 @@ export default async function BillingInvoicesPage({
     );
 }
 
-/** The month's CSV for GST filing, or what to do to get one. */
-function ExportRow({
-    month,
-    q,
-    gstin,
-}: {
+/**
+ * The month's CSV for the CA's GST filing (R29), with every filter the
+ * list has, or what to do to get one: a filing is one month.
+ */
+function ExportRow(filters: {
     month?: string;
     q?: string;
-    gstin?: "yes" | "no";
+    gstin?: GstinFilter;
+    status?: InvoiceStatus;
 }) {
-    if (!month) {
+    if (!filters.month) {
         return (
             <p className="text-sm text-muted-foreground">
-                Pick a month under Issued in to download its CSV for GST filing.
+                Pick a month under Issued in to export it for the CA.
             </p>
         );
     }
     return (
         <div className="flex flex-wrap items-center gap-3">
-            <a
-                href={billingHref("/billing/invoices/export", {
-                    month,
-                    q,
-                    gstin,
-                })}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-                Download CSV for GST · {monthLabel(month)}
-            </a>
             <span className="text-sm text-muted-foreground">
                 One row per invoice, with the filters above.
             </span>
+            <a
+                href={invoicesExportHref(filters)}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+                Export for the CA · {monthLabel(filters.month)}
+            </a>
         </div>
     );
 }

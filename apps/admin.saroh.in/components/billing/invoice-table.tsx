@@ -1,16 +1,23 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { Chip } from "@saroh/ui/chip";
 import type { DataColumn } from "@saroh/ui/data-view";
 import { DataView } from "@saroh/ui/data-view";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import type { SarohInvoiceRow } from "@/lib/billing-words";
+import type { Query } from "@/lib/billing-filters";
+import { invoiceStatusHref } from "@/lib/billing-filters";
+import type { InvoiceStatus, SarohInvoiceRow } from "@/lib/billing-words";
 import {
     cycleLabel,
     formatPaise,
     gstSplit,
+    INVOICE_STATUS_LABEL,
+    INVOICE_STATUSES,
     invoicePdfHref,
+    invoiceStatus,
     istDate,
     refundedPaise,
     sourceLabel,
@@ -79,6 +86,13 @@ const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
         ),
     },
     {
+        id: "status",
+        header: "Status",
+        priority: "primary",
+        width: "120px",
+        cell: (row) => <InvoiceStatusPill row={row} />,
+    },
+    {
         id: "taxable",
         header: "Before GST",
         priority: "detail",
@@ -126,18 +140,96 @@ const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
         id: "pdf",
         header: "",
         priority: "secondary",
-        width: "70px",
+        width: "110px",
         cell: (row) => (
-            <a
-                href={invoicePdfHref(row.id)}
-                className="text-sm font-medium underline underline-offset-4"
-                aria-label={`Download invoice ${row.number} as a PDF`}
-            >
-                PDF
-            </a>
+            <span className="flex items-center gap-3 text-sm font-medium">
+                <a
+                    href={invoicePdfHref(row.id)}
+                    className="underline underline-offset-4"
+                    aria-label={`Download invoice ${row.number} as a PDF`}
+                >
+                    PDF
+                </a>
+                {/* Its subscription, where its history and refunds are. */}
+                <Link
+                    href={businessBillingHref(row.organization.slug)}
+                    className="underline underline-offset-4"
+                    aria-label={`Open ${row.organization.name}'s subscription`}
+                >
+                    Open
+                </Link>
+            </span>
         ),
     },
 ];
+
+const STATUS_TONE: Record<InvoiceStatus, "success" | "error" | "neutral"> = {
+    paid: "success",
+    unpaid: "error",
+    refunded: "neutral",
+};
+
+/** Paid, Unpaid or Refunded (R29), by the API's own rule. */
+function InvoiceStatusPill({ row }: { row: SarohInvoiceRow }) {
+    const status = invoiceStatus(row);
+    const part =
+        status === "refunded" && refundedPaise(row) < row.totalPaise
+            ? "Part refunded"
+            : null;
+    return (
+        <Badge variant={STATUS_TONE[status]} size="sm">
+            {part ?? INVOICE_STATUS_LABEL[status]}
+        </Badge>
+    );
+}
+
+const figures = new Intl.NumberFormat("en-IN");
+
+/**
+ * Paid · Unpaid · Refunded (R29): toggles (`aria-pressed`), one on at a
+ * time; pressed again, every invoice. Each says how many it holds under
+ * the month, GSTIN and search already picked.
+ */
+export function InvoiceStatusChips({
+    counts,
+}: {
+    counts?: Record<InvoiceStatus, number>;
+}) {
+    const router = useRouter();
+    const pathname = usePathname();
+    const params = useSearchParams();
+    const query: Query = Object.fromEntries(params.entries());
+    return (
+        <div
+            role="group"
+            aria-label="Status"
+            className="flex flex-wrap items-center gap-2"
+        >
+            {INVOICE_STATUSES.map((status) => (
+                <Chip
+                    key={status}
+                    as="toggle"
+                    on={query.status === status}
+                    onClick={() =>
+                        router.push(
+                            invoiceStatusHref(pathname, query, status),
+                            {
+                                scroll: false,
+                            },
+                        )
+                    }
+                >
+                    {INVOICE_STATUS_LABEL[status]}
+                    {counts ? (
+                        <span className="tabular-nums opacity-70">
+                            {figures.format(counts[status])}
+                        </span>
+                    ) : null}
+                </Chip>
+            ))}
+        </div>
+    );
+}
 
 /**
  * How it was paid (DEC-166): the payment as a Razorpay link, what Razorpay

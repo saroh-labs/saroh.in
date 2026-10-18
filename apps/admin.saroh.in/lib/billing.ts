@@ -7,6 +7,7 @@ import type {
 import type {
     BillingCounts,
     GstinFilter,
+    InvoiceStatus,
     SarohInvoicePage,
     SarohSubscriptionDetail,
     SarohSubscriptionPage,
@@ -35,6 +36,7 @@ export function listSarohInvoices(filters: {
     month?: string;
     q?: string;
     gstin?: GstinFilter;
+    status?: InvoiceStatus;
     page?: number;
 }): Promise<SarohInvoicePage | null> {
     return getJson<SarohInvoicePage>(`/billing/invoices${query(filters)}`);
@@ -89,6 +91,7 @@ export function fetchInvoicesExport(filters: {
     month: string;
     q?: string;
     gstin?: GstinFilter;
+    status?: InvoiceStatus;
 }): Promise<Response> {
     return adminFetch(`/billing/invoices/export${query(filters)}`);
 }

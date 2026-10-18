@@ -19,11 +19,13 @@ import {
 } from "../billing/double-charge";
 import { renderSarohInvoicePdf } from "../billing/saroh-invoice-paper";
 import type {
+    InvoiceStatus,
     NextChargeHow,
     SubscriptionStatusKey,
     SubscriptionView,
 } from "./admin-billing";
 import {
+    INVOICE_STATUSES,
     invoicesCsv,
     invoicesCsvFileName,
     istMonthRange,
@@ -59,6 +61,8 @@ export interface InvoiceQuery {
     q?: string;
     /** "yes": only invoices with a buyer GSTIN; "no": only without. */
     gstin?: "yes" | "no";
+    /** Paid, unpaid (Razorpay took less) or refunded (R29). */
+    status?: InvoiceStatus;
     page?: number;
 }
 
@@ -122,6 +126,11 @@ export interface AdminInvoicePage {
     page: number;
     limit: number;
     totals: InvoiceTotals;
+    /**
+     * How many invoices each status holds under the other filters (month,
+     * search, GSTIN), for the status chips (R29).
+     */
+    statusCounts: Record<InvoiceStatus, number>;
 }
 
 export interface SubscriptionQuery {
@@ -324,9 +333,11 @@ export class AdminBillingService {
         query: InvoiceQuery,
     ): Promise<AdminInvoicePage> {
         assertSarohBillingReader(staff);
-        const where = invoiceWhere(query);
+        const refunded = await refundedInvoiceIds();
+        const where = invoiceWhere(query, refunded);
+        const others = invoiceWhere({ ...query, status: undefined });
         const page = Math.max(1, query.page ?? 1);
-        const [rows, sums] = await Promise.all([
+        const [rows, sums, ...byStatus] = await Promise.all([
             prisma.sarohInvoice.findMany({
                 where,
                 orderBy: [{ issuedAt: "desc" }, { number: "desc" }],
@@ -339,6 +350,13 @@ export class AdminBillingService {
                 _count: { _all: true },
                 _sum: { taxablePaise: true, taxPaise: true, totalPaise: true },
             }),
+            ...INVOICE_STATUSES.map((status) =>
+                prisma.sarohInvoice.count({
+                    where: {
+                        AND: [others, invoiceStatusWhere(status, refunded)],
+                    },
+                }),
+            ),
         ]);
         const refunds = await refundsByInvoice(rows.map((r) => r.id));
         return {
@@ -374,13 +392,17 @@ export class AdminBillingService {
                 taxPaise: sums._sum.taxPaise ?? 0,
                 totalPaise: sums._sum.totalPaise ?? 0,
             },
+            statusCounts: Object.fromEntries(
+                INVOICE_STATUSES.map((status, i) => [status, byStatus[i]]),
+            ) as Record<InvoiceStatus, number>,
         };
     }
 
     /**
      * One month's invoices as a CSV for GST filing, in number order. The
      * month is required: an export of everything ever is not a filing.
-     * The other filters apply too, so "with GSTIN" exports the B2B rows.
+     * The other filters apply too, so "with GSTIN" exports the B2B rows
+     * and "Refunded" the month's refunded ones (R29).
      */
     async exportInvoices(
         staff: PlatformAdminInfo,
@@ -390,8 +412,9 @@ export class AdminBillingService {
         if (!query.month || !istMonthRange(query.month)) {
             throw new BadRequestException("Choose a month to export.");
         }
+        const refunded = query.status ? await refundedInvoiceIds() : [];
         const rows = await prisma.sarohInvoice.findMany({
-            where: invoiceWhere(query),
+            where: invoiceWhere(query, refunded),
             orderBy: [{ issuedAt: "asc" }, { number: "asc" }],
             take: CSV_MAX_ROWS,
             include: {
@@ -994,11 +1017,16 @@ export function assertSarohBillingReader(staff: PlatformAdminInfo | undefined) {
     }
 }
 
-/** The invoices `where` for a query: month, search and GSTIN. */
+/**
+ * The invoices `where` for a query: month, search, GSTIN and, given the
+ * refunded invoices' ids ({@link refundedInvoiceIds}), the status.
+ */
 export function invoiceWhere(
     query: InvoiceQuery,
+    refunded: readonly string[] = [],
 ): Prisma.SarohInvoiceWhereInput {
     const and: Prisma.SarohInvoiceWhereInput[] = [];
+    if (query.status) and.push(invoiceStatusWhere(query.status, refunded));
     const range = istMonthRange(query.month);
     if (range) and.push({ issuedAt: { gte: range.from, lt: range.to } });
     if (query.gstin === "yes") and.push({ billToGstin: { not: null } });
@@ -1033,6 +1061,61 @@ export function invoiceWhere(
         });
     }
     return { AND: and };
+}
+
+/**
+ * Money given back on a Saroh invoice: a refund the provider processed, or
+ * a dispute the business lost. A pending or failed refund, and a dispute
+ * still open or won, leave the invoice as it was.
+ */
+const MONEY_BACK: Prisma.BillingRefundWhereInput = {
+    invoiceId: { not: null },
+    OR: [
+        { kind: "REFUND", status: "PROCESSED" },
+        { kind: "DISPUTE", status: "LOST" },
+    ],
+};
+
+/** The ids of every invoice with money given back on it. */
+async function refundedInvoiceIds(): Promise<string[]> {
+    const rows = await prisma.billingRefund.findMany({
+        where: MONEY_BACK,
+        select: { invoiceId: true },
+        distinct: ["invoiceId"],
+    });
+    return rows.flatMap((r) => (r.invoiceId ? [r.invoiceId] : []));
+}
+
+/**
+ * One invoice status (R29) as a `where`. Refunded: money given back on it.
+ * Unpaid: Razorpay says it took less than the invoice's total. Paid: the
+ * rest; an invoice is written when a charge is taken, so one the provider
+ * hasn't confirmed an amount for yet reads as paid.
+ */
+export function invoiceStatusWhere(
+    status: InvoiceStatus,
+    refunded: readonly string[],
+): Prisma.SarohInvoiceWhereInput {
+    if (status === "refunded") return { id: { in: [...refunded] } };
+    const notRefunded = { id: { notIn: [...refunded] } };
+    const total = prisma.sarohInvoice.fields.totalPaise;
+    if (status === "unpaid") {
+        return {
+            AND: [notRefunded, { providerAmountPaise: { lt: total } }],
+        };
+    }
+    // Not `NOT short`: a NULL amount would make it NULL, and drop the row.
+    return {
+        AND: [
+            notRefunded,
+            {
+                OR: [
+                    { providerAmountPaise: null },
+                    { providerAmountPaise: { gte: total } },
+                ],
+            },
+        ],
+    };
 }
 
 function profileOf(

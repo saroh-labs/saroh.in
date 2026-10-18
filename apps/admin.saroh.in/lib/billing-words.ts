@@ -64,6 +64,49 @@ export interface SarohInvoicePage {
         taxPaise: number;
         totalPaise: number;
     };
+    /** Each status's count under the other filters (R29). */
+    statusCounts?: Record<InvoiceStatus, number>;
+}
+
+/** Billing › Invoices' status chips (R29), as the API takes them. */
+export const INVOICE_STATUSES = ["paid", "unpaid", "refunded"] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+
+export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+    paid: "Paid",
+    unpaid: "Unpaid",
+    refunded: "Refunded",
+};
+
+export function readInvoiceStatus(
+    value: string | undefined,
+): InvoiceStatus | undefined {
+    return INVOICE_STATUSES.find((s) => s === value);
+}
+
+/**
+ * One invoice's status, by the API's rule (R29): Refunded when money went
+ * back on it (a processed refund or a lost dispute), Unpaid when Razorpay
+ * says it took less than the total, Paid otherwise.
+ */
+export function invoiceStatus(row: {
+    totalPaise: number;
+    providerAmountPaise: number | null;
+    refunds: { kind: string; status: string }[];
+}): InvoiceStatus {
+    const moneyBack = row.refunds.some(
+        (r) =>
+            (r.kind === "REFUND" && r.status === "PROCESSED") ||
+            (r.kind === "DISPUTE" && r.status === "LOST"),
+    );
+    if (moneyBack) return "refunded";
+    if (
+        row.providerAmountPaise !== null &&
+        row.providerAmountPaise < row.totalPaise
+    ) {
+        return "unpaid";
+    }
+    return "paid";
 }
 
 export interface PlanBrief {

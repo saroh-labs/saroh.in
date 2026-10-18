@@ -91,7 +91,9 @@ describe("billing filters as addresses", () => {
 
     it("knows when a tab is narrowed, and how to clear it", () => {
         expect(isNarrowed("invoices", { month: "2026-10" })).toBe(true);
-        expect(isNarrowed("invoices", { status: "ACTIVE" })).toBe(false);
+        // Invoices' own status (R29); a Subscriptions-only key isn't one.
+        expect(isNarrowed("invoices", { status: "unpaid" })).toBe(true);
+        expect(isNarrowed("invoices", { view: "ending-soon" })).toBe(false);
         expect(isNarrowed("subscriptions", { q: "rye" })).toBe(true);
         expect(isNarrowed("actions", { page: "2" })).toBe(false);
         expect(clearHref("actions")).toBe("/billing/actions");

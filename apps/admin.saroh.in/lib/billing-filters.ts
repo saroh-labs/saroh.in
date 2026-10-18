@@ -6,8 +6,8 @@
  * undoes it. Client-safe: no server imports.
  *
  * The query keys are the ones the API already takes: `q` (on every tab),
- * `status`, `view` and `plan` (Subscriptions), `month` and `gstin`
- * (Invoices), `state` (Needs action), `filter` (Provider events). Any
+ * `status`, `view` and `plan` (Subscriptions), `month`, `gstin` and
+ * `status` (Invoices), `state` (Needs action), `filter` (Provider events). Any
  * change of filter goes back to the first page and closes an open sheet.
  */
 
@@ -133,12 +133,41 @@ export function planHref(path: string, query: Query, plan: string): string {
     });
 }
 
+// ── Invoices ─────────────────────────────────────────────────────────────
+
+/**
+ * Where an invoice status chip leads (R29): that status, or, pressed
+ * again, every invoice. The month, GSTIN and search stay.
+ */
+export function invoiceStatusHref(
+    path: string,
+    query: Query,
+    status: string,
+): string {
+    return withFilter(path, query, {
+        status: query.status === status ? undefined : status,
+    });
+}
+
+/**
+ * The CA's export of what the list shows (R29): the same month, search,
+ * GSTIN and status, and nothing about where you are in the list.
+ */
+export function invoicesExportHref(query: Query): string {
+    return hrefOf("/billing/invoices/export", {
+        month: query.month,
+        q: query.q,
+        gstin: query.gstin,
+        status: query.status,
+    });
+}
+
 // ── Every tab ────────────────────────────────────────────────────────────
 
 /** The keys each tab narrows by, beside the search. */
 const TAB_FILTERS: Record<BillingTab, readonly string[]> = {
     subscriptions: ["status", "view", "plan"],
-    invoices: ["month", "gstin"],
+    invoices: ["month", "gstin", "status"],
     actions: ["state"],
     events: ["filter"],
 };
