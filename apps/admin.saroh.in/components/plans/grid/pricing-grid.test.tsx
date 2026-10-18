@@ -438,10 +438,16 @@ describe("a plan's price box", () => {
             screen.getByRole("button", { name: "Plan C's settings" }),
         );
         expect(
-            within(screen.getByRole("group", { name: "Plans" }))
-                .getByRole("button", { name: /^Plan C/ })
-                .getAttribute("aria-pressed"),
-        ).toBe("true");
+            screen.getByRole("dialog", { name: "Edit Plan C" }),
+        ).toBeTruthy();
+    });
+
+    it("opens a feature on every plan from its name", () => {
+        open();
+        fireEvent.click(
+            within(grid()).getByRole("rowheader", { name: "Gadgets" }),
+        );
+        expect(screen.getByRole("dialog", { name: "Gadgets" })).toBeTruthy();
     });
 });
 

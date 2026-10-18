@@ -213,7 +213,7 @@ export function TabModules() {
                 ))}
 
             <p className="flex flex-wrap gap-x-3.5 gap-y-1 text-[12px] text-muted-foreground">
-                <span>Click a cell to edit it plan by plan.</span>
+                <span>Click a cell to edit that feature on every plan.</span>
                 <span className="inline-flex items-center gap-1.5">
                     <span
                         aria-hidden

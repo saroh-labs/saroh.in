@@ -11,9 +11,11 @@ import type { GridKeys, GridPos } from "./use-grid-keys";
 /**
  * A plan's column header in the Plans grid (admin redesign U11, R20): its
  * name, its price box (₹ … /month, before GST) and a pencil to the plan's
- * own settings. The header is a cell of the grid's keyboard: Enter puts the
- * keyboard in the price box, where Enter keeps the price and Esc puts it
- * back. A price that isn't rupees ("-5", "12a") is refused beside the box
+ * own settings (the plan sheet, U12). The header is a cell of the grid's
+ * keyboard: Enter puts the keyboard in the price box, where Enter keeps the
+ * price and Esc puts it back, and Tab goes on to the pencil (Esc there is
+ * back on the header). Out of the header, the pencil leaves the tab order
+ * again, so Tab still leaves the grid in one stop. A price that isn't rupees ("-5", "12a") is refused beside the box
  * and never reaches the draft.
  */
 export function PlanHead({
@@ -49,6 +51,8 @@ export function PlanHead({
     const refused = parseRupees(text) === null;
     const cellRef = useRef<HTMLElement | null>(null);
     const cell = keys.cellProps(pos);
+    /** The keyboard is inside the header (its price box or pencil). */
+    const [inside, setInside] = useState(false);
 
     /** Enter or Esc has dealt with the box: the blur that follows hasn't. */
     const settled = useRef(false);
@@ -74,14 +78,18 @@ export function PlanHead({
                 cell.ref(el);
             }}
             data-plan={plan.id}
+            onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget))
+                    setInside(false);
+            }}
             className={cn(
                 "min-w-[132px] border-b border-border px-2 pb-2.5 pt-1 text-left align-top font-normal outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                 plan.featured && "bg-highlight-subtle/40",
                 plan.retired && "opacity-60",
             )}
         >
-            <div className="flex items-center gap-1">
-                <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1">
+                <span className="col-start-1 row-start-1 min-w-0 truncate text-[13.5px] font-semibold">
                     {name}
                     {plan.retired && (
                         <span className="font-normal text-muted-foreground">
@@ -90,63 +98,72 @@ export function PlanHead({
                         </span>
                     )}
                 </span>
+                <div className="col-span-2 mt-1 flex items-center gap-1 text-[12.5px] text-muted-foreground">
+                    <span aria-hidden>₹</span>
+                    <input
+                        ref={priceRef}
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        tabIndex={-1}
+                        readOnly={!canEdit}
+                        aria-label={`${name}'s price a month, before GST, in rupees`}
+                        aria-invalid={refused}
+                        aria-describedby={refused ? `${id}-hint` : undefined}
+                        value={text}
+                        onFocus={() => setInside(true)}
+                        onChange={(e) => setText(e.target.value)}
+                        onBlur={() => {
+                            if (settled.current || !keep()) return;
+                            setText(
+                                rupeesText(
+                                    parseRupees(text) ?? plan.pricePaise,
+                                ),
+                            );
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (keep()) back();
+                            } else if (e.key === "Escape") {
+                                e.preventDefault();
+                                setText(rupeesText(plan.pricePaise));
+                                back();
+                            }
+                        }}
+                        className="h-7 w-[72px] min-w-0 rounded-[7px] border border-border-strong bg-field px-1.5 text-right text-[13px] font-semibold tabular-nums text-foreground read-only:cursor-default read-only:border-transparent read-only:bg-transparent focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-destructive"
+                    />
+                    <span>/month</span>
+                </div>
+                {refused && (
+                    <p
+                        id={`${id}-hint`}
+                        className="col-span-2 mt-1 text-[11.5px] leading-snug text-destructive"
+                    >
+                        {PRICE_HINT}
+                    </p>
+                )}
+                {was && !refused && (
+                    <p className="col-span-2 mt-1 text-[11px] font-medium text-warning">
+                        {was}
+                    </p>
+                )}
                 <button
                     type="button"
-                    tabIndex={-1}
+                    tabIndex={inside ? 0 : -1}
                     aria-label={`${name}'s settings`}
                     onClick={onSettings}
-                    className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-[7px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active"
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                            e.preventDefault();
+                            back();
+                        }
+                    }}
+                    className="col-start-2 row-start-1 grid size-7 shrink-0 cursor-pointer place-items-center rounded-[7px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active"
                 >
                     <Pencil aria-hidden className="size-3.5" />
                 </button>
             </div>
-            <div className="mt-1 flex items-center gap-1 text-[12.5px] text-muted-foreground">
-                <span aria-hidden>₹</span>
-                <input
-                    ref={priceRef}
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    tabIndex={-1}
-                    readOnly={!canEdit}
-                    aria-label={`${name}'s price a month, before GST, in rupees`}
-                    aria-invalid={refused}
-                    aria-describedby={refused ? `${id}-hint` : undefined}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onBlur={() => {
-                        if (settled.current || !keep()) return;
-                        setText(
-                            rupeesText(parseRupees(text) ?? plan.pricePaise),
-                        );
-                    }}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                            e.preventDefault();
-                            if (keep()) back();
-                        } else if (e.key === "Escape") {
-                            e.preventDefault();
-                            setText(rupeesText(plan.pricePaise));
-                            back();
-                        }
-                    }}
-                    className="h-7 w-[72px] min-w-0 rounded-[7px] border border-border-strong bg-field px-1.5 text-right text-[13px] font-semibold tabular-nums text-foreground read-only:cursor-default read-only:border-transparent read-only:bg-transparent focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-destructive"
-                />
-                <span>/month</span>
-            </div>
-            {refused && (
-                <p
-                    id={`${id}-hint`}
-                    className="mt-1 text-[11.5px] leading-snug text-destructive"
-                >
-                    {PRICE_HINT}
-                </p>
-            )}
-            {was && !refused && (
-                <p className="mt-1 text-[11px] font-medium text-warning">
-                    {was}
-                </p>
-            )}
         </th>
     );
 }

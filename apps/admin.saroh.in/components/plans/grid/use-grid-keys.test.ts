@@ -33,6 +33,15 @@ describe("where a key moves", () => {
         expect(nextPos(at(2, 1), "End", size, true)).toEqual(at(3, 2));
     });
 
+    it("goes left onto the features' names when they are part of it, Home staying on the plans", () => {
+        const names = { ...size, minCol: -1 };
+        expect(nextPos(at(1, 0), "ArrowLeft", names)).toEqual(at(1, -1));
+        expect(nextPos(at(1, -1), "ArrowLeft", names)).toEqual(at(1, -1));
+        expect(nextPos(at(1, -1), "ArrowRight", names)).toEqual(at(1, 0));
+        expect(nextPos(at(1, 2), "Home", names)).toEqual(at(1, 0));
+        expect(nextPos(at(1, -1), "ArrowUp", names)).toEqual(at(0, -1));
+    });
+
     it("leaves Tab, Enter and letters to someone else", () => {
         for (const k of ["Tab", "Enter", "a", "/", "Escape"])
             expect(nextPos(at(1, 1), k, size)).toBeNull();

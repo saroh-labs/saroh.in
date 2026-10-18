@@ -6,7 +6,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 
-import type { Impact, ImpactTone } from "@/lib/pricing-types";
+import type { Impact, ImpactItem, ImpactTone } from "@/lib/pricing-types";
 
 const TONE_BADGE: Record<ImpactTone, "error" | "warning" | "success" | "info"> =
     {
@@ -142,44 +142,10 @@ function ImpactBody({
             ) : (
                 <ul className="grid gap-2">
                     {impact.items.map((item, i) => (
-                        <li
+                        <ImpactItemCard
                             key={`${i}-${item.title}`}
-                            className="grid gap-1.5 rounded-[10px] border border-border bg-card px-3 py-[11px]"
-                        >
-                            <div className="flex items-baseline gap-2">
-                                <Badge
-                                    variant={TONE_BADGE[item.tone]}
-                                    className="flex-none rounded-full px-[7px] py-px text-[10.5px] font-semibold"
-                                >
-                                    {item.label}
-                                </Badge>
-                                <span className="font-semibold leading-snug">
-                                    {item.title}
-                                </span>
-                            </div>
-                            {item.detail && (
-                                <span className="text-[12.5px] leading-normal text-foreground/80">
-                                    {item.detail}
-                                </span>
-                            )}
-                            {item.businesses.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                    {item.businesses.slice(0, 6).map((b) => (
-                                        <span
-                                            key={b.id}
-                                            className="rounded-full bg-secondary px-2 py-0.5 text-[11.5px] text-foreground/80"
-                                        >
-                                            {b.name}
-                                        </span>
-                                    ))}
-                                    {item.businesses.length > 6 && (
-                                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[11.5px] text-foreground/80">
-                                            +{item.businesses.length - 6} more
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </li>
+                            item={item}
+                        />
                     ))}
                 </ul>
             )}
@@ -190,6 +156,48 @@ function ImpactBody({
                 </p>
             )}
         </>
+    );
+}
+
+/**
+ * One effect of the draft, with the businesses it reaches; the feature
+ * sheet (U12) lists its own feature's the same way.
+ */
+export function ImpactItemCard({ item }: { item: ImpactItem }) {
+    return (
+        <li className="grid gap-1.5 rounded-[10px] border border-border bg-card px-3 py-[11px]">
+            <div className="flex items-baseline gap-2">
+                <Badge
+                    variant={TONE_BADGE[item.tone]}
+                    className="flex-none rounded-full px-[7px] py-px text-[10.5px] font-semibold"
+                >
+                    {item.label}
+                </Badge>
+                <span className="font-semibold leading-snug">{item.title}</span>
+            </div>
+            {item.detail && (
+                <span className="text-[12.5px] leading-normal text-foreground/80">
+                    {item.detail}
+                </span>
+            )}
+            {item.businesses.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                    {item.businesses.slice(0, 6).map((b) => (
+                        <span
+                            key={b.id}
+                            className="rounded-full bg-secondary px-2 py-0.5 text-[11.5px] text-foreground/80"
+                        >
+                            {b.name}
+                        </span>
+                    ))}
+                    {item.businesses.length > 6 && (
+                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[11.5px] text-foreground/80">
+                            +{item.businesses.length - 6} more
+                        </span>
+                    )}
+                </div>
+            )}
+        </li>
     );
 }
 

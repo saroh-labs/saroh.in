@@ -1,74 +1,86 @@
 "use client";
 
-import type { CatalogModule, Cell, LimitPeriod } from "@saroh/pricing-catalog";
-import { cellOf } from "@saroh/pricing-catalog";
+import type { Cell, IncludedCell } from "@saroh/pricing-catalog";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
-import { forwardRef } from "react";
+import { forwardRef, useId } from "react";
 
 import { LIMIT_HINT, parseLimit } from "./catalog-edits";
-import { FIELD, Field, NumberField, SELECT, SMALL_FIELD } from "./fields";
+import { FIELD, Field, NumberField, SMALL_FIELD } from "./fields";
 
 /**
- * One module on one plan, in the Plans tab (plans catalogue U7): the
- * include tick, "Changed", the usage line, and either what the plan gets
- * (Comparison table, Plan card, Limit, Counted, and with a limit whether
- * it's a soft cap) or how it shows when the plan hasn't got it
- * (Locked | Hidden).
+ * One plan's line in the feature sheet (admin redesign U12, R21; the Plans
+ * tab's module row before it): whether the plan has the feature, what it
+ * was on the live version, who it reaches and how much they use, and
+ * either what the plan gets (the comparison table's words, the plan card's
+ * line, the limit and whether that cap is soft) or how it shows when the
+ * plan hasn't got it (Locked | Hidden). How the feature is counted is the
+ * sheet's, once for every plan.
  */
 
+export type CellPatch = Partial<Omit<IncludedCell, "inc" | "limit" | "per">>;
+
 export interface ModuleRowProps {
-    module: CatalogModule;
+    /** The plan's name. */
+    plan: string;
     planId: string;
+    /** The feature's name, for the controls' names. */
+    feature: string;
+    cell: Cell;
     changed: boolean;
+    /** What it was on live, when changed ("Was 111"). */
+    was: string[];
+    /** "Reaches 2 businesses at renewal". */
+    reach: string;
     usage: string | null;
-    /** Opened from the Modules matrix on this row. */
+    /** Opened from the Modules matrix on this plan. */
     focused: boolean;
     disabled: boolean;
     /** Validation messages for this cell, by field. */
     errors: { text?: string; card?: string; limit?: string };
     onInclude: (on: boolean) => void;
-    onPatch: (patch: {
-        text?: string;
-        card?: string;
-        limit?: number | null;
-        per?: LimitPeriod;
-        soft?: boolean;
-    }) => void;
+    onPatch: (patch: CellPatch) => void;
+    onLimit: (limit: number | null) => void;
     onOff: (off: "locked" | "hidden") => void;
 }
 
 export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
     function ModuleRow(
         {
-            module,
+            plan,
             planId,
+            feature,
+            cell,
             changed,
+            was,
+            reach,
             usage,
             focused,
             disabled,
             errors,
             onInclude,
             onPatch,
+            onLimit,
             onOff,
         },
         tickRef,
     ) {
-        const cell: Cell = cellOf(module, planId);
-        const tickId = `inc-${module.id}`;
-        const softId = `soft-${module.id}`;
+        const id = useId();
+        const tickId = `${id}-inc`;
+        const softId = `${id}-soft`;
+        const offId = `${id}-off`;
         return (
             <div
-                data-module={module.id}
+                data-plan={planId}
                 className={cn(
-                    "-mx-2.5 grid gap-x-[18px] gap-y-2.5 rounded-[10px] border-t border-border/70 px-2.5 py-3 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]",
+                    "-mx-2.5 grid gap-x-[18px] gap-y-2.5 rounded-[10px] border-t border-border/70 px-2.5 py-3 sm:grid-cols-[minmax(0,170px)_minmax(0,1fr)]",
                     focused && "bg-highlight-subtle",
                 )}
             >
                 <div className="grid content-start gap-1">
-                    <div className="flex items-center gap-[9px]">
+                    <div className="flex flex-wrap items-center gap-x-[9px] gap-y-1">
                         <Checkbox
                             ref={tickRef}
                             id={tickId}
@@ -79,24 +91,36 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                         />
                         <label
                             htmlFor={tickId}
-                            className="flex min-w-0 cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 font-semibold"
+                            className="min-w-0 cursor-pointer font-semibold"
                         >
-                            {module.name}
-                            {changed && (
-                                <span className="rounded-full bg-highlight-subtle px-1.5 py-px text-[11px] font-semibold text-highlight-subtle-foreground">
-                                    Changed
-                                </span>
-                            )}
+                            {plan}
+                            <span className="sr-only"> has {feature}</span>
                         </label>
+                        {changed && (
+                            <span className="rounded-full bg-highlight-subtle px-1.5 py-px text-[11px] font-semibold text-highlight-subtle-foreground">
+                                Changed
+                            </span>
+                        )}
                     </div>
-                    {usage && (
-                        <span className="pl-[25px] text-[12px] leading-[1.45] text-muted-foreground">
-                            {usage}
-                        </span>
-                    )}
+                    <div className="grid gap-0.5 pl-[25px] text-[12px] leading-[1.45]">
+                        {was.map((line) => (
+                            <span
+                                key={line}
+                                className="font-medium text-warning"
+                            >
+                                {line}
+                            </span>
+                        ))}
+                        <span className="text-muted-foreground">{reach}</span>
+                        {usage && (
+                            <span className="text-muted-foreground">
+                                {usage}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 {cell.inc ? (
-                    <div className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 lg:grid-cols-3">
                         <Field
                             label="Comparison table"
                             small
@@ -137,34 +161,11 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                             value={cell.limit}
                             format={(v) => (v == null ? "" : String(v))}
                             parse={parseLimit}
-                            onCommit={(limit) => onPatch({ limit })}
+                            onCommit={onLimit}
                             hint={LIMIT_HINT}
                             error={errors.limit}
                             disabled={disabled}
                         />
-                        <Field label="Counted" small>
-                            {(a) => (
-                                <select
-                                    {...a}
-                                    value={cell.per}
-                                    disabled={disabled}
-                                    onChange={(e) =>
-                                        onPatch({
-                                            per: e.target.value as LimitPeriod,
-                                        })
-                                    }
-                                    className={cn(
-                                        FIELD,
-                                        SMALL_FIELD,
-                                        SELECT,
-                                        "bg-card px-2",
-                                    )}
-                                >
-                                    <option value="">In total</option>
-                                    <option value="month">Each month</option>
-                                </select>
-                            )}
-                        </Field>
                         {cell.limit != null && (
                             <div className="col-span-full flex items-start gap-2.5">
                                 <Switch
@@ -182,16 +183,15 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                                         htmlFor={softId}
                                         className="cursor-pointer text-[12.5px] font-semibold text-foreground"
                                     >
-                                        Soft limit: we tell the business, and
-                                        never block it
+                                        Soft limit on {plan}
                                     </label>
                                     <span
                                         id={`${softId}-note`}
                                         className="text-[12px] leading-[1.45] text-muted-foreground"
                                     >
                                         {cell.soft
-                                            ? "On: at the limit the business is told, and nothing stops."
-                                            : "Off: at the limit the business can't add more."}
+                                            ? "At the limit the business is told, and nothing stops."
+                                            : "At the limit the business can't add more."}
                                     </span>
                                 </div>
                             </div>
@@ -200,7 +200,7 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                 ) : (
                     <div className="flex flex-wrap items-center gap-2">
                         <span
-                            id={`off-${module.id}`}
+                            id={offId}
                             className="text-[12px] text-muted-foreground"
                         >
                             In the dashboard:
@@ -212,14 +212,14 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                             onValueChange={(v) => {
                                 if (v === "locked" || v === "hidden") onOff(v);
                             }}
-                            aria-labelledby={`off-${module.id}`}
+                            aria-labelledby={offId}
                             className="gap-0.5 rounded-[9px] border border-border bg-muted p-[3px]"
                         >
                             {(["locked", "hidden"] as const).map((v) => (
                                 <ToggleGroupItem
                                     key={v}
                                     value={v}
-                                    aria-label={`${v === "locked" ? "Locked" : "Hidden"} for ${module.name}`}
+                                    aria-label={`${v === "locked" ? "Locked" : "Hidden"} on ${plan}`}
                                     className="h-7 rounded-[6px] px-3 text-[12.5px] font-semibold text-muted-foreground hover:bg-background/40 hover:text-foreground data-[state=on]:bg-foreground data-[state=on]:text-background"
                                 >
                                     {v === "locked" ? "Locked" : "Hidden"}

@@ -9,7 +9,10 @@ import { useCallback, useRef, useState } from "react";
  * so Tab enters and leaves the grid in one stop; the arrows move between
  * cells, Home and End go to the row's first and last cell (with Ctrl, the
  * grid's), and Enter opens the cell. Row -1 is the plans' header row when
- * there is one (`minRow: -1`), where Enter opens the price box.
+ * there is one (`minRow: -1`), where Enter opens the price box. Column -1
+ * is the features' names when they are part of it (`minCol: -1`, admin
+ * redesign U12), where Enter opens the feature on every plan; Home and End
+ * stay on the plans' cells, the row's first and last plan.
  *
  * Keys pressed inside an open cell's editor are its own: only a key aimed at
  * the cell itself moves.
@@ -25,6 +28,8 @@ export interface GridSize {
     cols: number;
     /** -1 when the header row is part of the grid's keyboard. */
     minRow: number;
+    /** -1 when the row headers are part of it; 0 by default. */
+    minCol?: number;
 }
 
 export const posKey = (p: GridPos) => `${p.row}:${p.col}`;
@@ -33,7 +38,10 @@ function clampPos(p: GridPos, size: GridSize): GridPos {
     const maxRow = Math.max(size.minRow, size.rows - 1);
     return {
         row: Math.min(Math.max(p.row, size.minRow), maxRow),
-        col: Math.min(Math.max(p.col, 0), Math.max(0, size.cols - 1)),
+        col: Math.min(
+            Math.max(p.col, size.minCol ?? 0),
+            Math.max(0, size.cols - 1),
+        ),
     };
 }
 

@@ -140,3 +140,49 @@ test.describe("the Plans tab's pricing table", () => {
         expect(after?.x).toBe(before?.x);
     });
 });
+
+test.describe("the feature and plan sheets", () => {
+    test("a feature's name opens it on every plan, and Esc closes it", async ({
+        page,
+    }) => {
+        const grid = await openPlans(page);
+        await grid
+            .getByRole("rowheader", { name: "Products", exact: true })
+            .click();
+        const sheet = page.getByRole("dialog", { name: "Products" });
+        await expect(sheet).toBeVisible();
+        await expect(
+            sheet.getByRole("checkbox", { name: "Grow has Products" }),
+        ).toBeVisible();
+        await expect(
+            sheet.getByRole("region", { name: "Who this touches" }),
+        ).toBeVisible();
+        await expect(sheet.getByRole("button", { name: /save/i })).toHaveCount(
+            0,
+        );
+        await page.keyboard.press("Escape");
+        await expect(sheet).toHaveCount(0);
+        // Nothing was changed: no draft was started.
+        await expect(page.getByText(/^Draft ·/)).toHaveCount(0);
+    });
+
+    test("a plan's pencil opens its sheet beside its card", async ({
+        page,
+    }) => {
+        const grid = await openPlans(page);
+        await grid.getByRole("button", { name: "Grow's settings" }).click();
+        const sheet = page.getByRole("dialog", { name: "Edit Grow" });
+        await expect(sheet).toBeVisible();
+        await expect(
+            sheet.getByRole("region", {
+                name: "Preview of Grow on the pricing page",
+            }),
+        ).toBeVisible();
+        await expect(
+            sheet.getByRole("region", { name: "Retire Grow" }),
+        ).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(sheet).toHaveCount(0);
+        await expect(page.getByText(/^Draft ·/)).toHaveCount(0);
+    });
+});

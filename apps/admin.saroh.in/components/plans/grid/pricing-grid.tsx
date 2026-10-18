@@ -2,12 +2,12 @@
 
 import type { Catalog, CatalogModule, Plan } from "@saroh/pricing-catalog";
 import { cellOf } from "@saroh/pricing-catalog";
-import { Button } from "@saroh/ui/button";
 import { Chip } from "@saroh/ui/chip";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListSearch } from "@saroh/ui/list-search";
 import { ListToolbar } from "@saroh/ui/list-toolbar";
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
@@ -33,6 +33,7 @@ import {
     reachLine,
     rowChanged,
 } from "./grid-model";
+import { GridEmpty, GridHint } from "./grid-notes";
 import { PlanHead } from "./plan-head";
 import type { GridPos } from "./use-grid-keys";
 import { useGridKeys } from "./use-grid-keys";
@@ -50,16 +51,26 @@ import { useGridKeys } from "./use-grid-keys";
  * - Search ("/") and the filters (All · Changed · Limits · Modules) are on
  *   this page only. A row changed since the last filter change stays in
  *   view, so a cell put back to live doesn't vanish under the keyboard.
- * - Without `pricing:edit` it reads the same, and nothing opens.
+ * - A feature's name opens it on every plan (`onFeature`, the feature
+ *   sheet) and a plan's pencil opens its own settings (`onPlanSettings`,
+ *   the plan sheet), admin redesign U12. The names are the grid's column
+ *   -1, so the keyboard reaches them with ← from a row's first plan.
+ * - Without `pricing:edit` it reads the same, and nothing opens but the
+ *   sheets, which read the same too.
  * - On a phone the feature column stays put and the plan columns scroll
  *   inside the grid's box; the page itself never scrolls sideways.
  */
 export function PricingGrid({
     catalog,
     onPlanSettings,
+    onFeature,
+    actions,
 }: {
     catalog: Catalog;
     onPlanSettings: (planId: string) => void;
+    onFeature: (moduleId: string) => void;
+    /** On the toolbar's right: Add plan. */
+    actions?: ReactNode;
 }) {
     const { live, edit, canEdit } = useDraft();
     const { pricing } = usePlans();
@@ -110,24 +121,30 @@ export function PricingGrid({
         ]),
     ) as Record<GridFilter, number>;
 
-    const open = useCallback(
-        (p: GridPos) => {
-            if (!canEdit) return;
-            const plan = plans.at(p.col);
-            if (!plan) return;
-            if (p.row === -1) {
-                const box = prices.current.get(plan.id);
-                box?.focus();
-                box?.select();
-                return;
-            }
-            setEditing(p);
-        },
-        [canEdit, plans],
-    );
+    // Not memoised by hand: `rows` is worked out fresh on every render,
+    // and the compiler keeps what it can.
+    const open = (p: GridPos) => {
+        if (p.col === -1) {
+            // A feature's name: the feature on every plan. The
+            // "Feature" header above them opens nothing.
+            const m = p.row >= 0 ? rows.at(p.row) : undefined;
+            if (m) onFeature(m.id);
+            return;
+        }
+        if (!canEdit) return;
+        const plan = plans.at(p.col);
+        if (!plan) return;
+        if (p.row === -1) {
+            const box = prices.current.get(plan.id);
+            box?.focus();
+            box?.select();
+            return;
+        }
+        setEditing(p);
+    };
 
     const keys = useGridKeys({
-        size: { rows: rows.length, cols: plans.length, minRow: -1 },
+        size: { rows: rows.length, cols: plans.length, minRow: -1, minCol: -1 },
         onOpen: open,
     });
 
@@ -221,20 +238,9 @@ export function PricingGrid({
                     </div>
                 }
                 onClear={narrowed ? clear : undefined}
+                end={actions}
             />
-            <p
-                id={hintId}
-                className="text-[12px] text-muted-foreground coarse:hidden"
-            >
-                <span aria-hidden>
-                    ←↑↓→ move{canEdit ? " · Enter change · Esc cancel" : ""}
-                </span>
-                <span className="sr-only">
-                    {canEdit
-                        ? "Arrow keys move between cells. Enter changes a cell, Escape cancels."
-                        : "Arrow keys move between cells. You can read pricing but not change it."}
-                </span>
-            </p>
+            <GridHint id={hintId} canEdit={canEdit} />
 
             {/* The grid's own box scrolls sideways; the page never does. */}
             <div
@@ -253,7 +259,8 @@ export function PricingGrid({
                             <th
                                 role="columnheader"
                                 scope="col"
-                                className="sticky left-0 z-[2] w-[38%] min-w-[140px] border-b border-border bg-card px-3 pb-2.5 pt-3 text-left align-bottom text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:min-w-[200px]"
+                                {...keys.cellProps({ row: -1, col: -1 })}
+                                className="sticky left-0 z-[2] w-[38%] min-w-[140px] border-b border-border bg-card px-3 pb-2.5 pt-3 text-left align-bottom text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:min-w-[200px]"
                             >
                                 Feature
                             </th>
@@ -314,7 +321,19 @@ export function PricingGrid({
                                         <th
                                             role="rowheader"
                                             scope="row"
-                                            className="sticky left-0 z-[1] border-b border-border/70 bg-card px-3 py-2 text-left align-middle text-[13px] font-medium"
+                                            {...keys.cellProps({
+                                                row,
+                                                col: -1,
+                                            })}
+                                            data-feature={m.id}
+                                            onClick={() => {
+                                                keys.focusCell({
+                                                    row,
+                                                    col: -1,
+                                                });
+                                                onFeature(m.id);
+                                            }}
+                                            className="sticky left-0 z-[1] cursor-pointer border-b border-border/70 bg-card px-3 py-2 text-left align-middle text-[13px] font-medium outline-none hover:underline hover:underline-offset-4 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                                         >
                                             {m.name}
                                         </th>
@@ -369,25 +388,11 @@ export function PricingGrid({
                 </table>
             </div>
             {rows.length === 0 && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-muted-foreground">
-                    <p>
-                        {catalog.modules.length === 0
-                            ? "There are no features yet. Add one on the Modules tab."
-                            : filter === "changed" && term === ""
-                              ? "Nothing here differs from the live version yet."
-                              : "No feature matches."}
-                    </p>
-                    {narrowed && (
-                        <Button
-                            type="button"
-                            variant="link"
-                            className="h-auto p-0 text-[13px]"
-                            onClick={clear}
-                        >
-                            Show all features
-                        </Button>
-                    )}
-                </div>
+                <GridEmpty
+                    none={catalog.modules.length === 0}
+                    unchanged={filter === "changed" && term === ""}
+                    onShowAll={narrowed ? clear : undefined}
+                />
             )}
         </section>
     );

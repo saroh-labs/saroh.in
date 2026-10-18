@@ -95,7 +95,7 @@ export function ModuleLine({
                         <button
                             type="button"
                             onClick={() => onCell(p.id)}
-                            aria-label={`${m.name} on ${p.name}: ${said}${ch ? ", changed" : ""}. Edit plan by plan`}
+                            aria-label={`${m.name} on ${p.name}: ${said}${ch ? ", changed" : ""}. Edit on every plan`}
                             className={cn(
                                 "relative grid min-h-10 w-full cursor-pointer gap-0.5 rounded-[8px] border px-[9px] py-[7px] text-left text-[12.5px] transition-[filter] duration-fast hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card active:brightness-90",
                                 ch ? "border-highlight/60" : "border-border",

@@ -23,12 +23,15 @@ export const SELECT =
 export function Field({
     label,
     error,
+    note,
     className,
     small,
     children,
 }: {
     label: string;
     error?: string | null;
+    /** A quiet line under the field (what a change does); an error takes its place. */
+    note?: string | null;
     className?: string;
     small?: boolean;
     children: (props: {
@@ -39,6 +42,8 @@ export function Field({
 }) {
     const id = useId();
     const errorId = `${id}-error`;
+    const noteId = `${id}-note`;
+    const describedBy = error ? errorId : note ? noteId : undefined;
     return (
         <div className={cn("grid min-w-0 content-start gap-[5px]", className)}>
             <label
@@ -53,13 +58,20 @@ export function Field({
             {children({
                 id,
                 "aria-invalid": !!error,
-                "aria-describedby": error ? errorId : undefined,
+                "aria-describedby": describedBy,
             })}
-            {error && (
+            {error ? (
                 <p id={errorId} className="text-[12px] text-destructive">
                     {error}
                 </p>
-            )}
+            ) : note ? (
+                <p
+                    id={noteId}
+                    className="text-[12px] leading-[1.45] text-muted-foreground"
+                >
+                    {note}
+                </p>
+            ) : null}
         </div>
     );
 }
@@ -78,6 +90,8 @@ export function NumberField<T extends number | null>({
     onCommit,
     hint,
     error,
+    note,
+    prefix,
     small,
     className,
     inputClassName,
@@ -93,6 +107,10 @@ export function NumberField<T extends number | null>({
     hint: string;
     /** The catalogue's own message for this field, if any. */
     error?: string | null;
+    /** What a change here does, under the field while nothing is wrong. */
+    note?: string | null;
+    /** A fixed sign inside the box, before what is typed ("₹"). */
+    prefix?: string;
     small?: boolean;
     className?: string;
     inputClassName?: string;
@@ -115,26 +133,46 @@ export function NumberField<T extends number | null>({
         <Field
             label={label}
             error={refused ? hint : error}
+            note={note}
             small={small}
             className={className}
         >
-            {(a11y) => (
-                <input
-                    {...a11y}
-                    type="text"
-                    inputMode={inputMode}
-                    autoComplete="off"
-                    value={text}
-                    disabled={disabled}
-                    onChange={(e) => {
-                        const next = e.target.value;
-                        setText(next);
-                        const v = parse(next);
-                        if (v !== undefined && v !== value) onCommit(v);
-                    }}
-                    className={cn(FIELD, small && SMALL_FIELD, inputClassName)}
-                />
-            )}
+            {(a11y) => {
+                const input = (
+                    <input
+                        {...a11y}
+                        type="text"
+                        inputMode={inputMode}
+                        autoComplete="off"
+                        value={text}
+                        disabled={disabled}
+                        onChange={(e) => {
+                            const next = e.target.value;
+                            setText(next);
+                            const v = parse(next);
+                            if (v !== undefined && v !== value) onCommit(v);
+                        }}
+                        className={cn(
+                            FIELD,
+                            small && SMALL_FIELD,
+                            prefix && "pl-6",
+                            inputClassName,
+                        )}
+                    />
+                );
+                if (!prefix) return input;
+                return (
+                    <span className="relative flex min-w-0">
+                        <span
+                            aria-hidden
+                            className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-[13px] text-muted-foreground"
+                        >
+                            {prefix}
+                        </span>
+                        {input}
+                    </span>
+                );
+            }}
         </Field>
     );
 }
