@@ -26,9 +26,13 @@ import {
 } from "@nestjs/common/constants";
 
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
+import { OrganizationGuard } from "../../common/guards/organization.guard";
+import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
 import { BillingProfilesController } from "./billing-profiles.controller";
 import type { BillingProfilesService } from "./billing-profiles.service";
+import { BusinessBillingProfileController } from "./business-billing-profile.controller";
+import type { BusinessBillingProfileService } from "./business-billing-profile.service";
 
 describe("GET /billing-profiles", () => {
     it("is signed-in only, with no business guard", () => {
@@ -54,5 +58,74 @@ describe("GET /billing-profiles", () => {
             controller.listMine({ id: "user_1" } as AuthUser),
         ).resolves.toEqual([{ id: "bprof_1" }]);
         expect(listMine).toHaveBeenCalledWith("user_1");
+    });
+});
+
+describe("organizations/:organizationId/billing/profile (U5)", () => {
+    const ctx = {
+        organizationId: "org_1",
+        userId: "user_1",
+    } as OrganizationContext;
+
+    it("is the business's, behind its guard", () => {
+        expect(
+            Reflect.getMetadata(
+                PATH_METADATA,
+                BusinessBillingProfileController,
+            ),
+        ).toBe("organizations/:organizationId/billing/profile");
+        expect(
+            Reflect.getMetadata(
+                GUARDS_METADATA,
+                BusinessBillingProfileController,
+            ),
+        ).toEqual([BetterAuthGuard, OrganizationGuard]);
+        const verbs = (["view", "choose", "create", "update"] as const).map(
+            (name) => [
+                Reflect.getMetadata(
+                    METHOD_METADATA,
+                    BusinessBillingProfileController.prototype[name],
+                ) as RequestMethod,
+                Reflect.getMetadata(
+                    PATH_METADATA,
+                    BusinessBillingProfileController.prototype[name],
+                ) as string,
+            ],
+        );
+        expect(verbs).toEqual([
+            [RequestMethod.GET, "/"],
+            [RequestMethod.POST, "choose"],
+            [RequestMethod.POST, "/"],
+            [RequestMethod.PATCH, ":profileId"],
+        ]);
+    });
+
+    it("passes the business's context on, and `use` only when it is true", async () => {
+        const service = {
+            view: jest.fn().mockResolvedValue({}),
+            choose: jest.fn().mockResolvedValue({}),
+            create: jest.fn().mockResolvedValue({}),
+            update: jest.fn().mockResolvedValue({}),
+        };
+        const controller = new BusinessBillingProfileController(
+            service as unknown as BusinessBillingProfileService,
+        );
+        await controller.view(ctx);
+        expect(service.view).toHaveBeenCalledWith(ctx);
+        await controller.choose(ctx, { billingProfileId: "bprof_2" });
+        expect(service.choose).toHaveBeenCalledWith(ctx, "bprof_2");
+        await controller.create(ctx, {
+            legalName: "Asha Foods",
+            billingEmail: "a@example.com",
+        });
+        expect(service.create).toHaveBeenCalledWith(
+            ctx,
+            { legalName: "Asha Foods", billingEmail: "a@example.com" },
+            false,
+        );
+        await controller.update(ctx, "bprof_2", { city: "Pune" });
+        expect(service.update).toHaveBeenCalledWith(ctx, "bprof_2", {
+            city: "Pune",
+        });
     });
 });

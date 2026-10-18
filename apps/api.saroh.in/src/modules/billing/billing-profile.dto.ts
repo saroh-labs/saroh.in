@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsOptional, IsString, MaxLength } from "class-validator";
 
 /**
  * A new billing profile (DEC-167), as an owner types it: who Saroh bills.
@@ -54,4 +54,66 @@ export class NewBillingProfileDto {
     @IsString()
     @MaxLength(32)
     phone?: string;
+}
+
+/** A new profile from Plan & billing; `use` bills the business to it too. */
+export class CreateBusinessBillingProfileDto extends NewBillingProfileDto {
+    @IsOptional()
+    @IsBoolean()
+    use?: boolean;
+}
+
+/** An edit of one of the owner's profiles: only what changes is sent. */
+export class UpdateBillingProfileDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(300)
+    legalName?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(320)
+    billingEmail?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    addressLine1?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    addressLine2?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(100)
+    city?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(20)
+    postalCode?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(60)
+    gstState?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(20)
+    gstin?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(32)
+    phone?: string;
+}
+
+/** Bill the business to one of the owner's profiles. */
+export class ChooseBillingProfileDto {
+    @IsString()
+    @MaxLength(64)
+    billingProfileId!: string;
 }

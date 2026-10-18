@@ -43,6 +43,14 @@ export const AuditAction = {
     // metadata: the add-on, and its quantity before and after. One a plan
     // change ended (DEC-157) says so: `reason: "plan-change"`.
     PlanAddonChange: "organization.plan.addon.changed",
+    // Billing profiles from Plan & billing (DEC-167, U5): one made, one
+    // edited (it applies to every business on it; `businesses` says how
+    // many), and the business billed to another. Field names and ids
+    // only, never a value: a profile is its owner's, and an Admin may read
+    // the business's activity (R2). Not on Settings › Activity.
+    BillingProfileCreate: "billing.profile.created",
+    BillingProfileUpdate: "billing.profile.updated",
+    BillingProfileChoose: "organization.billing_profile.chosen",
     StorefrontHoursUpdate: "storefront.hours.update",
     // How a storefront's orders leave, or when they count as late (B17);
     // metadata names the storefront and each change as words.

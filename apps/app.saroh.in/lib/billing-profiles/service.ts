@@ -1,6 +1,4 @@
 import { getList } from "@/lib/api/http";
-import type { BillingProfileOption } from "@/lib/organizations/setup-billing";
-import { addressLine } from "@/lib/organizations/setup-billing";
 
 /**
  * The signed-in person's own billing profiles (DEC-167), from
@@ -34,15 +32,5 @@ export async function listMyBillingProfiles(): Promise<BillingProfile[]> {
     return getList<BillingProfile>("/billing-profiles");
 }
 
-/** The profiles as setup's step lists them. */
-export function profileOptions(
-    profiles: readonly BillingProfile[],
-): BillingProfileOption[] {
-    return profiles.map((p) => ({
-        id: p.id,
-        legalName: p.legalName,
-        gstin: p.gstin,
-        address: addressLine(p),
-        billingEmail: p.billingEmail,
-    }));
-}
+/** The profiles as setup's step lists them (client-safe, in `view.ts`). */
+export { profileOptions } from "./view";

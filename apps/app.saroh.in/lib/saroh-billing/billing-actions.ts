@@ -4,6 +4,12 @@ import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, orgBase } from "@/lib/api/http";
 
+import type {
+    BusinessBillingProfile,
+    OwnBillingProfile,
+    ProfileEdit,
+} from "@/lib/billing-profiles/view";
+
 import { cleanHandoff } from "./handoff";
 import type {
     AddonsView,
@@ -342,5 +348,108 @@ export async function setAddonAction(
         `/billing/addons/${encodeURIComponent(addonId)}`,
         ADDON_FAILED,
         { method: "PUT", body: JSON.stringify({ quantity }) },
+    );
+}
+
+// ── Who Saroh bills (DEC-167, U5) ───────────────────────────────────────
+
+const PROFILE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const PROFILE_READ_FAILED =
+    "Your billing profiles couldn't be loaded. Try again.";
+const PROFILE_FAILED =
+    "Who Saroh bills couldn't be changed just now. Nothing was changed. Try again.";
+
+/** The profile's fields an action passes on, trimmed and capped. */
+const PROFILE_LIMITS: Record<keyof ProfileEdit, number> = {
+    legalName: 200,
+    billingEmail: 254,
+    gstin: 15,
+    gstState: 60,
+    addressLine1: 120,
+    city: 60,
+    postalCode: 12,
+};
+
+/** What a profile's save sends: each field a string, "" to clear one. */
+function cleanProfile(input: unknown): ProfileEdit {
+    const raw =
+        input && typeof input === "object"
+            ? (input as Record<string, unknown>)
+            : {};
+    const out: ProfileEdit = {};
+    for (const key of Object.keys(PROFILE_LIMITS) as (keyof ProfileEdit)[]) {
+        const v = raw[key];
+        if (typeof v === "string") {
+            out[key] = v.trim().slice(0, PROFILE_LIMITS[key]);
+        }
+    }
+    return out;
+}
+
+/** Who Saroh bills, read for a sheet opened away from Plan & billing. */
+export async function billingProfileViewAction(): Promise<
+    ApiResult<BusinessBillingProfile>
+> {
+    return send<BusinessBillingProfile>(
+        "/billing/profile",
+        PROFILE_READ_FAILED,
+    );
+}
+
+/** Bill the business to one of the owner's profiles. */
+export async function chooseBillingProfileAction(
+    billingProfileId: unknown,
+): Promise<ApiResult<BusinessBillingProfile>> {
+    if (
+        typeof billingProfileId !== "string" ||
+        !PROFILE_ID.test(billingProfileId)
+    ) {
+        return { ok: false, error: PROFILE_FAILED, field: "billingProfile" };
+    }
+    return send<BusinessBillingProfile>(
+        "/billing/profile/choose",
+        PROFILE_FAILED,
+        { method: "POST", body: JSON.stringify({ billingProfileId }) },
+    );
+}
+
+/** A new profile for the owner, and (`use`) the business's from now. */
+export async function createBillingProfileAction(
+    input: unknown,
+    use: unknown,
+): Promise<ApiResult<BusinessBillingProfile & { created: string }>> {
+    const profile = cleanProfile(input);
+    return send<BusinessBillingProfile & { created: string }>(
+        "/billing/profile",
+        PROFILE_FAILED,
+        {
+            method: "POST",
+            body: JSON.stringify({
+                legalName: profile.legalName ?? "",
+                billingEmail: profile.billingEmail ?? "",
+                ...Object.fromEntries(
+                    Object.entries(profile).filter(([, v]) => v !== ""),
+                ),
+                use: use === true,
+            }),
+        },
+    );
+}
+
+/** Change one of the owner's profiles; says how many businesses it bills. */
+export async function updateBillingProfileAction(
+    billingProfileId: unknown,
+    input: unknown,
+): Promise<ApiResult<{ profile: OwnBillingProfile; businesses: number }>> {
+    if (
+        typeof billingProfileId !== "string" ||
+        !PROFILE_ID.test(billingProfileId)
+    ) {
+        return { ok: false, error: PROFILE_FAILED };
+    }
+    return send<{ profile: OwnBillingProfile; businesses: number }>(
+        `/billing/profile/${encodeURIComponent(billingProfileId)}`,
+        PROFILE_FAILED,
+        { method: "PATCH", body: JSON.stringify(cleanProfile(input)) },
     );
 }

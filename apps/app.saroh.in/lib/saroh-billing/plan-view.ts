@@ -128,12 +128,22 @@ export interface ChangeQuote {
      * the payment opens — a name, an email, its registered address, its
      * state — and whether it has a phone (asked for, optional, when not).
      * An API from before it sends none: only `registeredAddress` is read.
+     * `profile` is the billing profile it bills (DEC-167): null when the
+     * business has none yet, and must be given one before it pays
+     * (`missing` is then `["profile"]` alone).
      */
-    billingDetails?: { missing: BillingDetail[]; phone: boolean };
+    billingDetails?: {
+        missing: BillingDetail[];
+        phone: boolean;
+        profile?: { id: string; legalName: string } | null;
+    };
 }
 
-/** What Saroh needs before it charges for a plan (17 Oct 2026). */
-export type BillingDetail = "name" | "email" | "address" | "state";
+/**
+ * What Saroh needs before it charges for a plan (17 Oct 2026); "profile":
+ * the business has no billing profile yet (DEC-167).
+ */
+export type BillingDetail = "profile" | "name" | "email" | "address" | "state";
 
 /** An add-on that ends with a plan change, and how many are held. */
 export interface EndingAddon {

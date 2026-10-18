@@ -170,9 +170,10 @@ export function SetupBillingStep({
 /**
  * A new profile's fields, under the choices. The legal name and the
  * billing email are needed; the rest can wait until the first payment,
- * which asks for what is missing.
+ * which asks for what is missing. Plan & billing's sheets draw the same
+ * fields, by the same names, to make or edit a profile (U5).
  */
-function NewProfileFields() {
+export function NewProfileFields() {
     return (
         <div
             role="group"

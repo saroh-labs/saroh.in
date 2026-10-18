@@ -18,7 +18,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import type { BusinessBillingProfile } from "@/lib/billing-profiles/view";
 import {
+    billingProfileViewAction,
     changePlanAction,
     quoteChangeAction,
 } from "@/lib/saroh-billing/billing-actions";
@@ -30,6 +32,7 @@ import {
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 
 import { runAction } from "@/lib/api/run-action";
+import { ChangeBillingProfileSheet } from "./billing-profile-sheets";
 import type {
     DetailErrors,
     DetailField,
@@ -90,7 +93,10 @@ const NOTHING_ASKED: DetailsAsked = {
  * is paid now, or "From ‹date›" with the plan kept until then. Who Saroh
  * bills is asked for here, before the payment opens (17 Oct 2026): what
  * the business is missing must be given, never by a trip to Settings
- * (`invoice-details.tsx`).
+ * (`invoice-details.tsx`). A business with no billing profile yet
+ * (DEC-167) is asked who Saroh bills in Plan & billing's own sheet, opened
+ * over the dialog, and quoted again once one is chosen: never a raw
+ * refusal.
  *
  * The design moves plan on a click; real money asks first (design
  * deviation, U14).
@@ -137,6 +143,24 @@ export function ChangePlanDialog({
     const detailsRef = useRef<HTMLDetailsElement>(null);
     const [pending, start] = useTransition();
     const [attempt, setAttempt] = useState(0);
+    // Who Saroh bills, read when the business has no profile to bill.
+    const [choosing, setChoosing] = useState<BusinessBillingProfile | null>(
+        null,
+    );
+    const [loadingProfiles, setLoadingProfiles] = useState(false);
+
+    /** Open "Choose who Saroh bills" over the dialog. */
+    async function chooseProfile() {
+        const res = await runAction(() => billingProfileViewAction(), {
+            setBusy: setLoadingProfiles,
+        });
+        if (!res) return;
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        setChoosing(res.data);
+    }
 
     const code = coupon;
     const key = picked
@@ -190,6 +214,12 @@ export function ChangePlanDialog({
             ? detailsAsked(quoting.quote)
             : NOTHING_ASKED;
     const required = needsDetails(asked);
+    // No billing profile yet: one is chosen before anything else is asked.
+    const noProfile =
+        quoting.state === "ready" &&
+        Boolean(summary?.toPayment) &&
+        (quoting.quote.billingDetails?.profile === null ||
+            Boolean(quoting.quote.billingDetails?.missing.includes("profile")));
 
     /** Open the details and put the keyboard on the first field in error. */
     function showProblems() {
@@ -199,6 +229,10 @@ export function ChangePlanDialog({
 
     function confirm() {
         if (!picked || quoting.state !== "ready") return;
+        if (noProfile) {
+            void chooseProfile();
+            return;
+        }
         const problems = summary?.toPayment
             ? detailsProblems(details, asked)
             : {};
@@ -218,7 +252,10 @@ export function ChangePlanDialog({
             );
             if (!res) return;
             if (!res.ok) {
-                if (
+                if (res.field === "billing-profile") {
+                    // Asked in place, then quoted again.
+                    void chooseProfile();
+                } else if (
                     res.field &&
                     (DETAIL_FIELDS as string[]).includes(res.field)
                 ) {
@@ -433,7 +470,27 @@ export function ChangePlanDialog({
                     </p>
                 ) : null}
 
-                {summary?.toPayment ? (
+                {noProfile ? (
+                    <div className="grid gap-2 rounded-lg border border-border px-3.5 py-3 text-[13px]">
+                        <p className="font-semibold">Choose who Saroh bills</p>
+                        <p className="text-foreground/80">
+                            Saroh&apos;s invoices for this business need a
+                            billing profile before the payment opens.
+                        </p>
+                        <p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                busy={loadingProfiles}
+                                busyLabel="Opening…"
+                                onClick={() => void chooseProfile()}
+                            >
+                                Choose who Saroh bills
+                            </Button>
+                        </p>
+                    </div>
+                ) : summary?.toPayment ? (
                     <details
                         ref={detailsRef}
                         // Open from the start when something must be given.
@@ -459,6 +516,15 @@ export function ChangePlanDialog({
                             />
                         </div>
                     </details>
+                ) : null}
+
+                {choosing ? (
+                    <ChangeBillingProfileSheet
+                        view={choosing}
+                        open
+                        onClose={() => setChoosing(null)}
+                        onSaved={() => setAttempt((n) => n + 1)}
+                    />
                 ) : null}
 
                 <DialogFooter>

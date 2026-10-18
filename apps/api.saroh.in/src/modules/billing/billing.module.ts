@@ -27,6 +27,8 @@ import {
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
+import { BusinessBillingProfileController } from "./business-billing-profile.controller";
+import { BusinessBillingProfileService } from "./business-billing-profile.service";
 import { DeletedBusinessBilling } from "./business-closing";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import { CheckoutConfirmService } from "./checkout-confirm.service";
@@ -124,6 +126,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         BillingWebhookController,
         // The caller's own billing profiles, for setting up a business.
         BillingProfilesController,
+        BusinessBillingProfileController,
     ],
     providers: [
         PlansService,
@@ -145,6 +148,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         BillingCustomerSyncHandler,
         BillingProfileSyncHandler,
         BillingProfilesService,
+        BusinessBillingProfileService,
         // The daily match of what the provider took (DEC-166).
         BillingReconcileHandler,
         SarohInvoicesService,

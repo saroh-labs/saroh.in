@@ -207,7 +207,7 @@ export function InvoiceDetailsFields({
             {required ? (
                 <p className="text-[12px] text-muted-foreground">
                     Saroh&apos;s invoice needs these before the payment opens.
-                    The address is saved to your business details.
+                    They&apos;re saved to the billing profile Saroh bills.
                 </p>
             ) : null}
             {asked.name ? (
@@ -287,9 +287,9 @@ export function InvoiceDetailsFields({
 }
 
 /**
- * The business's registered address, asked for when its profile has none
- * whole and kept there (Settings › Business shows it after): it prints on
- * Saroh's invoice (CGST Rule 46(e)).
+ * The billing address, asked for when the business's billing profile has
+ * none whole and kept there (Plan & billing's "Billed to" shows it after,
+ * DEC-167): it prints on Saroh's invoice (CGST Rule 46(e)).
  */
 function AddressFields({
     value,

@@ -13,7 +13,13 @@ vi.mock("next/navigation", () => ({
 }));
 const quoteChangeAction = vi.fn();
 const changePlanAction = vi.fn();
+const billingProfileViewAction = vi.fn();
 vi.mock("@/lib/saroh-billing/billing-actions", () => ({
+    billingProfileViewAction: (...args: unknown[]) =>
+        billingProfileViewAction(...args) as unknown,
+    chooseBillingProfileAction: vi.fn(),
+    createBillingProfileAction: vi.fn(),
+    updateBillingProfileAction: vi.fn(),
     changePlanAction: (...args: unknown[]) =>
         changePlanAction(...args) as unknown,
     confirmCheckoutAction: vi.fn(),
@@ -64,6 +70,29 @@ beforeEach(() => {
     root = createRoot(host);
     quoteChangeAction.mockReset();
     changePlanAction.mockReset();
+    billingProfileViewAction.mockReset();
+    billingProfileViewAction.mockResolvedValue({
+        ok: true,
+        data: {
+            current: null,
+            mine: [
+                {
+                    id: "bprof_1",
+                    legalName: "Asha Foods LLP",
+                    gstin: null,
+                    gstState: "29",
+                    addressLine1: "3 Hill Road",
+                    addressLine2: null,
+                    city: "Bengaluru",
+                    postalCode: "560038",
+                    billingEmail: "accounts@example.com",
+                    phone: null,
+                    businesses: 1,
+                },
+            ],
+            businessesOnCurrent: null,
+        },
+    });
 });
 
 afterEach(() => {
@@ -415,5 +444,61 @@ describe("addressProblems", () => {
                 true,
             ),
         ).toEqual({});
+    });
+});
+
+describe("ChangePlanDialog: a business with no billing profile (DEC-167)", () => {
+    const noProfile = () =>
+        quote({
+            kind: "NEW",
+            startAt: null,
+            registeredAddress: false,
+            billingDetails: {
+                missing: ["profile"],
+                phone: false,
+                profile: null,
+            },
+        });
+    const sheet = () =>
+        Array.from(document.querySelectorAll('[role="dialog"]')).find((d) =>
+            d.textContent.includes("Choose who Saroh bills for this business"),
+        ) ??
+        Array.from(document.querySelectorAll('[role="dialog"]')).at(-1) ??
+        null;
+
+    it("asks who Saroh bills in place of the details, and opens the sheet, sending nothing", async () => {
+        const dialog = await open(noProfile());
+        expect(dialog.textContent).toContain("Choose who Saroh bills");
+        expect(dialog.querySelector("details")).toBeNull();
+        await press(dialog, "Continue to payment");
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 20));
+        });
+        expect(changePlanAction).not.toHaveBeenCalled();
+        expect(billingProfileViewAction).toHaveBeenCalled();
+        expect(sheet()?.textContent).toContain("Asha Foods LLP");
+        expect(sheet()?.textContent).toContain("New billing profile");
+    });
+
+    it("opens the same sheet on the API's billing-profile refusal, never a raw error", async () => {
+        changePlanAction.mockResolvedValue({
+            ok: false,
+            error: "Choose who Saroh bills for this business first.",
+            field: "billing-profile",
+        });
+        const dialog = await open(
+            quote({
+                kind: "NEW",
+                startAt: null,
+                registeredAddress: true,
+                billingDetails: { missing: [], phone: true },
+            }),
+        );
+        await press(dialog, "Continue to payment");
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 20));
+        });
+        expect(billingProfileViewAction).toHaveBeenCalled();
+        expect(sheet()?.textContent).toContain("Asha Foods LLP");
     });
 });
