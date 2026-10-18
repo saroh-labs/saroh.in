@@ -9,7 +9,15 @@ import type {
     SarohRefundRow,
     SarohSubscriptionDetail,
 } from "@/lib/billing-words";
-import { formatPaise, invoicePdfHref, istDate } from "@/lib/billing-words";
+import {
+    checkoutKindLabel,
+    checkoutStatusLabel,
+    cycleLabel,
+    formatPaise,
+    invoicePdfHref,
+    istDate,
+    istDateTime,
+} from "@/lib/billing-words";
 
 import { RecordRefund } from "./billing-controls";
 import { RazorpayId } from "./razorpay-id";
@@ -18,7 +26,8 @@ import { RazorpayId } from "./razorpay-id";
  * The subscription sheet's Invoices tab (U15, R27): the business's last
  * invoices, each with its PDF, the provider's payment and its refunds,
  * and, for operators with `saroh-billing:act`, Record a refund made by
- * hand; then every refund and dispute, and double charges found. The
+ * hand; the checkouts it started; then every refund and dispute, and
+ * double charges found. The
  * billing profile and today's other actions are on Summary.
  */
 export function SubscriptionInvoices({
@@ -45,6 +54,57 @@ export function SubscriptionInvoices({
                                 canAct={canAct}
                                 onDone={onDone}
                             />
+                        ))}
+                    </ul>
+                )}
+            </Section>
+
+            <Section title="Checkouts">
+                {detail.checkouts.length === 0 ? (
+                    <p className="text-muted-foreground">
+                        No checkout yet: this business has never started paying
+                        for a plan.
+                    </p>
+                ) : (
+                    <ul className="grid gap-2">
+                        {detail.checkouts.map((c) => (
+                            <li
+                                key={c.id}
+                                className="grid gap-1 rounded-lg border p-3"
+                            >
+                                <p className="font-medium">
+                                    {checkoutKindLabel(c.kind)} · {c.planName} ·{" "}
+                                    {cycleLabel(c.cycle)}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    {checkoutStatusLabel(c.status)} · started{" "}
+                                    {istDateTime(c.createdAt)}
+                                    {c.completedAt
+                                        ? ` · done ${istDateTime(c.completedAt)}`
+                                        : ""}
+                                </p>
+                                <p className="text-muted-foreground">
+                                    {formatPaise(c.pricePaise)} before GST
+                                    {c.chargeNowPaise > 0
+                                        ? ` · ${formatPaise(c.chargeNowPaise)} charged at once`
+                                        : ""}
+                                    {c.startAt
+                                        ? ` · charges from ${istDate(c.startAt)}`
+                                        : ""}
+                                </p>
+                                {c.endedReason ? (
+                                    <p className="text-muted-foreground">
+                                        Ended: {c.endedReason}
+                                    </p>
+                                ) : null}
+                                <p className="text-muted-foreground">
+                                    {c.provider} ·{" "}
+                                    <RazorpayId
+                                        id={c.providerSubscriptionId}
+                                        provider={c.provider}
+                                    />
+                                </p>
+                            </li>
                         ))}
                     </ul>
                 )}

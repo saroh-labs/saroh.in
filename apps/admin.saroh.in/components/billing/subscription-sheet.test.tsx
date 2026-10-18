@@ -312,6 +312,46 @@ describe("SubscriptionSheet › tabs", () => {
     });
 });
 
+describe("SubscriptionSheet › Checkouts", () => {
+    it("Invoices also lists the checkouts this business started", () => {
+        sheet({
+            tab: "invoices",
+            detail: subscriptionDetail({
+                checkouts: [
+                    {
+                        id: "co_1",
+                        kind: "NEW",
+                        status: "COMPLETED",
+                        cycle: "MONTHLY",
+                        planName: "Plan A",
+                        pricePaise: 10_000,
+                        chargeNowPaise: 0,
+                        provider: "RAZORPAY",
+                        providerSubscriptionId: "sub_Test123",
+                        startAt: null,
+                        expiresAt: "2026-10-20T06:00:00.000Z",
+                        completedAt: "2026-10-19T06:00:00.000Z",
+                        endedReason: null,
+                        billToGstin: null,
+                        createdAt: "2026-10-19T05:00:00.000Z",
+                    },
+                ],
+            }),
+        });
+        expect(screen.getByRole("heading", { name: "Checkouts" })).toBeTruthy();
+        expect(screen.getByText(/Plan A/)).toBeTruthy();
+    });
+
+    it("says when there is no checkout yet", () => {
+        sheet({ tab: "invoices", detail: subscriptionDetail({}) });
+        expect(
+            screen.getByText(
+                /No checkout yet: this business has never started paying/,
+            ),
+        ).toBeTruthy();
+    });
+});
+
 describe("SubscriptionSheet › History", () => {
     const staffRow: BillingHistoryRow = {
         id: "audit:1",
