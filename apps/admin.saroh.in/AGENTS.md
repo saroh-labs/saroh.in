@@ -85,7 +85,12 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   the API checks it on the route and again in the service, and records
   every read. The PDF and CSV are proxied by route handlers under
   `app/billing/invoices/`. Amounts arrive in paise from the API; no price
-  is ever written in the console.
+  is ever written in the console. **Billing is one page** (admin plan U14):
+  `app/billing/layout.tsx` draws the header, the four tabs as routes with
+  their counts (`GET /admin/billing/counts`) and one search (`q`) for every
+  tab; `/billing` lands on Subscriptions. Every filter is an address built
+  by `lib/billing-filters.ts` and applies as it is picked (no Apply
+  button); `FilterBar` stays for the other screens.
 - **Billing's queue and controls (DEC-166)**: `/billing/actions` (Needs
   action: every billing problem an operator must act on, across
   businesses, oldest open first, with the failed `billing.*` jobs beside

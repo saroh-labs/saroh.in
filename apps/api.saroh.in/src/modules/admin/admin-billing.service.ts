@@ -13,12 +13,17 @@ import {
     REFUNDED_AUDIT_ACTION,
 } from "../billing/double-charge";
 import { renderSarohInvoicePdf } from "../billing/saroh-invoice-paper";
-import type { SubscriptionStatusKey, SubscriptionView } from "./admin-billing";
+import type {
+    NextChargeHow,
+    SubscriptionStatusKey,
+    SubscriptionView,
+} from "./admin-billing";
 import {
     invoicesCsv,
     invoicesCsvFileName,
     istMonthRange,
     mrrPaise,
+    nextChargeOf,
     subscriptionViewWhere,
 } from "./admin-billing";
 import { subscriptionTerms } from "./admin-billing-terms";
@@ -134,6 +139,20 @@ export interface AdminSubscriptionRow {
     /** When the autopay (or the year paid once) runs out, if known. */
     termEndsAt: string | null;
     termPayment: "AUTOPAY" | "ONE_TIME" | null;
+    /**
+     * When the autopay takes its next charge: the end of the period it is
+     * in. Null when nothing more is taken (see `nextChargeHow`).
+     */
+    nextChargeAt: string | null;
+    /** On autopay, paid for the year at once, or not charged again. */
+    nextChargeHow: NextChargeHow;
+    /** The autopay's approved charges run out within 30 days. */
+    autopayRunsOutSoon: boolean;
+    /**
+     * Who the business is billed to (DEC-167): the profile's legal name and
+     * how many businesses it bills. Null: no profile chosen yet.
+     */
+    billingProfile: { name: string; businesses: number } | null;
     lastInvoice: {
         id: string;
         number: string;
@@ -147,7 +166,18 @@ export interface SubscriptionSummary {
     byPlan: { key: string; name: string; count: number }[];
     /** Before GST, at each plan row's price; ACTIVE and PAST_DUE only. */
     mrrPaise: number;
+    /** Ending, or moving to another plan, in the next 30 days. */
+    endingSoon: number;
     currency: string;
+}
+
+/** How many rows each Billing tab holds (R25). */
+export interface BillingCounts {
+    subscriptions: number;
+    invoices: number;
+    /** Needs action rows still open. */
+    openActions: number;
+    events: number;
 }
 
 export interface AdminSubscriptionPage {
@@ -359,6 +389,25 @@ export class AdminBillingService {
         return { ...pdf, organizationId: invoice.organizationId };
     }
 
+    // ── The tabs' counts ───────────────────────────────────────────────
+
+    /**
+     * What each Billing tab holds, for its tab (R25): every subscription,
+     * every invoice, the open Needs-action rows and every provider event.
+     * Counts only, nothing about a business.
+     */
+    async counts(staff: PlatformAdminInfo): Promise<BillingCounts> {
+        assertSarohBillingReader(staff);
+        const [subscriptions, invoices, openActions, events] =
+            await Promise.all([
+                prisma.subscription.count(),
+                prisma.sarohInvoice.count(),
+                prisma.billingAction.count({ where: { resolvedAt: null } }),
+                prisma.billingWebhookEvent.count(),
+            ]);
+        return { subscriptions, invoices, openActions, events };
+    }
+
     // ── Subscriptions ──────────────────────────────────────────────────
 
     async listSubscriptions(
@@ -385,7 +434,7 @@ export class AdminBillingService {
                 include: SUBSCRIPTION_INCLUDE,
             }),
             prisma.subscription.count({ where }),
-            this.summary(),
+            this.summary(now),
             prisma.plan.findMany({
                 where: { subscriptions: { some: {} } },
                 distinct: ["key"],
@@ -550,11 +599,16 @@ export class AdminBillingService {
     }
 
     /** Counts by status and plan, and the list-price monthly figure. */
-    private async summary(): Promise<SubscriptionSummary> {
-        const groups = await prisma.subscription.groupBy({
-            by: ["planId", "status"],
-            _count: { _all: true },
-        });
+    private async summary(now: Date): Promise<SubscriptionSummary> {
+        const [groups, endingSoon] = await Promise.all([
+            prisma.subscription.groupBy({
+                by: ["planId", "status"],
+                _count: { _all: true },
+            }),
+            prisma.subscription.count({
+                where: subscriptionViewWhere("ending-soon", now),
+            }),
+        ]);
         const plans = await prisma.plan.findMany({
             where: { id: { in: [...new Set(groups.map((g) => g.planId))] } },
             select: {
@@ -595,6 +649,7 @@ export class AdminBillingService {
             })),
             byPlan: [...byPlan.values()].sort((a, b) => b.count - a.count),
             mrrPaise: mrrPaise(priced),
+            endingSoon,
             currency: plans[0]?.currency ?? "INR",
         };
     }
@@ -624,9 +679,15 @@ export class AdminBillingService {
         return subs.map((s) => {
             const term = terms.get(s.id) ?? null;
             const last = lastBy.get(s.organizationId);
+            const next = nextChargeOf(s, term, now);
+            const profile = s.organization.billingProfile;
             return {
                 id: s.id,
-                organization: s.organization,
+                organization: {
+                    id: s.organization.id,
+                    name: s.organization.name,
+                    slug: s.organization.slug,
+                },
                 plan: s.plan,
                 status: s.status,
                 billingCycle: s.billingCycle,
@@ -644,6 +705,15 @@ export class AdminBillingService {
                 providerCustomerId: s.providerCustomerId,
                 termEndsAt: term?.endsAt.toISOString() ?? null,
                 termPayment: term?.payment ?? null,
+                nextChargeAt: next.nextChargeAt?.toISOString() ?? null,
+                nextChargeHow: next.nextChargeHow,
+                autopayRunsOutSoon: next.autopayRunsOutSoon,
+                billingProfile: profile
+                    ? {
+                          name: profile.legalName,
+                          businesses: profile._count.organizations,
+                      }
+                    : null,
                 lastInvoice: last
                     ? {
                           id: last.id,
@@ -658,7 +728,19 @@ export class AdminBillingService {
 }
 
 const SUBSCRIPTION_INCLUDE = {
-    organization: ORG_BRIEF,
+    organization: {
+        select: {
+            ...ORG_BRIEF.select,
+            // Who it is billed to, and how many businesses that profile
+            // bills (DEC-167): a count, never the other businesses' rows.
+            billingProfile: {
+                select: {
+                    legalName: true,
+                    _count: { select: { organizations: true } },
+                },
+            },
+        },
+    },
     plan: { select: { ...PLAN_BRIEF.select, priceCents: true } },
     pendingPlan: PLAN_BRIEF,
 } as const;

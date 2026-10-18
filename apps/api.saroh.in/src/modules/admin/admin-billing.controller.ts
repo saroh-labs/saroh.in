@@ -30,6 +30,16 @@ export class AdminBillingController {
         private readonly adminAudit: AdminAuditService,
     ) {}
 
+    /**
+     * Each tab's count, for Billing's tabs (R25). Not on the ledger: it is
+     * four numbers about no business, read on every Billing screen.
+     */
+    @Get("billing/counts")
+    @RequireAdminPermission(AdminPermission.SarohBillingRead)
+    counts(@PlatformAdminContext() staff: PlatformAdminInfo) {
+        return this.billing.counts(staff);
+    }
+
     @Get("billing/invoices")
     @RequireAdminPermission(AdminPermission.SarohBillingRead)
     async listInvoices(

@@ -92,6 +92,7 @@ describe("saroh-billing:read", () => {
         );
         expect(routes.sort()).toEqual(
             [
+                "counts",
                 "exportInvoices",
                 "invoicePdf",
                 "listInvoices",
@@ -144,6 +145,9 @@ describe("the service checks the permission itself", () => {
             await expect(
                 service.subscriptionDetail(staff, "sub_1"),
             ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(service.counts(staff)).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
             expect(db.sarohInvoice.findMany).not.toHaveBeenCalled();
             expect(db.sarohInvoice.findUnique).not.toHaveBeenCalled();
             expect(db.subscription.findMany).not.toHaveBeenCalled();

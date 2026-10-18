@@ -73,6 +73,8 @@ export interface PlanBrief {
     interval: string;
 }
 
+export type NextChargeHow = "AUTOPAY" | "PAID_FOR_YEAR" | "NONE";
+
 export interface SarohSubscriptionRow {
     id: string;
     organization: { id: string; name: string; slug: string };
@@ -88,6 +90,14 @@ export interface SarohSubscriptionRow {
     providerCustomerId: string | null;
     termEndsAt: string | null;
     termPayment: "AUTOPAY" | "ONE_TIME" | null;
+    /** The autopay's next charge; null when nothing more is taken. */
+    nextChargeAt: string | null;
+    /** On autopay, the year paid at once, or not charged again. */
+    nextChargeHow: NextChargeHow;
+    /** The autopay's approved charges run out within 30 days. */
+    autopayRunsOutSoon: boolean;
+    /** Who it is billed to, and how many businesses that profile bills. */
+    billingProfile: { name: string; businesses: number } | null;
     lastInvoice: {
         id: string;
         number: string;
@@ -105,9 +115,20 @@ export interface SarohSubscriptionPage {
         byStatus: { status: string; count: number }[];
         byPlan: { key: string; name: string; count: number }[];
         mrrPaise: number;
+        /** Ending, or moving plan, in the next 30 days. */
+        endingSoon: number;
         currency: string;
     };
     plans: { key: string; name: string }[];
+}
+
+/** How many rows each Billing tab holds (R25). */
+export interface BillingCounts {
+    subscriptions: number;
+    invoices: number;
+    /** Needs action rows still open. */
+    openActions: number;
+    events: number;
 }
 
 export interface SarohSubscriptionDetail {
@@ -311,7 +332,7 @@ export function istDateTime(value: string | null | undefined): string {
 // ── Words ────────────────────────────────────────────────────────────────
 
 export const STATUS_LABEL: Record<SubscriptionStatus, string> = {
-    TRIALING: "First month",
+    TRIALING: "In trial",
     ACTIVE: "Active",
     PAST_DUE: "Payment failed",
     CANCELLED: "Ended",
@@ -413,4 +434,77 @@ export function refundedPaise(row: {
 /** Where an invoice's PDF downloads from, through the console. */
 export function invoicePdfHref(invoiceId: string): string {
     return `/billing/invoices/${encodeURIComponent(invoiceId)}/pdf`;
+}
+
+// ── A subscription row, in words (R26) ───────────────────────────────────
+
+/**
+ * Who the business is billed to: the profile's name, and "2 businesses on
+ * one profile" when it bills more than this one. Null with no profile.
+ */
+export function billedToLine(row: SarohSubscriptionRow): string | null {
+    const profile = row.billingProfile;
+    if (!profile) return null;
+    return profile.businesses > 1
+        ? `${profile.name} · ${profile.businesses} businesses on one profile`
+        : profile.name;
+}
+
+/**
+ * The plan's note: a move waiting ("Moves to Pro on 1 Nov 2026"), an end
+ * the business chose, or a trial's end. Null when there is nothing to add.
+ */
+export function planNote(row: SarohSubscriptionRow): string | null {
+    const ending = endingLine(row);
+    if (ending) return ending;
+    if (row.status === "TRIALING") {
+        return row.currentPeriodEnd
+            ? `Trial until ${istDate(row.currentPeriodEnd)}`
+            : "Trial";
+    }
+    return null;
+}
+
+/**
+ * The next charge and how it is paid: "17 Nov 2026 · autopay", "Paid for
+ * the year · ends 5 May 2027", or "None" with why when there is a why.
+ */
+export function nextChargeLine(row: SarohSubscriptionRow): string {
+    if (row.nextChargeHow === "AUTOPAY" && row.nextChargeAt) {
+        return `${istDate(row.nextChargeAt)} · autopay`;
+    }
+    if (row.nextChargeHow === "PAID_FOR_YEAR") {
+        const ends = row.termEndsAt ?? row.currentPeriodEnd;
+        return ends
+            ? `Paid for the year · ends ${istDate(ends)}`
+            : "Paid for the year";
+    }
+    if (row.status === "CANCELLED") return "None · ended";
+    if (row.cancelAtPeriodEnd && row.currentPeriodEnd) {
+        return `None · ends ${istDate(row.currentPeriodEnd)}`;
+    }
+    return "None";
+}
+
+/** The autopay's state, and whether it asks for a look (orange). */
+export function autopayState(row: SarohSubscriptionRow): {
+    label: string;
+    warn: boolean;
+} {
+    if (row.status === "PAST_DUE") return { label: "Declined", warn: true };
+    if (row.autopayRunsOutSoon && row.termEndsAt) {
+        return { label: `Runs out ${istDate(row.termEndsAt)}`, warn: true };
+    }
+    if (row.nextChargeHow === "AUTOPAY") {
+        return {
+            label: row.termEndsAt
+                ? `On until ${istDate(row.termEndsAt)}`
+                : "On",
+            warn: false,
+        };
+    }
+    if (row.nextChargeHow === "PAID_FOR_YEAR") {
+        return { label: "Not needed", warn: false };
+    }
+    return { label: "Off", warn: false };
 }

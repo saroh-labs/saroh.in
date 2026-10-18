@@ -5,6 +5,7 @@ import type {
     ProviderEventPage,
 } from "./billing-action-words";
 import type {
+    BillingCounts,
     GstinFilter,
     SarohInvoicePage,
     SarohSubscriptionDetail,
@@ -50,6 +51,11 @@ export function listSarohSubscriptions(filters: {
     );
 }
 
+/** Each Billing tab's count, for the tabs (R25). */
+export function getBillingCounts(): Promise<BillingCounts | null> {
+    return getJson<BillingCounts>("/billing/counts");
+}
+
 export function getSarohSubscription(
     subscriptionId: string,
 ): Promise<SarohSubscriptionDetail | null> {
@@ -70,6 +76,7 @@ export function fetchInvoicesExport(filters: {
 /** Billing › Needs action (DEC-166): open or resolved, a page. */
 export function listBillingActions(filters: {
     state?: ActionState;
+    q?: string;
     page?: number;
 }): Promise<BillingActionPage | null> {
     return getJson<BillingActionPage>(`/billing/actions${query(filters)}`);
@@ -78,6 +85,7 @@ export function listBillingActions(filters: {
 /** Billing › Provider events (DEC-166). */
 export function listProviderEvents(filters: {
     filter?: EventFilter;
+    q?: string;
     page?: number;
 }): Promise<ProviderEventPage | null> {
     return getJson<ProviderEventPage>(`/billing/events${query(filters)}`);
