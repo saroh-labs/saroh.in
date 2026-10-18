@@ -47,6 +47,7 @@ import {
     FakeBillingProvider,
     FakeBillingProviderFactory,
 } from "./providers/fake.provider";
+import { billingNotes } from "./providers/razorpay.provider";
 
 const SECRET = "whsec_fake_platform_secret";
 const DAY = 24 * 60 * 60 * 1000;
@@ -233,6 +234,34 @@ describe("checkout from Free", () => {
             startAt: null,
             upfront: null,
             reference: r.checkout.id,
+        });
+        // On the billing profile's customer (DEC-167), the notes naming
+        // the business and the profile.
+        const { billingProfileId, slug } =
+            await prisma.organization.findUniqueOrThrow({
+                where: { id: ctx.organizationId },
+                select: { billingProfileId: true, slug: true },
+            });
+        const profile = await prisma.billingProfile.findUniqueOrThrow({
+            where: { id: billingProfileId! },
+        });
+        expect(profile.providerCustomerId).toBeTruthy();
+        expect(fake.createCalls[0]).toMatchObject({
+            organizationId: ctx.organizationId,
+            providerCustomerId: profile.providerCustomerId,
+        });
+        expect(billingNotes(fake.createCalls[0]!.customer)).toMatchObject({
+            billing_profile_id: profile.id,
+            saroh_business: slug,
+            email: profile.billingEmail,
+        });
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: r.checkout.id },
+            }),
+        ).toMatchObject({
+            billingProfileId: profile.id,
+            providerCustomerId: profile.providerCustomerId,
         });
         // Still on Free until it's paid.
         expect((await sub(ctx.organizationId)).plan.key).toBe("catalog.free");

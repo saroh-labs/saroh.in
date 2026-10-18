@@ -229,9 +229,15 @@ export class BillingEmailHandler {
             firstMonth: invoice.chargeKey.startsWith(FIRST_MONTH_KEY),
         });
         const { file, fileName } = await renderSarohInvoicePdf(invoice);
-        const sent = await this.deliver(job, p.organizationId, words, [
-            { filename: fileName, content: file },
-        ]);
+        // Sent to the billing profile's email too (DEC-167, R4): the
+        // address on the invoice, beside the business's billing people.
+        const sent = await this.deliver(
+            job,
+            p.organizationId,
+            words,
+            [{ filename: fileName, content: file }],
+            invoice.billingProfileId ? invoice.billToEmail : null,
+        );
         if (!sent) return;
         await prisma.sarohInvoice.updateMany({
             where: { id: invoice.id, emailedAt: null },
@@ -549,7 +555,8 @@ export class BillingEmailHandler {
     }
 
     /**
-     * Send to the business's billing people. True once it left; a failure
+     * Send to the business's billing people (and `also`, an invoice's
+     * billing profile email). True once it left; a failure
      * throws so the queue retries; no recipient or no mail set up is logged
      * and ends the job (nothing a retry would change).
      */
@@ -558,8 +565,14 @@ export class BillingEmailHandler {
         organizationId: string,
         words: RenderedEmail,
         attachments?: SarohBillingEmail["attachments"],
+        also?: string | null,
     ): Promise<boolean> {
-        const to = await billingRecipients(organizationId);
+        const people = await billingRecipients(organizationId);
+        const extra = also?.trim().toLowerCase();
+        const to =
+            extra && !people.some((e) => e.toLowerCase() === extra)
+                ? [...people, extra]
+                : people;
         if (to.length === 0) {
             this.skip(job, "no_recipient");
             return false;

@@ -521,7 +521,7 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         }
     });
 
-    it("puts who is billed in a subscription's notes", async () => {
+    it("puts who is billed in a subscription's notes, naming the business and its billing profile", async () => {
         const { provider, calls } = recorded([
             { status: 200, body: { id: "sub_1", status: "created" } },
         ]);
@@ -533,9 +533,19 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
             interval: "month",
             organizationId: "org_1",
             providerPlanId: "plan_1",
-            customer,
+            customer: {
+                ...customer,
+                businessSlug: "ammi-foods",
+                billingProfileId: "bp_1",
+            },
+            providerCustomerId: "cust_1",
         });
-        expect((calls[0]?.body as { notes: unknown }).notes).toMatchObject({
+        const body = calls[0]?.body as { notes: unknown; customer_id: unknown };
+        expect(body.customer_id).toBe("cust_1");
+        expect(body.notes).toMatchObject({
+            organizationId: "org_1",
+            saroh_business: "ammi-foods",
+            billing_profile_id: "bp_1",
             billing_name: "Ammi & Sons Foods Pvt. Ltd.",
             gstin: "27AAPFU0939F1ZV",
             billing_address: "12 Hill Road, Mumbai, Maharashtra, 400050",

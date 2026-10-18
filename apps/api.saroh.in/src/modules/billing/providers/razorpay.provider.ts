@@ -111,7 +111,9 @@ function addressLine(c: BillingCustomer): string | null {
 
 /**
  * Who is billed, as notes on a subscription, an order or the checkout
- * window: Razorpay's dashboard and its payment records show them.
+ * window: Razorpay's dashboard and its payment records show them. They
+ * name the billing profile and the business (its Saroh address), so a
+ * payment on a profile's customer is matched to its business (R12).
  */
 export function billingNotes(
     c: BillingCustomer | null | undefined,
@@ -128,6 +130,8 @@ export function billingNotes(
     put("phone", c.contact);
     put("gstin", c.gstin);
     put("billing_address", addressLine(c));
+    put("billing_profile_id", c.billingProfileId);
+    put("saroh_business", c.businessSlug);
     return out;
 }
 

@@ -127,6 +127,11 @@ export interface BillingCustomer {
     organizationId: string;
     /** The business's Saroh address (slug), for the customer's notes. */
     businessSlug?: string | null;
+    /**
+     * The billing profile billed (DEC-167), named in a subscription's or
+     * order's notes beside the business.
+     */
+    billingProfileId?: string | null;
 }
 
 /**

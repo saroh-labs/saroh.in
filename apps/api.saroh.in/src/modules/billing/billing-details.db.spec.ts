@@ -1,11 +1,12 @@
 /**
  * Who Saroh bills, before it charges or sets up autopay (owner, 17 Oct
- * 2026; `billing-details.ts`), against a real Postgres through the fake
- * billing provider: the quote says what is missing; a paid checkout of any
- * kind (a first month, a new plan, a year paid once) is refused by field
- * before anything is made at the provider; what was missing and given is
- * kept — the address and state on the profile, an email or phone on the
- * checkout — and billed with.
+ * 2026; `billing-details.ts`): the business's billing profile (DEC-167),
+ * against a real Postgres through the fake billing provider. The quote
+ * says what is missing; a paid checkout of any kind (a first month, a new
+ * plan, a year paid once) is refused by field before anything is made at
+ * the provider — first of all when the business has no profile; what was
+ * missing and given is kept on the profile, never on Settings › Business,
+ * and billed with.
  *
  * Made-up catalogue (`fakeCatalog`), businesses and addresses. Runs in the
  * integration project (TEST_DATABASE_URL).
@@ -18,7 +19,10 @@ import {
 import type { Catalog } from "@saroh/pricing-catalog";
 import { planRows } from "@saroh/pricing-catalog";
 
-import { giveBillingDetails } from "../../../test/business-details";
+import {
+    giveBillingDetails,
+    giveBusinessDetails,
+} from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { CheckoutService } from "./checkout.service";
@@ -48,6 +52,13 @@ beforeEach(async () => {
         new FakeBillingProviderFactory(fake),
     );
     await prisma.job.deleteMany({});
+    await prisma.organization.updateMany({
+        where: { slug: { startsWith: "bdet-" } },
+        data: { billingProfileId: null },
+    });
+    await prisma.billingProfile.deleteMany({
+        where: { owner: { email: { startsWith: "bdet-owner-" } } },
+    });
     await prisma.billingCheckout.deleteMany({});
     await prisma.subscription.deleteMany({});
     await prisma.pricingProviderPlan.deleteMany({});
@@ -85,6 +96,33 @@ async function bare(name = "Bare Shop"): Promise<OrganizationContext> {
     return { organizationId: org.id, userId: "no-such-user", role: "OWNER" };
 }
 
+/**
+ * A business billed to a profile of its owner's with only a legal name
+ * and an email (`over` changes them): no address, state or phone.
+ */
+async function onProfile(
+    name = "Bare Shop",
+    over: { legalName?: string; billingEmail?: string } = {},
+): Promise<OrganizationContext & { profileId: string }> {
+    const ctx = await bare(name);
+    const owner = await prisma.user.create({
+        data: { email: `bdet-owner-${seq}-${tag}@example.com`, name: "Asha" },
+    });
+    const profile = await prisma.billingProfile.create({
+        data: {
+            ownerUserId: owner.id,
+            legalName: over.legalName ?? "Mill Road Traders LLP",
+            billingEmail: over.billingEmail ?? "accounts@example.com",
+            provider: "RAZORPAY",
+        },
+    });
+    await prisma.organization.update({
+        where: { id: ctx.organizationId },
+        data: { billingProfileId: profile.id },
+    });
+    return { ...ctx, userId: owner.id, profileId: profile.id };
+}
+
 const fieldOf = (e: unknown) =>
     (
         e as { getResponse?: () => { details?: { field?: string } } }
@@ -109,12 +147,23 @@ const ADDRESS = {
 };
 
 describe("the quote", () => {
-    it("says what is missing, and that there's no phone", async () => {
+    it("says a business with no billing profile must be given one", async () => {
         const ctx = await bare();
         const q = await checkout.quote(ctx, { plan: "c", cycle: "month" });
         expect(q.registeredAddress).toBe(false);
         expect(q.billingDetails).toEqual({
-            missing: ["email", "address", "state"],
+            profile: null,
+            missing: ["profile"],
+            phone: false,
+        });
+    });
+
+    it("says what the profile is missing, and names it", async () => {
+        const ctx = await onProfile();
+        const q = await checkout.quote(ctx, { plan: "c", cycle: "month" });
+        expect(q.billingDetails).toEqual({
+            profile: { id: ctx.profileId, legalName: "Mill Road Traders LLP" },
+            missing: ["address", "state"],
             phone: false,
         });
 
@@ -122,18 +171,50 @@ describe("the quote", () => {
         await giveBillingDetails(whole.organizationId);
         const w = await checkout.quote(whole, { plan: "c", cycle: "month" });
         expect(w.registeredAddress).toBe(true);
-        expect(w.billingDetails).toEqual({ missing: [], phone: false });
+        expect(w.billingDetails).toMatchObject({ missing: [], phone: false });
     });
 });
 
 describe("a paid checkout is refused until who Saroh bills is whole", () => {
+    it("a business with no billing profile is refused with `billing-profile`, even with every detail given", async () => {
+        const ctx = await bare();
+        // Its own seller details whole: they are not Saroh's bill-to.
+        await giveBusinessDetails(ctx.organizationId);
+        const error: unknown = await checkout
+            .changePlan(ctx, {
+                plan: "c",
+                cycle: "month",
+                billingName: "Bare Shop",
+                billingEmail: "accounts@example.com",
+                billingState: "Maharashtra",
+                registeredAddress: ADDRESS,
+            })
+            .then(
+                () => null,
+                (e: unknown) => e,
+            );
+        expect(error).toMatchObject({
+            status: 400,
+            response: {
+                message: "Choose who Saroh bills for this business first.",
+                details: { field: "billing-profile", missing: ["profile"] },
+            },
+        });
+        expect(fake.createCalls).toHaveLength(0);
+        expect(
+            await prisma.billingProfile.count({
+                where: { organizations: { some: { id: ctx.organizationId } } },
+            }),
+        ).toBe(0);
+    });
+
     it("names each missing field in turn, and nothing is made at the provider or kept", async () => {
-        const nameless = await bare(" ");
+        const nameless = await onProfile(" ", { legalName: " " });
         expect(
             await refusedField(nameless, { plan: "c", cycle: "month" }),
         ).toBe("billingName");
 
-        const ctx = await bare();
+        const ctx = await onProfile("Bare Shop", { billingEmail: "" });
         const base = { plan: "c", cycle: "month" as const };
         expect(await refusedField(ctx, base)).toBe("billingEmail");
         const withEmail = { ...base, billingEmail: "accounts@example.com" };
@@ -162,21 +243,25 @@ describe("a paid checkout is refused until who Saroh bills is whole", () => {
             }),
         ).toBe(0);
         expect(
-            await prisma.businessProfile.findUnique({
-                where: { organizationId: ctx.organizationId },
+            await prisma.billingProfile.findUniqueOrThrow({
+                where: { id: ctx.profileId },
             }),
-        ).toBeNull();
+        ).toMatchObject({
+            billingEmail: "",
+            addressLine1: null,
+            gstState: null,
+        });
     });
 
     it("the first month (TRIAL) and a year paid once (an order) are refused the same way", async () => {
-        const ctx = await bare();
+        const ctx = await onProfile();
         const first = await checkout.quote(ctx, { plan: "b", cycle: "month" });
         expect(first.kind).toBe("TRIAL");
         expect(await refusedField(ctx, { plan: "b", cycle: "month" })).toBe(
-            "billingEmail",
+            "addressLine1",
         );
         expect(await refusedField(ctx, { plan: "c", cycle: "year" })).toBe(
-            "billingEmail",
+            "addressLine1",
         );
         expect(fake.createCalls).toHaveLength(0);
         expect(fake.orders.created).toHaveLength(0);
@@ -184,7 +269,10 @@ describe("a paid checkout is refused until who Saroh bills is whole", () => {
 
     it("a business with it all is asked nothing, and nothing of its own is written over", async () => {
         const ctx = await bare();
-        await giveBillingDetails(ctx.organizationId);
+        const profileId = await giveBillingDetails(ctx.organizationId);
+        const before = await prisma.billingProfile.findUniqueOrThrow({
+            where: { id: profileId },
+        });
         const r = await checkout.changePlan(ctx, {
             plan: "c",
             cycle: "month",
@@ -199,11 +287,12 @@ describe("a paid checkout is refused until who Saroh bills is whole", () => {
         if (r.kind === "TO_FREE") throw new Error("unreachable");
         expect(fake.createCalls).toHaveLength(1);
         expect(
-            await prisma.businessProfile.findUniqueOrThrow({
-                where: { organizationId: ctx.organizationId },
+            await prisma.billingProfile.findUniqueOrThrow({
+                where: { id: profileId },
             }),
         ).toMatchObject({
-            legalName: null,
+            legalName: before.legalName,
+            billingEmail: before.billingEmail,
             addressLine1: "3 Hill Road",
             city: "Bengaluru",
             postalCode: "560038",
@@ -213,74 +302,149 @@ describe("a paid checkout is refused until who Saroh bills is whole", () => {
             await prisma.billingCheckout.findUniqueOrThrow({
                 where: { id: r.checkout.id },
             }),
-        ).toMatchObject({ billToEmail: null, billToPhone: null });
+        ).toMatchObject({
+            billingProfileId: profileId,
+            billToEmail: null,
+            billToPhone: null,
+        });
     });
 });
 
 describe("what a checkout was given", () => {
-    it("keeps the address and state on the profile, the email and phone on the checkout, and bills with them", async () => {
-        const ctx = await bare();
+    it("is saved on the billing profile, never on Settings › Business, and billed with", async () => {
+        const ctx = await onProfile();
+        // The business's own seller details, which Saroh doesn't bill.
+        await prisma.businessProfile.create({
+            data: {
+                organizationId: ctx.organizationId,
+                legalName: "Bare Shop Retail",
+                phone: "+919800000000",
+            },
+        });
         const r = await checkout.changePlan(ctx, {
             plan: "c",
             cycle: "month",
             billingState: "Maharashtra",
-            billingEmail: "Accounts@Example.com",
             phone: "+91 98450 12345",
             registeredAddress: ADDRESS,
         });
         if (r.kind === "TO_FREE") throw new Error("unreachable");
         expect(r.quote.registeredAddress).toBe(true);
-        expect(r.quote.billingDetails).toEqual({ missing: [], phone: true });
+        expect(r.quote.billingDetails).toMatchObject({
+            missing: [],
+            phone: true,
+        });
 
         expect(
-            await prisma.businessProfile.findUniqueOrThrow({
-                where: { organizationId: ctx.organizationId },
+            await prisma.billingProfile.findUniqueOrThrow({
+                where: { id: ctx.profileId },
             }),
         ).toMatchObject({
             addressLine1: "4 Mill Road",
             city: "Pune",
             postalCode: "411001",
             gstState: "27",
-            // The website's phone and contact email stay the business's own.
-            phone: null,
-            contactEmail: null,
+            phone: "+919845012345",
+        });
+        expect(
+            await prisma.businessProfile.findUniqueOrThrow({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toMatchObject({
+            legalName: "Bare Shop Retail",
+            addressLine1: null,
+            gstState: null,
+            phone: "+919800000000",
         });
         expect(
             await prisma.billingCheckout.findUniqueOrThrow({
                 where: { id: r.checkout.id },
             }),
         ).toMatchObject({
-            billToEmail: "accounts@example.com",
-            billToPhone: "+919845012345",
+            billingProfileId: ctx.profileId,
+            billToEmail: null,
+            billToPhone: null,
             billToState: "27",
         });
+        // The profile's customer is brought up to date.
+        expect(
+            await prisma.job.count({
+                where: {
+                    type: "billing.profile.sync",
+                    payload: {
+                        path: ["billingProfileId"],
+                        equals: ctx.profileId,
+                    },
+                },
+            }),
+        ).toBe(1);
         expect(fake.createCalls[0]?.customer).toMatchObject({
-            name: "Bare Shop",
+            name: "Mill Road Traders LLP",
             email: "accounts@example.com",
             contact: "+919845012345",
             address: { line1: "4 Mill Road", state: "Maharashtra" },
+            billingProfileId: ctx.profileId,
         });
-        // The address and state are the business's now; an email given at
-        // checkout is that checkout's, so the next one asks again.
+        // Whole now: the next checkout asks nothing.
         const again = await checkout.quote(ctx, { plan: "c", cycle: "month" });
-        expect(again.billingDetails.missing).toEqual(["email"]);
+        expect(again.billingDetails.missing).toEqual([]);
     });
 
-    it("a legal name given when the business has no name is kept as its legal name", async () => {
-        const ctx = await bare(" ");
-        await giveBillingDetails(ctx.organizationId);
+    it("a legal name given when the profile and the business have none is kept on the profile", async () => {
+        const ctx = await onProfile(" ", { legalName: " " });
+        await prisma.billingProfile.update({
+            where: { id: ctx.profileId },
+            data: {
+                addressLine1: "3 Hill Road",
+                city: "Bengaluru",
+                postalCode: "560038",
+                gstState: "29",
+            },
+        });
         await checkout.changePlan(ctx, {
             plan: "c",
             cycle: "month",
             billingName: "Mill Road Traders LLP",
         });
         expect(
-            await prisma.businessProfile.findUniqueOrThrow({
-                where: { organizationId: ctx.organizationId },
+            await prisma.billingProfile.findUniqueOrThrow({
+                where: { id: ctx.profileId },
             }),
         ).toMatchObject({ legalName: "Mill Road Traders LLP" });
+        expect(
+            await prisma.businessProfile.findUnique({
+                where: { organizationId: ctx.organizationId },
+            }),
+        ).toBeNull();
         expect(fake.createCalls[0]?.customer).toMatchObject({
             name: "Mill Road Traders LLP",
         });
+    });
+
+    it("an email given that the owner bills another profile to is a 409", async () => {
+        const ctx = await onProfile("Bare Shop", { billingEmail: "" });
+        await prisma.billingProfile.create({
+            data: {
+                ownerUserId: ctx.userId,
+                legalName: "Other Entity LLP",
+                billingEmail: "taken@example.com",
+                provider: "RAZORPAY",
+            },
+        });
+        const error: unknown = await checkout
+            .changePlan(ctx, {
+                plan: "c",
+                cycle: "month",
+                billingEmail: "Taken@Example.com",
+                billingState: "Maharashtra",
+                registeredAddress: ADDRESS,
+            })
+            .then(
+                () => null,
+                (e: unknown) => e,
+            );
+        expect(error).toMatchObject({ status: 409 });
+        expect(fieldOf(error)).toBe("billingEmail");
+        expect(fake.createCalls).toHaveLength(0);
     });
 });

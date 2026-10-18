@@ -1,95 +1,94 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
-import { stateCode } from "../invoices/gst-states";
+import { gstinProblem, stateCode } from "../invoices/gst-states";
 import { normalisePublicPhone } from "../organizations/business-phone";
 
 /**
  * Who Saroh bills, before it charges or sets up autopay (owner, 17 Oct
- * 2026): "these details should be added, and must be filled before we
- * setup autopay or charge them payment".
+ * 2026: "these details should be added, and must be filled before we
+ * setup autopay or charge them payment"), now the business's billing
+ * profile (DEC-167, owner 18 Oct 2026): Settings › Business stays the
+ * business's own seller identity, and Saroh's bill-to comes only from the
+ * profile.
  *
  * A checkout that charges or sets up a mandate (every kind but a move to
  * Free) is refused with a 400 naming the field (`details.field`, as the
- * address's own refusal does) until the business has:
+ * address's own refusal does):
  *
- * - **a billing name**: its legal name, else its business name;
- * - **an email**: the owner's (the person checking out), else the
- *   profile's contact email, else one given at checkout;
- * - **a complete registered address**: first line, city and a six-digit
- *   PIN;
- * - **a state**: the profile's, else the one given at checkout (or a
- *   GSTIN's).
+ * - **no profile** (`billing-profile`): the business must be given one
+ *   first — one of its owner's, or a new one — as when a business is
+ *   created; nothing else is asked until it has one;
+ * - **a billing name**: the profile's legal name, else the business's name;
+ * - **an email**: the profile's billing email;
+ * - **a complete billing address**: first line, city and a six-digit PIN;
+ * - **a state**: the profile's (or a GSTIN's).
  *
  * A GSTIN stays optional, and a phone is used "if available". Details
- * given at checkout fill only what is missing: the address, the state and
- * the legal name are saved to the business's profile (never over one it
- * has); an email or phone is kept on the checkout instead
- * (`BillingCheckout.billToEmail`, `billToPhone`), since the profile's
- * phone is the one its website shows. The business's Razorpay customer
- * is brought up to date by the `billing.customer.sync` job the checkout
- * queues (`billing-customer.ts`, DEC-165).
+ * given at checkout are saved to the profile (never to `BusinessProfile`):
+ * the name, email, address, state and phone only where it has none; a
+ * GSTIN given there replaces the profile's, with its state. The profile's
+ * customer at the provider is brought up to date by the
+ * `billing.profile.sync` job the save queues (`billing-customer.ts`).
  */
 
-export type BillingDetail = "name" | "email" | "address" | "state";
+export type BillingDetail = "profile" | "name" | "email" | "address" | "state";
 
-/** The profile columns the check reads. */
+/** The billing profile columns the check and the bill read. */
 export const BILLING_PROFILE_SELECT = {
+    id: true,
     legalName: true,
-    contactEmail: true,
+    billingEmail: true,
     phone: true,
-    taxId: true,
-    gstRegistered: true,
+    gstin: true,
     gstState: true,
     addressLine1: true,
     addressLine2: true,
     city: true,
     postalCode: true,
+    providerCustomerId: true,
 } as const;
 
-export type BillingProfile = Prisma.BusinessProfileGetPayload<{
+/** The billing profile a business is billed to, as the bill reads it. */
+export type BilledProfile = Prisma.BillingProfileGetPayload<{
     select: typeof BILLING_PROFILE_SELECT;
 }>;
 
 /** Everything Saroh knows of who it bills, before a checkout adds to it. */
 export interface BillingParty {
-    profile: BillingProfile | null;
+    /** The business's billing profile; null: it has none yet. */
+    profile: BilledProfile | null;
     orgName: string | null;
-    userEmail: string | null;
-    userName: string | null;
+    /** The business's Saroh address, for the provider's notes. */
+    orgSlug: string | null;
 }
 
-type Db = Pick<
-    Prisma.TransactionClient,
-    "businessProfile" | "organization" | "user"
->;
+type Db = Pick<Prisma.TransactionClient, "billingProfile" | "organization">;
 
+/**
+ * Who the business is billed to: its billing profile now, or (`profileId`)
+ * a given one — a checkout's own, when it was made on another.
+ */
 export async function readBillingParty(
     db: Db,
     organizationId: string,
-    userId: string | null,
+    profileId?: string | null,
 ): Promise<BillingParty> {
-    const [profile, org, user] = await Promise.all([
-        db.businessProfile.findUnique({
-            where: { organizationId },
-            select: BILLING_PROFILE_SELECT,
-        }),
-        db.organization.findUnique({
-            where: { id: organizationId },
-            select: { name: true },
-        }),
-        userId
-            ? db.user.findUnique({
-                  where: { id: userId },
-                  select: { email: true, name: true },
-              })
-            : null,
-    ]);
+    const org = await db.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true, slug: true, billingProfileId: true },
+    });
+    const id = profileId ?? org?.billingProfileId ?? null;
+    const profile = id
+        ? await db.billingProfile.findUnique({
+              where: { id },
+              select: BILLING_PROFILE_SELECT,
+          })
+        : null;
     return {
         profile,
         orgName: nonEmpty(org?.name),
-        userEmail: nonEmpty(user?.email),
-        userName: nonEmpty(user?.name),
+        orgSlug: nonEmpty(org?.slug),
     };
 }
 
@@ -102,18 +101,20 @@ export function nonEmpty(value: string | null | undefined): string | null {
 /** An Indian PIN code: six digits, never starting with 0. */
 export const PIN = /^[1-9][0-9]{5}$/;
 
-/** The name on the bill: the legal name, else the business's. */
+/** The name on the bill: the profile's legal name, else the business's. */
 export function billingName(p: BillingParty): string | null {
     return nonEmpty(p.profile?.legalName) ?? p.orgName;
 }
 
-/** The billing email: the owner's, else the profile's contact email. */
+/** The billing email: the profile's. */
 export function billingEmail(p: BillingParty): string | null {
-    return p.userEmail ?? nonEmpty(p.profile?.contactEmail);
+    return nonEmpty(p.profile?.billingEmail);
 }
 
 /** First line, city and a six-digit PIN. */
-export function addressComplete(profile: BillingProfile | null): boolean {
+export function addressComplete(
+    profile: Pick<BilledProfile, "addressLine1" | "city" | "postalCode"> | null,
+): boolean {
     const pin = profile?.postalCode?.replace(/\s+/g, "") ?? "";
     return (
         Boolean(nonEmpty(profile?.addressLine1)) &&
@@ -122,13 +123,18 @@ export function addressComplete(profile: BillingProfile | null): boolean {
     );
 }
 
-/** What is missing before Saroh may charge, in the order the form asks. */
+/**
+ * What is missing before Saroh may charge, in the order the form asks. A
+ * business with no profile is missing only that: the rest is the
+ * profile's to have.
+ */
 export function missingBillingDetails(p: BillingParty): BillingDetail[] {
+    if (!p.profile) return ["profile"];
     const missing: BillingDetail[] = [];
     if (!billingName(p)) missing.push("name");
     if (!billingEmail(p)) missing.push("email");
     if (!addressComplete(p.profile)) missing.push("address");
-    if (!stateCode(p.profile?.gstState)) missing.push("state");
+    if (!stateCode(p.profile.gstState)) missing.push("state");
     return missing;
 }
 
@@ -140,7 +146,7 @@ export interface AddressSent {
     postalCode?: string | null;
 }
 
-/** The registered address a checkout saves to the business's profile. */
+/** The billing address a checkout saves to the business's billing profile. */
 export interface CheckoutAddress {
     addressLine1: string;
     addressLine2: string | null;
@@ -203,37 +209,47 @@ export interface BillingDetailsSent {
     registeredAddress?: AddressSent | null;
 }
 
-/** What a checkout keeps of the details it was given. */
+/** The state and GSTIN a checkout was given, checked (`checkoutBillTo`). */
+export interface BillToGiven {
+    state: string | null;
+    gstin: string | null;
+}
+
+/** What a checkout saves to the business's billing profile. */
 export interface CheckoutDetails {
-    /** Saved to the business's profile: only what it was missing. */
+    /** Only what it was missing, and a GSTIN given; empty: nothing. */
     profile: Partial<CheckoutAddress> & {
         legalName?: string;
+        billingEmail?: string;
+        phone?: string;
         gstState?: string;
+        gstin?: string;
     };
-    /** Kept on the checkout: given because the business had none. */
-    billToEmail: string | null;
-    billToPhone: string | null;
 }
+
+/** The refusal's words for a business with no billing profile. */
+export const CHOOSE_BILLING_PROFILE =
+    "Choose who Saroh bills for this business first.";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * The details a paid checkout needs, from what the business has and what
- * the checkout sent; refused, by field, before anything is made at the
- * provider. `stateGiven` is the bill-to state from the checkout (its
- * state, or its GSTIN's).
+ * The details a paid checkout needs, from the business's billing profile
+ * and what the checkout sent; refused, by field, before anything is made
+ * at the provider. `given` is the bill-to state and GSTIN from the
+ * checkout (`checkoutBillTo`: a GSTIN alone gives its state).
  */
 export function checkoutDetails(
     party: BillingParty,
     sent: BillingDetailsSent,
-    stateGiven: string | null,
+    given: BillToGiven,
 ): CheckoutDetails {
     const missing = missingBillingDetails(party);
-    const out: CheckoutDetails = {
-        profile: {},
-        billToEmail: null,
-        billToPhone: null,
-    };
+    const profile = party.profile;
+    if (!profile) {
+        refuse(CHOOSE_BILLING_PROFILE, "billing-profile", missing);
+    }
+    const out: CheckoutDetails = { profile: {} };
 
     if (missing.includes("name")) {
         const name = nonEmpty(sent.billingName);
@@ -259,7 +275,7 @@ export function checkoutDetails(
         if (email.length > 254 || !EMAIL.test(email)) {
             refuse("That email doesn't look right.", "billingEmail", missing);
         }
-        out.billToEmail = email;
+        out.profile.billingEmail = email;
     }
 
     if (missing.includes("address")) {
@@ -267,8 +283,14 @@ export function checkoutDetails(
         if (address) Object.assign(out.profile, address);
     }
 
-    if (missing.includes("state")) {
-        const state = stateCode(stateGiven);
+    // A GSTIN given is the one to bill: it replaces the profile's, and
+    // names its state.
+    if (given.gstin) {
+        if (given.gstin !== profile.gstin) out.profile.gstin = given.gstin;
+        const state = stateCode(given.state) ?? given.gstin.slice(0, 2);
+        if (state !== profile.gstState) out.profile.gstState = state;
+    } else if (missing.includes("state")) {
+        const state = stateCode(given.state);
         if (!state) {
             refuse(
                 "Choose the state your business is registered in.",
@@ -276,15 +298,30 @@ export function checkoutDetails(
                 missing,
             );
         }
+        if (profile.gstin) {
+            const problem = gstinProblem(profile.gstin, state);
+            if (problem) refuse(problem, "billingState", missing);
+        }
         out.profile.gstState = state;
+    } else if (given.state) {
+        // A state given over the profile's own: kept, unless it disagrees
+        // with the GSTIN the profile bills to.
+        const state = stateCode(given.state);
+        if (state && state !== profile.gstState) {
+            if (profile.gstin) {
+                const problem = gstinProblem(profile.gstin, state);
+                if (problem) refuse(problem, "billingState");
+            }
+            out.profile.gstState = state;
+        }
     }
 
     // "If available": asked when the profile has none, never required.
     const typedPhone = nonEmpty(sent.phone);
-    if (typedPhone && !nonEmpty(party.profile?.phone)) {
+    if (typedPhone && !nonEmpty(profile.phone)) {
         const result = normalisePublicPhone(typedPhone);
         if ("problem" in result) refuse(result.problem, "phone");
-        out.billToPhone = result.phone;
+        if (result.phone) out.profile.phone = result.phone;
     }
     return out;
 }

@@ -13,7 +13,7 @@ import { stateCode } from "../invoices/gst-states";
 import { formatSellerAddress } from "../invoices/order-invoice";
 import { authorize } from "../organizations/organization-policy";
 import { chargedAddonRowsInTx } from "./addon-charges";
-import { billingEmail, nonEmpty, readBillingParty } from "./billing-details";
+import { nonEmpty } from "./billing-details";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { periodStart as periodStartOf } from "./checkout-quote";
 import { keepProviderAmountInTx } from "./invoice-amount";
@@ -61,7 +61,10 @@ export interface ChargeToInvoice {
     periodStart: Date | null;
     periodEnd: Date | null;
     lines: SarohLineInput[];
-    /** As given at checkout; null: the business profile's. */
+    /**
+     * As given at checkout; null: the billing profile's. Read only for a
+     * checkout made before profiles: one made on a profile saved it there.
+     */
     billTo: { state: string | null; gstin: string | null } | null;
     issuedAt: Date;
 }
@@ -390,7 +393,7 @@ export class SarohInvoicesService {
             lines: [line, ...addons.lines],
             // The GSTIN and state given at checkout are for that checkout's
             // own first charge; a renewal is billed to the business as it
-            // is now (its profile), so a GSTIN corrected or a move of state
+            // is now (its billing profile), so a GSTIN corrected or a move of state
             // since reaches every later invoice (17 Oct 2026).
             billTo: checkout && firstOf ? billToOf(checkout) : null,
             issuedAt: now,
@@ -481,8 +484,20 @@ export class SarohInvoicesService {
             });
             return null;
         }
+        // Who it is addressed to, as they are now: the billing profile
+        // (DEC-167), read once here and copied, so an edit to the profile
+        // reaches the next invoice and never an issued one.
+        const buyer = await buyerInTx(
+            tx,
+            charge.organizationId,
+            charge.checkoutId,
+        );
+        // The customer the provider billed: the charge's (its checkout's,
+        // else the provider's word), else the profile's, else the
+        // subscription's from before profiles.
         const providerCustomerId =
             charge.providerCustomerId ??
+            buyer.providerCustomerId ??
             (
                 await tx.subscription.findUnique({
                     where: { organizationId: charge.organizationId },
@@ -499,36 +514,17 @@ export class SarohInvoicesService {
             );
         }
 
-        const [org, profile, contact] = await Promise.all([
-            tx.organization.findUnique({
-                where: { id: charge.organizationId },
-                select: { name: true },
-            }),
-            tx.businessProfile.findUnique({
-                where: { organizationId: charge.organizationId },
-                select: {
-                    legalName: true,
-                    gstRegistered: true,
-                    taxId: true,
-                    gstState: true,
-                    addressLine1: true,
-                    addressLine2: true,
-                    city: true,
-                    postalCode: true,
-                },
-            }),
-            buyerContactInTx(tx, charge.organizationId, charge.checkoutId),
-        ]);
-        const profileGstin =
-            profile?.gstRegistered && profile.taxId ? profile.taxId : null;
-        const billToGstin = charge.billTo?.gstin ?? profileGstin;
+        // A checkout made on a billing profile saved what it was given to
+        // the profile: the profile alone says who is billed. One made
+        // before profiles keeps the state and GSTIN it was given.
+        const given = buyer.fromProfile ? null : charge.billTo;
+        const billToGstin = given?.gstin ?? buyer.gstin;
         const billToState =
-            charge.billTo?.state ??
-            (charge.billTo?.gstin ? charge.billTo.gstin.slice(0, 2) : null);
+            given?.state ?? (given?.gstin ? given.gstin.slice(0, 2) : null);
         const supply = sarohSupply({
             billToState,
             billToGstin,
-            profileState: profile?.gstState ?? null,
+            profileState: buyer.state,
             sellerState: seller.state,
         });
         const { lines, totals } = taxSarohLines(charge.lines, supply.taxType);
@@ -554,6 +550,7 @@ export class SarohInvoicesService {
                 providerEventId: charge.providerEventId,
                 providerPaymentId: charge.providerPaymentId ?? null,
                 providerCustomerId,
+                billingProfileId: buyer.billingProfileId,
                 checkoutId: charge.checkoutId ?? null,
                 planId: charge.planId,
                 planName: charge.planName,
@@ -567,18 +564,16 @@ export class SarohInvoicesService {
                 sellerState: seller.state,
                 sellerAddress: seller.address,
                 sellerEmail: seller.email,
-                billToName: buyerName(profile?.legalName, org?.name),
-                billToEmail: contact.email,
-                billToPhone: contact.phone,
+                billToName: buyer.name,
+                billToEmail: buyer.email,
+                billToPhone: buyer.phone,
                 // The address only: the paper adds the state from the
                 // place of supply, so the two never disagree (Rule 46(e)).
-                billToAddress: profile
-                    ? formatSellerAddress({ ...profile, stateName: null })
-                    : null,
+                billToAddress: buyer.address,
                 billToState:
                     stateCode(billToState) ??
                     stateCode(billToGstin?.slice(0, 2)) ??
-                    stateCode(profile?.gstState) ??
+                    stateCode(buyer.state) ??
                     null,
                 billToGstin,
                 placeOfSupply: supply.placeOfSupply,
@@ -736,34 +731,140 @@ function buyerName(
     return "Your business";
 }
 
+/** Who a Saroh invoice is addressed to, as read at issue time. */
+interface Buyer {
+    /** The billing profile it is addressed to; null: none (before profiles). */
+    billingProfileId: string | null;
+    /** Read from a billing profile (else the business's own details). */
+    fromProfile: boolean;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    /** The address without its state (the paper adds it). */
+    address: string | null;
+    /** The address's GST state code. */
+    state: string | null;
+    gstin: string | null;
+    /** The profile's customer at the provider. */
+    providerCustomerId: string | null;
+}
+
 /**
- * The buyer's email and phone on Saroh's invoice (17 Oct 2026), by the
- * checkout's rule (`billingCustomer`): the email of the owner who checked
- * out, else the business's contact email, else one given at checkout, else
- * the owner's today; the business's phone, else one given at checkout.
- * Either may be null; the invoice is never held up for them.
+ * Who Saroh's invoice is addressed to (DEC-167, R4): the billing profile
+ * the charge's checkout was made on (a business switched to another
+ * profile keeps the old one's for what that checkout paid), else the
+ * business's now — its legal name (else the business's name), billing
+ * email, phone, address, state and GSTIN. Never Settings › Business: that
+ * is the business's own seller identity (owner, 18 Oct 2026).
+ *
+ * A business with no profile (left so by the data move) is billed as
+ * before profiles, so its invoice is still written (DEC-068: after money,
+ * nothing is refused): `buyerBeforeProfilesInTx`.
  */
-async function buyerContactInTx(
+async function buyerInTx(
     tx: Tx,
     organizationId: string,
     checkoutId: string | null | undefined,
-): Promise<{ email: string | null; phone: string | null }> {
-    const checkout = checkoutId
-        ? await tx.billingCheckout.findUnique({
-              where: { id: checkoutId },
-              select: {
-                  createdByUserId: true,
-                  billToEmail: true,
-                  billToPhone: true,
-              },
-          })
-        : null;
-    const party = await readBillingParty(
-        tx,
-        organizationId,
-        checkout?.createdByUserId ?? null,
-    );
-    let email = billingEmail(party) ?? nonEmpty(checkout?.billToEmail);
+): Promise<Buyer> {
+    const [org, checkout] = await Promise.all([
+        tx.organization.findUnique({
+            where: { id: organizationId },
+            select: { name: true, billingProfileId: true },
+        }),
+        checkoutId
+            ? tx.billingCheckout.findUnique({
+                  where: { id: checkoutId },
+                  select: {
+                      billingProfileId: true,
+                      createdByUserId: true,
+                      billToEmail: true,
+                      billToPhone: true,
+                  },
+              })
+            : null,
+    ]);
+    const select = {
+        id: true,
+        legalName: true,
+        billingEmail: true,
+        phone: true,
+        gstin: true,
+        gstState: true,
+        addressLine1: true,
+        addressLine2: true,
+        city: true,
+        postalCode: true,
+        providerCustomerId: true,
+    } as const;
+    let profile = null;
+    for (const id of [checkout?.billingProfileId, org?.billingProfileId]) {
+        if (!id) continue;
+        profile = await tx.billingProfile.findUnique({
+            where: { id },
+            select,
+        });
+        if (profile) break;
+    }
+    if (!profile) {
+        return buyerBeforeProfilesInTx(tx, organizationId, org?.name, checkout);
+    }
+    return {
+        billingProfileId: profile.id,
+        fromProfile: true,
+        name: buyerName(profile.legalName, org?.name),
+        email: nonEmpty(profile.billingEmail),
+        phone: nonEmpty(profile.phone),
+        address: formatSellerAddress({ ...profile, stateName: null }),
+        state: profile.gstState,
+        gstin: nonEmpty(profile.gstin),
+        providerCustomerId: profile.providerCustomerId,
+    };
+}
+
+/**
+ * Who a business with no billing profile is billed to, as before profiles
+ * (17 Oct 2026): its own legal name, registered address and state, its
+ * GSTIN while GST-registered; the email of the owner who checked out, else
+ * the business's contact email, else one given at checkout, else its first
+ * owner's; its phone, else one given at checkout.
+ */
+async function buyerBeforeProfilesInTx(
+    tx: Tx,
+    organizationId: string,
+    orgName: string | null | undefined,
+    checkout: {
+        createdByUserId: string | null;
+        billToEmail: string | null;
+        billToPhone: string | null;
+    } | null,
+): Promise<Buyer> {
+    const [business, user] = await Promise.all([
+        tx.businessProfile.findUnique({
+            where: { organizationId },
+            select: {
+                legalName: true,
+                contactEmail: true,
+                phone: true,
+                gstRegistered: true,
+                taxId: true,
+                gstState: true,
+                addressLine1: true,
+                addressLine2: true,
+                city: true,
+                postalCode: true,
+            },
+        }),
+        checkout?.createdByUserId
+            ? tx.user.findUnique({
+                  where: { id: checkout.createdByUserId },
+                  select: { email: true },
+              })
+            : null,
+    ]);
+    let email =
+        nonEmpty(user?.email) ??
+        nonEmpty(business?.contactEmail) ??
+        nonEmpty(checkout?.billToEmail);
     if (!email) {
         const owner = await tx.membership.findFirst({
             where: { organizationId, role: "OWNER" },
@@ -773,9 +874,18 @@ async function buyerContactInTx(
         email = nonEmpty(owner?.user.email);
     }
     return {
+        billingProfileId: null,
+        fromProfile: false,
+        name: buyerName(business?.legalName, orgName),
         email,
-        phone:
-            nonEmpty(party.profile?.phone) ?? nonEmpty(checkout?.billToPhone),
+        phone: nonEmpty(business?.phone) ?? nonEmpty(checkout?.billToPhone),
+        address: business
+            ? formatSellerAddress({ ...business, stateName: null })
+            : null,
+        state: business?.gstState ?? null,
+        gstin:
+            business?.gstRegistered && business.taxId ? business.taxId : null,
+        providerCustomerId: null,
     };
 }
 
