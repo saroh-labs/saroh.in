@@ -330,3 +330,36 @@ export function shownKinds(options: OfferOptions): OfferKind[] {
         (kind) => kind !== "trial" || options.trialEndsAt !== null,
     );
 }
+
+/**
+ * A plan until a date is a gift: only the plans above the one they pay
+ * for, in the catalogue's order (cheapest first). Their own plan, or one
+ * below it, would change nothing they see (the dry run says so too).
+ */
+export function plansAbove(options: OfferOptions): OfferOptions["plans"] {
+    const at = options.plans.findIndex((p) => p.name === options.planName);
+    return at < 0
+        ? options.plans.filter((p) => p.name !== options.planName)
+        : options.plans.slice(at + 1);
+}
+
+/** Why "A plan until a date" can't be given to a business on the top plan. */
+export const TOP_PLAN_WHY =
+    "They are on the top plan already. A higher limit or one module may be what they need.";
+
+/**
+ * The options as the sheet offers them: on the top plan there is no plan
+ * to give, so that kind says why, like any kind the API turns down.
+ */
+export function offerable(options: OfferOptions): OfferOptions {
+    if (!options.kinds.plan.available || plansAbove(options).length > 0) {
+        return options;
+    }
+    return {
+        ...options,
+        kinds: {
+            ...options.kinds,
+            plan: { available: false, why: TOP_PLAN_WHY },
+        },
+    };
+}

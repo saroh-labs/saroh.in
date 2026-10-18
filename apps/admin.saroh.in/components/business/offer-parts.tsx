@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { offerOptionsAction, previewOfferAction } from "@/lib/business-actions";
 import type { OfferDraft, OfferOptions, OfferPreview } from "@/lib/offer-words";
-import { previewLines } from "@/lib/offer-words";
+import { offerable, previewLines } from "@/lib/offer-words";
 
 /**
  * What the offer sheet and Take away a module… share (admin plan U5): the
@@ -30,7 +30,7 @@ export function useOfferOptions(organizationId: string): OptionsState {
                 if (!live) return;
                 setState(
                     r.ok
-                        ? { status: "ok", data: r.data }
+                        ? { status: "ok", data: offerable(r.data) }
                         : { status: "failed", error: r.error },
                 );
             })

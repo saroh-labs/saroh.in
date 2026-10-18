@@ -233,8 +233,15 @@ describe("OfferSheet", () => {
         });
         openSheet();
         const top = await sheet();
+        // Nothing to give: the kind says why and the sheet opens on the next.
+        const planCard = top.getByRole("button", {
+            name: /A plan until a date/,
+        });
+        expect(planCard.getAttribute("aria-pressed")).toBe("false");
+        expect(planCard.textContent).toMatch(
+            /They are on the top plan already/,
+        );
         expect(top.queryByLabelText("Plan")).toBeNull();
-        expect(top.getByText(/They are on the top plan already/)).toBeTruthy();
     });
 
     it("dry-runs a plan until a date, names the action, and confirms it with the reason", async () => {

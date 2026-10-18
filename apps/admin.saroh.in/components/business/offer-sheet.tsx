@@ -35,6 +35,7 @@ import {
     draftFrom,
     EMPTY_FIELDS,
     KIND_CARD,
+    plansAbove,
     rowForRegistry,
     shownKinds,
 } from "@/lib/offer-words";
@@ -125,18 +126,6 @@ export function OfferSheet({
             </SheetContent>
         </Sheet>
     );
-}
-
-/**
- * A plan until a date is a gift: only the plans above the one they pay
- * for, in the catalogue's order (cheapest first). Their own plan, or one
- * below it, would change nothing they see (the dry run says so too).
- */
-function plansAbove(options: OfferOptions): OfferOptions["plans"] {
-    const at = options.plans.findIndex((p) => p.name === options.planName);
-    return at < 0
-        ? options.plans.filter((p) => p.name !== options.planName)
-        : options.plans.slice(at + 1);
 }
 
 function firstFields(options: OfferOptions, start?: OfferStart): OfferFields {
@@ -350,14 +339,6 @@ function KindFields({
 
     switch (kind) {
         case "plan":
-            if (plansAbove(options).length === 0) {
-                return (
-                    <p className="text-[13px] text-muted-foreground">
-                        They are on the top plan already. A higher limit or one
-                        module may be what they need.
-                    </p>
-                );
-            }
             return (
                 <div className="grid gap-3">
                     <div className="grid gap-1.5">
