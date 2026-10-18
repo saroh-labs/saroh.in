@@ -374,7 +374,9 @@ export const BILLING_PROFILE_CHOICE_NEEDED =
  *   if it didn't exist), and so is one that doesn't;
  * - or a new one, made here with its sync queued (a billing email the
  *   caller already uses is the 409 of {@link createBillingProfileInTx});
- * - neither, from an owner who has profiles: a 400 naming the choice,
+ * - neither, from an owner with exactly one profile: that one (an app
+ *   from before profiles sends no choice; the new app always asks);
+ * - neither, from an owner with two or more: a 400 naming the choice,
  *   since a charged invoice's GST details can't be changed afterwards and
  *   none is picked for them;
  * - neither, from someone with no profile yet: null, and their first is
@@ -414,11 +416,19 @@ export async function chosenBillingProfileInTx(
         );
         return made.id;
     }
-    const hasProfile = await tx.billingProfile.findFirst({
+    // Only theirs to pick from: an app from before profiles (the release
+    // window, when the API ships first) sends no choice, and asking would
+    // strand it. The new app always asks, so this is only the API's
+    // default; with two or more, nothing is picked for them.
+    const theirs = await tx.billingProfile.findMany({
         where: { ownerUserId },
         select: { id: true },
+        take: 2,
     });
-    if (hasProfile) refuse(BILLING_PROFILE_CHOICE_NEEDED, "billingProfile");
+    if (theirs.length === 1) return theirs[0].id;
+    if (theirs.length > 1) {
+        refuse(BILLING_PROFILE_CHOICE_NEEDED, "billingProfile");
+    }
     return null;
 }
 

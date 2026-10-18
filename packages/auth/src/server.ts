@@ -139,6 +139,15 @@ export interface CreateAuthOptions {
     /** Confirm account deletion via a one-time link, never a bare API call. */
     sendDeleteAccountVerification?: EmailSender;
     /**
+     * Told just before a user's row is deleted, once the deletion is
+     * allowed (they are no business's only owner), with their id only:
+     * the host's chance to record what the deletion takes with it (the
+     * API raises a billing notice for each business billed to one of
+     * their billing profiles, DEC-167). Whatever it throws is swallowed:
+     * it can't block a deletion.
+     */
+    onUserDeleting?: (user: { id: string }) => Promise<void> | void;
+    /**
      * Told once, after a user's row is first written (sign-up by password
      * or through a provider). Handed the id only, never the email or name.
      * Whatever it throws is swallowed: it can't fail a sign-up.
@@ -457,6 +466,16 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
                 // assertNotSoleOwner). Runs before any row is deleted.
                 beforeDelete: async (user) => {
                     await assertNotSoleOwner(user.id);
+                    try {
+                        await opts.onUserDeleting?.({ id: user.id });
+                    } catch (error) {
+                        console.error(
+                            "[auth] onUserDeleting failed:",
+                            error instanceof Error
+                                ? error.name
+                                : "unknown error",
+                        );
+                    }
                 },
             },
         },

@@ -4,7 +4,9 @@ import type { BillingCheckout, Plan, Prisma } from "@saroh/database";
 import { isOneTime } from "./billing-term";
 import { renewsAtProvider } from "./business-closing";
 import { billedByProvider, paidUntil } from "./change-timing";
+import { periodEnd } from "./checkout-quote";
 import { enqueueProviderCancel } from "./provider-cancel.job";
+import { FIRST_MONTH_KEY } from "./saroh-invoice-terms";
 
 type Tx = Prisma.TransactionClient;
 type Db = Pick<Tx, "organization" | "billingCheckout">;
@@ -125,6 +127,18 @@ export const PAYMENT_DUE = "payment-due";
 export const PAYMENT_DUE_MESSAGE =
     "This plan's last payment hasn't gone through. Once it's paid, you can choose another billing profile.";
 
+export const DISCOUNT_RUNNING = "discount-running";
+/** Said while a coupon still comes off charges to come (owner, 18 Oct 2026). */
+export function discountRunningMessage(until: Date): string {
+    const day = until.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Asia/Kolkata",
+    });
+    return `Your discount runs until ${day}. You can move to another billing profile after that.`;
+}
+
 function refuse(code: string, message: string): never {
     throw new ConflictException({
         message,
@@ -167,6 +181,7 @@ export async function profileMoveInTx(
             providerSubscriptionId: true,
             currentPeriodEnd: true,
             cancelAtPeriodEnd: true,
+            billingCycle: true,
             planId: true,
             pendingPlanId: true,
             pendingFrom: true,
@@ -197,6 +212,18 @@ export async function profileMoveInTx(
         return { kind: "applied", from: current };
     }
 
+    // No profile billed today (the data move left it none): there is no
+    // profile to move from, so the choice applies at once — invoices are
+    // addressed to it from now, and the next checkout uses its customer.
+    if (current === null && !state.scheduledSwitch && !state.openSwitch) {
+        if (open) refuse(CHECKOUT_WAITING, CHECKOUT_WAITING_MESSAGE);
+        await tx.organization.update({
+            where: { id: organizationId },
+            data: { billingProfileId: to },
+        });
+        return { kind: "applied", from: null };
+    }
+
     if (to === state.settled) {
         if (!state.openSwitch?.billingProfileId) return { kind: "none" };
         await giveUpInTx(tx, state.openSwitch, "profile-kept");
@@ -219,8 +246,101 @@ export async function profileMoveInTx(
     if (!planId || !startAt || startAt.getTime() <= now.getTime()) {
         refuse(PAYMENT_DUE, PAYMENT_DUE_MESSAGE);
     }
+    // A coupon is the provider subscription's (its offer): a switch makes
+    // a new one at the full price, so it waits until the discount is used
+    // (the minimal default; owner, 18 Oct 2026).
+    const discountUntil = await discountRunsUntilInTx(
+        tx,
+        organizationId,
+        sub,
+        scheduled,
+    );
+    if (discountUntil) {
+        refuse(DISCOUNT_RUNNING, discountRunningMessage(discountUntil));
+    }
     const plan = await tx.plan.findUniqueOrThrow({ where: { id: planId } });
     return { kind: "schedule", from: state.settled, plan, startAt };
+}
+
+/**
+ * When a coupon's discounted charges end: the end of the period its last
+ * one pays for, over the business's live provider subscription and an
+ * authorised change still to start. Charges taken are counted as the
+ * invoices count them (an upgrade's difference and a nominal first month
+ * aside). Null when none is left.
+ */
+async function discountRunsUntilInTx(
+    tx: Tx,
+    organizationId: string,
+    sub: {
+        status: string;
+        provider: string | null;
+        providerSubscriptionId: string | null;
+        currentPeriodEnd: Date | null;
+        billingCycle: string;
+    } | null,
+    scheduled: BillingCheckout | null,
+): Promise<Date | null> {
+    const runs: {
+        provider: string;
+        providerSubscriptionId: string;
+        discountCharges: number;
+        cycle: string;
+        next: Date | null;
+    }[] = [];
+    if (
+        sub?.provider &&
+        sub.providerSubscriptionId &&
+        sub.status !== "CANCELLED"
+    ) {
+        const live = await tx.billingCheckout.findUnique({
+            where: {
+                provider_providerSubscriptionId: {
+                    provider: sub.provider,
+                    providerSubscriptionId: sub.providerSubscriptionId,
+                },
+            },
+            select: { discountCharges: true },
+        });
+        if (live) {
+            runs.push({
+                provider: sub.provider,
+                providerSubscriptionId: sub.providerSubscriptionId,
+                discountCharges: live.discountCharges,
+                cycle: sub.billingCycle,
+                next: sub.currentPeriodEnd,
+            });
+        }
+    }
+    if (scheduled) {
+        runs.push({
+            provider: scheduled.provider,
+            providerSubscriptionId: scheduled.providerSubscriptionId,
+            discountCharges: scheduled.discountCharges,
+            cycle: scheduled.cycle,
+            next: scheduled.startAt,
+        });
+    }
+    let until: Date | null = null;
+    for (const run of runs) {
+        if (run.discountCharges <= 0 || !run.next) continue;
+        const taken = await tx.sarohInvoice.count({
+            where: {
+                organizationId,
+                provider: run.provider,
+                providerSubscriptionId: run.providerSubscriptionId,
+                source: { not: "UPGRADE" },
+                NOT: { chargeKey: { startsWith: FIRST_MONTH_KEY } },
+            },
+        });
+        const left = run.discountCharges - taken;
+        if (left <= 0) continue;
+        const cycle = run.cycle === "year" ? "year" : "month";
+        let end = run.next;
+        for (let i = 0; i < left; i += 1) end = periodEnd(end, cycle);
+        if (!until || end.getTime() > until.getTime()) until = end;
+    }
+    return until;
 }
 
 /** A checkout no longer wanted, its provider subscription too. */

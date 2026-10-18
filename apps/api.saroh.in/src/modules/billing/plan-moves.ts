@@ -1,13 +1,24 @@
+import { Logger } from "@nestjs/common";
 import type { BillingCheckout, Prisma } from "@saroh/database";
 import { unsyncedCatalogueVersions } from "@saroh/database";
 
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
 import { clearAddonsInTx, endAddonsNotOfferedInTx } from "./addon-charges";
 import type { HeldAddon } from "./addons-ending";
+import { raiseBillingOpsNoticeInTx } from "./billing-ops-notice";
 import { periodEnd } from "./checkout-quote";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 
 type Tx = Prisma.TransactionClient;
+
+const logger = new Logger("PlanMoves");
+
+/**
+ * A checkout's billing profile was deleted before its renewal (its owner
+ * deleted their account): the move is carried out on the business as it
+ * is, and an operator is told (DEC-167).
+ */
+export const BILLING_PROFILE_GONE = "billing_profile_gone";
 
 /**
  * Applying a subscription's pending move (pricing catalogue U15, KTD-4).
@@ -240,6 +251,25 @@ async function repointBillingProfileInTx(
         select: { billingProfileId: true },
     });
     if (!org || org.billingProfileId === to) return;
+    // The checkout's profile has no foreign key: its owner may have
+    // deleted their account since, taking the profile with it. The
+    // subscription is still adopted (the provider is charging it); the
+    // business stays as it is, and with no profile chooses one before it
+    // next pays.
+    const exists = await tx.billingProfile.findUnique({
+        where: { id: to },
+        select: { id: true },
+    });
+    if (!exists) {
+        await raiseBillingOpsNoticeInTx(tx, logger, {
+            code: BILLING_PROFILE_GONE,
+            organizationId,
+            refs: { billingProfileId: to, checkoutId: checkout.id },
+            note: "This business's renewal was authorised on a billing profile that has since been deleted (its owner deleted their account). The new subscription was taken over and the business's billing profile left as it was. An owner of the business should choose their own profile in Plan & billing.",
+            dedupeKey: `${BILLING_PROFILE_GONE}:${checkout.id}`,
+        });
+        return;
+    }
     await tx.organization.update({
         where: { id: organizationId },
         data: { billingProfileId: to },

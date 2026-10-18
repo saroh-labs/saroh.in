@@ -5180,3 +5180,13 @@ rule stands for the profile's own fields.
 **Fix.** The enqueue reads the transaction's business (`current_setting('app.current_organization_id')`) and records it on the job, or none outside one; the specs were made true to the constraints.
 
 **Rule.** A job written inside a business's transaction carries that business's id, even when its work spans businesses. Every unit's specs are run with `TEST_RLS=on` before the unit lands, not only in the gate (`docs/patterns/backend-jobs.md`, `.agents/skills/saroh-migrations/SKILL.md`).
+
+### Billing profiles: six holes the code review found (18 Oct 2026)
+
+**Symptom.** The DEC-167 review found: a renewal moving a business to a profile deleted with its owner's account failed on `Organization_billingProfileId_fkey` on every webhook and sweep; a switch dropped a running coupon; a business left without a profile couldn't upgrade until its renewal; an Admin's `GET checkout` handed out the profile's email, phone and GSTIN; an app from before profiles couldn't create a second business; and the migration's data move had never met a row.
+
+**Cause.** `BillingCheckout.billingProfileId` has no foreign key, so it outlives the profile; the switch rule treated "no profile" as a profile to move from; the handoff was built for every `billing:read` caller; the onboarding refused a missing choice even when there was only one; the replay runs migrations on an empty database.
+
+**Fix.** The repoint checks the profile exists (else adopts, leaves the pointer and raises `billing_profile_gone`), account deletion raises `billing_profile_owner_left`; `discount-running` 409; no profile applies at once; handoff and quote profile gated on `billing:manage` and ownership; one profile is the default; `pnpm run check:migration-fold` runs the migration on fixtures.
+
+**Rule.** A data migration that moves rows gets a check against fixtures beside the replay (`check:migration-fold` is the example); an id column without a foreign key is checked before it is written to one that has one (`docs/patterns/backend-billing-and-classes.md`).

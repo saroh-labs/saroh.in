@@ -16,6 +16,7 @@
         "check:e2e-covers": "node scripts/e2e-affected.mjs --check",
         "check:formats": "node scripts/check-formats.mjs",
         "check:merchant-site-tracking": "node scripts/check-merchant-site-tracking.mjs",
+        "check:migration-fold": "pnpm --filter @saroh/database db:verify:migration-fold",
         "check:migration-ids": "node scripts/check-migration-ids.mjs",
         "check:mktemp": "node scripts/check-mktemp.mjs",
         "check:tag-strip": "node scripts/check-tag-strip.mjs",

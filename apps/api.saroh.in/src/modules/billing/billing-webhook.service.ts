@@ -841,9 +841,22 @@ export class BillingWebhookService {
                 where: { id: org },
                 select: { billingProfileId: true },
             });
+            // A profile deleted since (its owner deleted their account)
+            // took the business's pointer with it: a checkout on it while
+            // the business is on no profile was made on the profile the
+            // business was billed to, so it moves nothing. One on it while
+            // the business is on another still moves the payer: the old
+            // autopay must end.
+            const target = checkout.billingProfileId
+                ? await tx.billingProfile.findUnique({
+                      where: { id: checkout.billingProfileId },
+                      select: { id: true },
+                  })
+                : null;
             const switching =
                 Boolean(checkout.billingProfileId) &&
-                checkout.billingProfileId !== billedTo?.billingProfileId;
+                checkout.billingProfileId !== billedTo?.billingProfileId &&
+                (Boolean(target) || Boolean(billedTo?.billingProfileId));
             const renewal =
                 !switching &&
                 sub.plan.key === plan.key &&

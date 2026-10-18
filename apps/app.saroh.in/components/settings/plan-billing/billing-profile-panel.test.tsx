@@ -284,6 +284,22 @@ describe("Change: who Saroh bills", () => {
         expect(showError).not.toHaveBeenCalled();
     });
 
+    it("says a discount still running under the choices, the sheet open", async () => {
+        draw(mine(FOODS));
+        const said =
+            "Your discount runs until 5 December 2026. You can move to another billing profile after that.";
+        chooseBillingProfileAction.mockResolvedValue({
+            ok: false,
+            error: said,
+            field: "billingProfile",
+        });
+        await press(button("Change", host));
+        await press(choice("Asha Fitness"));
+        await submit();
+        expect(sheet()?.textContent).toContain(said);
+        expect(showError).not.toHaveBeenCalled();
+    });
+
     it("makes a new profile in place; a duplicate email from the API stays under the email field", async () => {
         draw({ current: null, mine: [], businessesOnCurrent: null });
         createBillingProfileAction.mockResolvedValue({

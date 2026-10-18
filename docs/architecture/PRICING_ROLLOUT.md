@@ -97,7 +97,11 @@ release time.
        `20261126100000_billing_profiles` among them), and healthy, before
        any web app: the app's change-plan sends billing details an older
        API refuses (`forbidNonWhitelisted`), and an older app is refused
-       by the new API for details it never sends.
+       by the new API for details it never sends. **Ship app.saroh.in
+       straight after the API**, not later: until it is out, an owner with
+       two or more billing profiles who creates a business from the older
+       app is refused (it has no step to choose one; with exactly one, the
+       API uses it, DEC-167).
     2. **Stop the old API before the new one starts** (as
        `PRODUCTS_STOCK_ROLLOUT.md` does): an old worker that leases a
        `billing.refund.double-charge`, `billing.payment.notes`,

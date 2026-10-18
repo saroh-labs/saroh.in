@@ -76,18 +76,36 @@ issue, with the profile's id (`SarohInvoice.billingProfileId`, also on
 well as the people who manage the business's billing. Earlier invoices
 keep what they were issued with. Settings › Business (`BusinessProfile`)
 stays the business's own seller identity, for the business's own
-invoices; it is not Saroh's bill-to.
+invoices; it is not Saroh's bill-to. A profile's details are its owner's
+(R2), also on the reads Plan & billing makes with `billing:read`: the
+checkout handoff (the provider window's prefill and notes) is built only
+for `billing:manage`, and with another owner's profile (a co-owner paying)
+carries no email or phone and notes naming only the profile and the
+business; a quote's `billingDetails.profile` is null without
+`billing:manage` (`checkout.service.ts`, `checkout-privacy.db.spec.ts`).
 
 **Switching a paid business's profile waits for the renewal (R13, U6).**
 Choosing another profile applies at once only while nothing more is
-charged at the provider (Free, a plan ending, a year paid once). A
+charged at the provider (Free, a plan ending, a year paid once), or while
+the business has no profile (nothing to move from; a business the data
+move left without one can then upgrade at once). While a coupon still
+comes off charges to come, a switch is refused (409 `discount-running`,
+naming the date the discount ends): the switch's new subscription is made
+at full price, so it waits until the discount is used. A
 business whose subscription renews gets a SCHEDULED checkout for the same
 plan and cycle on the new profile's customer, starting at the period's end
 (`billing/profile-switch.ts` decides, `CheckoutService.startProfileSwitch`
 makes it); authorised, the webhook tells the old autopay to end with its
 period (a same-plan checkout on another profile is never a "renewal"), and
 `applyDueMoveInTx` repoints `Organization.billingProfileId` as it adopts
-the checkout, with an audit row. Unauthorised, it lapses like any checkout
+the checkout, with an audit row — unless the checkout's profile has been
+deleted since (its owner deleted their account; `BillingCheckout` has no
+foreign key to it): then the checkout is still adopted, the business keeps
+its pointer, and `billing_profile_gone` is raised in Admin › Billing ›
+Needs action. Deleting an account raises `billing_profile_owner_left` for
+each business billed to, or with an OPEN or SCHEDULED checkout on, one of
+its profiles (`noticeProfilesOfDeletedOwnerInTx`, through `@saroh/auth`'s
+`onUserDeleting`), and never refuses the deletion. Unauthorised, it lapses like any checkout
 and nothing changes. A plan change and a switch before one renewal are one
 checkout: a switch after an authorised plan change is made for that plan
 and supersedes it once authorised; a change starting at the renewal while

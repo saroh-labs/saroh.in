@@ -3,8 +3,10 @@
  * against a real Postgres:
  *
  * - a first business gets its owner's first profile, with one sync (F1);
- * - an owner with a profile must choose: none is refused naming the
- *   choice, and nothing is made (AE2); their own profile bills it;
+ * - an owner with two or more profiles must choose: none is refused
+ *   naming the choice, and nothing is made (AE2); with one, no choice
+ *   (an app from before profiles) bills it to that one; their own
+ *   profile bills it;
  * - a new profile is made with the business, or, with an email the owner
  *   already uses, neither is (AE7);
  * - another person's profile is a 404, and nothing is made.
@@ -120,8 +122,28 @@ describe("a first business (R6, F1)", () => {
 });
 
 describe("a later business must choose (R7)", () => {
-    it("refuses one with no choice, naming it, and makes nothing (AE2)", async () => {
+    it("bills it to the owner's only profile when no choice was sent (an app from before profiles)", async () => {
         const { owner, profile } = await ownerWithOne();
+
+        const later = await onboard(owner.id, { name: "Asha's Bakery" });
+
+        expect(
+            (await businessesOf(owner.id)).find((b) => b.id === later.id),
+        ).toMatchObject({ billingProfileId: profile.id });
+        expect(await profilesOf(owner.id)).toHaveLength(1);
+        expect(await syncJobs()).toHaveLength(0);
+    });
+
+    it("refuses one with no choice from an owner with two profiles, naming it, and makes nothing (AE2)", async () => {
+        const { owner, profile } = await ownerWithOne();
+        const other = await prisma.billingProfile.create({
+            data: {
+                ownerUserId: owner.id,
+                legalName: "Asha Foods LLP",
+                billingEmail: `${uniq("accounts-")}@example.com`,
+                provider: "RAZORPAY",
+            },
+        });
 
         const made = onboard(owner.id, { name: "Asha's Bakery" });
         await expect(made).rejects.toBeInstanceOf(BadRequestException);
@@ -134,6 +156,7 @@ describe("a later business must choose (R7)", () => {
         expect(await businessesOf(owner.id)).toHaveLength(1);
         expect(await profilesOf(owner.id)).toEqual([
             expect.objectContaining({ id: profile.id }),
+            expect.objectContaining({ id: other.id }),
         ]);
         expect(await syncJobs()).toHaveLength(0);
     });

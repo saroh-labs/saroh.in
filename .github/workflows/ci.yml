@@ -482,6 +482,14 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_migrate_check
           DATABASE_TARGET_CONFIRM: saroh_migrate_check
         run: pnpm --filter @saroh/database db:verify:replay
+
+      # The billing profiles migration's data move against rows (DEC-167):
+      # the replay above runs it on an empty database. Rebuilds the schema.
+      - name: Check the billing profiles data move
+        env:
+          MIGFOLD_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_migrate_check
+          MIGFOLD_DATABASE_CONFIRM: saroh_migrate_check
+        run: pnpm run check:migration-fold
   # Browser tests against a running, seeded stack.
   #
   # This is the harness the cross-product UX epic kept deferring to. Browser

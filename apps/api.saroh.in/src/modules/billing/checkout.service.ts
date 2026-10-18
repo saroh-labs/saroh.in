@@ -36,7 +36,7 @@ import {
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
 import type { EndingAddon } from "./addons-ending";
@@ -122,6 +122,19 @@ function billingDetailsView(
             phone: Boolean(nonEmpty(party.profile?.phone)),
         },
     };
+}
+
+/** The notes that name no person: the profile's id and the business. */
+const NON_PERSONAL_NOTES = ["billing_profile_id", "saroh_business"] as const;
+
+function nonPersonalNotes(
+    notes: Record<string, string>,
+): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const key of NON_PERSONAL_NOTES) {
+        if (notes[key]) out[key] = notes[key];
+    }
+    return out;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -381,9 +394,15 @@ export class CheckoutService {
             now,
         );
         const party = await this.partyFor(ctx.organizationId, quote.kind);
+        const details = billingDetailsView(party);
         return {
             ...this.quoteView(target, quote, coupon, addonsEnding),
-            ...billingDetailsView(party),
+            ...details,
+            // A profile is its owner's (R2): only those who change what the
+            // business pays are told which one bills it.
+            billingDetails: allows(ctx, "billing:manage")
+                ? details.billingDetails
+                : { ...details.billingDetails, profile: null },
         };
     }
 
@@ -410,10 +429,14 @@ export class CheckoutService {
             return row ? checkoutView(row, row.plan) : null;
         };
         const openRow = rows.find((r) => r.status === "OPEN");
+        // The handoff carries the billing profile's contact details for
+        // the provider's window: only for whoever can pay (billing:manage).
         const open = openRow
             ? {
                   ...checkoutView(openRow, openRow.plan),
-                  handoff: await this.handoff(ctx, openRow, payNowOf(openRow)),
+                  handoff: allows(ctx, "billing:manage")
+                      ? await this.handoff(ctx, openRow, payNowOf(openRow))
+                      : null,
               }
             : null;
         const term = await this.termOfSubscription(subscription, now);
@@ -495,6 +518,14 @@ export class CheckoutService {
         if (!keyId) return null;
         const customer = await this.billingCustomer(ctx, row);
         const oneTime = isOneTime(row);
+        // Another owner's profile (a co-owner paying for a business billed
+        // to it): its email, phone, GSTIN and address stay its owner's
+        // (R2), so the window is prefilled with none of them and the notes
+        // name only the profile and the business.
+        const theirs = await this.profileOfAnother(
+            ctx,
+            customer.billingProfileId ?? null,
+        );
         return {
             provider: row.provider,
             keyId,
@@ -504,14 +535,29 @@ export class CheckoutService {
             currency: "INR",
             prefill: {
                 name: customer.name,
-                email: customer.email,
-                contact: customer.contact,
+                email: theirs ? null : customer.email,
+                contact: theirs ? null : customer.contact,
             },
             // Razorpay's window takes a customer with an order; a
             // subscription's customer is the one it authorises.
             customerId: oneTime ? (row.providerCustomerId ?? null) : null,
-            notes: billingNotes(customer),
+            notes: theirs
+                ? nonPersonalNotes(billingNotes(customer))
+                : billingNotes(customer),
         };
+    }
+
+    /** Whether the profile is someone else's than the caller's. */
+    private async profileOfAnother(
+        ctx: OrganizationContext,
+        billingProfileId: string | null,
+    ): Promise<boolean> {
+        if (!billingProfileId) return false;
+        const profile = await prisma.billingProfile.findUnique({
+            where: { id: billingProfileId },
+            select: { ownerUserId: true },
+        });
+        return Boolean(profile) && profile?.ownerUserId !== ctx.userId;
     }
 
     /**
