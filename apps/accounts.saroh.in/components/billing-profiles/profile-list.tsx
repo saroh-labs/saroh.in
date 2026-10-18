@@ -28,16 +28,20 @@ import { PageTitle } from "./states";
  * The owner's billing profiles (F1; F8 on a phone): one card each, with
  * where Razorpay stands, its GST and billing email, and the businesses it
  * pays for. + Add billing profile opens the Add panel (also from a link,
- * `?add=1`, which the Move dialog's "+ A new billing profile" uses).
+ * `?add=1`, which the Move dialog's "+ A new billing profile" uses, with
+ * `&bill=` naming the business it was moving, so it is billed to the new one).
  */
 export function ProfileList({
     profiles,
     businesses,
     startAdding = false,
+    startBilling,
 }: {
     profiles: readonly BillingProfile[];
     businesses: readonly OwnedBusiness[];
     startAdding?: boolean;
+    /** The business the Move dialog was moving, already picked to bill. */
+    startBilling?: string;
 }) {
     const router = useRouter();
     const path = usePathname();
@@ -64,6 +68,7 @@ export function ProfileList({
                 key={`add-${opening}`}
                 profiles={profiles}
                 businesses={businesses}
+                billFirst={opening === 0 ? startBilling : undefined}
                 open={adding}
                 onClose={() => {
                     setAdding(false);

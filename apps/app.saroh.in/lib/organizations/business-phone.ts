@@ -9,11 +9,24 @@ const SEPARATORS = /[\s\-.()]/g;
 
 export const PHONE_EXAMPLE = "+91 98450 12345";
 
+/**
+ * An Indian number typed without the + ("98450 12345", "098450 12345",
+ * "91 98450 12345"): the API stores it as +91, so it is accepted here too.
+ */
+const INDIAN_WITHOUT_PLUS = /^(?:0091|91|0)?([1-9]\d{9})$/;
+
+/** A typed number as the API will store it, or "" when it can't be read. */
+export function phoneStored(typed: string): string {
+    const compact = typed.trim().replace(SEPARATORS, "");
+    const indian = INDIAN_WITHOUT_PLUS.exec(compact);
+    return indian ? `+91${indian[1]}` : compact;
+}
+
 /** What is wrong with a typed number, or null when it will be accepted. */
 export function phoneProblem(typed: string): string | null {
     const trimmed = typed.trim();
     if (trimmed === "") return null;
-    const compact = trimmed.replace(SEPARATORS, "");
+    const compact = phoneStored(trimmed);
     if (!compact.startsWith("+")) {
         return `Start with + and the country code, like ${PHONE_EXAMPLE}.`;
     }

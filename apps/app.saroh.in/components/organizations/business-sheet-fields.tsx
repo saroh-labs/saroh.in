@@ -210,8 +210,8 @@ export function BusinessSheetFields({
                             <FormDescription>
                                 Your site shows it with a Call button, and
                                 offers it when a sign-in code can&apos;t be
-                                sent. Start with + and the country code. Leave
-                                it empty to show none.
+                                sent. A 10-digit Indian number is fine. Leave it
+                                empty to show none.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

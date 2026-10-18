@@ -34,6 +34,7 @@ import {
     nextLine,
     paysForCount,
     pendingLine,
+    phoneLabel,
     planLine,
     planName,
     shortDate,
@@ -333,7 +334,11 @@ export function ProfilePage({
                                 </span>
                             </Detail>
                             <Detail term="Phone">
-                                {profile.phone ?? <Missing>Not added</Missing>}
+                                {profile.phone ? (
+                                    phoneLabel(profile.phone)
+                                ) : (
+                                    <Missing>Not added</Missing>
+                                )}
                             </Detail>
                         </dl>
                     </section>

@@ -5240,3 +5240,13 @@ rule stands for the profile's own fields.
 **Fix.** Each plan's line in the feature sheet has "Counted on <plan>" again (`components/plans/plans/module-row.tsx`); "Counted, for every plan at once" stays as a shortcut and shows "Differs by plan" when they differ. `sheets.test.tsx` checks a single plan can count differently.
 
 **Rule.** A redesign changes how a screen looks and reads, never what it can do. Every control the old screen had is still reachable on the new one; a unit that thinks a capability should go stops and asks the owner before building it, and the brief says so.
+
+### Billing profiles passed every test and still needed fixing in a browser (19 Oct 2026)
+
+**Symptom.** #1015's pages passed unit, component and db tests. Tried by hand on the local stack (owner: "the UI has to be verified"), saves from accounts.saroh.in were refused until U24 sent an `Origin` header with server-side writes, and four smaller problems showed: a 10-digit Indian phone was refused ("Start with + and the country code") although the box shows +91; a saved phone read "+919876543210"; the Move dialog's "+ A new billing profile" lost the business being moved; the Move dialog said "pays for 0"; and the State list was in GST-code order, not by name.
+
+**Cause.** Component tests mock the server actions and the API, so nothing exercised the real request; the phone rule asked for a + that an owner in India never types.
+
+**Fix.** `normalisePublicPhone` (API) and `phoneProblem` (app) read a number typed without + as Indian (10 digits, a trunk 0, or 91 / 0091 in front); accounts shows phones grouped (`phoneLabel`); the Move dialog's link carries `&bill=<business>` so the new profile bills it; "pays for nothing yet"; states by name.
+
+**Rule.** A unit with a form that writes is not done until one save of each kind has been made in a browser on the local stack (`docs/patterns/frontend-verification.md`); a phone field takes the number as an owner says it.

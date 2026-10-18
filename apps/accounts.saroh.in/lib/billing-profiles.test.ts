@@ -23,6 +23,7 @@ import {
     moveTarget,
     paysForCount,
     paysForLine,
+    phoneLabel,
     planLine,
     profileEdit,
     profileProblems,
@@ -180,7 +181,7 @@ describe("moving a business", () => {
             disabled: true,
         });
         expect(moveTarget(mill, YOGA, PULSE.id)).toEqual({
-            line: "GSTIN 06AAAAA0000A1Z5 · pays for 0",
+            line: "GSTIN 06AAAAA0000A1Z5 · pays for nothing yet",
             disabled: false,
         });
         expect(moveTarget(PULSE, GURUGRAM, PULSE.id)).toEqual({
@@ -213,6 +214,9 @@ describe("lines", () => {
         expect(chips(moving)).toEqual(["Yoga Corner · moving"]);
         expect(paysForLine(moving)).toBe("Pays for Yoga Corner (moving)");
         expect(paysForCount(2)).toBe("pays for 2 businesses");
+        expect(phoneLabel("+919845012345")).toBe("+91 98450 12345");
+        expect(phoneLabel("+441134960000")).toBe("+441134960000");
+        expect(phoneLabel(null)).toBe("");
         expect(planLine(GURUGRAM)).toBe("Pro · monthly autopay");
         expect(planLine(YOGA)).toBe("Free");
         expect(syncBadge("linked", "list")).toBeNull();

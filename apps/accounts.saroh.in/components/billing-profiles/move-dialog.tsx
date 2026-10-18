@@ -160,7 +160,7 @@ export function MoveDialog({
                             </DialogDescription>
                         </DialogHeader>
                         <fieldset className="m-0 flex flex-col gap-2 border-0 px-[22px] py-3.5">
-                            <legend className="mb-2 text-[12.5px] font-medium">
+                            <legend className="mb-0.5 text-[12.5px] font-medium">
                                 Bill it to
                             </legend>
                             <RadioGroup
@@ -202,7 +202,7 @@ export function MoveDialog({
                                 ))}
                             </RadioGroup>
                             <Link
-                                href="/account/billing-profiles?add=1"
+                                href={`/account/billing-profiles?add=1&bill=${encodeURIComponent(business.id)}`}
                                 className={cn(
                                     textLinkClass(),
                                     "w-fit py-1.5 text-[12.5px]",

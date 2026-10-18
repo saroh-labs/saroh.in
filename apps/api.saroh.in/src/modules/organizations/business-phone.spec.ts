@@ -24,12 +24,24 @@ describe("the business's public phone (DEC-053, F20)", () => {
             expect(normalisePublicPhone("   ")).toEqual({ phone: null });
         });
 
-        it("asks for the country code when there is no +", () => {
-            const r = normalisePublicPhone("98450 12345");
-            expect(r).toEqual({
+        it.each([
+            ["98450 12345", "+919845012345"],
+            ["098450 12345", "+919845012345"],
+            ["91 98450 12345", "+919845012345"],
+            ["0091 98450 12345", "+919845012345"],
+            ["080 4000 1234", "+918040001234"],
+        ])(
+            "reads %j, typed without the +, as an Indian number",
+            (typed, stored) => {
+                expect(normalisePublicPhone(typed)).toEqual({ phone: stored });
+            },
+        );
+
+        it("asks for the country code when there is no + and it isn't an Indian number", () => {
+            expect(normalisePublicPhone("1 415 555 0100")).toEqual({
                 problem: expect.stringContaining("country code"),
             });
-            expect(normalisePublicPhone("0091 98450 12345")).toHaveProperty(
+            expect(normalisePublicPhone("98450 1234")).toHaveProperty(
                 "problem",
             );
         });

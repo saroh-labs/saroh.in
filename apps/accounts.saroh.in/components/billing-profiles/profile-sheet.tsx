@@ -50,10 +50,10 @@ import { GST_STATES } from "@/lib/gst-states";
 
 type Errors = Partial<Record<ProfileField, string>>;
 
-const STATE_OPTIONS = GST_STATES.map((s) => ({
-    value: s.value,
-    label: s.label,
-}));
+/** By name, as people look for their state; the register's order is by code. */
+const STATE_OPTIONS = [...GST_STATES]
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .map((s) => ({ value: s.value, label: s.label }));
 
 function useProfileForm(initial: ProfileValues) {
     const [values, setValues] = useState(initial);
@@ -375,12 +375,15 @@ export const ADD_DESCRIPTION =
 export function AddProfileSheet({
     profiles,
     businesses,
+    billFirst,
     open,
     onClose,
 }: {
     profiles: readonly BillingProfile[];
     /** The owner's businesses, for "Bill a business to it now". */
     businesses: readonly OwnedBusiness[];
+    /** Picked to begin with: the business the Move dialog was moving. */
+    billFirst?: string;
     open: boolean;
     onClose: () => void;
 }) {
@@ -388,7 +391,10 @@ export function AddProfileSheet({
     const form = useProfileForm(valuesOf(null));
     const ref = useRef<HTMLFormElement>(null);
     const [from, setFrom] = useState("");
-    const [billNow, setBillNow] = useState("");
+    const [billNow, setBillNow] = useState(() => {
+        const b = businesses.find((x) => x.id === billFirst);
+        return b && !billNowOption(b).disabled ? b.id : "";
+    });
     const [busy, setBusy] = useState(false);
 
     function startWith(id: string) {

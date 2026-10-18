@@ -55,12 +55,13 @@ beforeEach(() => {
 afterEach(tearDown);
 
 const BUSINESSES = [owned(GURUGRAM, "bp_pulse"), owned(YOGA, "bp_asha")];
-const list = (startAdding = false) =>
+const list = (startAdding = false, startBilling?: string) =>
     draw(
         <ProfileList
             profiles={PROFILES}
             businesses={BUSINESSES}
             startAdding={startAdding}
+            startBilling={startBilling}
         />,
     );
 
@@ -162,5 +163,31 @@ describe("Add billing profile", () => {
             "Asha Verma Studio is added.",
         );
         expect(refresh).toHaveBeenCalled();
+    });
+
+    it("opened from Move, bills the business it was moving to the new profile", async () => {
+        list(true, YOGA.id);
+        type(field("Legal name"), "Asha Verma Studio");
+        await press(
+            must(
+                dialog()?.querySelector<HTMLElement>(
+                    '[role="radio"][value="no"]',
+                ),
+            ),
+        );
+        type(field("Billing email"), "studio@example.com");
+        actions.createProfileAction.mockResolvedValue({
+            ok: true,
+            data: {
+                profile: { ...PULSE, legalName: "Asha Verma Studio" },
+                moved: "applied",
+                notMoved: null,
+            },
+        });
+        await submit();
+        expect(actions.createProfileAction).toHaveBeenCalledWith(
+            expect.objectContaining({ legalName: "Asha Verma Studio" }),
+            YOGA.id,
+        );
     });
 });

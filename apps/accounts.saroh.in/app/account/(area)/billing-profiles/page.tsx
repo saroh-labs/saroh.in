@@ -30,9 +30,9 @@ export const metadata: Metadata = {
 export default async function BillingProfilesPage({
     searchParams,
 }: {
-    searchParams: Promise<{ add?: string }>;
+    searchParams: Promise<{ add?: string; bill?: string }>;
 }) {
-    const { add } = await searchParams;
+    const { add, bill } = await searchParams;
     let profiles: BillingProfile[];
     let owned: OwnedBusiness[];
     let businesses: Business[];
@@ -73,6 +73,11 @@ export default async function BillingProfilesPage({
             profiles={profiles}
             businesses={owned}
             startAdding={add === "1"}
+            startBilling={
+                add === "1" && owned.some((b) => b.id === bill)
+                    ? bill
+                    : undefined
+            }
         />
     );
 }

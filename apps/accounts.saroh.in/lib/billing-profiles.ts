@@ -139,6 +139,16 @@ export function paysForLine(p: Pick<BillingProfile, "payingFor">): string {
         .join(", ")}`;
 }
 
+/**
+ * A stored number as a person reads it: an Indian one grouped
+ * "+91 98450 12345", any other as stored.
+ */
+export function phoneLabel(stored: string | null | undefined): string {
+    if (!stored) return "";
+    const india = /^\+91(\d{5})(\d{5})$/.exec(stored);
+    return india ? `+91 ${india[1]} ${india[2]}` : stored;
+}
+
 /** "pays for 2 businesses", under the page's title. */
 export function paysForCount(n: number): string {
     if (n === 0) return "pays for nothing yet";
@@ -408,8 +418,10 @@ export function moveTarget(
             disabled: true,
         };
     }
-    const n = p.payingFor.length;
-    return { line: `${gstLine(p)} · pays for ${n}`, disabled: false };
+    return {
+        line: `${gstLine(p)} · ${paysForCount(p.payingFor.length)}`,
+        disabled: false,
+    };
 }
 
 /** The Move dialog's note, its strong sentence first. */
