@@ -2,6 +2,16 @@ import { WhoHasIt } from "@/components/releases/who-has-it";
 import { explainFlag } from "@/lib/control-plane";
 import { releaseForTab } from "@/lib/release-data";
 
+/** The tab names the release by its key. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ key: string }>;
+}) {
+    const { key } = await params;
+    return { title: `${key} · Who has it · Releases` };
+}
+
 /**
  * Every business, what it gets and why. `?organizationId=` asks the
  * resolver why that one business sees what it sees ("Why?").

@@ -5,6 +5,16 @@ import { flagHistory } from "@/lib/control-plane";
 import { releaseForTab } from "@/lib/release-data";
 import { releaseCounts, releaseHref } from "@/lib/releases";
 
+/** The tab names the release by its key. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ key: string }>;
+}) {
+    const { key } = await params;
+    return { title: `${key} · Releases` };
+}
+
 /** The newest changes the Overview shows. */
 const RECENT = 3;
 
