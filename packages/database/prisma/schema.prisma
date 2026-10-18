@@ -2741,6 +2741,53 @@ model StaffProfile {
   @@index([reportsToPlatformAdminId])
 }
 
+// An invitation to Saroh's team (DEC-169, admin console U24), for someone
+// who may have no Saroh account yet. Sent by a holder of `staff:grant`, and
+// never for a role that can do more than the sender can.
+//
+// Only a sha256 of the token is stored: the token itself exists only in the
+// email. A resend draws a new token over the old hash, so the earlier link
+// stops working. Accepting needs the person's own verified email to be
+// `email` (never one staff marked verified), and the last sender to still
+// hold `staff:grant` and reach every role on the invite. It then makes the
+// grant, the roles and the profile (`worksAs`, `onCommission`) in one
+// transaction.
+//
+// Staff and user ids are bare, not foreign keys, as on the role
+// assignments: the record outlives the accounts it names. Saroh's, not a
+// business's, so it has no organizationId and no row-level policy.
+model StaffInvite {
+  id String @id @default(cuid())
+
+  /// Lower-cased: the address the link was sent to, and the only one that may accept.
+  email        String
+  name         String
+  roles        String[]
+  worksAs      String
+  onCommission Boolean  @default(false)
+  reason       String
+
+  tokenHash String   @unique
+  expiresAt DateTime
+
+  /// Who sent the link last: the first sender, or whoever resent it.
+  invitedByUserId String
+  sentAt          DateTime @default(now())
+  sendCount       Int      @default(1)
+
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  platformAdminId  String?
+
+  withdrawnAt       DateTime?
+  withdrawnByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
 // Global, append-only history of staff activity in the Saroh control plane.
 // Deliberately relation-free: deleting a User, Organization, or target business
 // record must never cascade into the platform audit trail.

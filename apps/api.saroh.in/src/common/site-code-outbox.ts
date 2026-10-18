@@ -37,6 +37,37 @@ export function writeSiteCodeOutbox(
 }
 
 /**
+ * Where the fake transport leaves a staff invite's link (admin plan U24),
+ * one file per address, for the browser test that accepts one
+ * (`e2e/tests/admin-team-invite.spec.ts`; keep the two in step). Written
+ * under the same rule as a code: no SMTP, fake allowed, never production.
+ */
+export const STAFF_INVITE_OUTBOX_DIR = "saroh-staff-invites";
+
+export function staffInviteOutboxPath(email: string, dir = tmpdir()): string {
+    return path.join(
+        dir,
+        STAFF_INVITE_OUTBOX_DIR,
+        encodeURIComponent(email.trim().toLowerCase()),
+    );
+}
+
+/** Leave the invite's link where a local browser test finds it. Never throws. */
+export function writeStaffInviteOutbox(
+    email: string,
+    url: string,
+    dir = tmpdir(),
+): void {
+    try {
+        const file = staffInviteOutboxPath(email, dir);
+        mkdirSync(path.dirname(file), { recursive: true });
+        writeFileSync(file, url, { mode: 0o600 });
+    } catch {
+        // A read-only temp directory only costs the browser test its link.
+    }
+}
+
+/**
  * Whether the fake code transport may stand in for SMTP: in development,
  * and anywhere else but production when it is asked for by name
  * (`SITE_CODES_EMAIL_FAKE`) — the browser-test stack in CI, which runs the

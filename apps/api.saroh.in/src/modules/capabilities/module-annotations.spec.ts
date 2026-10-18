@@ -330,6 +330,10 @@ const NEVER: Record<string, string> = {
         "staff control plane (Saroh's own billing), not a tenant surface",
     "admin/admin-billing-controls.controller.ts":
         "staff control plane (Saroh's billing queue and controls), not a tenant surface",
+    // Admin plan U24: a staff invite's preview and accept, for someone who
+    // is not staff yet and may belong to no business.
+    "staff-invites/staff-invites.controller.ts":
+        "joining Saroh's own team, not a tenant surface",
     // DEC-120: an owner takes the business's data whatever it has switched
     // off, and while it is closing or suspended.
     "data-export/data-export.controller.ts":

@@ -599,26 +599,8 @@ export class AdminStaffService {
         }
     }
 
-    /**
-     * Run a staff change and refuse it if it would take the instance from
-     * having a lasting Platform Owner to having none. An instance that never
-     * had one (only the break-glass allowlist) may still grant its first.
-     */
     private guarded<T>(change: (tx: Tx) => Promise<T>): Promise<T> {
-        return prisma.$transaction(
-            async (tx) => {
-                const before = await lastingOwners(tx);
-                const result = await change(tx);
-                const after = await lastingOwners(tx);
-                if (before > 0 && after === 0) {
-                    throw new ConflictException(
-                        "That would leave nobody who can manage staff. Make someone else a Platform Owner first.",
-                    );
-                }
-                return result;
-            },
-            { isolationLevel: "Serializable" },
-        );
+        return guardedStaffChange(change);
     }
 
     private async activeRoles(
@@ -652,6 +634,32 @@ export class AdminStaffService {
 }
 
 /**
+ * Run a staff change and refuse it if it would take the instance from
+ * having a lasting Platform Owner to having none. An instance that never
+ * had one (only the break-glass allowlist) may still grant its first.
+ * Serializable, so two changes at once cannot each pass alone. Shared by
+ * grants and by an invite's acceptance (`admin-staff-invites.service.ts`).
+ */
+export function guardedStaffChange<T>(
+    change: (tx: Tx) => Promise<T>,
+): Promise<T> {
+    return prisma.$transaction(
+        async (tx) => {
+            const before = await lastingOwners(tx);
+            const result = await change(tx);
+            const after = await lastingOwners(tx);
+            if (before > 0 && after === 0) {
+                throw new ConflictException(
+                    "That would leave nobody who can manage staff. Make someone else a Platform Owner first.",
+                );
+            }
+            return result;
+        },
+        { isolationLevel: "Serializable" },
+    );
+}
+
+/**
  * Active Platform Owners whose ownership does not expire. An owner with an
  * expiry is still an owner today, but cannot be the one the instance relies
  * on — when it lapses, nobody can manage staff.
@@ -667,7 +675,7 @@ async function lastingOwners(tx: Tx): Promise<number> {
     });
 }
 
-function requireRoles(values: string[]): AdminRole[] {
+export function requireRoles(values: string[]): AdminRole[] {
     const roles = [...new Set(values)];
     if (roles.length === 0) {
         throw new BadRequestException("Choose at least one role.");
@@ -679,7 +687,7 @@ function requireRoles(values: string[]): AdminRole[] {
     return roles as AdminRole[];
 }
 
-function requireReason(value: string): string {
+export function requireReason(value: string): string {
     const reason = value.trim();
     if (reason.length < 4) {
         throw new BadRequestException("Give a reason for this change.");

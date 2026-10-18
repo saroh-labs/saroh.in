@@ -635,6 +635,25 @@ emailVerifiedByStaffAt === null`, read through `emailVerifiedBySelf`
       (`POST people/:id/email/confirm`, CHECKed in the migration), which
       sends the code at once; otherwise `people.sign-in-email.release`
       sends it when the hold ends.
+- **Current** (admin console U24, R32) — **Staff invites** add a teammate
+  with no Saroh account (`admin/admin-staff-invites.service.ts`). Create,
+  resend and withdraw need `staff:grant` (`POST/DELETE admin/staff/invites…`,
+  a reason and an idempotency key, on the ledger); an invite never carries a
+  role with a permission the sender lacks (`rolesBeyondReach`, DENIED on the
+  ledger). `StaffInvite` stores only the token's sha256; the token is in the
+  email alone, valid 7 days, and a resend replaces it. The link opens
+  accounts' `/staff-invite/open`, which swaps the token for an httpOnly
+  cookie scoped to `/staff-invite` and redirects to the clean address (no
+  referrer, left out of error tracking by `lib/untracked-pages.ts`). The
+  preview is `POST /public/staff-invites/preview` and the accept
+  `POST /staff-invites/accept` on the session alone (`modules/staff-invites/`,
+  outside `AdminModule`), both with the token in the body. Accepting needs
+  the session's email to be the invite's and `emailVerifiedBySelf`, and the
+  last sender to still hold `staff:grant` and reach every role; it then makes
+  the grant (reopening a revoked one), the roles and the profile with a ledger
+  row in `guardedStaffChange`. A second accept by the same person answers
+  `already-joined` and writes nothing; anyone already on the team is refused
+  (`ALREADY_ON_TEAM`).
 - **Current** — **Operators act through the business's own services, as
   themselves.** A module change, a role change or a removal goes through
   `ModuleLifecycleService` / `OrganizationMembersService` with an operator

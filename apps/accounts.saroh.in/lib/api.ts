@@ -1,3 +1,4 @@
+import { requestOrigin } from "@saroh/auth/origins";
 import { headers } from "next/headers";
 
 import { env } from "@/env";
@@ -23,11 +24,16 @@ export async function apiFetch(
     path: string,
     init: { method?: string; body?: unknown } = {},
 ): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
+    const incoming = await headers();
+    const cookie = incoming.get("cookie") ?? "";
+    // The API refuses a write that names no origin (#50, `OriginGuard`); a
+    // server-side fetch sends none of its own, so say where this came from.
+    const origin = requestOrigin(incoming);
     return fetch(`${apiBase()}${path}`, {
         method: init.method ?? "GET",
         headers: {
             cookie,
+            ...(origin ? { origin } : {}),
             ...(init.body !== undefined
                 ? { "content-type": "application/json" }
                 : {}),
@@ -86,14 +92,24 @@ export async function apiWrite<T>(
     return { ok: false, status: res.status, ...(await refusalOf(res)) };
 }
 
-async function refusalOf(
+/**
+ * A refusal's words, field and code. The API's errors come in its envelope,
+ * `{ error: { message, details } }` (AllExceptionsFilter); a bare
+ * `{ message, details }` is read too.
+ */
+export async function refusalOf(
     res: Response,
 ): Promise<{ error: string; field?: string; code?: string }> {
     try {
-        const body = (await res.json()) as {
+        const raw = (await res.json()) as {
             message?: unknown;
             details?: { field?: unknown; code?: unknown };
+            error?: unknown;
         };
+        const body =
+            raw.error && typeof raw.error === "object"
+                ? (raw.error as typeof raw)
+                : raw;
         const message =
             typeof body.message === "string" && res.status < 500
                 ? body.message

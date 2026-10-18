@@ -206,12 +206,16 @@ describe("Admin console permission assignments", () => {
         ]);
     });
 
-    it.each(["grant", "amend", "revoke"] as const)(
-        "lets only a staff granter %s staff",
-        (method) => {
-            expect(perms(method)).toEqual([AdminPermission.StaffGrant]);
-        },
-    );
+    it.each([
+        "grant",
+        "amend",
+        "revoke",
+        "inviteTeammate",
+        "resendInvite",
+        "withdrawInvite",
+    ] as const)("lets only a staff granter %s staff", (method) => {
+        expect(perms(method)).toEqual([AdminPermission.StaffGrant]);
+    });
 
     it.each([
         "endSessions",

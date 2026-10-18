@@ -8,7 +8,11 @@ import {
 } from "../modules/site-accounts/sender-name";
 import type { WelcomeMail } from "./email-welcome";
 import { welcomeEmail } from "./email-welcome";
-import { siteCodesFakeAllowed, writeSiteCodeOutbox } from "./site-code-outbox";
+import {
+    siteCodesFakeAllowed,
+    writeSiteCodeOutbox,
+    writeStaffInviteOutbox,
+} from "./site-code-outbox";
 import { dayWords } from "./words-format";
 
 const FROM =
@@ -724,6 +728,69 @@ export function launchInviteEmail(
   <p>Create your account with this email address and set up ${what}. It starts on the launch offer from the waitlist page, and you add no payment details to begin.</p>
   <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Set up ${what}</a></p>
   <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${validDays} days. Or paste it: ${href}</p>
+</div>`;
+}
+
+export const STAFF_INVITE_SUBJECT = "You're invited to join Saroh's team";
+
+/**
+ * An invitation to Saroh's team (admin console U24): a one-time link, valid
+ * for `validDays`, that works only with this email address. Awaited, and it
+ * says how it went, so the console can offer Resend when it didn't leave.
+ *
+ * With no SMTP it never reaches the network: where the fake transport is
+ * allowed (`siteCodesFakeAllowed`, never production) the link is left in
+ * the staff-invite outbox for the browser test and the log says only that
+ * one was sent, never the link (it is a credential); `fail` fails it.
+ */
+export async function sendStaffInviteEmail(
+    to: string,
+    details: {
+        url: string;
+        name: string;
+        invitedByName: string | null;
+        validDays: number;
+    },
+): Promise<EmailOutcome> {
+    if (!transporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            writeStaffInviteOutbox(to, details.url);
+            console.info(`[Staff invite] (no SMTP) to ${to}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to,
+            subject: STAFF_INVITE_SUBJECT,
+            html: staffInviteEmail(details),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+/** The invite's body; every value in it is escaped. */
+export function staffInviteEmail(details: {
+    url: string;
+    name: string;
+    invitedByName: string | null;
+    validDays: number;
+}): string {
+    const href = esc(details.url);
+    const who = details.invitedByName
+        ? `${esc(details.invitedByName)} has invited you`
+        : "You've been invited";
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Hi ${esc(details.name)}, join Saroh's team</h2>
+  <p>${who} to work on Saroh's console, where the team looks after the businesses on Saroh.</p>
+  <p>Open the link, then sign in or create your Saroh account with this email address. You'll be asked to confirm it with a code.</p>
+  <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Join the team</a></p>
+  <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${details.validDays} days. Don't forward it. If you weren't expecting it, ignore this email. Or paste it: ${href}</p>
 </div>`;
 }
 

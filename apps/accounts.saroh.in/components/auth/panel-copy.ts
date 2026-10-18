@@ -203,6 +203,18 @@ export const INVITE_PANEL: PanelCopy = {
     ],
 };
 
+/** An invite to Saroh's own team (admin console U24). */
+export const STAFF_INVITE_PANEL: PanelCopy = {
+    eyebrow: "Saroh team",
+    heading: "You are joining the people who run Saroh.",
+    body: "The console is where the team looks after the businesses on Saroh. Next, sign in or make your account with the address the invite went to.",
+    points: [
+        "Your roles decide what you see and can change",
+        "The link works once, for this address only",
+        "A Platform owner can change your roles later",
+    ],
+};
+
 /** A reset link past its hour, or already used. */
 export const EXPIRED_PANEL: PanelCopy = {
     eyebrow: "Reset password",

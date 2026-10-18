@@ -605,6 +605,9 @@ jobs:
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.
       RENDERER_URL: http://localhost:3005
+      # Where the API's emails send someone to accounts: a staff invite's
+      # link (admin plan U24) opens this stack's, never production's.
+      ACCOUNTS_URL: http://localhost:3000
       # Site sign-in (round-2 A9): every booking page asks for an emailed
       # code at the last step. The built apps have no development fallback
       # for the relay and code secrets, so the stack gets throwaway ones (the

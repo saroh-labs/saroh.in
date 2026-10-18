@@ -10,6 +10,7 @@ import {
     permissionsFor,
 } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
+import { AdminStaffInvitesService } from "./admin-staff-invites.service";
 import { AdminStaffService } from "./admin-staff.service";
 import {
     AmendStaffDto,
@@ -17,6 +18,7 @@ import {
     OperatorReasonDto,
     SaveStaffProfileDto,
 } from "./dto";
+import { InviteStaffDto } from "./staff-invite.dto";
 import { taxIdFingerprint } from "./staff-profile";
 
 /**
@@ -27,6 +29,7 @@ import { taxIdFingerprint } from "./staff-profile";
 export class AdminStaffController {
     constructor(
         private readonly staffService: AdminStaffService,
+        private readonly invites: AdminStaffInvitesService,
         private readonly idempotency: IdempotencyService,
     ) {}
 
@@ -74,6 +77,87 @@ export class AdminStaffController {
                         ? new Date(dto.expiresAt)
                         : undefined,
                 }),
+        );
+    }
+
+    /**
+     * Invites not yet accepted or withdrawn (admin console U24), each with
+     * its state: waiting, or expired and ready for Resend. Never a token.
+     */
+    @Get("staff/invites")
+    @RequireAdminPermission(AdminPermission.StaffRead)
+    listInvites() {
+        return this.invites.list();
+    }
+
+    /**
+     * Invite someone with no Saroh account yet (R32): an email with a
+     * one-time link valid for 7 days. Never for a role beyond the sender's
+     * reach. Answers whether the email left, so the console can offer Resend.
+     */
+    @Post("staff/invites")
+    @RequireAdminPermission(AdminPermission.StaffGrant)
+    inviteTeammate(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Body() dto: InviteStaffDto,
+    ) {
+        const { idempotencyKey, ...payload } = dto;
+        return this.idempotency.run(
+            {
+                scope: "admin.staff.invite",
+                key: idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            payload,
+            () =>
+                this.invites.invite({
+                    staff,
+                    email: dto.email,
+                    name: dto.name,
+                    roles: dto.roles,
+                    worksAs: dto.worksAs,
+                    onCommission: dto.onCommission,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
+    /** Send it again with a new link; the old one stops working. */
+    @Post("staff/invites/:inviteId/resend")
+    @RequireAdminPermission(AdminPermission.StaffGrant)
+    resendInvite(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("inviteId") inviteId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.staff.invite.resend",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { inviteId, reason: dto.reason },
+            () => this.invites.resend({ staff, inviteId, reason: dto.reason }),
+        );
+    }
+
+    /** Take an invite back before it is accepted. */
+    @Delete("staff/invites/:inviteId")
+    @RequireAdminPermission(AdminPermission.StaffGrant)
+    withdrawInvite(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("inviteId") inviteId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.staff.invite.withdraw",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { inviteId, reason: dto.reason },
+            () =>
+                this.invites.withdraw({ staff, inviteId, reason: dto.reason }),
         );
     }
 
