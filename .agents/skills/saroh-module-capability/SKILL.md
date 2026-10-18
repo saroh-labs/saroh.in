@@ -108,6 +108,12 @@ than showing a section the server will refuse anyway once enforcement is on.
   have 404'd every review route under enforcement (#274).
   `module-enforcement.roles.spec.ts` checks every role against every module.
 - Never hard-code a module key in a component; read the registry.
+- Saying whether a business can use a module — in the app or the admin
+  console — means `evaluate()`'s answer, never one gate's row. The console
+  reads it from `GET /admin/organizations/:id/modules/state` (evaluated as
+  the owner role, hidden modules left out by `moduleHidden`); it once worded
+  only the business's own switch and said On for a module whose release was
+  off. Dependencies are information there, never a blocker.
 - Never emit an action for a module the actor cannot see — that is a leak.
 - Deactivation runs a policy; it does not delete rows.
 - A capability that is configured-but-broken reports `ATTENTION_REQUIRED`, not

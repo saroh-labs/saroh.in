@@ -8,6 +8,7 @@ import { IdempotencyService } from "../../common/idempotency/idempotency.service
 import { NOT_CATALOGUE_PLAN } from "../billing/plans.service";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
+import { AdminBusinessModulesService } from "./admin-business-modules.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
 import { AdminOrganizationViewService } from "./admin-organization-view.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
@@ -50,6 +51,7 @@ export class AdminOrganizationsController {
         private readonly adminAudit: AdminAuditService,
         private readonly idempotency: IdempotencyService,
         private readonly siteTrackers: AdminSiteTrackersService,
+        private readonly businessModules: AdminBusinessModulesService,
     ) {}
 
     /**
@@ -87,6 +89,20 @@ export class AdminOrganizationsController {
     @RequireAdminPermission(AdminPermission.OrganizationRead)
     summary(@Param("organizationId") organizationId: string) {
         return this.organizations.summary(organizationId);
+    }
+
+    /**
+     * Each module's true state for the business (U1, #989): on, off or
+     * locked, the gate in the way in words and what clears it, as the
+     * business's owner meets it. No support session: it carries no
+     * personal data.
+     */
+    // TODO(U25): scope — an Account manager reads only the businesses they
+    // manage (`scopeForStaff`, U18).
+    @Get("organizations/:organizationId/modules/state")
+    @RequireAdminPermission(AdminPermission.OrganizationRead)
+    moduleState(@Param("organizationId") organizationId: string) {
+        return this.businessModules.state(organizationId);
     }
 
     /**

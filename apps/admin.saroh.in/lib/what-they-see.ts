@@ -1,7 +1,9 @@
 import type {
+    BusinessModulesState,
     BusinessPlan,
     BusinessPresence,
     BusinessView,
+    Panel,
     PresenceAddress,
     SiteTrackersRow,
 } from "./businesses";
@@ -11,8 +13,9 @@ import { planLine } from "./plan-words";
 /**
  * "What they see" on the business page (owner, 9 Oct): what the merchant
  * can use now, one plain line per area, worded from what the API already
- * resolved for the page — the modules panel, the plan's catalogue rows,
- * the trackers panel and the presence panel. It decides nothing: an area
+ * resolved — each module's true state (`GET …/modules/state`, the check
+ * their own workspace runs), the plan's catalogue rows, the trackers panel
+ * and the presence panel. It decides nothing: an area
  * whose panel failed or is missing says so rather than guessing.
  * Client-safe (types only from `businesses`).
  */
@@ -25,20 +28,20 @@ export interface SeeLine {
 const UNKNOWN = "Couldn’t be read just now";
 
 /** The whole summary, in the order the panel shows it. */
-export function whatTheySee(view: BusinessView): SeeLine[] {
+export function whatTheySee(
+    view: BusinessView,
+    modules: Panel<BusinessModulesState>,
+): SeeLine[] {
     const plan = view.plan.status === "ok" ? view.plan.data : null;
     const presence = view.presence?.status === "ok" ? view.presence.data : null;
     const sites = view.sites?.status === "ok" ? view.sites.data : null;
+    const state = modules.status === "ok" ? modules.data : null;
     const lines: SeeLine[] = [
         { area: "Plan", text: plan ? planWords(plan) : UNKNOWN },
-        {
-            area: "Modules",
-            text:
-                view.modules.status === "ok"
-                    ? moduleWords(view.modules.data)
-                    : UNKNOWN,
-        },
+        { area: "Modules", text: state ? moduleWords(state) : UNKNOWN },
     ];
+    // Once for the business, never per module.
+    if (state?.note) lines.push({ area: "Plan limits", text: state.note });
     const locked = plan ? lockedWords(plan) : null;
     if (locked) lines.push({ area: "Not available to them", text: locked });
     lines.push(
@@ -65,19 +68,26 @@ export function planWords(plan: BusinessPlan): string {
         : "No plan — the free floor applies";
 }
 
-/** "On: Website, CRM. Off: Courses." from the business's own switches. */
-export function moduleWords(
-    modules: { label: string; status: string }[],
-): string {
-    const on = modules.filter((m) => m.status === "ENABLED");
-    const off = modules.filter((m) => m.status !== "ENABLED");
+/**
+ * "On: Website, CRM. Off: Bookings (release off for everyone). Locked:
+ * Courses (not in their plan)." — each module's true state with the API's
+ * reason, never only the business's own switch (a module whose release is
+ * off is Off, whatever they set).
+ */
+export function moduleWords(state: BusinessModulesState): string {
+    const on = state.modules.filter((m) => m.state === "on");
+    const off = state.modules.filter((m) => m.state === "off");
+    const locked = state.modules.filter((m) => m.state === "locked");
+    const withWhy = (m: BusinessModulesState["modules"][number]) =>
+        m.reason ? `${m.label} (${lowerFirst(m.reason)})` : m.label;
     const parts = [
         on.length > 0
             ? `On: ${on.map((m) => m.label).join(", ")}.`
-            : "None switched on.",
+            : "None on.",
     ];
-    if (off.length > 0) {
-        parts.push(`Off: ${off.map((m) => m.label).join(", ")}.`);
+    if (off.length > 0) parts.push(`Off: ${off.map(withWhy).join(", ")}.`);
+    if (locked.length > 0) {
+        parts.push(`Locked: ${locked.map(withWhy).join(", ")}.`);
     }
     return parts.join(" ");
 }

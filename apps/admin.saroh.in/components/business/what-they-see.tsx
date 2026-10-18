@@ -1,6 +1,11 @@
 import { ArrowUpRight } from "lucide-react";
 
-import type { BusinessPresence, BusinessView } from "@/lib/businesses";
+import type {
+    BusinessModulesState,
+    BusinessPresence,
+    BusinessView,
+    Panel,
+} from "@/lib/businesses";
 import { addressHost, addressLabel, whatTheySee } from "@/lib/what-they-see";
 
 import { Facts } from "../panel";
@@ -8,9 +13,16 @@ import { Facts } from "../panel";
 /**
  * "What they see" (owner, 9 Oct): a link to each live site, opening in a
  * new tab, and what the business can use now, one line per area. Built
- * only from what the business page's read already returned.
+ * only from what the API returned: the business page's read, and each
+ * module's true state (`getModuleState`), which it words and never decides.
  */
-export function WhatTheySee({ view }: { view: BusinessView }) {
+export function WhatTheySee({
+    view,
+    modules,
+}: {
+    view: BusinessView;
+    modules: Panel<BusinessModulesState>;
+}) {
     const presence = view.presence?.status === "ok" ? view.presence.data : null;
     return (
         <div className="grid gap-5">
@@ -25,7 +37,7 @@ export function WhatTheySee({ view }: { view: BusinessView }) {
                 )}
             </div>
             <Facts
-                rows={whatTheySee(view).map(
+                rows={whatTheySee(view, modules).map(
                     (line) => [line.area, line.text] as [string, string],
                 )}
             />

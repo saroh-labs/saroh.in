@@ -5200,3 +5200,13 @@ rule stands for the profile's own fields.
 **Fix.** A profile may also adopt a customer for a business its owner owns (OWNER membership) that is on no profile yet. Never one naming another profile, another owner's business or a business on another profile, nor one another profile holds (`billing/billing-customer.ts`, `isOwn`). The owner's memberships are read outside the business's RLS context (`outsideOrgContext`), because a checkout runs scoped to one business and Membership is isolated per business, so inside it only that business's membership would be seen. The fake provider now refuses the same email with no phone as Razorpay does.
 
 **Rule.** A read that spans an owner's businesses (memberships, anything org-isolated) is made with `outsideOrgContext`, and its spec runs one path scoped to a single business under `TEST_RLS=on`. A job runs with no context, so a job-only test passes either way (`docs/patterns/backend-data-and-money.md`, cross-business reads).
+
+### The console said a module was On while its release was off (18 Oct 2026)
+
+**Symptom.** A business page's "What they see" listed Bookings under "On" for a business whose Bookings release was off for everyone: the business saw no Bookings, and the operator was told it had them. A module outside their plan with plan limits enforced read On the same way.
+
+**Cause.** The console worded only the business's own switch (`OrganizationModule.status` in the business page's `modules` panel). Whether a business can use a module is `ModuleAvailabilityService.evaluate()`: the release, their switch, the project, the plan and readiness, in that order. The console re-derived the answer from one of those gates.
+
+**Fix.** `GET /admin/organizations/:id/modules/state` (`admin/admin-business-modules.service.ts`, `organization:read`, no support session) runs `evaluate()` for every module that isn't hidden, as the business's owner role, and returns On, Off or Locked with the gate in the way, its reason in words, the fix, dependencies as information, and "Plan limits not enforced yet" once per business. `lib/what-they-see.ts` only words that answer. Hidden modules are left out by `moduleHidden` in `capabilities/module-registry.ts`, the source `moduleRolledOut` reads.
+
+**Rule.** A console or app screen that says whether a business can use a module reads `evaluate()`'s answer through the API, never one gate's row; dependencies are information, never a blocker the workspace doesn't enforce (`.agents/skills/saroh-module-capability/SKILL.md` › Rules; `admin-business-modules.db.spec.ts` checks the release-off case).

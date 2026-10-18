@@ -12,6 +12,7 @@ import { REQUIRE_ADMIN_PERMISSIONS } from "../../common/decorators/require-admin
 import { AdminPermission } from "./admin-permissions";
 import { AdminController } from "./admin.controller";
 import { AdminModule } from "./admin.module";
+import { ORGANIZATION_ACCESS_INTENT } from "./organization-access-session.guard";
 
 /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access */
 
@@ -184,6 +185,16 @@ describe("Admin console permission assignments", () => {
             ]);
         },
     );
+
+    it("reads a business's module state with Organization read, no support session", () => {
+        expect(perms("moduleState")).toEqual([
+            AdminPermission.OrganizationRead,
+        ]);
+        const route = routeHandlers().find((r) => r.name === "moduleState");
+        expect(
+            Reflect.getMetadata(ORGANIZATION_ACCESS_INTENT, route!.handler),
+        ).toBeUndefined();
+    });
 
     it("keeps the business page behind view-as", () => {
         expect(perms("viewOrganization")).toEqual([

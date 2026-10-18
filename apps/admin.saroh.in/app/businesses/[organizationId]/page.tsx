@@ -39,14 +39,17 @@ import {
     RemoveMember,
 } from "@/components/people/person-actions";
 import type {
+    BusinessModulesState,
     BusinessPlan,
     BusinessRow,
     BusinessView,
+    Panel as PanelResult,
     PlanOption,
 } from "@/lib/businesses";
 import {
     getBusinessSummary,
     getBusinessView,
+    getModuleState,
     listPlans,
 } from "@/lib/businesses";
 import { can, requireStaff } from "@/lib/console";
@@ -102,7 +105,12 @@ export default async function BusinessPage({
     if (!summary) notFound();
 
     const canViewAs = can(staff, "organization:view-as");
-    const result = canViewAs ? await getBusinessView(organizationId) : null;
+    const [result, moduleState] = canViewAs
+        ? await Promise.all([
+              getBusinessView(organizationId),
+              getModuleState(organizationId),
+          ])
+        : [null, null];
 
     return (
         <AdminShell staff={staff}>
@@ -134,6 +142,7 @@ export default async function BusinessPage({
                     <Business
                         staff={staff}
                         view={result.view}
+                        moduleState={moduleState ?? { status: "failed" }}
                         plans={
                             can(staff, "subscription:read")
                                 ? ((await listPlans().catch(() => null)) ?? [])
@@ -191,10 +200,12 @@ function SummaryStrip({ summary }: { summary: BusinessRow }) {
 function Business({
     staff,
     view,
+    moduleState,
     plans,
 }: {
     staff: StaffIdentity;
     view: BusinessView;
+    moduleState: PanelResult<BusinessModulesState>;
     plans: PlanOption[];
 }) {
     const { facts } = view;
@@ -224,7 +235,7 @@ function Business({
                     title="What they see"
                     description="Their live site, and what they can use now."
                 >
-                    {() => <WhatTheySee view={view} />}
+                    {() => <WhatTheySee view={view} modules={moduleState} />}
                 </Panel>
 
                 <Panel

@@ -27,6 +27,7 @@ import { AdminBillingControlsController } from "./admin-billing-controls.control
 import { AdminBillingControlsService } from "./admin-billing-controls.service";
 import { AdminBillingController } from "./admin-billing.controller";
 import { AdminBillingService } from "./admin-billing.service";
+import { AdminBusinessModulesService } from "./admin-business-modules.service";
 import { AdminBusinessReportsController } from "./admin-business-reports.controller";
 import { AdminBusinessReportsService } from "./admin-business-reports.service";
 import { AdminContactMessagesController } from "./admin-contact-messages.controller";
@@ -118,6 +119,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminAuditService,
         AdminMetricsService,
         AdminOrganizationViewService,
+        AdminBusinessModulesService,
         AdminOrganizationsService,
         AdminLifecycleService,
         AdminOverridesService,

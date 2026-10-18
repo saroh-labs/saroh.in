@@ -7,7 +7,7 @@ import { OperatorDialog } from "../operator-dialog";
 /**
  * Turn one module on or off for a business, under the same dependency and
  * safe-deactivation rules its owner meets. When a rule blocks it, the API's
- * reason — "disable Appointments first", "3 open orders" — is what shows.
+ * reason — "disable Bookings first", "3 open orders" — is what shows.
  */
 export function ModuleToggle({
     organizationId,

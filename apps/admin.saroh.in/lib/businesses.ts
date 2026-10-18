@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 
+import type { AdminPermission } from "./control-plane";
 import { adminFetch, getJson } from "./control-plane";
 import type { EffectivePlan, UsageNote } from "./plan-words";
 
@@ -375,6 +376,52 @@ export function getBusinessSummary(id: string): Promise<BusinessRow | null> {
     return getJson<BusinessRow>(
         `/organizations/${encodeURIComponent(id)}/summary`,
     );
+}
+
+/** A module's true state for the business (API U1, #989). */
+export interface BusinessModuleState {
+    moduleKey: string;
+    label: string;
+    state: "on" | "off" | "locked";
+    /** The gate (or setup step) in the way; null when none. */
+    blocker: string | null;
+    /** Why, in words, as the API words it; null when nothing is in the way. */
+    reason: string | null;
+    fix: {
+        kind: "release" | "switch-on" | "plan" | "merchant";
+        label: string;
+        permission?: AdminPermission;
+        flagKey?: string;
+    } | null;
+    /** Modules this one needs on first. Information, never a gate. */
+    dependencies: { moduleKey: string; label: string; on: boolean }[];
+}
+
+export interface BusinessModulesState {
+    organizationId: string;
+    planLimitsEnforced: boolean;
+    /** Once per business ("Plan limits not enforced yet"), never per row. */
+    note: string | null;
+    modules: BusinessModuleState[];
+}
+
+/**
+ * Each module's true state for one business: the availability check the
+ * business's own workspace runs, as its owner meets it — not only their own
+ * switch. Needs `organization:read`, no support session. A refusal or an
+ * outage is a failed panel, never a guess.
+ */
+export async function getModuleState(
+    organizationId: string,
+): Promise<Panel<BusinessModulesState>> {
+    try {
+        const data = await getJson<BusinessModulesState>(
+            `/organizations/${encodeURIComponent(organizationId)}/modules/state`,
+        );
+        return data ? { status: "ok", data } : { status: "failed" };
+    } catch {
+        return { status: "failed" };
+    }
 }
 
 export function listPlans(): Promise<PlanOption[] | null> {
