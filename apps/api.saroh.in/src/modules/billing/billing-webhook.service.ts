@@ -833,9 +833,34 @@ export class BillingWebhookService {
             if (!sub) return { result: { status: "ignored", changed: false } };
             // The same plan again at its term's end (DEC-093's one-tap
             // renewal): the term running now finishes on its own — its last
-            // charges are still owed — so nothing is told to stop.
+            // charges are still owed — so nothing is told to stop. The
+            // same plan on another billing profile (U6) is no renewal: the
+            // old profile's autopay must end with its period, or both
+            // would charge.
+            const billedTo = await tx.organization.findUnique({
+                where: { id: org },
+                select: { billingProfileId: true },
+            });
+            // A profile deleted since (its owner deleted their account)
+            // took the business's pointer with it: a checkout on it while
+            // the business is on no profile was made on the profile the
+            // business was billed to, so it moves nothing. One on it while
+            // the business is on another still moves the payer: the old
+            // autopay must end.
+            const target = checkout.billingProfileId
+                ? await tx.billingProfile.findUnique({
+                      where: { id: checkout.billingProfileId },
+                      select: { id: true },
+                  })
+                : null;
+            const switching =
+                Boolean(checkout.billingProfileId) &&
+                checkout.billingProfileId !== billedTo?.billingProfileId &&
+                (Boolean(target) || Boolean(billedTo?.billingProfileId));
             const renewal =
-                sub.plan.key === plan.key && sub.billingCycle === cycle;
+                !switching &&
+                sub.plan.key === plan.key &&
+                sub.billingCycle === cycle;
             await tx.billingCheckout.update({
                 where: { id: checkout.id },
                 data: { status: "SCHEDULED" },

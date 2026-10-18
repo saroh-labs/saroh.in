@@ -228,6 +228,15 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         );
     });
 
+    it("the 18 Oct entry joins the sitemap on its day", () => {
+        expect(indexedPaths("waitlist", after)).not.toContain(
+            "/changelog/products-tidied-up",
+        );
+        expect(indexedPaths("waitlist", at("2026-10-17T18:31:00Z"))).toContain(
+            "/changelog/products-tidied-up",
+        );
+    });
+
     it("a preview shows unpublished pages", () => {
         const preview = { ...before, preview: true };
         expect(shownResources(preview).map((p) => p.id)).toContain("help");

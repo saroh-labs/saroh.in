@@ -7,6 +7,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
+import { BillingProfilePanel } from "@/components/settings/plan-billing/billing-profile-panel";
 import { CurrentPlanCard } from "@/components/settings/plan-billing/current-plan-card";
 import { HowBillingWorks } from "@/components/settings/plan-billing/how-billing-works";
 import { OldPlanLink } from "@/components/settings/plan-billing/old-plan-link";
@@ -28,6 +29,7 @@ import { planMessage } from "@/lib/saroh-billing/plan-status";
 import { addonRows, yourPlan } from "@/lib/saroh-billing/plan-view";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import {
+    getBillingProfileView,
     getPlanUsage,
     listAddons,
     listSarohInvoices,
@@ -50,6 +52,10 @@ import { requireSession } from "@/lib/session";
  * person to a page that turns them away. Someone who may read but not
  * change (an Admin) sees the plan and the invoices with no button to press,
  * that only the owner can, and a link to read Saroh's plans.
+ *
+ * Who Saroh bills (DEC-167, U5) is the owner's alone: its row is read and
+ * drawn only for whoever may change the plan, and an Admin sees nothing of
+ * a billing profile (R2, AE6).
  *
  * Reads degrade per source: the plan and access are the page (a failure is
  * the section's boundary); the price list, invoices, add-ons and checkouts
@@ -108,11 +114,14 @@ export default async function PlanBillingPage({
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
 
-    const [basics, invoices, addons, usage] = await Promise.all([
+    const [basics, invoices, addons, usage, billedTo] = await Promise.all([
         readPlanBasics(),
         settle(listSarohInvoices()),
         settle(listAddons()),
         getPlanUsage(),
+        canChange
+            ? settle(getBillingProfileView())
+            : Promise.resolve(undefined),
     ]);
     if (basics === null) {
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
@@ -203,6 +212,11 @@ export default async function PlanBillingPage({
                             <Link href={PLANS_HREF}>{planLabel()}</Link>
                         </Button>
                     </p>
+                ) : null}
+                {billedTo === null ? (
+                    <BillingProfilePanel view={null} />
+                ) : billedTo?.status === "ok" && billedTo.data ? (
+                    <BillingProfilePanel view={billedTo.data} />
                 ) : null}
                 <HowBillingWorks
                     notes={rest}

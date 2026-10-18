@@ -34,9 +34,66 @@ export async function seedFounder(prisma: Db): Promise<string> {
             password: await hashPassword(seedPassword()),
         },
     });
-    await seedFirstRuns(prisma, founder.id, "first-run", FIRST_RUNS);
-    await seedFirstRuns(prisma, founder.id, "site-start", SITE_STARTS);
+    const billingProfileId = await seedFounderBillingProfile(
+        prisma,
+        founder.id,
+    );
+    await seedFirstRuns(
+        prisma,
+        founder.id,
+        "first-run",
+        FIRST_RUNS,
+        billingProfileId,
+    );
+    await seedFirstRuns(
+        prisma,
+        founder.id,
+        "site-start",
+        SITE_STARTS,
+        billingProfileId,
+    );
     return founder.id;
+}
+
+/**
+ * Asha's billing profile (DEC-167): who Saroh bills for her seeded
+ * businesses. With one, every business she sets up asks who Saroh bills
+ * for it (R7), on every run alike, as it does any owner who has a
+ * business already: setup's specs walk that step, and
+ * `billing-profile-new-business.spec.ts` makes a new profile there. No
+ * customer at the billing provider: the seed queues no job.
+ */
+async function seedFounderBillingProfile(
+    prisma: Db,
+    userId: string,
+): Promise<string> {
+    const details = {
+        legalName: "Asha Rao",
+        gstState: "29",
+        addressLine1: "14 Church Street",
+        city: "Bengaluru",
+        postalCode: "560001",
+    };
+    const profile = await prisma.billingProfile.upsert({
+        // By her and the email, not the id: a run that set a business up
+        // before this seed had a profile made for her from it.
+        where: {
+            ownerUserId_billingEmail: {
+                ownerUserId: userId,
+                billingEmail: FOUNDER_EMAIL,
+            },
+        },
+        update: details,
+        create: {
+            id: id("billingprofile", "founder"),
+            ownerUserId: userId,
+            ...details,
+            billingEmail: FOUNDER_EMAIL,
+            provider: "RAZORPAY",
+        },
+        select: { id: true },
+    });
+    return profile.id;
 }
 
 /**
@@ -72,17 +129,19 @@ async function seedFirstRuns(
     userId: string,
     set: string,
     runs: readonly { key: string; kind: string; name: string }[],
+    billingProfileId: string,
 ): Promise<void> {
     for (const run of runs) {
         const orgId = id("org", set, run.key);
         await prisma.organization.upsert({
             where: { id: orgId },
-            update: { name: run.name, kind: run.kind },
+            update: { name: run.name, kind: run.kind, billingProfileId },
             create: {
                 id: orgId,
                 name: run.name,
                 slug: `${set}-${run.key}`,
                 kind: run.kind,
+                billingProfileId,
             },
         });
         await prisma.membership.upsert({

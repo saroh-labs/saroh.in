@@ -822,6 +822,7 @@ fi
 # that goes through turbo first waits for one build of what the affected
 # packages import (test_deps), then runs with --only, so no two turbo runs
 # ever build the same package at the same time.
+bg_step branch-base pnpm run check:branch-base
 bg_step routes pnpm run check:routes
 bg_step catalog-lock pnpm run check:catalog-lock
 bg_step edge-headers pnpm run check:edge-headers
@@ -922,7 +923,11 @@ replay() {
     dropdb --if-exists --force --maintenance-db="$rmaint" "$rdb" &&
         createdb --maintenance-db="$rmaint" "$rdb" &&
         DATABASE_URL="$REPLAY_DATABASE_URL" DATABASE_TARGET_CONFIRM="$rdb" \
-            pnpm --filter @saroh/database db:verify:replay
+            pnpm --filter @saroh/database db:verify:replay &&
+        # Then, on the same database rebuilt to just before it, the billing
+        # profiles migration's data move against rows (DEC-167): the replay
+        # runs it on an empty database, where none of its rules meet a row.
+        MIGFOLD_DATABASE_URL="$REPLAY_DATABASE_URL" pnpm run check:migration-fold
 }
 if echo "$CHANGED" | grep "^packages/database/prisma/" >/dev/null; then
     case "${REPLAY_DATABASE_URL:-}" in

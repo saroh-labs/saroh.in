@@ -1,34 +1,51 @@
-// Who Saroh bills, before it charges (17 Oct 2026): what is missing, and a
-// checkout refused by field until it's given. Pure; made-up businesses.
-import type { BillingParty, BillingProfile } from "./billing-details";
+// Who Saroh bills, before it charges (17 Oct 2026): the business's billing
+// profile (DEC-167), what is missing on it, and a checkout refused by field
+// until it's given. Pure; made-up businesses and profiles.
+import type { BilledProfile, BillingParty } from "./billing-details";
 import {
     addressComplete,
     checkoutDetails,
     missingBillingDetails,
 } from "./billing-details";
 
-const wholeProfile: BillingProfile = {
+const wholeProfile: BilledProfile = {
+    id: "bp_1",
     legalName: "Rye Bakes LLP",
-    contactEmail: null,
+    billingEmail: "accounts@example.com",
     phone: null,
-    taxId: null,
+    gstin: null,
     gstState: "29",
     addressLine1: "3 Hill Road",
     addressLine2: null,
     city: "Bengaluru",
     postalCode: "560038",
+    providerCustomerId: null,
 };
 
 const party = (over: Partial<BillingParty> = {}): BillingParty => ({
     profile: wholeProfile,
     orgName: "Rye",
-    userEmail: "owner@example.com",
-    userName: "Asha",
+    orgSlug: "rye",
     ...over,
 });
 
-const withProfile = (p: Partial<BillingProfile> | null): BillingParty =>
-    party({ profile: p ? { ...wholeProfile, ...p } : null });
+const withProfile = (p: Partial<BilledProfile>): BillingParty =>
+    party({ profile: { ...wholeProfile, ...p } });
+
+/** A profile with nothing on it but what the database requires (blank). */
+const emptyProfile = withProfile({
+    legalName: " ",
+    billingEmail: "",
+    gstState: null,
+    addressLine1: null,
+    city: null,
+    postalCode: null,
+});
+
+const NO_STATE = { state: null, gstin: null };
+
+/** A real-shaped GSTIN for Karnataka (29) that checks out. */
+const GSTIN_29 = "29ABCDE1234F1Z5";
 
 /** The refusal's `details`, or null when nothing was refused. */
 function refusal(fn: () => unknown): {
@@ -54,33 +71,25 @@ function refusal(fn: () => unknown): {
 }
 
 describe("missingBillingDetails", () => {
-    it("is nothing for a business with a name, email, whole address and state", () => {
+    it("is nothing for a profile with a name, email, whole address and state", () => {
         expect(missingBillingDetails(party())).toEqual([]);
     });
 
-    it("takes the business's name when there is no legal name, and the contact email when the owner has none", () => {
-        expect(
-            missingBillingDetails(
-                party({
-                    profile: {
-                        ...wholeProfile,
-                        legalName: " ",
-                        contactEmail: "hello@example.com",
-                    },
-                    userEmail: null,
-                }),
-            ),
-        ).toEqual([]);
+    it("takes the business's name when the profile's legal name is blank", () => {
+        expect(missingBillingDetails(withProfile({ legalName: " " }))).toEqual(
+            [],
+        );
+    });
+
+    it("a business with no billing profile is missing only that", () => {
+        expect(missingBillingDetails(party({ profile: null }))).toEqual([
+            "profile",
+        ]);
     });
 
     it("names each thing missing, in the form's order", () => {
         expect(
-            missingBillingDetails({
-                profile: null,
-                orgName: null,
-                userEmail: null,
-                userName: null,
-            }),
+            missingBillingDetails({ ...emptyProfile, orgName: null }),
         ).toEqual(["name", "email", "address", "state"]);
         expect(missingBillingDetails(withProfile({ gstState: null }))).toEqual([
             "state",
@@ -101,35 +110,53 @@ describe("missingBillingDetails", () => {
 
 describe("checkoutDetails", () => {
     it("asks nothing of a business that has it all, and keeps nothing", () => {
-        expect(checkoutDetails(party(), {}, null)).toEqual({
+        expect(checkoutDetails(party(), {}, NO_STATE)).toEqual({
             profile: {},
-            billToEmail: null,
-            billToPhone: null,
+        });
+    });
+
+    it("refuses a business with no billing profile first, whatever was sent", () => {
+        expect(
+            refusal(() =>
+                checkoutDetails(
+                    party({ profile: null }),
+                    {
+                        billingName: "Rye",
+                        billingEmail: "a@example.com",
+                        registeredAddress: {
+                            line1: "4 Mill Road",
+                            city: "Pune",
+                            postalCode: "411001",
+                        },
+                    },
+                    { state: "27", gstin: null },
+                ),
+            ),
+        ).toEqual({
+            status: 400,
+            field: "billing-profile",
+            missing: ["profile"],
         });
     });
 
     it("refuses, by field and with a 400, each thing missing", () => {
-        const none: BillingParty = {
-            profile: null,
-            orgName: null,
-            userEmail: null,
-            userName: null,
-        };
-        expect(refusal(() => checkoutDetails(none, {}, null))).toEqual({
+        const none: BillingParty = { ...emptyProfile, orgName: null };
+        expect(refusal(() => checkoutDetails(none, {}, NO_STATE))).toEqual({
             status: 400,
             field: "billingName",
             missing: ["name", "email", "address", "state"],
         });
         expect(
-            refusal(() => checkoutDetails(none, { billingName: "Rye" }, null))
-                ?.field,
+            refusal(() =>
+                checkoutDetails(none, { billingName: "Rye" }, NO_STATE),
+            )?.field,
         ).toBe("billingEmail");
         expect(
             refusal(() =>
                 checkoutDetails(
                     none,
                     { billingName: "Rye", billingEmail: "not-an-email" },
-                    null,
+                    NO_STATE,
                 ),
             )?.field,
         ).toBe("billingEmail");
@@ -138,7 +165,7 @@ describe("checkoutDetails", () => {
                 checkoutDetails(
                     none,
                     { billingName: "Rye", billingEmail: "a@example.com" },
-                    null,
+                    NO_STATE,
                 ),
             )?.field,
         ).toBe("addressLine1");
@@ -147,24 +174,19 @@ describe("checkoutDetails", () => {
                 checkoutDetails(
                     withProfile({ city: null }),
                     { registeredAddress: { line1: "3 Hill Road" } },
-                    null,
+                    NO_STATE,
                 ),
             )?.field,
         ).toBe("city");
         expect(
             refusal(() =>
-                checkoutDetails(withProfile({ gstState: null }), {}, null),
+                checkoutDetails(withProfile({ gstState: null }), {}, NO_STATE),
             )?.field,
         ).toBe("billingState");
     });
 
-    it("keeps what was missing and given: the address, state and name on the profile, an email on the checkout", () => {
-        const none: BillingParty = {
-            profile: null,
-            orgName: null,
-            userEmail: null,
-            userName: null,
-        };
+    it("keeps everything missing and given on the billing profile", () => {
+        const none: BillingParty = { ...emptyProfile, orgName: null };
         expect(
             checkoutDetails(
                 none,
@@ -176,21 +198,51 @@ describe("checkoutDetails", () => {
                         city: "Pune",
                         postalCode: "411 001",
                     },
+                    phone: "+91 98450-12345",
                 },
-                "27",
+                { state: "27", gstin: null },
             ),
         ).toEqual({
             profile: {
                 legalName: "Rye Bakes LLP",
+                billingEmail: "owner@example.com",
                 addressLine1: "4 Mill Road",
                 addressLine2: null,
                 city: "Pune",
                 postalCode: "411001",
                 gstState: "27",
+                phone: "+919845012345",
             },
-            billToEmail: "owner@example.com",
-            billToPhone: null,
         });
+    });
+
+    it("a GSTIN given replaces the profile's, with its state", () => {
+        expect(
+            checkoutDetails(
+                withProfile({ gstState: "27", gstin: null }),
+                {},
+                { state: "29", gstin: GSTIN_29 },
+            ).profile,
+        ).toEqual({ gstin: GSTIN_29, gstState: "29" });
+        expect(
+            checkoutDetails(
+                withProfile({ gstin: GSTIN_29 }),
+                {},
+                { state: "29", gstin: GSTIN_29 },
+            ).profile,
+        ).toEqual({});
+    });
+
+    it("a state given that disagrees with the profile's GSTIN is refused", () => {
+        expect(
+            refusal(() =>
+                checkoutDetails(
+                    withProfile({ gstin: GSTIN_29 }),
+                    {},
+                    { state: "27", gstin: null },
+                ),
+            ),
+        ).toMatchObject({ status: 400, field: "billingState" });
     });
 
     it("never takes a name, address or state over the ones the business has", () => {
@@ -205,26 +257,27 @@ describe("checkoutDetails", () => {
                         postalCode: "110001",
                     },
                 },
-                "07",
+                NO_STATE,
             ).profile,
         ).toEqual({});
     });
 
-    it("a phone is optional, kept when the business has none, and checked when given", () => {
+    it("a phone is optional, kept when the profile has none, and checked when given", () => {
         expect(
-            checkoutDetails(party(), { phone: "+91 98450-12345" }, null)
-                .billToPhone,
+            checkoutDetails(party(), { phone: "+91 98450-12345" }, NO_STATE)
+                .profile.phone,
         ).toBe("+919845012345");
         expect(
-            refusal(() => checkoutDetails(party(), { phone: "98450" }, null))
-                ?.field,
+            refusal(() =>
+                checkoutDetails(party(), { phone: "98450" }, NO_STATE),
+            )?.field,
         ).toBe("phone");
         expect(
             checkoutDetails(
                 withProfile({ phone: "+919800000000" }),
                 { phone: "+919845012345" },
-                null,
-            ).billToPhone,
-        ).toBeNull();
+                NO_STATE,
+            ).profile.phone,
+        ).toBeUndefined();
     });
 });

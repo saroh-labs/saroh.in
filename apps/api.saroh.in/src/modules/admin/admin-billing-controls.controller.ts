@@ -118,7 +118,7 @@ export class AdminBillingControlsController {
         @Body() dto: OperatorReasonDto,
     ) {
         return this.once(
-            "billing.customer.sync",
+            "billing.profile.sync",
             staff,
             organizationId,
             dto,

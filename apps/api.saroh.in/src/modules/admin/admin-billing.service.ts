@@ -162,13 +162,24 @@ export interface AdminSubscriptionPage {
 
 export interface AdminSubscriptionDetail {
     subscription: AdminSubscriptionRow;
-    /** The business as the provider's customer (DEC-165), and its sync. */
-    billingCustomer: {
+    /**
+     * Who Saroh bills the business to (DEC-167): its billing profile, the
+     * profile's customer at the provider and its sync, and the other
+     * businesses billed to the same profile. Null for a business that
+     * hasn't chosen one yet.
+     */
+    billingProfile: {
+        id: string;
+        legalName: string;
+        billingEmail: string;
+        gstin: string | null;
         provider: string;
         providerCustomerId: string | null;
         syncedAt: string | null;
         lastError: string | null;
         contactWithheld: boolean;
+        /** The other businesses on the profile, by name. */
+        otherBusinesses: { id: string; name: string }[];
     } | null;
     /** Its last invoices, with their refunds (DEC-166). */
     invoices: AdminInvoiceRow[];
@@ -457,51 +468,61 @@ export class AdminBillingService {
     }
 
     /**
-     * What the sheet shows beyond the subscription (DEC-166): the provider
-     * customer and its sync, the last 12 invoices with their refunds,
+     * What the sheet shows beyond the subscription (DEC-166): the billing
+     * profile with its provider customer and sync (DEC-167), the last 12 invoices with their refunds,
      * every refund and dispute, and the double charges owed or refunded.
      */
     private async detailExtra(organizationId: string) {
-        const [customer, invoices, refunds, claims, actions] =
-            await Promise.all([
-                prisma.billingCustomer.findFirst({
-                    where: { organizationId },
-                    orderBy: { createdAt: "asc" },
-                }),
-                prisma.sarohInvoice.findMany({
-                    where: { organizationId },
-                    orderBy: [{ issuedAt: "desc" }, { number: "desc" }],
-                    take: 12,
-                    include: { organization: ORG_BRIEF },
-                }),
-                prisma.billingRefund.findMany({
-                    where: { organizationId },
-                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                    take: 50,
-                }),
-                prisma.adminAuditEvent.findMany({
-                    where: {
-                        organizationId,
-                        action: {
-                            in: [REFUND_AUDIT_ACTION, REFUNDED_AUDIT_ACTION],
+        const [org, invoices, refunds, claims, actions] = await Promise.all([
+            prisma.organization.findUnique({
+                where: { id: organizationId },
+                select: {
+                    billingProfile: {
+                        include: {
+                            organizations: {
+                                where: { id: { not: organizationId } },
+                                orderBy: [{ name: "asc" }, { id: "asc" }],
+                                take: 50,
+                                select: { id: true, name: true },
+                            },
                         },
                     },
-                    orderBy: { createdAt: "asc" },
-                    take: 100,
-                    select: {
-                        action: true,
-                        targetId: true,
-                        reason: true,
-                        metadata: true,
-                        createdAt: true,
+                },
+            }),
+            prisma.sarohInvoice.findMany({
+                where: { organizationId },
+                orderBy: [{ issuedAt: "desc" }, { number: "desc" }],
+                take: 12,
+                include: { organization: ORG_BRIEF },
+            }),
+            prisma.billingRefund.findMany({
+                where: { organizationId },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                take: 50,
+            }),
+            prisma.adminAuditEvent.findMany({
+                where: {
+                    organizationId,
+                    action: {
+                        in: [REFUND_AUDIT_ACTION, REFUNDED_AUDIT_ACTION],
                     },
-                }),
-                prisma.billingAction.findMany({
-                    where: { organizationId, resolvedAt: null },
-                    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-                    take: 25,
-                }),
-            ]);
+                },
+                orderBy: { createdAt: "asc" },
+                take: 100,
+                select: {
+                    action: true,
+                    targetId: true,
+                    reason: true,
+                    metadata: true,
+                    createdAt: true,
+                },
+            }),
+            prisma.billingAction.findMany({
+                where: { organizationId, resolvedAt: null },
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                take: 25,
+            }),
+        ]);
         const refundRows = refunds.map(refundRow);
         const byInvoice = new Map<string, AdminRefundRow[]>();
         for (const r of refundRows) {
@@ -512,15 +533,7 @@ export class AdminBillingService {
             ]);
         }
         return {
-            billingCustomer: customer
-                ? {
-                      provider: customer.provider,
-                      providerCustomerId: customer.providerCustomerId,
-                      syncedAt: customer.syncedAt?.toISOString() ?? null,
-                      lastError: customer.lastError,
-                      contactWithheld: customer.contactWithheld,
-                  }
-                : null,
+            billingProfile: profileOf(org?.billingProfile ?? null),
             invoices: invoices.map((r) =>
                 invoiceRow(r, byInvoice.get(r.id) ?? []),
             ),
@@ -707,14 +720,37 @@ export function invoiceWhere(
     return { AND: and };
 }
 
+function profileOf(
+    p:
+        | (Prisma.BillingProfileGetPayload<object> & {
+              organizations: { id: string; name: string }[];
+          })
+        | null,
+): AdminSubscriptionDetail["billingProfile"] {
+    if (!p) return null;
+    return {
+        id: p.id,
+        legalName: p.legalName,
+        billingEmail: p.billingEmail,
+        gstin: p.gstin,
+        provider: p.provider,
+        providerCustomerId: p.providerCustomerId,
+        syncedAt: p.syncedAt?.toISOString() ?? null,
+        lastError: p.lastError,
+        contactWithheld: p.contactWithheld,
+        otherBusinesses: p.organizations,
+    };
+}
+
 /** A billing provider's id: Razorpay's pay_, sub_, cust_, order_, rfnd_. */
 export const PROVIDER_ID =
     /^(pay|sub|cust|order|rfnd|inv|disp)_[A-Za-z0-9]{4,40}$/;
 
 /**
  * The subscriptions search (DEC-166): a provider id finds the subscription
- * that carries it, or the business whose checkout, customer or invoice
- * does; anything else is a business's name or slug.
+ * that carries it, or the business whose checkout or invoice does; a
+ * customer id also finds every business billed to the billing profile that
+ * holds it (DEC-167); anything else is a business's name or slug.
  */
 export function subscriptionSearch(
     raw: string | undefined,
@@ -738,9 +774,10 @@ export function subscriptionSearch(
                         },
                     },
                 },
+                // The profile's customer: every business billed to it.
                 {
                     organization: {
-                        billingCustomers: { some: { providerCustomerId: q } },
+                        billingProfile: { providerCustomerId: q },
                     },
                 },
                 {

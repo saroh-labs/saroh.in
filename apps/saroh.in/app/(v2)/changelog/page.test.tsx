@@ -66,6 +66,59 @@ describe("changelogView", () => {
             expect(view.entries.map((e) => e.slug)).toEqual(["saroh-is-open"]);
         }
     });
+
+    it("adds the 18 Oct entry on its day in India, newest first", () => {
+        // 23:59 and 00:01 in India, the night of 17–18 Oct.
+        const before = changelogView(ctx("2026-10-17T18:29:00Z"));
+        const after = changelogView(ctx("2026-10-17T18:31:00Z"));
+        if (before.state !== "entries" || after.state !== "entries") {
+            throw new Error("expected entries");
+        }
+        expect(before.entries.map((e) => e.slug)).toEqual(["saroh-is-open"]);
+        expect(after.entries.map((e) => e.slug)).toEqual([
+            "products-tidied-up",
+            "saroh-is-open",
+        ]);
+    });
+});
+
+describe("entries", () => {
+    const words = (e: (typeof CHANGELOG_ENTRIES)[number]) =>
+        [
+            e.title,
+            e.summary,
+            e.lead,
+            e.description,
+            ...e.sections.flatMap((s) => [s.name, s.body, s.link?.label]),
+        ].join("\n");
+
+    it("have one slug each, and list newest first in the file", () => {
+        const slugs = CHANGELOG_ENTRIES.map((e) => e.slug);
+        expect(new Set(slugs).size).toBe(slugs.length);
+        const days = CHANGELOG_ENTRIES.map((e) => e.publishOn);
+        expect(days).toEqual([...days].sort().reverse());
+    });
+
+    it("say location, never storefront, with no em dash or exclamation", () => {
+        for (const e of CHANGELOG_ENTRIES) {
+            expect(words(e)).not.toMatch(/storefront|\bstores?\b|—|!/i);
+        }
+    });
+
+    it("name no price, plan or Saroh billing (owner, 18 Oct)", () => {
+        const entry = CHANGELOG_ENTRIES.find(
+            (e) => e.slug === "products-tidied-up",
+        );
+        expect(entry).toBeTruthy();
+        if (!entry) return;
+        expect(words(entry)).not.toMatch(
+            /₹|\bplans?\b|\bgrow\b|\bpro\b|refund|cancel|subscription|admin|demo|billing details/i,
+        );
+        // Every link is a page of the site's own.
+        for (const s of entry.sections) {
+            if (s.link) expect(s.link.href).toMatch(/^\/features\//);
+        }
+    });
 });
 
 describe("/changelog", () => {

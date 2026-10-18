@@ -67,12 +67,12 @@ Two kinds of switch decide many rows:
 
 | Status     | Rows |
 | ---------- | ---: |
-| Backed     |  139 |
+| Backed     |  146 |
 | Fixed      |  106 |
 | Partly     |   28 |
 | Not backed |    9 |
 | Planned    |   17 |
-| **Total**  |  299 |
+| **Total**  |  306 |
 
 Before the rewrites: 83 Backed, 81 Partly, 27 Not backed (191). Four rows
 were added for the new Insights copy (IN13–IN16). Two rows (SO5, SO10) only
@@ -90,7 +90,8 @@ read what the image shows; two copy questions in §10 are still open.
 Forty-five rows were added on 12 Oct 2026 for the Website page, the
 Salons page and the search titles (§16): thirty-five Backed, five Partly
 and five Not backed, the last five being what was asked for and left off
-the pages.
+the pages. Seven rows were added on 18 Oct 2026 for the
+changelog's second entry (CL11–CL17, §12), all Backed.
 
 What is still Partly or Not backed: the online shop (D5: H12, H19, PR1,
 PR4, PR12, OR1, SO1, SO2, SO7, F7), the Insights data pipeline (IN13, IN14,
@@ -628,7 +629,7 @@ removed and the row says the decision is still open.
   knowing what to bake" and "Fill tomorrow's 7am class" are kept: they
   claim nothing about when Saroh opens.
 
-## 12. Resources: Changelog (`/changelog`, `/changelog/saroh-is-open`)
+## 12. Resources: Changelog (`/changelog`, `/changelog/saroh-is-open`, `/changelog/products-tidied-up`)
 
 The launch entry (plan U4, `apps/saroh.in/content/changelog.ts`) publishes
 on 17 Oct 2026 (`publishOn`). Its design copy repeated claims this ledger
@@ -648,6 +649,26 @@ never a number in the repo.
 | CL8  | Website: "Start from a template made for your kind of business" + "See templates"                                                     | `@saroh/templates` gallery templates (U13)                                                                | Fixed  | "Start from a template…" + "See templates" (shown with `/templates`); "made for your kind" not claimed: no salon yet                                                                            |
 | CL9  | "On the waitlist? Your invite is in your email, with your first 3 months of Grow free."                                               | `GET /public/waitlist/offer`                                                                              | Backed | The API's plan and days; without an offer, "Your invite is in your email."                                                                                                                      |
 | CL10 | Coming next and the Integrations page's planned list: "CSV import, Jan–Mar 2027: bring products and customers in from a spreadsheet." | `imports/entities.ts` (products, customers), `components/stores/csv-import.tsx`; built 30 Aug 2026 (#175) | Fixed  | Dropped from both planned lists (#816); the launch entry's "Bring your lists in": "…Bring them in from a CSV file: match its columns, see what will be added, updated or skipped, then import." |
+
+**18 Oct 2026 entry** (`/changelog/products-tidied-up`, `publishOn`
+2026-10-18). It names only what release PR #977 put in production that
+day: the products audit fixes (#972) and Home's open orders (DEC-163),
+each checked on `batch-2026-10-18-1` and on `main` (31c4e3030). Left out
+by the owner: Saroh's own billing (cancel in the app, billing details on
+Saroh's invoices, double charges refunded), which waits for live billing
+keys and gets its own entry; the admin console; the demo businesses (dev
+only). No sentence names the website or a product's web address: the
+online shop is off (`SITE_SHOP`).
+
+| #    | Claim (entry)                                                                                                                                                                                       | Backed by                                                                                                                                                                                                                    | Status | Shipped words                                                                        |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| CL11 | What you can sell: the list says how many you can sell after what's promised, names what's short; Needs you skips drafts and archived; Restock in place                                             | feb2eb0a5: APP `lib/products/catalogue.ts` (stock cell "to sell", worst shelf), `lib/products/needs-you.ts`, API `products/catalogue-needs.ts`; `components/stores/catalogue/quick-look-stock.tsx` (Add box focused)         | Backed | As written. "On your site" not said (`SITE_SHOP` off)                                |
+| CL12 | A product's own page: publish, add stock, Sell again; stock card names what's out; stock sheet opens on its first count; quick look opens the page; one word Archive                                | 4c98c7440 (`components/commerce/product-page/header.tsx`, `product-actions.tsx`, `drawer-add-stock.tsx`), 7413e87fb (`components/shared/overlay-form.tsx` `data-autofocus`), d77955316, aa56f92fb (`quick-look.tsx`)         | Backed | As written                                                                           |
+| CL13 | Adding and editing: two products can share a name; a SKU in use is caught on save, naming its product; Create draft shows what's missing                                                            | 9a5a60376: API `products/product-path.ts` (next free path), `products/sku-holder.ts` (refusal names the holder); APP `product-editor-v2/basics-section.tsx`                                                                  | Backed | "Saroh keeps them apart for you": the path itself is not named, it is a site address |
+| CL14 | Product settings: Defaults in one card with a row per category; rename a size or shade in place and every product follows; drag or sort A to Z; Uncategorized and option counts open their products | 36d8d27b4 (`product-settings/defaults-tab.tsx`, API `catalogue/options.service.ts` rename and order, list `?option=`, `?category=none`), 3e8bcc3ce (`option-sheet.tsx`, `options-tab.tsx`), c4ebfbc75 (`categories-tab.tsx`) | Backed | As written                                                                           |
+| CL15 | Bringing products in: status in any case, amounts with a rupee sign or commas, GST with %; a missing column said once; rows numbered as the spreadsheet; a sample file for products or customers    | 749df7fd9: API `imports/entities.ts` (`normalizeStatus`, `normalizeMoney`, `sample` for products and customers), `imports/import-plan.ts` (row numbers, issue groups); APP `components/stores/csv-import.tsx`                | Backed | As written. "Hidden" reads as Archived                                               |
+| CL16 | Locations for your whole team: every role sees the business's locations on New product and Import; a role that can't change products opens it read-only, never "not found"                          | 29dcd8996: APP `lib/stores/business-stores.ts`, `commerce/products/[productId]/edit/page.tsx`, `components/commerce/storefront-chooser.tsx`; `e2e/tests/products-roles.spec.ts`                                              | Backed | As written. "Location", never "storefront" (DEC-069)                                 |
+| CL17 | Home: Needs you lists an open order only when late or due today or tomorrow; Home says how many more are in progress, with a link                                                                   | DEC-163, f4b2052e9: API `home/home-open-orders.ts` (`soonCutoff`), `home/home.service.ts`; APP `lib/home/needs.ts` (`inProgressLabel`), `components/home/needs-you.tsx`                                                      | Backed | As written; links to `/features/dashboard`                                           |
 
 ### Coming next and Planned (`/changelog`, `/integrations`)
 

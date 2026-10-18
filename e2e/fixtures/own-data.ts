@@ -4,6 +4,7 @@ import type {
     TestInfo,
 } from "@playwright/test";
 import { expect } from "@playwright/test";
+import { randomInt } from "node:crypto";
 
 import { NORTHWIND_ORG, urls } from "../playwright.config";
 import { takeProduct } from "./throwaway-products";
@@ -29,7 +30,9 @@ export function stamp(testInfo?: TestInfo): string {
     const who = testInfo
         ? `${testInfo.project.name}${testInfo.parallelIndex}`
         : "x";
-    const tail = Math.floor(Math.random() * 36 ** 4)
+    // node:crypto, not Math.random: the code scanner reads a stamp sent as a
+    // billing email as a security value (#986).
+    const tail = randomInt(36 ** 4)
         .toString(36)
         .padStart(4, "0");
     return `${who}-${Date.now().toString(36)}${tail}`;
@@ -37,7 +40,7 @@ export function stamp(testInfo?: TestInfo): string {
 
 /** A phone number no other test is likely to hold: +91 9 and nine random digits. */
 export function phone(): string {
-    const digits = String(Math.floor(Math.random() * 1e9)).padStart(9, "0");
+    const digits = String(randomInt(1e9)).padStart(9, "0");
     return `+91 9${digits.slice(0, 4)} ${digits.slice(4)}`;
 }
 

@@ -71,14 +71,14 @@ export function RecheckRefund({
     );
 }
 
-/** Send the business's details to the provider's customer again. */
+/** Send the business's billing profile to its provider customer again. */
 export function SyncCustomer({ organizationId }: { organizationId: string }) {
     return (
         <OperatorDialog
             trigger="Sync again"
             triggerVariant="outline"
             title="Sync the Razorpay customer again"
-            effect="Saroh sends the business's billing name, email, phone and GSTIN to its customer at the billing provider, in the background. A refusal shows here as the last error."
+            effect="Saroh sends the billing profile's legal name, email, phone and GSTIN to its customer at the billing provider, in the background. The profile may bill other businesses too; they share the one customer. A refusal shows here as the last error."
             submitLabel="Sync again"
             onSubmit={({ reason, idempotencyKey }) =>
                 syncCustomerAction({ organizationId, reason, idempotencyKey })

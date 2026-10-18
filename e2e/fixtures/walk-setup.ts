@@ -9,6 +9,11 @@ import { expect } from "@playwright/test";
  * creates the business. Every spec that sets a business up through the
  * screen goes through here, so the next change to the steps is made once.
  *
+ * An owner who has a billing profile (Asha, `founder`, is seeded with one)
+ * is also asked who Saroh bills for it, between the name and what to do
+ * first (DEC-167, R7). `answerName` answers it with the first profile
+ * listed, unless the spec answers it itself (`answerBilling`).
+ *
  * `walkSetup` answers all three and waits to be out of setup. The three
  * `answer…` steps are there for a spec that looks at a step on the way.
  */
@@ -39,6 +44,7 @@ export const SETUP_WORDS: Record<
 
 export const SETUP_QUESTIONS = {
     kind: "What are you setting up?",
+    billing: "Who does Saroh bill for this business?",
     first: "What will you do first?",
 } as const;
 
@@ -98,6 +104,32 @@ export async function answerName(
         page.getByText("Available. Your website will live here."),
     ).toBeVisible();
     await continueSetup(page);
+    const billing = setupHeading(page, SETUP_QUESTIONS.billing);
+    await expect(
+        billing.or(setupHeading(page, SETUP_QUESTIONS.first)),
+    ).toBeVisible();
+    if (await billing.isVisible()) await answerBilling(page);
+    await expect(setupHeading(page, SETUP_QUESTIONS.first)).toBeVisible();
+}
+
+/** The billing step's choices: the owner's profiles, then a new one. */
+export function billingChoices(page: Page) {
+    return page
+        .getByRole("radiogroup", { name: SETUP_QUESTIONS.billing })
+        .getByRole("radio");
+}
+
+/**
+ * Who Saroh bills (DEC-167): a profile by its legal name, or the first
+ * listed, and continue to what to do first.
+ */
+export async function answerBilling(page: Page, legalName?: string) {
+    await expect(setupHeading(page, SETUP_QUESTIONS.billing)).toBeVisible();
+    const choice = legalName
+        ? billingChoices(page).filter({ hasText: legalName })
+        : billingChoices(page).first();
+    await choice.click();
+    await continueSetup(page);
     await expect(setupHeading(page, SETUP_QUESTIONS.first)).toBeVisible();
 }
 
@@ -124,7 +156,7 @@ export async function answerFirst(
     });
 }
 
-/** Answer all three steps and wait to be in the product. */
+/** Answer every step and wait to be in the product. */
 export async function walkSetup(page: Page, answers: SetupAnswers) {
     await answerKind(page, answers.kind);
     await answerName(page, answers);

@@ -133,6 +133,8 @@ const ACTION_LABEL: Record<string, string> = {
     billing_credit_note_may_be_needed: "Credit note may be needed",
     billing_refund_failed: "Refund failed",
     billing_dispute_open: "Payment disputed",
+    billing_customer_refused: "Razorpay refused the customer",
+    billing_profile_owner_left: "Billed to someone no longer an owner",
 };
 
 /** What a billing action is about, in a few words. */

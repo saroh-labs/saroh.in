@@ -96,6 +96,10 @@ run has tested your migration; before `migration-replay` existed, it never had.
   refuses to start, and the command prints nothing and exits 0.
 - **Run the replay check before you commit**, not after review. It takes under a
   minute and it is the only thing that looks at the file you wrote.
+- **Run a unit's integration specs with `TEST_RLS=on` before it lands,** as
+  well as without. `db push` builds no CHECKs and no policies, so a row the
+  migrations refuse (an empty required email, a job with no business inside a
+  business's transaction) passes the plain run and fails only the gate.
 - **The guard is not an obstacle.** `DATABASE_TARGET_CONFIRM` exists so a
   throwaway database is named on purpose. Do not bypass `db:guard`.
 

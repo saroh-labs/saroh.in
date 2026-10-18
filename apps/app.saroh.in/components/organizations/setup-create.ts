@@ -4,6 +4,8 @@ import { showError, showInfo } from "@saroh/ui/toast";
 import { startWithGoalAction } from "@/lib/modules/first-goal-actions";
 import { GOAL_LATER } from "@/lib/modules/goals";
 import { createOrganization } from "@/lib/organizations/actions";
+import type { BillingField } from "@/lib/organizations/setup-billing";
+import { billingFieldOf, billingSent } from "@/lib/organizations/setup-billing";
 import type { SetupValues } from "@/lib/organizations/setup-steps";
 import { browserZone } from "@/lib/organizations/time-zones";
 import {
@@ -18,7 +20,7 @@ export type SetupOutcome =
     /** Not made, and it is this field's problem: say it under the field. */
     | {
           made: false;
-          field: "yourName" | "name" | "address";
+          field: "yourName" | "name" | "address" | BillingField;
           message: string;
       }
     /** Not made, and it has been said. */
@@ -38,10 +40,13 @@ export async function createFromSetup(
         needsName,
         checkout,
         invite,
+        billing = false,
         onMade,
     }: {
         /** The account has no name yet: it is saved first. */
         needsName: boolean;
+        /** Who Saroh bills was asked (DEC-167): the answer is sent. */
+        billing?: boolean;
         checkout?: {
             plan: string;
             cycle: "month" | "year";
@@ -77,6 +82,7 @@ export async function createFromSetup(
         address: values.address,
         // What they chose to do first: the welcome email leads with it.
         ...(values.goal === GOAL_LATER ? {} : { goal: values.goal }),
+        ...(billing ? billingSent(values) : {}),
         profile: {
             country: values.country,
             // The browser's zone (UX-008): the business's for a country
@@ -88,6 +94,9 @@ export async function createFromSetup(
         if (res.field === "name" || res.field === "address") {
             return { made: false, field: res.field, message: res.error };
         }
+        // Who Saroh bills, refused: said on its own step, when it was asked.
+        const onStep = billing ? billingFieldOf(res.field) : null;
+        if (onStep) return { made: false, field: onStep, message: res.error };
         showError(res.error);
         return { made: false };
     }

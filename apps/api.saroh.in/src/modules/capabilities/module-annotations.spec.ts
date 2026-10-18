@@ -158,6 +158,10 @@ const NEVER: Record<string, string> = {
     "members/members.controller.ts": "tenancy",
     "stores/stores.controller.ts": "tenancy",
     "billing/billing.controller.ts": "billing is not a capability module",
+    "billing/billing-profiles.controller.ts":
+        "the caller's own billing profiles, no business (DEC-167)",
+    "billing/business-billing-profile.controller.ts":
+        "who Saroh bills for the business: billing, not a capability module",
     "waitlist/launch-offer.controller.ts":
         "taking an opening-day invite's plan offer at onboarding — billing, not a capability module",
     "admin/admin.controller.ts": "staff control plane, not a tenant surface",

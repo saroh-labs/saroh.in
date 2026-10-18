@@ -67,24 +67,71 @@ paper view. Written by the billing webhook with the charge, once per
 charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
 invoices (U17)".
 
-**Who Saroh bills, before it charges (owner, 17 Oct 2026).** Every
-checkout that charges or sets up autopay — all but a move to Free; a first
-month, an upgrade, a renewal, a scheduled change, a year paid once — is
-refused before anything is made at the provider until the business has a
-billing name (legal name, else its name), an email (the owner's, else the
-profile's contact email), a whole registered address (first line, city,
-six-digit PIN) and a state. `billing/billing-details.ts` is the one rule:
-a 400 with `details.field` (`billingName`, `billingEmail`, `addressLine1`,
-`city`, `postalCode`, `billingState`, `phone`) and `details.missing`; the
-quote's `billingDetails: { missing, phone }` tells the change-plan dialog
-what to ask, in place. A GSTIN stays optional, a phone "if available".
-What was missing and given is kept: the address, state and legal name on
-the profile (never over what it has), an email or phone on the checkout
-(`BillingCheckout.billToEmail`, `billToPhone`), since the profile's phone
-is the one its website shows. The invoice carries the billing email and
-the phone (`SarohInvoice.billToEmail`, `billToPhone`) and prints them under
-the address. The Razorpay customer is brought up to date when it is found
-again (`PUT /customers/:id`, `backend-integrations.md`).
+**Who Saroh bills: the billing profile (DEC-167, owner, 18 Oct 2026).**
+A business is billed to one `BillingProfile` (owned by a user, possibly
+billing several businesses); Saroh's invoice takes its bill-to — legal
+name, GSTIN, address, state, billing email and phone — from the profile at
+issue, with the profile's id (`SarohInvoice.billingProfileId`, also on
+`BillingCheckout`), and its email goes to the profile's billing email as
+well as the people who manage the business's billing. Earlier invoices
+keep what they were issued with. Settings › Business (`BusinessProfile`)
+stays the business's own seller identity, for the business's own
+invoices; it is not Saroh's bill-to. A profile's details are its owner's
+(R2), also on the reads Plan & billing makes with `billing:read`: the
+checkout handoff (the provider window's prefill and notes) is built only
+for `billing:manage`, and with another owner's profile (a co-owner paying)
+carries no email or phone and notes naming only the profile and the
+business; a quote's `billingDetails.profile` is null without
+`billing:manage` (`checkout.service.ts`, `checkout-privacy.db.spec.ts`).
+
+**Switching a paid business's profile waits for the renewal (R13, U6).**
+Choosing another profile applies at once only while nothing more is
+charged at the provider (Free, a plan ending, a year paid once), or while
+the business has no profile (nothing to move from; a business the data
+move left without one can then upgrade at once). While a coupon still
+comes off charges to come, a switch is refused (409 `discount-running`,
+naming the date the discount ends): the switch's new subscription is made
+at full price, so it waits until the discount is used. A
+business whose subscription renews gets a SCHEDULED checkout for the same
+plan and cycle on the new profile's customer, starting at the period's end
+(`billing/profile-switch.ts` decides, `CheckoutService.startProfileSwitch`
+makes it); authorised, the webhook tells the old autopay to end with its
+period (a same-plan checkout on another profile is never a "renewal"), and
+`applyDueMoveInTx` repoints `Organization.billingProfileId` as it adopts
+the checkout, with an audit row — unless the checkout's profile has been
+deleted since (its owner deleted their account; `BillingCheckout` has no
+foreign key to it): then the checkout is still adopted, the business keeps
+its pointer, and `billing_profile_gone` is raised in Admin › Billing ›
+Needs action. Deleting an account raises `billing_profile_owner_left` for
+each business billed to, or with an OPEN or SCHEDULED checkout on, one of
+its profiles (`noticeProfilesOfDeletedOwnerInTx`, through `@saroh/auth`'s
+`onUserDeleting`), and never refuses the deletion. Unauthorised, it lapses like any checkout
+and nothing changes. A plan change and a switch before one renewal are one
+checkout: a switch after an authorised plan change is made for that plan
+and supersedes it once authorised; a change starting at the renewal while
+a switch is in play is made on the profile it moves to. Choosing the
+profile it keeps gives up a switch still waiting; once authorised (the old
+autopay told to end) staying is a switch back, authorised again. A payment
+for a plan waiting is a 409 `checkout-waiting`.
+
+**What Saroh needs before it charges (owner, 17 Oct 2026; the profile's
+since 18 Oct).** Every checkout that charges or sets up autopay — all but
+a move to Free; a first month, an upgrade, a renewal, a scheduled change, a
+year paid once — is refused before anything is made at the provider until
+the business has a billing profile with a billing name (its legal name,
+else the business's name), a billing email, a whole address (first line,
+city, six-digit PIN) and a state. `billing/billing-details.ts` is the one
+rule: a 400 with `details.field` (`billing-profile` when there is none,
+`billingName`, `billingEmail`, `addressLine1`, `city`, `postalCode`,
+`billingState`, `phone`) and `details.missing`; the quote's
+`billingDetails: { missing, phone }` tells the change-plan dialog what to
+ask, in place. A GSTIN stays optional, a phone "if available". What was
+missing and given is saved on the profile (never on `BusinessProfile`,
+and never over what the profile has; a GSTIN given replaces the
+profile's, with its state). The invoice prints the billing email and the
+phone under the address. The profile's Razorpay customer is brought up to
+date by the `billing.profile.sync` job the save queues
+(`backend-integrations.md`).
 
 **Cancelling a plan (owner, 17 Oct 2026).** "Cancel plan" under Your plan
 (`components/settings/plan-billing/cancel-plan.tsx`, owner only, offered
@@ -221,8 +268,9 @@ Rules and edge cases in `PRICING_ROLLOUT.md` › "During the first month".
 - A `plan` override never takes away a dearer plan the business pays for:
   the plan read is the dearer of the two (`effectivePlanId` with
   `planPriceOf`), and an override that dearer plan shadows is not reported.
-- A renewal's invoice is billed to the business as it is now (its profile's
-  GSTIN and state); the checkout's are for its own first charge.
+- A renewal's invoice is billed to the business's billing profile as it is
+  now (its GSTIN and state, DEC-167); the checkout's are for its own first
+  charge.
 - A suspended business, still billed, may always pay less: change-plan and
   add-ons are `@LifecycleWrite("lower-charges")` and ask `new` themselves
   for anything that charges more.

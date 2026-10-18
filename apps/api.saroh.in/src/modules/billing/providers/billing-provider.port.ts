@@ -92,7 +92,7 @@ export interface CreateSubscriptionInput {
     /** Who is billed, kept in the subscription's notes. */
     customer?: BillingCustomer | null;
     /**
-     * The business's provider customer (`BillingCustomer`), linked
+     * The business's billing profile's provider customer (DEC-167), linked
      * to the subscription from the start so the provider's dashboard shows
      * who it bills before it is paid, and after it is cancelled.
      */
@@ -127,6 +127,25 @@ export interface BillingCustomer {
     organizationId: string;
     /** The business's Saroh address (slug), for the customer's notes. */
     businessSlug?: string | null;
+    /**
+     * The billing profile billed (DEC-167), named in a subscription's or
+     * order's notes beside the business.
+     */
+    billingProfileId?: string | null;
+}
+
+/**
+ * A billing profile as the provider's customer (DEC-167): who it bills, and
+ * the notes that never change — the profile, its owner and the first
+ * business on it (notes are create-only at Razorpay).
+ */
+export interface ProfileCustomer extends Omit<
+    BillingCustomer,
+    "organizationId"
+> {
+    billingProfileId: string;
+    /** The profile owner's user id. */
+    ownerUserId: string;
 }
 
 /**
@@ -136,32 +155,38 @@ export interface BillingCustomer {
  */
 export type CustomerCreated = { providerCustomerId: string } | "exists";
 
-/** A customer the provider holds, and the business its notes name. */
+/** A customer the provider holds, and whose its notes say it is. */
 export interface ProviderCustomer {
     providerCustomerId: string;
-    /** Saroh's `organizationId` note; null: none (made by the provider). */
+    /** Saroh's `billing_profile_id` note (DEC-167); null: none. */
+    billingProfileId: string | null;
+    /**
+     * Saroh's `organizationId` note, on a customer made for one business
+     * before profiles (DEC-165); null: none (or made by the provider).
+     */
     organizationId: string | null;
 }
 
 /**
- * The provider's own customer record for a business: made once at sign-up
- * and kept current (`billing-customer.ts`). Never handed to a business by
- * email or phone alone: one the provider already holds for the same
- * details is adopted only when its notes name the same business.
+ * The provider's own customer record for a billing profile: made once and
+ * kept current (`billing-customer.ts`). Never handed to a profile by email
+ * or phone alone: one the provider already holds for the same details is
+ * adopted only when its notes name the same profile (or, made before
+ * profiles, one of its businesses).
  */
 export interface ProviderCustomerCapability {
     /** Whether the provider's keys are set here; false: nothing is asked. */
     configured(): boolean;
     createCustomer(
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<CustomerCreated>;
     /**
      * The customer the provider already holds for these details (the one
-     * `createCustomer` answered `exists` for), with its notes' business.
+     * `createCustomer` answered `exists` for), with its notes.
      */
     existingCustomer(
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<ProviderCustomer>;
     /** A customer by its id; null when the provider has none by it. */
@@ -172,7 +197,7 @@ export interface ProviderCustomerCapability {
      */
     updateCustomer(
         providerCustomerId: string,
-        input: BillingCustomer,
+        input: ProfileCustomer,
         options: { withContact: boolean },
     ): Promise<"updated" | "exists">;
 }

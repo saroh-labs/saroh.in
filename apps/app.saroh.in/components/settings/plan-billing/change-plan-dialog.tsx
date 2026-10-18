@@ -11,6 +11,7 @@ import {
     DialogTitle,
 } from "@saroh/ui/dialog";
 import { focusFirstError } from "@saroh/ui/field";
+import { Notice } from "@saroh/ui/notice";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { LoaderCircle } from "lucide-react";
@@ -18,7 +19,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import type { BusinessBillingProfile } from "@/lib/billing-profiles/view";
+import type { ProfileRefusal } from "@/lib/saroh-billing/billing-actions";
 import {
+    billingProfileViewAction,
     changePlanAction,
     quoteChangeAction,
 } from "@/lib/saroh-billing/billing-actions";
@@ -30,6 +34,7 @@ import {
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 
 import { runAction } from "@/lib/api/run-action";
+import { ChangeBillingProfileSheet } from "./billing-profile-sheets";
 import type {
     DetailErrors,
     DetailField,
@@ -90,7 +95,16 @@ const NOTHING_ASKED: DetailsAsked = {
  * is paid now, or "From ‹date›" with the plan kept until then. Who Saroh
  * bills is asked for here, before the payment opens (17 Oct 2026): what
  * the business is missing must be given, never by a trip to Settings
- * (`invoice-details.tsx`).
+ * (`invoice-details.tsx`). A business with no billing profile yet
+ * (DEC-167) is asked who Saroh bills in Plan & billing's own sheet, opened
+ * over the dialog, and quoted again once one is chosen: never a raw
+ * refusal. What is given here may change the billing profile, so it asks
+ * as Plan & billing's Edit does (owner, 18 Oct 2026): a profile billing
+ * several businesses says "This changes Saroh's invoices for N
+ * businesses." and Confirm becomes "Save for N businesses and continue",
+ * which sends it again confirmed; another owner's profile can't be
+ * changed here, and "Choose one of my profiles" opens the Change sheet.
+ * What was typed stays.
  *
  * The design moves plan on a click; real money asks first (design
  * deviation, U14).
@@ -137,6 +151,31 @@ export function ChangePlanDialog({
     const detailsRef = useRef<HTMLDetailsElement>(null);
     const [pending, start] = useTransition();
     const [attempt, setAttempt] = useState(0);
+    // Who Saroh bills, read when the business has no profile to bill.
+    const [choosing, setChoosing] = useState<BusinessBillingProfile | null>(
+        null,
+    );
+    const [loadingProfiles, setLoadingProfiles] = useState(false);
+    // The API's refusal to change the billing profile, for the quote it
+    // was made on: one message, in place of a toast.
+    const [refused, setRefused] = useState<{
+        key: string;
+        error: string;
+        profile: ProfileRefusal;
+    } | null>(null);
+
+    /** Open "Choose who Saroh bills" over the dialog. */
+    async function chooseProfile() {
+        const res = await runAction(() => billingProfileViewAction(), {
+            setBusy: setLoadingProfiles,
+        });
+        if (!res) return;
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        setChoosing(res.data);
+    }
 
     const code = coupon;
     const key = picked
@@ -145,6 +184,12 @@ export function ChangePlanDialog({
     // Loading until the answer for this very request has landed.
     const quoting: Quoting =
         answer?.key === key && key ? answer : { state: "loading" };
+    // A refusal holds until the dialog is quoted again (a profile chosen).
+    const profileRefused = refused?.key === key ? refused : null;
+    const sharedWith =
+        profileRefused?.profile.code === "profile-shared"
+            ? profileRefused.profile.businesses
+            : null;
 
     useEffect(() => {
         if (!picked) return;
@@ -190,6 +235,12 @@ export function ChangePlanDialog({
             ? detailsAsked(quoting.quote)
             : NOTHING_ASKED;
     const required = needsDetails(asked);
+    // No billing profile yet: one is chosen before anything else is asked.
+    const noProfile =
+        quoting.state === "ready" &&
+        Boolean(summary?.toPayment) &&
+        (quoting.quote.billingDetails?.profile === null ||
+            Boolean(quoting.quote.billingDetails?.missing.includes("profile")));
 
     /** Open the details and put the keyboard on the first field in error. */
     function showProblems() {
@@ -199,6 +250,10 @@ export function ChangePlanDialog({
 
     function confirm() {
         if (!picked || quoting.state !== "ready") return;
+        if (noProfile) {
+            void chooseProfile();
+            return;
+        }
         const problems = summary?.toPayment
             ? detailsProblems(details, asked)
             : {};
@@ -214,11 +269,17 @@ export function ChangePlanDialog({
                     cycle: picked.cycle,
                     coupon: code || undefined,
                     ...detailsSent(details, asked),
+                    ...(sharedWith ? { confirmSharedProfile: true } : {}),
                 }),
             );
             if (!res) return;
             if (!res.ok) {
-                if (
+                if (res.profile) {
+                    setRefused({ key, error: res.error, profile: res.profile });
+                } else if (res.field === "billing-profile") {
+                    // Asked in place, then quoted again.
+                    void chooseProfile();
+                } else if (
                     res.field &&
                     (DETAIL_FIELDS as string[]).includes(res.field)
                 ) {
@@ -433,7 +494,27 @@ export function ChangePlanDialog({
                     </p>
                 ) : null}
 
-                {summary?.toPayment ? (
+                {noProfile ? (
+                    <div className="grid gap-2 rounded-lg border border-border px-3.5 py-3 text-[13px]">
+                        <p className="font-semibold">Choose who Saroh bills</p>
+                        <p className="text-foreground/80">
+                            Saroh&apos;s invoices for this business need a
+                            billing profile before the payment opens.
+                        </p>
+                        <p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                busy={loadingProfiles}
+                                busyLabel="Opening…"
+                                onClick={() => void chooseProfile()}
+                            >
+                                Choose who Saroh bills
+                            </Button>
+                        </p>
+                    </div>
+                ) : summary?.toPayment ? (
                     <details
                         ref={detailsRef}
                         // Open from the start when something must be given.
@@ -459,6 +540,35 @@ export function ChangePlanDialog({
                             />
                         </div>
                     </details>
+                ) : null}
+
+                {profileRefused ? (
+                    <Notice tone="warning" role="alert">
+                        <p className="text-pretty">{profileRefused.error}</p>
+                        {profileRefused.profile.code === "profile-not-yours" ? (
+                            <p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    busy={loadingProfiles}
+                                    busyLabel="Opening…"
+                                    onClick={() => void chooseProfile()}
+                                >
+                                    Choose one of my profiles
+                                </Button>
+                            </p>
+                        ) : null}
+                    </Notice>
+                ) : null}
+
+                {choosing ? (
+                    <ChangeBillingProfileSheet
+                        view={choosing}
+                        open
+                        onClose={() => setChoosing(null)}
+                        onSaved={() => setAttempt((n) => n + 1)}
+                    />
                 ) : null}
 
                 <DialogFooter>
@@ -488,7 +598,9 @@ export function ChangePlanDialog({
                                     : "Changing…"
                             }
                         >
-                            {summary.confirm}
+                            {sharedWith
+                                ? `Save for ${sharedWith} businesses and continue`
+                                : summary.confirm}
                         </Button>
                     ) : null}
                 </DialogFooter>

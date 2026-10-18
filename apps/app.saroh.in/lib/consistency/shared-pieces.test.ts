@@ -102,6 +102,8 @@ describe("one of each small piece", () => {
                 "the HSN/SAC code field: a code is typed and kept in capitals",
             "components/organizations/business-tax-fields.tsx":
                 "the GSTIN field: a registration number is capitals",
+            "components/organizations/setup-billing-step.tsx":
+                "a new billing profile's GSTIN field: a registration number is capitals",
             "components/settings/plan-billing/invoice-details.tsx":
                 "the GSTIN field: a registration number is capitals",
             "components/settings/plan-billing/plan-chooser.tsx":

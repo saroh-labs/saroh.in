@@ -5134,6 +5134,13 @@ leaving queue it too.
 writes its source, including writes another library makes
 (`backend-integrations.md`, Razorpay customer).
 
+**Since (18 Oct 2026).** DEC-167 replaced DEC-165's customer per business
+with one per billing profile, which holds its own billing email: an
+account email change and a change of owners no longer touch billing, so
+`onUserEmailChanged` and the owner-change queueing were taken out, and
+the customer follows the profile's saves (`billing.profile.sync`). The
+rule stands for the profile's own fields.
+
 ### The contact form's focus test flaked on CI (17 Oct 2026)
 
 **Symptom.** `contact-form.test.tsx` "send another message" failed on CI (focus still on `<body>`) and passed locally and on development.
@@ -5153,3 +5160,33 @@ writes its source, including writes another library makes
 **Fix.** The spec presses until the panel opens (`expect(...).toPass`, as `business-settings.spec.ts`'s `openSheet`).
 
 **Rule.** A browser spec that opens a sheet or dialog presses again until it shows, never once and waits (`saroh-browser-tests` skill).
+
+### The release PR showed a conflict that wasn't there (18 Oct 2026)
+
+**Symptom.** Release PR #976 (development → main) showed "conflicting" on GitHub and ran no CI, although a local merge of development into main was clean.
+
+**Cause.** Main and development had two merge bases. The demo-business units of #972 were cut on 16 Oct from main (its #956 release merge commit) instead of from the batch, so that main-only commit reached development, while development's own history (#973) had reached main through #971. GitHub's mergeability check fails on such a criss-cross even when git merges it cleanly.
+
+**Fix.** The release went from a branch that is development with main merged in (#977), so GitHub saw no conflict. Once it merged, main contains development again, and the next release has one base. Main is never merged into development (owner).
+
+**Rule.** Work branches start from development or a batch made from it, never from main; unit worktrees are created from the batch branch by name. `pnpm run check:branch-base` (in `scripts/prepush.sh`) refuses a branch holding a commit main has and development doesn't (`docs/patterns/devops-tooling-and-deploy.md` › Branches, batches and pull requests).
+
+### A job with no business was refused under RLS (18 Oct 2026)
+
+**Symptom.** The batch gate's integration run under RLS failed 276 tests with `new row violates row-level security policy for table "Job"`, plus a CHECK on `BillingProfile` and one on `BillingCheckout`; the plain integration run passed.
+
+**Cause.** `billing.profile.sync` was queued with no `organizationId`, since a billing profile spans businesses, but it is queued inside a business's transaction, where the Job policy takes only that business's rows. Two specs made rows the migrations' CHECKs refuse (a profile with an empty email, an UPGRADE checkout with no start). The unit agents ran their specs only without RLS, and `db push` has no CHECKs.
+
+**Fix.** The enqueue reads the transaction's business (`current_setting('app.current_organization_id')`) and records it on the job, or none outside one; the specs were made true to the constraints.
+
+**Rule.** A job written inside a business's transaction carries that business's id, even when its work spans businesses. Every unit's specs are run with `TEST_RLS=on` before the unit lands, not only in the gate (`docs/patterns/backend-jobs.md`, `.agents/skills/saroh-migrations/SKILL.md`).
+
+### Billing profiles: six holes the code review found (18 Oct 2026)
+
+**Symptom.** The DEC-167 review found: a renewal moving a business to a profile deleted with its owner's account failed on `Organization_billingProfileId_fkey` on every webhook and sweep; a switch dropped a running coupon; a business left without a profile couldn't upgrade until its renewal; an Admin's `GET checkout` handed out the profile's email, phone and GSTIN; an app from before profiles couldn't create a second business; and the migration's data move had never met a row.
+
+**Cause.** `BillingCheckout.billingProfileId` has no foreign key, so it outlives the profile; the switch rule treated "no profile" as a profile to move from; the handoff was built for every `billing:read` caller; the onboarding refused a missing choice even when there was only one; the replay runs migrations on an empty database.
+
+**Fix.** The repoint checks the profile exists (else adopts, leaves the pointer and raises `billing_profile_gone`), account deletion raises `billing_profile_owner_left`; `discount-running` 409; no profile applies at once; handoff and quote profile gated on `billing:manage` and ownership; one profile is the default; `pnpm run check:migration-fold` runs the migration on fixtures.
+
+**Rule.** A data migration that moves rows gets a check against fixtures beside the replay (`check:migration-fold` is the example); an id column without a foreign key is checked before it is written to one that has one (`docs/patterns/backend-billing-and-classes.md`).

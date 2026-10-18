@@ -35,7 +35,7 @@ import { STATUS_TONE } from "./subscription-table";
  * provider ids, its checkouts and what the billing provider sent, newest
  * first, so an operator can see "Razorpay sent subscription.cancelled at
  * …". Since DEC-166 it also carries the business's billing controls —
- * End autopay, its Razorpay customer, Needs action, double charges,
+ * End autopay, its billing profile, Needs action, double charges,
  * invoices and refunds — for operators with `saroh-billing:act`, so the
  * Billing role needs no support session. "Open the business" shows only
  * to those who may open one. Closing it goes back to the list.

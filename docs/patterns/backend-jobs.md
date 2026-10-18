@@ -73,6 +73,12 @@
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
 - **Current** — **Advisory locks have a registry** (below). A new
   `pg_advisory_xact_lock` adds its row in the same change.
+- **Current** (18 Oct 2026) — **A job written inside a business's transaction
+  carries that business's `organizationId`,** even when its work spans
+  businesses: the `Job` RLS policy refuses one with none there.
+  `billing.profile.sync` reads it from the transaction
+  (`scopedOrganizationId`, `billing/billing-profile-sync.ts`), and queues with
+  none only outside one.
 - **Current** (DEC-122) — **A job that deletes asks about the legal hold.**
   A business on legal hold (`organizations/legal-hold.ts`) keeps every row
   and file. A sweep reads the held ids once a run (`heldOrganizationIds`)
@@ -88,15 +94,15 @@ Each is a transaction lock on `hashtext(<key>)`, held until the
 transaction ends. Take it before the transaction's row locks, so it never
 waits while holding one.
 
-| Key                                       | Serialises                                                                                                                                                                                                                                                                                                                    | Where                                                                                                                                           |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-120), with the partial unique index behind it                                                                                                                                                                                                     | `data-export/data-export.service.ts` (`request`)                                                                                                |
-| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                                                                                                                                                                                                | `class-packs/first-pack.ts`                                                                                                                     |
-| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                                                                                                                                                                                             | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
-| `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                                                                                                                                                                                             | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
-| `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                                                                                                                                                                                                | `notifications/provider-alerts.ts` (`wordProvider`)                                                                                             |
-| `billing-customer:<organizationId>`       | Making (or adopting) a business's one customer at Saroh's billing provider (DEC-165), so sign-up's job and a checkout make one. Held across up to three provider calls: `SET LOCAL lock_timeout = '30s'` first, and each id answered is stored at once on its own connection, so a transaction that ends badly never loses it | `billing/billing-customer.ts` (`create`)                                                                                                        |
-| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086)                                                                                                                                                                   | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
+| Key                                       | Serialises                                                                                                                                                                                                                                                                                                                               | Where                                                                                                                                           |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-120), with the partial unique index behind it                                                                                                                                                                                                                | `data-export/data-export.service.ts` (`request`)                                                                                                |
+| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                                                                                                                                                                                                           | `class-packs/first-pack.ts`                                                                                                                     |
+| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                                                                                                                                                                                                        | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
+| `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                                                                                                                                                                                                        | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
+| `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                                                                                                                                                                                                           | `notifications/provider-alerts.ts` (`wordProvider`)                                                                                             |
+| `billing-profile:<billingProfileId>`      | Making (or adopting) a billing profile's one customer at Saroh's billing provider (DEC-167), so the profile's job and a checkout make one. Held across up to three provider calls: `SET LOCAL lock_timeout = '30s'` first, and each id answered is stored at once on its own connection, so a transaction that ends badly never loses it | `billing/billing-customer.ts` (`create`)                                                                                                        |
+| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086)                                                                                                                                                                              | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
 (`test/lock-wait.ts`).
@@ -677,15 +683,17 @@ overrideId, reason }`. Re-read, then decide
   before it asks the provider and before it queues itself again, and
   stands down when the business is billed through that subscription again
   (live, not ending, the business not closing).
-- **`billing.customer.sync`** (DEC-165) makes the business's one customer
-  at Saroh's billing provider, or sends its details as they are now:
-  queued in the sign-up's transaction, by a Settings › Business save that
-  touches billing details and by every checkout, at most one waiting per
-  business (`enqueueBillingCustomerSync`), and by an owner's change of
-  email. Skips with no provider keys (a warning in production); retried
-  by the queue (10 tries); a refusal is logged, left as an admin note once,
-  and dropped (`billing-customer.ts`). Businesses from before are queued
-  by `backfill/billing-customers.cli.ts`.
+- **`billing.profile.sync`** (DEC-167) makes a billing profile's one
+  customer at Saroh's billing provider, or sends its details as they are
+  now: queued in the transaction that made or saved the profile (sign-up,
+  a profile's edit, a checkout's details step) and by an operator's Sync
+  again, at most one waiting per profile (`enqueueBillingProfileSync`).
+  Skips with no provider keys (a warning in production); retried by the
+  queue (10 tries); a refusal is logged, left as an admin note once, and
+  dropped (`billing-customer.ts`). Profiles from before are queued by
+  `backfill/billing-profiles.cli.ts`. DEC-165's **`billing.customer.sync`**
+  stays registered for jobs already queued: it syncs the business's
+  profile, and does nothing for a business without one.
 - **`billing.payment.notes`** (17 Oct 2026) puts Saroh's invoice number,
   business and checkout on the provider's payment once Saroh's invoice
   has its payment id: queued on the invoice's transaction, retried by the

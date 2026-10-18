@@ -4,17 +4,13 @@ import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
 import { stateName } from "../invoices/gst-states";
-import {
-    billingEmail,
-    billingName,
-    nonEmpty,
-    readBillingParty,
-} from "./billing-details";
 import { raiseBillingOpsNoticeInTx } from "./billing-ops-notice";
+import type { BillingProfileSyncPayload } from "./billing-profile-sync";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
 import type {
-    BillingCustomer,
     BillingProviderFactory,
+    ProfileCustomer,
+    ProviderCustomer,
     ProviderCustomerCapability,
 } from "./providers/billing-provider.port";
 import {
@@ -23,31 +19,32 @@ import {
 } from "./providers/billing-provider.port";
 
 /**
- * One customer per business at Saroh's billing provider (DEC-165, owner,
- * 17 Oct 2026: "make sure to create a razorpay customer when they join the
- * app, and then update the details based on info they fill in for
- * billing, this way we will make sure the data is consistent and we wont
- * create customer again").
+ * One customer per billing profile at Saroh's billing provider (DEC-167,
+ * which replaces DEC-165's one per business: Razorpay refuses a second
+ * customer with the same email and phone, so an owner's second business
+ * could never have one).
  *
- * - **Made at sign-up** by the `billing.customer.sync` job
- *   (`billing-customer-sync.ts`), queued in the sign-up's transaction;
- *   never in its way. Where the provider's keys aren't set (local, CI) it
- *   asks nothing, and the first checkout makes it.
- * - **Adopted, not made twice**: a business that paid before DEC-165 has a
- *   customer the provider made at payment (on `Subscription` or its latest
- *   `BillingCheckout`); it is checked at the provider and kept, unless
- *   another business already holds it. One the provider holds for the same
- *   email and phone is this business's when its notes name it (an earlier
- *   try whose answer was lost), and kept too.
- * - **Kept current**: the same job runs whenever the business's billing
- *   details change (Settings › Business, the checkout's details step, the
- *   owner's email) and sends the name, email, phone and GSTIN. The address
+ * - **Made in the background** by the `billing.profile.sync` job
+ *   (`billing-profile-sync.ts`), queued in the transaction that made or
+ *   changed the profile; never in its way. Where the provider's keys
+ *   aren't set (local, CI) it asks nothing, and the first checkout makes
+ *   it.
+ * - **Adopted, not made twice**: a profile whose businesses paid before
+ *   DEC-165 has a customer the provider made at payment (on their
+ *   `Subscription` or latest `BillingCheckout`); it is checked at the
+ *   provider and kept, unless another profile already holds it. One the
+ *   provider holds for the same email and phone is this profile's when its
+ *   notes name it (an earlier try whose answer was lost), or, made per
+ *   business before profiles, one of its businesses.
+ * - **Kept current**: the same job runs whenever the profile is saved and
+ *   sends the legal name, billing email, phone and GSTIN. The address
  *   can't be updated on a customer (its notes are create-only); it stays
  *   on each subscription's or order's notes and on Saroh's invoice.
- * - **Never handed another's**: an owner's second business with the same
- *   email and phone is refused by Razorpay ("already exists"), on a create
- *   or an update: it goes without the phone, which stays in Saroh
- *   (`contactWithheld`). Any other refusal is an operator's note, once.
+ * - **Never handed another's**: a profile whose email and phone another
+ *   customer has is refused by Razorpay ("already exists"), on a create or
+ *   an update: it goes without the phone, which stays in Saroh
+ *   (`contactWithheld`). Any other refusal is an operator's note, once,
+ *   on each business billed to the profile.
  * - Every checkout, subscription and Saroh invoice copies its id.
  */
 export class BillingCustomers {
@@ -57,22 +54,24 @@ export class BillingCustomers {
     ) {}
 
     /**
-     * The business's customer id, made now if it has none (a checkout before
-     * the sign-up's job ran). Null when the provider isn't configured here,
-     * or refuses (the checkout goes on without one); a provider that can't
-     * answer throws, so the checkout never goes on to have the provider
-     * make a second customer of its own.
+     * The profile's customer id, made now if it has none (a checkout
+     * before the profile's job ran). Null for a business with no profile,
+     * where the provider isn't configured here, or when it refuses (the
+     * checkout goes on without one); a provider that can't answer throws,
+     * so the checkout never goes on to have the provider make a second
+     * customer of its own.
      */
-    async idFor(organizationId: string): Promise<string | null> {
+    async idFor(billingProfileId: string | null): Promise<string | null> {
+        if (!billingProfileId) return null;
         try {
-            return await this.sync(organizationId, { update: false });
+            return await this.sync(billingProfileId, { update: false });
         } catch (error) {
             if (
                 error instanceof BillingProviderError &&
                 error.kind === "REFUSED"
             ) {
                 this.logger.warn(
-                    `billing_customer_refused org=${organizationId}: ${message(error)}`,
+                    `billing_customer_refused profile=${billingProfileId}: ${message(error)}`,
                 );
                 return null;
             }
@@ -81,41 +80,51 @@ export class BillingCustomers {
     }
 
     /**
-     * Make the business's customer, or (with `update`) send its details as
+     * Make the profile's customer, or (with `update`) send its details as
      * they are now. Throws what the provider answered, after keeping it on
-     * the row (`lastError`, and an operator's note the first time a
-     * refusal is seen); the job retries.
+     * the profile (`lastError`, and an operator's note the first time a
+     * refusal is seen); the job retries. Null when there is no such
+     * profile, or the provider isn't configured here.
      */
     async sync(
-        organizationId: string,
+        billingProfileId: string,
         options: { update: boolean },
     ): Promise<string | null> {
-        const provider = CATALOGUE_BILLING_PROVIDER;
-        const customers = this.providers.get(provider).customers;
+        const customers = this.providers.get(
+            CATALOGUE_BILLING_PROVIDER,
+        ).customers;
         if (!customers?.configured()) {
-            // Fine locally and in CI; in production every business goes
+            // Fine locally and in CI; in production every profile goes
             // without a customer until the keys are set.
-            const say = `billing_customer_skipped org=${organizationId}: the provider isn't configured here`;
+            const say = `billing_customer_skipped profile=${billingProfileId}: the provider isn't configured here`;
             if (env.NODE_ENV === "production") this.logger.warn(say);
             else this.logger.log(say);
             return null;
         }
-        const key = { organizationId_provider: { organizationId, provider } };
-        const before = await prisma.billingCustomer.findUnique({ where: key });
+        const before = await prisma.billingProfile.findUnique({
+            where: { id: billingProfileId },
+            select: {
+                providerCustomerId: true,
+                contactWithheld: true,
+                lastError: true,
+            },
+        });
+        if (!before) return null;
         try {
-            if (before?.providerCustomerId) {
+            if (before.providerCustomerId) {
                 if (options.update) {
-                    await this.push(organizationId, customers, before);
+                    await this.push(billingProfileId, customers, before);
                 }
                 return before.providerCustomerId;
             }
-            const made = await this.create(organizationId, customers);
+            const made = await this.create(billingProfileId, customers);
             if (made.adopted) {
                 // Adopted as the provider had it: bring it up to date.
-                const row = await prisma.billingCustomer.findUniqueOrThrow({
-                    where: key,
+                const row = await prisma.billingProfile.findUniqueOrThrow({
+                    where: { id: billingProfileId },
+                    select: { providerCustomerId: true, contactWithheld: true },
                 });
-                await this.push(organizationId, customers, row);
+                await this.push(billingProfileId, customers, row);
             }
             return made.providerCustomerId;
         } catch (error) {
@@ -124,41 +133,63 @@ export class BillingCustomers {
                 error instanceof BillingProviderError &&
                 error.kind === "REFUSED";
             await prisma.$transaction(async (tx) => {
-                await tx.billingCustomer.upsert({
-                    where: key,
-                    create: { organizationId, provider, lastError: said },
-                    update: { lastError: said },
+                await tx.billingProfile.updateMany({
+                    where: { id: billingProfileId },
+                    data: { lastError: said },
                 });
                 // Once per refusal: asked again it answers the same.
-                if (refused && before?.lastError !== said) {
-                    await raiseBillingOpsNoticeInTx(tx, this.logger, {
-                        code: "billing_customer_refused",
-                        organizationId,
-                        refs: {
-                            provider,
-                            customer: before?.providerCustomerId,
-                        },
-                        note: `The billing provider refused this business's customer details (${said}), so its customer there may be missing or out of date. Check the business's billing details and its customer in the provider's dashboard.`,
-                    });
+                if (refused && before.lastError !== said) {
+                    await this.raiseRefusal(tx, billingProfileId, said, before);
                 }
             });
             throw error;
         }
     }
 
+    /** The refusal, on each business billed to the profile. */
+    private async raiseRefusal(
+        tx: Prisma.TransactionClient,
+        billingProfileId: string,
+        said: string,
+        before: { providerCustomerId: string | null },
+    ): Promise<void> {
+        const businesses = await tx.organization.findMany({
+            where: { billingProfileId, deletedRetainedAt: null },
+            select: { id: true },
+        });
+        if (businesses.length === 0) {
+            this.logger.error(
+                `billing_customer_refused profile=${billingProfileId}: ${said}`,
+            );
+            return;
+        }
+        for (const { id: organizationId } of businesses) {
+            await raiseBillingOpsNoticeInTx(tx, this.logger, {
+                code: "billing_customer_refused",
+                organizationId,
+                refs: {
+                    provider: CATALOGUE_BILLING_PROVIDER,
+                    profile: billingProfileId,
+                    customer: before.providerCustomerId,
+                },
+                note: `The billing provider refused the details of the billing profile this business is billed to (${said}), so its customer there may be missing or out of date. Check the profile's billing details and its customer in the provider's dashboard.`,
+            });
+        }
+    }
+
     /**
      * Its details as they are now. An email and phone another customer has
-     * (the owner's other business, saved here since): sent without the
-     * phone, which stays withheld from then on.
+     * (saved here since): sent without the phone, which stays withheld from
+     * then on.
      */
     private async push(
-        organizationId: string,
+        billingProfileId: string,
         customers: ProviderCustomerCapability,
         row: { providerCustomerId: string | null; contactWithheld: boolean },
     ): Promise<void> {
         const id = row.providerCustomerId;
         if (!id) return;
-        const details = await billingCustomerOf(organizationId);
+        const details = await profileCustomerOf(billingProfileId);
         let withheld = row.contactWithheld;
         let answer = await customers.updateCustomer(id, details, {
             withContact: !withheld,
@@ -166,7 +197,7 @@ export class BillingCustomers {
         if (answer === "exists" && !withheld) {
             withheld = true;
             this.logger.warn(
-                `billing_customer_contact_withheld org=${organizationId}: another customer has the same email and phone`,
+                `billing_customer_contact_withheld profile=${billingProfileId}: another customer has the same email and phone`,
             );
             answer = await customers.updateCustomer(id, details, {
                 withContact: false,
@@ -178,13 +209,8 @@ export class BillingCustomers {
                 "the provider has another customer with these details",
             );
         }
-        await prisma.billingCustomer.update({
-            where: {
-                organizationId_provider: {
-                    organizationId,
-                    provider: CATALOGUE_BILLING_PROVIDER,
-                },
-            },
+        await prisma.billingProfile.update({
+            where: { id: billingProfileId },
             data: {
                 syncedAt: new Date(),
                 lastError: null,
@@ -194,32 +220,28 @@ export class BillingCustomers {
     }
 
     /**
-     * Made (or adopted) once: under a lock per business, so sign-up's job
-     * and a checkout running together never make two. The lock's
-     * transaction only holds the lock: each id the provider answers is
-     * stored at once on its own (only where none is stored yet), so a
-     * transaction that times out or fails after the provider made the
-     * customer never loses it, and a lost answer is healed by the next try
-     * finding its own customer by its notes.
+     * Made (or adopted) once: under a lock per profile, so its job and a
+     * checkout running together never make two. The lock's transaction
+     * only holds the lock: each id the provider answers is stored at once
+     * on its own (only where none is stored yet), so a transaction that
+     * times out or fails after the provider made the customer never loses
+     * it, and a lost answer is healed by the next try finding its own
+     * customer by its notes.
      */
     private async create(
-        organizationId: string,
+        billingProfileId: string,
         customers: ProviderCustomerCapability,
     ): Promise<{ providerCustomerId: string; adopted: boolean }> {
-        const customer = await billingCustomerOf(organizationId);
+        const customer = await profileCustomerOf(billingProfileId);
         return prisma.$transaction(
             async (tx) => {
                 // A waiter gives up (and its job retries) rather than
                 // holding a connection for the whole timeout.
                 await tx.$executeRaw`SET LOCAL lock_timeout = '30s'`;
-                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`billing-customer:${organizationId}`}))`;
-                const row = await tx.billingCustomer.findUnique({
-                    where: {
-                        organizationId_provider: {
-                            organizationId,
-                            provider: CATALOGUE_BILLING_PROVIDER,
-                        },
-                    },
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`billing-profile:${billingProfileId}`}))`;
+                const row = await tx.billingProfile.findUnique({
+                    where: { id: billingProfileId },
+                    select: { providerCustomerId: true },
                 });
                 if (row?.providerCustomerId) {
                     return {
@@ -227,15 +249,22 @@ export class BillingCustomers {
                         adopted: false,
                     };
                 }
+                const businesses = (
+                    await tx.organization.findMany({
+                        where: { billingProfileId },
+                        select: { id: true },
+                    })
+                ).map((o) => o.id);
                 const known = await this.knownCustomer(
                     tx,
-                    organizationId,
+                    billingProfileId,
+                    businesses,
                     customers,
                 );
                 if (known) {
-                    await this.store(organizationId, known, false);
+                    await this.store(billingProfileId, known, false);
                     this.logger.log(
-                        `billing_customer_adopted org=${organizationId} customer=${known}: made by the provider at an earlier payment`,
+                        `billing_customer_adopted profile=${billingProfileId} customer=${known}: made by the provider at an earlier payment`,
                     );
                     return { providerCustomerId: known, adopted: true };
                 }
@@ -248,26 +277,35 @@ export class BillingCustomers {
                         customer,
                         { withContact: true },
                     );
-                    if (existing.organizationId === organizationId) {
-                        // Its own, from a try whose answer was lost.
+                    if (
+                        isOwn(existing, billingProfileId, businesses) &&
+                        !(await heldByAnother(
+                            tx,
+                            billingProfileId,
+                            existing.providerCustomerId,
+                        ))
+                    ) {
+                        // Its own, from a try whose answer was lost (or one
+                        // of its businesses', made before profiles).
                         await this.store(
-                            organizationId,
+                            billingProfileId,
                             existing.providerCustomerId,
                             false,
                         );
                         this.logger.log(
-                            `billing_customer_adopted org=${organizationId} customer=${existing.providerCustomerId}: its own, from an earlier try`,
+                            `billing_customer_adopted profile=${billingProfileId} customer=${existing.providerCustomerId}: its own, from an earlier try`,
                         );
                         return {
                             providerCustomerId: existing.providerCustomerId,
                             adopted: true,
                         };
                     }
-                    // Another business of the same owner (same email and
-                    // phone): this one is made without the phone.
+                    // Another's (same email and phone, e.g. another
+                    // owner's profile billed to the same person): this one
+                    // is made without the phone.
                     withheld = true;
                     this.logger.warn(
-                        `billing_customer_contact_withheld org=${organizationId}: another customer has the same email and phone`,
+                        `billing_customer_contact_withheld profile=${billingProfileId}: another customer has the same email and phone`,
                     );
                     made = await customers.createCustomer(customer, {
                         withContact: false,
@@ -280,12 +318,12 @@ export class BillingCustomers {
                     );
                 }
                 await this.store(
-                    organizationId,
+                    billingProfileId,
                     made.providerCustomerId,
                     withheld,
                 );
                 this.logger.log(
-                    `billing_customer_created org=${organizationId} customer=${made.providerCustomerId}`,
+                    `billing_customer_created profile=${billingProfileId} customer=${made.providerCustomerId}`,
                 );
                 return {
                     providerCustomerId: made.providerCustomerId,
@@ -299,61 +337,54 @@ export class BillingCustomers {
     }
 
     /**
-     * A customer the provider made for this business at an earlier payment
-     * (before DEC-165): its subscription's, else its latest checkout's —
-     * still at the provider, naming no other business, and held by no
-     * other business here.
+     * A customer the provider made for one of the profile's businesses at
+     * an earlier payment (before DEC-165): a subscription's, else a latest
+     * checkout's — still at the provider, its notes naming no other profile
+     * or business, and held by no other profile here.
      */
     private async knownCustomer(
         tx: Pick<
             Prisma.TransactionClient,
-            "subscription" | "billingCheckout" | "billingCustomer"
+            "subscription" | "billingCheckout" | "billingProfile"
         >,
-        organizationId: string,
+        billingProfileId: string,
+        businesses: string[],
         customers: ProviderCustomerCapability,
     ): Promise<string | null> {
+        if (businesses.length === 0) return null;
         const provider = CATALOGUE_BILLING_PROVIDER;
-        const [sub, checkout] = await Promise.all([
-            tx.subscription.findFirst({
-                where: {
-                    organizationId,
-                    provider,
-                    providerCustomerId: { not: null },
-                },
+        const where = {
+            organizationId: { in: businesses },
+            provider,
+            providerCustomerId: { not: null },
+        };
+        const [subs, checkouts] = await Promise.all([
+            tx.subscription.findMany({
+                where,
+                orderBy: { createdAt: "asc" },
                 select: { providerCustomerId: true },
             }),
-            tx.billingCheckout.findFirst({
-                where: {
-                    organizationId,
-                    provider,
-                    providerCustomerId: { not: null },
-                },
+            tx.billingCheckout.findMany({
+                where,
                 orderBy: { createdAt: "desc" },
+                take: 5,
                 select: { providerCustomerId: true },
             }),
         ]);
         const ids = [
             ...new Set(
-                [sub?.providerCustomerId, checkout?.providerCustomerId].filter(
-                    (id): id is string => Boolean(id),
-                ),
+                [...subs, ...checkouts]
+                    .map((r) => r.providerCustomerId)
+                    .filter((id): id is string => Boolean(id)),
             ),
         ];
         for (const id of ids) {
-            const held = await tx.billingCustomer.findFirst({
-                where: {
-                    provider,
-                    providerCustomerId: id,
-                    organizationId: { not: organizationId },
-                },
-                select: { id: true },
-            });
-            if (held) continue;
+            if (await heldByAnother(tx, billingProfileId, id)) continue;
             const found = await customers.findCustomer(id);
             if (!found) continue;
             if (
-                found.organizationId &&
-                found.organizationId !== organizationId
+                (found.billingProfileId || found.organizationId) &&
+                !isOwn(found, billingProfileId, businesses)
             ) {
                 continue;
             }
@@ -367,96 +398,107 @@ export class BillingCustomers {
      * connection, not the lock's transaction, and only where none is kept.
      */
     private async store(
-        organizationId: string,
+        billingProfileId: string,
         providerCustomerId: string,
         contactWithheld: boolean,
     ): Promise<void> {
-        const provider = CATALOGUE_BILLING_PROVIDER;
-        const data = {
-            providerCustomerId,
-            contactWithheld,
-            syncedAt: new Date(),
-            lastError: null,
-        };
-        const kept = await prisma.billingCustomer.updateMany({
-            where: { organizationId, provider, providerCustomerId: null },
-            data,
+        await prisma.billingProfile.updateMany({
+            where: { id: billingProfileId, providerCustomerId: null },
+            data: {
+                providerCustomerId,
+                contactWithheld,
+                syncedAt: new Date(),
+                lastError: null,
+            },
         });
-        if (kept.count === 0) {
-            await prisma.billingCustomer.createMany({
-                data: [{ organizationId, provider, ...data }],
-                skipDuplicates: true,
-            });
-        }
     }
 }
 
 /**
- * Who the business's customer is: its billing name (legal name, else the
- * business's), the owner's email (else the profile's contact email, else
- * the latest one given at a checkout), its phone (else the latest given at
- * a checkout), its GSTIN (else the latest given at a checkout) and its
- * registered address. Each is the latest checkout that gave *it*: a later
- * checkout that asked nothing (an upgrade with every detail on file) never
- * hides what an earlier one was given.
+ * Whether a provider's customer is this profile's: its notes name the
+ * profile, or (made per business before profiles, naming no profile) one
+ * of the businesses billed to it.
  */
-export async function billingCustomerOf(
-    organizationId: string,
-): Promise<BillingCustomer> {
-    const latest = { organizationId } as const;
-    const newest = { createdAt: "desc" } as const;
-    const [owner, givenEmail, givenPhone, givenGstin] = await Promise.all([
-        prisma.membership.findFirst({
-            where: { organizationId, role: "OWNER" },
-            orderBy: { createdAt: "asc" },
-            select: { userId: true },
-        }),
-        prisma.billingCheckout.findFirst({
-            where: { ...latest, billToEmail: { not: null } },
-            orderBy: newest,
-            select: { billToEmail: true },
-        }),
-        prisma.billingCheckout.findFirst({
-            where: { ...latest, billToPhone: { not: null } },
-            orderBy: newest,
-            select: { billToPhone: true },
-        }),
-        prisma.billingCheckout.findFirst({
-            where: { ...latest, billToGstin: { not: null } },
-            orderBy: newest,
-            select: { billToGstin: true },
-        }),
-    ]);
-    const [party, org] = await Promise.all([
-        readBillingParty(prisma, organizationId, owner?.userId ?? null),
-        prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { slug: true },
-        }),
-    ]);
-    const profile = party.profile;
+function isOwn(
+    found: ProviderCustomer,
+    billingProfileId: string,
+    businesses: string[],
+): boolean {
+    if (found.billingProfileId) {
+        return found.billingProfileId === billingProfileId;
+    }
+    return (
+        found.organizationId !== null &&
+        businesses.includes(found.organizationId)
+    );
+}
+
+async function heldByAnother(
+    tx: Pick<Prisma.TransactionClient, "billingProfile">,
+    billingProfileId: string,
+    providerCustomerId: string,
+): Promise<boolean> {
+    const held = await tx.billingProfile.findFirst({
+        where: {
+            provider: CATALOGUE_BILLING_PROVIDER,
+            providerCustomerId,
+            id: { not: billingProfileId },
+        },
+        select: { id: true },
+    });
+    return held !== null;
+}
+
+/**
+ * Who the profile's customer is: its legal name, billing email, phone,
+ * GSTIN and address; its owner, and the first business billed to it (its
+ * name and address, for the customer's notes).
+ */
+export async function profileCustomerOf(
+    billingProfileId: string,
+): Promise<ProfileCustomer> {
+    const profile = await prisma.billingProfile.findUniqueOrThrow({
+        where: { id: billingProfileId },
+        select: {
+            ownerUserId: true,
+            legalName: true,
+            gstin: true,
+            gstState: true,
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            postalCode: true,
+            billingEmail: true,
+            phone: true,
+            organizations: {
+                orderBy: { createdAt: "asc" },
+                take: 1,
+                select: { name: true, slug: true },
+            },
+        },
+    });
+    // None yet: a profile made before any business is billed to it.
+    const first = profile.organizations.length
+        ? profile.organizations[0]
+        : null;
     return {
-        name: billingName(party) ?? party.userName ?? "",
-        businessName: party.orgName,
-        businessSlug: org?.slug ?? null,
-        email: billingEmail(party) ?? givenEmail?.billToEmail ?? null,
-        contact: nonEmpty(profile?.phone) ?? givenPhone?.billToPhone ?? null,
-        // As on Saroh's invoice: the profile's GSTIN only while the
-        // business says it is GST-registered.
-        gstin:
-            (profile?.gstRegistered ? nonEmpty(profile.taxId) : null) ??
-            givenGstin?.billToGstin ??
-            null,
-        address: profile?.addressLine1
+        name: profile.legalName,
+        businessName: first?.name ?? null,
+        businessSlug: first?.slug ?? null,
+        email: profile.billingEmail,
+        contact: profile.phone,
+        gstin: profile.gstin,
+        address: profile.addressLine1
             ? {
                   line1: profile.addressLine1,
-                  line2: profile.addressLine2 ?? null,
-                  city: profile.city ?? null,
+                  line2: profile.addressLine2,
+                  city: profile.city,
                   state: stateName(profile.gstState),
-                  postalCode: profile.postalCode ?? null,
+                  postalCode: profile.postalCode,
               }
             : null,
-        organizationId,
+        billingProfileId,
+        ownerUserId: profile.ownerUserId,
     };
 }
 
@@ -464,7 +506,62 @@ function message(error: unknown): string {
     return error instanceof Error ? error.message : "unknown error";
 }
 
-/** The `billing.customer.sync` job: make the customer, or update it. */
+/**
+ * Run a sync for the job: a provider that can't answer is retried by the
+ * queue; a refusal won't change by asking again (the next save of the
+ * profile, or the next checkout, tries again).
+ */
+async function syncForJob(
+    customers: BillingCustomers,
+    logger: Logger,
+    job: Job,
+    billingProfileId: string,
+): Promise<void> {
+    try {
+        await customers.sync(billingProfileId, { update: true });
+    } catch (error) {
+        const refused =
+            error instanceof BillingProviderError && error.kind === "REFUSED";
+        logger.error(
+            `billing_customer_sync_failed profile=${billingProfileId} attempt=${job.attempts + 1}/${job.maxAttempts}: ${message(error)}`,
+        );
+        if (refused) return;
+        throw error;
+    }
+}
+
+/** The `billing.profile.sync` job: make the profile's customer, or update it. */
+@Injectable()
+export class BillingProfileSyncHandler {
+    private readonly logger = new Logger(BillingProfileSyncHandler.name);
+    private readonly customers: BillingCustomers;
+
+    constructor(
+        @Inject(BILLING_PROVIDER_FACTORY)
+        providers: BillingProviderFactory,
+    ) {
+        this.customers = new BillingCustomers(providers, this.logger);
+    }
+
+    readonly handle = async (job: Job): Promise<void> => {
+        const payload = (job.payload ??
+            {}) as Partial<BillingProfileSyncPayload>;
+        const billingProfileId = payload.billingProfileId;
+        if (typeof billingProfileId !== "string" || !billingProfileId) {
+            this.logger.error(`billing_profile_bad_job job=${job.id}`);
+            return;
+        }
+        // A profile gone with its owner has nothing to send (`sync`).
+        await syncForJob(this.customers, this.logger, job, billingProfileId);
+    };
+}
+
+/**
+ * DEC-165's `billing.customer.sync` job, still registered so jobs queued
+ * before profiles (and an operator's Sync again) run: it syncs the
+ * profile the business is billed to, and does nothing for a business
+ * without one.
+ */
 @Injectable()
 export class BillingCustomerSyncHandler {
     private readonly logger = new Logger(BillingCustomerSyncHandler.name);
@@ -485,22 +582,14 @@ export class BillingCustomerSyncHandler {
         }
         const org = await prisma.organization.findUnique({
             where: { id: organizationId },
-            select: { deletedRetainedAt: true },
+            select: { deletedRetainedAt: true, billingProfileId: true },
         });
-        if (!org || org.deletedRetainedAt) return;
-        try {
-            await this.customers.sync(organizationId, { update: true });
-        } catch (error) {
-            const refused =
-                error instanceof BillingProviderError &&
-                error.kind === "REFUSED";
-            this.logger.error(
-                `billing_customer_sync_failed org=${organizationId} attempt=${job.attempts + 1}/${job.maxAttempts}: ${message(error)}`,
-            );
-            // A refusal won't change by asking again; the next change of
-            // details, or the next checkout, tries again.
-            if (refused) return;
-            throw error;
-        }
+        if (!org || org.deletedRetainedAt || !org.billingProfileId) return;
+        await syncForJob(
+            this.customers,
+            this.logger,
+            job,
+            org.billingProfileId,
+        );
     };
 }

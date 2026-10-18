@@ -7,6 +7,7 @@ import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 
 import { pickActive } from "./choose";
 import type { OrganizationKind } from "./kind";
+import type { NewBillingProfileInput } from "./setup-billing";
 
 /**
  * Organization data access for app.saroh.in. Organization is the tenant root
@@ -108,12 +109,35 @@ export interface CreateOrganizationInput {
      * decides what it means.
      */
     referralCode?: string;
+    /**
+     * Who Saroh bills for it (DEC-167, R7): one of the owner's billing
+     * profiles, or a new one. An owner with a profile must send one; the
+     * API names `billingProfile` when they don't.
+     */
+    billingProfileId?: string;
+    newBillingProfile?: NewBillingProfileInput;
 }
+
+/** The fields a create's refusal can be about, as the API names them. */
+const CREATE_FIELDS = [
+    "name",
+    "address",
+    // Who Saroh bills (DEC-167): the choice, and a new profile's fields.
+    "billingProfile",
+    "legalName",
+    "billingEmail",
+    "gstin",
+    "gstState",
+    "addressLine1",
+    "addressLine2",
+    "city",
+    "postalCode",
+] as const;
+export type CreateField = (typeof CREATE_FIELDS)[number];
 
 /** Discriminated result so the UI can surface field errors inline. */
 export type OrganizationResult<T> =
-    | { ok: true; data: T }
-    | { ok: false; error: string; field?: "name" | "address" };
+    { ok: true; data: T } | { ok: false; error: string; field?: CreateField };
 
 /** Whether an address can be reserved at setup, and why not. */
 export interface AddressAvailability {
@@ -219,10 +243,11 @@ export async function createOrganization(
     return {
         ok: false,
         error: failure.error,
-        field:
-            failure.field === "name" || failure.field === "address"
-                ? failure.field
-                : undefined,
+        field: (CREATE_FIELDS as readonly string[]).includes(
+            failure.field ?? "",
+        )
+            ? (failure.field as CreateField)
+            : undefined,
     };
 }
 

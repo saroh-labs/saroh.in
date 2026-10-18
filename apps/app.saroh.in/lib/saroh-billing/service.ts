@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { ApiError } from "@/lib/api/errors";
 import { apiFetch, orgBase } from "@/lib/api/http";
+import type { BusinessBillingProfile } from "@/lib/billing-profiles/view";
 import type { BillingAccessView } from "@/lib/billing/access";
 import type { PausedView } from "@/lib/billing/paused";
 
@@ -106,6 +107,18 @@ export const pausedOrNull = cache(async (): Promise<PausedView | null> => {
 /** Saroh's invoices to the business, newest first (U17). */
 export function listSarohInvoices(): Promise<Read<SarohInvoice[]>> {
     return orgRead<SarohInvoice[]>("/billing/invoices", []);
+}
+
+/**
+ * Who Saroh bills for this business (DEC-167, U5): its billing profile,
+ * in full only when it is the reader's, and the reader's own. The owner's
+ * alone (`billing:manage`): anyone else is `denied`, and the page draws
+ * nothing of it.
+ */
+export function getBillingProfileView(): Promise<
+    Read<BusinessBillingProfile | null>
+> {
+    return orgRead<BusinessBillingProfile | null>("/billing/profile", null);
 }
 
 /** The add-ons its plan offers and what it holds (U16). */

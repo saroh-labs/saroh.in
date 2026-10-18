@@ -112,13 +112,22 @@ export interface SarohSubscriptionPage {
 
 export interface SarohSubscriptionDetail {
     subscription: SarohSubscriptionRow;
-    /** The business as the provider's customer, and its last sync. */
-    billingCustomer: {
+    /**
+     * Who Saroh bills the business to (DEC-167): its billing profile, the
+     * profile's customer at the provider and its last sync, and the other
+     * businesses on the same profile. Null: it hasn't chosen one yet.
+     */
+    billingProfile: {
+        id: string;
+        legalName: string;
+        billingEmail: string;
+        gstin: string | null;
         provider: string;
         providerCustomerId: string | null;
         syncedAt: string | null;
         lastError: string | null;
         contactWithheld: boolean;
+        otherBusinesses: { id: string; name: string }[];
     } | null;
     /** Its last 12 invoices, with their refunds. */
     invoices: SarohInvoiceRow[];

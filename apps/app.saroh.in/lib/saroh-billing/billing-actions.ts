@@ -1,8 +1,16 @@
 "use server";
 
-import type { ApiResult } from "@/lib/api/failure";
+import type { ApiFailure, ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, orgBase } from "@/lib/api/http";
+
+import type {
+    BillingProfileChosen,
+    BusinessBillingProfile,
+    OwnBillingProfile,
+    ProfileEdit,
+    SwitchAuthorise,
+} from "@/lib/billing-profiles/view";
 
 import { cleanHandoff } from "./handoff";
 import type {
@@ -54,6 +62,42 @@ export interface ChangeInput {
     billingName?: string;
     billingEmail?: string;
     phone?: string;
+    /** "This changes Saroh's invoices for N businesses.": seen (18 Oct). */
+    confirmSharedProfile?: true;
+}
+
+/**
+ * A checkout refused for changing its billing profile (owner, 18 Oct
+ * 2026): one billing several businesses, until the owner confirms; or
+ * another owner's, which only they may change.
+ */
+export type ProfileRefusal =
+    | { code: "profile-shared"; businesses: number }
+    | { code: "profile-not-yours" };
+
+/** A change refused, with the profile refusal when it is one. */
+export type ChangeFailure = ApiFailure & { profile?: ProfileRefusal };
+
+/** The API's `details` of a profile refusal; anything else is none. */
+function profileRefusalOf(body: unknown): ProfileRefusal | undefined {
+    const b = (body ?? {}) as { details?: unknown; error?: unknown };
+    const inner =
+        b.error && typeof b.error === "object"
+            ? (b.error as { details?: unknown }).details
+            : undefined;
+    const d = (inner ?? b.details) as
+        { code?: unknown; businesses?: unknown } | undefined;
+    if (!d || typeof d !== "object") return undefined;
+    if (d.code === "profile-not-yours") return { code: "profile-not-yours" };
+    if (
+        d.code === "profile-shared" &&
+        typeof d.businesses === "number" &&
+        Number.isInteger(d.businesses) &&
+        d.businesses > 1
+    ) {
+        return { code: "profile-shared", businesses: d.businesses };
+    }
+    return undefined;
 }
 
 /** The typed words of a field, trimmed and capped; blank is none. */
@@ -96,6 +140,7 @@ function clean(input: unknown): ChangeInput | null {
         billingName,
         billingEmail,
         phone,
+        confirmSharedProfile,
     } = input as Record<string, unknown>;
     if (typeof plan !== "string" || !PLAN_ID.test(plan)) return null;
     if (cycle !== "month" && cycle !== "year") return null;
@@ -117,6 +162,7 @@ function clean(input: unknown): ChangeInput | null {
     if (email) out.billingEmail = email;
     const tel = text(phone, 32);
     if (tel) out.phone = tel;
+    if (confirmSharedProfile === true) out.confirmSharedProfile = true;
     return out;
 }
 
@@ -124,14 +170,16 @@ async function send<T>(
     path: string,
     fallback: string,
     init?: RequestInit,
-): Promise<ApiResult<T>> {
+): Promise<ApiResult<T> | ChangeFailure> {
     const base = await orgBase();
     if (!base) return { ok: false, error: fallback };
     const res = await apiFetch(`${base}${path}`, init);
     const body: unknown = await res.json().catch(() => null);
     if (res.ok && body) return { ok: true, data: body as T };
     // A server failure's words are generic: say ours instead.
-    return toFailure(res.status >= 500 ? null : body, fallback);
+    const said = res.status >= 500 ? null : body;
+    const profile = res.status === 409 ? profileRefusalOf(said) : undefined;
+    return { ...toFailure(said, fallback), ...(profile ? { profile } : {}) };
 }
 
 /** What moving to a plan would be and cost; a coupon refused names `coupon`. */
@@ -171,7 +219,7 @@ function securePage(url: unknown): string | null {
  */
 export async function changePlanAction(
     input: unknown,
-): Promise<ApiResult<ChangeResult>> {
+): Promise<{ ok: true; data: ChangeResult } | ChangeFailure> {
     const c = clean(input);
     if (!c) return { ok: false, error: CHANGE_FAILED };
     if (c.coupon && !COUPON.test(c.coupon)) {
@@ -342,5 +390,153 @@ export async function setAddonAction(
         `/billing/addons/${encodeURIComponent(addonId)}`,
         ADDON_FAILED,
         { method: "PUT", body: JSON.stringify({ quantity }) },
+    );
+}
+
+// ── Who Saroh bills (DEC-167, U5) ───────────────────────────────────────
+
+const PROFILE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const PROFILE_READ_FAILED =
+    "Your billing profiles couldn't be loaded. Try again.";
+const PROFILE_FAILED =
+    "Who Saroh bills couldn't be changed just now. Nothing was changed. Try again.";
+
+/** The profile's fields an action passes on, trimmed and capped. */
+const PROFILE_LIMITS: Record<keyof ProfileEdit, number> = {
+    legalName: 200,
+    billingEmail: 254,
+    gstin: 15,
+    gstState: 60,
+    addressLine1: 120,
+    city: 60,
+    postalCode: 12,
+};
+
+/** What a profile's save sends: each field a string, "" to clear one. */
+function cleanProfile(input: unknown): ProfileEdit {
+    const raw =
+        input && typeof input === "object"
+            ? (input as Record<string, unknown>)
+            : {};
+    const out: ProfileEdit = {};
+    for (const key of Object.keys(PROFILE_LIMITS) as (keyof ProfileEdit)[]) {
+        const v = raw[key];
+        if (typeof v === "string") {
+            out[key] = v.trim().slice(0, PROFILE_LIMITS[key]);
+        }
+    }
+    return out;
+}
+
+/** Who Saroh bills, read for a sheet opened away from Plan & billing. */
+export async function billingProfileViewAction(): Promise<
+    ApiResult<BusinessBillingProfile>
+> {
+    return send<BusinessBillingProfile>(
+        "/billing/profile",
+        PROFILE_READ_FAILED,
+    );
+}
+
+/**
+ * The payment a paid plan's switch waits on (U6): its page only if
+ * secure, its window only as `cleanHandoff` reads it. Anything else is none.
+ */
+function cleanAuthorise(value: unknown): SwitchAuthorise | null {
+    if (!value || typeof value !== "object") return null;
+    const v = value as Record<string, unknown>;
+    if (typeof v.at !== "string" || typeof v.legalName !== "string") {
+        return null;
+    }
+    return {
+        at: v.at,
+        legalName: v.legalName,
+        authorisationUrl: securePage(v.authorisationUrl),
+        handoff: cleanHandoff(v.handoff),
+    };
+}
+
+/** What choosing did, with its payment (if any) checked. */
+function chosen<T extends BillingProfileChosen>(
+    res: ApiResult<T>,
+): ApiResult<T> {
+    if (!res.ok) return res;
+    return {
+        ok: true,
+        data: { ...res.data, authorise: cleanAuthorise(res.data.authorise) },
+    };
+}
+
+/**
+ * Bill the business to one of the owner's profiles, or keep the one it is
+ * on (which gives up a switch still waiting): at once, or for a paid plan
+ * from its renewal, once the payment is authorised (`authorise`).
+ */
+export async function chooseBillingProfileAction(
+    billingProfileId: unknown,
+): Promise<ApiResult<BillingProfileChosen>> {
+    if (
+        typeof billingProfileId !== "string" ||
+        !PROFILE_ID.test(billingProfileId)
+    ) {
+        return { ok: false, error: PROFILE_FAILED, field: "billingProfile" };
+    }
+    return chosen(
+        await send<BillingProfileChosen>(
+            "/billing/profile/choose",
+            PROFILE_FAILED,
+            { method: "POST", body: JSON.stringify({ billingProfileId }) },
+        ),
+    );
+}
+
+/**
+ * A new profile for the owner, and (`use`) the business's, as choosing it
+ * would. `notMoved`: made, but a paid plan's switch couldn't start; why.
+ */
+export async function createBillingProfileAction(
+    input: unknown,
+    use: unknown,
+): Promise<
+    ApiResult<
+        BillingProfileChosen & { created: string; notMoved?: string | null }
+    >
+> {
+    const profile = cleanProfile(input);
+    return chosen(
+        await send<
+            BillingProfileChosen & {
+                created: string;
+                notMoved?: string | null;
+            }
+        >("/billing/profile", PROFILE_FAILED, {
+            method: "POST",
+            body: JSON.stringify({
+                legalName: profile.legalName ?? "",
+                billingEmail: profile.billingEmail ?? "",
+                ...Object.fromEntries(
+                    Object.entries(profile).filter(([, v]) => v !== ""),
+                ),
+                use: use === true,
+            }),
+        }),
+    );
+}
+
+/** Change one of the owner's profiles; says how many businesses it bills. */
+export async function updateBillingProfileAction(
+    billingProfileId: unknown,
+    input: unknown,
+): Promise<ApiResult<{ profile: OwnBillingProfile; businesses: number }>> {
+    if (
+        typeof billingProfileId !== "string" ||
+        !PROFILE_ID.test(billingProfileId)
+    ) {
+        return { ok: false, error: PROFILE_FAILED };
+    }
+    return send<{ profile: OwnBillingProfile; businesses: number }>(
+        `/billing/profile/${encodeURIComponent(billingProfileId)}`,
+        PROFILE_FAILED,
+        { method: "PATCH", body: JSON.stringify(cleanProfile(input)) },
     );
 }

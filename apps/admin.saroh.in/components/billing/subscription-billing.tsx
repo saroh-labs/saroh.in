@@ -23,7 +23,7 @@ import { RazorpayId } from "./razorpay-id";
 /**
  * What a subscription sheet shows of the business's billing beyond its
  * plan (DEC-166), so the Billing role acts from here without opening the
- * business: its Razorpay customer, what needs action, double charges, its
+ * business: its billing profile and Razorpay customer, what needs action, double charges, its
  * last invoices with their refunds, and every refund and dispute.
  */
 export function SubscriptionBilling({
@@ -46,9 +46,11 @@ export function SubscriptionBilling({
                 </Section>
             ) : null}
 
-            <Section title="Razorpay customer">
-                <CustomerFacts customer={detail.billingCustomer} />
-                {canAct ? <SyncCustomer organizationId={orgId} /> : null}
+            <Section title="Billing profile">
+                <ProfileFacts profile={detail.billingProfile} />
+                {canAct && detail.billingProfile ? (
+                    <SyncCustomer organizationId={orgId} />
+                ) : null}
             </Section>
 
             {detail.doubleCharges.length > 0 ? (
@@ -144,44 +146,56 @@ function Section({
     );
 }
 
-function CustomerFacts({
-    customer,
+function ProfileFacts({
+    profile,
 }: {
-    customer: SarohSubscriptionDetail["billingCustomer"];
+    profile: SarohSubscriptionDetail["billingProfile"];
 }) {
-    if (!customer) {
+    if (!profile) {
         return (
             <p className="text-muted-foreground">
-                Not made yet: Saroh makes it at sign-up, or with the first
-                checkout.
+                No billing profile yet. An owner chooses one in Plan &amp;
+                billing before paying.
             </p>
         );
     }
     return (
         <div className="grid gap-1">
-            {customer.providerCustomerId ? (
+            <p className="font-medium">{profile.legalName}</p>
+            <p className="text-muted-foreground">
+                {profile.billingEmail}
+                {profile.gstin ? ` · GSTIN ${profile.gstin}` : " · No GSTIN"}
+            </p>
+            {profile.providerCustomerId ? (
                 <RazorpayId
-                    id={customer.providerCustomerId}
-                    provider={customer.provider}
+                    id={profile.providerCustomerId}
+                    provider={profile.provider}
                 />
             ) : (
                 <p className="text-muted-foreground">
-                    No customer id yet at {customer.provider}.
+                    No customer at {profile.provider} yet.
                 </p>
             )}
             <p className="text-muted-foreground">
-                {customer.syncedAt
-                    ? `Last synced ${istDateTime(customer.syncedAt)}`
+                {profile.syncedAt
+                    ? `Last synced ${istDateTime(profile.syncedAt)}`
                     : "Never synced"}
-                {customer.contactWithheld
-                    ? " · made without the phone (another business of the same owner has it)"
+                {profile.contactWithheld
+                    ? " · made without the phone (another customer already has it)"
                     : ""}
             </p>
-            {customer.lastError ? (
+            {profile.lastError ? (
                 <p className="text-destructive">
-                    Last sync failed: {customer.lastError}
+                    Last sync failed: {profile.lastError}
                 </p>
             ) : null}
+            <p className="text-muted-foreground">
+                {profile.otherBusinesses.length === 0
+                    ? "Bills only this business."
+                    : `Also bills ${profile.otherBusinesses
+                          .map((b) => b.name)
+                          .join(", ")}.`}
+            </p>
         </div>
     );
 }

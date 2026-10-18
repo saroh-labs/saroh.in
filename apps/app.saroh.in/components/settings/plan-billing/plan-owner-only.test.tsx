@@ -35,6 +35,10 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/lib/saroh-billing/billing-actions", () => ({
+    billingProfileViewAction: vi.fn(),
+    chooseBillingProfileAction: vi.fn(),
+    createBillingProfileAction: vi.fn(),
+    updateBillingProfileAction: vi.fn(),
     checkCouponAction: vi.fn(),
     confirmCheckoutAction: vi.fn(),
     changePlanAction: vi.fn(),
@@ -58,7 +62,10 @@ const SUBSCRIPTION = {
         entitlements: {},
     },
 };
+/** Who Saroh bills (DEC-167, U5): the owner's alone. */
+const getBillingProfileView = vi.fn();
 vi.mock("@/lib/saroh-billing/service", () => ({
+    getBillingProfileView: () => getBillingProfileView() as unknown,
     getSarohSubscription: () =>
         Promise.resolve({ status: "ok", subscription: SUBSCRIPTION }),
     getBillingAccess: () => Promise.resolve({ status: "ok", data: null }),
@@ -103,7 +110,30 @@ async function plansPage(org: unknown): Promise<string> {
 
 const PLANS = 'href="/settings/billing/plans"';
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+    vi.clearAllMocks();
+    getBillingProfileView.mockResolvedValue({
+        status: "ok",
+        data: {
+            current: {
+                id: "bprof_1",
+                mine: true,
+                legalName: "Rye Bakery LLP",
+                gstin: null,
+                gstState: "29",
+                addressLine1: "3 Hill Road",
+                addressLine2: null,
+                city: "Bengaluru",
+                postalCode: "560038",
+                billingEmail: "accounts@rye.example.com",
+                phone: null,
+                businesses: 1,
+            },
+            mine: [],
+            businessesOnCurrent: 1,
+        },
+    });
+});
 
 describe("Settings › Plan and billing, by who is reading", () => {
     it("opens for an Admin to read, saying only the owner can change it", async () => {
@@ -125,6 +155,28 @@ describe("Settings › Plan and billing, by who is reading", () => {
         const html = await page({ ...ADMIN, actions: undefined });
         expect(html).toContain(READ_ONLY);
         expect(html).not.toContain('aria-label="Coupon"');
+    });
+
+    it("shows an Admin nothing of who Saroh bills, and never asks for it (AE6)", async () => {
+        const html = await page(ADMIN);
+        expect(html).not.toContain("Who Saroh bills");
+        expect(html).not.toContain("Rye Bakery LLP");
+        expect(html).not.toContain("accounts@rye.example.com");
+        expect(getBillingProfileView).not.toHaveBeenCalled();
+    });
+
+    it("shows the owner who Saroh bills, read first with Edit and Change", async () => {
+        const html = await page(OWNER);
+        expect(html).toContain("Who Saroh bills");
+        expect(html).toContain("Rye Bakery LLP");
+        expect(html).toContain("accounts@rye.example.com");
+        expect(html).toMatch(/>Edit</);
+    });
+
+    it("leaves the panel out when the API refuses it, as for an Admin", async () => {
+        getBillingProfileView.mockResolvedValue({ status: "denied" });
+        const html = await page(OWNER);
+        expect(html).not.toContain("Who Saroh bills");
     });
 
     it("keeps every control for the owner, and no note", async () => {
