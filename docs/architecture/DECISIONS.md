@@ -2091,3 +2091,14 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - The business sees its manager: the app's Help shows the manager's name and work email (an Email button), only while a manager is linked. Nothing shows when there is none. The phone is not shown for now (owner, 18 Oct).
 - A manager's details (phone, city, languages, joined, reports to, engagement, tax id, emergency contact) are kept on their team record. The tax id is shown only to Platform owner and Billing.
 - Rules: added when built (plan 2026-10-18-002 Part 3, local).
+
+## DEC-170 Bookings: a caller with just a name and phone can be booked, the front desk books, hours save themselves
+
+**Status: Accepted — 2026-10-19, to design then build** · owner, answering the Bookings and Availability UX audit (#1016; audit and boards on the "Saroh App Designs" canvas). Amends [DEC-113](#dec-113-one-word-for-each-thing-a-merchant-sees) (the pending word).
+
+- **A booking needs a name and phone, not an email** (owner: "yes"). A caller who gives only those is booked as a customer kept by phone, as a walk-in with a phone already is for orders; the email is optional and can be added later.
+- **A booking waiting for its payment reads "Awaiting payment"** everywhere a merchant sees it (calendar, list, the booking's page, quick look). DEC-113's "To confirm" no longer applies to bookings.
+- **A Member can make bookings and mark arrivals** (owner: "yes they can"). The front desk books a caller and marks Came / Didn't come; what a Member may see of money still follows DEC-098.
+- **Hours and time off save themselves** (owner: "we can save automatically"). Each change on the availability page saves when its control is done, with Undo; there is no Save bar there.
+- **A booking made by hand defaults to "Pays at the visit"**; a payment link or "Paid now" stays one choice away.
+- Consequences: the improved designs are drawn with these first; code follows once the owner signs off the boards. The word list in `docs/patterns/saroh-product.md` changes with the code.
