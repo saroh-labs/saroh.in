@@ -137,6 +137,10 @@ export const CHECKOUT_TTL_MS = 24 * 60 * 60 * 1000;
 export const COUPON_TRIES_PER_ORG = 10;
 export const COUPON_TRIES_PER_ADDRESS = 30;
 
+/** A checkout refused for changing another owner's billing profile. */
+export const PROFILE_NOT_YOURS =
+    "This billing profile is another owner's, so only they can change it. Choose one of your own profiles in Plan & billing.";
+
 /** Who is asking, for the coupon limit: the caller's address, hashed. */
 export interface CheckoutClient {
     addressKey?: string | null;
@@ -562,6 +566,8 @@ export class CheckoutService {
             billingState?: string | null;
             gstin?: string | null;
             coupon?: string | null;
+            /** "This changes Saroh's invoices for N businesses.": seen. */
+            confirmSharedProfile?: boolean | null;
         } & BillingDetailsSent,
         now: Date = new Date(),
         client: CheckoutClient = {},
@@ -622,6 +628,11 @@ export class CheckoutService {
         const profileId = party.profile?.id;
         if (!profileId) throw new Error("checkoutDetails passed no profile");
         if (Object.keys(details.profile).length) {
+            await this.assertMayChangeProfile(
+                ctx,
+                profileId,
+                input.confirmSharedProfile === true,
+            );
             await this.saveBillingProfile(ctx, profileId, details.profile);
         }
         // Whole now: nothing is missing any more.
@@ -732,11 +743,55 @@ export class CheckoutService {
     }
 
     /**
+     * A checkout may change the billing profile it bills (anything it fills
+     * in or replaces) only as Plan & billing's Edit would (owner, 18 Oct
+     * 2026): the profile is its owner's, so no one else changes it here;
+     * and one billing more than one business is changed only once the
+     * owner has seen "This changes Saroh's invoices for N businesses." —
+     * the same words as Edit's — and confirmed. Refused before anything is
+     * written or asked of the provider.
+     */
+    private async assertMayChangeProfile(
+        ctx: OrganizationContext,
+        billingProfileId: string,
+        confirmed: boolean,
+    ): Promise<void> {
+        const profile = await prisma.billingProfile.findUnique({
+            where: { id: billingProfileId },
+            select: {
+                ownerUserId: true,
+                _count: {
+                    select: {
+                        organizations: { where: { deletedRetainedAt: null } },
+                    },
+                },
+            },
+        });
+        if (!profile) throw new Error("the checkout's profile is gone");
+        if (profile.ownerUserId !== ctx.userId) {
+            throw new ConflictException({
+                message: PROFILE_NOT_YOURS,
+                details: { field: "billingProfile", code: "profile-not-yours" },
+            });
+        }
+        const businesses = profile._count.organizations;
+        if (businesses > 1 && !confirmed) {
+            throw new ConflictException({
+                message: `This changes Saroh's invoices for ${businesses} businesses.`,
+                details: {
+                    field: "billingProfile",
+                    code: "profile-shared",
+                    businesses,
+                },
+            });
+        }
+    }
+
+    /**
      * What a checkout filled in of the business's billing profile: what it
-     * was missing, and a GSTIN given. A profile is its owner's and may bill
-     * other businesses too; an owner of this one checking out may still
-     * complete it (owner, 18 Oct 2026: keep it simple). Its customer at the
-     * provider is brought up to date by the sync queued with it.
+     * was missing, and a GSTIN given, once `assertMayChangeProfile` allows
+     * it. Its customer at the provider is brought up to date by the sync
+     * queued with it.
      */
     private async saveBillingProfile(
         ctx: OrganizationContext,

@@ -421,3 +421,181 @@ describe("what a checkout was given", () => {
         });
     });
 });
+
+describe("a checkout that would change a billing profile (owner, 18 Oct 2026)", () => {
+    const GSTIN = "29ABCDE1234F1ZW";
+
+    /** `onProfile`, whole: an address in Karnataka, no GSTIN. */
+    async function wholeProfile(name = "Bare Shop") {
+        const ctx = await onProfile(name);
+        await prisma.billingProfile.update({
+            where: { id: ctx.profileId },
+            data: {
+                addressLine1: "3 Hill Road",
+                city: "Bengaluru",
+                postalCode: "560038",
+                gstState: "29",
+            },
+        });
+        return ctx;
+    }
+
+    /** Another business of the same owner, billed to the same profile. */
+    async function alsoBilledTo(
+        profileId: string,
+        userId: string,
+    ): Promise<OrganizationContext> {
+        const other = await bare("Second Shop");
+        await prisma.organization.update({
+            where: { id: other.organizationId },
+            data: { billingProfileId: profileId },
+        });
+        return { ...other, userId };
+    }
+
+    async function refusal(
+        ctx: OrganizationContext,
+        input: Parameters<CheckoutService["changePlan"]>[1],
+    ): Promise<unknown> {
+        return checkout.changePlan(ctx, input).then(
+            () => null,
+            (e: unknown) => e,
+        );
+    }
+
+    async function gstinOf(profileId: string): Promise<string | null> {
+        const p = await prisma.billingProfile.findUniqueOrThrow({
+            where: { id: profileId },
+        });
+        return p.gstin;
+    }
+
+    it("a profile billing two businesses is refused with `profile-shared` until confirmed, nothing written or made", async () => {
+        const ctx = await wholeProfile();
+        const other = await alsoBilledTo(ctx.profileId, ctx.userId);
+        const error = await refusal(ctx, {
+            plan: "c",
+            cycle: "month",
+            gstin: GSTIN,
+        });
+        expect(error).toMatchObject({
+            status: 409,
+            response: {
+                message: "This changes Saroh's invoices for 2 businesses.",
+                details: {
+                    field: "billingProfile",
+                    code: "profile-shared",
+                    businesses: 2,
+                },
+            },
+        });
+        expect(await gstinOf(ctx.profileId)).toBeNull();
+        expect(fake.createCalls).toHaveLength(0);
+        expect(fake.orders.created).toHaveLength(0);
+        expect(await prisma.billingCheckout.count()).toBe(0);
+        expect(await prisma.job.count()).toBe(0);
+
+        // Confirmed: saved, and both businesses are billed with it.
+        const r = await checkout.changePlan(ctx, {
+            plan: "c",
+            cycle: "month",
+            gstin: GSTIN,
+            confirmSharedProfile: true,
+        });
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        expect(await gstinOf(ctx.profileId)).toBe(GSTIN);
+        expect(fake.createCalls[0]?.customer).toMatchObject({ gstin: GSTIN });
+        await checkout.changePlan(other, { plan: "c", cycle: "month" });
+        expect(fake.createCalls[1]?.customer).toMatchObject({
+            gstin: GSTIN,
+            billingProfileId: ctx.profileId,
+        });
+    });
+
+    it("a deleted business on the profile isn't counted", async () => {
+        const ctx = await wholeProfile();
+        const gone = await alsoBilledTo(ctx.profileId, ctx.userId);
+        await prisma.organization.update({
+            where: { id: gone.organizationId },
+            data: { deletedRetainedAt: new Date() },
+        });
+        await checkout.changePlan(ctx, {
+            plan: "c",
+            cycle: "month",
+            gstin: GSTIN,
+        });
+        expect(await gstinOf(ctx.profileId)).toBe(GSTIN);
+    });
+
+    it("a profile billing only this business is saved without asking", async () => {
+        const ctx = await wholeProfile();
+        await checkout.changePlan(ctx, {
+            plan: "c",
+            cycle: "month",
+            gstin: GSTIN,
+        });
+        expect(await gstinOf(ctx.profileId)).toBe(GSTIN);
+        expect(fake.createCalls).toHaveLength(1);
+    });
+
+    it("another owner's profile is refused with `profile-not-yours`, even confirmed, and left as it was", async () => {
+        const ctx = await onProfile();
+        const someoneElse = { ...ctx, userId: "another-owner" };
+        for (const confirmSharedProfile of [false, true]) {
+            const error = await refusal(someoneElse, {
+                plan: "c",
+                cycle: "month",
+                billingState: "Maharashtra",
+                registeredAddress: ADDRESS,
+                confirmSharedProfile,
+            });
+            expect(error).toMatchObject({
+                status: 409,
+                response: {
+                    message:
+                        "This billing profile is another owner's, so only they can change it. Choose one of your own profiles in Plan & billing.",
+                    details: {
+                        field: "billingProfile",
+                        code: "profile-not-yours",
+                    },
+                },
+            });
+        }
+        expect(
+            await prisma.billingProfile.findUniqueOrThrow({
+                where: { id: ctx.profileId },
+            }),
+        ).toMatchObject({ addressLine1: null, gstState: null });
+        expect(fake.createCalls).toHaveLength(0);
+        expect(await prisma.job.count()).toBe(0);
+    });
+
+    it("a checkout that changes nothing on the profile goes ahead, shared or another owner's", async () => {
+        const ctx = await wholeProfile();
+        await alsoBilledTo(ctx.profileId, ctx.userId);
+        const before = await prisma.billingProfile.findUniqueOrThrow({
+            where: { id: ctx.profileId },
+        });
+        await checkout.changePlan(
+            { ...ctx, userId: "another-owner" },
+            {
+                plan: "c",
+                cycle: "month",
+                // The profile's own state, and a phone it isn't missing
+                // asked for nothing: nothing to save.
+                billingState: "Karnataka",
+            },
+        );
+        expect(fake.createCalls).toHaveLength(1);
+        const after = await prisma.billingProfile.findUniqueOrThrow({
+            where: { id: ctx.profileId },
+        });
+        // Only the provider's customer, made by the checkout, is new.
+        const made = {
+            providerCustomerId: null,
+            syncedAt: null,
+            updatedAt: null,
+        };
+        expect({ ...after, ...made }).toEqual({ ...before, ...made });
+    });
+});

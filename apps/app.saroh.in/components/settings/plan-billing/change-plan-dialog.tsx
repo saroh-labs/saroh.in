@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { BusinessBillingProfile } from "@/lib/billing-profiles/view";
+import type { ProfileRefusal } from "@/lib/saroh-billing/billing-actions";
 import {
     billingProfileViewAction,
     changePlanAction,
@@ -96,7 +97,13 @@ const NOTHING_ASKED: DetailsAsked = {
  * (`invoice-details.tsx`). A business with no billing profile yet
  * (DEC-167) is asked who Saroh bills in Plan & billing's own sheet, opened
  * over the dialog, and quoted again once one is chosen: never a raw
- * refusal.
+ * refusal. What is given here may change the billing profile, so it asks
+ * as Plan & billing's Edit does (owner, 18 Oct 2026): a profile billing
+ * several businesses says "This changes Saroh's invoices for N
+ * businesses." and Confirm becomes "Save for N businesses and continue",
+ * which sends it again confirmed; another owner's profile can't be
+ * changed here, and "Choose one of my profiles" opens the Change sheet.
+ * What was typed stays.
  *
  * The design moves plan on a click; real money asks first (design
  * deviation, U14).
@@ -148,6 +155,13 @@ export function ChangePlanDialog({
         null,
     );
     const [loadingProfiles, setLoadingProfiles] = useState(false);
+    // The API's refusal to change the billing profile, for the quote it
+    // was made on: one message, in place of a toast.
+    const [refused, setRefused] = useState<{
+        key: string;
+        error: string;
+        profile: ProfileRefusal;
+    } | null>(null);
 
     /** Open "Choose who Saroh bills" over the dialog. */
     async function chooseProfile() {
@@ -169,6 +183,12 @@ export function ChangePlanDialog({
     // Loading until the answer for this very request has landed.
     const quoting: Quoting =
         answer?.key === key && key ? answer : { state: "loading" };
+    // A refusal holds until the dialog is quoted again (a profile chosen).
+    const profileRefused = refused?.key === key ? refused : null;
+    const sharedWith =
+        profileRefused?.profile.code === "profile-shared"
+            ? profileRefused.profile.businesses
+            : null;
 
     useEffect(() => {
         if (!picked) return;
@@ -248,11 +268,14 @@ export function ChangePlanDialog({
                     cycle: picked.cycle,
                     coupon: code || undefined,
                     ...detailsSent(details, asked),
+                    ...(sharedWith ? { confirmSharedProfile: true } : {}),
                 }),
             );
             if (!res) return;
             if (!res.ok) {
-                if (res.field === "billing-profile") {
+                if (res.profile) {
+                    setRefused({ key, error: res.error, profile: res.profile });
+                } else if (res.field === "billing-profile") {
                     // Asked in place, then quoted again.
                     void chooseProfile();
                 } else if (
@@ -518,6 +541,29 @@ export function ChangePlanDialog({
                     </details>
                 ) : null}
 
+                {profileRefused ? (
+                    <div
+                        role="alert"
+                        className="grid gap-2 rounded-lg border border-border px-3.5 py-3 text-[13px]"
+                    >
+                        <p className="text-pretty">{profileRefused.error}</p>
+                        {profileRefused.profile.code === "profile-not-yours" ? (
+                            <p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    busy={loadingProfiles}
+                                    busyLabel="Opening…"
+                                    onClick={() => void chooseProfile()}
+                                >
+                                    Choose one of my profiles
+                                </Button>
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
+
                 {choosing ? (
                     <ChangeBillingProfileSheet
                         view={choosing}
@@ -554,7 +600,9 @@ export function ChangePlanDialog({
                                     : "Changing…"
                             }
                         >
-                            {summary.confirm}
+                            {sharedWith
+                                ? `Save for ${sharedWith} businesses and continue`
+                                : summary.confirm}
                         </Button>
                     ) : null}
                 </DialogFooter>

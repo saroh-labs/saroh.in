@@ -502,3 +502,88 @@ describe("ChangePlanDialog: a business with no billing profile (DEC-167)", () =>
         expect(sheet()?.textContent).toContain("Asha Foods LLP");
     });
 });
+
+describe("ChangePlanDialog: a checkout that would change the billing profile (18 Oct)", () => {
+    const missingAddress = () =>
+        quote({
+            kind: "NEW",
+            startAt: null,
+            registeredAddress: false,
+            billingDetails: { missing: ["address", "state"], phone: false },
+        });
+
+    async function fillAndContinue(dialog: Element) {
+        type(field(dialog, "bill-gstin"), "29AABCI1234A1Z7");
+        type(field(dialog, "bill-address-line1"), "4 Mill Road");
+        type(field(dialog, "bill-city"), "Pune");
+        type(field(dialog, "bill-pin"), "411001");
+        await press(dialog, "Continue to payment");
+    }
+
+    it("a shared profile: says the one message, and the button sends it again confirmed, with what was typed", async () => {
+        changePlanAction.mockResolvedValueOnce({
+            ok: false,
+            error: "This changes Saroh's invoices for 3 businesses.",
+            field: "billingProfile",
+            profile: { code: "profile-shared", businesses: 3 },
+        });
+        changePlanAction.mockResolvedValueOnce({ ok: false, error: "stop" });
+        const dialog = await open(missingAddress());
+        await fillAndContinue(dialog);
+        expect(changePlanAction).toHaveBeenCalledTimes(1);
+        expect(changePlanAction.mock.calls[0]?.[0]).not.toHaveProperty(
+            "confirmSharedProfile",
+        );
+        const alert = dialog.querySelector('[role="alert"]');
+        expect(alert?.textContent).toBe(
+            "This changes Saroh's invoices for 3 businesses.",
+        );
+        // Typed values stay.
+        expect(field(dialog, "bill-address-line1").value).toBe("4 Mill Road");
+
+        await press(dialog, "Save for 3 businesses and continue");
+        expect(changePlanAction).toHaveBeenCalledTimes(2);
+        expect(changePlanAction.mock.calls[1]?.[0]).toEqual(
+            expect.objectContaining({
+                confirmSharedProfile: true,
+                gstin: "29AABCI1234A1Z7",
+                registeredAddress: expect.objectContaining({
+                    line1: "4 Mill Road",
+                }) as unknown,
+            }),
+        );
+    });
+
+    it("another owner's profile: says so, and offers the Change sheet of the owner's own profiles", async () => {
+        const message =
+            "This billing profile is another owner's, so only they can change it. Choose one of your own profiles in Plan & billing.";
+        changePlanAction.mockResolvedValue({
+            ok: false,
+            error: message,
+            field: "billingProfile",
+            profile: { code: "profile-not-yours" },
+        });
+        const dialog = await open(missingAddress());
+        await fillAndContinue(dialog);
+        const alert = dialog.querySelector('[role="alert"]');
+        expect(alert?.textContent).toContain(message);
+        expect(field(dialog, "bill-city").value).toBe("Pune");
+        // The confirm keeps its own words: nothing to confirm here.
+        expect(
+            Array.from(dialog.querySelectorAll("button")).some(
+                (b) => b.textContent === "Continue to payment",
+            ),
+        ).toBe(true);
+
+        await press(dialog, "Choose one of my profiles");
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 20));
+        });
+        expect(billingProfileViewAction).toHaveBeenCalled();
+        const sheet = Array.from(
+            document.querySelectorAll('[role="dialog"]'),
+        ).at(-1);
+        expect(sheet?.textContent).toContain("Asha Foods LLP");
+        expect(sheet?.textContent).toContain("New billing profile");
+    });
+});

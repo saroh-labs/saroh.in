@@ -27,7 +27,10 @@ import { normalisePublicPhone } from "../organizations/business-phone";
  * A GSTIN stays optional, and a phone is used "if available". Details
  * given at checkout are saved to the profile (never to `BusinessProfile`):
  * the name, email, address, state and phone only where it has none; a
- * GSTIN given there replaces the profile's, with its state. The profile's
+ * GSTIN given there replaces the profile's, with its state. Only the
+ * profile's owner may change it this way, and one billing several
+ * businesses only once they confirm (`assertMayChangeProfile` in
+ * `checkout.service.ts`, owner 18 Oct 2026). The profile's
  * customer at the provider is brought up to date by the
  * `billing.profile.sync` job the save queues (`billing-customer.ts`).
  */

@@ -1,6 +1,6 @@
 "use server";
 
-import type { ApiResult } from "@/lib/api/failure";
+import type { ApiFailure, ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, orgBase } from "@/lib/api/http";
 
@@ -62,6 +62,42 @@ export interface ChangeInput {
     billingName?: string;
     billingEmail?: string;
     phone?: string;
+    /** "This changes Saroh's invoices for N businesses.": seen (18 Oct). */
+    confirmSharedProfile?: true;
+}
+
+/**
+ * A checkout refused for changing its billing profile (owner, 18 Oct
+ * 2026): one billing several businesses, until the owner confirms; or
+ * another owner's, which only they may change.
+ */
+export type ProfileRefusal =
+    | { code: "profile-shared"; businesses: number }
+    | { code: "profile-not-yours" };
+
+/** A change refused, with the profile refusal when it is one. */
+export type ChangeFailure = ApiFailure & { profile?: ProfileRefusal };
+
+/** The API's `details` of a profile refusal; anything else is none. */
+function profileRefusalOf(body: unknown): ProfileRefusal | undefined {
+    const b = (body ?? {}) as { details?: unknown; error?: unknown };
+    const inner =
+        b.error && typeof b.error === "object"
+            ? (b.error as { details?: unknown }).details
+            : undefined;
+    const d = (inner ?? b.details) as
+        { code?: unknown; businesses?: unknown } | undefined;
+    if (!d || typeof d !== "object") return undefined;
+    if (d.code === "profile-not-yours") return { code: "profile-not-yours" };
+    if (
+        d.code === "profile-shared" &&
+        typeof d.businesses === "number" &&
+        Number.isInteger(d.businesses) &&
+        d.businesses > 1
+    ) {
+        return { code: "profile-shared", businesses: d.businesses };
+    }
+    return undefined;
 }
 
 /** The typed words of a field, trimmed and capped; blank is none. */
@@ -104,6 +140,7 @@ function clean(input: unknown): ChangeInput | null {
         billingName,
         billingEmail,
         phone,
+        confirmSharedProfile,
     } = input as Record<string, unknown>;
     if (typeof plan !== "string" || !PLAN_ID.test(plan)) return null;
     if (cycle !== "month" && cycle !== "year") return null;
@@ -125,6 +162,7 @@ function clean(input: unknown): ChangeInput | null {
     if (email) out.billingEmail = email;
     const tel = text(phone, 32);
     if (tel) out.phone = tel;
+    if (confirmSharedProfile === true) out.confirmSharedProfile = true;
     return out;
 }
 
@@ -132,14 +170,16 @@ async function send<T>(
     path: string,
     fallback: string,
     init?: RequestInit,
-): Promise<ApiResult<T>> {
+): Promise<ApiResult<T> | ChangeFailure> {
     const base = await orgBase();
     if (!base) return { ok: false, error: fallback };
     const res = await apiFetch(`${base}${path}`, init);
     const body: unknown = await res.json().catch(() => null);
     if (res.ok && body) return { ok: true, data: body as T };
     // A server failure's words are generic: say ours instead.
-    return toFailure(res.status >= 500 ? null : body, fallback);
+    const said = res.status >= 500 ? null : body;
+    const profile = res.status === 409 ? profileRefusalOf(said) : undefined;
+    return { ...toFailure(said, fallback), ...(profile ? { profile } : {}) };
 }
 
 /** What moving to a plan would be and cost; a coupon refused names `coupon`. */
@@ -179,7 +219,7 @@ function securePage(url: unknown): string | null {
  */
 export async function changePlanAction(
     input: unknown,
-): Promise<ApiResult<ChangeResult>> {
+): Promise<{ ok: true; data: ChangeResult } | ChangeFailure> {
     const c = clean(input);
     if (!c) return { ok: false, error: CHANGE_FAILED };
     if (c.coupon && !COUPON.test(c.coupon)) {
