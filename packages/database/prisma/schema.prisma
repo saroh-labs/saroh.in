@@ -75,6 +75,10 @@ model User {
   // What this person chose to hear about, per business (round-2 F14).
   notificationPreferences NotificationPreference[]
 
+  // Billing profiles this person owns: who Saroh bills for their
+  // businesses (DEC-167).
+  billingProfiles BillingProfile[] @relation("BillingProfileOwner")
+
   @@index([email])
 }
 
@@ -385,11 +389,18 @@ model Organization {
   // Saroh billing: checkouts for a plan change (pricing catalogue U15).
   billingCheckouts         BillingCheckout[]
   billingCustomers         BillingCustomer[]
+  // Who Saroh bills for this business (DEC-167): one of its owner's
+  // billing profiles. Null only for a business made before the profile in
+  // the same transaction, or whose profile's owner was deleted; a checkout
+  // then makes one for the paying owner.
+  billingProfileId         String?
+  billingProfile           BillingProfile?          @relation("OrganizationBillingProfile", fields: [billingProfileId], references: [id], onDelete: SetNull)
   sarohInvoices            SarohInvoice[]
   // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
   subscriptionAddonCharges SubscriptionAddonCharge[]
 
   @@index([referredByOrganizationId])
+  @@index([billingProfileId])
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -7379,6 +7390,48 @@ model BillingCustomer {
   @@unique([organizationId, provider])
 }
 
+// Who Saroh bills (DEC-167): a GST entity with its own legal name, GSTIN,
+// billing address and billing email, owned by one person and used by any of
+// their businesses. One customer at Saroh's billing provider per profile.
+// Owned by a user, not a business, so it has no org policy: the API reads
+// and writes it only for its owner (`billing-profiles.service.ts`).
+model BillingProfile {
+  id          String @id @default(cuid())
+  ownerUserId String
+  owner       User   @relation("BillingProfileOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  legalName    String
+  // GSTIN, when the entity is registered.
+  gstin        String?
+  // Two-digit GST state code: the billing address's state (and the GSTIN's).
+  gstState     String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  postalCode   String?
+  // Lower-case (a CHECK holds it); unique per owner, as the provider refuses
+  // a second customer with the same email and phone.
+  billingEmail String
+  phone        String?
+
+  provider           String
+  // Razorpay's `cust_…`; null until the provider has made it.
+  providerCustomerId String?
+  // Made without the phone: the provider already has a customer with this
+  // email and phone. The phone stays in Saroh.
+  contactWithheld    Boolean   @default(false)
+  syncedAt           DateTime?
+  lastError          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organizations Organization[] @relation("OrganizationBillingProfile")
+
+  @@unique([ownerUserId, billingEmail])
+  @@unique([provider, providerCustomerId])
+  @@index([ownerUserId])
+}
+
 // Something about Saroh's billing an operator must act on by hand (DEC-166,
 // owner 17 Oct 2026): a refund owed, a cancel the provider keeps refusing,
 // a payment Saroh never matched, an invoice whose total isn't what the
@@ -7486,6 +7539,9 @@ model BillingCheckout {
   providerSubscriptionId String
   providerPlanId         String
   providerCustomerId     String?
+  // The billing profile this checkout bills (DEC-167): the business's own
+  // at the time, or the one a scheduled switch moves it to.
+  billingProfileId       String?
 
   // The plan's recurring price before GST, in paise, as it was quoted.
   pricePaise        Int
@@ -7563,6 +7619,9 @@ model SarohInvoice {
   // payment, its customer and Saroh's invoice can be followed either way
   // (17 Oct 2026). Null on invoices written before it was kept.
   providerCustomerId     String?
+  // The billing profile the invoice is addressed to (DEC-167); its bill-to
+  // fields above are the profile's at issue time. Null before profiles.
+  billingProfileId       String?
   checkoutId             String?
   planId                 String?
   planName               String

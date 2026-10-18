@@ -43,6 +43,8 @@ const NOT_TENANT_OWNED: Record<string, string> = {
     AdminOperationItem: "Child of AdminOperation; no organization.",
     WaitlistSignup:
         "A marketing-site waitlist entry, before any organization exists.",
+    BillingProfile:
+        "Who Saroh bills (DEC-167): owned by one person and used by any of their businesses, so no one organization owns it; the API reads and writes it only for its owner.",
     ContactMessage:
         "A message sent from saroh.in/contact (DEC-137); the writer need not have an account, and it belongs to no organization.",
 };
