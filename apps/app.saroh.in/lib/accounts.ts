@@ -25,3 +25,11 @@ export function inviteLandingFor(pathname: string): string | null {
     const token = /^\/join\/([^/]+)\/?$/.exec(pathname)?.[1];
     return token ? `${accountsUrl}/invite/${token}` : null;
 }
+
+/**
+ * Every billing profile the owner has, and what each pays for (DEC-167
+ * step 2): in their account on accounts.saroh.in, never inside one
+ * business. Opened in the same tab, from Plan & billing and the account
+ * menu, for owners only.
+ */
+export const billingProfilesUrl = `${accountsUrl}/account/billing-profiles`;

@@ -3,10 +3,12 @@
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
+import { textLinkClass } from "@saroh/ui/text-link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { billingProfilesUrl } from "@/lib/accounts";
 import type { BusinessBillingProfile } from "@/lib/billing-profiles/view";
 import {
     BILLED_TO,
@@ -188,6 +190,22 @@ export function BillingProfilePanel({
                     {action}
                 </div>
             </div>
+            {/* Every profile lives in the owner's account (DEC-167 step
+                2); this card only ever shows this business's. Drawn for
+                the owner alone, as the card is. */}
+            <p className="border-t border-muted bg-muted/40 px-[18px] pb-3 pt-2.5 text-[12.5px]">
+                <a
+                    href={billingProfilesUrl}
+                    className={textLinkClass()}
+                    data-all-billing-profiles=""
+                >
+                    All your billing profiles ↗
+                </a>
+                <span className="text-muted-foreground">
+                    {" "}
+                    in your Saroh account
+                </span>
+            </p>
             {current?.mine ? (
                 <EditBillingProfileSheet
                     key={`edit-${opening}`}

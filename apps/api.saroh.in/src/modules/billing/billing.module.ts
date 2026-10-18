@@ -18,6 +18,7 @@ import {
 import { BILLING_CUSTOMER_SYNC_TYPE } from "./billing-customer-sync";
 import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
 import { BILLING_PROFILE_SYNC_TYPE } from "./billing-profile-sync";
+import { BillingProfilesAccountService } from "./billing-profiles-account.service";
 import { BillingProfilesController } from "./billing-profiles.controller";
 import { BillingProfilesService } from "./billing-profiles.service";
 import {
@@ -149,6 +150,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         BillingProfileSyncHandler,
         BillingProfilesService,
         BusinessBillingProfileService,
+        // The account's Billing profiles (DEC-167 step 2).
+        BillingProfilesAccountService,
         // The daily match of what the provider took (DEC-166).
         BillingReconcileHandler,
         SarohInvoicesService,

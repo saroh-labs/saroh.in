@@ -117,3 +117,14 @@ export class ChooseBillingProfileDto {
     @MaxLength(64)
     billingProfileId!: string;
 }
+
+/**
+ * A new profile from the account's Billing profiles (step 2): with
+ * `organizationId`, one of the owner's businesses is moved to it too.
+ */
+export class CreateAccountBillingProfileDto extends NewBillingProfileDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    organizationId?: string;
+}

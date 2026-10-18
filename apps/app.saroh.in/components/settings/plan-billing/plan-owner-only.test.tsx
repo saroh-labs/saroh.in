@@ -173,6 +173,20 @@ describe("Settings › Plan and billing, by who is reading", () => {
         expect(html).toMatch(/>Edit</);
     });
 
+    it("links an owner to all their billing profiles in their account, and never an Admin or Member (DEC-167 step 2)", async () => {
+        const owner = await page(OWNER);
+        expect(owner).toContain("All your billing profiles ↗");
+        expect(owner).toContain(
+            'href="https://accounts.saroh.in/account/billing-profiles"',
+        );
+        expect(owner).not.toContain('target="_blank"');
+        for (const reader of [ADMIN, { ...ADMIN, role: "MEMBER" }]) {
+            const html = await page(reader);
+            expect(html).not.toContain("All your billing profiles");
+            expect(html).not.toContain("/account/billing-profiles");
+        }
+    });
+
     it("leaves the panel out when the API refuses it, as for an Admin", async () => {
         getBillingProfileView.mockResolvedValue({ status: "denied" });
         const html = await page(OWNER);

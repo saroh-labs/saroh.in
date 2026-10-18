@@ -1,7 +1,4 @@
-import { headers } from "next/headers";
-
-import { env } from "@/env";
-
+import { apiFetch } from "./api";
 import { getAppUrl } from "./app-urls";
 
 /**
@@ -43,26 +40,9 @@ export function businessBadge(
     return undefined;
 }
 
-function apiBase(): string {
-    if (env.NEXT_PUBLIC_BETTER_AUTH_URL) {
-        return new URL(env.NEXT_PUBLIC_BETTER_AUTH_URL).origin;
-    }
-    return env.NODE_ENV === "production"
-        ? "https://api.saroh.in"
-        : "https://api.saroh.localhost";
-}
-
-async function apiGet(path: string): Promise<Response> {
-    const cookie = (await headers()).get("cookie") ?? "";
-    return fetch(`${apiBase()}${path}`, {
-        headers: { cookie },
-        cache: "no-store",
-    });
-}
-
 /** Their businesses, by name. Throws when the API cannot answer. */
 export async function listBusinesses(): Promise<Business[]> {
-    const res = await apiGet("/organizations");
+    const res = await apiFetch("/organizations");
     if (!res.ok) throw new Error(`GET /organizations failed: ${res.status}`);
     return (await res.json()) as Business[];
 }
@@ -74,7 +54,7 @@ export async function listBusinesses(): Promise<Business[]> {
  */
 export async function isStaff(): Promise<boolean> {
     try {
-        const res = await apiGet("/admin/me");
+        const res = await apiFetch("/admin/me");
         return res.ok;
     } catch {
         return false;

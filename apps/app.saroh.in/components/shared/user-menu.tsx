@@ -2,6 +2,7 @@
 
 import { authClient } from "@saroh/auth/client";
 import { Avatar, AvatarFallback, avatarInitials } from "@saroh/ui/avatar";
+import { Badge } from "@saroh/ui/badge";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -15,11 +16,17 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
-import { CircleHelp, LogOut, SunMoon, UserRound } from "lucide-react";
+import {
+    CircleHelp,
+    LogOut,
+    ReceiptText,
+    SunMoon,
+    UserRound,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 
-import { accountsLoginUrl } from "@/lib/accounts";
+import { accountsLoginUrl, billingProfilesUrl } from "@/lib/accounts";
 import { helpHomeUrl } from "@/lib/help/links";
 
 /**
@@ -48,11 +55,17 @@ export function UserMenu({
     name,
     email,
     businessName,
+    ownsABusiness = false,
 }: {
     name?: string | null;
     email: string;
     /** For the note that says these settings are not the business's. */
     businessName?: string;
+    /**
+     * They own at least one business, so they have billing profiles
+     * (DEC-167 step 2): the menu links to them in their account.
+     */
+    ownsABusiness?: boolean;
 }) {
     const { theme = "system", setTheme } = useTheme();
     // An empty-string name is as good as absent.
@@ -107,6 +120,22 @@ export function UserMenu({
                         <span className="flex-1">Your profile</span>
                     </Link>
                 </DropdownMenuItem>
+                {ownsABusiness ? (
+                    <DropdownMenuItem asChild className="font-semibold">
+                        {/* Their own, not this business's: in their account
+                            on accounts.saroh.in, in the same tab. */}
+                        <a
+                            href={billingProfilesUrl}
+                            data-billing-profiles-link=""
+                        >
+                            <ReceiptText />
+                            <span className="flex-1">Billing profiles ↗</span>
+                            <Badge size="sm" variant="neutral">
+                                New
+                            </Badge>
+                        </a>
+                    </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="gap-2.5 rounded-[7px] px-[9px] py-[7px] text-[13px] [&>svg]:size-4">
                         <SunMoon />
@@ -139,8 +168,18 @@ export function UserMenu({
                     </a>
                 </DropdownMenuItem>
                 <p className="px-[9px] pb-1 pt-2 text-[11px] leading-[1.45] text-muted-foreground">
-                    These are yours, not {businessName ?? "the business"}
-                    &apos;s. They follow you into every business you belong to.
+                    {ownsABusiness ? (
+                        <>
+                            Your profile and billing profiles are yours, not{" "}
+                            {businessName ?? "the business"}&apos;s.
+                        </>
+                    ) : (
+                        <>
+                            These are yours, not{" "}
+                            {businessName ?? "the business"}&apos;s. They follow
+                            you into every business you belong to.
+                        </>
+                    )}
                 </p>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

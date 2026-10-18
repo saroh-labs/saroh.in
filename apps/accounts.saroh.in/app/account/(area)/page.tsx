@@ -6,12 +6,9 @@ import { PasswordSection } from "@/components/account/password-section";
 import { ProfileForm } from "@/components/account/profile-form";
 import { SessionsList } from "@/components/account/sessions-list";
 import { AuthHeading, AuthNote } from "@/components/auth/field";
-import { ACCOUNT_PANEL } from "@/components/auth/panel-copy";
-import { getAppUrl } from "@/lib/app-urls";
 import { authClient } from "@/lib/auth.client";
 import { Button } from "@saroh/ui/button";
 import { Skeleton } from "@saroh/ui/skeleton";
-import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -25,18 +22,14 @@ import type { ReactNode } from "react";
  * Everything here acts on the SESSION USER only, never on an id from the URL,
  * so there is no surface on which to act as someone else.
  *
- * In the same split every other page of this app wears (UX audit, 10 Oct).
- * It was a bare centred column with its own heading sizes, one of four page
- * styles across the accounts pages. Loading, failed and signed out are the
- * same frame too, so the page never arrives as a different layout from the
- * one it was waiting as.
+ * In the account area's frame since Billing profiles joined it (DEC-167
+ * step 2, `app/account/(area)/layout.tsx`): the top bar, Back to Saroh and
+ * the menu are the frame's; the sections here are unchanged. Loading,
+ * failed and signed out keep to the same column, so the page never
+ * arrives as a different layout from the one it was waiting as.
  */
 function Frame({ children }: { children: ReactNode }) {
-    return (
-        <SplitShell panel={<SplitPanel {...ACCOUNT_PANEL} />}>
-            {children}
-        </SplitShell>
-    );
+    return <div className="max-w-[760px]">{children}</div>;
 }
 
 export default function AccountPage() {
@@ -123,14 +116,6 @@ export default function AccountPage() {
                 <PasswordSection email={user.email} />
                 <SessionsList currentToken={session.session.token} />
                 <DeleteAccount />
-                <p className="sa-rise text-muted-foreground text-[12.5px]">
-                    <a
-                        href={getAppUrl()}
-                        className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
-                    >
-                        Back to Saroh
-                    </a>
-                </p>
             </div>
         </Frame>
     );

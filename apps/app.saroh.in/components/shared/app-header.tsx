@@ -103,6 +103,9 @@ export function AppHeader(props: AppHeaderProps) {
                     name={user.name}
                     email={user.email}
                     businessName={activeOrg?.name}
+                    ownsABusiness={organizations.some(
+                        (o) => o.role === "OWNER",
+                    )}
                 />
             </div>
         </header>
