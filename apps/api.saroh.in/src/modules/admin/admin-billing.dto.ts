@@ -12,6 +12,8 @@ import {
 
 import type { SubscriptionStatusKey, SubscriptionView } from "./admin-billing";
 import { SUBSCRIPTION_STATUSES, SUBSCRIPTION_VIEWS } from "./admin-billing";
+import type { HistoryShow } from "./admin-billing-history";
+import { HISTORY_MAX_PAGE, HISTORY_SHOWS } from "./admin-billing-history";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -87,5 +89,19 @@ export class ListSarohSubscriptionsDto {
     @IsInt()
     @Min(1)
     @Max(100_000)
+    page?: number;
+}
+
+/** A subscription's history (admin plan U15): which chip, and the page. */
+export class SubscriptionHistoryDto {
+    @IsOptional()
+    @IsIn(HISTORY_SHOWS)
+    show?: HistoryShow;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(HISTORY_MAX_PAGE)
     page?: number;
 }

@@ -133,6 +133,18 @@ export interface BillingCounts {
 
 export interface SarohSubscriptionDetail {
     subscription: SarohSubscriptionRow;
+    /** When the business first got a subscription. */
+    since: string;
+    /**
+     * The plan's list price for its cycle, before GST, and a custom price
+     * staff gave the business, with when it ends (null: no end).
+     */
+    price: {
+        listPaise: number;
+        currency: string;
+        customPaise: number | null;
+        customUntil: string | null;
+    };
     /**
      * Who Saroh bills the business to (DEC-167): its billing profile, the
      * profile's customer at the provider and its last sync, and the other

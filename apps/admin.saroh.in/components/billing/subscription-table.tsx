@@ -17,6 +17,8 @@ import {
 } from "@/lib/billing-words";
 import { plural } from "@/lib/format";
 
+import { useSubscriptionChanges } from "./subscription-changes";
+
 /** A state pill's tone; the state is always said in words too. */
 export const STATUS_TONE: Record<
     string,
@@ -119,7 +121,10 @@ const COLUMNS: DataColumn<SarohSubscriptionRow>[] = [
     },
 ];
 
-/** One page of subscriptions; a row opens its side sheet. */
+/**
+ * One page of subscriptions; a row opens its side sheet. A row the sheet
+ * just changed lights for two seconds (R9).
+ */
 export function SubscriptionTable({
     rows,
     openHref,
@@ -128,6 +133,7 @@ export function SubscriptionTable({
     /** This screen's address with the row's sheet open. */
     openHref: Record<string, string>;
 }) {
+    const changes = useSubscriptionChanges();
     return (
         <DataView
             viewId="console-billing-subscriptions"
@@ -135,6 +141,9 @@ export function SubscriptionTable({
             columns={COLUMNS}
             rowKey={(row) => row.id}
             rowHref={(row) => openHref[row.id] ?? "#"}
+            rowChanged={
+                changes ? (row) => changes.isHighlighted(row.id) : undefined
+            }
             modes={["table", "list"]}
             noun={{ one: "subscription", other: "subscriptions" }}
             countLabel={(visible) =>

@@ -33,8 +33,11 @@ export function tabOf(pathname: string): BillingTab {
 /** The query as a plain record: what the page's `searchParams` holds. */
 export type Query = Record<string, string | undefined>;
 
-/** Keys that are where you are in a list, not what it is narrowed to. */
-const PLACE = ["page", "open"] as const;
+/**
+ * Keys that are where you are in a list, not what it is narrowed to: the
+ * page, and an open sheet with its tab, History chip and page (U15).
+ */
+export const PLACE = ["page", "open", "sheet", "history", "hpage"] as const;
 
 /** An address from a path and a query, leaving out what says nothing. */
 export function hrefOf(path: string, query: Query): string {

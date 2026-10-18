@@ -67,7 +67,7 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
   `lib/billing-action-words.ts`, `lib/user-filters.ts`,
   `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
-  `lib/overview-words.ts`, `lib/module-fix.ts`.
+  `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -81,7 +81,12 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
 - **Billing (`/billing/invoices`, `/billing/subscriptions`, DEC-163)** shows
   every invoice Saroh issued (with the filtered set's totals, each PDF and a
   month's CSV for GST) and every business's Saroh subscription (a row opens
-  its checkouts and the provider's events in a side sheet). Read-only. It
+  its side sheet, admin plan U15: one problem banner, then Summary, History
+  and Invoices as addresses, `?sheet=`, `?history=`, `?hpage=`; History is
+  `GET …/subscriptions/:id/history`, merged by the API from provider
+  events (never their payload), invoices, billing emails and staff
+  actions; after a write the list's row lights through
+  `SubscriptionChangesProvider`). Read-only. It
   needs `saroh-billing:read`, which only Platform Owners and Billing hold
   (owner, 17 Oct: never Support, Operations, Release manager or Auditor);
   the API checks it on the route and again in the service, and records

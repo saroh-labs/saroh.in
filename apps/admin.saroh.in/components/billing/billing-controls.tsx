@@ -23,6 +23,19 @@ import { OperatorDialog } from "../operator-dialog";
  * else regardless.
  */
 
+/** What a control says back once its write went through (U8 feedback). */
+type OnDone = () => void;
+
+/** A write's result, telling `onDone` when it went through. */
+async function then<R extends { ok: boolean }>(
+    write: Promise<R>,
+    onDone: OnDone | undefined,
+): Promise<R> {
+    const result = await write;
+    if (result.ok) onDone?.();
+    return result;
+}
+
 /** Close a Needs-action row. */
 export function ResolveAction({ id, label }: { id: string; label: string }) {
     return (
@@ -43,8 +56,10 @@ export function ResolveAction({ id, label }: { id: string; label: string }) {
 /** Ask the provider again about a double charge's refund. */
 export function RecheckRefund({
     providerPaymentId,
+    onDone,
 }: {
     providerPaymentId: string;
+    onDone?: OnDone;
 }) {
     return (
         <OperatorDialog
@@ -65,6 +80,7 @@ export function RecheckRefund({
                         error: "It is already recorded as refunded. Nothing to do.",
                     };
                 }
+                if (result.ok) onDone?.();
                 return result;
             }}
         />
@@ -72,7 +88,13 @@ export function RecheckRefund({
 }
 
 /** Send the business's billing profile to its provider customer again. */
-export function SyncCustomer({ organizationId }: { organizationId: string }) {
+export function SyncCustomer({
+    organizationId,
+    onDone,
+}: {
+    organizationId: string;
+    onDone?: OnDone;
+}) {
     return (
         <OperatorDialog
             trigger="Sync again"
@@ -81,7 +103,14 @@ export function SyncCustomer({ organizationId }: { organizationId: string }) {
             effect="Saroh sends the billing profile's legal name, email, phone and GSTIN to its customer at the billing provider, in the background. The profile may bill other businesses too; they share the one customer. A refusal shows here as the last error."
             submitLabel="Sync again"
             onSubmit={({ reason, idempotencyKey }) =>
-                syncCustomerAction({ organizationId, reason, idempotencyKey })
+                then(
+                    syncCustomerAction({
+                        organizationId,
+                        reason,
+                        idempotencyKey,
+                    }),
+                    onDone,
+                )
             }
         />
     );
@@ -93,11 +122,13 @@ export function EndAutopay({
     businessName,
     planName,
     paidUntil,
+    onDone,
 }: {
     subscriptionId: string;
     businessName: string;
     planName: string;
     paidUntil: string | null;
+    onDone?: OnDone;
 }) {
     return (
         <OperatorDialog
@@ -123,7 +154,14 @@ export function EndAutopay({
             submitLabel="End autopay"
             destructive
             onSubmit={({ reason, idempotencyKey }) =>
-                endAutopayAction({ subscriptionId, reason, idempotencyKey })
+                then(
+                    endAutopayAction({
+                        subscriptionId,
+                        reason,
+                        idempotencyKey,
+                    }),
+                    onDone,
+                )
             }
         />
     );
@@ -135,11 +173,13 @@ export function RecordRefund({
     invoiceNumber,
     providerPaymentId,
     totalPaise,
+    onDone,
 }: {
     invoiceId: string;
     invoiceNumber: string;
     providerPaymentId: string | null;
     totalPaise: number;
+    onDone?: OnDone;
 }) {
     const id = useId();
     return (
@@ -194,14 +234,21 @@ export function RecordRefund({
                         error: "Give the amount in rupees, like 1180 or 1180.50.",
                     });
                 }
-                return recordRefundAction({
-                    invoiceId,
-                    providerPaymentId: (values.providerPaymentId ?? "").trim(),
-                    providerRefundId: (values.providerRefundId ?? "").trim(),
-                    amountPaise,
-                    reason,
-                    idempotencyKey,
-                });
+                return then(
+                    recordRefundAction({
+                        invoiceId,
+                        providerPaymentId: (
+                            values.providerPaymentId ?? ""
+                        ).trim(),
+                        providerRefundId: (
+                            values.providerRefundId ?? ""
+                        ).trim(),
+                        amountPaise,
+                        reason,
+                        idempotencyKey,
+                    }),
+                    onDone,
+                );
             }}
         />
     );

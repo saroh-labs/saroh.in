@@ -14,6 +14,7 @@ import type {
     SubscriptionView,
 } from "./billing-words";
 import { adminFetch, getJson } from "./control-plane";
+import type { BillingHistoryPage, HistoryShow } from "./subscription-sheet";
 
 /**
  * Admin › Billing's reads (DEC-163). Server-only: each forwards the
@@ -61,6 +62,25 @@ export function getSarohSubscription(
 ): Promise<SarohSubscriptionDetail | null> {
     return getJson<SarohSubscriptionDetail>(
         `/billing/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    );
+}
+
+/**
+ * One subscription's history (admin plan U15): provider events, invoices,
+ * billing emails and staff actions, newest first, a page at a time.
+ */
+export function getSubscriptionHistory(
+    subscriptionId: string,
+    filters: { show?: HistoryShow; page?: number },
+): Promise<BillingHistoryPage | null> {
+    return getJson<BillingHistoryPage>(
+        `/billing/subscriptions/${encodeURIComponent(subscriptionId)}/history${query(
+            {
+                show: filters.show === "everything" ? undefined : filters.show,
+                page:
+                    filters.page && filters.page > 1 ? filters.page : undefined,
+            },
+        )}`,
     );
 }
 

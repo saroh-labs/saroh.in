@@ -2,13 +2,18 @@ import { PermissionDeniedState } from "@saroh/ui/data-state";
 
 import { NumberPager } from "@/components/billing/number-pager";
 import { PlanChips, StatusCards } from "@/components/billing/status-cards";
+import { SubscriptionChangesProvider } from "@/components/billing/subscription-changes";
 import { SubscriptionSheet } from "@/components/billing/subscription-sheet";
 import { SubscriptionTable } from "@/components/billing/subscription-table";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { FailedPanel } from "@/components/states/failed-panel";
-import { getSarohSubscription, listSarohSubscriptions } from "@/lib/billing";
+import {
+    getSarohSubscription,
+    getSubscriptionHistory,
+    listSarohSubscriptions,
+} from "@/lib/billing";
 import type { StatusCardKey } from "@/lib/billing-filters";
-import { clearHref, hrefOf, isNarrowed } from "@/lib/billing-filters";
+import { clearHref, isNarrowed } from "@/lib/billing-filters";
 import type {
     SarohSubscriptionDetail,
     SarohSubscriptionPage,
@@ -21,6 +26,8 @@ import {
 } from "@/lib/billing-words";
 import { can, requireStaff } from "@/lib/console";
 import { param } from "@/lib/params";
+import type { BillingHistoryPage } from "@/lib/subscription-sheet";
+import { readHistoryShow, readSheetTab } from "@/lib/subscription-sheet";
 
 export const metadata = { title: "Subscriptions · Billing" };
 
@@ -31,7 +38,9 @@ const BASE = "/billing/subscriptions";
  * total at list price, five status cards and the plan chips that filter
  * as they are pressed, and a row per business with who it is billed to,
  * its plan and note, its status, its next charge and how it is paid, its
- * autopay and its last invoice. A row opens the subscription sheet.
+ * autopay and its last invoice. A row opens the subscription sheet
+ * (`?open=`), with its tab (`?sheet=`) and, on History, its chip
+ * (`?history=`) and page (`?hpage=`): History is read only when open.
  * Read-only. Needs `saroh-billing:read`; the API checks it again and
  * records every read.
  */
@@ -51,16 +60,22 @@ export default async function BillingSubscriptionsPage({
     const view = readView(raw.view);
     const page = readPage(raw.page);
     const open = param(raw.open);
+    const sheetTab = readSheetTab(raw.sheet);
+    const historyShow = readHistoryShow(raw.history);
+    const historyPage = readPage(raw.hpage);
     const filters = { q, status, plan, view };
     const here = { ...filters, page };
 
-    const [result, sheet] = await Promise.all([
+    const [result, sheet, history] = await Promise.all([
         listSarohSubscriptions({ ...filters, page }).catch(() => undefined),
         open ? readDetail(open) : Promise.resolve(undefined),
+        open && sheetTab === "history"
+            ? readHistory(open, historyShow, historyPage)
+            : Promise.resolve(undefined),
     ]);
 
     return (
-        <>
+        <SubscriptionChangesProvider>
             {result === undefined ? (
                 <FailedPanel things="subscriptions" />
             ) : result === null ? (
@@ -83,15 +98,16 @@ export default async function BillingSubscriptionsPage({
                 <SubscriptionSheet
                     detail={sheet.detail}
                     failed={sheet.failed}
-                    closeHref={hrefOf(BASE, {
-                        ...raw,
-                        open: undefined,
-                    })}
+                    base={BASE}
+                    query={raw}
+                    tab={sheetTab}
+                    history={history}
+                    historyShow={historyShow}
                     canAct={can(staff, "saroh-billing:act")}
                     canViewAs={can(staff, "organization:view-as")}
                 />
             ) : null}
-        </>
+        </SubscriptionChangesProvider>
     );
 }
 
@@ -183,5 +199,18 @@ async function readDetail(id: string): Promise<{
         return detail ? { detail } : { detail: null, failed: "refused" };
     } catch {
         return { detail: null, failed: "error" };
+    }
+}
+
+/** The History tab's page; undefined when the read failed. */
+async function readHistory(
+    id: string,
+    show: ReturnType<typeof readHistoryShow>,
+    page: number,
+): Promise<BillingHistoryPage | null | undefined> {
+    try {
+        return await getSubscriptionHistory(id, { show, page });
+    } catch {
+        return undefined;
     }
 }

@@ -106,6 +106,13 @@ export interface DataViewProps<TRow> {
      * action never fires a navigation as well.
      */
     rowActions?: (row: TRow) => ReactNode;
+    /**
+     * Whether a live write just changed this row (the admin console's R9
+     * highlight): it then wears `data-just-changed` for as long as this
+     * says so, on the row in every density. The colour is a token rule
+     * (`globals.css`), so no screen tints it itself.
+     */
+    rowChanged?: (row: TRow) => boolean;
     /** Renderings offered. Omit `grid` where cards would be meaningless. */
     modes?: DataViewMode[];
     /** Rendering used above `lg` when the merchant has expressed no preference. */

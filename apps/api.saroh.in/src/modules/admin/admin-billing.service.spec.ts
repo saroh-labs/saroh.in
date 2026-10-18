@@ -94,6 +94,7 @@ describe("saroh-billing:read", () => {
             [
                 "counts",
                 "exportInvoices",
+                "history",
                 "invoicePdf",
                 "listInvoices",
                 "listSubscriptions",
