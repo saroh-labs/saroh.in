@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import { flag, orgs } from "@/test/releases-fixture";
 import {
     effectiveSummary,
+    filterReleases,
+    flagsRedirect,
     globalChange,
     globalImpact,
-    groupReleases,
     inverseOf,
+    releaseCounts,
+    releaseState,
     reviewOverdue,
-    stateChip,
+    sortReleases,
     undoReason,
     whoHasIt,
 } from "./releases";
@@ -18,40 +21,51 @@ const shop = flag("SITE_SHOP", "Shop on your website", "feature");
 const limits = flag("PLAN_ENFORCEMENT", "Plan limits", "safety");
 const roles = flag("ORG_AUTHORIZATION", "Team roles", "migration");
 
-describe("groupReleases", () => {
-    it("groups modules, features, safety switches and migrations in order", () => {
-        const sections = groupReleases([roles, shop, limits, payments]);
-        expect(sections.map((s) => s.label)).toEqual([
-            "Modules",
-            "Features",
-            "Safety switches",
-            "Migrations",
+describe("sortReleases and filterReleases", () => {
+    it("lists modules, features, safety switches and migrations in order", () => {
+        expect(sortReleases([roles, shop, limits, payments])).toEqual([
+            payments,
+            shop,
+            limits,
+            roles,
         ]);
     });
 
-    it("searches the code key and the name a business sees", () => {
+    it("searches the code name and the name a business sees", () => {
         const all = [payments, shop, limits, roles];
-        expect(groupReleases(all, "shop on").flatMap((s) => s.flags)).toEqual([
-            shop,
+        expect(filterReleases(all, "all", "shop on")).toEqual([shop]);
+        expect(filterReleases(all, "all", "plan_enf")).toEqual([limits]);
+        expect(filterReleases(all, "all", "module payments")).toEqual([
+            payments,
         ]);
-        expect(groupReleases(all, "plan_enf").flatMap((s) => s.flags)).toEqual([
-            limits,
-        ]);
-        expect(
-            groupReleases(all, "module payments").flatMap((s) => s.flags),
-        ).toEqual([payments]);
-        expect(groupReleases(all, "nothing like it")).toEqual([]);
+        expect(filterReleases(all, "all", "nothing like it")).toEqual([]);
+    });
+
+    it("narrows by state", () => {
+        const on = { ...shop, enabledByDefault: true };
+        const some = {
+            ...payments,
+            enabledByDefault: false,
+            overrides: [
+                { organizationId: "o1", organizationName: "A", enabled: true },
+            ],
+        };
+        const all = [some, on, limits];
+        expect(filterReleases(all, "everyone", "")).toEqual([on]);
+        expect(filterReleases(all, "some", "")).toEqual([some]);
+        expect(filterReleases(all, "off", "")).toEqual([limits]);
+        expect(filterReleases(all, "off", "payments")).toEqual([]);
     });
 });
 
-describe("stateChip and effectiveSummary", () => {
+describe("releaseState and effectiveSummary", () => {
     it("says on for everyone", () => {
         const f = { ...payments, enabledByDefault: true };
-        expect(stateChip(f)).toBe("On for everyone");
+        expect(releaseState(f)).toBe("everyone");
         expect(effectiveSummary(f)).toBe("On for everyone.");
     });
 
-    it("counts the businesses set off when the default is on", () => {
+    it("is on for some when the default is on and some are turned off", () => {
         const f = {
             ...payments,
             enabledByDefault: true,
@@ -61,13 +75,13 @@ describe("stateChip and effectiveSummary", () => {
                 { organizationId: "o3", organizationName: "C", enabled: true },
             ],
         };
-        expect(stateChip(f)).toBe("Off for 2");
+        expect(releaseState(f)).toBe("some");
         expect(effectiveSummary(f)).toBe(
-            "On for everyone, off for 2 businesses set on their own.",
+            "On for everyone except 2 businesses turned off for them alone.",
         );
     });
 
-    it("counts the businesses set on when the default is off", () => {
+    it("is on for some when the default is off and some are turned on", () => {
         const f = {
             ...payments,
             enabledByDefault: false,
@@ -75,25 +89,73 @@ describe("stateChip and effectiveSummary", () => {
                 { organizationId: "o1", organizationName: "A", enabled: true },
             ],
         };
-        expect(stateChip(f)).toBe("On for 1");
+        expect(releaseState(f)).toBe("some");
         expect(effectiveSummary(f)).toBe(
-            "Off for everyone, on for 1 business set on their own.",
+            "Off for everyone except 1 business turned on for them alone.",
         );
     });
 
-    it("says off for everyone, and never switched on (R12)", () => {
-        expect(stateChip({ ...payments, enabledByDefault: false })).toBe(
-            "Off for everyone",
-        );
-        expect(stateChip(payments)).toBe("Never switched on");
+    it("says off, and never turned on, in plain words (R16)", () => {
+        const off = { ...payments, enabledByDefault: false };
+        expect(releaseState(off)).toBe("off");
+        expect(effectiveSummary(off)).toBe("Off for everyone.");
+        expect(releaseState(payments)).toBe("off");
         expect(effectiveSummary(payments)).toBe(
-            "Off for everyone · never switched on.",
+            "Off. It has never been turned on for anyone.",
         );
     });
 
     it("flags a review date that has passed", () => {
         expect(reviewOverdue(payments, "2027-04-01")).toBe(true);
         expect(reviewOverdue(payments, "2026-10-08")).toBe(false);
+    });
+});
+
+describe("releaseCounts", () => {
+    it("counts the default, who is turned on or off alone, and who follows it", () => {
+        const f = {
+            ...payments,
+            enabledByDefault: false,
+            overrides: [
+                { organizationId: "o1", organizationName: "A", enabled: true },
+                { organizationId: "o2", organizationName: "B", enabled: false },
+            ],
+        };
+        expect(releaseCounts(f, orgs(5))).toEqual({
+            defaultLabel: "Off",
+            turnedOn: 1,
+            turnedOff: 1,
+            following: 3,
+            followingLabel: "Would get it if turned on for everyone",
+            have: 1,
+            total: 5,
+        });
+        expect(releaseCounts(payments, orgs(2)).defaultLabel).toBe(
+            "Off · never turned on",
+        );
+        expect(
+            releaseCounts({ ...payments, enabledByDefault: true }, orgs(2)),
+        ).toMatchObject({
+            defaultLabel: "On",
+            following: 2,
+            followingLabel: "Would lose it if turned off for everyone",
+            have: 2,
+        });
+    });
+});
+
+describe("flagsRedirect", () => {
+    it("sends the old address to Releases, a release or its Who has it", () => {
+        expect(flagsRedirect({})).toBe("/releases");
+        expect(flagsRedirect({ release: "MODULE_PAYMENTS" })).toBe(
+            "/releases/MODULE_PAYMENTS",
+        );
+        expect(flagsRedirect({ flag: "SITE_SHOP" })).toBe(
+            "/releases/SITE_SHOP",
+        );
+        expect(
+            flagsRedirect({ release: "SITE_SHOP", organizationId: "o 1" }),
+        ).toBe("/releases/SITE_SHOP/who?organizationId=o%201");
     });
 });
 
@@ -112,7 +174,7 @@ describe("globalImpact", () => {
     it("says who already has it and who will get it", () => {
         expect(globalChange(f)).toBe(true);
         expect(globalImpact(f, orgs(6), true)).toBe(
-            "2 businesses already have it; 3 more will get it. 1 business stays off because it's set on its own.",
+            "2 businesses already have it; 3 more will get it. 1 business stays off, turned off for it alone.",
         );
     });
 
@@ -120,7 +182,7 @@ describe("globalImpact", () => {
         const on = { ...f, enabledByDefault: true };
         expect(globalChange(on)).toBe(false);
         expect(globalImpact(on, orgs(6), false)).toBe(
-            "3 businesses lose Payments; 2 keep it because they're set on their own.",
+            "3 businesses lose Payments; 2 keep it, turned on for them alone.",
         );
     });
 });

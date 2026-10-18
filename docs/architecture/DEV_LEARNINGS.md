@@ -5210,3 +5210,13 @@ rule stands for the profile's own fields.
 **Fix.** `GET /admin/organizations/:id/modules/state` (`admin/admin-business-modules.service.ts`, `organization:read`, no support session) runs `evaluate()` for every module that isn't hidden, as the business's owner role, and returns On, Off or Locked with the gate in the way, its reason in words, the fix, dependencies as information, and "Plan limits not enforced yet" once per business. `lib/what-they-see.ts` only words that answer. Hidden modules are left out by `moduleHidden` in `capabilities/module-registry.ts`, the source `moduleRolledOut` reads.
 
 **Rule.** A console or app screen that says whether a business can use a module reads `evaluate()`'s answer through the API, never one gate's row; dependencies are information, never a blocker the workspace doesn't enforce (`.agents/skills/saroh-module-capability/SKILL.md` › Rules; `admin-business-modules.db.spec.ts` checks the release-off case).
+
+### A component test stalled for ten seconds on a ⋯ menu (18 Oct 2026)
+
+**Symptom.** In the Releases component tests (U7), opening a dialog from a Radix `DropdownMenu` item blocked the event loop for 2 to 11 seconds a test, enough to time out. The same dialog opened from a plain button took milliseconds.
+
+**Cause.** When the menu closes, Radix looks for somewhere to put the focus, and every candidate is checked with `getComputedStyle`. In jsdom that cascades jsdom's whole built-in stylesheet through `nwsapi` for each element, which is slow. A browser does it in microseconds, so the screen itself is fine.
+
+**Fix.** `components/releases/releases.test.tsx` mocks `@saroh/ui/dropdown-menu` with plain buttons (`role="menuitem"`). The real menu is covered by the browser spec `e2e/tests/admin-releases.spec.ts`. A dialog opened from a menu is a controlled `OperatorDialog` (`open`, `onOpenChange`, no `trigger`), and the menu doesn't hand the focus back to ⋯ while one is open (`onCloseAutoFocus`).
+
+**Rule.** A vitest that opens a Radix menu mocks the menu, and leaves the real menu to the browser spec. A test that suddenly takes seconds is usually jsdom's `getComputedStyle`: profile it with `--pool=forks --execArgv=--cpu-prof` before raising the timeout.

@@ -27,7 +27,7 @@ export async function setGlobalFlagAction(
         reason,
         idempotencyKey,
     );
-    if (result.ok) revalidatePath("/flags");
+    if (result.ok) revalidatePath("/releases", "layout");
     return result;
 }
 
@@ -45,7 +45,7 @@ export async function setFlagOverrideAction(
         reason,
         idempotencyKey,
     );
-    if (result.ok) revalidatePath("/flags");
+    if (result.ok) revalidatePath("/releases", "layout");
     return result;
 }
 
@@ -61,6 +61,6 @@ export async function clearFlagOverrideAction(
         reason,
         idempotencyKey,
     );
-    if (result.ok) revalidatePath("/flags");
+    if (result.ok) revalidatePath("/releases", "layout");
     return result;
 }

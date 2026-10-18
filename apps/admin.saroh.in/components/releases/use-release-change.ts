@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { createContext, useCallback, useContext } from "react";
 
 import type { AdminFlag } from "@/lib/control-plane";
 import {
@@ -10,7 +10,17 @@ import {
 } from "@/lib/flag-actions";
 import type { ReleaseChange } from "@/lib/releases";
 import { businesses, inverseOf, undoReason } from "@/lib/releases";
+import type { ChangeFeedback } from "@/lib/use-change-feedback";
 import { useChangeFeedback } from "@/lib/use-change-feedback";
+
+/**
+ * A list's own `report`, so a change made from one of its rows lights that
+ * row and keeps it in place under the list's filter (R9). Without one, a
+ * change reports through a feedback of its own (the release page).
+ */
+export const ReleaseFeedbackContext = createContext<
+    ((feedback: ChangeFeedback) => void) | null
+>(null);
 
 export { UNDO_MS } from "@/lib/use-change-feedback";
 
@@ -59,7 +69,7 @@ export function describeChange(
         return `${name} is ${change.enabled ? "on" : "off"} for everyone`;
     }
     if (change.kind === "clear") {
-        return `${who} follows everyone's default for ${name}`;
+        return `${who} uses the default for ${name}`;
     }
     return `${name} is ${change.enabled ? "on" : "off"} for ${who}`;
 }
@@ -70,7 +80,8 @@ export function describeChange(
  * putting back what each business had before (`inverseOf`).
  */
 export function useReleaseFeedback(flag: AdminFlag) {
-    const { report } = useChangeFeedback();
+    const own = useChangeFeedback().report;
+    const report = useContext(ReleaseFeedbackContext) ?? own;
     return useCallback(
         (
             changes: { change: ReleaseChange; name: string }[],
@@ -83,6 +94,7 @@ export function useReleaseFeedback(flag: AdminFlag) {
             // The flag as it was, so Undo restores that and not the refresh.
             const before = flag;
             report({
+                rowId: flag.key,
                 message: describeChange(flag, first.change, who),
                 undo: async () => {
                     const failed: string[] = [];

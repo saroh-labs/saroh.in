@@ -44,6 +44,11 @@ export interface AdminFlag {
         organizationName: string;
         enabled: boolean;
     }[];
+    /**
+     * The newest change to it, and who made it; `null` when it has never
+     * changed. Absent from an API older than the Releases table.
+     */
+    lastChange?: { at: string; actorName: string | null } | null;
 }
 
 export interface AdminOrganization {
