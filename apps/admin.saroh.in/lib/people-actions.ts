@@ -16,7 +16,13 @@ interface Reasoned {
 }
 
 function refresh<T>(paths: string[], result: ControlPlaneResult<T>) {
-    if (result.ok) for (const path of paths) revalidatePath(path);
+    if (result.ok)
+        for (const path of paths)
+            // A business's page is a layout over its tabs (admin plan U2).
+            revalidatePath(
+                path,
+                path.startsWith("/businesses/") ? "layout" : undefined,
+            );
     return result;
 }
 

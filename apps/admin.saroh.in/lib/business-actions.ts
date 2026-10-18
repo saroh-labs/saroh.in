@@ -20,7 +20,8 @@ const base = (id: string) => `/organizations/${encodeURIComponent(id)}`;
 
 function refresh<T>(id: string, result: ControlPlaneResult<T>) {
     if (result.ok) {
-        revalidatePath(`/businesses/${id}`);
+        // "layout": the header and every tab under it (admin plan U2).
+        revalidatePath(`/businesses/${id}`, "layout");
         revalidatePath("/businesses");
     }
     return result;
@@ -51,7 +52,7 @@ export async function openAccessAction(
         path: "/",
         expires: new Date(result.data.expiresAt),
     });
-    revalidatePath(`/businesses/${organizationId}`);
+    revalidatePath(`/businesses/${organizationId}`, "layout");
     return { ok: true, data: null };
 }
 
@@ -72,7 +73,7 @@ export async function closeAccessAction(
         if (!result.ok) return result;
     }
     jar.delete(accessCookieName(organizationId));
-    revalidatePath(`/businesses/${organizationId}`);
+    revalidatePath(`/businesses/${organizationId}`, "layout");
     return { ok: true, data: null };
 }
 

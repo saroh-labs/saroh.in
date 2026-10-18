@@ -1,6 +1,15 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@saroh/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { useState, useTransition } from "react";
@@ -20,7 +29,14 @@ const QUICK_REASONS = [
     "Checking a setting",
     "Testing on a test business",
 ] as const;
-export function OpenAccess({ organizationId }: { organizationId: string }) {
+export function OpenAccess({
+    organizationId,
+    onOpened,
+}: {
+    organizationId: string;
+    /** Called once the session is open (a dialog closes itself). */
+    onOpened?: () => void;
+}) {
     const [reason, setReason] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -38,6 +54,7 @@ export function OpenAccess({ organizationId }: { organizationId: string }) {
                         idempotencyKey: crypto.randomUUID(),
                     });
                     if (!result.ok) setError(result.error);
+                    else onOpened?.();
                 });
             }}
         >
@@ -82,5 +99,71 @@ export function OpenAccess({ organizationId }: { organizationId: string }) {
                 </Button>
             </div>
         </form>
+    );
+}
+
+/** What a support session is, in the words the card and the dialog share. */
+function WhatAccessIs() {
+    return (
+        <p className="max-w-[68ch] text-sm text-muted-foreground">
+            A business&rsquo;s details are its own, so every look inside one is
+            on the record: pick or write a reason, and the details open
+            read-only for thirty minutes, written into the audit trail with your
+            name and reason. You see what an operator needs — what they see,
+            people, modules, plan, trackers, activity — and never the
+            business&rsquo;s own customers.
+        </p>
+    );
+}
+
+/**
+ * The support-access card, inside a tab whose details need a session (admin
+ * plan U2): the rest of the page — the header, the other tabs — stands
+ * without one.
+ */
+export function OpenAccessCard({ organizationId }: { organizationId: string }) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-[15px]">
+                    Open support access
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+                <WhatAccessIs />
+                <OpenAccess organizationId={organizationId} />
+            </CardContent>
+        </Card>
+    );
+}
+
+/**
+ * View as the business… in the header: the same reason and session as the
+ * card, from wherever the operator is on the page.
+ */
+export function ViewAsBusiness({ organizationId }: { organizationId: string }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button type="button" variant="outline">
+                    View as the business…
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>View as the business</DialogTitle>
+                    <DialogDescription asChild>
+                        <div>
+                            <WhatAccessIs />
+                        </div>
+                    </DialogDescription>
+                </DialogHeader>
+                <OpenAccess
+                    organizationId={organizationId}
+                    onOpened={() => setOpen(false)}
+                />
+            </DialogContent>
+        </Dialog>
     );
 }
