@@ -134,7 +134,9 @@ export class FakeProviderOrders implements ProviderOrderCapability {
  * The fake's provider customers, as Razorpay with `fail_existing: "1"`:
  * one per email and phone, a second refused as `exists` (and handed back
  * by {@link existingCustomer}, as `fail_existing: "0"` does); the same
- * email without a phone is a new one; an update to another's email and
+ * email without a phone is a new one, unless a customer has that email
+ * and no phone either (one is refused the same way, as saroh.io's
+ * DEC-165 customers made without a phone are); an update to another's email and
  * phone is `exists`. A customer's id is `fake_cus_<billing profile id>`.
  * Every create and update recorded; a test turns the keys off with
  * {@link keys}, queues a failure, loses the next create's answer after
@@ -167,7 +169,7 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
     addCustomer(
         providerCustomerId: string,
         notes: Partial<CustomerNotes> = {},
-        emailPhone?: { email: string; contact: string },
+        emailPhone?: { email: string; contact: string | null },
     ) {
         this.byId.set(providerCustomerId, {
             billingProfileId: notes.billingProfileId ?? null,
@@ -175,7 +177,7 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
         });
         if (emailPhone) {
             this.byEmailPhone.set(
-                `${emailPhone.email}|${emailPhone.contact}`,
+                `${emailPhone.email}|${emailPhone.contact ?? ""}`,
                 providerCustomerId,
             );
         }
@@ -190,7 +192,7 @@ export class FakeProviderCustomers implements ProviderCustomerCapability {
 
     private key(input: ProfileCustomer, withContact: boolean) {
         const contact = withContact ? input.contact : null;
-        return input.email && contact ? `${input.email}|${contact}` : null;
+        return input.email ? `${input.email}|${contact ?? ""}` : null;
     }
 
     private make(input: ProfileCustomer, withContact: boolean): string {

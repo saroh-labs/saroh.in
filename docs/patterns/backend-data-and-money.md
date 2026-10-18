@@ -36,6 +36,11 @@
   enforcement is on and a context is active. (Store slugs had the same
   check until L14 stopped writing them.) Never a `tx.<model>.findUnique`
   on a globally unique column. Prove it under `TEST_RLS=on`.
+  The same goes for any read that spans one person's businesses — the
+  businesses a billing profile's owner owns (`ownedBusinessIds`,
+  `billing/billing-customer.ts`): Membership is isolated per business, so
+  in a checkout's context only that business's membership is seen. A job
+  runs with no context, so prove it on a path scoped to one business.
 - **Current** — **Read a lost serializable race with `isSerializationFailure()`**
   (or `prismaErrorCode()`, `apps/api.saroh.in/src/common/prisma-errors.ts`),
   never `code === "P2034"`. Through the pg driver adapter it can arrive with no
