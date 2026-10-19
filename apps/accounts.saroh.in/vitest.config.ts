@@ -24,6 +24,10 @@ export default defineConfig({
         // jsdom's gaps a drawn component meets (`:modal`, ResizeObserver,
         // scrollIntoView), as app.saroh.in's.
         setupFiles: ["./vitest.setup.ts"],
+        // A sheet's first open in jsdom loads the phone field's country
+        // picker (#1036); on a busy CI runner that alone passed 5s while
+        // the file took 1s locally.
+        testTimeout: 15_000,
         include: [
             "lib/**/*.test.ts",
             "components/**/*.test.ts",

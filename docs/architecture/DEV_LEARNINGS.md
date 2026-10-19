@@ -5330,3 +5330,16 @@ rule stands for the profile's own fields.
 **Fix.** Lock the row (`FOR UPDATE`) or guard the write (`updateMany where status = 'WAITING'`, act on `count`); re-read under the lock and write only the changed columns, returning only those as `previous`; `pg_advisory_xact_lock` on the replace's key; refuse a new own rate over an ended one with a 409 naming its days, and only cut (not end) a rate replaced from a day to come; one SQL rule for the sweep equal to `linkForPaymentInTx`; after taking the phone lock, read the phone's contact on its own connection (`outsideOrgContext`) and retry the reservation when it exists. The month's lines on assigning a manager are written after the link commits, one short transaction per business. Each has a db spec that runs the two writers at once or holds one lock by hand (plain and `TEST_RLS=on`).
 
 **Rule.** A spec for a write that can race runs the race: `Promise.allSettled` of the two writers, or one writer held on the lock in a test transaction while the other starts. Two code paths that pick "the same" row (a job and its sweep) share one written rule and a test of its edge case. `docs/patterns/backend-data-and-money.md`.
+
+### A sideways strip in a flex row zooms the phone out (19 Oct 2026)
+
+- **Symptom:** on All bookings on a phone, the floating New booking button and row menus sat in the wrong place; browser specs tapped the wrong thing.
+- **Cause:** the view-chip strip (`overflow-x-auto`) sat in a flex item without `min-w-0`, so the item grew to the chips' full width (816px) and the phone zoomed the whole page out.
+- **Fix:** wrap the strip in a `min-w-0` item (`components/bookings/bookings-view.tsx`).
+- **Rule:** any horizontally scrolling strip inside a flex or grid item needs `min-w-0` on that item; `expectNothingHiddenSideways` in phone specs catches it.
+
+### CI-only unit timeouts on drawn sheets (19 Oct 2026)
+
+- **Symptom:** `profile-list.test.tsx` (accounts) timed out at 5s on CI; 1s locally.
+- **Cause:** the first sheet open in jsdom loads the shared phone field's country picker; CI runners are several times slower.
+- **Fix:** `testTimeout: 15_000` in `apps/accounts.saroh.in/vitest.config.ts`.
