@@ -26,6 +26,8 @@ import { AnalyticsService } from "./analytics.service";
 import { IngestAnalyticsEventDto, InsightsPeriodQueryDto } from "./dto";
 import type { MoneyRead } from "./money";
 import { DEFAULT_PERIOD } from "./period";
+import type { SellsRead } from "./sells";
+import { SellsService } from "./sells.service";
 import type { TakingsRead } from "./takings";
 import { TakingsService } from "./takings.service";
 
@@ -89,6 +91,7 @@ export class AnalyticsController {
     constructor(
         private readonly analytics: AnalyticsService,
         private readonly takings: TakingsService,
+        private readonly sells: SellsService,
     ) {}
 
     /**
@@ -114,6 +117,21 @@ export class AnalyticsController {
         @Query() query: InsightsPeriodQueryDto,
     ): Promise<MoneyRead> {
         return this.takings.money(ctx, query.period ?? DEFAULT_PERIOD);
+    }
+
+    /**
+     * Insights' What sells for one period (DEC-171, `sells.ts`): best
+     * sellers, booked most and how full, the busiest days and times, and
+     * the best customers. `?period=7d|4w|3m`, 4 weeks when absent. Needs
+     * `analytics:read`; amounts only with `payment:read` and customers'
+     * names only with `contact:read`.
+     */
+    @Get("sells")
+    getSells(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: InsightsPeriodQueryDto,
+    ): Promise<SellsRead> {
+        return this.sells.read(ctx, query.period ?? DEFAULT_PERIOD);
     }
 
     @Get()
