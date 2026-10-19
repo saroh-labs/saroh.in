@@ -306,10 +306,14 @@ describe("Home F7 This week (DB)", () => {
             { takings: false, bookings: true, orders: false, owed: false },
             clock,
         );
+        // The cheques slot (DEC-173) is always there, null until the
+        // invoices rebuild fills it.
         expect(Object.keys(week).sort()).toEqual([
             "bookings",
+            "chequesWaiting",
             "startDate",
             "zone",
         ]);
+        expect(week.chequesWaiting).toBeNull();
     });
 });

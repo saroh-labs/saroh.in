@@ -243,7 +243,8 @@ export const WEEK_PATHS = {
     OVERDUE: "/billing/invoices?view=overdue",
 } as const;
 
-async function readMoney(
+/** Paid in less handed back in `[from, to)`, per currency. */
+export async function readMoney(
     db: Db,
     organizationId: string,
     from: Date,
@@ -264,7 +265,7 @@ async function readMoney(
     return windowMoney(paid, refunded);
 }
 
-async function readOwed(
+export async function readOwed(
     db: Db,
     organizationId: string,
     now: Date,
@@ -376,5 +377,8 @@ export async function readWeek(
         };
     }
     if (owed) week.owed = owed;
+    // "Cheques not in the bank" (DEC-173): the invoices rebuild fills it
+    // from `home-cheques.ts`; until then there is never one to show.
+    week.chequesWaiting = null;
     return week;
 }

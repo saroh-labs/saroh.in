@@ -10,6 +10,7 @@ import { StockChecksService } from "../stock/stock-checks.service";
 import { businessDetailsGap } from "./home-business-details";
 import { overdueFollowUps } from "./home-crm-sources";
 import { noEmailProvider } from "./home-email-setup";
+import { groupNeeds } from "./home-groups";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import {
@@ -50,20 +51,27 @@ import type { HomeSchedule } from "./home-schedule";
 import { NO_SCHEDULE, readSchedule } from "./home-schedule";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { isStaffView, readStaffNarrow, WHOLE_BUSINESS } from "./home-staff";
+import { buildTiles } from "./home-tiles";
 import { readToday, todayScope } from "./home-today";
+import { readTodayFirst } from "./home-today-first";
 import { uncollectedOrders } from "./home-uncollected";
 import { readWeek, weekScope } from "./home-week";
 
 export type {
     HomeAction,
     HomeBooking,
+    HomeChequesWaiting,
     HomeEvidence,
+    HomeGoing,
+    HomeGoingOwed,
     HomeInline,
     HomeInlineKind,
     HomeInput,
     HomeLastDay,
     HomeModel,
     HomeNeed,
+    HomeNeedGroup,
+    HomeNeedKind,
     HomeRetryVia,
     HomeReviewPage,
     HomeReviewSite,
@@ -71,6 +79,7 @@ export type {
     HomeSinceItem,
     HomeStaff,
     HomeStaffStore,
+    HomeTiles,
     HomeToday,
     HomeTodayItem,
     HomeTone,
@@ -300,27 +309,7 @@ export class HomeService {
         const scope = todayScope(input, available);
         const week = weekScope(input, available);
 
-        const [
-            overdue,
-            open,
-            schedule,
-            today,
-            lastDay,
-            owed,
-            renewals,
-            waiting,
-            overdueInvoiceAction,
-            short,
-            notLive,
-            thisWeek,
-            reviews,
-            notes,
-            messages,
-            refundsFailed,
-            detailsGap,
-            uncollected,
-            noEmail,
-        ] = await Promise.all([
+        const reads = Promise.all([
             active.has("CRM") && canReadLeads
                 ? guard(
                       { moduleKey: "CRM", label: "Overdue follow-ups" },
@@ -586,6 +575,39 @@ export class HomeService {
                   )
                 : skip(null),
         ]);
+        // Home A's sources (DEC-171), asked at once with the rest; their
+        // slots come after today's, so `unavailable` keeps its order.
+        const todayFirst = readTodayFirst(this.db, guard, {
+            input,
+            available,
+            now,
+            zone,
+            narrow,
+            today: scope,
+            week,
+        });
+        const [
+            overdue,
+            open,
+            schedule,
+            today,
+            lastDay,
+            owed,
+            renewals,
+            waiting,
+            overdueInvoiceAction,
+            short,
+            notLive,
+            thisWeek,
+            reviews,
+            notes,
+            messages,
+            refundsFailed,
+            detailsGap,
+            uncollected,
+            noEmail,
+        ] = await reads;
+        const [awaiting, low, moneyIn, going] = await todayFirst;
         const unavailable = slots.flat();
 
         if (overdue.count > 0) {
@@ -690,6 +712,38 @@ export class HomeService {
         // What each row offers in place (F4), for whoever may do it.
         await this.inline?.decorate(actions, input, now);
 
+        // Home A (DEC-171): Needs you grouped, with the two sources only
+        // the groups carry, and the tiles. Amounts only with `payment:read`.
+        const money = holds(input, "payment:read");
+        const grouped = groupNeeds(
+            [
+                ...actions,
+                ...(awaiting ? [awaiting] : []),
+                ...(low ? [low] : []),
+            ],
+            zone,
+            {
+                money,
+                extra: {
+                    bills: going?.owed
+                        ? { totals: going.owed.totals, all: going.owed.bills }
+                        : null,
+                    awaiting: awaiting?.totals ?? null,
+                },
+            },
+        );
+        const openRead =
+            available.has("COMMERCE") &&
+            (holds(input, "order:read") || holds(input, "order:stage")) &&
+            !unavailable.some((u) => u.label === "Open orders");
+        const tiles = buildTiles({
+            now,
+            today,
+            upcoming,
+            open: openRead ? open : null,
+            moneyIn,
+        });
+
         return {
             // A staff member's Home is the business's rows, narrowed (F11).
             ...(staffView
@@ -706,6 +760,9 @@ export class HomeService {
             today,
             lastDay,
             week: thisWeek,
+            tiles,
+            ...grouped,
+            going,
         };
     }
 

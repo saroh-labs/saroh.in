@@ -1,6 +1,50 @@
 import type { OrgRole } from "../../common/types/organization-context";
 import type { OrgAction } from "../organizations/organization-actions";
 import { can } from "../organizations/organization-policy";
+import type {
+    HomeInline,
+    HomeNeed,
+    HomeRowLink,
+    HomeSeverity,
+    HomeTone,
+    HomeWeekChange,
+} from "./home-need-model";
+import type {
+    HomeChequesWaiting,
+    HomeGoing,
+    HomeNeedGroup,
+    HomeTiles,
+} from "./home-today-first-model";
+
+export type {
+    HomeChequesWaiting,
+    HomeGoing,
+    HomeGoingOwed,
+    HomeGoingSales,
+    HomeMoneyToday,
+    HomeMoneyTotal,
+    HomeNeedGroup,
+    HomeNeedKind,
+    HomeNeedOldest,
+    HomeOwedBucket,
+    HomeTileBookings,
+    HomeTileCame,
+    HomeTileMoneyIn,
+    HomeTileNext,
+    HomeTiles,
+    HomeTileToPack,
+} from "./home-today-first-model";
+
+export type {
+    HomeInline,
+    HomeInlineKind,
+    HomeNeed,
+    HomeRetryVia,
+    HomeRowLink,
+    HomeSeverity,
+    HomeTone,
+    HomeWeekChange,
+} from "./home-need-model";
 
 /**
  * The shapes `GET /home` answers with, and the small helpers every Home
@@ -8,15 +52,6 @@ import { can } from "../organizations/organization-policy";
  * own files (`home-money-sources.ts`, `home-site-stock-sources.ts`) can
  * build actions without importing the service that imports them.
  */
-export type HomeSeverity = "ATTENTION" | "SETUP" | "OVERDUE" | "SUGGESTION";
-
-/**
- * The colour a row's tag is drawn in, as the design names them: `bad` for
- * something already wrong (late, failed, blocked), `due` for something to do
- * soon, `info` for something to know. The tag's words always say it too, so
- * the colour is never the only signal.
- */
-export type HomeTone = "bad" | "due" | "info";
 
 /**
  * How many rows of evidence an action carries. Five is what fits on Home
@@ -60,17 +95,12 @@ export interface HomeEvidence {
     inline?: HomeInline;
     /** A second action the row opens elsewhere, set by `home-inline.ts`. */
     link?: HomeRowLink;
-}
-
-/**
- * A step a Needs-you row opens where it is taken, beside its inline action:
- * "Send a set-up link" on a renewal whose autopay limit is too low (D14)
- * opens Subscription Detail's own set-up sheet, where the method is picked.
- */
-export interface HomeRowLink {
-    /** The button: "Send a set-up link". */
-    label: string;
-    href: string;
+    /**
+     * A quiet second action in place, beside `inline`: Turn down beside
+     * Send payment link on a booking awaiting payment (A7). Only on
+     * `needGroups`' rows.
+     */
+    second?: HomeInline;
 }
 
 export interface HomeAction {
@@ -91,6 +121,11 @@ export interface HomeAction {
      * not with the last row shown. Absent, it ranks beside the last row.
      */
     moreTone?: HomeTone;
+    /**
+     * Of `count`, how many are late, when the source knows it (open
+     * orders' late ones); else the group works it out from its rows.
+     */
+    late?: number;
 }
 
 /**
@@ -125,95 +160,6 @@ export interface HomeUnavailable {
     moduleKey: string;
     /** What the merchant would call it, e.g. "Open orders". */
     label: string;
-}
-
-/** The inline actions a Needs-you row can carry (F4). */
-export type HomeInlineKind =
-    | "MARK_SENT"
-    | "RETRY"
-    | "SEND_REMINDER"
-    | "REPLY"
-    | "REVIEW_REPLY"
-    | "REFUND";
-
-/**
- * How a Retry is made (F4, D13): `PAY_LINK`, a fresh pay link; `MANDATE`,
- * a new charge on the customer's autopay. No Retry is offered while such a
- * charge is under way ("Autopay charge in progress").
- */
-export type HomeRetryVia = "PAY_LINK" | "MANDATE";
-
-/**
- * What an inline action on a Needs-you row will do (F4), decided by the API
- * (`home-inline.ts`): it is sent only to a viewer who may do it, only when
- * the write it calls can take it, and its words say truthfully who is told
- * and how. A row without one stays a link.
- *
- * Every action calls the target's own endpoint — the order's stage move,
- * the subscription's retry, the invoice's reminder, the customer's thread —
- * and Home adds no write of its own.
- */
-export interface HomeInline {
-    kind: HomeInlineKind;
-    /** The row's button: "Mark sent". */
-    label: string;
-    /** What will happen, and who is told, said before it happens. */
-    confirm: string;
-    /** The confirm's button: "Mark sent and tell Anika". */
-    yes: string;
-    /** What the row says once it's done: "Reminder sent to Farah". */
-    done: string;
-    /**
-     * A message leaves the business. The app holds it ten seconds (default
-     * 51) before it goes, and Undo in that time means nothing leaves; after
-     * it, no Undo.
-     */
-    sends: boolean;
-    /** Whether Undo is offered after (never once a message has left). */
-    undoable: boolean;
-    /**
-     * What it acts on: the order, subscription, invoice, contact or review
-     * id; for REFUND, the mismatched payment's attempt id.
-     */
-    target: string;
-    /** The customer's first name, for what the toast says after; else null. */
-    person: string | null;
-    /** MARK_SENT: the step it moves the order to. */
-    stage?: string;
-    /** RETRY: how it is retried. */
-    via?: HomeRetryVia;
-}
-
-/**
- * One row of Needs you (F3): one thing to do, with the words for it.
- *
- * The flat list is the ranked actions again, with each action's evidence
- * promoted to a row of its own (a row per order, not "3 open orders"), so
- * the ranking stays on the server. Money travels in minor units beside the
- * words and is placed by `amountIn`, because formatting it is the client's
- * (`formatMoney`): "₹4,800 overdue from Farah Khan" is `amountIn: "title"`
- * with the title "overdue from Farah Khan".
- */
-export interface HomeNeed {
-    /** Stable across reads: the action's code, and the row's own id. */
-    id: string;
-    /** The action it came from, e.g. `COMMERCE_OPEN_ORDERS`. */
-    code: string;
-    severity: HomeSeverity;
-    title: string;
-    /** The line under the title, without its money. */
-    sub: string | null;
-    amountMinor: number | null;
-    currency: string | null;
-    /** Where the amount goes: before the title, before the line, or nowhere. */
-    amountIn: "title" | "sub" | null;
-    /** The tag's words; the tone is never the only signal. */
-    tag: string | null;
-    tone: HomeTone;
-    href: string;
-    moduleKey?: string;
-    inline?: HomeInline;
-    link?: HomeRowLink;
 }
 
 /**
@@ -302,13 +248,6 @@ export interface HomeLastDay {
     items: HomeSinceItem[];
 }
 
-/**
- * This week's takings against last week's same days (F7): up, down or level
- * by a whole percent, or `THIN` — too little last week to compare.
- */
-export type HomeWeekChange =
-    { kind: "UP" | "DOWN" | "LEVEL"; percent: number } | { kind: "THIN" };
-
 /** Takings so far this week in one currency (F7), net of refunds. */
 export interface HomeWeekTakings {
     currency: string;
@@ -349,6 +288,12 @@ export interface HomeWeek {
     orders?: { count: number; href: string };
     /** Absent too for a business that has never billed outside an order. */
     owed?: HomeWeekOwed;
+    /**
+     * Cheques received and not in the bank yet (DEC-173). The invoices
+     * rebuild fills it (`home/home-cheques.ts`); until then always null,
+     * and null for a viewer without `payment:read`.
+     */
+    chequesWaiting?: HomeChequesWaiting | null;
 }
 
 /**
@@ -479,6 +424,25 @@ export interface HomeModel {
      * sent to a Reviewer.
      */
     week?: HomeWeek | null;
+    /**
+     * Home A's tiles (DEC-171): bookings today, to pack, money in today,
+     * came. Never sent to a Reviewer.
+     */
+    tiles?: HomeTiles;
+    /**
+     * Needs you grouped by kind (DEC-171), in the board's order; only the
+     * groups with something in them. Beside the flat `needs` until the
+     * screens switch (U17 removes `needs`, `needsTotal` and `week`).
+     */
+    needGroups?: HomeNeedGroup[];
+    /** The header's "24 things": the sum of every group's `count`. */
+    needGroupsTotal?: number;
+    /**
+     * How it's going (DEC-171): the last 7 days against the 7 before. Null
+     * when the viewer reads none of it, or when its read failed (then
+     * `unavailable` names "How it's going").
+     */
+    going?: HomeGoing | null;
 }
 
 export interface HomeInput {

@@ -334,6 +334,8 @@ describe("readWeek", () => {
                 overdue: 1,
                 href: "/billing/invoices?view=overdue",
             },
+            // Filled by the invoices rebuild (DEC-173); none until then.
+            chequesWaiting: null,
         });
     });
 
