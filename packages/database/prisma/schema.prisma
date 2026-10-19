@@ -352,6 +352,7 @@ model Organization {
   invoiceLines          InvoiceLine[]
   invoiceSequences      InvoiceSequence[]
   invoicePayments       InvoicePayment[]
+  invoiceShares         InvoiceShare[]
   courses               Course[]
   courseSessions        CourseSession[]
   courseEnrollments     CourseEnrollment[]
@@ -6815,6 +6816,10 @@ model Invoice {
   payments  InvoicePayment[]
   paidCents Int              @default(0)
 
+  // How it was shared by hand (DEC-173, U5): on WhatsApp, as a link, a PDF
+  // or printed. Emails are the Message rows; this is everything else.
+  shares InvoiceShare[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -6914,11 +6919,39 @@ model InvoicePayment {
   paymentIntentId String?        @unique
   paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
 
+  // The receipt emailed for it (DEC-173, owner 20 Oct): the Message the
+  // `invoice.receipt` job queued, set in the same transaction under this
+  // row's lock, so a job run twice emails it once. Null until it goes, and
+  // forever when there was no email provider or the payment was removed.
+  receiptMessageId String?
+
   createdAt DateTime @default(now())
 
   @@index([invoiceId])
   @@index([organizationId, receivedAt])
   @@index([organizationId, bankStatus])
+}
+
+/// One time an invoice was shared by hand (DEC-173, U5 #1117): opened on
+/// WhatsApp (click-to-chat; Saroh sends nothing and can't know it went), its
+/// link copied, its PDF downloaded or the paper printed. The one-reminder-a-
+/// day rule reads the WhatsApp ones beside the email Messages.
+model InvoiceShare {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // WHATSAPP | LINK | PDF | PRINT
+  channel   String
+  // NEW | REMINDER | RECEIPT: what the message said.
+  kind      String
+  // Who shared it; null if the person was since deleted.
+  byUserId  String?
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId, createdAt])
 }
 
 model InvoiceLine {

@@ -92,8 +92,7 @@ requireProvider: false })`), the email says "view it and download a copy",
   the same transaction (`invoice.payment.recorded`, `.removed`,
   `.cheque_cleared`, `.cheque_bounced`; `invoice-payment-events.ts`),
   ids, amounts and the method only. The automatic receipt (owner, 20 Oct)
-  hangs from `paymentRecordedInTx`: a delayed job past the Undo window
-  (`RECEIPT_HOLD_MS`), added with its handler by U5 (#1117).
+  hangs from `paymentRecordedInTx` (below, U5 #1117).
 - **Every other path that pays an invoice writes the ledger** (U3, #1115),
   in its own transaction: the webhook, a mandate charge found by a look-up
   (`settleCapturedChargeInTx`) and a pay-now hold, a pack or a plan bought
@@ -149,6 +148,58 @@ requireProvider: false })`), the email says "view it and download a copy",
 - **Search speed:** a business's invoices are filtered after the
   `organizationId` index; 5,000 invoices (among 55,000) search in about
   4 ms, so there is no trigram index. `list-filter.db.spec.ts` times 1,500.
+
+## Sharing an invoice, reminding many, and the receipt — **Current** (DEC-173, U5 #1117)
+
+- **WhatsApp is a link, never a sender.** `POST :invoiceId/share`
+  (`InvoiceShareService`, `invoice:write`) with `channel` WHATSAPP, LINK,
+  PDF or PRINT and an optional `kind` (NEW, REMINDER, RECEIPT; by default
+  a receipt once paid, a reminder once overdue, else new). WHATSAPP and
+  LINK mint a fresh link as a send does (a pay link while the invoice is
+  owed and payable online, else a view link; the old link stops, DEC-110)
+  and answer `{ url, text, phone, whatsappUrl }`; PDF and PRINT mint
+  nothing. The words are `invoice-share-words.ts`, in the business's voice,
+  asking for what is left on a partly paid invoice. The app opens
+  `whatsappChatLink(phone, text)` (`@saroh/block-contract`); the API
+  answers the same link so the bulk flow needs no second rule. Saroh can't
+  know a WhatsApp message went: words say "shared on WhatsApp".
+- **The share log** is `InvoiceShare` (channel, kind, who, when; its own
+  RLS policy and CHECKs), served as `shared[]` on the invoice read. Emails
+  aren't in it: their `Message` rows are the record.
+- **One reminder a day, whichever way:** `nextReminderAt`
+  (`invoice-send.service.ts`) reads email Messages, account-thread posts
+  and WhatsApp NEW or REMINDER shares together, so a WhatsApp reminder
+  after an email one (or the other way) is a 429 with `retryAt`. Link, PDF
+  and print don't count.
+- **Remind many:** `POST invoices/reminders/preview` and `POST
+invoices/reminders` (`InvoiceRemindersService`, `invoice:write`, at most
+  100 ids, duplicates once). Each invoice is EMAIL when an email can go
+  (`channelsFor`: provider connected, an address, email not turned off),
+  else WHATSAPP with a phone, else NONE with why (`UNREACHABLE` with
+  `emailBlocked`; `DRAFT`, `PAID`, `ORDER`, `NOT_OWED`, `AUTOPAY_PENDING`,
+  `NOT_FOUND` for an id that isn't the business's); one reminded today is
+  WAIT with `retryAt`. Send emails the EMAIL ones, each through `remind`
+  (its own transaction and checks), and sends nothing else: the business
+  opens each WhatsApp one through the share route. Never a failure for
+  the lot.
+- **The receipt is automatic** (owner, 20 Oct). `paymentRecordedInTx`
+  queues `invoice.receipt` (`invoice-receipt.ts`) at
+  `now + RECEIPT_HOLD_MS`, for every payment the ledger records, by hand,
+  online, by autopay or at the desk; a cheque's goes when it is marked in
+  the bank. It is queued only when it can go (`receiptCanGo`: the
+  business's email provider connected, an address, email not turned off),
+  so with no provider nothing is queued or sent; Saroh's address never
+  carries it. Removing a payment (Undo) deletes its waiting job. The
+  handler (`invoice-receipt.handler.ts`) locks the payment row, sends
+  nothing for one removed, bounced or already receipted, and records the
+  Message on `InvoicePayment.receiptMessageId` in the same transaction, so
+  a retry never emails twice. The email (`INVOICE_PAYMENT_RECEIVED`) says
+  the payment, paid so far and left to pay, with the PDF attached and no
+  link. `share` with `channel: EMAIL` (receipts only) sends it now, and a
+  409 with no provider.
+- **Tests:** `invoice-share-words.spec.ts`, `invoice-share.db.spec.ts`,
+  `invoice-reminders.db.spec.ts`, `invoice-receipt.db.spec.ts` and
+  `rls/invoice-shares-rls.db.spec.ts`, plain and under `TEST_RLS=on`.
 
 ## Saroh's own invoices — **Current** (pricing catalogue U17)
 

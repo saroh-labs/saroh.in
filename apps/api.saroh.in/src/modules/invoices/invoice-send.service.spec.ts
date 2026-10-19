@@ -37,6 +37,8 @@ jest.mock("@saroh/database", () => {
             count: jest.fn(),
         },
         customerThreadMessage: { findFirst: jest.fn(), count: jest.fn() },
+        // DEC-173: a WhatsApp reminder counts towards one a day.
+        invoiceShare: { findFirst: jest.fn(), findMany: jest.fn() },
         merchantPaymentProvider: { findFirst: jest.fn() },
         // DEC-070: Payments on or off decides a pay link or a view link.
         organizationModule: { findFirst: jest.fn() },
@@ -123,6 +125,8 @@ beforeEach(() => {
     db.message!.count!.mockResolvedValue(0);
     db.customerThreadMessage!.findFirst!.mockResolvedValue(null);
     db.customerThreadMessage!.count!.mockResolvedValue(0);
+    db.invoiceShare!.findFirst!.mockResolvedValue(null);
+    db.invoiceShare!.findMany!.mockResolvedValue([]);
     db.merchantPaymentProvider!.findFirst!.mockResolvedValue({ id: "mpp_1" });
     db.organizationModule!.findFirst!.mockResolvedValue(null);
     db.paymentIntent!.findMany!.mockResolvedValue([]);

@@ -317,6 +317,8 @@ module.exports = {
         "<rootDir>/src/modules/invoices/invoice-ledger.spec.ts",
         // Nothing pays an invoice outside the ledger (DEC-173, U3).
         "<rootDir>/src/modules/invoices/invoice-ledger.guard.spec.ts",
+        // DEC-173, U5: what a shared invoice and its receipt say.
+        "<rootDir>/src/modules/invoices/invoice-share-words.spec.ts",
         "<rootDir>/src/modules/invoices/invoices.service.spec.ts",
         // U13: the invoice pay link (make, replace, revoke, read).
         "<rootDir>/src/modules/invoices/pay-link.spec.ts",

@@ -38,7 +38,10 @@ import {
 } from "./invoice-payments.dto";
 import { InvoicePaymentsService } from "./invoice-payments.service";
 import { InvoicePdfService } from "./invoice-pdf.service";
+import { InvoiceRemindersService } from "./invoice-reminders.service";
 import { InvoiceSendService } from "./invoice-send.service";
+import { BulkRemindersDto, ShareInvoiceDto } from "./invoice-share.dto";
+import { InvoiceShareService } from "./invoice-share.service";
 import { InvoiceSummaryService } from "./invoice-summary.service";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
@@ -63,6 +66,8 @@ export class InvoicesController {
         private readonly pdfs: InvoicePdfService,
         private readonly payments: InvoicePaymentsService,
         private readonly summaries: InvoiceSummaryService,
+        private readonly shares: InvoiceShareService,
+        private readonly reminders: InvoiceRemindersService,
     ) {}
 
     @Get()
@@ -81,6 +86,36 @@ export class InvoicesController {
     @Get("summary")
     summary(@OrgContext() ctx: OrganizationContext) {
         return this.summaries.summary(ctx);
+    }
+
+    /**
+     * Remind many (DEC-173, U5): how each picked invoice's reminder would
+     * go (email, WhatsApp, wait until tomorrow, or no way, with why). At
+     * most 100. Before `:invoiceId`, like `summary`.
+     */
+    @Post("reminders/preview")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    remindersPreview(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: BulkRemindersDto,
+    ) {
+        return this.reminders.preview(ctx, dto);
+    }
+
+    /**
+     * Send them: the email ones go now, each as `remind` sends it; the
+     * WhatsApp ones are opened one at a time by the business, through
+     * `POST :invoiceId/share`. Answers per invoice.
+     */
+    @Post("reminders")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    remindMany(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: BulkRemindersDto,
+    ) {
+        return this.reminders.send(ctx, dto);
     }
 
     /** Declared before `:invoiceId`, or "owed" would be read as an id. */
@@ -267,6 +302,25 @@ export class InvoicesController {
         @Param("invoiceId") id: string,
     ) {
         return this.sending.remind(ctx, id);
+    }
+
+    /**
+     * Share it by hand (DEC-173, U5): on WhatsApp (a fresh link and the
+     * message, with the `wa.me` link to open; Saroh sends nothing), as a
+     * link, a PDF or printed, each logged; or a receipt by email through
+     * the business's own provider. A second WhatsApp reminder in a day is
+     * a 429 with `retryAt`, as an email one is.
+     */
+    @Post(":invoiceId/share")
+    @LifecycleWrite("wind-down")
+    @HttpCode(200)
+    @Header("Cache-Control", "no-store")
+    share(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+        @Body() dto: ShareInvoiceDto,
+    ) {
+        return this.shares.share(ctx, id, dto);
     }
 
     /**

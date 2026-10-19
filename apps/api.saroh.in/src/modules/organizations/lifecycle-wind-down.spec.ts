@@ -200,6 +200,11 @@ const CASES = [
             "removePayment",
             "chequeCleared",
             "chequeBounced",
+            // Share and Remind many (DEC-173, U5): a closing business still
+            // asks to be paid for what it already invoiced.
+            "share",
+            "remindersPreview",
+            "remindMany",
         ],
         refused: ["create", "update", "remove", "issue", "reissue"],
     },

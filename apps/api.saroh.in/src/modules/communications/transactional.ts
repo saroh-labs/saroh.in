@@ -56,11 +56,20 @@ export type AutopayTemplate = (typeof AUTOPAY_TEMPLATES)[number];
 export const REVIEW_TEMPLATES = ["REVIEW_INVITATION"] as const;
 export type ReviewTemplate = (typeof REVIEW_TEMPLATES)[number];
 
+/**
+ * The receipt for a payment on an invoice (DEC-173, owner 20 Oct): sent
+ * automatically once the Undo window has passed, through the business's
+ * own provider only, never Saroh's (DEC-086 reversed).
+ */
+export const RECEIPT_TEMPLATES = ["INVOICE_PAYMENT_RECEIVED"] as const;
+export type ReceiptTemplate = (typeof RECEIPT_TEMPLATES)[number];
+
 export const TRANSACTIONAL_TEMPLATES = [
     ...INVOICE_TEMPLATES,
     ...NOTICE_TEMPLATES,
     ...AUTOPAY_TEMPLATES,
     ...REVIEW_TEMPLATES,
+    ...RECEIPT_TEMPLATES,
 ] as const;
 export type TransactionalTemplate = (typeof TRANSACTIONAL_TEMPLATES)[number];
 
@@ -270,6 +279,54 @@ export function renderReviewInvitation(
         `<p>${store}</p>`,
     ].join("\n");
     return { subject: `How was your order from ${vars.store}?`, body };
+}
+
+/** What a payment receipt says. Money and dates arrive formatted. */
+export interface ReceiptMailVars {
+    business: string;
+    /** "Vivek", or null when the bill-to has no name. */
+    firstName: string | null;
+    number: string;
+    /** "₹4,000": this payment. */
+    amount: string;
+    /** "by UPI", or null when it isn't named (Other). */
+    method: string | null;
+    /** "12 Oct 2026": when it came in. */
+    receivedOn: string;
+    /** "₹4,000": every live payment on the invoice. */
+    paidSoFar: string;
+    /** "₹8,400". */
+    total: string;
+    /** "₹4,400"; "₹0" once paid in full. */
+    leftToPay: string;
+    paidInFull: boolean;
+}
+
+/**
+ * The receipt email (DEC-173): the payment, then what is paid so far and
+ * what is left. No link: a link would retire the one the customer already
+ * has (DEC-110). The invoice's PDF is attached where the provider takes it.
+ */
+export function renderInvoiceReceipt(vars: ReceiptMailVars): RenderedMessage {
+    const business = escapeHtml(vars.business);
+    const number = escapeHtml(vars.number);
+    const amount = escapeHtml(vars.amount);
+    const greeting = vars.firstName
+        ? `Hi ${escapeHtml(vars.firstName)},`
+        : "Hello,";
+    const how = vars.method ? ` ${escapeHtml(vars.method)}` : "";
+    const body = [
+        `<p>${greeting}</p>`,
+        `<p>Thank you. ${business} has received your payment of ${amount}${how} on ${escapeHtml(vars.receivedOn)}, for invoice ${number}.</p>`,
+        vars.paidInFull
+            ? `<p>Invoice ${number} is now paid in full (${escapeHtml(vars.total)}).</p>`
+            : `<p>Paid so far: ${escapeHtml(vars.paidSoFar)} of ${escapeHtml(vars.total)}<br>Left to pay: ${escapeHtml(vars.leftToPay)}</p>`,
+        `<p>${business}</p>`,
+    ].join("\n");
+    return {
+        subject: `Receipt for ${vars.amount} from ${vars.business}`,
+        body,
+    };
 }
 
 /** The stored body with the link put back, for the provider only. */

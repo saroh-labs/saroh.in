@@ -1,6 +1,8 @@
 import type { Prisma } from "@saroh/database";
 
 import { AuditAction, auditMetadata } from "../audit/audit.service";
+import { cancelReceiptInTx, enqueueReceiptInTx } from "./invoice-receipt";
+import { CHEQUE_PAYMENT_METHOD } from "./invoice-state";
 import { fromCents } from "./totals";
 
 type Tx = Prisma.TransactionClient;
@@ -48,23 +50,25 @@ export interface PaymentRecordedEvent {
 }
 
 /**
- * A payment was recorded: noted on the invoice's history.
+ * A payment was recorded: noted on the invoice's history, and its receipt
+ * queued (DEC-173, owner 20 Oct; U5 #1117).
  *
- * **The receipt hook (U5, #1117).** The owner decided (20 Oct) that every
- * recorded payment, full or part, any method, online too, sends its
- * receipt to the customer through the business's own email provider, with
- * no tick box, once the Undo window has passed. U5 adds that here, in this
- * transaction: a `Job` (transactional outbox, `backend-jobs.md`) of its
- * receipt type carrying `paymentId`, with
- * `runAt = now + RECEIPT_HOLD_MS`. Its handler re-reads the payment and
- * sends nothing when it was removed meanwhile (Undo) or no provider is
- * connected. Nothing is enqueued here yet: a job no handler sends would be
- * dead-lettered, and one whose handler does nothing is refused by the jobs
- * pattern ("never enqueue a job the handler will no-op on").
+ * Every recorded payment, full or part, by hand, online or by autopay,
+ * sends its receipt to the customer through the business's own email
+ * provider, with no tick box: an `invoice.receipt` job in this
+ * transaction (the outbox, `backend-jobs.md`) carrying `paymentId`, due
+ * at `now + RECEIPT_HOLD_MS`, so Undo can take it back first. Its handler
+ * re-reads the payment and sends nothing for one removed meanwhile. It is
+ * queued only when it can go (`receiptCanGo`): with no provider connected,
+ * nothing is queued and nothing is sent.
+ *
+ * A cheque is the exception: it waits for the bank, and its receipt goes
+ * when it is marked as in the bank (`paymentChangedInTx`).
  */
 export async function paymentRecordedInTx(
     tx: Tx,
     event: PaymentRecordedEvent,
+    now: Date = new Date(),
 ): Promise<void> {
     await ledgerAuditInTx(tx, AuditAction.InvoicePaymentRecorded, event, {
         paymentId: event.paymentId,
@@ -73,9 +77,22 @@ export async function paymentRecordedInTx(
         method: event.method,
         paidInFull: event.paidInFull,
     });
+    if (event.method !== CHEQUE_PAYMENT_METHOD) {
+        await enqueueReceiptInTx(tx, {
+            organizationId: event.organizationId,
+            invoiceId: event.invoiceId,
+            paymentId: event.paymentId,
+            runAt: new Date(now.getTime() + RECEIPT_HOLD_MS),
+        });
+    }
 }
 
-/** A payment removed by mistake (soft), a cheque in the bank, or bounced. */
+/**
+ * A payment removed by mistake (soft), a cheque in the bank, or bounced:
+ * noted on the invoice's history. A removed payment's receipt, if it is
+ * still waiting, is taken back. A cheque in the bank sends its receipt
+ * (there is no Undo for it, so it goes at once).
+ */
 export async function paymentChangedInTx(
     tx: Tx,
     action:
@@ -94,6 +111,16 @@ export async function paymentChangedInTx(
         method: event.method,
         paidInFull: event.paidInFull,
     });
+    if (action === AuditAction.InvoicePaymentRemoved) {
+        await cancelReceiptInTx(tx, event.organizationId, event.paymentId);
+    } else if (action === AuditAction.InvoiceChequeCleared) {
+        await enqueueReceiptInTx(tx, {
+            organizationId: event.organizationId,
+            invoiceId: event.invoiceId,
+            paymentId: event.paymentId,
+            runAt: new Date(),
+        });
+    }
 }
 
 async function ledgerAuditInTx(
