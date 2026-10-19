@@ -20,10 +20,10 @@ const ROW =
     "flex w-full items-center gap-3 text-left text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /**
- * The Calendar month's one filter button (bookings U13): "Everyone ·
+ * The Calendar's one filter button (bookings U13; the week's too, U14): "Everyone ·
  * bookings, classes and invoices", which opens What to show — Whose (the
  * team filter, E24) and On the calendar (a switch per layer with this
- * month's total). A sheet from the foot of a phone (BKMOverviewMonth), a
+ * month's or this week's total). A sheet from the foot of a phone (BKMOverviewMonth), a
  * popover under the button on the desk (BKDCalMonth). Each choice takes
  * effect as it is made; Show closes it. A layer that couldn't be read is
  * named and can't be switched.
@@ -37,6 +37,7 @@ export function WhatToShow({
     totals,
     failed,
     onToggle,
+    span = "month",
 }: {
     people: TeamOption[];
     person: string | null;
@@ -46,6 +47,8 @@ export function WhatToShow({
     totals: CalendarMonth["totals"];
     failed: Set<string>;
     onToggle: (key: LayerKey) => void;
+    /** What the totals count: the month read, or the week (U14). */
+    span?: "month" | "week";
 }) {
     const phone = usePhone();
     const [open, setOpen] = useState(false);
@@ -157,7 +160,7 @@ export function WhatToShow({
                     const broken = failed.has(layer.key);
                     const sub = broken
                         ? "Couldn't load"
-                        : `${totals[layer.key] ?? 0} this month`;
+                        : `${totals[layer.key] ?? 0} this ${span}`;
                     const swatch = (
                         <span
                             aria-hidden

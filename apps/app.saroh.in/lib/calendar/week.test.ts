@@ -73,6 +73,16 @@ describe("weekTitle", () => {
     it("names both years when it crosses the new year", () => {
         expect(weekTitle("2026-12-28")).toBe("28 Dec 2026 to 3 Jan 2027");
     });
+
+    it("leaves this year off, as the Calendar week boards do (U14)", () => {
+        expect(weekTitle("2026-10-19", "2026-10-19")).toBe("19 to 25 Oct");
+        expect(weekTitle("2026-09-28", TODAY)).toBe("28 Sep to 4 Oct");
+        // Another year, or a week across the new year, keeps it.
+        expect(weekTitle("2027-01-04", TODAY)).toBe("4 to 10 Jan 2027");
+        expect(weekTitle("2026-12-28", TODAY)).toBe(
+            "28 Dec 2026 to 3 Jan 2027",
+        );
+    });
 });
 
 describe("weekEdges", () => {

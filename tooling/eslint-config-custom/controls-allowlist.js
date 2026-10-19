@@ -81,8 +81,6 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/week-phone.tsx": ["button"],
     // button: a choice in a list
     "components/bookings/reschedule-booking.tsx": ["button"],
-    // button: a legend chip in its layer's colour, pressed to show or hide it
-    "components/calendar/layer-switches.tsx": ["button"],
     // button: a calendar cell
     "components/calendar/month-grid.tsx": ["button"],
     // button: the filter chip, a chip, a row that is one button (a person,
@@ -90,10 +88,10 @@ export const RAW_ALLOWED = {
     "components/calendar/what-to-show.tsx": ["button"],
     // button: a row or card that is one button
     "components/calendar/month-strip.tsx": ["button"],
-    // button: a choice in a list
-    "components/calendar/week-columns.tsx": ["button"],
-    // button: a choice in a list
-    "components/calendar/week-hour-grid.tsx": ["button"],
+    // button: a calendar cell (a week day's head, which opens the day)
+    "components/calendar/week-day-head.tsx": ["button"],
+    // button: a calendar cell (the week strip)
+    "components/calendar/week-strip.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/class-packs/pack-detail/overview.tsx": ["button"],
     // button: a row or card that is one button

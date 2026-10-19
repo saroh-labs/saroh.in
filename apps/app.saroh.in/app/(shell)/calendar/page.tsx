@@ -31,7 +31,8 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** Before the first read names the business's zone, the one it falls back to. */
 const FALLBACK_ZONE = "Asia/Kolkata";
 
-type Can = React.ComponentProps<typeof BusinessCalendar>["can"];
+// The week's, which also says who may open hours on a closed day (U14).
+type Can = React.ComponentProps<typeof BusinessWeek>["can"];
 
 /**
  * Home › Calendar (U17, the "Saroh Business Calendar" design): one month of
@@ -79,6 +80,8 @@ export default async function CalendarPage({
         retry: may("subscription:write"),
         // Any amount at all (DEC-098): the permission, never the role.
         money: may("payment:read"),
+        // "Open hours on this day" on a closed day (bookings U14).
+        hours: may("hours:write"),
     };
     // The team filter's person (E24); one the filter doesn't list opens on
     // Everyone.

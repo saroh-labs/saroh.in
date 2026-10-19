@@ -10,6 +10,8 @@ import type { HourDay } from "@/lib/calendar/week-hours";
 import { Tip } from "@saroh/ui/tooltip";
 import { TONE_BORDER, TONE_FILL } from "./tones";
 import { STRIPED } from "./week-columns";
+import type { DayExtra } from "./week-day-head";
+import { ClosedCard, DayHead, NO_EXTRA } from "./week-day-head";
 
 /** The gutter the hour labels sit in, then Monday to Sunday. */
 const COLS = "grid grid-cols-[52px_repeat(7,minmax(0,1fr))]";
@@ -23,24 +25,29 @@ const LABELS = hourLabels();
 /**
  * The Week as an hour grid (plan 005 E27), for a business with a team,
  * after the "Saroh Business Calendar" design: 06:00 to 22:00 at 44px an
- * hour under a header a day — its date, money in and out, who is off and
- * its named problem — and an All day row for what has no length. Bookings
+ * hour under a head a day (`DayHead`: its date and how many things are on,
+ * money in and out, who is off, its named problem, and Book or "Closed on
+ * Sundays", bookings U14) and an All day row for what has no length. Bookings
  * and classes are blocks by start and length, side by side where they
  * overlap, each opening its record. Hours outside working time are shaded;
  * a day closed, or off for the person picked, is striped.
  *
- * Wider than a phone, so the grid scrolls sideways inside its frame; the
- * page never does. The header keeps `#calendar-week [data-day]`, so the day
- * sheet hands focus back to it as it does for the card columns.
+ * The desk's only: a phone gets the strip and the day's list instead
+ * (`WeekStrip`). A closed day with nothing on it holds a card saying so.
+ * The head keeps `#calendar-week [data-day]`, so the day sheet hands focus
+ * back to it as it does for the card columns.
  */
 export function WeekHourGrid({
     title,
     days,
+    extras,
     onPick,
 }: {
     /** "14–20 Sep 2026", for the grid's label. */
     title: string;
     days: HourDay[];
+    /** Each day's Book, or why it is closed (bookings U14). */
+    extras: Map<string, DayExtra>;
     onPick: (date: string) => void;
 }) {
     return (
@@ -54,73 +61,13 @@ export function WeekHourGrid({
                 <div className={cn(COLS, "border-b border-border")}>
                     <div />
                     {days.map(({ column: col }) => (
-                        <button
+                        <DayHead
                             key={col.date}
-                            type="button"
-                            data-day={col.date}
-                            onClick={() => onPick(col.date)}
-                            disabled={col.outside}
-                            aria-label={col.label}
-                            aria-haspopup="dialog"
-                            aria-current={col.isToday ? "date" : undefined}
-                            className={cn(
-                                "grid min-w-0 gap-0.5 border-l border-foreground/10 px-2 pb-[7px] pt-2 text-left font-sans text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                                col.outside
-                                    ? "cursor-default bg-neutral-50 dark:bg-muted"
-                                    : col.selected
-                                      ? "cursor-pointer bg-muted hover:brightness-[0.98] active:brightness-95"
-                                      : "cursor-pointer bg-transparent hover:bg-muted/60 active:bg-muted",
-                                col.isToday &&
-                                    "shadow-[inset_0_2px_0_hsl(var(--foreground))]",
-                            )}
-                        >
-                            <span className="flex items-baseline gap-1.5">
-                                <span className="label">{col.dow}</span>
-                                <span
-                                    className={cn(
-                                        "font-display text-[17px] font-semibold",
-                                        col.outside
-                                            ? "text-neutral-400 dark:text-muted-foreground"
-                                            : col.isToday
-                                              ? "text-foreground"
-                                              : col.past
-                                                ? "text-muted-foreground"
-                                                : "text-foreground",
-                                    )}
-                                >
-                                    {col.n}
-                                </span>
-                            </span>
-                            {/* In, then out; the header's label says both. */}
-                            <span
-                                aria-hidden
-                                className="flex min-h-[14px] gap-1.5 text-[11px] font-semibold tabular-nums"
-                            >
-                                <span className="text-neutral-600 dark:text-muted-foreground">
-                                    {col.moneyIn}
-                                </span>
-                                <span className="font-medium text-destructive-subtle-foreground">
-                                    {col.moneyOut}
-                                </span>
-                            </span>
-                            {col.off ? (
-                                <span
-                                    aria-hidden
-                                    title={col.off.title}
-                                    className="truncate text-[10.5px] font-semibold text-muted-foreground"
-                                >
-                                    {col.off.text}
-                                </span>
-                            ) : null}
-                            {col.problem ? (
-                                <span
-                                    aria-hidden
-                                    className="truncate text-[10.5px] font-bold text-destructive-subtle-foreground"
-                                >
-                                    {col.problem}
-                                </span>
-                            ) : null}
-                        </button>
+                            column={col}
+                            extra={extras.get(col.date) ?? NO_EXTRA}
+                            onPick={onPick}
+                            className="border-l border-foreground/10"
+                        />
                     ))}
                 </div>
 
@@ -203,6 +150,12 @@ export function WeekHourGrid({
                                 <div
                                     aria-hidden
                                     className={cn("absolute inset-0", STRIPED)}
+                                />
+                            ) : null}
+                            {blocks.length === 0 ? (
+                                <ClosedCard
+                                    extra={extras.get(col.date) ?? NO_EXTRA}
+                                    className="absolute inset-x-2 top-[200px] z-[1]"
                                 />
                             ) : null}
                             {shade.bands.map((b) => (
