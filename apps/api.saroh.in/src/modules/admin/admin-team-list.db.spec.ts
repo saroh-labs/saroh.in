@@ -196,6 +196,8 @@ describe("Add a teammate: the grant keeps their job (DB, U17)", () => {
         expect(profile.worksAs).toBe("FINDS_BUSINESSES");
         expect(profile.onCommission).toBe(true);
         expect(profile.managerCode).toMatch(/^[2-9A-HJKMNP-Z]{8}$/);
+        // What the business sees on "Your Saroh contact", as an invite does.
+        expect(profile.workEmail).toBe(user.email);
 
         const row = await prisma.adminAuditEvent.findFirst({
             where: { action: "staff.granted", targetId: platformAdminId },

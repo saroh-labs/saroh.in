@@ -1,5 +1,7 @@
 import { prisma } from "@saroh/database";
 
+import type { OrgRole } from "../../common/types/organization-context";
+
 /**
  * The business sees its manager (DEC-169, admin console U26).
  *
@@ -13,6 +15,14 @@ export interface BusinessAccountManager {
     name: string | null;
     /** The work email on their staff profile; null when it isn't set. */
     workEmail: string | null;
+}
+
+/**
+ * Who in the business sees their manager: everyone but a Reviewer (owner,
+ * 19 Oct), whose seat is only for signing off the website.
+ */
+export function seesAccountManager(role: OrgRole): boolean {
+    return role !== "REVIEWER";
 }
 
 /**
