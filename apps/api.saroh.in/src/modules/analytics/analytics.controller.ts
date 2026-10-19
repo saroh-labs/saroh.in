@@ -23,7 +23,9 @@ import {
 } from "../capabilities/require-module.decorator";
 import type { IngestResult } from "./analytics.service";
 import { AnalyticsService } from "./analytics.service";
-import { IngestAnalyticsEventDto } from "./dto";
+import { IngestAnalyticsEventDto, InsightsPeriodQueryDto } from "./dto";
+import type { MoneyRead } from "./money";
+import { DEFAULT_PERIOD } from "./period";
 import type { TakingsRead } from "./takings";
 import { TakingsService } from "./takings.service";
 
@@ -97,6 +99,21 @@ export class AnalyticsController {
     @Get("takings")
     getTakings(@OrgContext() ctx: OrganizationContext): Promise<TakingsRead> {
         return this.takings.read(ctx);
+    }
+
+    /**
+     * Insights' Money for one period (DEC-171, `money.ts`): money in against
+     * the same number of days before, the usual order, twelve weekly bars
+     * marked by window, this week and today so far, places with their
+     * change, and who owes by how late. `?period=7d|4w|3m`, 4 weeks when
+     * absent. Needs `payment:read` beside `analytics:read`.
+     */
+    @Get("money")
+    getMoney(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: InsightsPeriodQueryDto,
+    ): Promise<MoneyRead> {
+        return this.takings.money(ctx, query.period ?? DEFAULT_PERIOD);
     }
 
     @Get()

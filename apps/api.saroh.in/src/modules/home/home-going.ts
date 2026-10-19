@@ -1,17 +1,10 @@
-import type { Prisma, prisma } from "@saroh/database";
+import type { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { toMinor } from "../../common/money";
-import { OWED_WHERE } from "../invoices/invoice-state";
+import { readOwedByAge } from "../analytics/owed-by-age";
 import { realOrderWhere } from "../orders/open-orders";
 import { MONEY_ON_THE_CALENDAR, sinceHref } from "./home-last-day";
-import type {
-    HomeGoing,
-    HomeGoingOwed,
-    HomeGoingSales,
-    HomeMoneyTotal,
-    HomeOwedBucket,
-} from "./home-model";
+import type { HomeGoing, HomeGoingSales } from "./home-model";
 import { onOneStore, storeWhere } from "./home-staff";
 import type { WeekScope } from "./home-week";
 import { compareTakings, readMoney, WEEK_PATHS } from "./home-week";
@@ -29,16 +22,15 @@ import { compareTakings, readMoney, WEEK_PATHS } from "./home-week";
  * Each figure for whoever holds its read, as This week's (`weekScope`):
  * sales with `payment:read`, bookings with `booking:read`, orders with
  * `order:read` or `order:stage`, owed with `invoice:read` — and owed's
- * amounts only with `payment:read` too (DEC-098).
+ * amounts only with `payment:read` too (DEC-098). Owed by how late is
+ * Insights' own read (`analytics/owed-by-age.ts`): what is left to pay on
+ * each bill, so Home and Insights never disagree.
  */
 
 type Db = typeof prisma;
 
 /** How many days each window holds. */
 export const GOING_DAYS = 7;
-
-/** Past due by more than this many days is "more than 30 days late". */
-export const LATE_LONG_DAYS = 30;
 
 export interface GoingWindows {
     /** 00:00 six days before today: the last 7 days start here. */
@@ -91,97 +83,6 @@ export function goingSales(
             href,
         };
     });
-}
-
-interface OwedRow {
-    currency: string;
-    _sum: { total: { toString(): string } | null };
-    _count: { _all: number };
-}
-
-function bucket(rows: OwedRow[], money: boolean, href: string): HomeOwedBucket {
-    return {
-        count: rows.reduce((n, r) => n + r._count._all, 0),
-        totals: money ? totalsOf(rows) : null,
-        href,
-    };
-}
-
-function totalsOf(rows: OwedRow[]): HomeMoneyTotal[] {
-    return rows.map((r) => ({
-        currency: r.currency,
-        amountMinor: toMinor(r._sum.total ?? 0),
-    }));
-}
-
-/** Every age's total together, per currency, in minor units. */
-function together(...ages: OwedRow[][]): HomeMoneyTotal[] {
-    const by = new Map<string, number>();
-    for (const row of ages.flat()) {
-        by.set(
-            row.currency,
-            (by.get(row.currency) ?? 0) + toMinor(row._sum.total ?? 0),
-        );
-    }
-    return [...by.entries()]
-        .sort(([x], [y]) => x.localeCompare(y))
-        .map(([currency, amountMinor]) => ({ currency, amountMinor }));
-}
-
-/**
- * What is owed now (issued, unpaid, not an order's own — `OWED_WHERE`, as
- * This week's owed) in three ages: not due yet (or no due date), 1 to 30
- * days past due, and more than 30. Null for a business that has never
- * billed outside an order: no "₹0 owed" for a shop.
- */
-export async function readOwedByAge(
-    db: Db,
-    organizationId: string,
-    clock: { now: Date; zone: string },
-    money: boolean,
-): Promise<HomeGoingOwed | null> {
-    const unpaid = {
-        organizationId,
-        ...OWED_WHERE,
-        status: "ISSUED",
-    } satisfies Prisma.InvoiceWhereInput;
-    // "More than 30 days late": due before this moment 30 days ago, by the
-    // zone's calendar.
-    const longAgo = DateTime.fromJSDate(clock.now, { zone: clock.zone })
-        .minus({ days: LATE_LONG_DAYS })
-        .toJSDate();
-    const sums = (where: Prisma.InvoiceWhereInput) =>
-        db.invoice.groupBy({
-            by: ["currency"],
-            where: { ...unpaid, ...where },
-            _sum: { total: true },
-            _count: { _all: true },
-            orderBy: { currency: "asc" },
-        }) as unknown as Promise<OwedRow[]>;
-    const [notDue, recent, old, ever] = await Promise.all([
-        sums({ OR: [{ dueAt: null }, { dueAt: { gte: clock.now } }] }),
-        sums({ dueAt: { lt: clock.now, gte: longAgo } }),
-        sums({ dueAt: { lt: longAgo } }),
-        db.invoice.findFirst({
-            where: { organizationId, ...OWED_WHERE },
-            select: { id: true },
-        }),
-    ]);
-    if (!ever) return null;
-    const count = (rows: OwedRow[]) =>
-        rows.reduce((n, r) => n + r._count._all, 0);
-    const overdue = count(recent) + count(old);
-    return {
-        totals: money ? together(notDue, recent, old) : null,
-        bills: count(notDue) + overdue,
-        overdue,
-        byAge: {
-            notDue: bucket(notDue, money, WEEK_PATHS.OWED),
-            late1to30: bucket(recent, money, WEEK_PATHS.OVERDUE),
-            lateOver30: bucket(old, money, WEEK_PATHS.OVERDUE),
-        },
-        href: overdue > 0 ? WEEK_PATHS.OVERDUE : WEEK_PATHS.OWED,
-    };
 }
 
 /**

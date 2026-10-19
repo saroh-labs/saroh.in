@@ -1,5 +1,6 @@
 import { Transform } from "class-transformer";
 import {
+    IsIn,
     IsInt,
     IsISO8601,
     IsObject,
@@ -9,6 +10,9 @@ import {
     Min,
     MinLength,
 } from "class-validator";
+
+import type { InsightsPeriod } from "./period";
+import { INSIGHTS_PERIODS } from "./period";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
@@ -57,4 +61,17 @@ export class IngestAnalyticsEventDto {
     @IsOptional()
     @IsISO8601()
     occurredAt?: string;
+}
+
+/**
+ * Insights' one period for the page (DEC-171): `7d`, `4w` or `3m`, each
+ * against the same number of days before it (`period.ts`). Absent means
+ * the default, the last 4 weeks; anything else is a 400.
+ */
+export class InsightsPeriodQueryDto {
+    @IsOptional()
+    @IsIn(INSIGHTS_PERIODS, {
+        message: `period must be one of ${INSIGHTS_PERIODS.join(", ")}`,
+    })
+    period?: InsightsPeriod;
 }

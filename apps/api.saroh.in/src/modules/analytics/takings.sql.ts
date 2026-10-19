@@ -86,3 +86,26 @@ export function firstSaleSql(organizationId: string, zone: string): Prisma.Sql {
               AND i."paidAt" IS NOT NULL
         ) s`;
 }
+
+/**
+ * What an order usually comes to (Insights' Money tile, DEC-171): the
+ * middle paid order, net of refunds, per currency, in the period
+ * `[from, to)` and the one before it `[beforeFrom, from)`. The median, not
+ * the mean: one big order does not make "usually" untrue. `window` is
+ * PERIOD or BEFORE; `amount` in major units; `orders` how many.
+ */
+export function usualOrderSql(
+    organizationId: string,
+    beforeFrom: Date,
+    from: Date,
+    to: Date,
+): Prisma.Sql {
+    return Prisma.sql`
+        SELECT CASE WHEN s.at >= ${ts(from)} THEN 'PERIOD' ELSE 'BEFORE' END AS window,
+            s.currency,
+            percentile_disc(0.5) WITHIN GROUP (ORDER BY s.amount) AS amount,
+            COUNT(*)::int AS orders
+        FROM (${salesSql(organizationId, beforeFrom, to)}) s
+        WHERE s.orders = 1
+        GROUP BY 1, 2`;
+}
