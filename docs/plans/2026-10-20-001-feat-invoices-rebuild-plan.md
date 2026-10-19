@@ -774,7 +774,7 @@ Copy-check scripts (`check:copy`, `check:words`) must pass.
   - **Cheque only:** cheque number and bank.
   - **Received on:** Today, Yesterday or Pick.
   - **Note:** "only you see this".
-  - **Share a receipt:** "On WhatsApp after, or email if connected".
+  - **Receipt:** emailed automatically after the Undo window when email is connected (owner, 20 Oct); otherwise "Share receipt on WhatsApp".
 - **The button** reads "Record ₹4,000".
 - **Overpaying** says so when Record is pressed. The 422's line is "₹9,000 is ₹600 more than what's left (₹8,400). Record ₹8,400." The advance wording is left out, since advances are Phase 2.
 - **After recording:** `showUndo("₹4,000 recorded on RC/26-27/0106. ₹4,400 left.")`. Undo calls remove. If a receipt was asked for, WhatsApp opens through U11's share call after the Undo window, or the email receipt is sent with `useHold().send`.
@@ -1141,4 +1141,4 @@ These are inferred bets, made without asking. Each is recorded in DEC-173 and op
 ## Open questions for the owner (not blocking)
 
 - Should "Take some off" appear in Cancel or correct as "coming", or stay hidden until Phase 2? The plan hides it.
-- Should the receipt email go automatically when a payment is recorded and email is connected, or only when ticked? The plan only sends it when ticked.
+- ~~Should the receipt email go automatically?~~ **Answered (owner, 20 Oct 2026): automatically.** Every recorded payment (full or part, any method, including a cheque marked in the bank and online payments) is noted on the invoice's history and the receipt goes to the customer by the business's own email provider without a tick. Without a connected provider nothing is sent and the sheet offers Share receipt on WhatsApp instead. U5 sends it from the payment-recorded event, not from the sheet; U10 drops the tick and says "Receipt emailed to <email>" in the Undo toast. Removing a payment within the Undo window sends nothing (the send waits for the window to end).

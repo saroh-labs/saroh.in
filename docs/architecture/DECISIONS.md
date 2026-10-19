@@ -2164,3 +2164,5 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Defaults while open:** an overpayment is blocked (no advances yet); styles, colour and logo are in; a credit note on a paid invoice is a later decision (refund or credit), so today's Refund… stays and a partly paid invoice can't be cancelled until its payments are removed; corrections after 30 Nov aren't touched.
 - Consequences: owed figures everywhere read what is left to pay; the pay link charges what is left; every path that pays an invoice writes the ledger through one helper.
 - Rules: added when built.
+
+- **Receipts are automatic (owner, 20 Oct 2026).** Recording a payment is an event: it is noted on the invoice's history and the receipt email goes to the customer through the business's own email provider, with no tick box. It waits for the Undo window, so a payment removed by Undo sends nothing. Without a provider nothing is sent and the owner can share the receipt on WhatsApp.
