@@ -1,8 +1,11 @@
+import { phoneNumberProblem } from "@saroh/block-contract";
+
 import type { SignedInCustomer } from "../../account/api";
 import { cn } from "../../lib/utils";
+import { SitePhoneInput } from "../../phone-input";
 import type { BookingWhere } from "../model";
 import { card, focusRing } from "../styles";
-import { Field } from "./field";
+import { Field, fieldBox } from "./field";
 import { StepHead } from "./step-head";
 import { WhereAndNote } from "./where-and-note";
 
@@ -66,6 +69,8 @@ export function DetailsStep({
     forWaitlist?: boolean;
 }) {
     const asksName = customer !== null && !customer.name;
+    // Said once they try to book, as the name is.
+    const phoneError = touched ? phoneNumberProblem(phone) : null;
     return (
         <div className={card}>
             <StepHead n={3} title="Your details" />
@@ -110,17 +115,34 @@ export function DetailsStep({
                 />
             ) : null}
             {forWaitlist || !onPhone ? null : (
-                <Field
-                    id={`${ids}-phone`}
-                    label="Phone (optional)"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    placeholder={`So ${business} can call you about it`}
-                    value={phone}
-                    onChange={onPhone}
-                    error={null}
-                />
+                <div className="mt-3 first-of-type:mt-0">
+                    <label
+                        htmlFor={`${ids}-phone`}
+                        className="text-site-fg block text-[13.5px] font-medium"
+                    >
+                        Phone (optional)
+                    </label>
+                    <SitePhoneInput
+                        id={`${ids}-phone`}
+                        className="mt-1.5"
+                        box={fieldBox}
+                        value={phone}
+                        onValueChange={onPhone}
+                        placeholder={`So ${business} can call you`}
+                        invalid={Boolean(phoneError)}
+                        describedBy={
+                            phoneError ? `${ids}-phone-error` : undefined
+                        }
+                    />
+                    {phoneError ? (
+                        <p
+                            id={`${ids}-phone-error`}
+                            className="text-site-fg mt-1.5 text-[12.5px] font-medium"
+                        >
+                            {phoneError}
+                        </p>
+                    ) : null}
+                </div>
             )}
             {forWaitlist ? null : (
                 <WhereAndNote

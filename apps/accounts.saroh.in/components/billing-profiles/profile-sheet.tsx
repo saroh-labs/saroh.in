@@ -5,6 +5,7 @@ import { Field, focusFirstError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { OptionSelect } from "@saroh/ui/option-select";
+import { PhoneInput } from "@saroh/ui/phone-input";
 import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import {
     Sheet,
@@ -180,13 +181,7 @@ function ProfileFields({
                 />
             </Field>
             <Field label="Phone" optional error={errors.phone}>
-                <Input
-                    type="tel"
-                    placeholder="+91"
-                    value={values.phone}
-                    onChange={(e) => set("phone")(e.target.value)}
-                    autoComplete="tel"
-                />
+                <PhoneInput value={values.phone} onValueChange={set("phone")} />
             </Field>
         </>
     );

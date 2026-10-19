@@ -54,6 +54,12 @@ export interface UserOrganization {
      */
     timeZone: string | null;
     /**
+     * The business's country as an ISO code ("IN"), so a phone field starts
+     * on its calling code (#1036). Null when never set; the app then reads
+     * India's.
+     */
+    country: string | null;
+    /**
      * Past the business's plan limit after a move to a lower plan (#800):
      * they can't open it until it moves up again, so the chooser says
      * "Paused" rather than opening into a refusal.
@@ -180,7 +186,9 @@ export class OrganizationContextService {
                         slug: true,
                         lifecycleStatus: true,
                         kind: true,
-                        businessProfile: { select: { timezone: true } },
+                        businessProfile: {
+                            select: { timezone: true, country: true },
+                        },
                     },
                 },
             },
@@ -259,6 +267,8 @@ export class OrganizationContextService {
                 kind: kindRead(membership.organization.kind),
                 timeZone:
                     membership.organization.businessProfile?.timezone ?? null,
+                country:
+                    membership.organization.businessProfile?.country ?? null,
                 paused: paused[i],
             };
         });

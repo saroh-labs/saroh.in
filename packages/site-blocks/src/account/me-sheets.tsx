@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { phoneNumberProblem } from "@saroh/block-contract";
+import { useId, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
 import { cn } from "../lib/utils";
+import { SitePhoneInput } from "../phone-input";
 import type { DetailsResult, MeApi, NoteResult } from "./me-api";
 import type { AccountNote, AccountView } from "./model";
 import { Sheet, sheetButton, sheetInput } from "./sheet";
@@ -29,12 +31,19 @@ export function DetailsSheet({
 }) {
     const [name, setName] = useState(account.name ?? "");
     const [phone, setPhone] = useState(account.phone ?? "");
+    const [phoneError, setPhoneError] = useState<string | null>(null);
+    const ids = useId();
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
     const off = busy || name.trim() === "";
 
     async function submit() {
         if (off) return;
+        // A number saved before numbers were checked is kept as it is.
+        const wrong =
+            phone !== (account.phone ?? "") ? phoneNumberProblem(phone) : null;
+        setPhoneError(wrong);
+        if (wrong) return;
         setBusy(true);
         setProblem(null);
         const result = await save({
@@ -73,18 +82,33 @@ export function DetailsSheet({
                         className={sheetInput}
                     />
                 </label>
-                <label className="mt-3 block text-[13.5px] font-medium">
+                <label
+                    htmlFor={`${ids}-phone`}
+                    className="mt-3 block text-[13.5px] font-medium"
+                >
                     Phone
-                    <input
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="tel"
-                        placeholder="+91 98765 43210"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className={sheetInput}
-                    />
                 </label>
+                <SitePhoneInput
+                    id={`${ids}-phone`}
+                    className="mt-1.5"
+                    box={sheetInput}
+                    value={phone}
+                    onValueChange={(v) => {
+                        setPhone(v);
+                        setPhoneError(null);
+                    }}
+                    placeholder="98765 43210"
+                    invalid={Boolean(phoneError)}
+                    describedBy={phoneError ? `${ids}-phone-error` : undefined}
+                />
+                {phoneError ? (
+                    <p
+                        id={`${ids}-phone-error`}
+                        className="text-site-fg mt-1.5 text-[12.5px] font-medium"
+                    >
+                        {phoneError}
+                    </p>
+                ) : null}
                 {problem ? (
                     <p
                         role="alert"

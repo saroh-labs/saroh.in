@@ -34,6 +34,7 @@ import {
     STAGE_LABEL,
 } from "@/lib/saroh-lead-words";
 
+import { phoneLabel } from "@saroh/ui/lib/phone";
 import { LeadDetailsForm } from "./lead-details";
 import { LeadStageControl } from "./lead-stage";
 import { LogCallSheet } from "./log-call-sheet";
@@ -273,7 +274,9 @@ function DetailList({ lead }: { lead: LeadDetail }) {
             {lead.signUpEmail ? (
                 <Row term="Sign-up email">{lead.signUpEmail}</Row>
             ) : null}
-            <Row term="Phone">{lead.phone ?? "Not known"}</Row>
+            <Row term="Phone">
+                {lead.phone ? phoneLabel(lead.phone) : "Not known"}
+            </Row>
             <Row term="City">{lead.city ?? "Not known"}</Row>
             <Row term="Follow up on">
                 {lead.followUpOn ? formatDate(lead.followUpOn) : "Not set"}

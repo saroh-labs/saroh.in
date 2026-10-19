@@ -5,6 +5,8 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
+
 import type {
     DetailsDraft,
     DetailsKey,
@@ -51,6 +53,40 @@ export function TextField({
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error || note ? `${fid}-note` : undefined}
                 onChange={(e) => set(k, e.target.value)}
+            />
+        </Field>
+    );
+}
+
+/**
+ * A phone wired to one key of the draft (#1036): the country code and the
+ * number, kept as E.164 once edited.
+ */
+export function PhoneField({
+    id,
+    k,
+    label,
+    draft,
+    set,
+    error,
+}: {
+    id: string;
+    k: DetailsKey;
+    label: string;
+    draft: DetailsDraft;
+    set: (k: DetailsKey, value: string) => void;
+    error?: string;
+}) {
+    const fid = `${id}-${k}`;
+    return (
+        <Field htmlFor={fid} label={label} error={error}>
+            <BusinessPhoneInput
+                id={fid}
+                value={draft[k]}
+                autoComplete="off"
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? `${fid}-note` : undefined}
+                onValueChange={(value) => set(k, value)}
             />
         </Field>
     );

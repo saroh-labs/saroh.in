@@ -2,6 +2,7 @@
 
 import { isRoleRefusal } from "@/lib/api/role-denied";
 import { Button } from "@saroh/ui/button";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -9,10 +10,12 @@ import { useRouter } from "next/navigation";
 import type { ReactElement } from "react";
 import { useId, useState } from "react";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { createContact } from "@/lib/contacts/create";
 import { personHref } from "@/lib/contacts/person-href";
+import { phoneProblem } from "@/lib/organizations/business-phone";
 
 /** A contact just added, as a picker names it. */
 export interface AddedContact {
@@ -55,6 +58,7 @@ export function AddContactDialog({
         company: "",
     });
     const [error, setError] = useState<string | null>(null);
+    const [phoneError, setPhoneError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const ids = {
         name: useId(),
@@ -73,6 +77,9 @@ export function AddContactDialog({
             return;
         }
         setError(null);
+        const phoneBad = phoneProblem(fields.phone);
+        setPhoneError(phoneBad);
+        if (phoneBad) return;
         const [firstName, ...rest] = fields.name.trim().split(/\s+/);
         const res = await runAction(
             () =>
@@ -133,6 +140,7 @@ export function AddContactDialog({
                 if (openOnArrival) router.replace("/contacts");
                 setFields(blank);
                 setError(null);
+                setPhoneError(null);
             }}
             onSubmit={submit}
         >
@@ -165,34 +173,24 @@ export function AddContactDialog({
                     </p>
                 ) : null}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                    <Label htmlFor={ids.phone}>
-                        Phone{" "}
-                        <span className="font-normal text-muted-foreground">
-                            optional
-                        </span>
-                    </Label>
-                    <Input
+            <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Phone" optional error={phoneError}>
+                    <BusinessPhoneInput
                         id={ids.phone}
-                        type="tel"
                         value={fields.phone}
-                        onChange={(e) => set("phone", e.target.value)}
+                        onValueChange={(v) => {
+                            set("phone", v);
+                            setPhoneError(null);
+                        }}
                     />
-                </div>
-                <div className="grid gap-1.5">
-                    <Label htmlFor={ids.company}>
-                        Company{" "}
-                        <span className="font-normal text-muted-foreground">
-                            optional
-                        </span>
-                    </Label>
+                </Field>
+                <Field label="Company" optional>
                     <Input
                         id={ids.company}
                         value={fields.company}
                         onChange={(e) => set("company", e.target.value)}
                     />
-                </div>
+                </Field>
             </div>
         </FormSheet>
     );

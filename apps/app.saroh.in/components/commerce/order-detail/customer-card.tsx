@@ -7,6 +7,7 @@ import { cardAttention } from "@/lib/orders/attention";
 import type { Shipment } from "@/lib/orders/courier";
 import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";
 
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel } from "./parts";
 
@@ -115,7 +116,13 @@ export function CustomerCard({
                 {customer.email ? (
                     <span className="break-all">{customer.email}</span>
                 ) : null}
-                {contact ? <span>{customer.phone ?? "No phone"}</span> : null}
+                {contact ? (
+                    <span>
+                        {customer.phone
+                            ? phoneLabel(customer.phone)
+                            : "No phone"}
+                    </span>
+                ) : null}
                 {address ? (
                     <span className="whitespace-pre-line text-muted-foreground">
                         {address}

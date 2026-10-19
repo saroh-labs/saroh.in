@@ -5,6 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { OptionSelect } from "@saroh/ui/option-select";
 import type { ChangeEvent } from "react";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import { GST_STATES } from "@/lib/invoices/gst";
 import { phoneProblem } from "@/lib/organizations/business-phone";
 import type { BillingDetail, ChangeQuote } from "@/lib/saroh-billing/plan-view";
@@ -268,16 +269,14 @@ export function InvoiceDetailsFields({
                 <Field
                     label="Phone"
                     optional
-                    hint="Printed on Saroh's invoice. Like +91 98450 12345."
+                    hint="Printed on Saroh's invoice."
                     error={errors.phone}
                 >
-                    <Input
+                    <BusinessPhoneInput
                         id="bill-phone"
-                        {...input("phone")}
-                        type="tel"
-                        inputMode="tel"
-                        maxLength={32}
-                        autoComplete="tel"
+                        value={value.phone}
+                        onValueChange={(v) => onChange("phone", v)}
+                        autoComplete="tel-national"
                     />
                 </Field>
             ) : null}

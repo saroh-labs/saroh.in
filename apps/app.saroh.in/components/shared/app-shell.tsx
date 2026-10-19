@@ -8,6 +8,7 @@ import { PlanAccessProvider } from "@/components/billing/plan-way";
 import { ClosingBanner } from "@/components/organizations/closing-banner";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
+import { BusinessCountryProvider } from "@/components/shared/business-country";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
 import { JoinedNotice } from "@/components/shared/joined-notice";
@@ -345,28 +346,35 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                          * keeps it, on the server's first paint too.
                          */}
                         <BusinessZoneProvider zone={businessZone(activeOrg)}>
-                            {/*
-                             * PostHog in the signed-in shell (DEC-125):
-                             * internal ids beside the workspace's error
-                             * reports, the one-time notice that it is
-                             * recorded, and the recorder, which waits for
-                             * that notice. Nothing without a key.
-                             */}
-                            <UsageRecording
-                                userId={session.user.id}
-                                organizationId={activeOrg?.id}
-                                usage={usageSharing}
-                            />
-                            {/* Scheduled for deletion (#921). */}
-                            <ClosingBanner view={closing} />
-                            {/* A plan that ends within 30 days (#805). */}
-                            <PlanEndingBanner ending={billing?.planEnding} />
-                            {/* What a lower plan paused, or will (#800). */}
-                            <PausedBanner view={paused} />
-                            {/* Just accepted an invitation: which business
+                            {/* Its country: where a phone field starts (#1036). */}
+                            <BusinessCountryProvider
+                                country={activeOrg?.country}
+                            >
+                                {/*
+                                 * PostHog in the signed-in shell (DEC-125):
+                                 * internal ids beside the workspace's error
+                                 * reports, the one-time notice that it is
+                                 * recorded, and the recorder, which waits for
+                                 * that notice. Nothing without a key.
+                                 */}
+                                <UsageRecording
+                                    userId={session.user.id}
+                                    organizationId={activeOrg?.id}
+                                    usage={usageSharing}
+                                />
+                                {/* Scheduled for deletion (#921). */}
+                                <ClosingBanner view={closing} />
+                                {/* A plan that ends within 30 days (#805). */}
+                                <PlanEndingBanner
+                                    ending={billing?.planEnding}
+                                />
+                                {/* What a lower plan paused, or will (#800). */}
+                                <PausedBanner view={paused} />
+                                {/* Just accepted an invitation: which business
                                 this is and what their role opens, once. */}
-                            <JoinedNotice />
-                            {children}
+                                <JoinedNotice />
+                                {children}
+                            </BusinessCountryProvider>
                         </BusinessZoneProvider>
                     </div>
                 </div>

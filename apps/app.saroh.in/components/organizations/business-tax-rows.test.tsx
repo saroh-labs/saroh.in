@@ -122,7 +122,7 @@ describe("Contact's rows and sheets", () => {
         await type(input("phone"), "+91 98450 12345");
         await press(item("Save"));
         expect(save).toHaveBeenCalledWith({
-            profile: { phone: "+91 98450 12345" },
+            profile: { phone: "+919845012345" },
         });
         expect(showUndo.mock.calls[0]?.[0]).toBe(
             "Phone on your website saved.",

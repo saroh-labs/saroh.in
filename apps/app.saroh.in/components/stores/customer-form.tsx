@@ -12,6 +12,7 @@ import {
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import { FormSheetBody, FormSheetFoot } from "@/components/shared/form-sheet";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -21,19 +22,25 @@ import { createCustomer, updateCustomer } from "@/lib/customers/actions";
 import { customerHref } from "@/lib/customers/links";
 import type { Customer } from "@/lib/customers/service";
 import { trimmedOr } from "@/lib/forms/values";
+import { phoneSchemaKeeping } from "@/lib/organizations/business-phone";
 
-const formSchema = z.object({
-    email: z.string().trim().min(1, { message: "Add their email address." }),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
-    phone: z.string().optional(),
-    country: z.string().optional(),
-    state: z.string().optional(),
-    city: z.string().optional(),
-    zipCode: z.string().optional(),
-});
+/** The form's rules; a phone saved before numbers were checked stays. */
+const schemaFor = (savedPhone: string) =>
+    z.object({
+        email: z
+            .string()
+            .trim()
+            .min(1, { message: "Add their email address." }),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        phone: phoneSchemaKeeping(savedPhone).optional(),
+        country: z.string().optional(),
+        state: z.string().optional(),
+        city: z.string().optional(),
+        zipCode: z.string().optional(),
+    });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<ReturnType<typeof schemaFor>>;
 
 export function CustomerForm({
     storeId,
@@ -49,7 +56,7 @@ export function CustomerForm({
     const editing = Boolean(customer);
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(formSchema),
+        resolver: zodResolver(schemaFor(customer?.phone ?? "")),
         defaultValues: {
             email: customer?.email ?? "",
             firstName: customer?.firstName ?? "",
@@ -157,10 +164,13 @@ export function CustomerForm({
                             <FormItem>
                                 <FormLabel>Phone</FormLabel>
                                 <FormControl>
-                                    <Input
-                                        autoComplete="tel"
+                                    <BusinessPhoneInput
+                                        ref={field.ref}
+                                        name={field.name}
+                                        value={field.value ?? ""}
+                                        onValueChange={field.onChange}
+                                        onBlur={field.onBlur}
                                         disabled={isSubmitting}
-                                        {...field}
                                     />
                                 </FormControl>
                                 <FormMessage />

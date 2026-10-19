@@ -252,7 +252,10 @@ describe("OrganizationContextService.listForUser", () => {
                     slug: "beta",
                     lifecycleStatus: "SUSPENDED",
                     kind: "WORK",
-                    businessProfile: { timezone: "Europe/London" },
+                    businessProfile: {
+                        timezone: "Europe/London",
+                        country: "GB",
+                    },
                 },
             },
         ]);
@@ -269,6 +272,7 @@ describe("OrganizationContextService.listForUser", () => {
                 kind: "BUSINESS",
                 // No profile: no zone, and the app reads India's (UX-008).
                 timeZone: null,
+                country: null,
             },
             {
                 id: "org_2",
@@ -281,6 +285,8 @@ describe("OrganizationContextService.listForUser", () => {
                 kind: "WORK",
                 // So server-rendered times are the business's (UX-008).
                 timeZone: "Europe/London",
+                // So a phone field starts on +44 (#1036).
+                country: "GB",
             },
         ]);
         // Each membership carries what the actor may do there, so the rail

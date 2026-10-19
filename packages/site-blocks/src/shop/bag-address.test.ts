@@ -58,7 +58,8 @@ describe("a delivery's address in the bag", () => {
             "Asha Rao",
             "12 Hill Road",
             "Mumbai, Maharashtra 400050",
-            "98450 12345",
+            // Grouped with its country code, as every saved number (#1036).
+            "+91 98450 12345",
         ]);
     });
 

@@ -1004,7 +1004,7 @@ describe("the header's bag", () => {
         await openTheBag();
         await screen.findByText("12 Hill Road");
         expect(screen.getByText("Mumbai, Maharashtra 400050")).toBeVisible();
-        expect(screen.getByText("98450 12345")).toBeVisible();
+        expect(screen.getByText("+91 98450 12345")).toBeVisible();
         expect(savedAddress).toHaveBeenCalledTimes(1);
         // Nothing to type: no field is drawn.
         expect(screen.queryByLabelText(/^Address/)).toBeNull();
@@ -1164,7 +1164,8 @@ describe("the header's bag", () => {
                 booker: {
                     name: "Kavya Iyer",
                     email: "asha@example.in",
-                    phone: "9845012345",
+                    // The field's E.164, as Razorpay's prefill takes it.
+                    phone: "+919845012345",
                 },
             }),
         );
@@ -1700,7 +1701,7 @@ describe("the bag's delivery fields on a phone", () => {
         const phone = screen.getByLabelText(/^Phone/);
         expect(phone).toHaveAttribute("type", "tel");
         expect(phone).toHaveAttribute("inputmode", "tel");
-        expect(phone).toHaveAttribute("autocomplete", "tel");
+        expect(phone).toHaveAttribute("autocomplete", "tel-national");
         for (const [label, auto] of [
             ["Name", "name"],
             ["Address", "address-line1"],
@@ -1716,8 +1717,9 @@ describe("the bag's delivery fields on a phone", () => {
         const fields = Array.from(
             document.querySelectorAll("input, select, textarea"),
         );
-        // The address's seven, the code, and the note for the business.
-        expect(fields).toHaveLength(9);
+        // The address's seven (the phone's country code an eighth), the
+        // code, and the note for the business.
+        expect(fields).toHaveLength(10);
         for (const field of fields) {
             expect(field.className).toMatch(/\btext-base\b/);
             expect(field.className).not.toMatch(/text-\[1[0-5](\.\d)?px\]/);

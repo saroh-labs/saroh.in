@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 import type { RenderedEnquiry } from "@saroh/block-contract";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
+import { SitePhoneInput } from "../phone-input";
 
 import type { SignedInCustomer } from "../account/api";
 import type { SendResult } from "../account/messages";
@@ -347,6 +348,23 @@ function EnquiryForm({
                                     {...shared}
                                     rows={4}
                                     className={controlClasses}
+                                />
+                            ) : field.type === "tel" ? (
+                                // The country code and the number (#1036),
+                                // sent as E.164.
+                                <SitePhoneInput
+                                    id={fieldId}
+                                    name={field.name}
+                                    required={field.required ?? false}
+                                    disabled={submitting}
+                                    value={values[field.name] ?? ""}
+                                    onValueChange={(value) =>
+                                        setValues((prev) => ({
+                                            ...prev,
+                                            [field.name]: value,
+                                        }))
+                                    }
+                                    box={controlClasses}
                                 />
                             ) : (
                                 <input

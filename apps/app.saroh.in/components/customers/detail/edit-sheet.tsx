@@ -22,7 +22,7 @@ import type { EmailHolder } from "@/lib/customer-workspace/service";
 
 import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
-import { AddressFields, TextField } from "./edit-fields";
+import { AddressFields, PhoneField, TextField } from "./edit-fields";
 
 interface Refusal {
     field: DetailsKey;
@@ -65,7 +65,7 @@ export function EditSheet({
     const id = useId();
     const patch = detailsPatch(initial, draft);
     const dirty = Object.keys(patch).length > 0;
-    const problems = detailsProblems(draft);
+    const problems = detailsProblems(draft, initial);
     const blocked = Object.keys(problems).length > 0;
     const errors: Partial<Record<DetailsKey, string>> = {
         ...(tried ? problems : {}),
@@ -176,12 +176,10 @@ export function EditSheet({
                     {emailNote}
                 </span>
             ) : null}
-            <TextField
+            <PhoneField
                 {...common}
                 k="phone"
                 label="Phone"
-                type="tel"
-                maxLength={40}
                 error={errors.phone}
             />
             <TextField

@@ -959,13 +959,6 @@ export function looksLikeEmail(value: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-/** Ten digits or more, if a phone is given at all. */
-export function phoneProblem(value: string): string | null {
-    const digits = value.replace(/\D/g, "");
-    if (value.trim() === "") return null;
-    return digits.length >= 10 ? null : "A phone number needs 10 digits.";
-}
-
 /**
  * The booking as a calendar file the booker can add. Times in UTC, so any
  * calendar puts it at the right hour wherever the phone is.

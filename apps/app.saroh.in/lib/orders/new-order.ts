@@ -8,6 +8,7 @@
 
 import type { CustomerPick } from "@/lib/customers/picker";
 import { count } from "@/lib/format/plural";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { METHOD_WORD } from "@/lib/payments/method-words";
 import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
@@ -353,11 +354,11 @@ export function findSellables<T extends { name: string }>(
  */
 export function pickMeta(pick: CustomerPick): string {
     if (pick.kind === "walk-in") {
-        const phone = pick.phone.trim();
+        const phone = phoneLabel(pick.phone);
         return phone ? `${phone} · kept as a customer` : "Walk-in";
     }
     return (
-        [pick.phone, pick.email].filter(Boolean).join(" · ") ||
+        [phoneLabel(pick.phone), pick.email].filter(Boolean).join(" · ") ||
         "No contact details"
     );
 }

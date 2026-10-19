@@ -105,7 +105,7 @@ describe("ReportForm", () => {
         }
         expect(email().getAttribute("type")).toBe("email");
         expect(phone().getAttribute("type")).toBe("tel");
-        expect(phone().getAttribute("autocomplete")).toBe("tel");
+        expect(phone().getAttribute("autocomplete")).toBe("tel-national");
         expect(phone().getAttribute("inputmode")).toBe("tel");
         expect(screen.getByText(copy.emailHint)).toBeTruthy();
         expect(screen.getByText(copy.phoneHint)).toBeTruthy();
@@ -164,7 +164,8 @@ describe("ReportForm", () => {
             site: "rye.saroh.app",
             message: WORDS,
             email: "first.last@example.com",
-            phone: "+91 98450 12345",
+            // Sent as E.164 with its country code (#1036).
+            phone: "+919845012345",
         });
     });
 

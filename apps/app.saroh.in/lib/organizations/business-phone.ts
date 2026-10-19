@@ -1,50 +1,32 @@
 /**
- * The business's public phone (DEC-053): the number its website shows, with
- * a Call button. The API stores it as E.164 ("+919845012345") and is the
- * judge (`organizations/business-phone.ts` there); this says the same rule
- * on the field as the merchant types, so Save isn't the first to know.
+ * A phone number in the workspace (DEC-053, #1036): the business's public
+ * phone, a customer's, a contact's. The API stores E.164 ("+919845012345")
+ * and is the judge; the rule itself is `@saroh/block-contract`'s `phone.ts`,
+ * the same code the API runs, so the field says what Save would refuse
+ * before Save does. `PhoneInput` (`@saroh/ui/phone-input`) is the field.
  */
-const E164 = /^\+[1-9]\d{7,14}$/;
-const SEPARATORS = /[\s\-.()]/g;
+import { phoneNumberProblem } from "@saroh/block-contract";
+import { z } from "zod";
 
-export const PHONE_EXAMPLE = "+91 98450 12345";
+export {
+    PHONE_EXAMPLE,
+    phoneLabel,
+    phoneNumberProblem as phoneProblem,
+    phoneE164 as phoneStored,
+} from "@saroh/block-contract";
 
 /**
- * An Indian number typed without the + ("98450 12345", "098450 12345",
- * "91 98450 12345"): the API stores it as +91, so it is accepted here too.
+ * A phone field in a form's schema: "" for none, else a number the API
+ * keeps. `saved`, a number saved before numbers were checked, is let
+ * through as it is, so an untouched phone never stops the rest saving.
  */
-const INDIAN_WITHOUT_PLUS = /^(?:0091|91|0)?([1-9]\d{9})$/;
-
-/** A typed number as the API will store it, or "" when it can't be read. */
-export function phoneStored(typed: string): string {
-    const compact = typed.trim().replace(SEPARATORS, "");
-    const indian = INDIAN_WITHOUT_PLUS.exec(compact);
-    return indian ? `+91${indian[1]}` : compact;
+export function phoneSchemaKeeping(saved = "") {
+    return z.string().superRefine((value, ctx) => {
+        if (saved !== "" && value === saved) return;
+        const problem = phoneNumberProblem(value);
+        if (problem) ctx.addIssue({ code: "custom", message: problem });
+    });
 }
 
-/** What is wrong with a typed number, or null when it will be accepted. */
-export function phoneProblem(typed: string): string | null {
-    const trimmed = typed.trim();
-    if (trimmed === "") return null;
-    const compact = phoneStored(trimmed);
-    if (!compact.startsWith("+")) {
-        return `Start with + and the country code, like ${PHONE_EXAMPLE}.`;
-    }
-    if (!E164.test(compact)) {
-        return `That isn't a number a customer can call. Use + and the country code, like ${PHONE_EXAMPLE}.`;
-    }
-    if (compact.startsWith("+91") && compact.length !== 13) {
-        return "An Indian number is +91 and then 10 digits.";
-    }
-    return null;
-}
-
-/**
- * A stored number as a person reads it: an Indian one grouped
- * "+91 98450 12345", any other as stored.
- */
-export function phoneLabel(stored: string | null | undefined): string {
-    if (!stored) return "";
-    const india = /^\+91(\d{5})(\d{5})$/.exec(stored);
-    return india ? `+91 ${india[1]} ${india[2]}` : stored;
-}
+/** A phone field in a form's schema, for a new record. */
+export const phoneSchema = phoneSchemaKeeping();

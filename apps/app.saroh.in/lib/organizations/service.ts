@@ -57,6 +57,12 @@ export interface Organization {
      */
     timeZone?: string | null;
     /**
+     * The business's country, an ISO code ("IN"), so a phone field starts
+     * on its calling code (#1036). Null when never set, absent from an older
+     * API: `PhoneInput` then starts on India's.
+     */
+    country?: string | null;
+    /**
      * `ACTIVE`, or the state an operator put it in (`SUSPENDED`,
      * `PENDING_DELETION`, `DELETED_RETAINED`): read-only, not gone. The
      * chooser lists one that isn't open apart (UX-084). Absent from an

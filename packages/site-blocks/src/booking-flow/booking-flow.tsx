@@ -1,5 +1,6 @@
 "use client";
 
+import { phoneNumberProblem } from "@saroh/block-contract";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import type {
@@ -12,7 +13,7 @@ import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { timeWords } from "../lib/clock";
-import { phoneOk, phoneText } from "../lib/phone";
+import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import { useQrSource } from "../qr-source";
 import type { BusinessReach } from "../reach-links";
@@ -186,7 +187,7 @@ export interface BookingAccount {
  */
 export function accountPhone(customer: SignedInCustomer | null): string {
     const phone = customer?.phone?.trim() ?? "";
-    return phone && phoneOk(phone) ? phone : "";
+    return phone && phoneNumberProblem(phone) === null ? phone : "";
 }
 
 /**
@@ -197,6 +198,7 @@ const NAME_AFTER_SIGN_IN = "You're signed in. Add your name, then book.";
 
 /** What is left while the name isn't typed (UX-083: a next step until they try to book). */
 const NAME_LEFT = "Add your name.";
+const PHONE_WRONG = "Check the phone number.";
 export interface BookingFlowProps {
     page: BookingPageData;
     /** Sign-in and booking with it, through the site's server (A9). */
@@ -540,10 +542,18 @@ export default function BookingFlow({
     const bookerName = (customer?.name ?? name).trim();
     const bookerFirst = bookerName.split(/\s+/)[0] ?? "";
 
+    // A phone is optional, but one typed must be a number to ring (#1036).
+    const phoneOk = waiting || phoneNumberProblem(phoneNo) === null;
     const block = !service
         ? "Pick what you'd like to book."
         : (unpayable ??
-          (!chosenStart ? "Pick a time." : !whoOk ? NAME_LEFT : ""));
+          (!chosenStart
+              ? "Pick a time."
+              : !whoOk
+                ? NAME_LEFT
+                : !phoneOk
+                  ? PHONE_WRONG
+                  : ""));
 
     const whenText = chosenStart
         ? `${dateText(dateIn(chosenStart.startAt, zone), true)} at ${timeWords(chosenStart.startAt, zone)}${

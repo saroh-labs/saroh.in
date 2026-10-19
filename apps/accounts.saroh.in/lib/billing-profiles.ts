@@ -1,3 +1,5 @@
+import { phoneLabel, phoneNumberProblem } from "@saroh/ui/lib/phone";
+
 import { GSTIN_SHAPE, stateName } from "./gst-states";
 
 /**
@@ -140,14 +142,10 @@ export function paysForLine(p: Pick<BillingProfile, "payingFor">): string {
 }
 
 /**
- * A stored number as a person reads it: an Indian one grouped
- * "+91 98450 12345", any other as stored.
+ * A stored number as a person reads it, grouped: "+91 98450 12345" (#1036,
+ * the one rule in `@saroh/block-contract`).
  */
-export function phoneLabel(stored: string | null | undefined): string {
-    if (!stored) return "";
-    const india = /^\+91(\d{5})(\d{5})$/.exec(stored);
-    return india ? `+91 ${india[1]} ${india[2]}` : stored;
-}
+export { phoneLabel };
 
 /** "pays for 2 businesses", under the page's title. */
 export function paysForCount(n: number): string {
@@ -315,6 +313,8 @@ export function profileProblems(
         const taken = emailTakenBy(email, others);
         if (taken) out.push(["billingEmail", taken]);
     }
+    const phone = phoneNumberProblem(v.phone);
+    if (phone) out.push(["phone", phone]);
     return out;
 }
 

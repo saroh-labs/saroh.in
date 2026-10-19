@@ -17,7 +17,7 @@ import { BusinessPriceModeField } from "@/components/organizations/business-pric
 import { BusinessTaxFields } from "@/components/organizations/business-tax-fields";
 import { fieldWidth } from "@/components/organizations/registered-address-fields";
 import { TimeZoneSelect } from "@/components/organizations/time-zone-select";
-import { PHONE_EXAMPLE } from "@/lib/organizations/business-phone";
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
 import { nameLabelOf } from "@/lib/organizations/business-sheet-words";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
@@ -199,19 +199,20 @@ export function BusinessSheetFields({
                         <FormItem {...at("100%")}>
                             <FormLabel>Phone on your website</FormLabel>
                             <FormControl>
-                                <Input
-                                    {...field}
-                                    type="tel"
-                                    inputMode="tel"
-                                    autoComplete="tel"
-                                    placeholder={PHONE_EXAMPLE}
+                                <BusinessPhoneInput
+                                    ref={field.ref}
+                                    name={field.name}
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    onBlur={field.onBlur}
+                                    disabled={field.disabled}
+                                    placeholder="98450 12345"
                                 />
                             </FormControl>
                             <FormDescription>
                                 Your site shows it with a Call button, and
                                 offers it when a sign-in code can&apos;t be
-                                sent. A 10-digit Indian number is fine. Leave it
-                                empty to show none.
+                                sent. Leave it empty to show none.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

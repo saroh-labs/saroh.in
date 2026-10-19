@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { joinPhone, PHONE_CASES, splitPhone } from "@saroh/block-contract";
 
 import {
     normalisePublicPhone,
@@ -103,5 +104,31 @@ describe("the business's public phone (DEC-053, F20)", () => {
             expect(publicPhone("98450 12345")).toBeNull();
             expect(publicPhone("+91 98450 12345")).toBeNull();
         });
+    });
+});
+
+/**
+ * #1036: the workspace's and the site's phone fields send what
+ * `joinPhone(splitPhone(typed))` gives. Each shared case must mean the same
+ * here as there: kept as the same E.164, or refused by both.
+ */
+describe("the API's rule and the phone fields agree (#1036)", () => {
+    it.each(PHONE_CASES)("$typed", ({ typed, stored }) => {
+        const api = normalisePublicPhone(typed);
+        const field = normalisePublicPhone(joinPhone(splitPhone(typed, "IN")));
+        if (stored) {
+            expect(api).toEqual({ phone: stored });
+            expect(field).toEqual({ phone: stored });
+        } else {
+            expect(api).toHaveProperty("problem");
+            expect(field).toHaveProperty("problem");
+        }
+    });
+
+    it("keeps every stored E.164 number as it is", () => {
+        for (const { stored } of PHONE_CASES) {
+            if (stored)
+                expect(normalisePublicPhone(stored)).toEqual({ phone: stored });
+        }
     });
 });

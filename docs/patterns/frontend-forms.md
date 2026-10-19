@@ -360,6 +360,23 @@ preview under its fields, from the draft.
   moment (a new order before its location is read) the box is a plain
   decimal `Input` until it is. Gap: a lead's Worth has no sign, because a
   lead has no currency (the Leads list draws none either).
+- **Current** — **One phone field** (#1036): `PhoneInput`
+  (`@saroh/ui/phone-input`) in the workspace, accounts, admin and saroh.in,
+  and `SitePhoneInput` (`packages/site-blocks/src/phone-input.tsx`) on a
+  merchant's site, drawn with the `--site-*` tokens only. Both are a
+  country-code picker (the business's country, else India) and the number
+  as typed; a whole number pasted ("+44 …", "0091 …", "098765 43210")
+  picks its country. The value is E.164 ("+919876543210") or "". In
+  `app.saroh.in` use `BusinessPhoneInput`
+  (`components/shared/business-phone-input.tsx`), which starts on the
+  active business's country. What a number means is one pure module,
+  `packages/block-contract/src/phone.ts` (`normalisePhoneNumber`,
+  `phoneNumberProblem`, `phoneLabel`), which the API's
+  `normalisePublicPhone` re-exports; `PHONE_CASES` there pins the API and
+  both fields to the same answers. A saved number is shown with
+  `phoneLabel`, grouped ("+91 98765 43210"). An edit checks a phone only
+  once it is changed (`phoneSchemaKeeping`), so one saved before numbers
+  were checked never stops the rest saving. Never a bare `type="tel"`.
 - **Current** — **Saving from the keyboard**
   (`lib/hooks/keyboard-save.ts`): Cmd/Ctrl+Enter sends the form the
   keyboard is in (`submitOnModEnter` on a `<form>`; the overlay frames

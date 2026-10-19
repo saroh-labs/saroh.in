@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import type {
     CtaAction,
     CtaKind,
@@ -186,13 +187,12 @@ export function CtaActionFields({
             ) : null}
             {action.kind === "call" || action.kind === "whatsapp" ? (
                 <Field label="Phone number">
-                    <Input
+                    <BusinessPhoneInput
                         value={action.number}
-                        onChange={(e) =>
-                            onChange({ ...action, number: e.target.value })
+                        onValueChange={(number) =>
+                            onChange({ ...action, number })
                         }
-                        placeholder="+91 98450 12345"
-                        inputMode="tel"
+                        placeholder="98450 12345"
                     />
                 </Field>
             ) : null}

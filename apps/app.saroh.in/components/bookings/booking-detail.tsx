@@ -23,6 +23,7 @@ import {
 } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { bookingStatus } from "@/lib/format/status";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import {
     deadlineText,
     paidLine,
@@ -323,7 +324,11 @@ export function BookingDetailView({
                         />
                         <Row
                             label="Phone"
-                            value={contact?.phone ?? booking.bookerPhone}
+                            value={
+                                phoneLabel(
+                                    contact?.phone ?? booking.bookerPhone,
+                                ) || null
+                            }
                         />
                     </dl>
                     {/* A linked contact is a destination; a typed-in name is

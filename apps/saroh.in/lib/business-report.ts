@@ -6,6 +6,8 @@
  * this page, and the answer never says.
  */
 
+import { phoneNumberProblem } from "@saroh/ui/lib/phone";
+
 export interface ReportBody {
     site: string;
     message: string;
@@ -81,7 +83,11 @@ export function reportProblem(input: {
     if (!email || email.length > REPORT_LIMITS.email || !EMAIL.test(email)) {
         return "email";
     }
-    if (!phoneOk(input.phone)) return "phone";
+    // The API's loose rule, and the shared one the field keeps (#1036): a
+    // number with its country code that a person could ring.
+    if (!phoneOk(input.phone) || phoneNumberProblem(input.phone)) {
+        return "phone";
+    }
     return null;
 }
 

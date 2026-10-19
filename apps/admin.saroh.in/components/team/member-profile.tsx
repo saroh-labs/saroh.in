@@ -6,7 +6,9 @@ import { DateInput } from "@saroh/ui/date-picker";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { phoneNumberProblem } from "@saroh/ui/lib/phone";
 import { OptionSelect } from "@saroh/ui/option-select";
+import { PhoneInput } from "@saroh/ui/phone-input";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
@@ -194,6 +196,8 @@ export function profileSave(
             error: "How many businesses they can look after: a whole number from 1.",
         };
     }
+    const phone = phoneNumberProblem(draft.phone);
+    if (phone) return { ok: false, error: phone };
     const taxId = draft.taxId.trim();
     return {
         ok: true,
@@ -271,10 +275,9 @@ function EditDetails({
                             optional
                             hint="Only Saroh's team sees this; businesses see the name and work email."
                         >
-                            <Input
-                                inputMode="tel"
+                            <PhoneInput
                                 value={draft.phone}
-                                onChange={(e) => set("phone", e.target.value)}
+                                onValueChange={(value) => set("phone", value)}
                             />
                         </Field>
                         <Field label="City" optional>

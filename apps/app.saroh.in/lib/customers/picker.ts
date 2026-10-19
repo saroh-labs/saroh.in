@@ -5,6 +5,8 @@
  * What is here only reads what was typed into the fields it belongs in.
  */
 
+import { phoneNumberProblem } from "@saroh/block-contract";
+
 /** Why a search result is exactly what was typed (C2's rules, on the API). */
 export type ExactOn = "email" | "phone";
 
@@ -107,17 +109,21 @@ export function exactly(
 
 /**
  * Fewest digits a walk-in's phone keeps them by: the API's rule (C2's
- * `normalisePhone`). Only counted here, to say so before it is sent.
+ * `normalisePhone`).
  */
 export const MIN_WALK_IN_PHONE_DIGITS = 7;
 
 /** What a walk-in's phone field holds: nothing, too little, or a phone. */
 export type WalkInPhone = "none" | "short" | "phone";
 
+/**
+ * The phone field sends E.164 with its country code (#1036), so a phone is
+ * one the shared rule reads (`phoneNumberProblem`): eight digits at least,
+ * more than the API keeps a customer by.
+ */
 export function walkInPhone(phone: string): WalkInPhone {
-    const digits = phone.replace(/\D/g, "").length;
     if (!phone.trim()) return "none";
-    return digits >= MIN_WALK_IN_PHONE_DIGITS ? "phone" : "short";
+    return phoneNumberProblem(phone) === null ? "phone" : "short";
 }
 
 /**

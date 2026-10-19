@@ -5,6 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useId, useState } from "react";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import { runAction } from "@/lib/api/run-action";
 import type {
     CustomerSearchResult,
@@ -80,11 +81,10 @@ export function NewCustomerForm({
             <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                     <Label htmlFor={ids.phone}>Phone</Label>
-                    <Input
+                    <BusinessPhoneInput
                         id={ids.phone}
-                        type="tel"
                         value={draft.phone}
-                        onChange={(e) => set("phone")(e.target.value)}
+                        onValueChange={set("phone")}
                         autoComplete="off"
                         className={FIELD}
                     />
@@ -194,12 +194,11 @@ export function WalkInForm({
                 </div>
                 <div>
                     <Label htmlFor={ids.phone}>Phone (if they give one)</Label>
-                    <Input
+                    <BusinessPhoneInput
                         id={ids.phone}
-                        type="tel"
                         value={phone}
-                        onChange={(e) => {
-                            setPhone(e.target.value);
+                        onValueChange={(v) => {
+                            setPhone(v);
                             setError(null);
                         }}
                         autoComplete="off"

@@ -362,7 +362,7 @@ describe("ChangePlanDialog: the registered address for Saroh's invoice (Rule 46(
         expect(changePlanAction).toHaveBeenCalledWith(
             expect.objectContaining({
                 gstin: "29AABCI1234A1Z7",
-                phone: "+91 98450 12345",
+                phone: "+919845012345",
                 registeredAddress: {
                     line1: "4 Mill Road",
                     line2: "",

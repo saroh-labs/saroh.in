@@ -4,6 +4,7 @@ import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import type { ContactContent } from "@/lib/sites/service";
 
 import type { SectionFieldsProps } from "./props";
@@ -70,11 +71,10 @@ export function ContactFields({
                 />
             </Field>
             <Field label="Phone">
-                <Input
-                    type="tel"
+                <BusinessPhoneInput
                     value={c.phone ?? ""}
-                    onChange={set("phone")}
-                    placeholder="+91 98765 43210"
+                    onValueChange={(v) => patch({ phone: v || undefined })}
+                    placeholder="98765 43210"
                 />
             </Field>
             <Field label="Email">
@@ -86,11 +86,10 @@ export function ContactFields({
                 />
             </Field>
             <Field label="WhatsApp number">
-                <Input
-                    type="tel"
+                <BusinessPhoneInput
                     value={c.whatsapp ?? ""}
-                    onChange={set("whatsapp")}
-                    placeholder="With country code, e.g. +91 98765 43210"
+                    onValueChange={(v) => patch({ whatsapp: v || undefined })}
+                    placeholder="98765 43210"
                 />
             </Field>
             <Field optional label="Map link">
