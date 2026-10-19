@@ -56,6 +56,8 @@ export function TakePayment({
     variant = "default",
     triggerClassName,
     onTaken,
+    open: openProp,
+    onOpenChange,
 }: {
     bookingId: string;
     take: DeskTake;
@@ -74,10 +76,20 @@ export function TakePayment({
     triggerClassName?: string;
     /** After it's taken or a link is made, beside the page's own refresh. */
     onTaken?: () => void;
+    /**
+     * Opened from elsewhere (the quick look's main button or its More):
+     * no trigger is drawn, and the screen holds whether it is open.
+     */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }) {
     const router = useRouter();
     const ids = { given: useId(), how: useId(), error: useId() };
-    const [open, setOpen] = useState(false);
+    const [ownOpen, setOwnOpen] = useState(false);
+    const controlled = openProp !== undefined;
+    const open = controlled ? openProp : ownOpen;
+    const setOpen = (next: boolean) =>
+        controlled ? onOpenChange?.(next) : setOwnOpen(next);
     const [choice, setChoice] = useState<DeskChoice>("CASH");
     const [given, setGiven] = useState("");
     const [busy, setBusy] = useState(false);
@@ -95,6 +107,13 @@ export function TakePayment({
     const choices = deskChoices({ take, canLink, online });
     const change = deskChange(given, take.cents);
     const problem = deskProblem(choice, given, take.cents, format);
+
+    // Opened from elsewhere: each opening starts fresh, as the trigger's.
+    const [wasOpen, setWasOpen] = useState(open);
+    if (wasOpen !== open) {
+        setWasOpen(open);
+        if (open && controlled) reset();
+    }
 
     function reset() {
         setChoice("CASH");
@@ -154,18 +173,20 @@ export function TakePayment({
 
     return (
         <>
-            <Button
-                data-ph-unmask=""
-                type="button"
-                variant={variant}
-                className={cn("cursor-pointer", triggerClassName)}
-                onClick={() => {
-                    reset();
-                    setOpen(true);
-                }}
-            >
-                Take {amount}
-            </Button>
+            {controlled ? null : (
+                <Button
+                    data-ph-unmask=""
+                    type="button"
+                    variant={variant}
+                    className={cn("cursor-pointer", triggerClassName)}
+                    onClick={() => {
+                        reset();
+                        setOpen(true);
+                    }}
+                >
+                    Take {amount}
+                </Button>
+            )}
             <FormDialog
                 open={open}
                 size="md"

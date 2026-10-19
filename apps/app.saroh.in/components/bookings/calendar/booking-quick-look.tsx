@@ -1,117 +1,66 @@
 "use client";
 
-import {
-    formatClock,
-    formatClockRange,
-    formatDay,
-} from "@/lib/format/datetime";
-import { count } from "@/lib/format/plural";
-import { AbsentOr, AbsentValue } from "@saroh/ui/absent-value";
-import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
+import { Avatar, AvatarFallback, avatarInitials } from "@saroh/ui/avatar";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Sheet,
     SheetContent,
     SheetDescription,
-    SheetHeader,
     SheetTitle,
 } from "@saroh/ui/sheet";
-import { ArrowRight } from "lucide-react";
-import Link from "next/link";
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
-
-import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
-import { TakePayment } from "@/components/bookings/take-payment";
-import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
-import { personHref } from "@/lib/contacts/person-href";
-import { formatMoney } from "@/lib/format/money";
 import {
-    bookingChangeText,
-    classCancelText,
-} from "@/lib/messages/notice-reach";
-import { listAvailability, readBookingPerson } from "@/lib/services/actions";
-import type {
-    DiaryBooking,
-    TreatmentView,
-} from "@/lib/services/booking-calendar";
-import { canCheckIn, canMarkNoShow } from "@/lib/services/booking-state";
-import { BOOKING_WORDS } from "@/lib/services/booking-words";
-import type { Block, LocalDate } from "@/lib/services/diary";
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from "react";
+
+import type { SendHeld } from "@/components/bookings/sheets/cancel-sheet";
+import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
+import { TakePayment } from "@/components/bookings/take-payment";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { useHold } from "@/components/shared/use-hold";
+import { formatClockRange, formatDay } from "@/lib/format/datetime";
+import { useNarrow } from "@/lib/hooks/use-narrow";
+import { readBookingPerson } from "@/lib/services/actions";
+import type { Block, DiaryState } from "@/lib/services/diary";
 import {
     bookingState,
     liveSeats,
     localDateOf,
-    localMinuteOf,
-    paidText,
     STATE_LABEL,
     whoFor,
 } from "@/lib/services/diary";
 import type { PeekPerson } from "@/lib/services/peek";
-import { attentionText, phoneText } from "@/lib/services/peek";
-import type { Slot } from "@/lib/services/service";
-import {
-    orderHref,
-    orderLabel,
-    visitLabel,
-    visitsDoneText,
-    visitToBook,
-} from "@/lib/services/treatment";
 
-import { StatusBadge } from "@/components/shared/status-badge";
-import { ProgressBar } from "@saroh/ui/progress-bar";
-import { TextLink } from "@saroh/ui/text-link";
-import { ClassSeats } from "./class-seats";
-import { Eyebrow, STATE_TONE } from "./parts";
+import { STATE_TONE } from "./parts";
+import { ChooseStep, MoveStep } from "./quick-look-change";
+import { ClassLook } from "./quick-look-class";
+import { NextVisitStep } from "./quick-look-next-visit";
+import type { PersonRead } from "./quick-look-one";
+import { OneLook, paidWords } from "./quick-look-one";
+import { CloseButton } from "./quick-look-parts";
+import type { NextDayChoice, QuickLookStep } from "./quick-look-state";
 import type {
     HeldFor,
     QuickLookActions,
     QuickLookContext,
 } from "./quick-look-types";
-import { btn } from "./quick-look-types";
-
-function Card({
-    children,
-    className,
-}: {
-    children: ReactNode;
-    className?: string;
-}) {
-    return (
-        <div
-            className={cn(
-                "rounded-[12px] border border-border bg-card px-4 py-[13px]",
-                className,
-            )}
-        >
-            {children}
-        </div>
-    );
-}
-
-function Rows({ rows }: { rows: [string, ReactNode][] }) {
-    return (
-        <Card>
-            <dl>
-                {rows.map(([k, v]) => (
-                    <div key={k} className="flex gap-2.5 py-[5px] text-[13px]">
-                        <dt className="w-[90px] shrink-0 text-muted-foreground">
-                            {k}
-                        </dt>
-                        <dd className="min-w-0 flex-1">{v}</dd>
-                    </div>
-                ))}
-            </dl>
-        </Card>
-    );
-}
 
 /**
- * The quick look over the calendar (the design's booking peek): who and
- * when, how it was paid, and what the desk does next — check in, no-show,
- * move, cancel with Undo. A class lists who holds each place and how they
- * paid. The full booking page keeps the history and everything else.
+ * The quick look over the calendar (U7, #1023; BKMQuickLook,
+ * BKMQuickLookStep2, BKMNextVisit, BKDQuickLook): a bottom sheet on a
+ * phone, the right-hand panel at a desk.
+ *
+ * One main action at a time (Mark arrived, then Take ₹X, then Book their
+ * next visit), "Move or cancel" as its own step, and the rest under More,
+ * Cancel last and in red. Move uses U3's time picker; Cancel is U3's one
+ * cancel sheet, asking about the money as the business's policy says
+ * (Q14), its held Undo kept here so it outlives the quick look closing.
+ * Book their next visit keeps the service and person and leaves the day
+ * to the merchant (Q16). A class lists who is booked, with Cancel a place
+ * on each, and Cancel the class under More.
  */
 export function BookingQuickLook({
     block,
@@ -130,573 +79,394 @@ export function BookingQuickLook({
     // Keep the last block through the closing slide, so it does not blank.
     if (block && block !== kept) setKept(block);
     const shown = block ?? kept;
+    const [step, setStep] = useState<QuickLookStep>("look");
+    const [nextChoice, setNextChoice] = useState<NextDayChoice | null>(null);
+    const [taking, setTaking] = useState(false);
+    // A new booking opened: it starts at its glance.
+    const [openFor, setOpenFor] = useState<string | null>(block?.key ?? null);
+    if ((block?.key ?? null) !== openFor) {
+        setOpenFor(block?.key ?? null);
+        setStep("look");
+        setTaking(false);
+    }
+    const narrow = useNarrow();
+    // What had the keyboard when it opened (the block on the calendar):
+    // it gets it back on close. Read before the sheet takes it.
+    const opener = useRef<HTMLElement | null>(null);
+    const isOpen = block !== null;
+    useLayoutEffect(() => {
+        if (!isOpen) return;
+        const el = document.activeElement;
+        opener.current =
+            el instanceof HTMLElement && el !== document.body ? el : null;
+    }, [isOpen]);
+    // The cancel's ten seconds outlive the sheet: this component stays
+    // mounted while the calendar is on screen.
+    const { send, pending, undo } = useHold();
+    const cancelKey = (id: string) => `cancel-booking:${id}`;
+    const held: HeldFor = (id) => {
+        const theirs = heldFor(id);
+        if (theirs) return theirs;
+        return pending.includes(cancelKey(id))
+            ? () => undo(cancelKey(id))
+            : null;
+    };
 
-    return (
-        <Sheet open={block !== null} onOpenChange={(o) => !o && onClose()}>
-            <SheetContent className="flex w-full flex-col gap-0 bg-background p-0 sm:max-w-[420px]">
-                {shown ? (
-                    <Body block={shown} ctx={ctx} act={act} heldFor={heldFor} />
-                ) : null}
-            </SheetContent>
-        </Sheet>
-    );
-}
+    const close = () => {
+        setStep("look");
+        onClose();
+    };
+    // A plain cancel is held with its Undo: the quick look closes at once.
+    const sendAndClose: SendHeld = (key, options) => {
+        send(key, options);
+        setStep("look");
+        onClose();
+    };
 
-function Body({
-    block,
-    ctx,
-    act,
-    heldFor,
-}: {
-    block: Block;
-    ctx: QuickLookContext;
-    act: QuickLookActions;
-    heldFor: HeldFor;
-}) {
-    const start =
-        block.kind === "one" ? block.booking.startAt : block.session.startAt;
-    const date = localDateOf(start, ctx.timezone);
-    const staff =
-        block.kind === "one" ? block.booking.staff : block.session.staff;
-    const title =
-        block.kind === "one"
-            ? whoFor(block.booking)
-            : block.session.service.name;
-    return (
-        <>
-            <SheetHeader className="space-y-0 border-b border-border bg-card py-3.5 pl-[18px] pr-14 text-left">
-                <div className="flex items-center gap-2.5">
-                    <div className="min-w-0 flex-1">
-                        <SheetTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                            {title}
-                        </SheetTitle>
-                        <SheetDescription className="text-[12px] text-muted-foreground">
-                            {formatDay(date, {
-                                weekday: "short",
-                                year: "never",
-                            })}{" "}
-                            · {formatClockRange(block.start, block.end)}
-                            {staff ? ` · ${staff.name}` : ""}
-                        </SheetDescription>
-                    </div>
-                    <StatusBadge tone={STATE_TONE[block.state]}>
-                        {STATE_LABEL[block.state]}
-                    </StatusBadge>
-                </div>
-            </SheetHeader>
-            <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-[18px] py-4">
-                {block.kind === "one" ? (
-                    <OneToOne
-                        booking={block.booking}
-                        date={date}
-                        ctx={ctx}
-                        act={act}
-                        undo={heldFor(block.booking.id)}
-                    />
-                ) : (
-                    <ClassLook
-                        block={block}
-                        ctx={ctx}
-                        act={act}
-                        heldFor={heldFor}
-                    />
-                )}
-            </div>
-        </>
-    );
-}
-
-function OneToOne({
-    booking: b,
-    date,
-    ctx,
-    act,
-    undo,
-}: {
-    booking: DiaryBooking;
-    date: LocalDate;
-    ctx: QuickLookContext;
-    act: QuickLookActions;
-    /** Undo for a change still held, beside it (the design's "Undo checked in"). */
-    undo: (() => void) | null;
-}) {
-    const [moving, setMoving] = useState(false);
-    const person = usePerson(b.contact?.id ?? null);
-    const state = bookingState(b);
-    const first = whoFor(b).split(" ")[0];
-    const price = ctx.money
-        ? formatMoney(b.service.priceCents ?? null, b.service.currency ?? null)
-        : null;
-    // A visit of a treatment is paid on its order (E10, DEC-050).
-    const paid: ReactNode = b.treatment ? (
-        <OrderText treatment={b.treatment} canRead={!!ctx.canReadOrder} />
-    ) : b.paidAtDesk ? (
-        // Taken at the desk (P2): how, never how much.
-        paidText(b)
-    ) : b.paidWith === "PAID" ? (
-        // How it was paid, and how much to someone who sees money (UX-049).
-        price ? (
-            `${price} paid online`
-        ) : (
-            "Paid online"
-        )
-    ) : b.paidWith === "DESK" ? (
-        `Not yet. ${BOOKING_WORDS.paysAtVisit}`
-    ) : (
-        paidText(b)
-    );
-    const open = state === "booked" || state === "pending";
-    const actions: ReactNode[] = [];
-    const nextVisit = ctx.canBook ? visitToBook(b.treatment, whoFor(b)) : null;
-    if (undo) {
-        actions.push(
-            <Button
-                key="undo"
-                variant="outline"
-                className={btn.ghost}
-                onClick={undo}
-            >
-                {state === "in"
-                    ? "Undo came"
-                    : state === "noshow"
-                      ? "Undo didn't come"
-                      : "Undo cancel"}
-            </Button>,
-        );
-    } else if (ctx.canBook && open) {
-        if (canCheckIn(b, ctx.now)) {
-            actions.push(
-                <Button
-                    key="in"
-                    className={btn.primary}
-                    onClick={() => act.checkIn(b)}
-                >
-                    {BOOKING_WORDS.markArrived}
-                </Button>,
-            );
-        }
-        if (canMarkNoShow(b, ctx.now)) {
-            actions.push(
-                <Button
-                    key="no"
-                    variant="outline"
-                    className={btn.ghost}
-                    onClick={() => act.noShow(b)}
-                >
-                    {BOOKING_WORDS.didntCome}
-                </Button>,
-            );
-        }
-        actions.push(
-            <Button
-                key="mv"
-                variant="outline"
-                className={btn.ghost}
-                aria-expanded={moving}
-                onClick={() => setMoving((m) => !m)}
-            >
-                Move
-            </Button>,
-            <Button
-                key="x"
-                variant="outline"
-                className={btn.danger}
-                onClick={() => act.cancel(b)}
-            >
-                Cancel
-            </Button>,
-        );
-    }
-    // "Take ₹X" (P2): what the desk takes now, beside checking them in.
-    if (!undo && ctx.desk?.canTake && b.take && state !== "cancelled") {
-        actions.push(
-            <TakePayment
-                key="take"
-                bookingId={b.id}
-                take={b.take}
-                currency={b.service.currency ?? null}
-                who={whoFor(b)}
-                canLink={ctx.desk.canLink}
-                online={ctx.desk.online}
-                variant="outline"
-                triggerClassName={btn.ghost}
-            />,
-        );
-    } else if (
-        !undo &&
-        ctx.desk &&
-        !ctx.desk.canTake &&
-        (b.take || b.toTake) &&
-        state !== "cancelled"
-    ) {
-        // Shown, disabled, with why (FB-1, DEC-098): the figure only when
-        // the API sent it.
-        actions.push(
-            <TakePaymentLocked
-                key="take"
-                amount={
-                    b.take
-                        ? formatMoney(b.take.cents, b.service.currency ?? null)
-                        : null
-                }
-                variant="outline"
-                triggerClassName={btn.ghost}
-            />,
-        );
-    }
-    if (!undo && ctx.canBook && state === "in" && canMarkNoShow(b, ctx.now)) {
-        actions.push(
-            <Button
-                key="fix"
-                variant="outline"
-                className={btn.ghost}
-                onClick={() => act.noShow(b)}
-            >
-                Mark as didn&apos;t come instead
-            </Button>,
-        );
-    }
-    if (!undo && nextVisit) {
-        actions.push(
-            <NewBookingDialog
-                key="visit"
-                services={[
-                    {
-                        id: b.service.id,
-                        name: b.service.name,
-                        timezone: b.service.timezone,
-                        minutes: b.service.durationMinutes,
-                        priceCents: b.service.priceCents ?? null,
-                    },
-                ]}
-                people={{ canSearch: false, payLink: false }}
-                visit={nextVisit}
-                triggerClassName={btn.ghost}
-            />,
-        );
-    }
-    if (!undo && ctx.canBook && state === "noshow") {
-        actions.push(
-            <Button
-                key="fix"
-                variant="outline"
-                className={btn.ghost}
-                onClick={() => act.checkIn(b)}
-            >
-                Mark as came instead
-            </Button>,
-        );
-    }
-    const rule = ctx.rules?.freeCancelHours;
-    const help =
-        state === "cancelled"
-            ? `Cancelled${b.cancelledLate ? " late" : ""}. To see ${first} again, book a free time.`
-            : `${open && rule !== null && rule !== undefined ? `Free to cancel until ${count(rule, "hour")} before. ` : ""}${bookingChangeText(person?.reach, first)}`;
+    const one = shown?.kind === "one" ? shown.booking : null;
+    const person = usePerson(one?.contact?.id ?? null);
+    const tall = step === "move" || step === "next";
 
     return (
         <>
-            <Rows
-                rows={[
-                    ["Service", b.service.name],
-                    ...visitRow(b),
-                    ["With", b.staff?.name ?? "Unassigned"],
-                    ["Paid", paid],
-                    [
-                        "Phone",
-                        <AbsentOr says="Not known">
-                            {phoneText({
-                                bookerPhone: b.bookerPhone,
-                                hasContact: b.contact !== null,
-                                person: person ?? undefined,
-                            })}
-                        </AbsentOr>,
-                    ],
-                    [
-                        "Email",
-                        b.contact?.email ?? b.bookerEmail ?? (
-                            <AbsentValue says="Not set" />
-                        ),
-                    ],
-                    ...needsAttention(person),
-                ]}
-            />
-            <Card>
-                {actions.length ? (
-                    <div className="flex flex-wrap gap-2">{actions}</div>
-                ) : null}
-                <p
+            <Sheet
+                open={block !== null && step !== "cancel"}
+                onOpenChange={(o) => {
+                    if (!o) close();
+                }}
+            >
+                <SheetContent
+                    side={narrow ? "bottom" : "right"}
+                    closeButton={false}
+                    data-quick-look=""
+                    // No trigger: give the keyboard back to what opened it.
+                    onCloseAutoFocus={(event) => {
+                        event.preventDefault();
+                        if (opener.current?.isConnected) {
+                            opener.current.focus();
+                        }
+                    }}
                     className={cn(
-                        "text-[11.5px] text-muted-foreground",
-                        actions.length && "mt-2",
+                        "flex flex-col gap-0 bg-card p-0",
+                        narrow
+                            ? cn(
+                                  "rounded-t-[18px] border-0 shadow-xl",
+                                  tall
+                                      ? "h-[calc(100dvh-30px)]"
+                                      : "max-h-[calc(100dvh-40px)]",
+                              )
+                            : "w-full sm:max-w-[480px]",
                     )}
                 >
-                    {help}
-                </p>
-                {moving ? (
-                    <MovePanel
-                        booking={b}
-                        date={date}
-                        ctx={ctx}
-                        onPick={(slot) => {
-                            setMoving(false);
-                            act.move(b, slot);
-                        }}
-                        onKeep={() => setMoving(false)}
-                    />
-                ) : null}
-            </Card>
-            <Links booking={b} />
-        </>
-    );
-}
-
-/**
- * The person behind the booking (their phone and Needs attention), read when
- * the peek opens. Null while it loads or when it can't be read.
- */
-function usePerson(contactId: string | null): PeekPerson | null {
-    const [read, setRead] = useState<{
-        id: string;
-        person: PeekPerson | null;
-    } | null>(null);
-    useEffect(() => {
-        if (!contactId) return;
-        let live = true;
-        void readBookingPerson(contactId)
-            .catch(() => null)
-            .then((person) => {
-                if (live) setRead({ id: contactId, person });
-            });
-        return () => {
-            live = false;
-        };
-    }, [contactId]);
-    return read?.id === contactId ? read.person : null;
-}
-
-/** "Visit 2 of 3" for a visit of a treatment (E10); "· all booked" once none are left. */
-function visitRow(b: DiaryBooking): [string, string][] {
-    const t = b.treatment;
-    if (!t) return [];
-    const done = visitsDoneText(t);
-    return [["Visit", done ? `${visitLabel(t)} · ${done}` : visitLabel(t)]];
-}
-
-/** "With order #…": a link for someone who may read orders, else words. */
-function OrderText({
-    treatment,
-    canRead,
-}: {
-    treatment: TreatmentView;
-    canRead: boolean;
-}) {
-    if (!canRead) return <>{orderLabel(treatment)}</>;
-    return (
-        <TextLink href={orderHref(treatment)}>{orderLabel(treatment)}</TextLink>
-    );
-}
-
-/** The design's "Needs attention" row, only when there is something. */
-function needsAttention(person: PeekPerson | null): [string, string][] {
-    const text = attentionText(person?.attention ?? null);
-    return text ? [["Needs attention", text]] : [];
-}
-
-function Links({ booking: b }: { booking: DiaryBooking }) {
-    const link =
-        "flex items-center gap-2 rounded-[11px] border border-border bg-card px-3.5 py-[11px] text-[13px] font-semibold text-foreground hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-    return (
-        <>
-            {b.contact ? (
-                <Link href={personHref(b.contact.id)} className={link}>
-                    <span className="flex-1">
-                        Open {whoFor(b).split(" ")[0]}&apos;s page
-                    </span>
-                    <ArrowRight aria-hidden className="size-4" />
-                </Link>
-            ) : null}
-            <Link href={`/bookings/${b.id}`} className={link}>
-                <span className="flex-1">
-                    The full booking and what happened to it
-                </span>
-                <ArrowRight aria-hidden className="size-4" />
-            </Link>
-        </>
-    );
-}
-
-/** The next free starts with the same person, over a week — pick one. */
-function MovePanel({
-    booking: b,
-    date,
-    ctx,
-    onPick,
-    onKeep,
-}: {
-    booking: DiaryBooking;
-    date: LocalDate;
-    ctx: QuickLookContext;
-    onPick: (slot: Slot) => void;
-    onKeep: () => void;
-}) {
-    const [slots, setSlots] = useState<Slot[] | null>(null);
-    useEffect(() => {
-        let live = true;
-        const from = new Date(
-            Math.max(ctx.now, Date.parse(`${date}T00:00:00Z`) - 86_400_000),
-        );
-        const to = new Date(from.getTime() + 8 * 86_400_000);
-        void listAvailability(
-            b.serviceId,
-            from.toISOString(),
-            to.toISOString(),
-            b.staff?.id,
-        ).then((found) => {
-            if (live)
-                setSlots(
-                    found.filter((s) => s.startAt !== b.startAt).slice(0, 8),
-                );
-        });
-        return () => {
-            live = false;
-        };
-    }, [b.serviceId, b.staff?.id, b.startAt, ctx.now, date]);
-
-    return (
-        <div className="mt-3 border-t border-border/60 pt-3">
-            <div className="mb-2 text-[13px] font-semibold">
-                Move to another free time
-                {b.staff ? ` with ${b.staff.name}` : ""}
-            </div>
-            {slots === null ? (
-                <p
-                    role="status"
-                    className="text-[12.5px] text-muted-foreground"
-                >
-                    Finding free times…
-                </p>
-            ) : slots.length === 0 ? (
-                <EmptyState
-                    size="inline"
-                    title="Nothing free in the next week"
-                    description="Open more hours on the calendar, or move it from the full booking."
+                    {narrow ? (
+                        <span
+                            aria-hidden
+                            className="mx-auto mt-2 h-[5px] w-10 shrink-0 rounded-full bg-border"
+                        />
+                    ) : null}
+                    {shown ? (
+                        <Steps
+                            block={shown}
+                            step={step}
+                            nextChoice={nextChoice}
+                            ctx={ctx}
+                            act={act}
+                            held={held}
+                            cancelHeld={
+                                one
+                                    ? pending.includes(cancelKey(one.id))
+                                    : false
+                            }
+                            person={person}
+                            onStep={(next, choice) => {
+                                setNextChoice(choice ?? null);
+                                setStep(next);
+                            }}
+                            onTake={() => setTaking(true)}
+                            onClose={close}
+                        />
+                    ) : null}
+                    {one?.take && ctx.desk?.canTake ? (
+                        <TakePayment
+                            bookingId={one.id}
+                            take={one.take}
+                            currency={one.service.currency ?? null}
+                            who={whoFor(one)}
+                            canLink={ctx.desk.canLink}
+                            online={ctx.desk.online}
+                            open={taking}
+                            onOpenChange={setTaking}
+                        />
+                    ) : null}
+                </SheetContent>
+            </Sheet>
+            {one ? (
+                <CancelSheet
+                    open={block !== null && step === "cancel"}
+                    booking={{
+                        id: one.id,
+                        who: whoFor(one),
+                        when: `${whenLine(one.startAt, shown, ctx)} · ${one.service.name}`,
+                        freeCancelUntil: null,
+                        timezone: ctx.timezone,
+                    }}
+                    canRefund={ctx.canRefund ?? false}
+                    canReadOrder={ctx.canReadOrder ?? false}
+                    send={sendAndClose}
+                    onClose={() => setStep("choose")}
+                    onCancelled={() => {
+                        setStep("look");
+                        onClose();
+                    }}
                 />
-            ) : (
-                <div className="flex flex-wrap gap-1.5">
-                    {slots.map((s) => {
-                        const label = `${formatDay(localDateOf(s.startAt, ctx.timezone), { weekday: "short", year: "never" })} · ${formatClock(localMinuteOf(s.startAt, ctx.timezone))}`;
-                        return (
-                            <button
-                                key={s.startAt}
-                                type="button"
-                                onClick={() => onPick(s)}
-                                className="h-8 rounded-full border border-border bg-card px-3 text-[12.5px] font-medium hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:h-11"
-                            >
-                                {label}
-                            </button>
-                        );
-                    })}
-                </div>
-            )}
-            <Button
-                variant="link"
-                size="inline"
-                type="button"
-                onClick={onKeep}
-                className="mt-2 text-muted-foreground"
+            ) : null}
+        </>
+    );
+}
+
+/** "Today · 11:30 am to 12:15 pm", in the business's zone. */
+function whenLine(
+    startAt: string,
+    block: Block | null,
+    ctx: QuickLookContext,
+): string {
+    const today = localDateOf(new Date(ctx.now), ctx.timezone);
+    const day = formatDay(localDateOf(startAt, ctx.timezone), {
+        weekday: "short",
+        year: "never",
+        relative: true,
+        today,
+    });
+    return block ? `${day} · ${formatClockRange(block.start, block.end)}` : day;
+}
+
+function Steps({
+    block,
+    step,
+    nextChoice,
+    ctx,
+    act,
+    held,
+    cancelHeld,
+    person,
+    onStep,
+    onTake,
+    onClose,
+}: {
+    block: Block;
+    step: QuickLookStep;
+    nextChoice: NextDayChoice | null;
+    ctx: QuickLookContext;
+    act: QuickLookActions;
+    held: HeldFor;
+    cancelHeld: boolean;
+    person: PersonRead;
+    onStep: (step: QuickLookStep, choice?: NextDayChoice) => void;
+    onTake: () => void;
+    onClose: () => void;
+}) {
+    const startAt =
+        block.kind === "one" ? block.booking.startAt : block.session.startAt;
+    const date = localDateOf(startAt, ctx.timezone);
+    const when = whenLine(startAt, block, ctx);
+    const back = () => onStep("look");
+
+    if (block.kind === "class") {
+        const s = block.session;
+        const full = liveSeats(s).length >= s.capacity;
+        return (
+            <>
+                <LookHead
+                    title={s.service.name}
+                    when={when}
+                    what={
+                        s.staff
+                            ? `Group class with ${s.staff.name}`
+                            : "Group class"
+                    }
+                    badge={
+                        full && block.state !== "cancelled"
+                            ? { label: "Full", state: "full" }
+                            : {
+                                  label: STATE_LABEL[block.state],
+                                  state: block.state,
+                              }
+                    }
+                    isClass
+                    onClose={onClose}
+                />
+                <ClassLook
+                    block={block}
+                    date={date}
+                    ctx={ctx}
+                    act={act}
+                    heldFor={held}
+                />
+            </>
+        );
+    }
+
+    const b = block.booking;
+    // A plain cancel held for its ten seconds reads as done here.
+    const state: DiaryState = cancelHeld ? "cancelled" : bookingState(b);
+    const what = b.staff
+        ? `${b.service.name} with ${b.staff.name}`
+        : b.service.name;
+    const reach = person.state === "ready" ? person.person?.reach : null;
+
+    switch (step) {
+        case "choose":
+            return (
+                <ChooseStep
+                    booking={b}
+                    when={when}
+                    what={what}
+                    paid={b.treatment ? null : paidWords(b, ctx, state)}
+                    reach={reach}
+                    onMove={() => onStep("move")}
+                    onCancel={() => onStep("cancel")}
+                    onBack={back}
+                    onClose={onClose}
+                />
+            );
+        case "move":
+            return (
+                <MoveStep
+                    booking={b}
+                    ctx={ctx}
+                    reach={reach}
+                    onBack={() => onStep("choose")}
+                    onMoved={onClose}
+                    onClose={onClose}
+                />
+            );
+        case "next":
+            return (
+                <NextVisitStep
+                    booking={b}
+                    ctx={ctx}
+                    initial={nextChoice}
+                    onBack={back}
+                    onClose={onClose}
+                />
+            );
+        default:
+            return (
+                <>
+                    <LookHead
+                        title={whoFor(b)}
+                        when={when}
+                        what={what}
+                        badge={{ label: STATE_LABEL[state], state }}
+                        onClose={onClose}
+                    />
+                    <OneLook
+                        booking={b}
+                        state={state}
+                        ctx={ctx}
+                        act={act}
+                        person={person}
+                        undo={held(b.id)}
+                        onStep={onStep}
+                        onTake={onTake}
+                    />
+                </>
+            );
+    }
+}
+
+/** Who or what, where it stands, when, and with whom. */
+function LookHead({
+    title,
+    when,
+    what,
+    badge,
+    isClass = false,
+    onClose,
+}: {
+    title: string;
+    when: string;
+    what: string;
+    badge: { label: string; state: DiaryState };
+    isClass?: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <div className="relative flex shrink-0 items-start gap-3 py-3 pl-5 pr-14 min-[760px]:gap-3.5 min-[760px]:border-b min-[760px]:border-border min-[760px]:pb-3.5 min-[760px]:pl-6 min-[760px]:pr-16 min-[760px]:pt-[18px]">
+            <Avatar
+                size="panel"
+                aria-hidden
+                className="min-[760px]:size-11 min-[760px]:text-[14px]"
             >
-                Keep the current time
-            </Button>
+                <AvatarFallback
+                    className={cn(
+                        isClass &&
+                            "bg-[hsl(var(--diary-class)/0.16)] text-diary-class",
+                    )}
+                >
+                    {avatarInitials(title)}
+                </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <SheetTitle className="font-display text-[18px] font-semibold leading-tight tracking-[-0.02em] min-[760px]:text-[20px]">
+                        {title}
+                    </SheetTitle>
+                    <StatusBadge tone={STATE_TONE[badge.state]}>
+                        {badge.label}
+                    </StatusBadge>
+                </div>
+                <SheetDescription asChild>
+                    <div>
+                        <span className="mt-0.5 block text-[13.5px] font-medium tabular-nums text-foreground min-[760px]:mt-1.5 min-[760px]:font-display min-[760px]:text-[17px] min-[760px]:font-semibold">
+                            {when}
+                        </span>
+                        <span className="block text-[12.5px] text-muted-foreground min-[760px]:text-[13px]">
+                            {what}
+                        </span>
+                    </div>
+                </SheetDescription>
+            </div>
+            <CloseButton
+                onClose={onClose}
+                className="absolute right-2 top-1.5 min-[760px]:right-3.5 min-[760px]:top-3.5"
+            />
         </div>
     );
 }
 
-function ClassLook({
-    block,
-    ctx,
-    act,
-    heldFor,
-}: {
-    block: Extract<Block, { kind: "class" }>;
-    ctx: QuickLookContext;
-    act: QuickLookActions;
-    heldFor: HeldFor;
-}) {
-    const s = block.session;
-    const live = liveSeats(s);
-    const onPrepaid = live.filter(
-        (b) => b.paidWith === "PACK" || b.paidWith === "MEMBERSHIP",
-    ).length;
-    const price = ctx.money
-        ? formatMoney(s.service.priceCents ?? null, s.service.currency ?? null)
-        : null;
-    const full = live.length >= s.capacity;
-    // Several places held back at once is the class being cancelled.
-    const held = s.bookings.map((b) => heldFor(b.id)).filter(Boolean);
-    const classUndo = live.length === 0 && held.length > 1 ? held[0] : null;
-    const cancelled = block.state === "cancelled";
-    return (
-        <>
-            <Rows
-                rows={[
-                    ["Class", s.service.name],
-                    ["Teacher", s.staff?.name ?? "Unassigned"],
-                    ...(price
-                        ? ([["Price", `${price} or 1 class from a pack`]] as [
-                              string,
-                              string,
-                          ][])
-                        : []),
-                    [
-                        "Prepaid",
-                        `${onPrepaid} of ${count(live.length, "place")} on a pack or membership`,
-                    ],
-                ]}
-            />
-            {!cancelled ? (
-                <Card>
-                    <Eyebrow>Places</Eyebrow>
-                    <ProgressBar
-                        value={live.length}
-                        max={s.capacity}
-                        tone={full ? "danger" : "success"}
-                        label={`${live.length} of ${s.capacity} places booked`}
-                    />
-                    <p className="mt-1.5 text-[12.5px]">
-                        {live.length} of {s.capacity} booked
-                        {full
-                            ? " · full. Cancelling a place frees one."
-                            : ` · ${s.capacity - live.length} free`}
-                    </p>
-                </Card>
-            ) : null}
-            <ClassSeats session={s} ctx={ctx} act={act} heldFor={heldFor} />
-            {ctx.canBook && live.length > 0 ? (
-                <Card>
-                    <Button
-                        variant="outline"
-                        className={btn.danger}
-                        onClick={() => act.cancelClass(live, s.service.name)}
-                    >
-                        Cancel class
-                    </Button>
-                    <p className="mt-2 text-[11.5px] text-muted-foreground">
-                        Cancelling the class gives back every class paid from a
-                        pack or membership. Anyone who paid is refunded by you.{" "}
-                        {classCancelText(ctx.notices)}
-                    </p>
-                </Card>
-            ) : classUndo ? (
-                <Card>
-                    <Button
-                        variant="outline"
-                        className={btn.ghost}
-                        onClick={classUndo}
-                    >
-                        Undo cancelling the class
-                    </Button>
-                </Card>
-            ) : null}
-        </>
-    );
+/**
+ * The person behind the booking (their phone, Needs attention and how a
+ * change reaches them), read when the quick look opens, with Try again
+ * when it can't be read.
+ */
+function usePerson(contactId: string | null): PersonRead {
+    const [attempt, setAttempt] = useState(0);
+    const [read, setRead] = useState<{
+        key: string;
+        person: PeekPerson | null;
+        failed: boolean;
+    } | null>(null);
+    const key = contactId ? `${contactId}:${attempt}` : null;
+    const retry = useCallback(() => setAttempt((n) => n + 1), []);
+    useEffect(() => {
+        if (!contactId || !key) return;
+        let live = true;
+        void readBookingPerson(contactId)
+            // Null is a role that may not read them: not a failure, the
+            // rows then say they don't know ("—").
+            .then((person) => ({ person, failed: false }))
+            .catch(() => ({ person: null, failed: true }))
+            .then((found) => {
+                if (live) setRead({ key, ...found });
+            });
+        return () => {
+            live = false;
+        };
+    }, [contactId, key]);
+    if (!contactId) return { state: "none" };
+    if (read?.key !== key) return { state: "loading" };
+    return read.failed
+        ? { state: "failed", retry }
+        : { state: "ready", person: read.person };
 }

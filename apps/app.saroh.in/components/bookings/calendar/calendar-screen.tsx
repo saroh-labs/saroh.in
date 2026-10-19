@@ -176,6 +176,8 @@ export function CalendarScreen({
         /** Add someone who takes bookings; else as `hours`. */
         addPeople?: boolean;
         order?: boolean;
+        /** `payment:manage`: may change what a cancel does with the money. */
+        refund?: boolean;
         /** Take payment at the desk, and send a pay link instead (P2). */
         desk?: {
             canTake: boolean;
@@ -869,6 +871,8 @@ export function CalendarScreen({
                     money,
                     rules,
                     canBook: can.book,
+                    canRefund: can.refund ?? false,
+                    canEditService: can.addPeople ?? false,
                     canReadOrder: can.order ?? false,
                     desk: can.desk,
                     notices,

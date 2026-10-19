@@ -5,7 +5,7 @@ import type { BookingRules } from "@/lib/staff/types";
 
 /**
  * What the calendar's quick look and its pieces share: the actions the
- * screen gives them, what they read, and the design's button sizes.
+ * screen gives them and what they read.
  */
 
 /** What the quick look can do; the screen holds each change for its Undo. */
@@ -27,6 +27,13 @@ export interface QuickLookContext {
     money: boolean;
     rules: BookingRules | null;
     canBook: boolean;
+    /**
+     * `payment:manage`: may change what the business's policy does with
+     * the money when a paid booking is cancelled (DEC-170, Q14).
+     */
+    canRefund?: boolean;
+    /** `service:write`: "Edit this class" in a class's More. */
+    canEditService?: boolean;
     /** `order:read`: a treatment's order is a link, else words (E10). */
     canReadOrder?: boolean;
     /**
@@ -45,9 +52,3 @@ export interface QuickLookContext {
      */
     notices?: NoticeChannels | null;
 }
-
-export const btn = {
-    primary: "h-[38px] rounded-[9px] px-4 text-[14px]",
-    ghost: "h-[38px] rounded-[9px] px-4 text-[14px]",
-    danger: "h-[38px] rounded-[9px] px-4 text-[14px] text-destructive hover:text-destructive",
-};

@@ -239,6 +239,9 @@ export default async function BookingsPage({
                     hours: may("hours:write"),
                     addPeople: may("service:write"),
                     order: may("order:read"),
+                    // Refund what a late cancel keeps, or keep what the
+                    // policy returns (DEC-170, Q14).
+                    refund: may("payment:manage"),
                     // "Take ₹X" (P2): the pair a payment link needs, and the
                     // link itself only where the plan and a provider take it.
                     desk: {

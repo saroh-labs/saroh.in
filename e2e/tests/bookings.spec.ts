@@ -304,7 +304,9 @@ test.describe("bookings calendar", () => {
             });
             await expect(sheet.getByText("Needs attention")).toBeVisible();
             await expect(sheet.getByText(/Allergy: E2E sesame/)).toBeVisible();
-            await sheet.getByRole("link", { name: /^Open .+'s page$/ }).click();
+            // Their page is under More (U7).
+            await sheet.getByRole("button", { name: "More" }).click();
+            await page.getByRole("link", { name: /^Open .+'s page$/ }).click();
             await expect(page).toHaveURL(new RegExp(`/contacts/${who.id}`));
         } finally {
             // Its time, back for everyone else.
@@ -352,55 +354,107 @@ test.describe("bookings calendar", () => {
 
     test("cancel from the quick look, then Undo: nothing is sent", async ({
         page,
-    }) => {
+    }, testInfo) => {
+        // A booking of its own on Northwind, with nothing paid: the cancel
+        // asks no money question and waits ten seconds with Undo (U3, U7).
         // The page's own clock, so the hold can be run out rather than
         // slept through. Installed before the page loads; it keeps time.
         await page.clock.install();
-        await signIn(page);
-        // A future one-to-one booking with a person, within the week.
-        const from = new Date().toISOString();
-        const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
-        const found = (await diaries(page.request, from, to))
-            .filter((d) => d.person)
-            .flatMap((d) => d.bookings)
-            .find(
-                (b) => b.status === "CONFIRMED" && !b.outcome && b.bookerName,
-            );
-        test.skip(!found, "No upcoming one-to-one booking in the seed");
-        if (!found) return;
-        const day = new Date(Date.parse(found.startAt) + IST_OFFSET_MS)
-            .toISOString()
-            .slice(0, 10);
-
-        await page.goto(`/bookings?date=${day}&layout=agenda`);
-        await page
-            .getByRole("button", { name: new RegExp(found.bookerName ?? "") })
-            .first()
-            .click();
-        const sheet = page.getByRole("dialog");
-        await sheet
-            .getByRole("button", { name: "Cancel", exact: true })
-            .click();
-        await expect(
-            sheet.getByText("Cancelled", { exact: true }),
-        ).toBeVisible();
-        await sheet.getByRole("button", { name: "Undo cancel" }).click();
-        await expect(sheet.getByText("Booked", { exact: true })).toBeVisible();
-        await page.keyboard.press("Escape");
-
-        // Past the hold (use-hold.ts, ten seconds), the booking is still
-        // booked and nothing was sent. Running the page's clock on fires
-        // whatever timer is still held, at once.
-        const sent: string[] = [];
-        page.on("request", (r) => {
-            if (r.method() !== "GET") sent.push(r.url());
+        await useSession(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const s = ownStamp(testInfo);
+        const who = await makeContact(page.request, {
+            firstName: "Cancel",
+            lastName: s,
+            email: `cancel-${s}@example.test`,
         });
-        await page.clock.runFor(11_000);
-        expect(sent).toEqual([]);
-        const after = (await diaries(page.request, from, to))
-            .flatMap((d) => d.bookings)
-            .find((b) => b.id === found.id);
-        expect(after?.status).toBe("CONFIRMED");
+        const booked = await bookOwn(page.request, who.id);
+        try {
+            const sheet = await openPeek(page, {
+                startAt: booked.startAt,
+                bookerName: who.name,
+            });
+            await sheet.getByRole("button", { name: "Move or cancel" }).click();
+            await expect(
+                sheet.getByRole("heading", { name: /^Change .+'s booking\?$/ }),
+            ).toBeVisible();
+            await sheet.getByRole("button", { name: "Cancel booking" }).click();
+            const cancel = page.getByRole("dialog", {
+                name: /^Cancel .+'s booking\?$/,
+            });
+            await cancel
+                .getByRole("button", { name: "Cancel booking", exact: true })
+                .click();
+            // The quick look closes; the toast holds the Undo.
+            await page.getByRole("button", { name: "Undo" }).click();
+
+            const sent: string[] = [];
+            page.on("request", (r) => {
+                if (r.method() !== "GET") sent.push(r.url());
+            });
+            await page.clock.runFor(11_000);
+            expect(sent).toEqual([]);
+            const after = await northwind(page.request).get<{
+                status: string;
+            }>(`/services/bookings/${booked.id}`);
+            expect(after.status).toBe("CONFIRMED");
+        } finally {
+            await northwind(page.request).delete(
+                `/services/bookings/${booked.id}`,
+            );
+        }
+    });
+
+    test("the quick look moves a booking to another free time (U7)", async ({
+        page,
+    }, testInfo) => {
+        await useSession(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const s = ownStamp(testInfo);
+        const who = await makeContact(page.request, {
+            firstName: "Move",
+            lastName: s,
+            email: `move-${s}@example.test`,
+        });
+        const booked = await bookOwn(page.request, who.id);
+        try {
+            const sheet = await openPeek(page, {
+                startAt: booked.startAt,
+                bookerName: who.name,
+            });
+            await expect(
+                sheet.getByText("Booked", { exact: true }),
+            ).toBeVisible();
+            await sheet.getByRole("button", { name: "Move or cancel" }).click();
+            await sheet
+                .getByRole("button", { name: "Move to another time" })
+                .click();
+            await expect(
+                sheet.getByRole("heading", { name: /^Move .+'s booking$/ }),
+            ).toBeVisible();
+            await expect(
+                sheet.getByRole("button", { name: "Pick a new time" }),
+            ).toBeDisabled();
+            // Any free time the picker offers on the day it opens on, or the
+            // next free day.
+            const next = sheet.getByRole("button", { name: /^Next free day/ });
+            if (await next.isVisible().catch(() => false)) await next.click();
+            await sheet
+                .getByRole("radio", { name: /^\d{1,2}:\d{2} (am|pm)/ })
+                .first()
+                .click();
+            await sheet.getByRole("button", { name: /^Move to / }).click();
+            await expect(page.getByText(/^Moved .+ to /)).toBeVisible();
+            const after = await northwind(page.request).get<{
+                startAt: string;
+            }>(`/services/bookings/${booked.id}`);
+            expect(after.startAt).not.toBe(booked.startAt);
+            await expectNothingHiddenSideways(page);
+        } finally {
+            await northwind(page.request).delete(
+                `/services/bookings/${booked.id}`,
+            );
+        }
     });
 
     // @serial: Northwind takes bookings without a team, so this makes it a

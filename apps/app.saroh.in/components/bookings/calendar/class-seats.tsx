@@ -81,7 +81,7 @@ export function ClassSeats({
     return (
         <div className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
             <div className="mb-1 flex flex-wrap items-baseline gap-2">
-                <span className="label">Booked by name</span>
+                <span className="label">Who&apos;s booked</span>
                 {note ? (
                     <span className="ml-auto text-[11.5px] text-muted-foreground">
                         {note}
@@ -163,11 +163,15 @@ export function ClassSeats({
                                     ) : null}
                                     <Button
                                         size="sm"
-                                        variant="outline"
-                                        className="text-destructive hover:text-destructive"
+                                        variant="link"
+                                        className="min-h-11 px-1 text-[13px] font-semibold text-destructive underline decoration-destructive/30 underline-offset-4 hover:text-destructive"
                                         onClick={() => act.cancel(b)}
                                     >
-                                        Cancel
+                                        Cancel a place
+                                        <span className="sr-only">
+                                            {" "}
+                                            for {whoFor(b)}
+                                        </span>
                                     </Button>
                                 </>
                             ) : null}

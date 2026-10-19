@@ -36,8 +36,8 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/header/date-sheet.tsx": ["button"],
     // button: a row that is one button (a person, picked to see theirs)
     "components/bookings/calendar/header/people-sheet.tsx": ["button"],
-    // button: a chip
-    "components/bookings/calendar/booking-quick-look.tsx": ["button"],
+    // button: a menu row that is one button (the quick look's More)
+    "components/bookings/calendar/quick-look-more.tsx": ["button"],
     // button: a cell covered by its button, a row or card that is one button
     "components/bookings/calendar/day-by-person.tsx": ["button"],
     // button: a booking on the Day calendar, a block that is one button
