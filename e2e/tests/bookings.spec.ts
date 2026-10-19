@@ -557,7 +557,12 @@ test.describe("bookings calendar", () => {
                         .getByText(/^How long, from /)
                         .textContent()) || "",
                 )?.[1];
-                await lengths.getByRole("radio").first().click();
+                // Two hours: room for the service to start in it (an hour
+                // left only a 45-minute gap from 2:15, too short).
+                await lengths.getByRole("radio", { name: "2 hours" }).click();
+                await expect(
+                    lengths.getByRole("radio", { name: "2 hours" }),
+                ).toBeChecked();
                 await expect(
                     dialog.getByRole("radio", { name: /^Just / }),
                 ).toBeChecked();
