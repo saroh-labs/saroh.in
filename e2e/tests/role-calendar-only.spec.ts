@@ -84,8 +84,7 @@ test.describe("someone who is Calendar only", () => {
         ).toBeVisible();
         await expect(
             page.getByRole("note").filter({
-                hasText:
-                    "Your role can see these services but not change them.",
+                hasText: "Your role can see services but not change them.",
             }),
         ).toContainText(WHO_CAN_CHANGE);
         await expectNotOffered(page, "New service");

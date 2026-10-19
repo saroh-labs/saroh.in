@@ -745,7 +745,7 @@ test.describe("the Service Editor on Northwind (E2)", () => {
                 .locator("tr, li")
                 .filter({ hasText: name })
                 .filter({ visible: true });
-            await expect(row).toContainText("In person or online");
+            await expect(row).toContainText("in person or online");
             await expect(
                 row.getByRole("switch", { name: `Taking bookings, ${name}` }),
             ).toBeChecked();

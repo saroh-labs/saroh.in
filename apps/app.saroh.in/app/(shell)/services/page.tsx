@@ -25,7 +25,7 @@ import { readBookingPayment } from "@/lib/staff/service";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
- * Bookings › Services (U16, E2): what people can book, as rows. The
+ * Bookings › Services (U16, E2; U15, #1031): what people can book. The
  * services read is the page; the staff read (who takes each), the
  * bookings read (how each is used) and the sites read (whether there is
  * a booking page) degrade on their own and say so. The module list, for
@@ -92,7 +92,7 @@ export default async function ServicesPage() {
                         <PermissionDeniedState {...await servicesDenied()} />
                     ) : (
                         <FailedState
-                            title={couldntLoad("services")}
+                            title={couldntLoad("your services")}
                             retryHref="/services"
                         />
                     )}
