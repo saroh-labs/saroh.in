@@ -41,6 +41,7 @@ export {
     DEFAULT_FONT_PAIR,
     FONT_PAIRS,
     FONT_PAIR_KEYS,
+    PICKABLE_FONT_PAIRS,
     findFontPair,
     fontPairVariables,
     isFontPairKey,

@@ -309,6 +309,13 @@ describe("the typeface pair (KTD-2)", () => {
         });
         expect(fontPairs.map((p) => p.key)).toContain("archivo-narrow");
     });
+
+    it("does not offer a look's pair, which comes with its look (U3)", () => {
+        const keys = siteStyleOptions().fontPairs.map((p) => p.key);
+        for (const look of ["folio", "quiet", "live"]) {
+            expect(keys).not.toContain(look);
+        }
+    });
 });
 
 describe("a look (DEC-172)", () => {

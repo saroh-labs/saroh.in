@@ -571,11 +571,18 @@ export type { LoadedSiteFaces } from "./site-theme";
 // The typeface pairs (KTD-2), for the renderer's loader and the Style panel.
 export {
     FONT_PAIRS,
+    PICKABLE_FONT_PAIRS,
     findFontPair,
+    fontFaceKey,
+    fontPairFaceKeys,
     fontPairFamilies,
     isFontPairKey,
 } from "@saroh/block-contract";
-export type { FontPairKey, SiteFontPair } from "@saroh/block-contract";
+export type {
+    FontPairKey,
+    SiteFontFace,
+    SiteFontPair,
+} from "@saroh/block-contract";
 
 // A test release (DEC-071, T6): the layout's provider, the hook the flows
 // read, the stop they show instead of taking a real order, booking,

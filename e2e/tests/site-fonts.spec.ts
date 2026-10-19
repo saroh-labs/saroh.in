@@ -84,6 +84,27 @@ test.describe("merchant sites load no Saroh font", () => {
         expect(body).toContain("system-ui");
     });
 
+    test("a Classic site on the system font fetches and preloads no font file", async ({
+        page,
+    }) => {
+        // The looks' faces (U3) are declared beside every other merchant
+        // face, preload off: a site that is set in none of them must fetch
+        // none, and no page may preload one.
+        const fonts = await fontRequests(page, async () => {
+            await page.goto(PULSE);
+        });
+        expect(fonts).toEqual([]);
+        await expect(
+            page.locator('link[rel="preload"][as="font"]'),
+        ).toHaveCount(0);
+        const loaded = await page.evaluate(() =>
+            [...document.fonts]
+                .filter((f) => f.status === "loaded")
+                .map((f) => f.family),
+        );
+        expect(loaded).toEqual([]);
+    });
+
     test("the booking page fetches no Saroh face, and its step heading is the system stack", async ({
         page,
     }) => {

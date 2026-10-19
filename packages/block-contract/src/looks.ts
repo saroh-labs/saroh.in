@@ -1,3 +1,4 @@
+import type { FontPairKey } from "./fonts";
 import type { SectionType } from "./section-contract";
 import type { SiteTypeScale } from "./type-scale";
 
@@ -23,10 +24,10 @@ export const LOOK_IDS = ["folio", "quiet", "live"] as const;
 export type LookId = (typeof LOOK_IDS)[number];
 
 /**
- * The font pair each look sets (`FONT_PAIRS` keys U3 adds; its sync test
- * checks every look's pair exists).
+ * The font pair each look sets: its own `FONT_PAIRS` entry, with only the
+ * weights its type uses (U3; `fonts.test.ts` checks every look's pair).
  */
-export type LookFontPair = "folio" | "quiet" | "live";
+export type LookFontPair = Extract<FontPairKey, "folio" | "quiet" | "live">;
 
 /** How the booking steps are framed (KD8): one engine, three frames. */
 export type BookingPresentation = "panel" | "page" | "sheets";

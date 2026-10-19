@@ -40,6 +40,30 @@ describe("fontPairStacks", () => {
         expect(fontPairStacks(undefined)).toBeNull();
     });
 
+    it("finds a look's face under its own key, not its family (U3)", () => {
+        const faces = {
+            // The full-range Newsreader of the `newsreader` pair...
+            Newsreader: "'__Newsreader_a1'",
+            // ...and Folio's trimmed copy of the same family.
+            "folio:heading": "'__Newsreader_b2'",
+            "folio:body": "'__Hanken_Grotesk_c3'",
+        };
+        const folio = fontPairStacks("folio", faces);
+        expect(folio?.heading).toMatch(/^'__Newsreader_b2', Georgia/);
+        expect(folio?.body).toMatch(/^'__Hanken_Grotesk_c3', ui-sans-serif/);
+        expect(folio?.mono).toBeUndefined();
+        // The first pair is still set in the face it always was.
+        expect(fontPairStacks("newsreader", faces)?.heading).toMatch(
+            /^'__Newsreader_a1', /,
+        );
+    });
+
+    it("names a look's families plainly where nothing was loaded", () => {
+        const quiet = fontPairStacks("quiet");
+        expect(quiet?.heading).toMatch(/^"Cormorant Garamond", Georgia/);
+        expect(quiet?.body).toMatch(/^"Jost", ui-sans-serif/);
+    });
+
     it("keeps the system pair on the neutral stack", () => {
         expect(fontPairStacks("system")).toEqual({
             heading: SITE_FONT_STACK,
@@ -77,6 +101,35 @@ describe("SiteTheme with a font pair", () => {
         expect(out).not.toContain("Papyrus");
         // The defaults above still hold.
         expect(out).toContain(`--site-font-heading: ${SITE_FONT_STACK};`);
+    });
+
+    it("sets a Classic site, with no font variable, in no loaded face", () => {
+        const faces = {
+            "quiet:heading": "'__Cormorant_Garamond_q1'",
+            "quiet:body": "'__Jost_q2'",
+        };
+        const out = css({ "--site-bg": "40 30% 96%" }, faces);
+        expect(out).not.toContain("__Cormorant");
+        expect(out).not.toContain("__Jost");
+        expect(out).toContain(`--site-font-body: ${SITE_FONT_STACK};`);
+    });
+
+    it("sets a look's pair in its loaded faces", () => {
+        const out = css(
+            {
+                "--site-bg": "40 30% 96%",
+                "--site-font-heading": "live",
+                "--site-font-body": "live",
+            },
+            {
+                "live:heading": "'__Bricolage_Grotesque_l1'",
+                "live:body": "'__Figtree_l2'",
+            },
+        );
+        expect(out).toMatch(
+            /--site-font-heading: '__Bricolage_Grotesque_l1', /,
+        );
+        expect(out).toMatch(/--site-font-body: '__Figtree_l2', /);
     });
 });
 

@@ -10,8 +10,8 @@
  * without moving this would have let them drift apart again the same way.
  */
 
-import type { SiteFontPair } from "@saroh/block-contract";
-import { findFontPair, fontStack } from "@saroh/block-contract";
+import type { SiteFontFace, SiteFontPair } from "@saroh/block-contract";
+import { findFontPair, fontFaceKey, fontStack } from "@saroh/block-contract";
 
 import { craftRules } from "./site-craft";
 import { SITE_FONT_STACK } from "./tailwind-preset";
@@ -44,10 +44,13 @@ const FONT_ROLES: Partial<
  */
 function safeLoadedFamily(
     faces: LoadedSiteFaces | undefined,
-    family: string | null,
+    face: SiteFontFace,
 ): string | undefined {
-    if (!faces || family === null) return undefined;
-    const loaded = faces[family];
+    // A look's face is filed under its own key (`load`), not its family:
+    // the same family may be loaded twice with different weights.
+    const key = fontFaceKey(face);
+    if (!faces || key === null) return undefined;
+    const loaded = faces[key];
     return typeof loaded === "string" && /^[\w '",-]{1,200}$/.test(loaded)
         ? loaded
         : undefined;
@@ -66,17 +69,14 @@ export function fontPairStacks(
     const pair = findFontPair(key);
     if (!pair) return null;
     return {
-        heading: fontStack(
-            pair.heading,
-            safeLoadedFamily(faces, pair.heading.family),
-        ),
-        body: fontStack(pair.body, safeLoadedFamily(faces, pair.body.family)),
+        heading: fontStack(pair.heading, safeLoadedFamily(faces, pair.heading)),
+        body: fontStack(pair.body, safeLoadedFamily(faces, pair.body)),
         // Only a pair that names a mono face has one.
         ...(pair.mono
             ? {
                   mono: fontStack(
                       pair.mono,
-                      safeLoadedFamily(faces, pair.mono.family),
+                      safeLoadedFamily(faces, pair.mono),
                   ),
               }
             : {}),

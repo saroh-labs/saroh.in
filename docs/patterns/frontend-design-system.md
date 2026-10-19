@@ -814,6 +814,16 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   plus a loader in both files; tests hold the three in step. A pair may name a
   third, `mono` face (`archivo-narrow`: IBM Plex Mono; `geist`: JetBrains
   Mono), emitted as `--site-font-mono` only when it has one.
+- **Current** — **A look's pair (DEC-172, `folio`, `quiet`, `live`) names
+  its weights, styles and subsets**, and is marked `look: true`: it comes with
+  its look, so the Typeface picker (`PICKABLE_FONT_PAIRS`) does not offer it.
+  Each face has its own loader with exactly those options, filed in
+  `SITE_FACES` under the face's `load` key (`quiet:heading`), never its family,
+  because a family may be loaded twice (Folio's trimmed Newsreader beside the
+  `newsreader` pair's full one). Two families per look, no mono. Add
+  `latin-ext` only for a face that draws ₹ there (checked against the files).
+  Every face stays `preload: false`: `next/font` preloads per layout file, not
+  per request, so a preloaded look face would reach every Classic site.
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app

@@ -3,11 +3,11 @@ import type { SiteStyle, StyleRow, StyleScalar } from "@saroh/templates";
 import {
     DEFAULT_FONT_PAIR,
     defaultSiteStyle,
-    FONT_PAIRS,
     isFontPairKey,
     parseLook,
     parsePalette,
     parseTypeScale,
+    PICKABLE_FONT_PAIRS,
     STYLE_ROW_KEYS,
     STYLE_ROW_LABELS,
     STYLE_ROWS,
@@ -250,7 +250,11 @@ export function siteStyleOptions(
             // The slider's floor is the merchant's, not the template's.
             return { key, ...bounds, min: pickerMin ?? bounds.min };
         }),
-        fontPairs: FONT_PAIRS.map((p) => ({ key: p.key, name: p.name })),
+        // A look's pair comes with its look (DEC-172), so it is not offered.
+        fontPairs: PICKABLE_FONT_PAIRS.map((p) => ({
+            key: p.key,
+            name: p.name,
+        })),
         colourways,
         startColourway: startOf(colourways, startColourway),
     };
