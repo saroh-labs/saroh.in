@@ -310,3 +310,56 @@ describe("the typeface pair (KTD-2)", () => {
         expect(fontPairs.map((p) => p.key)).toContain("archivo-narrow");
     });
 });
+
+describe("a look (DEC-172)", () => {
+    it.each(["folio", "quiet", "live"])("keeps %s", (look) => {
+        expect(parseSiteStyle({ look }).look).toBe(look);
+    });
+
+    it("reads absent and null as Classic, and writes nothing", () => {
+        expect(parseSiteStyle({})).not.toHaveProperty("look");
+        expect(parseSiteStyle({ look: null })).not.toHaveProperty("look");
+        expect(parseSiteStyle({ look: null })).toEqual(defaultSiteStyle());
+    });
+
+    it.each(["corner", "classic", "", 1])(
+        "refuses %j, naming the field",
+        (look) => {
+            let error: unknown;
+            try {
+                parseSiteStyle({ look });
+            } catch (e) {
+                error = e;
+            }
+            expect(error).toBeInstanceOf(BadRequestException);
+            expect((error as BadRequestException).getResponse()).toMatchObject({
+                details: { field: "look" },
+            });
+        },
+    );
+
+    it("leaves a Classic site's variables exactly as they were", () => {
+        const style = parseSiteStyle({ colours: { accent: "rose" } });
+        const vars = siteStyleVariables(style);
+        expect(vars).not.toHaveProperty("--site-accent-text");
+        expect(vars).not.toHaveProperty("--site-rule");
+        expect(vars["--site-accent"]).toBe(STYLE_ROWS.accent[3].hsl);
+    });
+
+    it("adds the safe colours under a look, and moves an accent that does not read", () => {
+        const classic = siteStyleVariables(
+            parseSiteStyle({ colours: { accent: "rose" } }),
+        );
+        const quiet = siteStyleVariables(
+            parseSiteStyle({ colours: { accent: "rose" }, look: "quiet" }),
+        );
+        expect(quiet["--site-accent-text"]).toBeTruthy();
+        expect(quiet["--site-rule"]).toBeTruthy();
+        expect(quiet["--site-accent-soft"]).toBeTruthy();
+        expect(quiet["--site-footer-muted"]).toBeTruthy();
+        // Rose is 3.4:1 on paper: enough for a fill, too light for a link.
+        expect(quiet["--site-accent-text"]).not.toBe(classic["--site-accent"]);
+        // Nothing but colours changes.
+        expect(quiet["--site-radius"]).toBe(classic["--site-radius"]);
+    });
+});

@@ -155,15 +155,20 @@ export function planLook(
             site.style === null || site.style === undefined
                 ? defaultSiteStyle()
                 : parsedStyle(site.style);
+        // A look (DEC-172) is chosen apart from the colours: it neither
+        // makes the colourway "touched" nor is lost when it moves on.
+        const { look, ...colours } = stored ?? {};
         const untouched =
             started !== undefined &&
             stored !== undefined &&
-            isDeepStrictEqual(stored, started);
+            isDeepStrictEqual(colours, started);
         if (untouched) {
             const next = planTemplateStyle(to);
             if (next) {
                 plan.style = "applied";
-                plan.nextStyle = next;
+                plan.nextStyle = look
+                    ? { ...next, value: { ...next.value, look } }
+                    : next;
             }
         } else {
             plan.style = "kept";

@@ -125,6 +125,7 @@ import {
     publicSiteIcon,
     siteIconView,
 } from "./site-icon";
+import { assertLookAllowed, looksRolloutOn } from "./site-looks";
 import type { SiteNavigation } from "./site-navigation";
 import {
     parseSiteNavigation,
@@ -543,6 +544,12 @@ export interface SiteDetailView {
      * flag, off until checkout ships): the settings show no row then.
      */
     sellsFrom: SellsFromView | null;
+    /**
+     * Whether this business may choose a look (`SITE_LOOKS`, DEC-172).
+     * Off, Website › Style offers no look to a Classic site; a site that
+     * has one keeps the row with it and Classic (plan U16).
+     */
+    looksAvailable: boolean;
     /**
      * The shop could serve (`SITE_SHOP`, Commerce rolled out and on) and a
      * storefront with products could be chosen, but Sells from is
@@ -1072,6 +1079,7 @@ export class SitesService {
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
             sellsFrom,
+            looksAvailable: await looksRolloutOn(ctx.organizationId),
             // Asked only when it could be true: Commerce's gate is a read.
             shopAwaitsSellsFrom:
                 sellsFrom !== null &&
@@ -1227,6 +1235,9 @@ export class SitesService {
         // A palette or type scale only as one of the template's colourways
         // (DEC-090): never colours a merchant typed.
         await assertSiteLookOffered(ctx.organizationId, siteId, style);
+        // Setting or changing a look needs `SITE_LOOKS` (DEC-172); keeping
+        // the one the draft has, or going back to Classic, never does.
+        await assertLookAllowed(ctx.organizationId, siteId, style);
         // Changing the theme and fonts is a plan row (U13); a site keeps the
         // look it has where the plan leaves it off.
         await planMeter.assertIncluded(ctx.organizationId, "themes");
@@ -2000,6 +2011,13 @@ export class SitesService {
                  * silently restyle everything anyone has already published.
                  */
                 styleVariables: siteStyleVariables(publishedStyle),
+                /*
+                 * The look (DEC-172, KD1), beside the variables it already
+                 * shaped (its safe colours), for the renderer's tokens and
+                 * block defaults. Only when the site has one: a Classic
+                 * site's snapshot is byte for byte what it was.
+                 */
+                ...(publishedStyle.look ? { look: publishedStyle.look } : {}),
                 footer: publishedFooter,
                 /*
                  * The menu, RESOLVED (#206): page ids become paths and default
