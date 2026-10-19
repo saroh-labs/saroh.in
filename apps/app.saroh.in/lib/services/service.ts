@@ -492,12 +492,21 @@ const REGISTER_REACH_MS = 365 * 86_400_000;
  * read fails.
  */
 export async function listAllBookings(): Promise<BookingWithService[]> {
+    const calendar = await readBookingsRegister();
+    return calendar ? flattenCalendar(calendar) : [];
+}
+
+/**
+ * The register's read whole (All bookings, U11): a year each way, with the
+ * business's zone and who each is with. Null when it couldn't be read, so
+ * the page says so rather than showing no bookings.
+ */
+export async function readBookingsRegister(): Promise<BookingsCalendar | null> {
     const now = Date.now();
-    const calendar = await readBookingsCalendar(
+    return readBookingsCalendar(
         new Date(now - REGISTER_REACH_MS).toISOString(),
         new Date(now + REGISTER_REACH_MS).toISOString(),
     );
-    return calendar ? flattenCalendar(calendar) : [];
 }
 
 /**

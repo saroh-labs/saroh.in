@@ -22,6 +22,12 @@ export const RAW_ALLOWED = {
     "app/choose/page.tsx": ["button", "input"],
     // button: a bar of a chart, pressed to read it
     "components/analytics/readout-bars.tsx": ["button"],
+    // button: Came and Didn't come, a finished row's two outcome chips (U11)
+    "components/bookings/all-bookings/booking-row.tsx": ["button"],
+    // button: the More filters chip at the end of All bookings' views
+    "components/bookings/all-bookings/more-filters.tsx": ["button"],
+    // button: each item of a row's menu sheet on a phone, a row that is one button
+    "components/bookings/all-bookings/row-menu.tsx": ["button"],
     // button: a row or card that is one button
     "components/bookings/availability/time-off-card.tsx": ["button"],
     // button: a chip, a row or card that is one button

@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/bookings app:/bookings/availability app:/services app:/services/new app:/customers app:/contacts api:bookings api:staff api:customer-workspace api:contacts
+// @covers accounts:/login app:/open app:/bookings app:/bookings/all app:/bookings/availability app:/services app:/services/new app:/customers app:/contacts api:bookings api:staff api:customer-workspace api:contacts
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -1005,6 +1005,138 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             await page.request.delete(nwApi(`/services/${id}`), {
                 headers: { "x-organization-id": NORTHWIND },
             });
+        }
+    });
+});
+
+test.describe("All bookings (U11)", () => {
+    test("views are chips with counts, search and More filters narrow, nothing scrolls sideways", async ({
+        page,
+    }) => {
+        // Read on Pulse: nothing is saved.
+        await signIn(page);
+        await page.goto("/bookings/all");
+        await expect(
+            page.getByRole("heading", { level: 1, name: "All bookings" }),
+        ).toBeVisible();
+        const views = page.getByRole("radiogroup", { name: "Show" });
+        await expect(
+            views.getByRole("radio", { name: /^Upcoming\s*\d+$/ }),
+        ).toHaveAttribute("aria-checked", "true");
+        for (const label of [
+            "Needs an outcome",
+            "Awaiting payment",
+            "Today",
+            "Next 7 days",
+            "All",
+        ]) {
+            await expect(
+                views.getByRole("radio", {
+                    name: new RegExp(`^${label}\\s*\\d+$`),
+                }),
+            ).toBeVisible();
+        }
+        await expect(
+            page.getByText(/Times in \w+, your business's time zone\./),
+        ).toBeVisible();
+
+        // A view is kept in the address.
+        await views.getByRole("radio", { name: /^All\s*\d+$/ }).click();
+        await expect(page).toHaveURL(/view=all/);
+
+        // More filters: Service, With and Status, then Show closes it.
+        await page.getByRole("button", { name: /More filters/ }).click();
+        const panel = page.getByRole("dialog", { name: "More filters" });
+        await expect(panel.getByText("Service", { exact: true })).toBeVisible();
+        await expect(panel.getByText("With", { exact: true })).toBeVisible();
+        await panel.getByRole("button", { name: "Cancelled" }).click();
+        await panel.getByRole("button", { name: /^Show \d+$/ }).click();
+        await expect(panel).toBeHidden();
+        await page.getByRole("button", { name: "Clear filters" }).click();
+
+        // A search that finds nothing says so, and clears.
+        await page.getByLabel("Search bookings").fill("zzzz-nobody");
+        await page.getByLabel("Search bookings").press("Enter");
+        await expect(
+            page.getByText("No bookings match “zzzz-nobody”"),
+        ).toBeVisible();
+        await page.getByRole("button", { name: "Clear search" }).click();
+
+        if (test.info().project.name.startsWith("phone")) {
+            await expectNothingHiddenSideways(page);
+        } else {
+            await expect(page.getByText(/^When · \w+$/)).toBeVisible();
+        }
+        const view = await page.evaluate(() => ({
+            vw: window.innerWidth,
+            scroll: document.documentElement.scrollWidth,
+        }));
+        expect(view.scroll).toBeLessThanOrEqual(view.vw);
+    });
+
+    test("cancel from a row's menu asks first, waits with Undo, then cancels", async ({
+        page,
+    }) => {
+        await page.clock.install();
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const owner = page.request;
+        const stamp = ownStamp(test.info());
+        const who = await makeContact(owner, {
+            firstName: "Allbk",
+            lastName: stamp,
+            email: `allbk.${stamp}@example.com`,
+        });
+        const booked = await bookOwn(owner, who.id, 2);
+        try {
+            await page.goto("/bookings/all");
+            await page.getByLabel("Search bookings").fill(stamp);
+            await page.getByLabel("Search bookings").press("Enter");
+            await page
+                .getByRole("button", { name: `More for ${who.name}` })
+                .filter({ visible: true })
+                .click();
+            await page
+                .getByRole("menuitem", { name: "Cancel booking" })
+                .or(
+                    page
+                        .getByRole("dialog", { name: who.name })
+                        .getByRole("button", { name: "Cancel booking" }),
+                )
+                .click();
+            // Nothing was paid: a plain question.
+            const sheet = page.getByRole("dialog", {
+                name: "Cancel Allbk's booking?",
+            });
+            await expect(sheet).toBeVisible();
+            await expect(sheet.getByText(/Refund/)).toHaveCount(0);
+            await sheet.getByRole("button", { name: "Cancel booking" }).click();
+            await expect(
+                page.getByText("Cancelling in 10 seconds"),
+            ).toBeVisible();
+
+            // Past the hold the booking is cancelled.
+            await page.clock.runFor(11_000);
+            await expect
+                .poll(async () => {
+                    const res = await owner.get(
+                        `${urls.API_URL}/organizations/${NORTHWIND}/services/bookings/${booked.id}`,
+                        { headers: { "x-organization-id": NORTHWIND } },
+                    );
+                    return ((await res.json()) as { status?: string }).status;
+                })
+                .toBe("CANCELLED");
+        } finally {
+            await owner.delete(
+                `${urls.API_URL}/organizations/${NORTHWIND}/services/bookings/${booked.id}`,
+                {
+                    headers: {
+                        "x-organization-id": NORTHWIND,
+                        origin: urls.APP_URL,
+                    },
+                },
+            );
+            await northwind(owner).delete(`/contacts/${who.id}`);
         }
     });
 });
