@@ -142,7 +142,7 @@ export function FirstDayHelp({
                         >
                             <b
                                 aria-hidden
-                                className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-highlight text-[12px] text-highlight-foreground"
+                                className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-foreground text-[12px] text-background"
                             >
                                 {i + 1}
                             </b>

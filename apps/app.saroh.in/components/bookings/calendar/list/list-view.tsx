@@ -254,7 +254,7 @@ function NextCard({
             data-list-next=""
             className="flex min-w-0 items-center gap-3 rounded-[12px] border border-foreground bg-card px-3.5 py-3 min-[760px]:col-start-1 min-[760px]:row-start-1 min-[760px]:gap-4 min-[760px]:px-[18px] min-[760px]:py-4 min-[760px]:shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
         >
-            <span className="label shrink-0 text-destructive min-[760px]:text-highlight-subtle-foreground">
+            <span className="label shrink-0 text-destructive min-[760px]:text-foreground">
                 Next
             </span>
             <span className="min-w-0 flex-1">
@@ -299,7 +299,7 @@ function BookedRow({
             aria-current={selected ? "true" : undefined}
             className={cn(
                 "flex min-h-[60px] w-full cursor-pointer items-stretch gap-2.5 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring min-[760px]:min-h-[52px] min-[760px]:items-center min-[760px]:gap-3 min-[760px]:px-4",
-                next ? "bg-highlight-subtle" : "bg-card hover:bg-muted/40",
+                next ? "bg-muted" : "bg-card hover:bg-muted/40",
                 selected && "shadow-[inset_3px_0_0_hsl(var(--foreground))]",
                 cancelled && "text-muted-foreground",
             )}
