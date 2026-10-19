@@ -15,7 +15,7 @@ import type { StaffInvite, StaffMember, UnassignedBusiness } from "@/lib/staff";
 
 /**
  * The Team screen (DEC-169, admin console U17): the job filter, invites
- * with Resend, the load bar at capacity, Assign… and Share out evenly…
+ * with Resend, the load bar at capacity, Assign… (no share-them-all-out)
  * on businesses without a manager, the Add a teammate sheet's suggested
  * role, Payouts and the commission card only with `team:pay`, and the
  * no-access panel without `team:read`. Every name here is made up.
@@ -38,7 +38,6 @@ const teamActions = vi.hoisted(() => ({
     addTeammateAction: vi.fn(),
     resendInviteAction: vi.fn(),
     withdrawInviteAction: vi.fn(),
-    shareOutAction: vi.fn(),
     claimPlatformOwnerAction: vi.fn(),
 }));
 const identity = vi.hoisted(() => ({
@@ -432,53 +431,6 @@ describe("Businesses without a manager", () => {
         );
     });
 
-    it("shares them all out evenly with a reason", async () => {
-        teamActions.shareOutAction.mockResolvedValue({
-            ok: true,
-            data: {
-                assigned: [
-                    {
-                        organizationId: "org_green",
-                        platformAdminId: "pa_rahul",
-                    },
-                ],
-                left: 1,
-            },
-        });
-        render(
-            <UnassignedBusinesses
-                businesses={[green, sunrise]}
-                total={2}
-                canAssign
-            />,
-        );
-        fireEvent.click(
-            screen.getByRole("button", { name: "Share out evenly…" }),
-        );
-        const dialog = await screen.findByRole("dialog");
-        expect(
-            within(dialog).getByText(/Each of the 2 businesses/),
-        ).toBeTruthy();
-        fireEvent.change(within(dialog).getByRole("textbox"), {
-            target: { value: "Monday share-out" },
-        });
-        fireEvent.click(
-            within(dialog).getByRole("button", { name: "Share them out" }),
-        );
-        await waitFor(() =>
-            expect(teamActions.shareOutAction).toHaveBeenCalledWith({
-                reason: "Monday share-out",
-                idempotencyKey: expect.any(String) as unknown,
-            }),
-        );
-        await waitFor(() =>
-            expect(toast.showSuccess).toHaveBeenCalledWith(
-                "1 business shared out.",
-                "1 business still without a manager: everyone else is full.",
-            ),
-        );
-    });
-
     it("offers no Assign or Share out to staff who may only see", () => {
         render(
             <UnassignedBusinesses
@@ -494,9 +446,14 @@ describe("Businesses without a manager", () => {
     it("says in one line when every business has a manager", () => {
         render(<UnassignedBusinesses businesses={[]} total={0} canAssign />);
         expect(screen.getByText("Every business has a manager.")).toBeTruthy();
-        expect(
-            screen.queryByRole("button", { name: "Share out evenly…" }),
-        ).toBeNull();
+    });
+
+    it("offers no button to share them all out (owner assigns one by one)", () => {
+        render(
+            <UnassignedBusinesses businesses={[green]} total={1} canAssign />,
+        );
+        expect(screen.queryByRole("button", { name: /Share out/ })).toBeNull();
+        expect(screen.getByRole("button", { name: "Assign…" })).toBeTruthy();
     });
 });
 

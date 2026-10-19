@@ -154,23 +154,6 @@ export async function withdrawInviteAction(
 }
 
 /**
- * Share out evenly (R30, U25's endpoint): every business without a
- * manager, paying ones first, to account managers on commission with the
- * fewest, up to what each can take.
- */
-export async function shareOutAction(input: {
-    reason: string;
-    idempotencyKey: string;
-}) {
-    const result = await adminWrite<{
-        assigned: { organizationId: string; platformAdminId: string }[];
-        left: number;
-    }>("/team/share-out", "POST", input, "Could not share the businesses out.");
-    if (result.ok) revalidatePath("/team", "layout");
-    return result;
-}
-
-/**
  * Make me Platform owner (admin console redesign U10): the break-glass
  * banner's one action. The API records the grant only while the caller has
  * none on record, and refuses otherwise.

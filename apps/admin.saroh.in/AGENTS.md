@@ -171,7 +171,8 @@ recorded grant (the API refuses it otherwise).
   Change and Revoke per person for `staff:grant`; revoked people listed
   apart; then Businesses without a manager, `GET /admin/team/unassigned`,
   `accounts:read`, paying first, with each row's Assign…, the U25 picker,
-  and Share out evenly…, both `accounts:assign`; a row just assigned stays
+  `accounts:assign`, one at a time: no share-them-all-out button (owner,
+  19 Oct; the API route stays unused); a row just assigned stays
   lit saying who has it), **Console roles** (`GET /admin/team/roles`: each
   role with its purpose and how many hold it, then a Change / See / — table
   in plain words from `lib/roles-matrix.ts`, which `roles-matrix.test.ts`

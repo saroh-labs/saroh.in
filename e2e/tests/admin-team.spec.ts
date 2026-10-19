@@ -13,7 +13,7 @@ import { urls } from "../playwright.config";
  * and on a phone.
  *
  * Staff is Sam (`people.staff`), a Platform owner. Reads only: the Add a
- * teammate sheet is opened and cancelled, Assign… and Share out evenly…
+ * teammate sheet is opened and cancelled, Assign…
  * are opened and closed, and nothing is sent, so the seeded team and
  * businesses every other spec reads are never changed. The writes and
  * their rules are `admin-team-list.db.spec.ts`'s,
@@ -61,9 +61,7 @@ test.describe("Team on the operator console", () => {
         }
     });
 
-    test("businesses without a manager offer Assign… and Share out evenly…", async ({
-        page,
-    }) => {
+    test("businesses without a manager offer Assign…", async ({ page }) => {
         await page.goto(`${ADMIN}/team`);
         const section = page.locator("#unassigned");
         await expect(
@@ -71,21 +69,16 @@ test.describe("Team on the operator console", () => {
                 name: /^Businesses without a manager · \d+$/,
             }),
         ).toBeVisible();
-        const share = section.getByRole("button", {
-            name: "Share out evenly…",
-        });
-        if ((await share.count()) === 0) {
+        const assign = section.getByRole("button", { name: "Assign…" });
+        if ((await assign.count()) === 0) {
             await expect(
                 section.getByText("Every business has a manager."),
             ).toBeVisible();
             return;
         }
-        await share.click();
-        const dialog = page.getByRole("dialog");
-        await expect(dialog.getByText(/paying ones first/)).toBeVisible();
-        await dialog.getByRole("button", { name: "Cancel" }).click();
-        await expect(dialog).toHaveCount(0);
-
+        await expect(
+            section.getByRole("button", { name: /Share out/ }),
+        ).toHaveCount(0);
         await section.getByRole("button", { name: "Assign…" }).first().click();
         await expect(page.getByRole("dialog")).toBeVisible();
         await page

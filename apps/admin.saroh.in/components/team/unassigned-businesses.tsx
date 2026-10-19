@@ -1,16 +1,13 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
 import { ManagerActions } from "@/components/business/overview/manager-actions";
 import { ChangedRow } from "@/components/changed-row";
-import { OperatorDialog } from "@/components/operator-dialog";
-import { formatDate, plural } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import type { UnassignedBusiness } from "@/lib/staff";
-import { shareOutAction } from "@/lib/team-actions";
 import { useChangeFeedback } from "@/lib/use-change-feedback";
 
 /** Paying first, then the oldest: the API's order, kept as rows change. */
@@ -24,9 +21,10 @@ function inOrder(a: UnassignedBusiness, b: UnassignedBusiness): number {
 
 /**
  * Businesses without a manager (R30, admin console U17): paying ones
- * first, each with Assign… (the business Overview's picker, U25), and
- * Share out evenly… for the lot. Both need `accounts:assign`; staff who
- * may only see (`accounts:read`) get the list.
+ * first, each with Assign… (the business Overview's picker, U25), which
+ * needs `accounts:assign`; staff who may only see (`accounts:read`) get
+ * the list. No share-them-all-out button: the owner assigns businesses
+ * one by one (19 Oct).
  *
  * A business just given a manager stays in its place, lit, saying who has
  * it now, until the operator leaves the screen: the list is not reshuffled
@@ -66,38 +64,10 @@ export function UnassignedBusinesses({
                     {total > 0 && (
                         <p className="text-[13px] text-muted-foreground">
                             Paying ones first.
-                            {canAssign &&
-                                " Give one to someone, or share them all out."}
+                            {canAssign && " Give each one to someone."}
                         </p>
                     )}
                 </div>
-                {canAssign && total > 0 && (
-                    <OperatorDialog
-                        trigger="Share out evenly…"
-                        title="Share these businesses out evenly?"
-                        effect={`Each of the ${plural(total, "business", "businesses")} without a manager goes, paying ones first, to an account manager on commission who looks after the fewest. Nobody is given more than they can take, or a business they own.`}
-                        submitLabel="Share them out"
-                        quickReasons={["New businesses to look after"]}
-                        onSubmit={async ({ reason, idempotencyKey }) => {
-                            const result = await shareOutAction({
-                                reason,
-                                idempotencyKey,
-                            });
-                            if (!result.ok) {
-                                return { ok: false, error: result.error };
-                            }
-                            const shared = result.data.assigned.length;
-                            const left = result.data.left;
-                            showSuccess(
-                                `${plural(shared, "business", "businesses")} shared out.`,
-                                left > 0
-                                    ? `${plural(left, "business", "businesses")} still without a manager: everyone else is full.`
-                                    : "Kept with your name in the audit trail.",
-                            );
-                            return { ok: true };
-                        }}
-                    />
-                )}
             </div>
 
             {rows.length === 0 ? (
@@ -173,8 +143,7 @@ export function UnassignedBusinesses({
             )}
             {total > businesses.length && (
                 <p className="text-[13px] text-muted-foreground">
-                    Showing the first {businesses.length} of {total}. Share out
-                    evenly takes them all.
+                    Showing the first {businesses.length} of {total}.
                 </p>
             )}
         </section>
