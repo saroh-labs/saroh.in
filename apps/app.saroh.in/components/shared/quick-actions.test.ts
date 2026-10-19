@@ -7,7 +7,12 @@
 import { describe, expect, it } from "vitest";
 
 import { NAV_GROUPS, navGroupsWithSites } from "./nav-items";
-import { QUICK_ACTIONS, quickActionsFor } from "./quick-actions";
+import {
+    HOME_NEW,
+    homeNewFor,
+    QUICK_ACTIONS,
+    quickActionsFor,
+} from "./quick-actions";
 
 /** What the API resolves for each narrow role (`organization-policy.ts`). */
 const MEMBER = [
@@ -246,5 +251,121 @@ describe("the palette's site rows, by permission and never by role name", () => 
         expect(
             websiteRows("MEMBER", null, []).map((r) => r.label),
         ).not.toContain("New site");
+    });
+});
+
+/*
+ * Home's New menu (DEC-171, plan U5, A17): the three daily starts, by the
+ * permissions the API resolved, never by the role's name.
+ */
+describe("Home's New menu", () => {
+    /** `organization-policy.ts`: an Owner and an Admin hold every start. */
+    const OWNER = [...MEMBER, "order:create", "invoice:write", "booking:write"];
+    const ADMIN = OWNER;
+    /** A Member: the floor, the kitchen and the front desk (DEC-170). */
+    const MEMBER_NOW = [...MEMBER, "booking:write", "hours:write"];
+    const REVIEWER = ["site:read", "site:comment", "site:approve"];
+    /** A role the business made: the till and the bills, no diary. */
+    const TILL = [...MEMBER, "order:create", "invoice:write"];
+
+    const offered = (
+        actions: readonly string[] | null,
+        moduleKeys: readonly string[] | null = EVERY_MODULE,
+    ) => homeNewFor({ moduleKeys, actions });
+    const labelsOf = (actions: readonly string[] | null) =>
+        offered(actions).items.map((i) => i.label);
+
+    it("is three quick actions, in the board's words and order", () => {
+        expect(HOME_NEW.map((r) => [r.label, r.hint])).toEqual([
+            ["Take an order", "In the shop or on the phone"],
+            ["Book someone", "A class, a visit or a time"],
+            ["Send an invoice", "For a client or a trade customer"],
+        ]);
+        for (const row of HOME_NEW) {
+            const quick = QUICK_ACTIONS.find((a) => a.href === row.href);
+            expect(quick, row.label).toBeDefined();
+            expect(quick?.action).toBe(row.action);
+            expect(quick?.moduleKey).toBe(row.moduleKey);
+        }
+    });
+
+    it("opens each flow where it lives, never a page of its own", () => {
+        expect(HOME_NEW.map((r) => r.href)).toEqual([
+            "/commerce/orders?new=1",
+            "/bookings?new=1",
+            "/billing/invoices/new",
+        ]);
+    });
+
+    it("offers an Owner all three, and says nothing about the role", () => {
+        expect(offered(OWNER)).toEqual({
+            items: HOME_NEW.map(({ key, href, label, hint }) => ({
+                key,
+                href,
+                label,
+                hint,
+            })),
+            roleLine: null,
+        });
+    });
+
+    it("offers an Admin all three", () => {
+        expect(labelsOf(ADMIN)).toEqual([
+            "Take an order",
+            "Book someone",
+            "Send an invoice",
+        ]);
+        expect(offered(ADMIN).roleLine).toBeNull();
+    });
+
+    it("offers a Member Book someone, and names the other two once", () => {
+        // The rail's role mirror has no booking:write for a Member; the
+        // API does (DEC-170). The menu follows the API.
+        const member = offered(MEMBER_NOW);
+        expect(member.items.map((i) => i.label)).toEqual(["Book someone"]);
+        expect(member.roleLine).toBe(
+            "Taking orders and sending invoices aren't part of your role. An owner or admin can change this in Settings › Team.",
+        );
+    });
+
+    it("offers a Reviewer nothing, so no New is drawn and nothing is said", () => {
+        expect(offered(REVIEWER)).toEqual({ items: [], roleLine: null });
+    });
+
+    it("offers a role the business made what was ticked, and names the rest", () => {
+        const till = offered(TILL);
+        expect(till.items.map((i) => i.label)).toEqual([
+            "Take an order",
+            "Send an invoice",
+        ]);
+        expect(till.roleLine).toBe(
+            "Booking people isn't part of your role. An owner or admin can change this in Settings › Team.",
+        );
+        expect(labelsOf(CALENDAR_ONLY)).toEqual(["Book someone"]);
+        expect(labelsOf(STOREFRONT_TEAM)).toEqual([]);
+    });
+
+    it("never judges by the role's name: no permissions loaded offers nothing", () => {
+        expect(offered(null)).toEqual({ items: [], roleLine: null });
+    });
+
+    it("leaves out a start whose module is off, and doesn't name it", () => {
+        const noShop = offered(MEMBER_NOW, ["APPOINTMENTS"]);
+        expect(noShop.items.map((i) => i.label)).toEqual(["Book someone"]);
+        // Invoicing needs no module (DEC-070), so it is still named.
+        expect(noShop.roleLine).toBe(
+            "Sending invoices isn't part of your role. An owner or admin can change this in Settings › Team.",
+        );
+        expect(offered(OWNER, ["COMMERCE"]).items.map((i) => i.label)).toEqual([
+            "Take an order",
+            "Send an invoice",
+        ]);
+        expect(offered(OWNER, []).items.map((i) => i.label)).toEqual([
+            "Send an invoice",
+        ]);
+    });
+
+    it("offers by permission alone while the modules aren't known", () => {
+        expect(offered(OWNER, null).items).toHaveLength(3);
     });
 });

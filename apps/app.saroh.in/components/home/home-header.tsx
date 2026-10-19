@@ -1,8 +1,12 @@
 import { PageHeader } from "@saroh/ui/page-header";
 
+import type { HomeNew } from "@/components/shared/quick-actions";
 import { dateLine, greeting, sinceLinks } from "@/lib/home/last-day";
 import type { HomeLastDay } from "@/lib/home/service";
 import { TextLink } from "@saroh/ui/text-link";
+
+import { NewMenu } from "./new-menu";
+import { NewSheet } from "./new-sheet";
 
 /**
  * Home's page header (round 2, F6), the one every screen draws: the greeting in the
@@ -13,6 +17,10 @@ import { TextLink } from "@saroh/ui/text-link";
  * and the design spends the line on who and when instead. The strip is left
  * out for a new business and on a quiet day, never drawn as zeros; a strip
  * that couldn't be read is named in the notice under it, with the rest.
+ *
+ * Beside the greeting, New (DEC-171, plan U5): a menu on a desk and the +
+ * over the tab bar on a phone, with what this person may start. Not drawn
+ * when they may start none of them.
  */
 export function HomeHeader({
     lastDay,
@@ -21,6 +29,7 @@ export function HomeHeader({
     only = null,
     kind,
     subject = null,
+    newMenu = null,
 }: {
     lastDay: HomeLastDay | null;
     /** The viewer's own name, from their session. */
@@ -35,38 +44,51 @@ export function HomeHeader({
      * line under the greeting follows it, not always "ready to take money".
      */
     subject?: "money" | "site" | "setup" | null;
+    /** What New offers this person (`homeNewFor`); null draws no New. */
+    newMenu?: HomeNew | null;
 }) {
     const links = sinceLinks(lastDay);
+    const offersNew = newMenu !== null && newMenu.items.length > 0;
 
     return (
-        <PageHeader
-            holdsData
-            className="mb-0"
-            breadcrumb={["Home"]}
-            title={greeting(lastDay, name)}
-            description={
-                <>
-                    <p>
-                        {dateLine(lastDay, businessName, only, kind, subject)}
-                    </p>
-                    {links.length > 0 ? (
-                        <div
-                            role="group"
-                            aria-labelledby="home-last-24-hours"
-                            className="mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 text-[13px] text-foreground/80"
-                        >
-                            <span id="home-last-24-hours" className="label">
-                                Last 24 hours
-                            </span>
-                            {links.map((link) => (
-                                <TextLink key={link.key} href={link.href}>
-                                    {link.label}
-                                </TextLink>
-                            ))}
-                        </div>
-                    ) : null}
-                </>
-            }
-        />
+        <>
+            <PageHeader
+                holdsData
+                className="mb-0"
+                breadcrumb={["Home"]}
+                title={greeting(lastDay, name)}
+                actions={offersNew ? <NewMenu {...newMenu} /> : undefined}
+                description={
+                    <>
+                        <p>
+                            {dateLine(
+                                lastDay,
+                                businessName,
+                                only,
+                                kind,
+                                subject,
+                            )}
+                        </p>
+                        {links.length > 0 ? (
+                            <div
+                                role="group"
+                                aria-labelledby="home-last-24-hours"
+                                className="mt-2 flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 text-[13px] text-foreground/80"
+                            >
+                                <span id="home-last-24-hours" className="label">
+                                    Last 24 hours
+                                </span>
+                                {links.map((link) => (
+                                    <TextLink key={link.key} href={link.href}>
+                                        {link.label}
+                                    </TextLink>
+                                ))}
+                            </div>
+                        ) : null}
+                    </>
+                }
+            />
+            {offersNew ? <NewSheet {...newMenu} /> : null}
+        </>
     );
 }

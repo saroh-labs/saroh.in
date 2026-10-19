@@ -8,6 +8,7 @@ import { ReviewerHome } from "@/components/home/reviewer-home";
 import { StaffHome } from "@/components/home/staff-home";
 import { Moment } from "@/components/shared/moment";
 import { PageContainer } from "@/components/shared/page-container";
+import { homeNewFor } from "@/components/shared/quick-actions";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";
@@ -78,10 +79,24 @@ export default async function Home() {
         );
     }
 
-    // A business with nothing on is asked what it wants to do first, and the
-    // question needs to know what may be turned on and by whom. Everyone
-    // else never pays for the read.
-    const modules = home.hasAnyModule ? null : await listModules();
+    // What is turned on, read once: New offers only what the business does
+    // (a failed read leaves that to the permissions alone), and a business
+    // with nothing on is asked what it wants to do first, which needs to
+    // know what may be turned on and by whom.
+    const allModules = await listModules().catch(() => null);
+    const modules = home.hasAnyModule
+        ? null
+        : (allModules ?? (await listModules()));
+    // New (DEC-171, A17): by the permissions the API resolved for this
+    // person, never by their role's name.
+    const newMenu = homeNewFor({
+        moduleKeys: allModules
+            ? allModules
+                  .filter((m) => m.readiness !== "DISABLED")
+                  .map((m) => m.key)
+            : null,
+        actions: business?.actions,
+    });
 
     // A staff member's Home (F11): their storefronts and their own diary,
     // each part as their role allows. No setup checklist to read.
@@ -93,6 +108,7 @@ export default async function Home() {
                     modules={modules}
                     name={session.user.name}
                     businessName={business?.name ?? "This business"}
+                    newMenu={newMenu}
                 />
             </PageContainer>
         );
@@ -121,6 +137,7 @@ export default async function Home() {
                 kind={kind}
                 // The line under the greeting follows the checklist below.
                 subject={setup ? checklistSubject(setup.list) : null}
+                newMenu={newMenu}
             />
             {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
