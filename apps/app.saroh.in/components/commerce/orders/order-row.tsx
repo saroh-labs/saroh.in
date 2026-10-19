@@ -145,7 +145,7 @@ function rowView(row: OrderRow, showStore: boolean) {
         age: rowAge(row),
         money: rowMoney(row),
         attention: rowAttention(row),
-        // "Payment failed — send a new pay link" (#122); a pay link is
+        // "Payment failed — send a new payment link" (#122); a payment link is
         // the money reader's, so the kitchen reads "not paid yet".
         payment: onlinePaymentLine(row.onlinePayment, row.total !== undefined),
     };

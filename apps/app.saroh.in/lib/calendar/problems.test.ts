@@ -89,9 +89,9 @@ describe("a day's named problem", () => {
             problemChip(dayProblems(day("2026-09-16", layers), {}, TODAY));
         expect(one({ subscriptions: [failed] })).toBe("1 renewal failed");
         expect(one({ orders: [late] })).toBe("1 late order");
-        expect(one({ bookings: [noShow] })).toBe("1 no-show");
+        expect(one({ bookings: [noShow] })).toBe("1 didn't come");
         expect(one({ bookings: [noShow, { ...noShow, id: "b2" }] })).toBe(
-            "2 no-shows",
+            "2 didn't come",
         );
     });
 
@@ -122,7 +122,9 @@ describe("a day's named problem", () => {
     it("a no-show needs you this week, and is history before it", () => {
         const monday = day("2026-09-14", { bookings: [noShow] });
         const lastWeek = day("2026-09-13", { bookings: [noShow] });
-        expect(problemChip(dayProblems(monday, {}, TODAY))).toBe("1 no-show");
+        expect(problemChip(dayProblems(monday, {}, TODAY))).toBe(
+            "1 didn't come",
+        );
         expect(problemChip(dayProblems(lastWeek, {}, TODAY))).toBe("");
         expect(
             problemOf("bookings", noShow, {

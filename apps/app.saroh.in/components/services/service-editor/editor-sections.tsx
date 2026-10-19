@@ -40,7 +40,7 @@ import { WhereField } from "./where-field";
 
 /*
  * The Service Editor's sections (E2), in the design's order: What it is,
- * Time (with Where), Price and Who takes it in the main column, and the
+ * Time (with Where), Price and Who does it in the main column, and the
  * booking page in the side one. Each edits the draft through `set`.
  */
 
@@ -81,15 +81,15 @@ export function WhatItIs({ draft, set, problem, leave }: Edit) {
                 />
             </Field>
             <Eyebrow id={ids.kind} className="mt-3">
-                Kind
+                Who comes
             </Eyebrow>
             <ChipGroup
                 labelledBy={ids.kind}
                 value={draft.kind}
                 onChange={(kind) => set({ kind })}
                 choices={[
-                    { value: "one", label: "One-to-one" },
-                    { value: "class", label: "Class" },
+                    { value: "one", label: "One person" },
+                    { value: "class", label: "A group class" },
                 ]}
             />
             <p className={HELP}>
@@ -122,7 +122,7 @@ export function TimeSection({
             />
             <div className="mt-3 flex flex-wrap gap-3">
                 <NumberField
-                    label="Gap after (min)"
+                    label="Break after (min)"
                     value={draft.gap}
                     onChange={(gap) => set({ gap })}
                     width="w-[120px]"
@@ -283,7 +283,7 @@ export function WhoTakesIt({
                 : [...draft.staffIds, personId],
         });
     return (
-        <Section title="Who takes it">
+        <Section title="Who does it">
             {staff === null ? (
                 <FailedRead
                     things="who takes it"
@@ -292,7 +292,7 @@ export function WhoTakesIt({
             ) : people.length ? (
                 <>
                     <span id={id} className="sr-only">
-                        Who takes it
+                        Who does it
                     </span>
                     <div
                         role="group"
@@ -326,7 +326,7 @@ export function WhoTakesIt({
                 <p className={cn(HELP, "mt-0")}>
                     Nobody is on the diary yet.{" "}
                     <TextLink href={AVAILABILITY_HREF}>
-                        Add yourself or your team in Availability
+                        Add yourself or your team in Hours and time off
                     </TextLink>
                 </p>
             )}

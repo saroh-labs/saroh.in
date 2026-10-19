@@ -477,7 +477,7 @@ export function OrdersScreen({
                     noMoneyAt={newOrder.places
                         ?.filter((p) => !p.money)
                         .map((p) => p.id)}
-                    // A new order's pay link is `order:create`'s (B16).
+                    // A new order's payment link is `order:create`'s (B16).
                     canLink={can.create}
                     online={newOrder.online ?? true}
                     canSearch={newOrder.canSearch}

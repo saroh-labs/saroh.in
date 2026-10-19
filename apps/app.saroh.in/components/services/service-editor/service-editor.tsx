@@ -285,7 +285,7 @@ export function ServiceEditor({
             : `Your changes to ${joinAnd(changed)} will be lost.`,
     });
 
-    /** Who takes it, written to each person whose list changes. */
+    /** Who does it, written to each person whose list changes. */
     async function setWho(serviceId: string, want: string[]) {
         for (const p of people) {
             const has = p.serviceIds.includes(serviceId);
@@ -363,7 +363,7 @@ export function ServiceEditor({
             hours: saved.hours,
         };
 
-        // 2. Who takes it: a call per person whose list changes.
+        // 2. Who does it: a call per person whose list changes.
         let whoError: string | null = null;
         if (staff && (creating ? draft.staffIds.length > 0 : parts.who)) {
             const who = await runAction(

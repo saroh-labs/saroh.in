@@ -225,7 +225,7 @@ describe("services are rows", () => {
         expect(heads).toEqual([
             "Service",
             "Price",
-            "Who takes it",
+            "Who does it",
             "Bookings",
             "Actions",
         ]);
@@ -238,7 +238,7 @@ describe("services are rows", () => {
         show();
         const facial = rowOf("Glow facial").textContent;
         expect(facial).toContain(
-            ["60 min", "10 min gap after", "In person", "One-to-one"].join(
+            ["60 min", "10 min break after", "In person", "One person"].join(
                 FACT_DOT,
             ),
         );
@@ -250,7 +250,7 @@ describe("services are rows", () => {
 
         const yoga = rowOf("Morning yoga").textContent;
         expect(yoga).toContain(
-            ["60 min", "Online", "Class", "12 places"].join(FACT_DOT),
+            ["60 min", "Online", "A group class", "12 places"].join(FACT_DOT),
         );
         expect(yoga).toContain("Free");
     });
@@ -316,7 +316,7 @@ describe("nobody takes it yet is said once", () => {
         const link = notes[0]?.querySelector("a");
         expect(link?.getAttribute("href")).toBe("/bookings/availability");
         expect(link?.textContent).toBe(
-            "Add yourself or your team in Availability",
+            "Add yourself or your team in Hours and time off",
         );
         // Not once a row: each row says two words.
         expect(text()).not.toContain("It books in its own hours");

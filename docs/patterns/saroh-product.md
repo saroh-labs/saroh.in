@@ -606,7 +606,8 @@ organizations/:org/customers`: everyone who has paid (an order through a
 on merchant sites, in emails and in Help. Code identifiers, routes, enum
 values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
 `RESCHEDULED`, `BANK` and `BANK_TRANSFER`); only the words shown change.
-`pnpm check:words` fails on the three that crept back most.
+`pnpm check:words` fails on the three that crept back most, and on
+Bookings' retired words below.
 
 - **Booking**, never "appointment" or "reservation". The `APPOINTMENTS`
   module is **Bookings**; its name lives in `lib/modules/names.ts` (and the
@@ -614,10 +615,34 @@ values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
 - **Move** a booking, never "Reschedule".
 - **Booked** for a confirmed booking still to come, never "Confirmed" — the
   pill and the confirmation email ("You're booked with …"). A `PENDING`
-  booking's pill and filter read **To confirm** (`bookingStatus` in
-  `lib/format/status.ts`). Open question for the owner: the diary and the
-  month calendar still say **Awaiting payment** for the same pay-now hold,
-  the word the payment-provider Help pages use too.
+  booking, held while the customer pays, reads **Awaiting payment**
+  everywhere: pill, filter, diary, month calendar, quick look (DEC-170
+  replaced DEC-113's "To confirm"; `bookingStatus` in `lib/format/status.ts`).
+- **Bookings' words** (DEC-170, bookings plan U18, #1034). Each lives once
+  in `apps/app.saroh.in/lib/services/booking-words.ts` (`BOOKING_WORDS`,
+  `outcomeWord`), and `pnpm check:words` fails on the retired one in the
+  workspace:
+
+    | Say                                   | Not                                                                |
+    | ------------------------------------- | ------------------------------------------------------------------ |
+    | Awaiting payment                      | To confirm, Waiting for payment, unpaid                            |
+    | Mark arrived (button), Came (status)  | Check in, They came, Attended, Checked in                          |
+    | Didn't come                           | No-show, They didn't                                               |
+    | Not marked yet                        | Not said yet, Nobody has said how this went                        |
+    | Pays at the visit                     | Pays at the session                                                |
+    | Payment link, Send a payment link     | Pay link, Send a pay link (invoices, orders and subscriptions too) |
+    | Book                                  | Create booking                                                     |
+    | Day · Week · List                     | Day by person, Agenda                                              |
+    | Hours and time off                    | Availability                                                       |
+    | Extra opening hours                   | One-off extra hours                                                |
+    | Break after, Break before             | Gap after, Buffer before                                           |
+    | Who comes: One person · A group class | Kind: One-to-one · Class                                           |
+    | Who does it                           | Who takes it                                                       |
+    | Calendar (Home's month of everything) | Overview                                                           |
+
+    "Booking rules" stays. Code identifiers, routes (`/bookings/availability`,
+    `/calendar`) and stored values (`NO_SHOW`, `ATTENDED`) keep their names.
+
 - **Cash, UPI, Card, Bank transfer, Other** — every payment picker and
   label, from `lib/payments/method-words.ts`. Where it is taken ("at the
   counter", "the card machine") is a hint under the choice, never the label.

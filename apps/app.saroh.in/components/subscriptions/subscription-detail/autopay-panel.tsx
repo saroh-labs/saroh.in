@@ -327,7 +327,7 @@ function CancelAutopay({
             open={open}
             onOpenChange={(o) => (o ? null : onClose())}
             title="Cancel autopay?"
-            description={`${firstName}'s autopay stops now and ${at} is asked to cancel it. The subscription carries on: the next renewal is invoiced with a pay link.${
+            description={`${firstName}'s autopay stops now and ${at} is asked to cancel it. The subscription carries on: the next renewal is invoiced with a payment link.${
                 emailTo
                     ? ` Saroh emails ${firstName} at ${emailTo} to say so.`
                     : ""

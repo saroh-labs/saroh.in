@@ -42,9 +42,9 @@ export interface TodayView {
     empty: boolean;
 }
 
-/** "Arrived 9:32 am", or "Arrived" when the time ("09:32") wasn't sent. */
+/** "Came at 9:32 am", or "Came" when the time ("09:32") wasn't sent. */
 export function arrivedLabel(time: string | null): string {
-    return time ? `Arrived ${formatClock(time)}` : "Arrived";
+    return time ? `Came at ${formatClock(time)}` : "Came";
 }
 
 function stateOf(item: HomeTodayItem, started: boolean, next: boolean): string {
@@ -92,7 +92,7 @@ export function todayView(today: HomeToday | null, now: Date): TodayView {
     ).length;
     const count = [
         upcoming.length > 0 ? `${upcoming.length} still to come` : "",
-        arrived > 0 ? `${arrived} arrived` : "",
+        arrived > 0 ? `${arrived} came` : "",
         waiting > 0 ? `${waiting} not here yet` : "",
     ]
         .filter(Boolean)

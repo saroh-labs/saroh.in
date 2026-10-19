@@ -15,6 +15,7 @@ import type { HomeToday, HomeTodayItem } from "@/lib/home/service";
 import type { TodayRow } from "@/lib/home/today";
 import { todayView } from "@/lib/home/today";
 import { recordBookingOutcome } from "@/lib/services/actions";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { EmptyState } from "@saroh/ui/data-state";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -72,7 +73,7 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
             `home-outcome:${row.id}`,
             outcome === "ATTENDED"
                 ? `${who} arrived.`
-                : `Marked ${who} a no-show.`,
+                : `Marked ${who} as didn't come.`,
             async () => {
                 const res = await recordBookingOutcome(row.id, outcome);
                 if (!res.ok) {
@@ -178,12 +179,12 @@ function TodayLine({
                     <span className="relative z-10 mt-2 flex flex-wrap gap-2">
                         {row.canArrive ? (
                             <MarkButton onClick={() => onMark("ATTENDED")}>
-                                Arrived
+                                {BOOKING_WORDS.markArrived}
                             </MarkButton>
                         ) : null}
                         {row.canNoShow ? (
                             <MarkButton onClick={() => onMark("NO_SHOW")}>
-                                No-show
+                                {BOOKING_WORDS.didntCome}
                             </MarkButton>
                         ) : null}
                     </span>

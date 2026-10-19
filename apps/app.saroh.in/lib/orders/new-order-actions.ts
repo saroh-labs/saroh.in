@@ -19,7 +19,7 @@ export async function newOrderLines(storeId: string, productIds: string[]) {
     return readNewOrderLines(storeId, productIds).catch(() => null);
 }
 
-/** Make the order; a pay link, if asked for, comes back this once. */
+/** Make the order; a payment link, if asked for, comes back this once. */
 export async function makeNewOrder(storeId: string, input: NewOrderInput) {
     return createNewOrder(storeId, input);
 }

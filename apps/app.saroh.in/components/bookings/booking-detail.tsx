@@ -30,6 +30,7 @@ import {
     refundLine,
     refundPolicyLine,
 } from "@/lib/services/booking-money";
+import { outcomeWord } from "@/lib/services/booking-words";
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import { joinLink } from "@/lib/services/meeting-link";
 import type { BookingDetail, BookingEvent } from "@/lib/services/service";
@@ -70,7 +71,7 @@ export function BookingDetailView({
     canReadOrder?: boolean;
     /**
      * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
-     * and whether a pay link can be sent (a provider connected).
+     * and whether a payment link can be sent (a provider connected).
      */
     desk?: {
         canTake: boolean;
@@ -242,7 +243,7 @@ export function BookingDetailView({
                             // said" is a real state, and the merchant is the
                             // only one who can end it.
                             <span className="text-sm text-muted-foreground">
-                                Nobody has said how this went yet.
+                                Not marked yet.
                             </span>
                         ) : null}
                     </div>
@@ -448,7 +449,7 @@ function OutcomeBadge({ outcome }: { outcome: "ATTENDED" | "NO_SHOW" }) {
             size="default"
             tone={outcome === "ATTENDED" ? "success" : "warning"}
         >
-            {outcome === "ATTENDED" ? "Attended" : "No-show"}
+            {outcomeWord(outcome)}
         </StatusBadge>
     );
 }
@@ -457,8 +458,8 @@ function OutcomeBadge({ outcome }: { outcome: "ATTENDED" | "NO_SHOW" }) {
 function eventTitle(event: BookingEvent, timeZone: string): string {
     if (event.type === "BOOKED") return "Booked";
     if (event.type === "CANCELLED") return "Cancelled";
-    if (event.type === "ATTENDED") return "Marked as attended";
-    if (event.type === "NO_SHOW") return "Marked as a no-show";
+    if (event.type === "ATTENDED") return "Marked as came";
+    if (event.type === "NO_SHOW") return "Marked as didn't come";
     if (event.type === "PAID_AT_DESK") return "Paid at the desk";
     const from = event.fromStartAt
         ? formatDateTime(event.fromStartAt, timeZone, { weekday: "short" })

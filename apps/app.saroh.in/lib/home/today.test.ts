@@ -46,7 +46,7 @@ describe("todayView", () => {
         expect(view.empty).toBe(false);
     });
 
-    it("tags a booking marked Arrived with the time it was marked", () => {
+    it("tags a booking marked Came with the time it was marked", () => {
         const view = todayView(
             day([
                 item("09:00", { outcome: "ATTENDED", outcomeTime: "09:32" }),
@@ -54,9 +54,9 @@ describe("todayView", () => {
             ]),
             NOW,
         );
-        expect(view.rows[0].state).toBe("Arrived 9:32 am");
+        expect(view.rows[0].state).toBe("Came at 9:32 am");
         expect(view.rows[0].canArrive).toBe(false);
-        expect(view.count).toBe("1 still to come · 1 arrived");
+        expect(view.count).toBe("1 still to come · 1 came");
     });
 
     it("keeps the last ninety minutes to be marked, and drops what's older", () => {
@@ -84,7 +84,7 @@ describe("todayView", () => {
         expect(view.count).toBe("6 still to come");
     });
 
-    it("offers Arrived from an hour before, and No-show once it has started", () => {
+    it("offers Mark arrived from an hour before, and Didn't come once it has started", () => {
         const view = todayView(
             day([item("09:00"), item("10:15"), item("10:45")]),
             NOW,
@@ -169,7 +169,7 @@ describe("todayView", () => {
 
 describe("arrivedLabel", () => {
     it("adds the time when there is one", () => {
-        expect(arrivedLabel("09:32")).toBe("Arrived 9:32 am");
-        expect(arrivedLabel(null)).toBe("Arrived");
+        expect(arrivedLabel("09:32")).toBe("Came at 9:32 am");
+        expect(arrivedLabel(null)).toBe("Came");
     });
 });

@@ -135,7 +135,7 @@ export function RescheduleBooking({
                     size="inline"
                     className="py-6"
                     title={`No open times in the next ${weeks} weeks`}
-                    description="Opening more hours for this service, in Bookings › Availability, adds times here."
+                    description="Opening more hours for this service, in Bookings › Hours and time off, adds times here."
                 />
             ) : (
                 <div className="grid gap-4">

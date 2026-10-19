@@ -45,7 +45,7 @@ const AUTOPAY_METHOD: Record<string, string> = {
 const SET_UP_FROM: Record<string, string> = {
     ACCOUNT: "from their account",
     PRICES: "from the Prices page",
-    PAY_LINK: "from the pay link",
+    PAY_LINK: "from the payment link",
     SETUP_LINK: "from a set-up link",
 };
 
@@ -150,7 +150,7 @@ export function changeWhat(
                 ? "Renewed. Nothing charged, every collection skipped"
                 : `Renewed${invoice}`;
         case "RETRIED":
-            return `Made a new pay link${invoice}`;
+            return `Made a new payment link${invoice}`;
         case "RESUME_REFUSED":
             return "Couldn't resume on its own. Payments is off";
         case "RENEWAL_FAILED":

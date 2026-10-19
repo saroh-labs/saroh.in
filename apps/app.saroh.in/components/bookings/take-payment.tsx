@@ -38,7 +38,7 @@ import { Tip } from "@saroh/ui/tooltip";
 /**
  * "Take ₹X" at the desk for a booking (round-2 P2): the walk-in's ways to
  * pay (B13) — cash with what was given and the change, UPI at the counter,
- * the card machine — or a pay link to send instead. Taking it marks the
+ * the card machine — or a payment link to send instead. Taking it marks the
  * booking's invoice paid (the API makes or finds it), and the page reads
  * "Paid at the desk · ‹method›". After a deposit only the rest is taken, and
  * a link isn't offered: a link bills the whole booking.
@@ -60,7 +60,7 @@ export function TakePayment({
     bookingId: string;
     take: DeskTake;
     currency: string | null;
-    /** "Priya Raman", for the pay link's line. */
+    /** "Priya Raman", for the payment link's line. */
     who: string;
     /** `booking:write` and `invoice:write`, with a provider connected. */
     canLink: boolean;
@@ -180,7 +180,7 @@ export function TakePayment({
             >
                 {link ? (
                     <PayLinkPanel
-                        booked={`A pay link for ${amount}.`}
+                        booked={`A payment link for ${amount}.`}
                         bookingId={bookingId}
                         first={link}
                         onDone={close}

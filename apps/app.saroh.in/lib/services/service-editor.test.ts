@@ -173,7 +173,7 @@ describe("serviceProblems", () => {
         ).toEqual([
             "Add a name.",
             "Each visit needs a length of at least 5 minutes.",
-            "The gap after has to be a number of minutes.",
+            "The break after has to be a number of minutes.",
             "Add a price (0 if it's free).",
             "Pick who takes it.",
         ]);
@@ -559,7 +559,7 @@ describe("At booking, they pay (E8)", () => {
 
     it("works the split out from the price as typed, in the design's words", () => {
         expect(depositNote("NONE", "1200", "INR")).toBe(
-            "No card needed to book. No-shows cost you the time.",
+            "No card needed to book. If they don't come, you lose the time.",
         );
         expect(depositNote("PERCENT_25", "1,200", "INR")).toBe(
             "They pay ₹300 when booking, and the rest (₹900) at the visit. Refunded if they cancel in time.",
@@ -577,10 +577,10 @@ describe("At booking, they pay (E8)", () => {
             "They pay ₹1,200 online when booking: your booking rules take payment online only.",
         );
         expect(depositNote("NONE", "0", "INR", 1, "ONLINE")).toBe(
-            "No card needed to book. No-shows cost you the time.",
+            "No card needed to book. If they don't come, you lose the time.",
         );
         expect(depositNote("NONE", "1200", "INR", 1, "DESK")).toBe(
-            "No card needed to book. No-shows cost you the time.",
+            "No card needed to book. If they don't come, you lose the time.",
         );
     });
 

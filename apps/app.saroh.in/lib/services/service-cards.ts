@@ -54,8 +54,8 @@ const WHERE: Record<Service["locationType"], string> = {
 };
 
 /**
- * A row's one line: "60 min · 10 min gap after · In person · One-to-one";
- * a class "45 min · Online · Class · 12 places"; a treatment (E10)
+ * A row's one line: "60 min · 10 min break after · In person · One person";
+ * a class "45 min · Online · A group class · 12 places"; a treatment (E10)
  * "3 visits of 60 min · …". No gap is not said.
  */
 export function lengthLine(service: RowService): string {
@@ -66,10 +66,10 @@ export function lengthLine(service: RowService): string {
             ? `${visits} visits of ${service.durationMinutes} min`
             : `${service.durationMinutes} min`,
         service.bufferAfterMinutes
-            ? `${service.bufferAfterMinutes} min gap after`
+            ? `${service.bufferAfterMinutes} min break after`
             : null,
         WHERE[service.locationType],
-        isClass ? "Class" : "One-to-one",
+        isClass ? "A group class" : "One person",
         isClass ? `${service.capacity} places` : null,
     );
 }

@@ -135,14 +135,14 @@ function Form({
             ? `That overlaps ${hit.map((b) => `${blockTitle(b)} at ${formatClock(b.start)}`).join(", ")}. Move or cancel it first.`
             : ""
         : works || (scope === "week" && weeklyClash)
-          ? `${staff.name} already works part of that time. Pick a closed time, or change hours on Availability.`
+          ? `${staff.name} already works part of that time. Pick a closed time, or change hours on Hours and time off.`
           : "";
     const note =
         bad ||
         (block
             ? "Customers won't be offered this time. It shows as time off on the calendar."
             : scope === "week"
-              ? `Adds to ${staff.name}'s weekly hours, the same as on Availability.`
+              ? `Adds to ${staff.name}'s weekly hours, the same as on Hours and time off.`
               : `A one-off. ${staff.name}'s weekly hours don't change.`);
 
     async function save() {

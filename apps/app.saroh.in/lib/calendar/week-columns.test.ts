@@ -233,7 +233,7 @@ describe("dayCards", () => {
         expect(card).toMatchObject({
             at: "7:00 am",
             title: "Personal training",
-            flag: { label: "No-show", tone: "bad" },
+            flag: { label: "Didn't come", tone: "bad" },
             href: "/bookings/b1",
         });
     });

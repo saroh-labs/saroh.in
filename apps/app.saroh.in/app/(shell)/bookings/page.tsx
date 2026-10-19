@@ -93,9 +93,9 @@ export default async function BookingsPage({
 
     const may = permitsFor(organization);
     // New booking finds the customer by search (E4, `contact:read`) and can
-    // send a pay link when the viewer may issue the invoice, the plan takes
+    // send a payment link when the viewer may issue the invoice, the plan takes
     // online payment and a provider is connected to take the money. On a
-    // plan without online payments it starts on "Pays at the session" (R33).
+    // plan without online payments it starts on "Pays at the visit" (R33).
     const people = {
         canSearch: may("contact:read"),
         payLink:
@@ -185,7 +185,7 @@ export default async function BookingsPage({
                     book: may("booking:write"),
                     hours: may("service:write"),
                     order: may("order:read"),
-                    // "Take ₹X" (P2): the pair a pay link needs, and the
+                    // "Take ₹X" (P2): the pair a payment link needs, and the
                     // link itself only where the plan and a provider take it.
                     desk: {
                         canTake: canTakeDeskPayments(organization),

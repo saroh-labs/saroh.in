@@ -285,9 +285,9 @@ describe("a new service starts from the opening hours", () => {
     it("with someone to take it, a one-to-one starts with none, and a class takes the opening hours", async () => {
         open({ staff: [person()] });
         expect(windows()).toEqual([]);
-        await press("Class");
+        await press("A group class");
         expect(windows()).toHaveLength(2);
-        await press("One-to-one");
+        await press("One person");
         expect(windows()).toEqual([]);
     });
 
@@ -484,7 +484,7 @@ describe("When it can be booked is its own card", () => {
             "Time",
             "When it can be booked",
             "Price",
-            "Who takes it",
+            "Who does it",
         ]);
         // On the page without opening anything.
         expect(
@@ -507,10 +507,10 @@ describe("When it can be booked is its own card", () => {
         );
         expect(windows()).toEqual(["Remove Monday, 10:00 to 16:00"]);
         // And the way to put someone on the diary is a plain link.
-        const link = card("Who takes it").querySelector("a");
+        const link = card("Who does it").querySelector("a");
         expect(link?.getAttribute("href")).toBe("/bookings/availability");
         expect(link?.textContent).toBe(
-            "Add yourself or your team in Availability",
+            "Add yourself or your team in Hours and time off",
         );
     });
 
@@ -524,7 +524,7 @@ describe("When it can be booked is its own card", () => {
         expect(when.textContent).toContain("Its times come from Asha's hours.");
         const link = when.querySelector("a");
         expect(link?.getAttribute("href")).toBe("/bookings/availability");
-        expect(link?.textContent).toBe("Change them in Availability");
+        expect(link?.textContent).toBe("Change them in Hours and time off");
         // Its own hours only narrow theirs: asked for, not shown.
         expect(windows()).toEqual([]);
         expect(when.textContent).not.toContain("No hours of its own");
@@ -620,7 +620,7 @@ describe("the length is picked from chips", () => {
         expect(host.textContent).not.toContain("Each visit (min)");
         expect(host.textContent).not.toContain("Custom length (min)");
         // Gap after and Visits stay fields.
-        expect(field("Gap after (min)").value).toBe("10");
+        expect(field("Break after (min)").value).toBe("10");
         expect(field("Visits").value).toBe("1");
     });
 

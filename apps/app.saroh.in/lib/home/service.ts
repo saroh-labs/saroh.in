@@ -52,7 +52,7 @@ export interface HomeInline {
     /** MARK_SENT: the step it moves the order to. */
     stage?: string;
     /**
-     * RETRY: how — a new pay link, or a new charge on their autopay (D13).
+     * RETRY: how — a new payment link, or a new charge on their autopay (D13).
      * The API offers no Retry while an autopay charge is under way.
      */
     via?: "PAY_LINK" | "MANDATE";

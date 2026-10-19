@@ -7,6 +7,7 @@ import { useTransition } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { recordBookingOutcome } from "@/lib/services/actions";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { BookingOutcome } from "@/lib/services/service";
 
 /**
@@ -43,8 +44,8 @@ export function OutcomeControl({
             }
             showSuccess(
                 next === "ATTENDED"
-                    ? "Booking marked as attended."
-                    : "Booking marked as a no-show.",
+                    ? "Marked as came."
+                    : "Marked as didn't come.",
             );
             router.refresh();
         });
@@ -60,7 +61,7 @@ export function OutcomeControl({
                 disabled={pending}
                 onClick={() => record("ATTENDED")}
             >
-                They came
+                {BOOKING_WORDS.came}
             </Button>
             <Button
                 type="button"
@@ -70,7 +71,7 @@ export function OutcomeControl({
                 disabled={pending}
                 onClick={() => record("NO_SHOW")}
             >
-                They didn&rsquo;t
+                {BOOKING_WORDS.didntCome}
             </Button>
         </div>
     );

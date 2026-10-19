@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { UnseenLinkNote } from "./unseen-link";
 
 /**
- * A pay link out that this tab can't show (UX-048, owner 8 Oct: the API
+ * A payment link out that this tab can't show (UX-048, owner 8 Oct: the API
  * keeps only its hash): the drawer and the Payment panel say why, and that
  * a new link ends the old one, before anything is pressed.
  */
@@ -15,7 +15,7 @@ describe("UnseenLinkNote", () => {
 
     it("says the address is shown only when made, and a new link ends the old one", () => {
         const html = renderToStaticMarkup(<UnseenLinkNote sendable={false} />);
-        expect(html).toContain("A pay link is out and still works.");
+        expect(html).toContain("A payment link is out and still works.");
         expect(html).toContain("shown only once, when it&#x27;s made");
         expect(html).toContain("here or on another device");
         expect(html).toContain("Making a new link ends the old one.");
@@ -46,7 +46,7 @@ describe("UnseenLinkNote", () => {
         );
         // The server snapshot writes it in UTC; the browser corrects it.
         expect(html).toContain(
-            'A pay link was made on <time dateTime="2026-10-08T09:00:00.000Z">8 Oct</time> and still works.',
+            'A payment link was made on <time dateTime="2026-10-08T09:00:00.000Z">8 Oct</time> and still works.',
         );
         expect(html).toContain("shown only once, when it&#x27;s made");
         expect(html).toContain("Making a new link ends the old one.");
@@ -58,7 +58,7 @@ describe("UnseenLinkNote", () => {
         const html = renderToStaticMarkup(
             <UnseenLinkNote sendable={false} madeAt={null} />,
         );
-        expect(html).toContain("A pay link is out and still works.");
+        expect(html).toContain("A payment link is out and still works.");
         expect(html).not.toContain("<time");
     });
 });

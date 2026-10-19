@@ -16,7 +16,7 @@ const WAYS: { kind: CounterPayment; label: string }[] = [
  * difference — once the business has been paid at the counter. The API
  * works out the amount; this only asks how it was paid. On a plan without
  * online payments it is the only way the difference is settled; with them
- * it sits beside the pay link.
+ * it sits beside the payment link.
  */
 export function RecordPayment({
     due,

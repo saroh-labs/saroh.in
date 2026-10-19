@@ -46,7 +46,7 @@ export function hasCode(
  *   is offered "Make this code", an explicit press: opening a panel never
  *   writes. Someone who may not gets a QR of the public link, and is told
  *   it isn't counted.
- * - **An instant link** (a pay link, a draft's preview): drawn in the
+ * - **An instant link** (a payment link, a draft's preview): drawn in the
  *   browser from the link itself. Nothing is read or saved.
  *
  * A read that failed says so and offers it again; it is never shown as

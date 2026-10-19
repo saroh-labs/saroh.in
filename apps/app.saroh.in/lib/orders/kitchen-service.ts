@@ -276,7 +276,7 @@ export function refundOrderLines(
 }
 
 /**
- * Make the order's pay link (B11) — or a new one, which stops the old one
+ * Make the order's payment link (B11) — or a new one, which stops the old one
  * working. The address comes back this once; the API keeps only its hash.
  */
 export function createOrderPayLink(
@@ -286,7 +286,7 @@ export function createOrderPayLink(
         path(orderId, "/pay-link"),
         "POST",
         {},
-        "The pay link wasn't made. Try again.",
+        "The payment link wasn't made. Try again.",
     );
 }
 

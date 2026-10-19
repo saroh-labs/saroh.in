@@ -51,7 +51,7 @@ const panel = (s: PanelSub, canWrite = true, paysBy: string | null = null) =>
 describe("autopayPanel (D14)", () => {
     it("no autopay, offered: the pay-link line and Send a set-up link", () => {
         const p = panel(sub());
-        expect(p.line).toBe("Each renewal is invoiced with a pay link");
+        expect(p.line).toBe("Each renewal is invoiced with a payment link");
         expect(p.sendLabel).toBe("Send a set-up link");
         expect(p.canCancel).toBe(false);
         expect(p.notice).toBeNull();
@@ -192,7 +192,7 @@ describe("autopayPanel (D14)", () => {
             canCancel: false,
         });
         expect(panel(sub({ autopayCard: undefined }))).toMatchObject({
-            line: "Each renewal is invoiced with a pay link",
+            line: "Each renewal is invoiced with a payment link",
             sendLabel: null,
             canCancel: false,
         });
@@ -244,7 +244,7 @@ describe("cancelledText", () => {
                 account: false,
             }),
         ).toBe(
-            "The next renewal is invoiced with a pay link. Meera was told by email.",
+            "The next renewal is invoiced with a payment link. Meera was told by email.",
         );
         expect(
             told({
@@ -253,13 +253,13 @@ describe("cancelledText", () => {
                 account: true,
             }),
         ).toBe(
-            "The next renewal is invoiced with a pay link. Meera was told by email and in their account on your site.",
+            "The next renewal is invoiced with a payment link. Meera was told by email and in their account on your site.",
         );
         expect(told({ email: null, suppressed: true, account: false })).toBe(
-            "The next renewal is invoiced with a pay link. Meera has turned off email, so it wasn't emailed.",
+            "The next renewal is invoiced with a payment link. Meera has turned off email, so it wasn't emailed.",
         );
         expect(told({ email: null, suppressed: false, account: false })).toBe(
-            "The next renewal is invoiced with a pay link.",
+            "The next renewal is invoiced with a payment link.",
         );
         // An older API sends no `told`: nothing is claimed.
         expect(

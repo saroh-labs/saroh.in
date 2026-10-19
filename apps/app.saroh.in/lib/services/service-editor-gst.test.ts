@@ -177,7 +177,7 @@ describe("the amounts the Price card says", () => {
             "They pay the price plus GST online when booking: your booking rules take payment online only.",
         );
         expect(depositNote("NONE", "1000", "INR", 1, "BOTH", gst)).toBe(
-            "No card needed to book. No-shows cost you the time.",
+            "No card needed to book. If they don't come, you lose the time.",
         );
     });
 });

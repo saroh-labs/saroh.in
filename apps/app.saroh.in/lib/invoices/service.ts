@@ -27,12 +27,12 @@ export type InvoiceSource =
 export type PaymentMethod = "CASH" | "UPI" | "BANK_TRANSFER" | "CARD" | "OTHER";
 /**
  * How a payment is stored: one of the ways it is recorded by hand, or ONLINE
- * — paid through the invoice's pay link, written by the payment webhook and
+ * — paid through the invoice's payment link, written by the payment webhook and
  * never offered in Record a payment.
  */
 export type StoredPaymentMethod = PaymentMethod | "ONLINE";
 
-/** One payment taken online through the invoice's pay link. */
+/** One payment taken online through the invoice's payment link. */
 export interface InvoiceOnlinePayment {
     id: string;
     provider: string;
@@ -47,7 +47,7 @@ export interface InvoiceOnlinePayment {
     refund: "NONE" | "PENDING" | "REFUNDED";
 }
 
-/** On the detail read: can a pay link take payment, and is one out. */
+/** On the detail read: can a payment link take payment, and is one out. */
 export interface InvoiceOnline {
     providerConnected: boolean;
     payLinkActive: boolean;
@@ -59,7 +59,7 @@ export interface InvoiceOnline {
     payments: InvoiceOnlinePayment[];
     /**
      * An autopay charge is under way on it (D13), `at` being when the debit
-     * is asked for: the pay link and sends are held until the bank answers.
+     * is asked for: the payment link and sends are held until the bank answers.
      * Null or absent (an API older than D13): none.
      */
     autopayCharge?: { at: string } | null;
@@ -76,7 +76,7 @@ export type SendChannel = "email" | "thread";
 
 /**
  * Whether it can be sent, and how (D17) — the one flag Invoice Detail and
- * Home both read. No channels: no Send, and "Copy pay link" only where it
+ * Home both read. No channels: no Send, and "Copy payment link" only where it
  * can be paid online (`payOnline`).
  */
 export interface InvoiceSend {
@@ -90,7 +90,7 @@ export interface InvoiceSend {
     /** Where the email would go. */
     emailTo?: string;
     /**
-     * The link it sends is a pay link: Payments is on and a provider can
+     * The link it sends is a payment link: Payments is on and a provider can
      * take the money (DEC-070). False: a link to view the invoice, with no
      * Pay button. Absent from an API before DEC-070, which read a connected
      * provider instead. The workspace reads it and never guesses.
@@ -215,7 +215,7 @@ export interface Invoice {
     /** The invoice a credit note or supplementary invoice corrects. */
     related?: { id: string; number: string | null } | null;
     corrections?: InvoiceCorrection[];
-    /** The order it bills: the order is the ledger, so it has no pay link. */
+    /** The order it bills: the order is the ledger, so it has no payment link. */
     order?: { id: string; number: string } | null;
     bookingId?: string | null;
     gst?: InvoiceGst | null;
@@ -265,7 +265,7 @@ export interface Invoice {
     } | null;
     /** On a detail read only. */
     lines?: InvoiceLine[];
-    /** On the detail read only; absent from an API that predates pay links. */
+    /** On the detail read only; absent from an API that predates payment links. */
     online?: InvoiceOnline;
     /** On the detail read only; absent from an API before D17: no Send. */
     send?: InvoiceSend;
@@ -456,7 +456,7 @@ export function recordPayment(id: string, input: PaymentInput) {
 }
 
 /**
- * Make the invoice's pay link. The answer is the only time the link is seen —
+ * Make the invoice's payment link. The answer is the only time the link is seen —
  * the API keeps only a hash of it — so asking again makes a new one and the
  * one shared before stops working.
  */
@@ -465,14 +465,14 @@ export function createPayLink(id: string) {
         `${at(id)}/pay-link`,
         "POST",
         {},
-        "Couldn't make a pay link.",
+        "Couldn't make a payment link.",
     );
 }
 
 /**
  * A link that only shows the invoice (#833, DEC-070): no Pay button, with
  * "How to pay us". For a business whose invoices can't be paid online; like
- * a pay link it is seen once, and replaces the one before.
+ * a payment link it is seen once, and replaces the one before.
  */
 export function createViewLink(id: string) {
     return send<{ url: string; payLinkMadeAt?: string }>(
@@ -484,7 +484,7 @@ export function createViewLink(id: string) {
 }
 
 /**
- * Send it with a fresh pay link (D17), through the business's own email
+ * Send it with a fresh payment link (D17), through the business's own email
  * and, once it is live, the customer's account thread. The link itself
  * never comes back here: it goes only to the customer.
  */

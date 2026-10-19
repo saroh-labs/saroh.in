@@ -5,8 +5,8 @@ export default function Loading() {
         <PageLoading
             shape="editor"
             width="full"
-            breadcrumb={["Bookings", "Availability"]}
-            title="Availability"
+            breadcrumb={["Bookings", "Hours and time off"]}
+            title="Hours and time off"
             label="Loading availability"
         />
     );

@@ -11,7 +11,7 @@ import { defaultLabel } from "./words";
  * Two kinds, as the decision has them. A **saved code** for a page that
  * stays (the website, the shop, the booking page, a product, a page): a
  * row with a short link, found or made. An **instant QR** for a link that
- * belongs to one record (a pay link, a draft's preview): drawn in the
+ * belongs to one record (a payment link, a draft's preview): drawn in the
  * browser, nothing saved, not counted.
  */
 
@@ -33,7 +33,7 @@ export interface QrSavedLink {
 export interface QrInstantLink {
     mode: "instant";
     url: string;
-    /** "this invoice's pay link": ends "QR code for …". */
+    /** "this invoice's payment link": ends "QR code for …". */
     what: string;
     /** What a scan opens, said in the panel. */
     opens: "pay" | "invoice" | "preview";

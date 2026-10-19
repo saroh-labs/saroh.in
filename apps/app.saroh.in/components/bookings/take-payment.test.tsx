@@ -165,7 +165,7 @@ const PAID = {
 };
 
 describe("Take ₹X at the desk", () => {
-    it("offers Cash, UPI, Card and a pay link, one word each, cash first", () => {
+    it("offers Cash, UPI, Card and a payment link, one word each, cash first", () => {
         openTake();
         const chips = Array.from(
             dialog().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
@@ -174,7 +174,7 @@ describe("Take ₹X at the desk", () => {
             "Cash",
             "UPI",
             "Card",
-            "Send a pay link",
+            "Send a payment link",
         ]);
         expect(chip("Cash").getAttribute("aria-checked")).toBe("true");
         expect(chips.every((c) => c.className.includes("cursor-pointer"))).toBe(
@@ -247,14 +247,14 @@ describe("Take ₹X at the desk", () => {
         expect(showSuccess).not.toHaveBeenCalled();
     });
 
-    it("makes a pay link instead, and shows it to copy", async () => {
+    it("makes a payment link instead, and shows it to copy", async () => {
         createBookingPayLink.mockResolvedValue({
             ok: true,
             data: { url: "https://pay.saroh.in/pay/tok_1" },
         });
         openTake();
-        act(() => chip("Send a pay link").click());
-        await click(button(/^Get the pay link$/));
+        act(() => chip("Send a payment link").click());
+        await click(button(/^Get the payment link$/));
         expect(createBookingPayLink).toHaveBeenCalledWith("bk_1");
         expect(takeDeskPayment).not.toHaveBeenCalled();
         const field = dialog().querySelector("input");
@@ -265,16 +265,16 @@ describe("Take ₹X at the desk", () => {
 
     it("never offers a link for what's left after a deposit, or without a provider", () => {
         openTake({ byLink: false });
-        expect(chip("Send a pay link").disabled).toBe(true);
+        expect(chip("Send a payment link").disabled).toBe(true);
         expect(
-            chip("Send a pay link").getAttribute("aria-description"),
+            chip("Send a payment link").getAttribute("aria-description"),
         ).toContain("take the rest here");
         act(() => root.unmount());
         root = createRoot(host);
         openTake({ canLink: false });
-        expect(chip("Send a pay link").disabled).toBe(true);
+        expect(chip("Send a payment link").disabled).toBe(true);
         expect(
-            chip("Send a pay link").getAttribute("aria-description"),
+            chip("Send a payment link").getAttribute("aria-description"),
         ).toContain("No payment provider connected");
     });
 });
@@ -487,7 +487,7 @@ describe("the calendar quick look's Take ₹X", () => {
         const trigger = peekTake();
         expect(trigger?.textContent).toBe("Take ₹500");
         expect(document.body.textContent).toContain(
-            "Not yet. Pays at the session",
+            "Not yet. Pays at the visit",
         );
         act(() => trigger?.click());
         const dialogs = document.querySelectorAll('[role="dialog"]');

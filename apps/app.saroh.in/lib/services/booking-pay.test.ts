@@ -12,10 +12,10 @@ import {
 } from "@/lib/services/booking-pay";
 
 describe("how a booking made by hand is paid (E4)", () => {
-    it("offers Send a pay link first, and as the default, only when it can be sent", () => {
+    it("offers Send a payment link first, and as the default, only when it can be sent", () => {
         expect(payChoices(true).map((c) => c.label)).toEqual([
-            "Send a pay link",
-            "Pays at the session",
+            "Send a payment link",
+            "Pays at the visit",
             "Paid now",
         ]);
         expect(defaultPay(true)).toBe("LINK");
@@ -67,7 +67,7 @@ describe("New booking's choices on each plan (R33)", () => {
     const offerLink = (plan: Parameters<typeof offersOnlinePay>[0]) =>
         offersOnlinePay(plan, true);
 
-    it("on a plan without online payments: no link, and pays at the session first", () => {
+    it("on a plan without online payments: no link, and pays at the visit first", () => {
         const link = offerLink(offlinePlan());
         expect(payChoices(link).map((c) => c.key)).toEqual(["DESK", "PAID"]);
         expect(defaultPay(link)).toBe("DESK");

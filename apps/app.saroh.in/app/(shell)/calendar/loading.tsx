@@ -5,8 +5,8 @@ export default function Loading() {
         <PageLoading
             shape="dashboard"
             width="full"
-            breadcrumb={["Home", "Overview"]}
-            label="Loading the overview"
+            breadcrumb={["Home", "Calendar"]}
+            label="Loading the calendar"
         />
     );
 }

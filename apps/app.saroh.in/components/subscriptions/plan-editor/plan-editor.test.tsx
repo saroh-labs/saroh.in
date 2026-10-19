@@ -487,14 +487,14 @@ describe("the Plan Editor", () => {
 
     it("says how it's paid without promising autopay", () => {
         render(record());
-        expect(text()).toContain("Invoiced each month with a pay link.");
+        expect(text()).toContain("Invoiced each month with a payment link.");
         expect(text()).not.toMatch(/autopay/i);
     });
 
     it("mentions autopay only when the business offers it (D14)", () => {
         render(record(), { autopayOffered: true });
         expect(text()).toContain(
-            "Invoiced each month with a pay link, or by autopay for members who set it up.",
+            "Invoiced each month with a payment link, or by autopay for members who set it up.",
         );
     });
 });
@@ -809,7 +809,7 @@ describe("a plan's GST (12 Oct 2026)", () => {
             "12 members' next renewal changes from ₹1,200 to ₹1,416.",
         );
         expect(text()).toContain(
-            "3 of them pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a pay link.",
+            "3 of them pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a payment link.",
         );
         // The note after "When you publish" no longer says nobody's price
         // changes.

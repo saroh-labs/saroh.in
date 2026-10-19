@@ -595,9 +595,9 @@ export type BookByHandInput = {
     idempotencyKey?: string;
     /** Pay with this class pack (ADR-007); needs `pack:sell`. */
     packPurchaseId?: string;
-    /** Who takes it (U3); absent, whoever is free. */
+    /** Who does it (U3); absent, whoever is free. */
     staffId?: string;
-    /** How it is paid (U3). Left out for a pay link (E4): unpaid until paid. */
+    /** How it is paid (U3). Left out for a payment link (E4): unpaid until paid. */
     paidWith?: "PAID" | "DESK";
     /**
      * How "Paid now" was paid at the desk (DEC-170), saved with the booking.
@@ -645,7 +645,7 @@ export function bookVisit(
 }
 
 /**
- * "Send a pay link" (E4): issue the booking's invoice and get its pay link,
+ * "Send a payment link" (E4): issue the booking's invoice and get its payment link,
  * to copy and send. Needs `booking:write` and `invoice:write`.
  */
 export function createBookingPayLink(
@@ -655,7 +655,7 @@ export function createBookingPayLink(
         `/bookings/${bookingId}/pay-link`,
         "POST",
         undefined,
-        "Couldn't make the pay link",
+        "Couldn't make the payment link",
     );
 }
 

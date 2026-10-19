@@ -57,7 +57,7 @@ export async function takeDeskPayment(
     return takeDeskPaymentApi(bookingId, input);
 }
 
-/** "Send a pay link" for a booking just made (E4). */
+/** "Send a payment link" for a booking just made (E4). */
 export async function createBookingPayLink(bookingId: string) {
     return createBookingPayLinkApi(bookingId);
 }

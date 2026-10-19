@@ -49,7 +49,7 @@ export default async function NewInvoicePage({
         listInvoices(),
         // GST standing, and the details Issue needs (#838), in one read.
         readOrganizationSettings(),
-        // A pay link needs Payments on too (DEC-070).
+        // A payment link needs Payments on too (DEC-070).
         payLinkPossible(),
         resolveActiveOrganization(),
         searchParams,

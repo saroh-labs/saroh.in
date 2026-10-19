@@ -31,7 +31,7 @@ export interface QuickLookContext {
     canReadOrder?: boolean;
     /**
      * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
-     * and whether a pay link can be sent instead (a provider connected).
+     * and whether a payment link can be sent instead (a provider connected).
      */
     desk?: {
         canTake: boolean;

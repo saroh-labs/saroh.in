@@ -177,7 +177,7 @@ export function ServicesScreen({
         },
         {
             id: "who",
-            header: "Who takes it",
+            header: "Who does it",
             priority: "secondary",
             cell: (s) => {
                 const who = takers(s.id);
@@ -278,7 +278,7 @@ export function ServicesScreen({
                         <>
                             {" "}
                             <TextLink href={AVAILABILITY_HREF}>
-                                Add yourself or your team in Availability
+                                Add yourself or your team in Hours and time off
                             </TextLink>
                         </>
                     ) : null}

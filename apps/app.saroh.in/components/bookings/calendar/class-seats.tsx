@@ -11,6 +11,7 @@ import type {
     DiaryBooking,
 } from "@/lib/services/booking-calendar";
 import { canCheckIn } from "@/lib/services/booking-state";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import {
     bookingState,
     paidText,
@@ -157,7 +158,7 @@ export function ClassSeats({
                                             variant="outline"
                                             onClick={() => act.checkIn(b)}
                                         >
-                                            Check in
+                                            {BOOKING_WORDS.markArrived}
                                         </Button>
                                     ) : null}
                                     <Button

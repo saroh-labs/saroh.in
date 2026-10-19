@@ -91,7 +91,7 @@ export function MoreSettings({
                         />
                     </Field>
                     <NumberField
-                        label="Buffer before (min)"
+                        label="Break before (min)"
                         value={draft.bufferBefore}
                         onChange={(bufferBefore) => set({ bufferBefore })}
                         width="w-[120px]"

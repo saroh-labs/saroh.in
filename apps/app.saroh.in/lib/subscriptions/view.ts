@@ -291,7 +291,7 @@ export function chargingText(
 
 /**
  * The Retry a failed renewal offers (D13, default 35): "Charge autopay
- * again" when their mandate can take it, else "Retry with a new pay link"
+ * again" when their mandate can take it, else "Retry with a new payment link"
  * for someone who may make one. None while a charge is under way.
  */
 export function retryOffer(
@@ -302,9 +302,9 @@ export function retryOffer(
     if (sub.retryVia === "MANDATE") {
         return { label: "Charge autopay again", via: "MANDATE" };
     }
-    // Absent: an API older than D13, where Retry is a pay link.
+    // Absent: an API older than D13, where Retry is a payment link.
     if (sub.retryVia === null || !sub.failedCharge || !canPayLink) return null;
-    return { label: "Try again with a new pay link", via: "PAY_LINK" };
+    return { label: "Try again with a new payment link", via: "PAY_LINK" };
 }
 
 /**
@@ -605,7 +605,7 @@ export function headline(
         when: on,
         line: charging
             ? `${charging} for this period. Next: ${nextPay} on ${on}`
-            : `${nextPay} on ${on} · ${how ? `pays by ${how}` : "invoiced with a pay link"}`,
+            : `${nextPay} on ${on} · ${how ? `pays by ${how}` : "invoiced with a payment link"}`,
     };
 }
 
@@ -667,7 +667,7 @@ const METHOD: Record<string, string> = {
     UPI: "UPI",
     BANK_TRANSFER: "bank transfer",
     CARD: "card",
-    ONLINE: "the pay link",
+    ONLINE: "the payment link",
     OTHER: "another way",
 };
 
@@ -802,7 +802,7 @@ function autopayStateText(autopay: SubscriptionAutopay): string {
     }
 }
 
-/** "UPI", "the pay link" — how the latest paid charge was paid, if any was. */
+/** "UPI", "the payment link" — how the latest paid charge was paid, if any was. */
 export function paysBy(charges: readonly SubscriptionCharge[]): string | null {
     const paid = sortCharges(charges).find(
         (c) => c.standing === "PAID" && c.payment,

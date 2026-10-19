@@ -55,7 +55,7 @@ describe("actions that replace the link", () => {
         expect(mintedLink("inv_1")).toBeNull();
     });
 
-    it("after a view link, the pay link is forgotten", async () => {
+    it("after a view link, the payment link is forgotten", async () => {
         vi.mocked(createViewLink).mockResolvedValue({
             ok: true,
             data: { url: "https://rye.saroh.app/pay/view" },
@@ -70,7 +70,7 @@ describe("actions that replace the link", () => {
         expect(mintedLink("inv_1")).toBe(OLD);
     });
 
-    it("a new pay link is remembered in place of the old", async () => {
+    it("a new payment link is remembered in place of the old", async () => {
         vi.mocked(createPayLink).mockResolvedValue({
             ok: true,
             data: { url: "https://rye.saroh.app/pay/new" },
@@ -79,7 +79,7 @@ describe("actions that replace the link", () => {
         expect(mintedLink("inv_1")).toBe("https://rye.saroh.app/pay/new");
     });
 
-    it("a new pay link keeps the date the API made it on (#870)", async () => {
+    it("a new payment link keeps the date the API made it on (#870)", async () => {
         const made = "2026-10-08T10:00:00.000Z";
         vi.mocked(createPayLink).mockResolvedValue({
             ok: true,

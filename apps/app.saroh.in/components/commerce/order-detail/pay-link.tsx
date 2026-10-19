@@ -21,8 +21,8 @@ import { runAction } from "@/lib/api/run-action";
 import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 
 /**
- * An order's pay link (B11), as the invoice's: the address is shown once,
- * to whoever makes it — only its hash is kept — and "New pay link" replaces
+ * An order's payment link (B11), as the invoice's: the address is shown once,
+ * to whoever makes it — only its hash is kept — and "New payment link" replaces
  * it, after saying the old one stops working. Saroh sends nothing itself yet
  * (A14): the address is copied and sent by hand.
  */
@@ -52,8 +52,8 @@ export function usePayLink({
         setUrl(address);
         showSuccess(
             (await copyText(address))
-                ? `Pay link copied. Send it to ${first}.`
-                : `Pay link ready. Copy it from ${shownIn}.`,
+                ? `Payment link copied. Send it to ${first}.`
+                : `Payment link ready. Copy it from ${shownIn}.`,
             "Nothing is sent by Saroh. The order shows paid once they pay.",
         );
         router.refresh();
@@ -83,7 +83,7 @@ export function usePayLink({
         else
             void copyText(url).then((ok) =>
                 ok
-                    ? showSuccess("Pay link copied.")
+                    ? showSuccess("Payment link copied.")
                     : showError(copyFailedMessage()),
             );
     };
@@ -94,7 +94,7 @@ export function usePayLink({
             onOpenChange={setConfirming}
             icon={Link2}
             tone="neutral"
-            title="Make a new pay link?"
+            title="Make a new payment link?"
             description={`The link you sent before stops working straight away. Send ${first} the new one. This cannot be undone.`}
             confirmLabel="Make a new link"
             keepLabel="Keep the old link"
@@ -106,9 +106,9 @@ export function usePayLink({
 }
 
 /**
- * The pay link's part of the Money panel, for an order still owed money:
- * "Make a pay link"; the address, once, to copy; then "Pay link made ‹when›"
- * with "New pay link". Without a provider that can take the payment, it says
+ * The payment link's part of the Money panel, for an order still owed money:
+ * "Make a payment link"; the address, once, to copy; then "Payment link made ‹when›"
+ * with "New payment link". Without a provider that can take the payment, it says
  * to connect one.
  */
 export function PayLinkBlock({
@@ -146,7 +146,7 @@ export function PayLinkBlock({
                         variant="outline"
                         size="sm"
                         onClick={link.ask}
-                        aria-label="Copy the pay link"
+                        aria-label="Copy the payment link"
                     >
                         <Copy aria-hidden className="size-4" />
                     </Button>
@@ -155,7 +155,7 @@ export function PayLinkBlock({
                         link={{
                             mode: "instant",
                             url: link.url,
-                            what: "this order's pay link",
+                            what: "this order's payment link",
                             opens: "pay",
                             fileName: "pay-link-qr",
                         }}
@@ -172,7 +172,8 @@ export function PayLinkBlock({
         return (
             <div className="mt-2 flex flex-wrap items-center gap-2">
                 <p className="min-w-0 flex-1 text-[12.5px] text-muted-foreground">
-                    Pay link made <BusinessDate iso={madeAt} variant="moment" />
+                    Payment link made{" "}
+                    <BusinessDate iso={madeAt} variant="moment" />
                 </p>
                 <Button
                     type="button"
@@ -180,7 +181,7 @@ export function PayLinkBlock({
                     disabled={link.busy}
                     onClick={link.replace}
                 >
-                    New pay link
+                    New payment link
                 </Button>
             </div>
         );
@@ -194,7 +195,7 @@ export function PayLinkBlock({
             busy={link.busy}
             busyLabel="Making…"
         >
-            Make a pay link
+            Make a payment link
         </Button>
     );
 }

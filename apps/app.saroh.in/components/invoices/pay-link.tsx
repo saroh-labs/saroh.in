@@ -16,7 +16,7 @@ export function providerName(provider: string): string {
 }
 
 /**
- * Money taken through the pay link that the invoice could not take: it
+ * Money taken through the payment link that the invoice could not take: it
  * arrived after the invoice was already paid or voided. The customer is owed
  * it back, and Saroh cannot send it — the refund is made in the provider's
  * own dashboard, and Saroh records it when the provider reports it.

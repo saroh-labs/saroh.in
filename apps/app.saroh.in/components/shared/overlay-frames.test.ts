@@ -71,7 +71,7 @@ const NOT_FORMS: Record<string, string> = {
     "components/settings/plan-billing/change-plan-dialog.tsx":
         "a payment flow with its own waiting states",
     "components/commerce/orders/order-row-menu.tsx":
-        "a pay link shown once, to copy",
+        "a payment link shown once, to copy",
 };
 
 /** Files that only pass a frame's name or type along. */

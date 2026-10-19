@@ -57,7 +57,7 @@ export default async function BookingsPage({
         resolveActiveOrganization(),
     ]);
     const may = permitsFor(organization);
-    // New booking finds the customer by search (E4) and can send a pay link.
+    // New booking finds the customer by search (E4) and can send a payment link.
     const people = {
         canSearch: may("contact:read"),
         payLink:

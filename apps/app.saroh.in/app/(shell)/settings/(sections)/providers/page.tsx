@@ -126,7 +126,7 @@ export default async function ProvidersSettingsPage() {
             {prompt ? <EmailPromptBlock prompt={prompt} /> : null}
             <PlanLimitNotice moduleId="integrations" />
             {/* A plan without online payments: no first connection, no
-                pay links, no checkout — said here, before Connect. */}
+                payment links, no checkout — said here, before Connect. */}
             <OnlinePaymentsLockNotice what="payments" />
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are

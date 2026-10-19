@@ -438,10 +438,10 @@ test.describe("bookings calendar", () => {
                     book.getByRole("radio", { name: `${customer} · new` }),
                 ).toBeChecked();
                 await book
-                    .getByRole("radio", { name: "Pays at the session" })
+                    .getByRole("radio", { name: "Pays at the visit" })
                     .click();
                 await book
-                    .getByRole("button", { name: "Create booking" })
+                    .getByRole("button", { name: "Book", exact: true })
                     .click();
                 await expect(
                     page
@@ -528,7 +528,7 @@ test.describe("New booking finds the customer (E4)", () => {
         await expect(chip).toBeVisible();
         await chip.click();
         await expect(chip).toBeChecked();
-        // Nothing is written until "Create booking": Cancel drops it.
+        // Nothing is written until "Book": Cancel drops it.
         await book.getByRole("button", { name: "Cancel" }).click();
         await expect(book).toBeHidden();
     });
@@ -541,7 +541,7 @@ test.describe("availability and services", () => {
         await signIn(page);
         await page.goto("/bookings/availability");
         await expect(
-            page.getByRole("heading", { level: 1, name: "Availability" }),
+            page.getByRole("heading", { level: 1, name: "Hours and time off" }),
         ).toBeVisible();
         const monday = page.getByRole("listitem").filter({ hasText: "Monday" });
         // A range reads "9:00 to 11:00 am", or "9:00 am to 6:00 pm".
@@ -620,11 +620,11 @@ test.describe("availability and services", () => {
         await expect(
             page.getByRole("radiogroup", { name: "Deposit" }),
         ).toHaveCount(0);
-        await page.getByRole("radio", { name: "Class" }).click();
+        await page.getByRole("radio", { name: "A group class" }).click();
         await expect(page.getByLabel("Visits")).toHaveCount(0);
         await page.getByLabel("Name").fill("E2E class");
         await page.getByRole("textbox", { name: /^Price/ }).fill("0");
-        const who = page.getByRole("group", { name: "Who takes it" });
+        const who = page.getByRole("group", { name: "Who does it" });
         if (await who.isVisible()) {
             // With one person on the diary they are ticked already.
             const first = who.getByRole("checkbox").first();
@@ -698,7 +698,7 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             .getByLabel("Link to join")
             .fill("https://meet.example.com/e2e-either");
         await page.getByRole("textbox", { name: /^Price/ }).fill("500");
-        const who = page.getByRole("group", { name: "Who takes it" });
+        const who = page.getByRole("group", { name: "Who does it" });
         if (await who.isVisible()) {
             // With one person on the diary they are ticked already.
             const first = who.getByRole("checkbox").first();

@@ -219,7 +219,7 @@ export function useSubscriptionActions(
             (res) => {
                 if ("data" in res) setPayLink(res.data.url);
                 showSuccess(
-                    "Pay link made.",
+                    "Payment link made.",
                     "The one sent before no longer works.",
                 );
             },

@@ -156,7 +156,7 @@ export interface OfferedDay {
 /**
  * The booking page's next two weeks for one service, as the public API
  * answers them (`GET public/services/:id/days`): the read the booking page
- * itself draws from, so the preview on Availability can't disagree with it.
+ * itself draws from, so the preview on Hours and time off can't disagree with it.
  */
 export interface OfferedDays {
     timezone: string;

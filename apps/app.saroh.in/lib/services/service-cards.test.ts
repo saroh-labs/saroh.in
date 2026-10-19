@@ -58,10 +58,10 @@ describe("servicesCount", () => {
 describe("lengthLine", () => {
     it("says the length, the gap, where and the kind on one line", () => {
         expect(lengthLine(row())).toBe(
-            facts("60 min", "15 min gap after", "In person", "One-to-one"),
+            facts("60 min", "15 min break after", "In person", "One person"),
         );
         expect(lengthLine(row({ locationType: "ONLINE" }))).toBe(
-            facts("60 min", "15 min gap after", "Online", "One-to-one"),
+            facts("60 min", "15 min break after", "Online", "One person"),
         );
     });
 
@@ -74,16 +74,23 @@ describe("lengthLine", () => {
                     bufferAfterMinutes: 0,
                 }),
             ),
-        ).toBe(facts("60 min", "In person or online", "Class", "12 places"));
+        ).toBe(
+            facts(
+                "60 min",
+                "In person or online",
+                "A group class",
+                "12 places",
+            ),
+        );
     });
 
     it("says a treatment's visits (E10)", () => {
         expect(lengthLine(row({ visits: 3 }))).toBe(
             facts(
                 "3 visits of 60 min",
-                "15 min gap after",
+                "15 min break after",
                 "In person",
-                "One-to-one",
+                "One person",
             ),
         );
         expect(lengthLine(row({ visits: 1 }))).toContain("60 min");

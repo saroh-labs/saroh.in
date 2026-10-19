@@ -22,6 +22,7 @@ import {
     isInNextWeek,
     needsOutcome,
 } from "@/lib/services/booking-state";
+import { BOOKING_WORDS, outcomeWord } from "@/lib/services/booking-words";
 import type { BookingWithService } from "@/lib/services/service";
 import type { ShareLink } from "@/lib/sites/share-links";
 
@@ -70,7 +71,7 @@ const FILTERS: DataFilter<BookingWithService>[] = [
     },
     {
         id: "unconfirmed",
-        label: "To confirm",
+        label: BOOKING_WORDS.awaitingPayment,
         predicate: (b) => b.status === "PENDING",
     },
 ];
@@ -199,10 +200,12 @@ export function BookingsView({
                                 : "text-muted-foreground",
                         )}
                     >
-                        {b.outcome === "ATTENDED" ? "Attended" : "No-show"}
+                        {outcomeWord(b.outcome)}
                     </span>
                 ) : needsOutcome(b) ? (
-                    <span className="text-muted-foreground">Not said yet</span>
+                    <span className="text-muted-foreground">
+                        {BOOKING_WORDS.notMarked}
+                    </span>
                 ) : null,
         },
         {

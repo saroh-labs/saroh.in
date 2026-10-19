@@ -81,13 +81,13 @@ export default async function OrdersPage({
     const query = readOrdersQuery(params, await rememberedPageSize("orders"));
     const storesRead = listBusinessStores();
     // What a row's menu and quick view may offer (B5), as Order Detail
-    // asks it. A pay link needs a provider that opens the checkout window
+    // asks it. A payment link needs a provider that opens the checkout window
     // (DEC-054), asked only of someone who may make one.
     const may = permitsFor(organization);
     // What this person may do to orders, each the power its endpoint asks
     // (B16): what they can't do isn't drawn.
     const powers = orderPowers(organization);
-    // On a plan without online payments no pay link is offered at all —
+    // On a plan without online payments no payment link is offered at all —
     // not on a row, not in New order (R33); "Paid in cash" and the counter
     // ways stay. The API refuses one anyway.
     const billing = await billingAccessOrNull();

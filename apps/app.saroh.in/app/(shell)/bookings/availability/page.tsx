@@ -44,7 +44,7 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
  * services' own hours, as the calendar's "Service hours" column does
  * (`readServiceHours`), to say the week customers can book today.
  */
-export const metadata = { title: "Availability" };
+export const metadata = { title: "Hours and time off" };
 
 async function readStaff(): Promise<StaffList | null> {
     try {
@@ -70,8 +70,8 @@ export default async function AvailabilityPage() {
         return (
             <PageContainer width="full">
                 <PageHeader
-                    breadcrumb={["Bookings", "Availability"]}
-                    title="Availability"
+                    breadcrumb={["Bookings", "Hours and time off"]}
+                    title="Hours and time off"
                 />
                 <div>
                     <FailedState

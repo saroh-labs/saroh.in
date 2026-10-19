@@ -68,7 +68,7 @@ export default async function BookingPage({
     // reads. A past appointment offers different controls (#241), but nothing
     // about its OUTCOME is decided by the clock — only a person sets that.
     const organization = await resolveActiveOrganization();
-    // Taking payment at the desk (P2), and sending a pay link instead when
+    // Taking payment at the desk (P2), and sending a payment link instead when
     // the plan takes online payment and a provider is connected (R33).
     const canTake = canTakeDeskPayments(organization);
     const desk = {

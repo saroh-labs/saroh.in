@@ -18,7 +18,7 @@ import { packKind, unitWord } from "./pack-cards";
 /**
  * How the desk was paid. A record of what was taken, never a limit on how
  * anyone pays (DEC-059): the business's payment account decides that.
- * ONLINE is the site's and a pay link's, never chosen at the desk.
+ * ONLINE is the site's and a payment link's, never chosen at the desk.
  */
 export type DeskPaidBy = "CASH" | "UPI" | "CARD" | "BANK" | "NONE";
 export type PaidBy = DeskPaidBy | "ONLINE";

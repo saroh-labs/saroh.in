@@ -58,7 +58,7 @@ type Read =
 /**
  * An invoice's quick look, from the Invoices list (the design's peek): who
  * it is billed to and what it connects to, the lines with their tax, how it
- * stands, and — while money is owed — its pay link. The list carries only a
+ * stands, and — while money is owed — its payment link. The list carries only a
  * summary of each invoice, so the lines are read when it opens.
  */
 export function InvoiceQuickLook({
@@ -81,7 +81,7 @@ export function InvoiceQuickLook({
 }) {
     const [read, setRead] = useState<Read>({ state: "loading" });
     const [attempt, setAttempt] = useState(0);
-    // The pay link's address, once made or asked for again (UX-048): shown
+    // The payment link's address, once made or asked for again (UX-048): shown
     // inline, so a blocked clipboard never loses it.
     const [shown, setShown] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -174,8 +174,8 @@ export function InvoiceQuickLook({
         }
         // A toast only when the link was also just made: it says who to
         // send it to. A plain copy is acknowledged by the button.
-        if (made) showSuccess(`Pay link copied. Send it to ${who.name}.`);
-        else showSuccess("Pay link copied.");
+        if (made) showSuccess(`Payment link copied. Send it to ${who.name}.`);
+        else showSuccess("Payment link copied.");
     }
 
     async function copyLink() {
@@ -384,7 +384,7 @@ export function InvoiceQuickLook({
 }
 
 /**
- * The pay link's address, shown in place (UX-048): selectable, with its own
+ * The payment link's address, shown in place (UX-048): selectable, with its own
  * copy button, so it can be copied by hand when the clipboard is blocked.
  */
 export function ShownLink({
@@ -395,7 +395,7 @@ export function ShownLink({
     onCopy: () => void;
 }) {
     return (
-        <div className="grid gap-1.5" aria-label="Pay link" role="group">
+        <div className="grid gap-1.5" aria-label="Payment link" role="group">
             <div className="flex min-w-0 items-center gap-2">
                 <code className="min-w-0 flex-1 select-all break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">
                     {url}
@@ -405,7 +405,7 @@ export function ShownLink({
                     variant="outline"
                     size="sm"
                     onClick={onCopy}
-                    aria-label="Copy the pay link"
+                    aria-label="Copy the payment link"
                 >
                     <Copy aria-hidden className="size-4" />
                 </Button>
@@ -414,7 +414,7 @@ export function ShownLink({
                     link={{
                         mode: "instant",
                         url,
-                        what: "this invoice's pay link",
+                        what: "this invoice's payment link",
                         opens: "pay",
                         fileName: "pay-link-qr",
                     }}
@@ -538,9 +538,9 @@ function payLine(i: Invoice, money: (a: string) => string) {
         case "DRAFT":
             return "A draft has no number and can still change.";
         default:
-            // No online payment (DEC-070): there is no pay link to send.
+            // No online payment (DEC-070): there is no payment link to send.
             return paysOnline(i.send, i.online)
-                ? "Not paid. Send the pay link, or mark it paid when the money arrives."
+                ? "Not paid. Send the payment link, or mark it paid when the money arrives."
                 : "Not paid. Send it, or mark it paid when the money arrives.";
     }
 }

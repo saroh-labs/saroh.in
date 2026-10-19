@@ -80,7 +80,7 @@ interface FulfilmentProps {
     paid: PaidHow;
     /** Where money handed back goes: "Razorpay", "the till". */
     refundTo: string;
-    /** A pay link can be made for more that is owed. */
+    /** A payment link can be made for more that is owed. */
     linkable: boolean;
     canTell: boolean;
     /** Money in minor units, as the screen says it; null without a money read. */

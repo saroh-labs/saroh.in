@@ -135,7 +135,7 @@ function NewOrderBody({
     // What is missing is said once the button is pressed.
     const [tried, setTried] = useState(false);
     const details = useBusinessDetailsStep({
-        then: "make the order and its pay link",
+        then: "make the order and its payment link",
         continueLabel: "Save and create order",
     });
     // Paid at the counter, with a product that has no GST rate: chosen
@@ -171,7 +171,7 @@ function NewOrderBody({
     async function create() {
         setTried(true);
         if (o.problem || saving || !o.pick || !o.way) return;
-        // A pay link waits for the registered address (DEC-068): asked in
+        // A payment link waits for the registered address (DEC-068): asked in
         // place, then the order is made.
         const res = await runAction(
             () =>

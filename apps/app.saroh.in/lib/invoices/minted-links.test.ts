@@ -13,10 +13,10 @@ import {
 } from "./minted-links";
 
 /**
- * Pay links made in this tab (UX-048): the API keeps only a hash, so the
+ * Payment links made in this tab (UX-048): the API keeps only a hash, so the
  * address is kept here to show again, never re-made by asking.
  */
-describe("minted pay links", () => {
+describe("minted payment links", () => {
     beforeEach(() => forgetLinks());
 
     it("has nothing for an invoice no link was made for", () => {
@@ -179,7 +179,7 @@ describe("copyLinkLabel", () => {
     const base = { busy: false, shown: false, linkOut: false };
 
     it("offers a first link plainly", () => {
-        expect(copyLinkLabel(base)).toBe("Copy pay link");
+        expect(copyLinkLabel(base)).toBe("Copy payment link");
     });
 
     it("offers a new link, not a copy, when the one out can't be shown", () => {
@@ -220,16 +220,16 @@ describe("linkSight", () => {
 describe("the unseen link's words", () => {
     it("says why the address isn't shown, and that a new link ends the old one", () => {
         expect(unseenLinkLine({ sendable: false })).toBe(
-            "A pay link is out and still works. Its full address is shown only once, when it's made, so it can't be shown again here or on another device. Making a new link ends the old one.",
+            "A payment link is out and still works. Its full address is shown only once, when it's made, so it can't be shown again here or on another device. Making a new link ends the old one.",
         );
     });
 
     it("names the day it was made when that is known (#870)", () => {
         expect(unseenLinkLine({ sendable: false, madeOn: "8 Oct 2026" })).toBe(
-            "A pay link was made on 8 Oct 2026 and still works. Its full address is shown only once, when it's made, so it can't be shown again here or on another device. Making a new link ends the old one.",
+            "A payment link was made on 8 Oct 2026 and still works. Its full address is shown only once, when it's made, so it can't be shown again here or on another device. Making a new link ends the old one.",
         );
         expect(unseenLinkLine({ sendable: false, madeOn: null })).toMatch(
-            /^A pay link is out and still works\./,
+            /^A payment link is out and still works\./,
         );
     });
 
@@ -240,7 +240,7 @@ describe("the unseen link's words", () => {
     });
 
     it("asks before replacing it, naming who gets the new one", () => {
-        expect(UNSEEN_LINK.confirmTitle).toBe("Make a new pay link?");
+        expect(UNSEEN_LINK.confirmTitle).toBe("Make a new payment link?");
         expect(UNSEEN_LINK.confirmLabel).toBe("Make a new link");
         expect(UNSEEN_LINK.keepLabel).toBe("Keep the old link");
         expect(newLinkWarning("Farah Khan")).toBe(

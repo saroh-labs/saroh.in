@@ -13,7 +13,7 @@ import type {
 /**
  * "Add your business details" (DEC-068): the registered address, and a
  * GST-registered business's GSTIN, asked in place where the merchant meets
- * the API's refusal — Issue, Send, New order with a pay link, connecting a
+ * the API's refusal — Issue, Send, New order with a payment link, connecting a
  * payment provider — then the action they started carries on.
  *
  * The API refuses with 409 `{ reason: "BUSINESS_DETAILS_MISSING", missing:

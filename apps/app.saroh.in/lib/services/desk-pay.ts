@@ -21,7 +21,7 @@ export type DeskChoice = DeskMethod | "LINK";
 /** What "Take ₹X" can take now, as the booking and diary reads send it. */
 export interface DeskTake {
     cents: number;
-    /** A pay link could ask for it instead (never a deposit's balance). */
+    /** A payment link could ask for it instead (never a deposit's balance). */
     byLink: boolean;
 }
 
@@ -83,9 +83,9 @@ export function deskChoices(input: {
             : [
                   {
                       key: "LINK" as const,
-                      label: "Send a pay link",
+                      label: "Send a payment link",
                       off: !input.take.byLink
-                          ? "A pay link bills the whole booking, so take the rest here"
+                          ? "A payment link bills the whole booking, so take the rest here"
                           : !input.canLink
                             ? providerDisconnected.title("payment")
                             : null,
@@ -118,7 +118,7 @@ export function deskButton(choice: DeskChoice, amount: string): string {
         case "CARD":
             return "Card approved";
         case "LINK":
-            return "Get the pay link";
+            return "Get the payment link";
     }
 }
 

@@ -1146,7 +1146,7 @@ describe("Bookings, a section across two modules", () => {
         expect(navRowsForModule("APPOINTMENTS")).toEqual([
             "Calendar",
             "Services",
-            "Availability",
+            "Hours and time off",
         ]);
         expect(navRowsForModule("COURSES")).toEqual(["Courses"]);
         expect(navRowsForModule("CLASS_PACKS")).toEqual(["Class packs"]);

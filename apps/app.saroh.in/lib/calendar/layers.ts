@@ -290,7 +290,7 @@ export function describeItem(
                 at ? `${at} ${item.title}` : item.title,
                 item.subtitle,
                 item.kind === "no_show"
-                    ? { label: "No-show", tone: "bad" }
+                    ? { label: "Didn't come", tone: "bad" }
                     : // A pay-now hold keeps its place while the customer
                       // pays: not a booking yet. The diary's word for it.
                       item.kind === "held"

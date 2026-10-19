@@ -263,7 +263,7 @@ export function PlanCard({
     );
 }
 
-/** A failed charge's new pay link, shown once: the API keeps only its hash. */
+/** A failed charge's new payment link, shown once: the API keeps only its hash. */
 export function PayLinkRow({ url, name }: { url: string; name: string }) {
     return (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">

@@ -73,7 +73,7 @@ export interface ServiceDraft {
      * (12 Oct 2026); "" is "same as the business".
      */
     gstPriceMode: ItemModeValue;
-    // Who takes it
+    // Who does it
     staffIds: string[];
     // The booking page, and taking bookings
     showOnBookingPage: boolean;
@@ -289,7 +289,7 @@ export function serviceFieldProblems(
         say("minutes", "A visit can be 24 hours at most.");
     }
     if (!(strictWhole(draft.gap) <= 1440)) {
-        say("gap", "The gap after has to be a number of minutes.");
+        say("gap", "The break after has to be a number of minutes.");
     }
     if (draft.kind === "one") {
         const visits = strictWhole(draft.visits);
@@ -442,7 +442,7 @@ const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["Time", ["minutes", "gap", "visits", "places", "where", "meetingUrl"]],
     [HOURS_SECTION, ["hours"]],
     ["Price", ["price", "deposit", "gstPriceMode"]],
-    ["Who takes it", ["staffIds"]],
+    ["Who does it", ["staffIds"]],
     ["Booking page", ["showOnBookingPage"]],
     ["Taking bookings", ["taking"]],
     ["More settings", ["timezone", "bufferBefore", "gstRate", "sacCode"]],
@@ -760,7 +760,7 @@ export function depositNote(
         // Online only: nothing at the visit, it is all paid when booking.
         return way === "ONLINE" && cents > 0
             ? `They pay ${all} online when booking: your booking rules take payment online only.`
-            : "No card needed to book. No-shows cost you the time.";
+            : "No card needed to book. If they don't come, you lose the time.";
     }
     if (way === "DESK" && cents > 0) return `They pay ${all} ${later}.`;
     const percent = DEPOSIT_PERCENT[deposit];
@@ -829,7 +829,7 @@ export function hasBookableHours(
     return ruleCount > 0 || (kind === "one" && staffCount > 0);
 }
 
-/** The note under Who takes it. */
+/** The note under Who does it. */
 export function staffNote(
     staffIds: string[],
     people: readonly { id: string; name: string }[],

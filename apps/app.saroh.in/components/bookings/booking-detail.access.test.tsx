@@ -132,17 +132,15 @@ describe("a booking that has happened", () => {
     it("asks how it went of someone with booking:write", () => {
         draw({ canWrite: true, past: true });
         expect(buttons()).toEqual(
-            expect.arrayContaining(["They came", "They didn’t"]),
+            expect.arrayContaining(["Came", "Didn't come"]),
         );
     });
 
-    it("doesn't ask a reader, who is still told nobody has said", () => {
+    it("doesn't ask a reader, who is still told it is not marked yet", () => {
         draw({ canWrite: false, past: true });
-        expect(buttons()).not.toContain("They came");
-        expect(buttons()).not.toContain("They didn’t");
-        expect(host.textContent).toContain(
-            "Nobody has said how this went yet.",
-        );
+        expect(buttons()).not.toContain("Came");
+        expect(buttons()).not.toContain("Didn't come");
+        expect(host.textContent).toContain("Not marked yet.");
         expect(host.textContent).toContain(NOTE);
     });
 });

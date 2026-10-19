@@ -16,14 +16,14 @@ export interface BookingPeople {
     payLink: boolean;
 }
 
-/** Send a pay link, pay at the session, or paid now. */
+/** Send a payment link, pay at the visit, or paid now. */
 export type PayChoice = "LINK" | "DESK" | "PAID";
 
 /**
- * The choices in the design's order. "Send a pay link" is offered only for
+ * The choices in the design's order. "Send a payment link" is offered only for
  * a priced booking by someone who may issue its invoice, on a plan that
  * takes payment online, with a payment provider connected; it is then the
- * default, as the design has it. Otherwise "Pays at the session" leads.
+ * default, as the design has it. Otherwise "Pays at the visit" leads.
  */
 export function payChoices(offerLink: boolean): {
     key: PayChoice;
@@ -31,9 +31,9 @@ export function payChoices(offerLink: boolean): {
 }[] {
     return [
         ...(offerLink
-            ? [{ key: "LINK" as const, label: "Send a pay link" }]
+            ? [{ key: "LINK" as const, label: "Send a payment link" }]
             : []),
-        { key: "DESK", label: "Pays at the session" },
+        { key: "DESK", label: "Pays at the visit" },
         { key: "PAID", label: "Paid now" },
     ];
 }
@@ -47,9 +47,9 @@ export function defaultPay(offerLink: boolean): PayChoice {
 export function payNote(choice: PayChoice): string {
     switch (choice) {
         case "LINK":
-            return "Booked now, and you get a pay link to send them. It shows unpaid until they pay. Saroh doesn't send it for you yet.";
+            return "Booked now, and you get a payment link to send them. It shows Awaiting payment until they pay. Saroh doesn't send it for you yet.";
         case "DESK":
-            return "Booked now. The calendar shows they pay at the session.";
+            return "Booked now. The calendar shows they pay at the visit.";
         case "PAID":
             return "Recorded as paid. Saroh takes no payment and makes no receipt for it.";
     }

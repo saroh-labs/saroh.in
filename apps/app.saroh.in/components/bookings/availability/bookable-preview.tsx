@@ -17,7 +17,7 @@ const card = "rounded-[12px] border border-border bg-card px-4 py-[13px]";
 const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
 
 /**
- * "What customers see" on Availability: for a service this person takes
+ * "What customers see" on Hours and time off: for a service this person takes
  * and a day the owner picks (today, or the next day with a time), the
  * times the booking page offers. It asks the booking page's own read
  * (`readOffered`), so it shows saved hours, less bookings, time off, the

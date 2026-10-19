@@ -37,6 +37,7 @@ import type {
     TreatmentView,
 } from "@/lib/services/booking-calendar";
 import { canCheckIn, canMarkNoShow } from "@/lib/services/booking-state";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import type { Block, LocalDate } from "@/lib/services/diary";
 import {
     bookingState,
@@ -240,7 +241,7 @@ function OneToOne({
             "Paid online"
         )
     ) : b.paidWith === "DESK" ? (
-        "Not yet. Pays at the session"
+        `Not yet. ${BOOKING_WORDS.paysAtVisit}`
     ) : (
         paidText(b)
     );
@@ -256,9 +257,9 @@ function OneToOne({
                 onClick={undo}
             >
                 {state === "in"
-                    ? "Undo check-in"
+                    ? "Undo came"
                     : state === "noshow"
-                      ? "Undo no-show"
+                      ? "Undo didn't come"
                       : "Undo cancel"}
             </Button>,
         );
@@ -270,7 +271,7 @@ function OneToOne({
                     className={btn.primary}
                     onClick={() => act.checkIn(b)}
                 >
-                    Check in
+                    {BOOKING_WORDS.markArrived}
                 </Button>,
             );
         }
@@ -282,7 +283,7 @@ function OneToOne({
                     className={btn.ghost}
                     onClick={() => act.noShow(b)}
                 >
-                    No-show
+                    {BOOKING_WORDS.didntCome}
                 </Button>,
             );
         }
@@ -351,7 +352,7 @@ function OneToOne({
                 className={btn.ghost}
                 onClick={() => act.noShow(b)}
             >
-                Mark no-show instead
+                Mark as didn&apos;t come instead
             </Button>,
         );
     }
@@ -382,7 +383,7 @@ function OneToOne({
                 className={btn.ghost}
                 onClick={() => act.checkIn(b)}
             >
-                Mark attended instead
+                Mark as came instead
             </Button>,
         );
     }

@@ -122,7 +122,7 @@ export default async function InvoicePage({
     const zone = invoiceZone(business);
     // Whether its link takes payment: the API's word (DEC-070).
     const payOnline = paysOnline(invoice.send, invoice.online);
-    const again = payOnline ? "Send the pay link again" : "Send it again";
+    const again = payOnline ? "Send the payment link again" : "Send it again";
 
     return (
         <PageContainer width="full">
@@ -248,10 +248,10 @@ function payLine(i: Invoice, who: string, canWrite: boolean) {
                     : `Not paid. Mark it paid when the money arrives.`;
             }
             if (canWrite && canSend(i.send)) {
-                return `Not paid. ${first} can pay by UPI or card from the pay link. Send it to them, or mark it paid when the money arrives.`;
+                return `Not paid. ${first} can pay by UPI or card from the payment link. Send it to them, or mark it paid when the money arrives.`;
             }
             return i.online?.providerConnected
-                ? `Not paid. ${first} can pay online from the pay link. Copy it and send it, or mark it paid when the money arrives.`
+                ? `Not paid. ${first} can pay online from the payment link. Copy it and send it, or mark it paid when the money arrives.`
                 : `Not paid. Mark it paid when the money arrives.`;
     }
 }

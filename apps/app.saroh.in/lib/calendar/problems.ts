@@ -18,7 +18,7 @@ const WORDS: Record<ProblemKind, [string, string]> = {
     renewal_failed: ["renewal failed", "renewals failed"],
     late_order: ["late order", "late orders"],
     invoice_overdue: ["invoice overdue", "invoices overdue"],
-    no_show: ["no-show", "no-shows"],
+    no_show: ["didn't come", "didn't come"],
 };
 
 /** "YYYY-MM-DD" of the Monday on or before a day. */
@@ -117,7 +117,7 @@ export interface ProblemCan {
     remind: boolean;
     /**
      * `subscription:write`: retry a failed renewal (D13) — by their autopay
-     * or a new pay link, as its subscription offers.
+     * or a new payment link, as its subscription offers.
      */
     retry?: boolean;
 }
@@ -133,7 +133,7 @@ export function problemAction(
 ): string {
     switch (kind) {
         // "Retry charge" opens the subscription, where Retry charges their
-        // autopay again or makes a new pay link (D13), for whoever may
+        // autopay again or makes a new payment link (D13), for whoever may
         // write subscriptions; anyone else opens it to read.
         case "renewal_failed":
             if (can.retry) return "Try the charge again";

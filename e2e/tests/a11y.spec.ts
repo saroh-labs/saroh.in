@@ -107,7 +107,7 @@ const SCREENS: Screen[] = [
         ready: h1("Priya Raman"),
     },
     {
-        name: "Overview",
+        name: "Calendar",
         org: PULSE,
         path: "/calendar",
         ready: (page) =>

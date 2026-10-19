@@ -64,7 +64,7 @@ export function MoneyCard({
     /** Try again a refund being confirmed — `payment:manage` only. */
     onRetryRefund?: (refundId: string) => void;
     busy?: boolean;
-    /** The pay link's part, for an order still owed money (B11). */
+    /** The payment link's part, for an order still owed money (B11). */
     payLink?: ReactNode;
     /**
      * "Record payment" for what a paid order still owes after an edit,

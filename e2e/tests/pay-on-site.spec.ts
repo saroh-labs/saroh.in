@@ -9,7 +9,7 @@ import { urls } from "../playwright.config";
 /**
  * Pay pages on the business's own address (DEC-069, plan L6).
  *
- * A pay link opens at `<its host>/pay/<token>`: on the renderer's apex, as
+ * A payment link opens at `<its host>/pay/<token>`: on the renderer's apex, as
  * every link issued so far does, and on a business's own host, which the
  * renderer serves with the same page. Opened on another business's host, the
  * page sends the customer to the link's own address (the API's `payUrl`),
@@ -31,7 +31,7 @@ const RYE = hostOf("rye-and-co");
 /** The provider windows' scripts: never loaded from a test run. */
 const PROVIDER_SDKS = /checkout\.razorpay\.com|sdk\.cashfree\.com/;
 
-/** An issued Northwind invoice and its fresh pay link's token. */
+/** An issued Northwind invoice and its fresh payment link's token. */
 async function issuedInvoice(
     request: APIRequestContext,
     tag: string,
@@ -76,7 +76,7 @@ async function payUrlOf(
     return new URL(payUrl ?? "");
 }
 
-test.describe("pay links on the business's own address (L6)", () => {
+test.describe("payment links on the business's own address (L6)", () => {
     test("the apex link and Northwind's own host open the same invoice", async ({
         page,
     }, testInfo) => {

@@ -70,7 +70,7 @@ const WINDOW_DAYS = 14;
  *
  * The customer is found with the shared picker (E4): by name or phone, most
  * recent first, or added new, with their Needs attention once picked. A
- * priced booking can be sent a pay link: the booking is made, its invoice
+ * priced booking can be sent a payment link: the booking is made, its invoice
  * issued, and the link shown to copy.
  *
  * With `visit` (E10) it books the next visit of a treatment: the service,
@@ -95,7 +95,7 @@ export function NewBookingDialog({
         minutes: number;
         priceCents: number | null;
     }[];
-    /** Customer search and pay links, as far as the viewer may (E4). */
+    /** Customer search and payment links, as far as the viewer may (E4). */
     people: BookingPeople;
     /** May read and spend class packs (`pack:read`, `pack:sell` and `booking:write`). */
     canUsePacks?: boolean;
@@ -565,7 +565,7 @@ export function NewBookingDialog({
                         ) : null}
                     </FormSheetBody>
                     <FormSheetFoot
-                        saveLabel={visit ? "Book visit" : "Create booking"}
+                        saveLabel={visit ? "Book visit" : "Book"}
                         savingLabel="Booking…"
                         note={
                             tried && !ready ? (

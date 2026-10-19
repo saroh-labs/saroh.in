@@ -392,8 +392,8 @@ export function everyNote(form: PlanForm, autopay = false): string {
     const price = priceOf(form);
     if (!price) return "";
     const how = autopay
-        ? "with a pay link, or by autopay for members who set it up"
-        : "with a pay link";
+        ? "with a payment link, or by autopay for members who set it up"
+        : "with a payment link";
     const invoiced = `Invoiced each ${EVERY[form.interval]} ${how}.`;
     if (form.interval === "MONTH" || form.interval === "WEEK") return invoiced;
     const cur = form.currency || "INR";

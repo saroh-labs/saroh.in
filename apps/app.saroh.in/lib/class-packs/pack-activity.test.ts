@@ -100,7 +100,7 @@ describe("Used this week", () => {
             state: { label: "Booked", tone: "accent" },
         });
         expect(rows[1].state).toEqual({ label: "Came", tone: "ok" });
-        expect(rows[2].state).toEqual({ label: "No-show", tone: "bad" });
+        expect(rows[2].state).toEqual({ label: "Didn't come", tone: "bad" });
     });
 
     it("says a cancel in time gave the credit back, and a late one didn't", () => {

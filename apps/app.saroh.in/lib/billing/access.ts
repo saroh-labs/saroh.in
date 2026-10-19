@@ -302,7 +302,7 @@ export interface OnlinePaymentsLock {
  * view (DEC-070). Plan names are the catalogue's; no price is said here.
  * Null when nothing is locked, or while nothing enforces it.
  *
- * - `payments`: taking payment online — connecting a provider, pay links,
+ * - `payments`: taking payment online — connecting a provider, payment links,
  *   the site's checkout.
  * - `subscriptions`: subscribing someone new — needs memberships and online
  *   payments both, so either row's lock stops it.

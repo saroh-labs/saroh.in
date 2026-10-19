@@ -38,7 +38,7 @@ import { people } from "../fixtures/sessions";
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
-    { label: "Overview", href: "/calendar" },
+    { label: "Calendar", href: "/calendar" },
     { label: "Website", href: "/sites" },
     {
         label: "Sell",
@@ -58,7 +58,7 @@ const MENU: readonly MenuRow[] = [
         pages: [
             { label: "Calendar", href: "/bookings" },
             { label: "Services", href: "/services" },
-            { label: "Availability", href: "/bookings/availability" },
+            { label: "Hours and time off", href: "/bookings/availability" },
             { label: "Courses", href: "/courses" },
         ],
     },

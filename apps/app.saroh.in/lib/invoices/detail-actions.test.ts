@@ -6,7 +6,7 @@ import { detailActions } from "./detail-actions";
 /**
  * Invoice Detail's buttons (after "Saroh Invoice Detail"), and what DEC-070
  * changes: without online payment Send reads "Send invoice" and there is no
- * "Copy pay link"; with it, today's buttons.
+ * "Copy payment link"; with it, today's buttons.
  */
 
 const base: DetailActionState = {
@@ -29,11 +29,11 @@ const labels = (over: Partial<DetailActionState>) =>
 const primary = (over: Partial<DetailActionState>) =>
     detailActions({ ...base, ...over }).find((a) => a.primary)?.label;
 
-describe("detailActions' pay link after a reload (UX-048)", () => {
+describe("detailActions' payment link after a reload (UX-048)", () => {
     it("says Make a new link when the link out can't be shown", () => {
         const got = labels({ linkUnseen: true });
         expect(got).toContain("Make a new link");
-        expect(got).not.toContain("Copy pay link");
+        expect(got).not.toContain("Copy payment link");
     });
 
     it("still says it is working while the link is made", () => {
@@ -50,23 +50,23 @@ describe("detailActions' pay link after a reload (UX-048)", () => {
 });
 
 describe("detailActions", () => {
-    it("an unpaid invoice that pays online: Send with pay link and Copy pay link, as today", () => {
+    it("an unpaid invoice that pays online: Send with payment link and Copy payment link, as today", () => {
         expect(labels({})).toEqual([
-            "Send with pay link",
-            "Copy pay link",
+            "Send with payment link",
+            "Copy payment link",
             "Mark paid",
             "Print",
             "Download PDF",
             "Cancel invoice",
         ]);
-        expect(primary({})).toBe("Send with pay link");
+        expect(primary({})).toBe("Send with payment link");
     });
 
-    it("payOnline false: Send invoice, and no Copy pay link (DEC-070)", () => {
+    it("payOnline false: Send invoice, and no Copy payment link (DEC-070)", () => {
         const got = labels({ payOnline: false });
         expect(got[0]).toBe("Send invoice");
-        expect(got).not.toContain("Copy pay link");
-        expect(got).not.toContain("Send with pay link");
+        expect(got).not.toContain("Copy payment link");
+        expect(got).not.toContain("Send with payment link");
         expect(primary({ payOnline: false })).toBe("Send invoice");
     });
 
@@ -91,7 +91,7 @@ describe("detailActions", () => {
             "Edit",
             "Delete draft",
         ]);
-        expect(labels({ standing: "DRAFT" })[0]).toBe("Send with pay link");
+        expect(labels({ standing: "DRAFT" })[0]).toBe("Send with payment link");
         expect(primary({ standing: "DRAFT", sendable: false })).toBe(
             "Issue it",
         );
@@ -111,14 +111,14 @@ describe("detailActions", () => {
         });
     });
 
-    it("no pay link while autopay is charging it (D13)", () => {
-        expect(labels({ charging: true })).not.toContain("Copy pay link");
+    it("no payment link while autopay is charging it (D13)", () => {
+        expect(labels({ charging: true })).not.toContain("Copy payment link");
         expect(labels({ charging: true, payOnline: false })).not.toContain(
             "Copy view link",
         );
     });
 
-    it("Copy view link only where no pay link can be made (#833)", () => {
+    it("Copy view link only where no payment link can be made (#833)", () => {
         expect(labels({})).not.toContain("Copy view link");
         expect(labels({ payOnline: false })).toContain("Copy view link");
         expect(labels({ payOnline: false, canWrite: false })).not.toContain(

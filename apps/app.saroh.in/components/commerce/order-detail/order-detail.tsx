@@ -67,12 +67,12 @@ export interface OrderPermissions {
      * hand (`order:edit`, B16).
      */
     edit: boolean;
-    /** Make or replace its pay link (`order:create` or `order:edit`). */
+    /** Make or replace its payment link (`order:create` or `order:edit`). */
     payLink: boolean;
     /** Refund and cancel (`order:refund`, B16). */
     refund: boolean;
     /**
-     * A provider can open the checkout window, so a pay link can be made
+     * A provider can open the checkout window, so a payment link can be made
      * (B11, DEC-054). Making one also takes `payLink`.
      */
     payOnline?: boolean;
@@ -210,7 +210,7 @@ export function OrderDetail({
     });
     const { hold, busy } = kitchen;
 
-    // The pay link (B11): for an order still owed money, made by someone
+    // The payment link (B11): for an order still owed money, made by someone
     // who may change orders. Its address is shown once, to its maker.
     const madeAt = order.payLinkCreatedAt ?? null;
     const payLink = usePayLink({ orderId: order.id, first, madeAt });

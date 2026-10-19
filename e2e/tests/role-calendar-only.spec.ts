@@ -41,14 +41,14 @@ const HERS = { id: "seed_booking_calendar-only", booker: "Meera Nair" };
  */
 const MENU: readonly MenuRow[] = [
     { label: "Home", href: "/" },
-    { label: "Overview", href: "/calendar" },
+    { label: "Calendar", href: "/calendar" },
     {
         label: "Bookings",
         href: "/bookings",
         pages: [
             { label: "Calendar", href: "/bookings" },
             { label: "Services", href: "/services" },
-            { label: "Availability", href: "/bookings/availability" },
+            { label: "Hours and time off", href: "/bookings/availability" },
         ],
     },
     { label: "Settings", href: "/settings" },

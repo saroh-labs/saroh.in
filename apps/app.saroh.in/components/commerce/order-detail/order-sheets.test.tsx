@@ -21,7 +21,7 @@ import { OrderDetail } from "./order-detail";
  * Drawn with `react-dom/client` + `act` on the real page and the real
  * sheet, so the dialog's role, name and focus return are what is tested.
  * The Server Actions, the router and the toasts are stand-ins; the menu,
- * the pay link and the money card are not this file's subject.
+ * the payment link and the money card are not this file's subject.
  */
 
 const actions = {

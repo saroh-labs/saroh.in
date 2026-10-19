@@ -10,10 +10,10 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * Invoices without Payments (DEC-070, K7), on Northwind with Payments
  * switched off for the test: Invoices get a rail row of their own (in the
  * phone's More), an invoice is written, issued and marked paid, Send reads
- * "Send invoice" where there is a channel, there's no "Copy pay link", and
+ * "Send invoice" where there is a channel, there's no "Copy payment link", and
  * the customer's link shows the invoice with no Pay button.
  *
- * The pay link is made while Payments is still on — with it off the
+ * The payment link is made while Payments is still on — with it off the
  * workspace offers none, and a Send's link goes only to the customer —
  * which is also the case DEC-070 names: a link already shared opens as a
  * view link once Payments goes off.
@@ -154,11 +154,11 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                 await expect(action(page, "Send invoice")).toBeVisible();
             }
             await expect(
-                page.getByRole("button", { name: "Send with pay link" }),
+                page.getByRole("button", { name: "Send with payment link" }),
             ).toHaveCount(0);
             await action(page, "Issue it").click();
             const confirm = page.getByRole("alertdialog");
-            await expect(confirm).not.toContainText("pay link");
+            await expect(confirm).not.toContainText("payment link");
             await confirm
                 .getByRole("button", { name: "Issue invoice" })
                 .click();
@@ -170,12 +170,12 @@ test.describe("invoices without Payments (DEC-070)", { tag: "@serial" }, () => {
                 )
                 .toBe("ISSUED");
 
-            // Unpaid: no pay link to copy, and Mark paid is there.
+            // Unpaid: no payment link to copy, and Mark paid is there.
             const pay = action(page, "Mark paid");
             await expect(pay).toBeVisible();
             await expect(pay).toHaveCSS("cursor", "pointer");
             await expect(
-                page.getByRole("button", { name: "Copy pay link" }),
+                page.getByRole("button", { name: "Copy payment link" }),
             ).toHaveCount(0);
             await expect(
                 page.getByText("Its link shows the invoice with no Pay"),

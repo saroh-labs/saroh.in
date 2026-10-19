@@ -97,7 +97,7 @@ export function reachOf(pick: CustomerPick | null): string | null {
 export function payOptions(input: {
     pick: CustomerPick | null;
     way: NewOrderWay["type"] | null;
-    /** A pay link can be made here: `order:create` (B16) and a provider. */
+    /** A payment link can be made here: `order:create` (B16) and a provider. */
     canLink: boolean;
     /**
      * The plan takes payment online (`takesOnlinePayment`). When it

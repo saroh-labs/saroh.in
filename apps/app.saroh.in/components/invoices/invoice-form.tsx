@@ -140,8 +140,8 @@ function dueFrom(days: number): string {
  * another state than the business's is IGST. Prices include GST; the API
  * works the tax out and freezes it when the invoice is issued.
  *
- * Nothing is sent: "Issue with pay link" numbers it, locks its lines and
- * copies its pay link for the merchant to send. The running total is the
+ * Nothing is sent: "Issue with payment link" numbers it, locks its lines and
+ * copies its payment link for the merchant to send. The running total is the
  * only sum the browser does, and only to read.
  */
 export function InvoiceForm({
@@ -163,7 +163,7 @@ export function InvoiceForm({
     /** A GST-registered business: lines carry a rate and HSN/SAC. */
     registered: boolean;
     businessName: string;
-    /** A pay link can be made (Payments on, a provider connected), so issuing makes one. */
+    /** A payment link can be made (Payments on, a provider connected), so issuing makes one. */
     providerConnected: boolean;
     /**
      * The business details on file, read with the page: Issue asks for any
@@ -364,22 +364,22 @@ export function InvoiceForm({
         const link = await newPayLink(id, issued.data.updatedAt);
         if (!link.ok) {
             if (link.plan) {
-                // Issued; only the pay link is the plan's to refuse.
+                // Issued; only the payment link is the plan's to refuse.
                 showSuccess(`${number} issued. Its lines are locked.`);
                 reportFailure(link);
             } else {
                 showError(
-                    `${number} issued, but no pay link was made.`,
+                    `${number} issued, but no payment link was made.`,
                     link.error,
                 );
             }
         } else if (await copyText(link.data.url)) {
             showSuccess(
-                `${number} issued and its pay link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,
+                `${number} issued and its payment link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,
             );
         } else {
             showError(
-                `${number} issued, but its pay link couldn't be copied. Copy a new one from the invoice.`,
+                `${number} issued, but its payment link couldn't be copied. Copy a new one from the invoice.`,
             );
         }
         router.push(to);
@@ -811,7 +811,7 @@ export function InvoiceForm({
                         A draft has no number and can still change. Issuing
                         numbers it and locks the lines
                         {withLink
-                            ? ", and copies its pay link for you to send. Saroh doesn't send it."
+                            ? ", and copies its payment link for you to send. Saroh doesn't send it."
                             : ". Saroh doesn't send it. Print it or share it yourself."}
                     </p>
                     <div className="mt-3 flex flex-col gap-2">
@@ -830,7 +830,7 @@ export function InvoiceForm({
                             busy={isSubmitting && intent === "issue"}
                             busyLabel="Issuing…"
                         >
-                            {withLink ? "Issue with pay link" : "Issue it"}
+                            {withLink ? "Issue with payment link" : "Issue it"}
                         </Button>
                         <Button
                             type="submit"

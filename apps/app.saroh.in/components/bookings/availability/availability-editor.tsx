@@ -417,8 +417,8 @@ export function AvailabilityEditor({
             <>
                 <PageHeader
                     className="mb-5"
-                    breadcrumb={["Bookings", "Availability"]}
-                    title="Availability"
+                    breadcrumb={["Bookings", "Hours and time off"]}
+                    title="Hours and time off"
                 />
                 {canEdit ? null : (
                     <ReadOnlyNote>
@@ -524,9 +524,9 @@ export function AvailabilityEditor({
         <>
             <PageHeader
                 className="mb-5"
-                breadcrumb={["Bookings", "Availability"]}
-                title="Availability"
-                description="When each person can be booked. Customers only ever see free times inside these hours, minus bookings and the gap after each. Changing hours never moves a booking that's already made."
+                breadcrumb={["Bookings", "Hours and time off"]}
+                title="Hours and time off"
+                description="When each person can be booked. Customers only ever see free times inside these hours, minus bookings and the break after each. Changing hours never moves a booking that's already made."
                 meta={`${me.name} · ${weeklyHours(hours)} hours a week`}
             />
             {openingHours ? (
@@ -645,7 +645,7 @@ export function AvailabilityEditor({
 
                     <section aria-labelledby="extra-hours" className={card}>
                         <h2 id="extra-hours" className={cn(cardTitle, "mb-1")}>
-                            One-off extra hours
+                            Extra opening hours
                         </h2>
                         <p className="mb-1.5 text-[11.5px] text-muted-foreground">
                             Opened on the calendar for a single day.

@@ -76,7 +76,7 @@ export function HoursCard({
                         : ""}
                     .{" "}
                     <TextLink href={AVAILABILITY_HREF}>
-                        Change them in Availability
+                        Change them in Hours and time off
                     </TextLink>
                 </p>
             ) : (

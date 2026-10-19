@@ -60,7 +60,7 @@ export interface GapTarget {
  *
  * The customer is found with the shared picker (E4): by name or phone, most
  * recent first, or added new, with their Needs attention once picked. A
- * priced booking can be sent a pay link: the booking is made, its invoice
+ * priced booking can be sent a payment link: the booking is made, its invoice
  * issued, and the link shown to copy.
  */
 export function NewBookingFromGap({
@@ -398,7 +398,7 @@ function Form({
                 </div>
             </FormSheetBody>
             <FormSheetFoot
-                saveLabel="Create booking"
+                saveLabel="Book"
                 savingLabel="Booking…"
                 pending={saving}
                 onSubmit={book}
