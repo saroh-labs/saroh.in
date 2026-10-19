@@ -78,16 +78,24 @@ export function normaliseEmail(
 }
 
 /**
- * The phone as it is compared: digits only, the leading 91 of a twelve-digit
- * Indian number dropped. Null for no phone or fewer than seven digits.
+ * The phone as it is compared: digits only, with India's prefixes dropped
+ * the way the shared phone rule reads them (`@saroh/block-contract`
+ * phone.ts, #1036): 0091 in front of fourteen digits, 91 in front of
+ * twelve, a trunk 0 in front of eleven. "+91 98450 12345", "098450 12345"
+ * and "0091 98450 12345" are all "9845012345". Null for no phone or fewer
+ * than seven digits. `walk-in-customer.ts` `phoneOf` is the same in SQL.
  */
 export function normalisePhone(
     phone: string | null | undefined,
 ): string | null {
     if (!phone) return null;
     let digits = phone.replace(/\D/g, "");
-    if (digits.length === 12 && digits.startsWith("91")) {
+    if (digits.length === 14 && digits.startsWith("0091")) {
+        digits = digits.slice(4);
+    } else if (digits.length === 12 && digits.startsWith("91")) {
         digits = digits.slice(2);
+    } else if (digits.length === 11 && digits.startsWith("0")) {
+        digits = digits.slice(1);
     }
     return digits.length >= MIN_PHONE_DIGITS ? digits : null;
 }

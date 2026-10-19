@@ -14,8 +14,8 @@ import {
  * duplicate matching and is reached by a privacy removal (C11).
  *
  * Phones are compared as C2's `duplicates.ts` compares them, which is what
- * E4's picker searches by: digits only, a twelve-digit number's leading 91
- * dropped ("+91 98450 00002" is "9845000002").
+ * E4's picker searches by: digits only, India's 0091, 91 or trunk 0 dropped
+ * ("+91 98450 00002" and "098450 00002" are "9845000002").
  *
  * Someone known by their phone alone gets the reserved
  * `phone+<random>@phone.invalid` placeholder as their email, on the contact
@@ -61,13 +61,18 @@ export async function lockWalkInPhone(
 
 /**
  * A stored phone column, compared as `normalisePhone` compares: digits
- * only, a twelve-digit number's leading 91 dropped.
+ * only, India's 0091 (fourteen digits), 91 (twelve) or trunk 0 (eleven)
+ * dropped.
  */
 function phoneOf(column: string): Prisma.Sql {
     const digits = Prisma.raw(
         `regexp_replace(coalesce(${column}, ''), '\\D', '', 'g')`,
     );
-    return Prisma.sql`(CASE WHEN length(${digits}) = 12 AND left(${digits}, 2) = '91' THEN substr(${digits}, 3) ELSE ${digits} END)`;
+    return Prisma.sql`(CASE
+        WHEN length(${digits}) = 14 AND left(${digits}, 4) = '0091' THEN substr(${digits}, 5)
+        WHEN length(${digits}) = 12 AND left(${digits}, 2) = '91' THEN substr(${digits}, 3)
+        WHEN length(${digits}) = 11 AND left(${digits}, 1) = '0' THEN substr(${digits}, 2)
+        ELSE ${digits} END)`;
 }
 
 /**

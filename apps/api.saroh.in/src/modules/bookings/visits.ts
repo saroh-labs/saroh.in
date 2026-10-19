@@ -24,6 +24,7 @@ import {
     toAvailabilityService,
 } from "./booking-slots";
 import type { BookingLocationType } from "./dto";
+import { assertBookableByTeam } from "./hand-booker";
 import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type { BookInput, SignedInBooker } from "./reservation";
 import { loadBookableService, reserveInTx } from "./reservation";
@@ -384,6 +385,9 @@ export async function bookVisit(
     if (service.organizationId !== ctx.organizationId) {
         throw new NotFoundException("Order not found");
     }
+    // The team books a visit by hand: a service only customers book is
+    // refused here too (Q5). The customer booking their own visit isn't.
+    if (!customer) assertBookableByTeam(service);
     const live = new Set(
         order.bookings
             .filter((b) => b.status !== "CANCELLED")

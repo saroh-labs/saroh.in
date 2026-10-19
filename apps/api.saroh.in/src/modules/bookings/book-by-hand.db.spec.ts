@@ -24,6 +24,7 @@ import { prisma } from "@saroh/database";
 import { giveBusinessDetails } from "../../../test/business-details";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { isReservedContactEmail } from "../contacts/contact-email";
+import { lockWalkInPhone } from "../orders/walk-in-customer";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { StaffService } from "../staff/staff.service";
 import { BookingEventType } from "./booking-event-type";
@@ -156,10 +157,11 @@ describe("booking a caller with a name and phone (DEC-170)", () => {
             bookerName: "Kiran Shah",
             bookerPhone: "+91 98450 11111",
         });
+        // Kept as the one phone rule keeps it (#1036): E.164.
         expect(booked).toMatchObject({
             status: "CONFIRMED",
             bookerName: "Kiran Shah",
-            bookerPhone: "+91 98450 11111",
+            bookerPhone: "+919845011111",
             bookerEmail: null,
         });
         const contact = await prisma.contact.findUniqueOrThrow({
@@ -169,7 +171,7 @@ describe("booking a caller with a name and phone (DEC-170)", () => {
             organizationId: orgId,
             firstName: "Kiran",
             lastName: "Shah",
-            phone: "+91 98450 11111",
+            phone: "+919845011111",
             source: "manual",
         });
         // Kept by their phone: the placeholder every reader treats as none.
@@ -257,6 +259,93 @@ describe("booking a caller with a name and phone (DEC-170)", () => {
         const made = [a, b].filter((r) => r.status === "fulfilled");
         expect(made.length).toBeGreaterThanOrEqual(1);
         expect(await contactsWithPhone("9845055555")).toBe(1);
+    });
+
+    it("a contact saved with a trunk 0 or 0091 is found by the number in E.164, and the other way round", async () => {
+        const trunk = await prisma.contact.create({
+            data: {
+                organizationId: orgId,
+                email: `trunk-${tag}@example.com`,
+                firstName: "Trunk",
+                phone: "098450 99991",
+            },
+        });
+        const intl = await prisma.contact.create({
+            data: {
+                organizationId: orgId,
+                email: `intl-${tag}@example.com`,
+                firstName: "Intl",
+                phone: "0091 98450 99993",
+            },
+        });
+        const e164 = await prisma.contact.create({
+            data: {
+                organizationId: orgId,
+                email: `e164-${tag}@example.com`,
+                firstName: "Plus",
+                phone: "+919845099992",
+            },
+        });
+        for (const [typed, who] of [
+            ["+91 98450 99991", trunk.id],
+            ["+919845099993", intl.id],
+            ["098450 99992", e164.id],
+            ["0091 98450 99992", e164.id],
+        ] as const) {
+            const booked = await bookings.bookByHand(owner, facialId, {
+                startAt: nextStart(),
+                bookerName: "Someone",
+                bookerPhone: typed,
+            });
+            expect(booked.contactId).toBe(who);
+        }
+        for (const digits of ["9845099991", "9845099992", "9845099993"]) {
+            expect(await contactsWithPhone(digits)).toBe(1);
+        }
+    });
+
+    it("a phone the rule can't read is refused on bookerPhone, in its words", async () => {
+        await expect(
+            bookings.bookByHand(owner, facialId, {
+                startAt: nextStart(),
+                bookerName: "Someone",
+                bookerPhone: "98765",
+            }),
+        ).rejects.toMatchObject({
+            response: {
+                field: "bookerPhone",
+                message: expect.stringContaining("+91 98450 12345"),
+            },
+        });
+    });
+
+    it("a walk-in order making the number's customer mid-booking: one customer, the booking on it", async () => {
+        const key = "9845012121";
+        let booking: Promise<{ contactId: string | null }> | undefined;
+        let made = "";
+        // The order holds the phone's lock, as New order does, while the
+        // booking starts; it makes the customer and commits.
+        await prisma.$transaction(async (tx) => {
+            await lockWalkInPhone(tx, orgId, key);
+            booking = bookings.bookByHand(owner, facialId, {
+                startAt: nextStart(),
+                bookerName: "Walk In",
+                bookerPhone: "+91 98450 12121",
+            });
+            await new Promise((r) => setTimeout(r, 500));
+            made = (
+                await tx.contact.create({
+                    data: {
+                        organizationId: orgId,
+                        email: `walkin-${tag}@example.com`,
+                        firstName: "Walk",
+                        phone: "+919845012121",
+                    },
+                })
+            ).id;
+        });
+        await expect(booking).resolves.toMatchObject({ contactId: made });
+        expect(await contactsWithPhone(key)).toBe(1);
     });
 
     it("no customer, no email and no phone: a clear message naming the phone", async () => {

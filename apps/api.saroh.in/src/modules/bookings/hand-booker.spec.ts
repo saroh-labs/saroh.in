@@ -7,12 +7,14 @@
 jest.mock("@saroh/database", () => ({ prisma: {} }));
 
 import { BadRequestException, ConflictException } from "@nestjs/common";
+import { PHONE_CASES } from "@saroh/block-contract";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import {
     assertBookableByTeam,
     assertHandPayment,
+    bookerPhoneE164,
     bookerPhoneKey,
     CANT_TAKE_PAYMENT,
     notBookableByTeamMessage,
@@ -33,6 +35,9 @@ describe("bookerPhoneKey", () => {
     it("matches a phone as orders' walk-ins do: digits, no leading 91", () => {
         expect(bookerPhoneKey("+91 98450 00002")).toBe("9845000002");
         expect(bookerPhoneKey("98450-00002")).toBe("9845000002");
+        // India's trunk 0 and 0091, as the shared phone rule reads them.
+        expect(bookerPhoneKey("098450 00002")).toBe("9845000002");
+        expect(bookerPhoneKey("0091 98450 00002")).toBe("9845000002");
     });
 
     it("refuses a phone too short to keep anyone by, naming bookerPhone", () => {
@@ -42,6 +47,34 @@ describe("bookerPhoneKey", () => {
         } catch (error) {
             expect((error as BadRequestException).getResponse()).toMatchObject({
                 field: "bookerPhone",
+            });
+        }
+    });
+});
+
+describe("bookerPhoneE164", () => {
+    it("keeps a typed phone as E.164 by the shared rule, every case", () => {
+        for (const c of PHONE_CASES) {
+            if (c.stored) {
+                expect(bookerPhoneE164(c.typed)).toBe(c.stored);
+            } else {
+                expect(() => bookerPhoneE164(c.typed)).toThrow(
+                    BadRequestException,
+                );
+            }
+        }
+        expect(bookerPhoneE164("  ")).toBeUndefined();
+        expect(bookerPhoneE164(undefined)).toBeUndefined();
+    });
+
+    it("refuses on bookerPhone in the rule's own words", () => {
+        try {
+            bookerPhoneE164("call me");
+            throw new Error("not refused");
+        } catch (error) {
+            expect((error as BadRequestException).getResponse()).toEqual({
+                field: "bookerPhone",
+                message: "A phone number is only digits, like +91 98450 12345.",
             });
         }
     });

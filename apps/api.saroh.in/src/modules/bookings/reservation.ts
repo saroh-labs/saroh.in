@@ -28,7 +28,7 @@ import { freeCancelDeadline } from "./booking-rules";
 import type { AccountBookPay, BookingLocationType, PaidWith } from "./dto";
 import { seatsHeld } from "./held-seats";
 import { loadRulesFor } from "./person-rules";
-import { phoneContactInTx } from "./phone-booker";
+import { phoneContactInTx, PhoneSeenLate } from "./phone-booker";
 import { depositCents } from "./service-fields";
 import { bookedPriceOf, serviceCharge } from "./service-price";
 import { acceptWaitlistInTx } from "./waitlist-queue";
@@ -402,7 +402,9 @@ async function reserveOnce(
         }
         // Serialization failure — Postgres aborted the loser of a race.
         // On its own, the only thing two bookings contend for is the slot.
-        if (code === "P2034") {
+        // A phone's contact made under us by a walk-in order counts the
+        // same: the retry books that contact (phone-booker.ts).
+        if (code === "P2034" || err instanceof PhoneSeenLate) {
             throw new RaceLost(also?.onRace ?? "That time is fully booked.");
         }
         throw err;

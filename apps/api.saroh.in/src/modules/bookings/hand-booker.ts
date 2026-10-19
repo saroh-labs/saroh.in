@@ -4,6 +4,7 @@ import {
     ForbiddenException,
     NotFoundException,
 } from "@nestjs/common";
+import { normalisePhoneNumber } from "@saroh/block-contract";
 import type { Contact } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
@@ -61,9 +62,9 @@ export function assertBookableByTeam(service: {
 }
 
 /**
- * The phone as matched (digits only, a twelve-digit number's leading 91
- * dropped, as orders' walk-ins and duplicate matching compare it), or a
- * 400 naming `bookerPhone`.
+ * The phone as matched (digits only, India's 0091, 91 or trunk 0 dropped,
+ * as orders' walk-ins and duplicate matching compare it), or a 400 naming
+ * `bookerPhone`.
  */
 export function bookerPhoneKey(phone: string): string {
     const key = normalisePhone(phone);
@@ -74,6 +75,24 @@ export function bookerPhoneKey(phone: string): string {
         });
     }
     return key;
+}
+
+/**
+ * A typed phone as it is kept: E.164 by the one phone rule
+ * (`@saroh/block-contract`, #1036), "098450 12345" as "+919845012345",
+ * or a 400 naming `bookerPhone` with the rule's own words. Undefined for
+ * nothing typed.
+ */
+export function bookerPhoneE164(phone: string | undefined): string | undefined {
+    if (!phone?.trim()) return undefined;
+    const result = normalisePhoneNumber(phone);
+    if ("problem" in result) {
+        throw new BadRequestException({
+            message: result.problem,
+            field: "bookerPhone",
+        });
+    }
+    return result.phone ?? undefined;
 }
 
 /**
@@ -183,12 +202,12 @@ export async function handBooker(
             startAt: dto.startAt,
             bookerEmail: dto.bookerEmail,
             bookerName: given(dto.bookerName),
-            bookerPhone: given(dto.bookerPhone),
+            bookerPhone: bookerPhoneE164(dto.bookerPhone),
         };
     }
 
-    if (given(dto.bookerPhone)) {
-        const phone = (dto.bookerPhone ?? "").trim();
+    const phone = bookerPhoneE164(dto.bookerPhone);
+    if (phone) {
         const key = bookerPhoneKey(phone);
         const name = given(dto.bookerName)?.trim();
         if (!name) {
