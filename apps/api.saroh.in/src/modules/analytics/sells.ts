@@ -115,10 +115,14 @@ export function countChange(
  * Best sellers, most sold first (then most brought in, then by name, so the
  * order never shuffles). Amounts only with `money`.
  */
-export function bestSellers(
+/**
+ * `bestSellersSql`'s rows paired per product: the period's row and the one
+ * before's, either absent when it sold nothing then. Best sellers and the
+ * "selling less" suggestion (`suggestions.ts`) read the same pairs.
+ */
+export function soldByProduct(
     rows: readonly SoldRow[],
-    opts: { thin: boolean; money: boolean },
-): BestSellers {
+): Map<string, { name: string; now?: SoldRow; was?: SoldRow }> {
     const by = new Map<
         string,
         { name: string; now?: SoldRow; was?: SoldRow }
@@ -129,8 +133,15 @@ export function bestSellers(
         else entry.was = row;
         by.set(row.productId, entry);
     }
+    return by;
+}
+
+export function bestSellers(
+    rows: readonly SoldRow[],
+    opts: { thin: boolean; money: boolean },
+): BestSellers {
     const all: BestSeller[] = [];
-    for (const [productId, { name, now, was }] of by) {
+    for (const [productId, { name, now, was }] of soldByProduct(rows)) {
         const sold = Number(now?.sold ?? 0);
         if (sold <= 0) continue;
         const soldBefore = Math.max(0, Number(was?.sold ?? 0));

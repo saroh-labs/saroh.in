@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     Ip,
@@ -28,6 +29,9 @@ import type { MoneyRead } from "./money";
 import { DEFAULT_PERIOD } from "./period";
 import type { SellsRead } from "./sells";
 import { SellsService } from "./sells.service";
+import type { SuggestionsRead } from "./suggestions";
+import type { NotNowResult } from "./suggestions.service";
+import { SuggestionsService } from "./suggestions.service";
 import type { TakingsRead } from "./takings";
 import { TakingsService } from "./takings.service";
 
@@ -92,6 +96,7 @@ export class AnalyticsController {
         private readonly analytics: AnalyticsService,
         private readonly takings: TakingsService,
         private readonly sells: SellsService,
+        private readonly suggestions: SuggestionsService,
     ) {}
 
     /**
@@ -132,6 +137,42 @@ export class AnalyticsController {
         @Query() query: InsightsPeriodQueryDto,
     ): Promise<SellsRead> {
         return this.sells.read(ctx, query.period ?? DEFAULT_PERIOD);
+    }
+
+    /**
+     * Insights' suggestions for the person asking (DEC-171,
+     * `suggestions.ts`): a class nearly always full, a bill more than 3
+     * weeks late, something selling less, ranked, less what they put off
+     * with Not now; the first-sale suggestion before any sale.
+     * `?period=7d|4w|3m` is what selling less compares, 4 weeks when
+     * absent. Needs `analytics:read`; the money rules need `payment:read`.
+     */
+    @Get("suggestions")
+    getSuggestions(
+        @OrgContext() ctx: OrganizationContext,
+        @Query() query: InsightsPeriodQueryDto,
+    ): Promise<SuggestionsRead> {
+        return this.suggestions.read(ctx, query.period ?? DEFAULT_PERIOD);
+    }
+
+    /** Not now: hide one suggestion from this person for 7 days. */
+    @Post("suggestions/:key/not-now")
+    @HttpCode(200)
+    notNow(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("key") key: string,
+    ): Promise<NotNowResult> {
+        return this.suggestions.notNow(ctx, key);
+    }
+
+    /** Undo Not now: the suggestion shows again at once. */
+    @Delete("suggestions/:key/not-now")
+    @HttpCode(204)
+    undoNotNow(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("key") key: string,
+    ): Promise<void> {
+        return this.suggestions.undoNotNow(ctx, key);
     }
 
     @Get()

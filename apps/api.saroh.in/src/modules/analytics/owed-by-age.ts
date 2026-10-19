@@ -28,6 +28,13 @@ import { leftToPayCents, OWED_WHERE } from "../invoices/invoice-state";
 
 type Db = typeof prisma;
 
+/**
+ * Every bill someone still owes on: issued, and not an order's own paper or
+ * a credit note (`OWED_WHERE`). Owed by age and the late-bill suggestion
+ * (`suggestions.service.ts`) read the same bills.
+ */
+export const UNPAID_BILLS_WHERE = { ...OWED_WHERE, status: "ISSUED" } as const;
+
 /** Past due by more than this many days is "more than 30 days late". */
 export const LATE_LONG_DAYS = 30;
 
@@ -123,7 +130,7 @@ export async function readOwedByAge(
 ): Promise<OwedByAge | null> {
     const [bills, ever] = await Promise.all([
         db.invoice.findMany({
-            where: { organizationId, ...OWED_WHERE, status: "ISSUED" },
+            where: { organizationId, ...UNPAID_BILLS_WHERE },
             select: {
                 currency: true,
                 dueAt: true,

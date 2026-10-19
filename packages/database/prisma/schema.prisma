@@ -89,6 +89,9 @@ model User {
   // Sign-in email changes staff made for them (admin console U9).
   signInEmailChanges SignInEmailChange[]
 
+  // Insights suggestions this person put off with Not now (DEC-171).
+  insightSuggestionsNotNow InsightSuggestionNotNow[]
+
   @@index([email])
 }
 
@@ -328,6 +331,7 @@ model Organization {
   // Stage 7 — analytics (S7-001)
   analyticsEvents          AnalyticsEvent[]
   analyticsDailyAggregates AnalyticsDailyAggregate[]
+  insightSuggestionsNotNow InsightSuggestionNotNow[]
 
   // Stage 7 — SaaS billing (S7-005). One current subscription per org.
   subscription Subscription?
@@ -5932,6 +5936,27 @@ model AnalyticsDailyAggregate {
 
   @@unique([organizationId, siteId, date, type, dimension, dimensionValue])
   @@index([organizationId, type, date])
+}
+
+/// Insights' "Not now" on a suggestion (DEC-171, #1087): one person put off
+/// one suggestion in one business until `hiddenUntil`, 7 days on. Per
+/// person, kept on the server so it holds on every device; one row per key,
+/// written again (not added) each time. Past `hiddenUntil` the suggestion
+/// comes back. `key` names the rule and its subject, `class-full:<serviceId>`,
+/// `late-bill:<invoiceId>` or `selling-less:<productId>` (`suggestions.ts`).
+model InsightSuggestionNotNow {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key            String
+  hiddenUntil    DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId, key])
+  @@index([userId])
 }
 
 // Plan — the VERSIONED catalog of Saroh subscription plans sold to
