@@ -620,7 +620,10 @@ function JournalCards({
                                         <img
                                             src={image}
                                             alt=""
-                                            {...siteImage()}
+                                            {...siteImage("below", {
+                                                src: image,
+                                                sizes: "(min-width: 640px) 240px, 40vw",
+                                            })}
                                             className={listPhoto}
                                         />
                                     ) : null}
@@ -665,7 +668,10 @@ function JournalCards({
                                     <img
                                         src={image}
                                         alt=""
-                                        {...siteImage()}
+                                        {...siteImage("below", {
+                                            src: image,
+                                            sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
+                                        })}
                                         className="mb-1.5 h-[130px] w-full object-cover"
                                     />
                                 ) : null}

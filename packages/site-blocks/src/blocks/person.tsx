@@ -86,7 +86,11 @@ export default function PersonSection({
                         alt={content.image?.alt ?? ""}
                         width={content.image?.width}
                         height={content.image?.height}
-                        {...siteImage()}
+                        {...siteImage("below", {
+                            src,
+                            width: content.image?.width,
+                            sizes: "(min-width: 640px) 384px, 100vw",
+                        })}
                         className="aspect-[4/5] w-full max-w-sm rounded-[calc(var(--site-radius)*1.4)] object-cover"
                     />
                 ) : null}
@@ -210,7 +214,11 @@ function PortraitColumn({ content }: { content: RenderedPerson }) {
                                 alt={content.image?.alt ?? ""}
                                 width={content.image?.width}
                                 height={content.image?.height}
-                                {...siteImage()}
+                                {...siteImage("below", {
+                                    src,
+                                    width: content.image?.width,
+                                    sizes: "300px",
+                                })}
                                 className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
                             />
                         ) : null}
@@ -286,7 +294,11 @@ function TeamGrid({ content }: { content: RenderedPerson }) {
                                         <img
                                             src={src}
                                             alt={m.image?.alt ?? ""}
-                                            {...siteImage()}
+                                            {...siteImage("below", {
+                                                src,
+                                                width: m.image?.width,
+                                                sizes: "(min-width: 1024px) 25vw, 50vw",
+                                            })}
                                             className="h-full w-full object-cover"
                                         />
                                     ) : null}

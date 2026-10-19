@@ -358,6 +358,10 @@ export default function ShopListing({
                                                     index < 4
                                                         ? "above"
                                                         : "below",
+                                                    {
+                                                        src: p.image.url,
+                                                        sizes: "(min-width: 1024px) 25vw, 50vw",
+                                                    },
                                                 )}
                                                 className="h-full w-full object-cover transition-transform duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03] motion-reduce:transform-none motion-reduce:transition-none"
                                             />

@@ -287,7 +287,10 @@ function ProductVideo({
                     <img
                         src={video.posterUrl}
                         alt={label}
-                        {...siteImage("above")}
+                        {...siteImage("above", {
+                            src: video.posterUrl,
+                            sizes: "(min-width: 1024px) 50vw, 100vw",
+                        })}
                         className="aspect-[4/5] w-full object-cover"
                     />
                 ) : (
@@ -810,7 +813,11 @@ export default function ProductPage({
                                     // The box is 4:5 whatever the file is.
                                     width={shown.width ?? 800}
                                     height={shown.height ?? 1000}
-                                    {...siteImage("above")}
+                                    {...siteImage("above", {
+                                        src: shown.url,
+                                        width: shown.width,
+                                        sizes: "(min-width: 1024px) 50vw, 100vw",
+                                    })}
                                     className="aspect-[4/5] w-full object-cover"
                                 />
                             ) : null}
@@ -857,7 +864,12 @@ export default function ProductPage({
                                                     alt=""
                                                     width={160}
                                                     height={160}
-                                                    {...siteImage()}
+                                                    {...siteImage("below", {
+                                                        src: video
+                                                            ? img.posterUrl
+                                                            : img.url,
+                                                        sizes: "160px",
+                                                    })}
                                                     className="aspect-square w-full object-cover"
                                                 />
                                             )}

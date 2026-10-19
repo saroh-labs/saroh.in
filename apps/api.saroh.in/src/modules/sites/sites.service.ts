@@ -326,6 +326,14 @@ export interface PublicSiteView {
      */
     siteId?: string;
     /**
+     * The business the site belongs to. The site's image route
+     * (`apps/saroh.app/lib/images/resize.ts`, #1043) resizes only photos
+     * stored under it (`org/<organizationId>/…`), so a site's host can't
+     * be used to serve another business's files. Not a secret: it is in
+     * the address of every photo the site shows.
+     */
+    organizationId?: string;
+    /**
      * Whether each module page in the snapshot shows now (G15): its module
      * on or off, read live beside the immutable snapshot. Present only when
      * the snapshot holds a module page, so a site without them reads as
@@ -2317,6 +2325,7 @@ export class SitesService {
             snapshot,
             publishedAt,
             siteId: site.id,
+            organizationId: site.organizationId,
             ...(modules ? { modules } : {}),
             icon: await publicSiteIcon(snapshot, site.organizationId),
             primaryHost: await primaryHostOf(site),

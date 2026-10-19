@@ -94,7 +94,11 @@ export default function FullBleedHero({
                     alt={content.image?.alt ?? ""}
                     width={content.image?.width}
                     height={content.image?.height}
-                    {...siteImage(priority ? "first-hero" : "below")}
+                    {...siteImage(priority ? "first-hero" : "below", {
+                        src,
+                        width: content.image?.width,
+                        sizes: "100vw",
+                    })}
                     className="absolute inset-0 -z-20 size-full object-cover"
                 />
             ) : null}

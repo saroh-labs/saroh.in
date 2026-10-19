@@ -144,7 +144,11 @@ export default function RichTextSection({
                 alt={image.alt ?? ""}
                 width={image.width}
                 height={image.height}
-                {...siteImage()}
+                {...siteImage("below", {
+                    src: image.src,
+                    width: image.width,
+                    sizes: "(min-width: 1280px) 1280px, 100vw",
+                })}
                 className="bg-site-surface mb-8 aspect-video h-auto w-full rounded-[var(--site-radius)] object-cover"
             />
         );
@@ -188,7 +192,11 @@ export default function RichTextSection({
                     alt={image.alt ?? ""}
                     width={image.width}
                     height={image.height}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src: image.src,
+                        width: image.width,
+                        sizes: "(min-width: 768px) 50vw, 100vw",
+                    })}
                     className={
                         photoLeft
                             ? "h-auto w-full rounded-[var(--site-radius)] object-cover"

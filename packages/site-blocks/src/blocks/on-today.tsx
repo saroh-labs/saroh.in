@@ -364,7 +364,11 @@ function SplitHero({
                         alt={content.image.alt ?? ""}
                         width={content.image.width}
                         height={content.image.height}
-                        {...siteImage()}
+                        {...siteImage("below", {
+                            src: content.image.src,
+                            width: content.image.width,
+                            sizes: "(min-width: 1280px) 1280px, 100vw",
+                        })}
                         className="absolute inset-0 size-full rounded-[calc(var(--site-radius)*1.6)] object-cover"
                     />
                 </div>

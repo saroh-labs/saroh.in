@@ -86,7 +86,10 @@ export function PostArticle({ post }: { post: PostViewModel }) {
                 <img
                     src={post.image}
                     alt=""
-                    {...siteImage("above")}
+                    {...siteImage("above", {
+                        src: post.image,
+                        sizes: "(min-width: 768px) 768px, 100vw",
+                    })}
                     className="mb-8 w-full rounded-[var(--site-radius)]"
                 />
             ) : null}
@@ -144,7 +147,10 @@ export function PostIndex({
                                     <img
                                         src={post.image}
                                         alt=""
-                                        {...siteImage()}
+                                        {...siteImage("below", {
+                                            src: post.image,
+                                            sizes: "160px",
+                                        })}
                                         className="hidden aspect-[1.91/1] w-40 shrink-0 rounded-[var(--site-radius)] object-cover sm:block"
                                     />
                                 ) : null}

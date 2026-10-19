@@ -175,7 +175,10 @@ export function SiteHeader({
                             width={32}
                             height={32}
                             // On the first screen of every page.
-                            {...siteImage("above")}
+                            {...siteImage("above", {
+                                src: mark,
+                                sizes: "120px",
+                            })}
                             data-site-logo=""
                             className="h-8 w-auto max-w-[7.5rem] shrink-0 rounded-[min(var(--site-radius),8px)] object-contain"
                         />

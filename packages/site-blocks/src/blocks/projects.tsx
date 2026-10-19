@@ -158,7 +158,11 @@ function ProjectCard({ item, over }: { item: Project; over: boolean }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src,
+                        width: item.image?.width,
+                        sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
+                    })}
                     className="mb-1.5 aspect-[4/3] w-full object-cover"
                 />
             ) : null}
@@ -176,7 +180,11 @@ function ProjectRow({ item }: { item: Project }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src,
+                        width: item.image?.width,
+                        sizes: "(min-width: 640px) 240px, 40vw",
+                    })}
                     className={listPhoto}
                 />
             ) : null}
@@ -203,7 +211,11 @@ function ProjectPlate({ item, src }: { item: Project; src: string }) {
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    {...siteImage()}
+                    {...siteImage("below", {
+                        src,
+                        width: item.image?.width,
+                        sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
+                    })}
                     className="aspect-[4/3] w-full object-cover"
                 />
                 <div

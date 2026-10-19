@@ -51,7 +51,11 @@ export default function GallerySection({
                                     alt={img.alt ?? ""}
                                     width={img.width}
                                     height={img.height}
-                                    {...siteImage()}
+                                    {...siteImage("below", {
+                                        src: img.src,
+                                        width: img.width,
+                                        sizes: "(min-width: 640px) 480px, 85vw",
+                                    })}
                                     className="h-64 w-auto rounded-[var(--site-radius)] object-cover"
                                 />
                                 <Caption text={img.caption} over={over} />
@@ -63,7 +67,11 @@ export default function GallerySection({
                                 alt={img.alt ?? ""}
                                 width={img.width}
                                 height={img.height}
-                                {...siteImage()}
+                                {...siteImage("below", {
+                                    src: img.src,
+                                    width: img.width,
+                                    sizes: "(min-width: 640px) 480px, 85vw",
+                                })}
                                 className="h-64 w-auto flex-none snap-start rounded-[var(--site-radius)] object-cover"
                             />
                         ),
@@ -93,7 +101,11 @@ export default function GallerySection({
                             // holds its room before it arrives.
                             width={img.width}
                             height={img.height}
-                            {...siteImage()}
+                            {...siteImage("below", {
+                                src: img.src,
+                                width: img.width,
+                                sizes: "(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw",
+                            })}
                             className={cn(
                                 "w-full rounded-[var(--site-radius)] object-cover",
                                 layout === "masonry"

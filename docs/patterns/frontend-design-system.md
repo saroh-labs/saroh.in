@@ -684,8 +684,24 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   one rule**, `siteImage()` (`site-blocks/src/lib/site-image.ts`), spread
   onto a plain `<img>`: lazy below the fold, decoded off the main thread,
   the first section's hero fetched first. Give the `<img>` its width and
-  height, or a box with an aspect ratio. No `srcset`: storage keeps one
-  file per photo and nothing resizes on request.
+  height, or a box with an aspect ratio.
+- **Current** (19 Oct 2026, #1043) — **A photo is sized for the screen
+  through `siteImage(place, { src, width, sizes })`.** Pass the address the
+  `<img>` draws, the file's own width when the snapshot has it, and how wide
+  the block draws it (`sizes`, `100vw` unsaid). A photo in the business's
+  public media (`org/<id>/site-image|product-image|business-logo/…`, JPEG,
+  PNG, WebP or AVIF) then gets `srcset` over a fixed ladder (320, 480, 780,
+  1200, 1600, 1920; nothing wider than the file) through the Worker's
+  `/_img/<width>/<key>` route (`apps/saroh.app/lib/images/resize.ts`), which
+  resizes it with the `IMAGES` binding as AVIF or WebP and keeps the result.
+  The first hero is preloaded from the head with the same sources. The
+  route serves only the site's own organization's image keys, fetched only
+  from the public media address; anything else is a 404, and a failed
+  resize serves the original. It is on only in builds with
+  `NEXT_PUBLIC_SITE_MEDIA_URL` (the Worker's `wrangler.jsonc`); elsewhere,
+  and for any other address, the `<img>` keeps its own `src`. The ladder
+  and the key rules are one module, `@saroh/site-blocks/image-sizes`, which
+  the page and the route both import.
 - **Current** (12 Oct 2026) — **A product with no photo never leaves an
   empty frame on a merchant's site**, and "No photo yet" never reaches a
   customer (it is a note for the owner, said in the workspace). Where

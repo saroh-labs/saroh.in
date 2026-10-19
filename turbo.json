@@ -29,6 +29,9 @@
         "NEXT_PUBLIC_API_URL",
         "NEXT_PUBLIC_BETTER_AUTH_URL",
         "NEXT_PUBLIC_ROOT_DOMAIN",
+        // Merchant sites' media address (#1043): with it, photos get a
+        // srcset through the Worker's image route. Compiled in.
+        "NEXT_PUBLIC_SITE_MEDIA_URL",
         "NEXT_PUBLIC_VERCEL_ENV",
         "NEXT_PUBLIC_VERCEL_URL",
         // PostHog (DEC-125): the public project key, its host and the
