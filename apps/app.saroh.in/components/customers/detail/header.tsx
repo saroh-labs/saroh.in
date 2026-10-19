@@ -15,6 +15,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/shared/status-badge";
 import type { MoreItem } from "@/lib/customer-workspace/more-menu";
 import type { Tab, TabKey, Tag } from "@/lib/customer-workspace/view";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { TabStrip } from "@saroh/ui/tabs";
 import { Tip } from "@saroh/ui/tooltip";
 /** A menu row: the design's 8px by 10px, 7px corners. */
@@ -145,7 +146,7 @@ export function Header({
                                 </span>
                             )}
                             <span className="text-foreground/75">
-                                {phone?.trim() ? phone : "No phone"}
+                                {phone?.trim() ? phoneLabel(phone) : "No phone"}
                             </span>
                             {/* On the same line as how to reach them. The
                                 address is said once: when they sign in with

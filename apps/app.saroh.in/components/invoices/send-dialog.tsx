@@ -19,18 +19,18 @@ import { sendConfirmLine, sendOutcome } from "@/lib/invoices/send";
 import type { InvoiceSend } from "@/lib/invoices/service";
 
 /**
- * Sending an invoice with its pay link, or a reminder (D17).
+ * Sending an invoice with its payment link, or a reminder (D17).
  *
  * A send tells a customer, so it asks nothing and waits ten seconds with
  * Undo (`useHold`), as Home's reminder does: the toast says who is told
  * and where, and nothing goes until the hold ends.
  *
- * From a draft, "Send with pay link" issues it first, and issuing can't be
+ * From a draft, "Send with payment link" issues it first, and issuing can't be
  * undone: it takes its number and its lines lock. So a draft is asked
  * once, in the one confirm (`draftConfirm`), and then issued and sent.
  *
  * Without online payment (`send.payOnline` false, DEC-070) the link only
- * shows the invoice, and the words say so: no pay link is promised.
+ * shows the invoice, and the words say so: no payment link is promised.
  */
 export function useInvoiceSend({
     invoice,

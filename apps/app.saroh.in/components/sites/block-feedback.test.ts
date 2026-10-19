@@ -6,9 +6,9 @@ describe("a note author's initials", () => {
     it.each([
         ["Dalia Haddad", "DH"],
         ["Priya (reviewer)", "PR"],
-        ["priya", "P"],
+        ["priya", "PR"],
         ["Ananya R. Rao", "AR"],
-        ["2nd shift", "NS"],
+        ["2nd shift", "SH"],
         ["???", "?"],
         ["", "?"],
     ])("%s → %s", (name, expected) => {

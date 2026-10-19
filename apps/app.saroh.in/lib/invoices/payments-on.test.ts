@@ -6,7 +6,7 @@ import { offlinePlan, onlinePlan } from "@/lib/billing/fixtures.test-data";
 import { onlinePayReady, payLinkPossible } from "./payments-on";
 
 /**
- * The invoice form's "Issue with pay link" and the bookings pages' link
+ * The invoice form's "Issue with payment link" and the bookings pages' link
  * (R33): offered only where the plan takes payment online, beside a
  * provider (and, for invoices, Payments on). Elsewhere the form just
  * issues, and the invoice goes out as a link to view.
@@ -58,7 +58,7 @@ describe("payLinkPossible: the invoice form's Issue choice", () => {
     });
 });
 
-describe("onlinePayReady: the bookings pages' pay link", () => {
+describe("onlinePayReady: the bookings pages' payment link", () => {
     it("is off on a plan without online payments", async () => {
         reads.access = offlinePlan();
         expect(await onlinePayReady()).toBe(false);

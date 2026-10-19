@@ -97,7 +97,7 @@ export function SubscriptionDetail({
     ran: { text: string; late: boolean } | null;
     bizName: string | null;
     canWrite: boolean;
-    /** A new pay link needs `invoice:write` as well. */
+    /** A new payment link needs `invoice:write` as well. */
     canPayLink: boolean;
     /** `?do=` from the list's quick look. */
     initialStep: Step | "restart" | null;
@@ -354,7 +354,7 @@ export function SubscriptionDetail({
                         </div>
                         <div className="mt-[3px] text-[12.5px] leading-[1.5] text-foreground/75">
                             {charging
-                                ? `${charging}. The pay link is held until their bank answers, so ${first} isn't charged twice.`
+                                ? `${charging}. The payment link is held until their bank answers, so ${first} isn't charged twice.`
                                 : sub.retryVia === "MANDATE"
                                   ? `Their autopay didn't collect it, and Saroh doesn't try again on its own. Charge autopay again, send a new link, record a payment you took, pause or cancel.`
                                   : `Saroh doesn't charge a card or try again on its own. ${first} pays through the invoice's link. Send a new link, record a payment you took, pause or cancel.`}

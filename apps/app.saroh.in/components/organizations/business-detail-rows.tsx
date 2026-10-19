@@ -21,6 +21,7 @@ import {
 } from "@/components/organizations/business-tax-rows";
 import { countryName } from "@/components/shared/country-select";
 import { Absent, Row } from "@/components/sites/settings-rows";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { BUSINESS_ROW_ID } from "@/lib/organizations/business-rows";
 import { nameLabelOf } from "@/lib/organizations/business-sheet-words";
 import {
@@ -234,7 +235,7 @@ export function BusinessDetailRows({
                     )}
                 >
                     <Saved
-                        text={saved.phone}
+                        text={phoneLabel(saved.phone)}
                         empty="None. Your website shows no Call button."
                         mono
                     />

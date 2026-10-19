@@ -17,7 +17,7 @@ const FLOWS: [flow: string, file: string][] = [
     ["plan", "components/editor-shell/editor-shell.tsx"],
     ["class pack", "components/editor-shell/editor-shell.tsx"],
     ["product", "components/commerce/product-editor-v2/editor-shell.tsx"],
-    ["service", "components/services/service-editor/service-editor.tsx"],
+    ["service (new)", "components/services/service-editor/new-service.tsx"],
     ["post", "components/sites/post-editor.tsx"],
     ["site editor", "components/sites/editor/use-editor-leave.ts"],
     [
@@ -31,10 +31,6 @@ const FLOWS: [flow: string, file: string][] = [
     ["location (new)", "components/stores/create-store-form.tsx"],
     ["create site", "components/sites/create-site-form.tsx"],
     ["CSV import review", "components/stores/csv-import.tsx"],
-    [
-        "availability",
-        "components/bookings/availability/availability-editor.tsx",
-    ],
     ["stock count", "components/commerce/stock/stock-screen.tsx"],
 ];
 

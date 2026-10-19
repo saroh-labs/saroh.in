@@ -172,7 +172,8 @@ describe("the phone on the booking page, for a signed-in customer", () => {
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await chooseOneToOne();
         const phone = screen.getByLabelText("Phone (optional)");
-        expect(phone).toHaveValue("+91 98450 12345");
+        // Its code in the picker, the number in the box (#1036).
+        expect(phone).toHaveValue("98450 12345");
         expect(phone).not.toBeRequired();
         fireEvent.click(screen.getByRole("button", { name: /^Book/ }));
         await screen.findByRole("heading", { name: "You're booked, Asha." });

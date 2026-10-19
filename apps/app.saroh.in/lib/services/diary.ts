@@ -6,6 +6,7 @@ import type {
     ClassSession,
     DiaryBooking,
 } from "./booking-calendar";
+import { BOOKING_WORDS } from "./booking-words";
 import { paidAtDeskText } from "./desk-pay";
 
 /**
@@ -257,9 +258,9 @@ export function bookingState(
 
 export const STATE_LABEL: Record<DiaryState, string> = {
     booked: "Booked",
-    pending: "Awaiting payment",
-    in: "Checked in",
-    noshow: "No-show",
+    pending: BOOKING_WORDS.awaitingPayment,
+    in: BOOKING_WORDS.came,
+    noshow: BOOKING_WORDS.didntCome,
     cancelled: "Cancelled",
     open: "Open",
     full: "Full",
@@ -568,7 +569,7 @@ export function paidText(b: DiaryBooking): string {
             // How, beside the "Paid" label: never "Paid · Paid" (UX-049).
             return "Paid online";
         case "DESK":
-            return "Pays at the session";
+            return BOOKING_WORDS.paysAtVisit;
         default:
             return "Not recorded";
     }
@@ -581,7 +582,7 @@ export function blockTitle(block: Block): string {
         : block.session.service.name;
 }
 
-/** "Personal training · pays at the session", or "11 of 16 · Vikram". */
+/** "Personal training · pays at the visit", or "11 of 16 · Vikram". */
 export function blockLine(block: Block, withTeacher = true): string {
     if (block.kind === "class") {
         const places = `${liveSeats(block.session).length} of ${block.session.capacity}`;
@@ -593,7 +594,7 @@ export function blockLine(block: Block, withTeacher = true): string {
     const pay = b.paidAtDesk
         ? " · paid at the desk"
         : b.paidWith === "DESK" && block.state === "booked"
-          ? " · pays at the session"
+          ? " · pays at the visit"
           : b.paidWith === "PACK"
             ? " · pack"
             : b.paidWith === "MEMBERSHIP"

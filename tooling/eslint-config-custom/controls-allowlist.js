@@ -22,34 +22,74 @@ export const RAW_ALLOWED = {
     "app/choose/page.tsx": ["button", "input"],
     // button: a bar of a chart, pressed to read it
     "components/analytics/readout-bars.tsx": ["button"],
+    // button: Came and Didn't come, a finished row's two outcome chips (U11)
+    "components/bookings/all-bookings/booking-row.tsx": ["button"],
+    // button: the More filters chip at the end of All bookings' views
+    "components/bookings/all-bookings/more-filters.tsx": ["button"],
+    // button: each item of a row's menu sheet on a phone, a row that is one button
+    "components/bookings/all-bookings/row-menu.tsx": ["button"],
+    // button: a row that is one button (a rule, opened to change it)
+    "components/bookings/availability/booking-rules-card.tsx": ["button"],
+    // button: a row that opens its time picker under it
+    "components/bookings/availability/clock-select.tsx": ["button"],
+    // button: a row that is one button (a shift, a person's day, add a shift)
+    "components/bookings/availability/day-editor.tsx": ["button"],
+    // button: a row that is one button (a person, opened to change their day)
+    "components/bookings/availability/everyone-day.tsx": ["button"],
+    // button: a row that is one button (add someone else)
+    "components/bookings/availability/first-hours.tsx": ["button"],
+    // button: a row that is one button (More's rows)
+    "components/bookings/availability/more-list.tsx": ["button"],
     // button: a row or card that is one button
     "components/bookings/availability/time-off-card.tsx": ["button"],
     // button: a chip, a row or card that is one button
     "components/bookings/availability/weekly-hours.tsx": ["button"],
-    // button: a calendar cell, a row or card that is one button
-    "components/bookings/calendar/agenda-month.tsx": ["button"],
-    // button: a chip
-    "components/bookings/calendar/booking-quick-look.tsx": ["button"],
+    // button: a card that is one button (whose hours, opened to pick)
+    "components/bookings/availability/whose-hours.tsx": ["button"],
+    // button: New booking's What next? rows, each a row that is one button
+    "components/bookings/new-booking/done-step.tsx": ["button"],
+    // button: New booking's chips of what is picked, and its step list's
+    // steps, each a row that goes back to its step
+    "components/bookings/new-booking/flow-frame.tsx": ["button"],
+    // button: the List's free times card that opens, and each free time a row
+    "components/bookings/calendar/list/list-free-times.tsx": ["button"],
+    // button: each booked row of the List, one button
+    "components/bookings/calendar/list/list-view.tsx": ["button"],
+    // button: the date title and the person chip of header C, and "…"
+    "components/bookings/calendar/header/calendar-header.tsx": ["button"],
+    // button: a calendar cell (the week strip and the month), a step
+    "components/bookings/calendar/header/date-sheet.tsx": ["button"],
+    // button: a row that is one button (a person, picked to see theirs)
+    "components/bookings/calendar/header/people-sheet.tsx": ["button"],
+    // button: a menu row that is one button (the quick look's More)
+    "components/bookings/calendar/quick-look-more.tsx": ["button"],
     // button: a cell covered by its button, a row or card that is one button
     "components/bookings/calendar/day-by-person.tsx": ["button"],
+    // button: a booking on the Day calendar, a block that is one button
+    "components/bookings/calendar/day-block.tsx": ["button"],
     // button: a booking on the diary, a block that is one button
     "components/bookings/calendar/diary-block.tsx": ["button"],
     // button: free time on the diary, a cell covered by its button
     "components/bookings/calendar/free-gap.tsx": ["button"],
-    // button: a row or card that is one button
+    // button: a day heading, a cell that is one button
     "components/bookings/calendar/week-view.tsx": ["button"],
-    // button: a choice in a list
-    "components/bookings/reschedule-booking.tsx": ["button"],
-    // button: a legend chip in its layer's colour, pressed to show or hide it
-    "components/calendar/layer-switches.tsx": ["button"],
+    // button: free time and a booking on the diary, each one button
+    "components/bookings/calendar/week-blocks.tsx": ["button"],
+    // button: a row that is one button (a free time, a booking)
+    "components/bookings/calendar/week-day-rows.tsx": ["button"],
+    // button: a calendar cell (the week strip)
+    "components/bookings/calendar/week-phone.tsx": ["button"],
     // button: a calendar cell
     "components/calendar/month-grid.tsx": ["button"],
+    // button: the filter chip, a chip, a row that is one button (a person,
+    // a layer ticked on or off)
+    "components/calendar/what-to-show.tsx": ["button"],
     // button: a row or card that is one button
     "components/calendar/month-strip.tsx": ["button"],
-    // button: a choice in a list
-    "components/calendar/week-columns.tsx": ["button"],
-    // button: a choice in a list
-    "components/calendar/week-hour-grid.tsx": ["button"],
+    // button: a calendar cell (a week day's head, which opens the day)
+    "components/calendar/week-day-head.tsx": ["button"],
+    // button: a calendar cell (the week strip)
+    "components/calendar/week-strip.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/class-packs/pack-detail/overview.tsx": ["button"],
     // button: a row or card that is one button
@@ -107,6 +147,10 @@ export const RAW_ALLOWED = {
     "components/qr/qr-add-logo.tsx": ["button"],
     // button: a row or card that is one button
     "components/qr/qr-target-picker.tsx": ["button"],
+    // button: a row that is one button (a service's own hours, opening under itself)
+    "components/services/service-editor/hours-field.tsx": ["button"],
+    // button: a row that is one button (More details, a saved service's rows)
+    "components/services/service-editor/service-rows.tsx": ["button"],
     // button: a row or card that is one button
     "components/settings/activity-list.tsx": ["button"],
     // button: a control styled by its screen's own helper, an option in a list; input: a field its screen draws itself

@@ -1,93 +1,36 @@
 "use client";
 
-import { formatDate, formatDateTime, formatTime } from "@/lib/format/datetime";
+import { formatDateTime } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
-import { Label } from "@saroh/ui/label";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
-import {
-    makePayLink,
-    PayLinkPanel,
-} from "@/components/bookings/pay-link-panel";
-import { CustomerPicker } from "@/components/customers/customer-picker";
-import { CheckRow } from "@/components/shared/check-row";
-import { ChipGroup, ChoiceGroup } from "@/components/shared/choice-group";
+import { TimePicker } from "@/components/bookings/sheets/time-picker";
 import {
     FormSheet,
     FormSheetBody,
     FormSheetFoot,
 } from "@/components/shared/form-sheet";
 import { runAction } from "@/lib/api/run-action";
-import { packsFor } from "@/lib/class-packs/actions";
-import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
-import type { PackPurchase } from "@/lib/class-packs/service";
-import type { CustomerPick } from "@/lib/customers/picker";
-import { pickName } from "@/lib/customers/picker";
-import { withoutArrival } from "@/lib/customers/prefill";
-import {
-    bookByHand,
-    bookVisit,
-    listAvailability,
-} from "@/lib/services/actions";
-import type { BookingPeople, PayChoice } from "@/lib/services/booking-pay";
-import {
-    bookerFor,
-    defaultPay,
-    paidWithFor,
-    payChoices,
-    payNote,
-} from "@/lib/services/booking-pay";
-import type { Slot } from "@/lib/services/service";
+import { bookVisit } from "@/lib/services/actions";
 import type { VisitToBook } from "@/lib/services/treatment";
-import { Notice } from "@saroh/ui/notice";
-import { OptionSelect } from "@saroh/ui/option-select";
-
-const WINDOW_DAYS = 14;
 
 /**
- * "New booking" — after the CRUD Flows design: who, what, when, as one
- * dialog. Choosing the service fixes the length, so there are really two
- * things to decide.
- *
- * The times offered are REAL: the same open-slot read the reschedule dialog
- * and the public booking page use, so nothing here can offer a time the
- * service is closed or already full. Saving goes through the same reservation
- * as the booking page (#384): if someone takes the time while this is open,
- * the API says so, and the times are read again.
- *
- * A dialog commits on Save, so nothing is written until "Book it".
- *
- * When the person holds a class pack that covers the service and is still
- * valid at the chosen time (ADR-007), it is offered by name and ticked; the
- * booking then spends a class from it. A pack that does not cover the
- * service, is used up, or runs out before the session is not offered.
- *
- * The customer is found with the shared picker (E4): by name or phone, most
- * recent first, or added new, with their Needs attention once picked. A
- * priced booking can be sent a pay link: the booking is made, its invoice
- * issued, and the link shown to copy.
- *
- * With `visit` (E10) it books the next visit of a treatment: the service,
- * the customer and the order are set, and only the time is chosen. The
- * visit is paid for on its order, so no pack or payment is asked.
+ * "Book visit N" of a treatment (E10): the service, the customer and the
+ * order are set, so only the time is chosen, from the one time picker
+ * (U3). The visit is paid for on its order, so no pack or payment is
+ * asked. A new booking of anything else is New booking's journey (U8,
+ * `new-booking/new-booking-host.tsx`).
  */
 export function NewBookingDialog({
     services,
-    people,
-    canUsePacks = false,
-    triggerClassName,
-    plainTrigger = false,
     visit,
+    triggerClassName,
     primaryTrigger = false,
-    initialWho = null,
-    openOnArrival = false,
 }: {
+    /** The treatment's service: the first is booked. */
     services: {
         id: string;
         name: string;
@@ -95,151 +38,44 @@ export function NewBookingDialog({
         minutes: number;
         priceCents: number | null;
     }[];
-    /** Customer search and pay links, as far as the viewer may (E4). */
-    people: BookingPeople;
-    /** May read and spend class packs (`pack:read`, `pack:sell` and `booking:write`). */
-    canUsePacks?: boolean;
-    triggerClassName?: string;
-    /** The calendar's button: words only, as the Bookings design draws it. */
-    plainTrigger?: boolean;
+    /** Kept for the callers that pass it; a visit asks nothing of it. */
+    people?: unknown;
     /** Book this treatment's next visit (E10), on its order. */
-    visit?: VisitToBook;
+    visit: VisitToBook;
+    triggerClassName?: string;
     /**
      * "Book visit N" as the page's primary action (B14, Order Detail's
      * header) rather than the booking page's outline button.
      */
     primaryTrigger?: boolean;
-    /**
-     * Who it is for, already chosen (#247): the person page's New booking
-     * arrives with `?new=1&contactId=`. The picker's Change still picks
-     * anyone else; once booked, the next one starts empty.
-     */
-    initialWho?: CustomerPick | null;
-    /**
-     * Open on arrival (`?new=1`); closing it then leaves the page's own
-     * address, so a reload doesn't open it again.
-     */
-    openOnArrival?: boolean;
 }) {
     const router = useRouter();
-    const [open, setOpen] = useState(
-        openOnArrival && services.length > 0 && !visit,
-    );
+    const service = services.at(0);
+    const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
-    // What is missing is said once the button is pressed.
     const [tried, setTried] = useState(false);
-    // One per attempt, so a double-click books once (the API replays it).
-    const [attempt, setAttempt] = useState(() => crypto.randomUUID());
-    const [reload, setReload] = useState(0);
-    const [serviceId, setServiceId] = useState(services.at(0)?.id ?? "");
-    const [who, setWho] = useState<CustomerPick | null>(initialWho);
-    const [arrived, setArrived] = useState(openOnArrival);
-    const [pay, setPay] = useState<PayChoice>(defaultPay(people.payLink));
-    const [done, setDone] = useState<{
-        booked: string;
-        bookingId: string;
-        link: PayLinkResult;
-    } | null>(null);
     const [picked, setPicked] = useState<string | null>(null);
-    const [loaded, setLoaded] = useState<{
-        serviceId: string;
-        slots: Slot[];
-    } | null>(null);
-    // The chosen person's packs for the chosen service, keyed so a stale
-    // read for someone else is never shown.
-    const [held, setHeld] = useState<{
-        key: string;
-        packs: PackPurchase[];
-    } | null>(null);
-    const [usePack, setUsePack] = useState(true);
-    const [packId, setPackId] = useState("");
-    const [packRefusal, setPackRefusal] = useState<string | null>(null);
-    const ids = {
-        service: useId(),
-        contact: useId(),
-        pay: useId(),
-        pack: useId(),
-    };
+    const [staffId, setStaffId] = useState<string | null>(null);
+    const [taken, setTaken] = useState<string | null>(null);
+    const [reload, setReload] = useState(0);
 
-    const service = services.find((s) => s.id === serviceId);
-    const slots = loaded?.serviceId === serviceId ? loaded.slots : null;
-
-    useEffect(() => {
-        if (!open || !serviceId) return;
-        let live = true;
-        const from = new Date().toISOString();
-        const to = new Date(
-            Date.now() + WINDOW_DAYS * 24 * 60 * 60 * 1000,
-        ).toISOString();
-        void listAvailability(serviceId, from, to).then((found) => {
-            if (live) setLoaded({ serviceId, slots: found });
-        });
-        return () => {
-            live = false;
-        };
-    }, [open, serviceId, reload]);
-
-    const contactId = who?.kind === "contact" ? who.id : null;
-    const packKey =
-        canUsePacks && contactId && serviceId
-            ? `${contactId}:${serviceId}`
-            : null;
-    useEffect(() => {
-        if (!open || !packKey) return;
-        let live = true;
-        const [forContact = "", forService = ""] = packKey.split(":");
-        void packsFor(forContact, forService).then((found) => {
-            if (live) setHeld({ key: packKey, packs: found ?? [] });
-        });
-        return () => {
-            live = false;
-        };
-    }, [open, packKey, reload]);
-
-    /** Opened by `?new=1` (#247): once closed, the page's own address. */
-    function leaveArrival() {
-        setArrived(false);
-        if (!arrived) return;
-        router.replace(
-            withoutArrival(window.location.pathname, window.location.search),
-            { scroll: false },
-        );
-    }
-
-    /** Closed: by Cancel, Escape, the ×, or once it is booked. */
     function close() {
         setOpen(false);
-        leaveArrival();
         setPicked(null);
-        setPackRefusal(null);
-        setUsePack(true);
+        setStaffId(null);
+        setTaken(null);
         setTried(false);
-        if (done) {
-            setDone(null);
-            setWho(null);
-            setAttempt(crypto.randomUUID());
-        }
     }
 
-    const heldNow = held?.key === packKey ? held.packs : [];
-    const usable = picked ? usablePacks(heldNow, picked) : [];
-    const pack = usable.find((p) => p.id === packId) ?? usable.at(0);
-    const paying = usePack && pack !== undefined;
-
-    const byDay = service ? groupByDay(slots ?? [], service.timezone) : [];
-    const booker = bookerFor(who);
-    const offerLink = people.payLink && (service?.priceCents ?? 0) > 0;
-    const payNow: PayChoice = pay === "LINK" && !offerLink ? "DESK" : pay;
-    const ready = Boolean(service && picked && (visit !== undefined || booker));
-
-    /** The treatment's next visit (E10): on its order, nothing to pay. */
-    async function saveVisit(v: VisitToBook) {
-        if (!service || !picked) return;
+    async function save() {
+        setTried(true);
+        if (saving || !service || !picked) return;
         const res = await runAction(
             () =>
-                bookVisit(v.orderId, {
-                    visitNumber: v.visitNumber,
+                bookVisit(visit.orderId, {
+                    visitNumber: visit.visitNumber,
                     startAt: picked,
+                    ...(staffId ? { staffId } : {}),
                 }),
             { setBusy: setSaving },
         );
@@ -248,353 +84,86 @@ export function NewBookingDialog({
             // At the plan's bookings-a-month limit (U13): its notice, and
             // the time stays picked for when there's room.
             showPlanRefusal(res.plan);
-            setAttempt(crypto.randomUUID());
             return;
         }
         if (!res.ok) {
+            if (res.field === "startAt") {
+                // The time went while this was open: said in the picker,
+                // which reads the times again.
+                setTaken(picked);
+                setPicked(null);
+                setReload((n) => n + 1);
+                return;
+            }
             showError(res.error);
-            // Most likely the time went while this was open: read again.
-            setPicked(null);
-            setLoaded(null);
-            setReload((n) => n + 1);
             return;
         }
         showSuccess(
             "Visit booked.",
-            `Visit ${v.visitNumber} of ${v.visits} for ${v.who}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}.`,
+            `Visit ${visit.visitNumber} of ${visit.visits} for ${visit.who}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}.`,
         );
         close();
-        router.refresh();
-    }
-
-    async function save() {
-        setTried(true);
-        if (saving) return;
-        if (visit) return saveVisit(visit);
-        if (!service || !picked || !booker || !who) return;
-        setSaving(true);
-        setPackRefusal(null);
-        const paidWith = paying ? undefined : paidWithFor(payNow);
-        const res = await runAction(() =>
-            bookByHand(service.id, {
-                startAt: picked,
-                idempotencyKey: attempt,
-                ...(paying ? { packPurchaseId: pack.id } : {}),
-                ...(paidWith ? { paidWith } : {}),
-                ...booker,
-            }),
-        );
-        if (!res?.ok) setSaving(false);
-        if (!res) return;
-        if (!res.ok && res.field === "packPurchaseId") {
-            // The pack changed while this was open — its last class went on
-            // another booking, say. Nothing was booked; read its packs again
-            // and say so here, where the choice is.
-            setPackRefusal(
-                `${res.error} Nothing has been booked and no class was spent. Book it paid another way, or sell them another pack.`,
-            );
-            setHeld(null);
-            setReload((n) => n + 1);
-            setAttempt(crypto.randomUUID());
-            return;
-        }
-        if (!res.ok) {
-            showError(res.error);
-            // Most likely the time went while this was open: read again.
-            setPicked(null);
-            setLoaded(null);
-            setReload((n) => n + 1);
-            setAttempt(crypto.randomUUID());
-            return;
-        }
-        const whom = pickName(who);
-        if (!paying && payNow === "LINK") {
-            const link = await makePayLink(res.data.id);
-            setSaving(false);
-            setDone({
-                booked: `${whom} booked for ${service.name}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}.`,
-                bookingId: res.data.id,
-                link,
-            });
-            router.refresh();
-            return;
-        }
-        setSaving(false);
-        showSuccess(
-            "Booking created.",
-            paying
-                ? `${whom} for ${service.name}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}, paid with ${pack.pack.name}.`
-                : `${whom} for ${service.name}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}.`,
-        );
-        close();
-        setPicked(null);
-        setWho(null);
-        setAttempt(crypto.randomUUID());
         router.refresh();
     }
 
     return (
         <FormSheet
             open={open}
-            title={
-                visit
-                    ? `Book visit ${visit.visitNumber} of ${visit.visits}`
-                    : "New booking"
-            }
-            description={
-                visit
-                    ? `${service?.name ?? "The treatment"} for ${visit.who}. It's paid for on order #${visit.orderNumber}, so there's only the time to choose.`
-                    : "Pick the service, then who and when."
-            }
+            title={`Book visit ${visit.visitNumber} of ${visit.visits}`}
+            description={`${service?.name ?? "The treatment"} for ${visit.who}. It's paid for on order #${visit.orderNumber}, so there's only the time to choose.`}
             pending={saving}
-            // Someone or a time chosen is work to lose. Otherwise the
-            // frame reads the fields.
-            dirty={
-                done
-                    ? false
-                    : picked !== null || who !== initialWho
-                      ? true
-                      : undefined
-            }
+            dirty={picked !== null ? true : undefined}
             onOpen={() => setOpen(true)}
             onClose={close}
             trigger={
-                visit ? (
-                    <Button
-                        data-ph-unmask=""
-                        variant={primaryTrigger ? "default" : "outline"}
-                        size={primaryTrigger ? "default" : "sm"}
-                        disabled={services.length === 0}
-                        className={triggerClassName}
-                    >
-                        Book visit {visit.visitNumber}
-                    </Button>
-                ) : (
-                    <Button
-                        disabled={services.length === 0}
-                        className={triggerClassName}
-                    >
-                        {plainTrigger ? null : (
-                            <Plus className="mr-1.5 size-4" />
-                        )}
-                        New booking
-                    </Button>
-                )
+                <Button
+                    data-ph-unmask=""
+                    variant={primaryTrigger ? "default" : "outline"}
+                    size={primaryTrigger ? "default" : "sm"}
+                    disabled={!service}
+                    className={triggerClassName}
+                >
+                    Book visit {visit.visitNumber}
+                </Button>
             }
         >
-            {done ? (
-                <PayLinkPanel
-                    booked={done.booked}
-                    bookingId={done.bookingId}
-                    first={done.link}
-                    onDone={close}
-                />
-            ) : (
-                <>
-                    <FormSheetBody className="gap-4">
-                        {visit ? null : (
-                            <>
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor={ids.service}>
-                                        What are they booked for?
-                                    </Label>
-                                    <OptionSelect
-                                        id={ids.service}
-                                        value={serviceId}
-                                        onValueChange={(v) => {
-                                            setServiceId(v);
-                                            setPicked(null);
-                                        }}
-                                        options={services.map((s) => ({
-                                            value: s.id,
-                                            label: `${s.name} · ${s.minutes} min`,
-                                        }))}
-                                    />
-                                </div>
-
-                                <div className="grid gap-1.5">
-                                    <div
-                                        id={ids.contact}
-                                        className="text-[12.5px] font-medium"
-                                    >
-                                        Who is it for?
-                                    </div>
-                                    <CustomerPicker
-                                        value={who}
-                                        onPick={setWho}
-                                        canSearch={people.canSearch}
-                                        labelledBy={ids.contact}
-                                    />
-                                </div>
-                            </>
-                        )}
-
-                        <div className="grid gap-2">
-                            <div className="text-[12.5px] font-medium">
-                                When?
-                            </div>
-                            {slots === null ? (
-                                <p className="text-[12.5px] text-muted-foreground">
-                                    Finding open times…
-                                </p>
-                            ) : byDay.length === 0 ? (
-                                <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                                    No open times in the next {WINDOW_DAYS}{" "}
-                                    days. Opening more hours on this service,
-                                    under Services, adds times here.
-                                </p>
-                            ) : (
-                                <ChoiceGroup
-                                    label="Time"
-                                    className="grid max-h-[220px] gap-3 overflow-y-auto pr-1"
-                                    value={picked}
-                                    onChange={setPicked}
-                                    choices={slots.map((slot) => ({
-                                        value: slot.startAt,
-                                        label: formatTime(
-                                            slot.startAt,
-                                            service?.timezone ?? "UTC",
-                                        ),
-                                    }))}
-                                    itemClassName={(on) =>
-                                        cn(
-                                            "whitespace-nowrap rounded-md border px-2.5 py-1 text-[12.5px] tabular-nums coarse:min-h-11",
-                                            on
-                                                ? "border-foreground bg-foreground text-background"
-                                                : "border-border hover:border-border-strong hover:bg-accent",
-                                        )
-                                    }
-                                    layout={(item) =>
-                                        byDay.map(([day, daySlots]) => (
-                                            <div key={day}>
-                                                <div className="label">
-                                                    {day}
-                                                </div>
-                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                    {daySlots.map((slot) =>
-                                                        item(slot.startAt),
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))
-                                    }
-                                />
-                            )}
-                            {service ? (
-                                <p className="text-[11.5px] text-muted-foreground">
-                                    Times in {service.timezone}, the
-                                    service&apos;s own timezone. Only open times
-                                    nobody has taken are shown.
-                                </p>
-                            ) : null}
-                        </div>
-
-                        {pack && service && !visit ? (
-                            <div
-                                className={cn(
-                                    "grid gap-2.5 rounded-[10px] border px-3.5 py-3 transition-colors duration-fast",
-                                    usePack
-                                        ? "border-border-strong bg-foreground/[0.03]"
-                                        : "border-border",
-                                )}
-                            >
-                                <CheckRow
-                                    checked={usePack}
-                                    onChange={setUsePack}
-                                    className="items-start gap-2.5"
-                                    boxClassName="mt-0.5"
-                                >
-                                    <span className="grid gap-0.5">
-                                        <span className="text-[13.5px] font-medium">
-                                            Use their class pack
-                                        </span>
-                                        <span className="text-[12px] text-muted-foreground">
-                                            {usePack
-                                                ? `${packOffer(pack, service.timezone)}. ${classesLeft(pack) - 1} after this booking, and cancelling gives it back.`
-                                                : `${packOffer(pack, service.timezone)}. They pay another way and keep every class.`}
-                                        </span>
-                                    </span>
-                                </CheckRow>
-                                {usePack && usable.length > 1 ? (
-                                    <OptionSelect
-                                        id={ids.pack}
-                                        aria-label="Which pack"
-                                        value={pack.id}
-                                        onValueChange={setPackId}
-                                        options={usable.map((p) => ({
-                                            value: p.id,
-                                            label: packOffer(
-                                                p,
-                                                service.timezone,
-                                            ),
-                                        }))}
-                                    />
-                                ) : null}
-                            </div>
-                        ) : null}
-                        {visit ? (
-                            <p className="text-[12px] leading-[1.5] text-muted-foreground">
-                                A visit is never billed on its own: the
-                                treatment was sold once, on order #
-                                {visit.orderNumber}.
-                            </p>
-                        ) : paying ? null : (
-                            <div className="grid gap-1.5">
-                                <div
-                                    id={ids.pay}
-                                    className="text-[12.5px] font-medium"
-                                >
-                                    Payment
-                                </div>
-                                <ChipGroup
-                                    labelledBy={ids.pay}
-                                    value={payNow}
-                                    onChange={setPay}
-                                    choices={payChoices(offerLink).map((c) => ({
-                                        value: c.key,
-                                        label: c.label,
-                                    }))}
-                                />
-                                <p className="text-[12px] leading-[1.5] text-muted-foreground">
-                                    {payNote(payNow)}
-                                </p>
-                            </div>
-                        )}
-                        {packRefusal ? (
-                            <Notice tone="error">{packRefusal}</Notice>
-                        ) : null}
-                    </FormSheetBody>
-                    <FormSheetFoot
-                        saveLabel={visit ? "Book visit" : "Create booking"}
-                        savingLabel="Booking…"
-                        note={
-                            tried && !ready ? (
-                                <p
-                                    role="alert"
-                                    className="text-[12.5px] font-medium text-destructive-subtle-foreground"
-                                >
-                                    {visit
-                                        ? "Pick a time."
-                                        : "Pick who it is for and a time."}
-                                </p>
-                            ) : null
-                        }
-                        onSubmit={save}
+            <FormSheetBody className="gap-4">
+                {service ? (
+                    <TimePicker
+                        serviceId={service.id}
+                        timezone={service.timezone}
+                        value={picked}
+                        onChange={(at, person) => {
+                            setPicked(at);
+                            setStaffId(person?.id ?? null);
+                            if (at) setTaken(null);
+                        }}
+                        withChips={false}
+                        taken={taken}
+                        reloadKey={reload}
                     />
-                </>
-            )}
+                ) : null}
+                <p className="text-[12px] leading-[1.5] text-muted-foreground">
+                    A visit is never billed on its own: the treatment was sold
+                    once, on order #{visit.orderNumber}.
+                </p>
+            </FormSheetBody>
+            <FormSheetFoot
+                saveLabel="Book visit"
+                savingLabel="Booking…"
+                pending={saving}
+                note={
+                    tried && !picked ? (
+                        <p
+                            role="alert"
+                            className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                        >
+                            Pick a time.
+                        </p>
+                    ) : null
+                }
+                onSubmit={save}
+            />
         </FormSheet>
     );
-}
-
-/** Slots grouped under the day they fall on in the service's own zone. */
-function groupByDay(slots: Slot[], timeZone: string): [string, Slot[]][] {
-    const days = new Map<string, Slot[]>();
-    for (const slot of slots) {
-        const key = formatDate(slot.startAt, timeZone, { weekday: "short" });
-        const list = days.get(key);
-        if (list) list.push(slot);
-        else days.set(key, [slot]);
-    }
-    return Array.from(days.entries());
 }

@@ -40,6 +40,7 @@ const service = (over: Partial<Service> = {}): Service => ({
     depositMode: "PERCENT_50",
     depositCents: 59_000,
     showOnBookingPage: true,
+    bookableByTeam: true,
     gstPriceMode: "ADDED",
     payCents: 118_000,
     gst: {
@@ -72,10 +73,10 @@ describe("the draft and what it sends", () => {
         expect(send("")).toBeNull();
     });
 
-    it("a change to it is a change to Price", () => {
+    it("a change to it is a change to Money", () => {
         const saved = draft();
         expect(changedSections(saved, { ...saved, gstPriceMode: "" })).toEqual([
-            "Price",
+            "Money",
         ]);
     });
 });
@@ -176,7 +177,7 @@ describe("the amounts the Price card says", () => {
             "They pay the price plus GST online when booking: your booking rules take payment online only.",
         );
         expect(depositNote("NONE", "1000", "INR", 1, "BOTH", gst)).toBe(
-            "No card needed to book. No-shows cost you the time.",
+            "No card needed to book. If they don't come, you lose the time.",
         );
     });
 });

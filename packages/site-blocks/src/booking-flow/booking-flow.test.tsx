@@ -315,9 +315,33 @@ describe("the booking page (U19)", () => {
         );
         await screen.findByRole("heading", { name: "You're booked, Asha." });
         const post = calls.find((c) => c.url.endsWith("/book"));
+        // As E.164, with its country code (#1036).
         expect(JSON.parse(post?.init?.body as string)).toMatchObject({
-            bookerPhone: "+91 98450 12345",
+            bookerPhone: "+919845012345",
         });
+    });
+
+    it("refuses a phone that isn't a number to ring, on the field", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        await chooseOneToOne();
+        fireEvent.change(screen.getByLabelText("Phone (optional)"), {
+            target: { value: "98450" },
+        });
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book and pay at the desk" }),
+        );
+        expect(
+            await screen.findByText(/isn.t a whole phone number/),
+        ).toBeTruthy();
+        expect(screen.getByLabelText("Phone (optional)")).toHaveAttribute(
+            "aria-invalid",
+            "true",
+        );
+        expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
     });
 
     it("pays now: holds the place, starts the payment, and confirms when the hold does", async () => {

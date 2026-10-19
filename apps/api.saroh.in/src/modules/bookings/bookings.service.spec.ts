@@ -319,10 +319,10 @@ describe("BookingsService — bookings management", () => {
         expect(bookingUpdate).not.toHaveBeenCalled();
     });
 
-    it("cancelBooking denies a MEMBER (booking:write)", async () => {
+    it("cancelBooking denies a Reviewer (booking:write)", async () => {
         const service = new BookingsService();
         await expect(
-            service.cancelBooking(ctx({ role: "MEMBER" }), "bk_1"),
+            service.cancelBooking(ctx({ role: "REVIEWER" }), "bk_1"),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(bookingFindUnique).not.toHaveBeenCalled();
     });
@@ -726,10 +726,10 @@ describe("BookingsService.rescheduleBooking", () => {
         expect(serviceFindUnique).not.toHaveBeenCalled();
     });
 
-    it("denies a MEMBER (booking:write) before any I/O", async () => {
+    it("denies a Reviewer (booking:write) before any I/O", async () => {
         await expect(
             new BookingsService().rescheduleBooking(
-                ctx({ role: "MEMBER" }),
+                ctx({ role: "REVIEWER" }),
                 "bk_1",
                 { startAt: AT_10 },
             ),
@@ -952,10 +952,10 @@ describe("BookingsService.recordOutcome", () => {
         ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it("denies a MEMBER (booking:write) before any I/O", async () => {
+    it("denies a Reviewer (booking:write) before any I/O", async () => {
         await expect(
             new BookingsService().recordOutcome(
-                ctx({ role: "MEMBER" }),
+                ctx({ role: "REVIEWER" }),
                 "bk_1",
                 "ATTENDED",
                 PAST,
@@ -1155,23 +1155,114 @@ describe("BookingsService.bookByHand — a booking the merchant makes (#384)", (
         expect(transaction).not.toHaveBeenCalled();
     });
 
-    it("needs a contact or an email", async () => {
+    it("needs a customer, an email or a phone, and says so naming the phone (DEC-170)", async () => {
         wireBookHappyPath();
         await expect(
             new BookingsService().bookByHand(ctx(), "svc_1", {
                 startAt: START,
             }),
-        ).rejects.toBeInstanceOf(BadRequestException);
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "Add their name and phone number, or choose one of your customers.",
+                field: "bookerPhone",
+            },
+        });
+        expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it("refuses a phone too short to keep anyone by, and a phone with no name", async () => {
+        wireBookHappyPath();
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                bookerName: "Ravi",
+                bookerPhone: "12345",
+            }),
+        ).rejects.toMatchObject({ response: { field: "bookerPhone" } });
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                bookerPhone: "+91 98450 00002",
+            }),
+        ).rejects.toMatchObject({
+            response: { message: "Add their name.", field: "bookerName" },
+        });
+        expect(transaction).not.toHaveBeenCalled();
     });
 
     it("refuses a role without booking:write", async () => {
         await expect(
+            new BookingsService().bookByHand(
+                ctx({ role: "REVIEWER" }),
+                "svc_1",
+                {
+                    startAt: START,
+                    bookerEmail: "x@example.com",
+                },
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(serviceFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("lets a Member book (DEC-170)", async () => {
+        wireBookHappyPath();
+        contactFindUnique.mockResolvedValue(null);
+        await new BookingsService().bookByHand(
+            ctx({ role: "MEMBER" }),
+            "svc_1",
+            { startAt: START, bookerEmail: "new@example.com" },
+        );
+        expect(bookingCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses Paid now from a Member, before anything is read (DEC-098)", async () => {
+        await expect(
             new BookingsService().bookByHand(ctx({ role: "MEMBER" }), "svc_1", {
                 startAt: START,
                 bookerEmail: "x@example.com",
+                paidWith: "PAID",
+                paidBy: "UPI",
             }),
-        ).rejects.toBeInstanceOf(ForbiddenException);
+        ).rejects.toThrow(
+            "Your role can't take payment for bookings, because it can't issue invoices.",
+        );
         expect(serviceFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("says how they paid only with Paid now", async () => {
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                bookerEmail: "x@example.com",
+                paidWith: "DESK",
+                paidBy: "CASH",
+            }),
+        ).rejects.toMatchObject({ response: { field: "paidBy" } });
+        expect(serviceFindUnique).not.toHaveBeenCalled();
+    });
+
+    it("refuses a service the team can't book, naming it (Q5)", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            bookableByTeam: false,
+            availabilityRules: RULES,
+        });
+        await expect(
+            new BookingsService().bookByHand(ctx(), "svc_1", {
+                startAt: START,
+                bookerEmail: "x@example.com",
+            }),
+        ).rejects.toMatchObject({
+            response: {
+                message: expect.stringContaining(
+                    `Your team can't book ${SERVICE.name}.`,
+                ),
+                details: { reason: "not-bookable-by-team" },
+            },
+        });
+        expect(transaction).not.toHaveBeenCalled();
     });
 });
 

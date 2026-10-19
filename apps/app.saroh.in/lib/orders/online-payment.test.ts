@@ -7,16 +7,16 @@ import { onlinePaymentLine, onlinePaymentWords } from "./online-payment";
  * step — never a colour alone.
  */
 describe("onlinePaymentWords", () => {
-    it("a failed payment says so, names the provider and offers a new pay link", () => {
+    it("a failed payment says so, names the provider and offers a new payment link", () => {
         const words = onlinePaymentWords(
             { state: "FAILED", provider: "RAZORPAY" },
             true,
         );
         expect(words.word).toBe("Payment failed");
-        expect(words.next).toBe("send a new pay link");
+        expect(words.next).toBe("send a new payment link");
         expect(words.tone).toBe("act");
         expect(words.detail).toBe(
-            "Razorpay said the payment didn't go through, so nothing was taken. Send a new pay link, or take it at the counter.",
+            "Razorpay said the payment didn't go through, so nothing was taken. Send a new payment link, or take it at the counter.",
         );
     });
 
@@ -31,17 +31,17 @@ describe("onlinePaymentWords", () => {
         expect(words.detail).toContain("once Cashfree confirms it");
     });
 
-    it("a payment not finished offers a new pay link", () => {
+    it("a payment not finished offers a new payment link", () => {
         const words = onlinePaymentWords(
             { state: "NOT_FINISHED", provider: "RAZORPAY" },
             true,
         );
         expect(words.word).toBe("Payment not finished");
-        expect(words.next).toBe("send a new pay link");
+        expect(words.next).toBe("send a new payment link");
         expect(words.tone).toBe("act");
     });
 
-    it("without a pay link to send, the next step is not to start it", () => {
+    it("without a payment link to send, the next step is not to start it", () => {
         for (const state of ["FAILED", "NOT_FINISHED"] as const) {
             const words = onlinePaymentWords(
                 { state, provider: "RAZORPAY" },
@@ -49,7 +49,7 @@ describe("onlinePaymentWords", () => {
             );
             expect(words.next).toBe("not paid yet");
             expect(words.detail).toContain("Don't start it until it's paid.");
-            expect(words.detail).not.toContain("pay link");
+            expect(words.detail).not.toContain("payment link");
         }
     });
 });
@@ -59,7 +59,7 @@ describe("onlinePaymentLine", () => {
         expect(
             onlinePaymentLine({ state: "FAILED", provider: "RAZORPAY" }, true),
         ).toEqual({
-            text: "Payment failed: send a new pay link",
+            text: "Payment failed: send a new payment link",
             tone: "act",
         });
         expect(

@@ -19,7 +19,7 @@ export interface OnlinePayment {
 export interface OnlinePaymentWords {
     /** "Payment failed", "Waiting for Razorpay", "Payment not finished". */
     word: string;
-    /** The next step, in a few words: "send a new pay link". */
+    /** The next step, in a few words: "send a new payment link". */
     next: string;
     /** A sentence for a banner: what happened and what to do. */
     detail: string;
@@ -28,7 +28,7 @@ export interface OnlinePaymentWords {
 }
 
 /**
- * The words for a state. `canSend`: this viewer may send a pay link (the
+ * The words for a state. `canSend`: this viewer may send a payment link (the
  * money read, `order:read`); without it, the next step is not to start the
  * order until it's paid, as the kitchen's banner says.
  */
@@ -41,10 +41,10 @@ export function onlinePaymentWords(
         case "FAILED":
             return {
                 word: "Payment failed",
-                next: canSend ? "send a new pay link" : "not paid yet",
+                next: canSend ? "send a new payment link" : "not paid yet",
                 detail: `${provider} said the payment didn't go through, so nothing was taken. ${
                     canSend
-                        ? "Send a new pay link, or take it at the counter."
+                        ? "Send a new payment link, or take it at the counter."
                         : "Don't start it until it's paid."
                 }`,
                 tone: "act",
@@ -59,10 +59,10 @@ export function onlinePaymentWords(
         case "NOT_FINISHED":
             return {
                 word: "Payment not finished",
-                next: canSend ? "send a new pay link" : "not paid yet",
+                next: canSend ? "send a new payment link" : "not paid yet",
                 detail: `The customer opened ${provider}'s payment but didn't finish it, so nothing was taken. ${
                     canSend
-                        ? "Send a new pay link, or take it at the counter."
+                        ? "Send a new payment link, or take it at the counter."
                         : "Don't start it until it's paid."
                 }`,
                 tone: "act",
@@ -70,7 +70,7 @@ export function onlinePaymentWords(
     }
 }
 
-/** "Payment failed — send a new pay link": the row's one line. */
+/** "Payment failed — send a new payment link": the row's one line. */
 export function onlinePaymentLine(
     payment: Pick<OnlinePayment, "state" | "provider"> | null | undefined,
     canSend: boolean,

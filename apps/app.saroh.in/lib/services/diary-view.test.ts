@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { ClassSession, DiaryBooking } from "./booking-calendar";
 import type { Block, Column } from "./diary";
 import {
+    closedKind,
     closedSpans,
+    dayFullness,
     drawnLanes,
     firstSight,
     hoursAcross,
@@ -12,6 +14,7 @@ import {
     slotIn,
     toPay,
     toPayText,
+    weekLanes,
 } from "./diary-view";
 
 /**
@@ -275,5 +278,83 @@ describe("the legend", () => {
                 off: false,
             }),
         ).toEqual(["cancelled"]);
+    });
+});
+
+describe("the week's days (U5)", () => {
+    const col = (
+        key: string,
+        windows: [number, number][] | null,
+        blocks: Block[] = [],
+    ): Column => ({
+        key,
+        name: key === "meera" ? "Meera Iyer" : "Arjun Rao",
+        title: null,
+        day: windows ? { windows, off: [], free: [] } : null,
+        blocks,
+    });
+
+    it("measures how full a day is against each person's own hours", () => {
+        // Meera 9 to 1 with 2 hours booked; Arjun 10 to 6, nothing.
+        const day = [
+            col(
+                "meera",
+                [[540, 780]],
+                [one("a", 540, 600), one("b", 660, 720)],
+            ),
+            col("arjun", [[600, 1080]]),
+        ];
+        expect(dayFullness(day)).toBeCloseTo(120 / 720);
+        // A cancelled booking takes nothing; time outside the hours neither.
+        expect(
+            dayFullness([
+                col(
+                    "meera",
+                    [[540, 600]],
+                    [
+                        one("x", 540, 600, { status: "CANCELLED" }),
+                        one("late", 600, 660),
+                    ],
+                ),
+            ]),
+        ).toBe(0);
+        expect(
+            dayFullness([col("meera", [[540, 600]], [one("a", 500, 700)])]),
+        ).toBe(1);
+    });
+
+    it("has nothing to measure without hours or with nobody open", () => {
+        expect(dayFullness([col("meera", null, [one("a", 540, 600)])])).toBe(
+            null,
+        );
+        expect(dayFullness([col("meera", [])])).toBe(null);
+    });
+
+    it("says closed every week only when nobody works that weekday", () => {
+        const shut = [col("meera", []), col("arjun", [])];
+        expect(closedKind(shut, () => false)).toBe("weekly");
+        // Arjun works Sundays as a rule, but not this one.
+        expect(closedKind(shut, (k) => k === "arjun")).toBe("day");
+        expect(
+            closedKind(
+                [col("meera", []), col("arjun", [[600, 660]])],
+                () => false,
+            ),
+        ).toBe(null);
+        // Unknown hours are never read as closed.
+        expect(closedKind([col("meera", null)], () => false)).toBe(null);
+        expect(closedKind([], () => false)).toBe(null);
+    });
+
+    it("keeps a lane per person, in the order first seen", () => {
+        expect(
+            weekLanes([
+                [col("meera", [])],
+                [col("arjun", []), col("meera", [])],
+            ]),
+        ).toEqual([
+            { key: "meera", name: "Meera Iyer" },
+            { key: "arjun", name: "Arjun Rao" },
+        ]);
     });
 });

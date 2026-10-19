@@ -4,6 +4,8 @@ import { Button } from "@saroh/ui/button";
 import { DateInput } from "@saroh/ui/date-picker";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
+import { phoneNumberProblem } from "@saroh/ui/lib/phone";
+import { PhoneInput } from "@saroh/ui/phone-input";
 import {
     Sheet,
     SheetContent,
@@ -47,6 +49,7 @@ export function AddLeadSheet({
     const [errors, setErrors] = useState<{
         name?: string;
         email?: string;
+        phone?: string;
         form?: string;
     }>({});
     const [pending, startTransition] = useTransition();
@@ -58,8 +61,10 @@ export function AddLeadSheet({
         if (email.trim() && !EMAIL.test(email.trim())) {
             found.email = "That email doesn't look right.";
         }
+        const phoneBad = phoneNumberProblem(phone);
+        if (phoneBad) found.phone = phoneBad;
         setErrors(found);
-        if (found.name || found.email) return;
+        if (found.name || found.email || found.phone) return;
         startTransition(async () => {
             const result = await addLeadAction({
                 name: name.trim(),
@@ -123,12 +128,12 @@ export function AddLeadSheet({
                         />
                     </Field>
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Phone" optional>
-                            <Input
+                        <Field label="Phone" optional error={errors.phone}>
+                            <PhoneInput
                                 name="phone"
-                                type="tel"
+                                autoComplete="off"
                                 value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
+                                onValueChange={setPhone}
                             />
                         </Field>
                         <Field label="City" optional>

@@ -128,9 +128,9 @@ export interface Shortcut {
 
 /**
  * What a day from today offers to make on it: "New order" where the business
- * sells and this person may take one, "Book" where it takes bookings and
- * they may book — Bookings opening on that day. A past day, or one past the
- * range, offers nothing.
+ * sells and this person may take one, "Book on this day" where it takes
+ * bookings and they may book — Bookings opening on that day with New booking
+ * open (bookings U13). A past day, or one past the range, offers nothing.
  */
 export function dayShortcuts(
     date: string,
@@ -154,8 +154,8 @@ export function dayShortcuts(
     }
     if (can.book && layers.includes("bookings")) {
         out.push({
-            label: "Book",
-            href: `/bookings?date=${encodeURIComponent(date)}`,
+            label: "Book on this day",
+            href: `/bookings?date=${encodeURIComponent(date)}&new=1`,
         });
     }
     return out;

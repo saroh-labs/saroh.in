@@ -357,12 +357,14 @@ model Organization {
 
   // Staff who take bookings, their hours and the business's booking rules
   // (ADR-008, U3).
-  staffMembers    StaffMember[]
-  staffServices   StaffService[]
-  staffHours      StaffHours[]
-  staffTimeOff    StaffTimeOff[]
-  staffExtraHours StaffExtraHours[]
-  bookingRules    BookingRules?
+  staffMembers      StaffMember[]
+  staffServices     StaffService[]
+  staffHours        StaffHours[]
+  staffTimeOff      StaffTimeOff[]
+  staffExtraHours   StaffExtraHours[]
+  bookingRules      BookingRules?
+  // A Member's own booking rules waiting for approval, and decided (#1038).
+  staffRuleRequests StaffRuleRequest[]
 
   // A business's own customers who sign in on its site (ADR-011, DEC-037).
   customerAccounts    CustomerAccount[]
@@ -3005,8 +3007,10 @@ model CommissionLine {
   kind            String
   /// This line's share of the invoice's amount before GST, in paise.
   baseAmountPaise Int
-  /// The rate copied from `CommissionRate` (`rateId`); null while NO_RATE.
+  /// The rate copied from `CommissionRate` (`rateId`), or from the
+  /// business's own rate (`businessRateId`, #1035); both null while NO_RATE.
   rateId          String?
+  businessRateId  String?
   basisPoints     Int?
   /// What it earns, in paise; null while NO_RATE.
   amountPaise     Int?
@@ -3029,6 +3033,43 @@ model CommissionLine {
   @@index([platformAdminId, status])
   @@index([status, periodEnd])
   @@index([organizationId])
+  @@index([businessRateId])
+}
+
+// A business's own commission rate for its account manager (DEC-169, #1035):
+// set by a holder of `commission:rates` for the manager who looks after it,
+// it prices that manager's payments from this business made on or after
+// `earnsFrom` (and before `until`) instead of the general rate for the
+// link's kind. `earnsFrom` is never before the business's first paid plan
+// (its first cleared Saroh invoice with an amount before GST). Saving one
+// is the only way a NO_RATE line is ever priced (back-pay, once). One in
+// force per business: a new one ends the one before at its `earnsFrom`.
+// Written once except its end: `until` may only move earlier (End…, or
+// replaced), with who and why. Never a rate in code, tests or docs.
+// Relation-free, like CommissionLine; a business's row, so it carries the
+// org-isolation policy.
+model BusinessCommissionRate {
+  id String @id @default(cuid())
+
+  organizationId  String
+  /// The manager it was set for; only their lines are priced by it.
+  platformAdminId String
+  /// Hundredths of a percent, 0..10000 (CHECKed).
+  basisPoints     Int
+  /// The start of its first day in India.
+  earnsFrom       DateTime
+  /// Exclusive: the start of the day after its last; null while open.
+  until           DateTime?
+  setByUserId     String
+  reason          String
+
+  endedAt       DateTime?
+  endedByUserId String?
+  endedReason   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, earnsFrom])
 }
 
 // A month's commission paid to one teammate (DEC-169, admin console U21):
@@ -4780,8 +4821,11 @@ model Notification {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // Recipient. Null = an org-wide notice any member/owner may see; set = a
-  // specific user's inbox item. Informational (no FK cascade wiring needed).
+  // Recipient. Null = the business's notice, read with `notification:read`
+  // (owners and admins); set = one person's alone (DEC-170, #1038: the
+  // answer to their booking rules request), read with
+  // `notification:read-own` and never shown to anyone else, owners
+  // included. Informational (no FK cascade wiring needed).
   userId String?
 
   type  String // "enquiry.new" | ...
@@ -4805,6 +4849,9 @@ model Notification {
   bookingId String?
   invoiceId String?
   siteId    String?
+  // Or someone on the diary (#1038): a booking rules request opens Hours
+  // and time off on that person. Informational, no FK, like leadId.
+  staffId   String?
 
   readAt DateTime? // null = unread
 
@@ -4932,9 +4979,14 @@ model Service {
   // What is paid at booking: NONE | PERCENT_25 | PERCENT_50 | FULL, of
   // `priceCents`, worked out on the server. Only a priced service has one.
   depositMode       String  @default("NONE")
-  // Whether the business's booking page and services lists offer it. A
-  // hidden service is still booked by staff.
+  // Whether the business's booking page and services lists offer it: the
+  // "Customers" tick of Who can book it. A hidden service is still booked
+  // by staff unless `bookableByTeam` says otherwise.
   showOnBookingPage Boolean @default(true)
+  // Whether the team books it by hand, from Bookings: the "Your team" tick
+  // of Who can book it (DEC-170, Q5 of 19 Oct). Neither tick reads as
+  // paused in the app; bookings already made stay.
+  bookableByTeam    Boolean @default(true)
 
   // The order lines that bill it: a treatment sold as an order (E9).
   orderItems OrderItem[]
@@ -5147,6 +5199,16 @@ model StaffMember {
   // Invites that would give them a login (#868).
   invitations OrganizationInvitation[]
 
+  // Their own timing rules for their diary (DEC-170, #1038), each one
+  // falling back to the business's (`BookingRules`) when null — "same as
+  // the business". Paying and refunds stay business-wide. CHECKed to the
+  // business rules' own ranges.
+  bookAheadDays        Int? // how far ahead a customer may book them, in days
+  latestBookingMinutes Int? // the notice they need before a start
+  freeCancelHours      Int? // free to cancel up to this long before
+  gapMinutes           Int? // kept clear between their bookings
+  ruleRequests         StaffRuleRequest[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5264,6 +5326,18 @@ model BookingRules {
   latestBookingMinutes Int? // the latest a customer may book before a start
   freeCancelHours      Int? // cancel at least this long before to get a class back
 
+  /// "Gap between bookings" (DEC-170, #1038): minutes kept clear either
+  /// side of a person's bookings, on top of a service's buffers. None by
+  /// default; each person's own `StaffMember.gapMinutes` falls back to it.
+  gapMinutes Int @default(0)
+
+  /// "Members' rule changes need approval" (DEC-170, #1038): on, a change
+  /// someone makes to their own booking rules without `service:write`
+  /// waits as a `StaffRuleRequest` for an owner or admin. On for every
+  /// business, new and existing (the column's default, and no row reads
+  /// as on).
+  memberRuleChangesNeedApproval Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -5280,6 +5354,40 @@ model BookingRules {
   /// take it) and at the desk. A deposit or full price at booking is always
   /// paid online, so DESK leaves a service that asks one unbookable online.
   bookingPayment String @default("BOTH")
+}
+
+/// A change someone asked for to their own booking rules while "Members'
+/// rule changes need approval" is on (DEC-170, #1038). It changes nothing
+/// until an owner or admin approves it. WAITING → APPROVED | TURNED_DOWN |
+/// WITHDRAWN, CHECKed; one WAITING per person (a new ask replaces it).
+model StaffRuleRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          StaffMember  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  // Who asked: the person's own login.
+  requestedByUserId String
+  // The asked values, by field: only the fields that change, a null being
+  // "same as the business" (`bookings/person-rules.ts`).
+  changes           Json
+
+  status String @default("WAITING") // WAITING | APPROVED | TURNED_DOWN | WITHDRAWN
+
+  // Turned down: the optional words the person reads.
+  reason          String?
+  decidedByUserId String?
+  decidedAt       DateTime?
+  // When the person said OK to the outcome; until then their rules show it.
+  dismissedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([staffId], map: "StaffRuleRequest_one_waiting", where: raw("status = 'WAITING'"))
+  @@index([organizationId, status])
+  @@index([staffId, createdAt])
 }
 
 /// What has happened to a Booking, in order (#121).

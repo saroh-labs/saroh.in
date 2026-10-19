@@ -109,7 +109,8 @@ describe("Edit details on a location's customer", () => {
             "st1",
             "cu1",
             expect.objectContaining({
-                phone: "98200 11111",
+                // E.164, with its country code (#1036).
+                phone: "+919820011111",
                 city: "Bengaluru",
             }),
         );

@@ -3,7 +3,7 @@
 import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent, ReactNode, RefObject } from "react";
 import {
     createContext,
     useCallback,
@@ -379,6 +379,27 @@ export interface OverlayFootProps {
 }
 
 /**
+ * For a foot drawn by the overlay's own content rather than `OverlayFoot`
+ * (New booking's Back and Next, U8): its submit is the form's, so Enter
+ * and Cmd/Ctrl+Enter run it, and while it saves nothing closes the frame.
+ */
+export function useOverlaySubmit(onSubmit: OverlaySubmit, pending = false) {
+    const { register, setPending } = useOverlay();
+    useEffect(() => {
+        setPending(pending);
+        return () => setPending(false);
+    }, [pending, setPending]);
+    const handler = useRef(onSubmit);
+    useLayoutEffect(() => {
+        handler.current = onSubmit;
+    });
+    useEffect(() => {
+        register((event) => handler.current(event));
+        return () => register(null);
+    }, [register]);
+}
+
+/**
  * Pinned under the fields with a rule above it: the way out (outline),
  * then the overlay's own button (ink), on the right. On a phone they
  * stack full width with the overlay's button on top. While it saves the
@@ -407,6 +428,8 @@ export function OverlayFoot({
     useLayoutEffect(() => {
         handler.current = onSubmit;
     });
+    const foot = useRef<HTMLDivElement | null>(null);
+    useToastsAboveFoot(foot);
     // Registered once; `handler` follows the latest.
     const own = Boolean(onSubmit);
     useEffect(() => {
@@ -417,6 +440,7 @@ export function OverlayFoot({
 
     return (
         <div
+            ref={foot}
             data-overlay-foot
             className={cn(
                 "mt-4 grid gap-3 border-t border-border pt-4",
@@ -462,4 +486,51 @@ export function OverlayFoot({
             </div>
         </div>
     );
+}
+
+/** Phone width, where toasts rise from the foot of the screen. */
+const PHONE = "(max-width: 759px)";
+
+/** The property toasts' offset reads (`app/providers.tsx`). */
+export const FOOT_INSET = "--overlay-foot-inset";
+
+/**
+ * On a phone, the room an open overlay's foot takes at the bottom of the
+ * screen, said to the toasts (`--overlay-foot-inset`), so one said while
+ * the sheet is open — "10:00 am was just booked", an Undo — lands above
+ * its buttons rather than over them (BA-23). Cleared when the foot goes.
+ */
+export function useToastsAboveFoot(foot: RefObject<HTMLDivElement | null>) {
+    useEffect(() => {
+        const el = foot.current;
+        if (
+            !el ||
+            typeof window.matchMedia !== "function" ||
+            !window.matchMedia(PHONE).matches
+        ) {
+            return;
+        }
+        const root = document.documentElement;
+        const say = () => {
+            const top = el.getBoundingClientRect().top;
+            const inset = Math.max(0, window.innerHeight - top);
+            root.style.setProperty(FOOT_INSET, `${Math.round(inset)}px`);
+        };
+        say();
+        const watch =
+            typeof ResizeObserver === "function"
+                ? new ResizeObserver(say)
+                : null;
+        watch?.observe(el);
+        window.addEventListener("resize", say);
+        // A sheet slides in: measured again once it has arrived.
+        const frame = el.closest('[role="dialog"], [role="alertdialog"]');
+        frame?.addEventListener("animationend", say);
+        return () => {
+            watch?.disconnect();
+            window.removeEventListener("resize", say);
+            frame?.removeEventListener("animationend", say);
+            root.style.removeProperty(FOOT_INSET);
+        };
+    }, [foot]);
 }

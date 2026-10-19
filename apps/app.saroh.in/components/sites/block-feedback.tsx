@@ -9,30 +9,18 @@ import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { runAction } from "@/lib/api/run-action";
+import { initials } from "@/lib/names";
 import { createComment, setCommentResolved } from "@/lib/sites/actions";
 import type { SiteCommentView } from "@/lib/sites/service";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
 import { Tip } from "@saroh/ui/tooltip";
 
-/** A character that is a letter: letters change case, digits and punctuation do not. */
-const isLetter = (ch: string) => ch.toUpperCase() !== ch.toLowerCase();
-
 /**
- * Initials for a note's author: the first LETTER of the first two words that
- * have one — "Priya (reviewer)" is "PR", not "P(".
+ * Initials for a note's author: the one rule (`lib/names.ts`), which skips
+ * words that don't start with a letter, so "Priya (reviewer)" is "PR".
  */
-export function initials(name: string): string {
-    return (
-        name
-            .split(/\s+/)
-            .map((word) => Array.from(word).find(isLetter))
-            .filter((ch): ch is string => ch !== undefined)
-            .slice(0, 2)
-            .map((ch) => ch.toUpperCase())
-            .join("") || "?"
-    );
-}
+export { initials };
 
 /**
  * The inspector's Feedback tab for ONE block (#339): what reviewers said

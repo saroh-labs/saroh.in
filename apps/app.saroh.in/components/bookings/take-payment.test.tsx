@@ -12,13 +12,11 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DiaryBooking } from "@/lib/services/booking-calendar";
 import type { BookingMoney } from "@/lib/services/booking-money";
-import { bookingState } from "@/lib/services/diary";
 import type { BookingDetail } from "@/lib/services/service";
 
 import { BookingDetailView } from "./booking-detail";
-import { BookingQuickLook } from "./calendar/booking-quick-look";
+import { FRONT_DESK_LINE } from "./calendar/quick-look-one";
 import { TakePayment } from "./take-payment";
 
 const takeDeskPayment = vi.fn();
@@ -165,7 +163,7 @@ const PAID = {
 };
 
 describe("Take ₹X at the desk", () => {
-    it("offers Cash, UPI, Card and a pay link, one word each, cash first", () => {
+    it("offers Cash, UPI, Card and a payment link, one word each, cash first", () => {
         openTake();
         const chips = Array.from(
             dialog().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
@@ -174,7 +172,7 @@ describe("Take ₹X at the desk", () => {
             "Cash",
             "UPI",
             "Card",
-            "Send a pay link",
+            "Send a payment link",
         ]);
         expect(chip("Cash").getAttribute("aria-checked")).toBe("true");
         expect(chips.every((c) => c.className.includes("cursor-pointer"))).toBe(
@@ -247,14 +245,14 @@ describe("Take ₹X at the desk", () => {
         expect(showSuccess).not.toHaveBeenCalled();
     });
 
-    it("makes a pay link instead, and shows it to copy", async () => {
+    it("makes a payment link instead, and shows it to copy", async () => {
         createBookingPayLink.mockResolvedValue({
             ok: true,
             data: { url: "https://pay.saroh.in/pay/tok_1" },
         });
         openTake();
-        act(() => chip("Send a pay link").click());
-        await click(button(/^Get the pay link$/));
+        act(() => chip("Send a payment link").click());
+        await click(button(/^Get the payment link$/));
         expect(createBookingPayLink).toHaveBeenCalledWith("bk_1");
         expect(takeDeskPayment).not.toHaveBeenCalled();
         const field = dialog().querySelector("input");
@@ -265,16 +263,16 @@ describe("Take ₹X at the desk", () => {
 
     it("never offers a link for what's left after a deposit, or without a provider", () => {
         openTake({ byLink: false });
-        expect(chip("Send a pay link").disabled).toBe(true);
+        expect(chip("Send a payment link").disabled).toBe(true);
         expect(
-            chip("Send a pay link").getAttribute("aria-description"),
+            chip("Send a payment link").getAttribute("aria-description"),
         ).toContain("take the rest here");
         act(() => root.unmount());
         root = createRoot(host);
         openTake({ canLink: false });
-        expect(chip("Send a pay link").disabled).toBe(true);
+        expect(chip("Send a payment link").disabled).toBe(true);
         expect(
-            chip("Send a pay link").getAttribute("aria-description"),
+            chip("Send a payment link").getAttribute("aria-description"),
         ).toContain("No payment provider connected");
     });
 });
@@ -324,7 +322,12 @@ function renderDetail(
 ) {
     act(() => {
         root.render(
-            <BookingDetailView booking={booking} past={false} desk={desk} />,
+            <BookingDetailView
+                booking={booking}
+                past={false}
+                desk={desk}
+                canWrite
+            />,
         );
     });
 }
@@ -338,7 +341,7 @@ describe("the booking page's Take ₹X", () => {
     it("shows for a pay-at-the-desk booking, to someone who may take it", () => {
         renderDetail(detail({}), { canTake: true, canLink: true });
         expect(takeButton()?.textContent).toBe("Take ₹500");
-        expect(host.textContent).toContain("₹500 due at the visit");
+        expect(host.textContent).toContain("₹500 to take at the visit");
     });
 
     it("takes only the balance after a deposit", () => {
@@ -353,9 +356,8 @@ describe("the booking page's Take ₹X", () => {
             { canTake: true, canLink: true },
         );
         expect(takeButton()?.textContent).toBe("Take ₹400");
-        expect(host.textContent).toContain(
-            "Deposit ₹400 paid · ₹400 due at the visit",
-        );
+        expect(host.textContent).toContain("₹400 paid online");
+        expect(host.textContent).toContain("₹400 to take at the visit");
     });
 
     it("is shown disabled, with why, to a role that can't take it (FB-1, DEC-098)", () => {
@@ -364,9 +366,8 @@ describe("the booking page's Take ₹X", () => {
         expect(locked?.textContent).toBe("Take ₹500");
         expect(locked?.disabled).toBe(true);
         const why = locked?.getAttribute("aria-describedby") ?? "";
-        expect(document.getElementById(why)?.textContent).toBe(
-            "Your role can't take payments. An owner or admin can change this in Settings › Team.",
-        );
+        // Said once, in the page: the front desk's line (U12).
+        expect(document.getElementById(why)?.textContent).toBe(FRONT_DESK_LINE);
         // No desk at all (an older page): nothing to say.
         renderDetail(detail({}));
         expect(takeButton()).toBeUndefined();
@@ -403,157 +404,4 @@ describe("the booking page's Take ₹X", () => {
     });
 });
 
-function diaryBooking(over: Partial<DiaryBooking> = {}): DiaryBooking {
-    return {
-        id: "bk_1",
-        serviceId: "svc_1",
-        startAt: "2099-10-01T05:30:00.000Z",
-        endAt: "2099-10-01T06:00:00.000Z",
-        timezone: "Asia/Kolkata",
-        status: "CONFIRMED",
-        outcome: null,
-        bookerName: "Priya Raman",
-        bookerEmail: "priya@example.com",
-        bookerPhone: null,
-        createdAt: "2099-09-01T05:30:00.000Z",
-        cancelledAt: null,
-        cancelledLate: false,
-        service: {
-            id: "svc_1",
-            name: "Check-up",
-            timezone: "Asia/Kolkata",
-            capacity: 1,
-            durationMinutes: 30,
-            priceCents: 50_000,
-            currency: "INR",
-        },
-        contact: null,
-        staff: null,
-        paidWith: "DESK",
-        packName: null,
-        subscriptionId: null,
-        paidAtDesk: null,
-        take: { cents: 50_000, byLink: true },
-        ...over,
-    };
-}
-
-function renderPeek(
-    b: DiaryBooking,
-    desk?: { canTake: boolean; canLink: boolean },
-) {
-    act(() => {
-        root.render(
-            <BookingQuickLook
-                block={{
-                    kind: "one",
-                    key: b.id,
-                    start: 11 * 60,
-                    end: 11 * 60 + 30,
-                    state: bookingState(b),
-                    staffId: null,
-                    booking: b,
-                }}
-                onClose={() => undefined}
-                ctx={{
-                    timezone: "Asia/Kolkata",
-                    now: Date.parse("2099-10-01T05:00:00.000Z"),
-                    money: true,
-                    rules: null,
-                    canBook: true,
-                    desk,
-                }}
-                act={{
-                    checkIn: vi.fn(),
-                    noShow: vi.fn(),
-                    cancel: vi.fn(),
-                    move: vi.fn(),
-                    cancelClass: vi.fn(),
-                }}
-                heldFor={() => null}
-            />,
-        );
-    });
-}
-
-const peekTake = () =>
-    Array.from(document.querySelectorAll("button")).find((b) =>
-        b.textContent.startsWith("Take ₹"),
-    );
-
-describe("the calendar quick look's Take ₹X", () => {
-    it("shows beside the desk's actions, and opens the dialog", () => {
-        renderPeek(diaryBooking(), { canTake: true, canLink: true });
-        const trigger = peekTake();
-        expect(trigger?.textContent).toBe("Take ₹500");
-        expect(document.body.textContent).toContain(
-            "Not yet. Pays at the session",
-        );
-        act(() => trigger?.click());
-        const dialogs = document.querySelectorAll('[role="dialog"]');
-        expect(dialogs[dialogs.length - 1].textContent).toContain("UPI");
-    });
-
-    it("is shown disabled, with why, to a role that can't take it (FB-1, DEC-098)", () => {
-        renderPeek(diaryBooking(), { canTake: false, canLink: false });
-        const locked = peekTake();
-        expect(locked?.disabled).toBe(true);
-        const why = locked?.getAttribute("aria-describedby") ?? "";
-        expect(document.getElementById(why)?.textContent).toBe(
-            "Your role can't take payments. An owner or admin can change this in Settings › Team.",
-        );
-    });
-
-    it("says Take payment, with no figure, when the API only says something is due", () => {
-        const { take: _take, ...noMoney } = diaryBooking();
-        renderPeek(
-            { ...noMoney, toTake: true },
-            { canTake: false, canLink: false },
-        );
-        const locked = Array.from(document.querySelectorAll("button")).find(
-            (b) => b.textContent === "Take payment",
-        );
-        expect(locked?.disabled).toBe(true);
-        expect(peekTake()).toBeUndefined();
-        expect(document.body.textContent).toContain(
-            "Your role can't take payments",
-        );
-    });
-
-    it("is hidden when nothing is left to take", () => {
-        renderPeek(diaryBooking({ take: null, toTake: false }), {
-            canTake: false,
-            canLink: false,
-        });
-        expect(
-            Array.from(document.querySelectorAll("button")).some((b) =>
-                b.textContent.startsWith("Take "),
-            ),
-        ).toBe(false);
-        renderPeek(diaryBooking({ take: null }), {
-            canTake: true,
-            canLink: true,
-        });
-        expect(peekTake()).toBeUndefined();
-    });
-
-    it("says paid at the desk, with how, once it's taken", () => {
-        renderPeek(
-            diaryBooking({ take: null, paidAtDesk: { method: "CASH" } }),
-            { canTake: true, canLink: true },
-        );
-        expect(peekTake()).toBeUndefined();
-        expect(document.body.textContent).toContain("Paid at the desk · Cash");
-    });
-
-    it("is gone for a cancelled booking", () => {
-        renderPeek(
-            diaryBooking({
-                status: "CANCELLED",
-                cancelledAt: "2099-09-02T00:00:00.000Z",
-            }),
-            { canTake: true, canLink: true },
-        );
-        expect(peekTake()).toBeUndefined();
-    });
-});
+// The calendar quick look's Take ₹X: `calendar/booking-quick-look.test.tsx`.

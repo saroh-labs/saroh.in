@@ -36,7 +36,7 @@ export function BookingsTab({
         { key: "past", label: "Past", count: lists.past.list.length },
         {
             key: "issue",
-            label: "No-shows and late cancels",
+            label: "Didn't come or cancelled late",
             count: lists.issue.list.length,
         },
     ];

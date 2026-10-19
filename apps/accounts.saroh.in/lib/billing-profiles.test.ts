@@ -98,6 +98,17 @@ describe("errors in the design's words", () => {
         ]);
         expect(profileProblems({ ...v, registered: "no" }, []).length).toBe(0);
     });
+
+    it("says a phone that isn't a whole number on its field (#1036)", () => {
+        const v = { ...valuesOf(PULSE), registered: "no" as const };
+        expect(profileProblems({ ...v, phone: "+9198450" }, [])).toEqual([
+            ["phone", expect.stringMatching(/whole phone number/)],
+        ]);
+        expect(profileProblems({ ...v, phone: "+919845012345" }, [])).toEqual(
+            [],
+        );
+        expect(profileProblems({ ...v, phone: "" }, [])).toEqual([]);
+    });
 });
 
 describe("edit and add", () => {
@@ -215,7 +226,7 @@ describe("lines", () => {
         expect(paysForLine(moving)).toBe("Pays for Yoga Corner (moving)");
         expect(paysForCount(2)).toBe("pays for 2 businesses");
         expect(phoneLabel("+919845012345")).toBe("+91 98450 12345");
-        expect(phoneLabel("+441134960000")).toBe("+441134960000");
+        expect(phoneLabel("+441134960000")).toBe("+44 113 496 0000");
         expect(phoneLabel(null)).toBe("");
         expect(planLine(GURUGRAM)).toBe("Pro · monthly autopay");
         expect(planLine(YOGA)).toBe("Free");

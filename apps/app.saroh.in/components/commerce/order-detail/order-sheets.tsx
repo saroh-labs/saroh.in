@@ -57,7 +57,7 @@ export function OrderSheets({
     /** Paid and not yet refunded on the whole order. */
     remaining: number;
     addable: Sellable[] | "unavailable" | null;
-    /** A pay link can be made for more that is owed (B11). */
+    /** A payment link can be made for more that is owed (B11). */
     linkable: boolean;
     /** Money in major units; null without a money read. */
     format: ((n: number) => string) | null;

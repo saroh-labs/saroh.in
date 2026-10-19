@@ -102,7 +102,7 @@ export function differenceNote(input: {
     paid: PaidHow;
     first: string;
     refundTo: string;
-    /** A pay link can be made for what is owed. */
+    /** A payment link can be made for what is owed. */
     linkable: boolean;
     format: (cents: number) => string;
 }): string {
@@ -121,7 +121,7 @@ export function differenceNote(input: {
     }
     return d > 0
         ? input.linkable
-            ? `${amount} more to pay. Saving makes a pay link for it to send ${first}.`
+            ? `${amount} more to pay. Saving makes a payment link for it to send ${first}.`
             : `${amount} more to pay. It shows as due on the order.`
         : `${amount} back to them. It goes back to ${input.refundTo} when you save.`;
 }
@@ -138,7 +138,7 @@ export function saveLabel(input: {
         return `Save and refund ${input.format(-d)}`;
     }
     if (input.paid === "online" && d > 0 && input.linkable) {
-        return "Save and make pay link";
+        return "Save and make payment link";
     }
     return "Save";
 }

@@ -74,6 +74,7 @@ function row(over: Partial<PayoutRow> = {}): PayoutRow {
                 kind: "BROUGHT_IN",
                 baseAmountPaise: 99_900,
                 basisPoints: RATE,
+                ownRate: false,
                 amountPaise: 12_345,
                 periodEnd: "2026-12-20T00:00:00.000Z",
                 status: "PAYABLE",
@@ -115,6 +116,7 @@ const RATES: RatesView = {
     current: { BROUGHT_IN: BROUGHT_IN_RATE, ASSIGNED: null },
     upcoming: [],
     history: [],
+    ownRates: [],
 };
 
 describe("PayoutsTab", () => {

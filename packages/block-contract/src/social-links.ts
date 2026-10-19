@@ -18,6 +18,8 @@
  *   one that no longer passes is dropped, never drawn.
  */
 
+import { E164, PHONE_SEPARATORS } from "./phone";
+
 /** The networks, in the order they are listed and drawn. */
 export const SOCIAL_NETWORKS = [
     "instagram",
@@ -400,9 +402,6 @@ function googleMaps(raw: string): SocialCheck {
     return refuse(wrong);
 }
 
-/** What a merchant may type between a number's digits. */
-const PHONE_SEPARATORS = /[\s\-.()]/g;
-const E164 = /^\+[1-9]\d{7,14}$/;
 const WHATSAPP_HOSTS = ["wa.me", "api.whatsapp.com"];
 
 /** A `wa.me` link from an E.164 number ("+919845012345"), or null. */

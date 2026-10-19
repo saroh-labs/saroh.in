@@ -14,7 +14,7 @@ import type {
 /**
  * Whether its link takes payment (DEC-070): the API's `payOnline` on the
  * send view — Payments on, and a provider that can take the money.
- * Otherwise the link only shows the invoice, and there is no pay link to
+ * Otherwise the link only shows the invoice, and there is no payment link to
  * copy. An API from before DEC-070 sends no `payOnline`; a connected
  * provider answered then, and still does for it.
  */
@@ -25,9 +25,9 @@ export function paysOnline(
     return send?.payOnline ?? online?.providerConnected ?? false;
 }
 
-/** "Send with pay link" where the link takes payment, else "Send invoice". */
+/** "Send with payment link" where the link takes payment, else "Send invoice". */
 export function sendLabel(payOnline: boolean): string {
-    return payOnline ? "Send with pay link" : "Send invoice";
+    return payOnline ? "Send with payment link" : "Send invoice";
 }
 
 /** Whether Send (or Send reminder) is offered at all. */
@@ -70,7 +70,7 @@ export function sendConfirmLine(
         return pay ? `${what}, with a way to pay it.` : `${what}.`;
     }
     return pay
-        ? `${what}, with a new pay link. A link you shared before stops working.`
+        ? `${what}, with a new payment link. A link you shared before stops working.`
         : `${what}, with a link to view it and download a copy. A link you shared before stops working.`;
 }
 
@@ -79,7 +79,7 @@ export function sendOutcome(
     result: SendResult,
     first: string,
     reminder: boolean,
-    /** The link went as a pay link (`payOnline`); false, a view link. */
+    /** The link went as a payment link (`payOnline`); false, a view link. */
     payOnline = true,
 ): { message: string; ok: boolean } {
     if (result.email?.status === "SUPPRESSED") {
@@ -88,7 +88,7 @@ export function sendOutcome(
             message: result.thread
                 ? `Posted to ${first}'s account. Not emailed: ${first} has turned off email from you.`
                 : payOnline
-                  ? `Not sent: ${first} has turned off email from you. Copy the pay link and share it another way.`
+                  ? `Not sent: ${first} has turned off email from you. Copy the payment link and share it another way.`
                   : `Not sent: ${first} has turned off email from you. Download the PDF and share it another way.`,
         };
     }
@@ -103,7 +103,7 @@ export function sendOutcome(
         return {
             ok: true,
             message: payOnline
-                ? `${noun} to ${result.email.to} with a pay link.`
+                ? `${noun} to ${result.email.to} with a payment link.`
                 : `${noun} to ${result.email.to}.`,
         };
     }

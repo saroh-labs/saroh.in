@@ -21,10 +21,10 @@ import { alsoSellToast } from "@/lib/services/also-sell";
  * Settings › Modules uses, so the menu, `/class-packs` and Settings all
  * follow. Turning one off takes Undo; nothing it holds is deleted.
  *
- * A quiet row under the list since the Bookings audit (12 Oct 2026): the
- * list starts the screen, and a switch for a module doesn't sit where it
- * should begin. Once Courses is on, "New course" is in the header's New
- * service menu.
+ * Under the list since the Bookings audit (12 Oct 2026): the list starts
+ * the screen. A card of tick rows on a phone, two cards at the desk (U15,
+ * BKMServices and BKDStates). Once Courses is on, "New course" is in the
+ * New service menu.
  */
 export function AlsoSell({
     features,
@@ -70,28 +70,40 @@ export function AlsoSell({
             role="group"
             aria-label="Also sell"
             aria-busy={pending || undefined}
-            className="mt-4 flex flex-wrap items-start gap-x-[18px] gap-y-1.5 px-[14px]"
+            // A card of rows on a phone; a heading and two cards at the desk
+            // (BKMServices, BKDStates).
+            className="mt-3.5 rounded-xl border border-border bg-card px-3.5 pb-1 min-[760px]:mt-[22px] min-[760px]:border-0 min-[760px]:bg-transparent min-[760px]:p-0"
         >
-            <span className="text-[13px] font-medium leading-snug text-muted-foreground">
+            <span aria-hidden className="label block pt-2.5 min-[760px]:hidden">
                 Also sell
             </span>
-            {features.map((f) => (
-                <CheckRow
-                    key={f.key}
-                    checked={f.on}
-                    disabled={pending}
-                    onChange={() => flip(f)}
-                    boxClassName="mt-0.5"
-                    className="max-w-[300px] items-start gap-[7px]"
-                >
-                    <span>
-                        {f.label}
-                        <span className="block text-[11.5px] text-muted-foreground">
-                            {f.note}
+            <span
+                aria-hidden
+                className="mb-2.5 hidden font-display text-base font-semibold tracking-tight min-[760px]:block"
+            >
+                Also sell
+            </span>
+            <div className="divide-y divide-border min-[760px]:grid min-[760px]:grid-cols-2 min-[760px]:gap-3 min-[760px]:divide-y-0">
+                {features.map((f) => (
+                    <CheckRow
+                        key={f.key}
+                        checked={f.on}
+                        disabled={pending}
+                        onChange={() => flip(f)}
+                        boxClassName="mt-0.5"
+                        className="min-h-14 items-start gap-3 py-2.5 min-[760px]:rounded-xl min-[760px]:border min-[760px]:border-border min-[760px]:bg-card min-[760px]:px-3.5"
+                    >
+                        <span>
+                            <span className="block text-[14.5px] font-semibold text-foreground">
+                                {f.label}
+                            </span>
+                            <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+                                {f.note}
+                            </span>
                         </span>
-                    </span>
-                </CheckRow>
-            ))}
+                    </CheckRow>
+                ))}
+            </div>
             <TurnOnSheet
                 picked={picked}
                 modules={modules}

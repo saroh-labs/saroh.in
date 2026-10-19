@@ -196,3 +196,57 @@ export function legendOf(drawn: {
     if (drawn.blocks.some((b) => !isLive(b))) keys.push("cancelled");
     return keys;
 }
+
+// ── The week's days (U5) ────────────────────────────────────────────────────
+
+/**
+ * How full a day is, 0 to 1: the share of everyone's open time that live
+ * bookings take, each person against their own hours. Null when no column
+ * knows its hours (nothing to measure against) or nobody is open.
+ */
+export function dayFullness(columns: readonly Column[]): number | null {
+    let open = 0;
+    let taken = 0;
+    for (const c of columns) {
+        if (!c.day) continue;
+        const windows = mergeSpans(c.day.windows);
+        const minutes = (spans: readonly Span[]) =>
+            spans.reduce((n, [a, b]) => n + Math.max(0, b - a), 0);
+        open += minutes(windows);
+        const busy = mergeSpans(
+            c.blocks.filter(isLive).map((b): Span => [b.start, b.end]),
+        );
+        taken += minutes(windows) - minutes(subtractSpans(windows, busy));
+    }
+    return open > 0 ? Math.min(1, taken / open) : null;
+}
+
+/**
+ * Why nobody takes bookings on a day, when nobody does: `weekly` when
+ * nobody shown works that weekday at all ("Closed on Sundays"), `day` when
+ * it is this date only (time off, say). Null on a day somebody works, or
+ * when the hours are not known, so a guess never reads as closed.
+ */
+export function closedKind(
+    columns: readonly Column[],
+    worksWeekday: (key: string) => boolean,
+): "weekly" | "day" | null {
+    const known = columns.filter((c) => c.day !== null);
+    if (known.length === 0) return null;
+    if (known.some((c) => (c.day?.windows.length ?? 0) > 0)) return null;
+    return known.some((c) => worksWeekday(c.key)) ? "day" : "weekly";
+}
+
+/**
+ * The lanes of a week on Everyone: one per person who has a column on any
+ * day of it, in the order the day draws them. One lane needs no dividing.
+ */
+export function weekLanes(
+    days: readonly (readonly Column[])[],
+): { key: string; name: string }[] {
+    const seen = new Map<string, string>();
+    for (const cols of days) {
+        for (const c of cols) if (!seen.has(c.key)) seen.set(c.key, c.name);
+    }
+    return Array.from(seen, ([key, name]) => ({ key, name }));
+}

@@ -1,263 +1,496 @@
 "use client";
 
-import { Badge } from "@saroh/ui/badge";
+import { EmptyState, FailedState } from "@saroh/ui/data-state";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
+import { ListSearch } from "@saroh/ui/list-search";
+import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
+import { ListFilter, ListToolbar } from "@saroh/ui/list-toolbar";
+import { useLocalPages } from "@saroh/ui/page-sizes";
+import { ScrollX } from "@saroh/ui/scroll-x";
 import { CalendarDays } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState } from "react";
 
-import { CancelBookingControl } from "@/components/bookings/cancel-booking-control";
-import { DataView } from "@/components/shared/data-view/data-view";
-import type {
-    DataColumn,
-    DataFilter,
-} from "@/components/shared/data-view/types";
+import {
+    BookingRow,
+    ROW_GRID,
+} from "@/components/bookings/all-bookings/booking-row";
+import { MoreBookingFilters } from "@/components/bookings/all-bookings/more-filters";
+import { MoveSheet } from "@/components/bookings/all-bookings/move-sheet";
+import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
+import { TakePayment } from "@/components/bookings/take-payment";
+import { ChipGroup } from "@/components/shared/choice-group";
+import { useHold } from "@/components/shared/use-hold";
 import { ShareLinkButton } from "@/components/sites/share-link-button";
 import { personHref } from "@/lib/contacts/person-href";
-import { formatDate, formatTimeRange } from "@/lib/format/datetime";
-// From ./booking-state, NOT ./service: this is a client component, and the
-// service module reaches next/headers through the CRM HTTP plumbing.
-import { bookingStatus } from "@/lib/format/status";
+import { formatDateTime } from "@/lib/format/datetime";
+import { firstName } from "@/lib/names";
+import { recordBookingOutcome } from "@/lib/services/actions";
+import type {
+    MoreFilters,
+    Order,
+    RowAbilities,
+    ViewId,
+} from "@/lib/services/all-bookings";
 import {
-    hasEnded,
-    isInNextWeek,
-    needsOutcome,
-} from "@/lib/services/booking-state";
-import type { BookingWithService } from "@/lib/services/service";
+    asksOutcome,
+    defaultOrder,
+    emptyView,
+    groupByDay,
+    inView,
+    matchesMore,
+    matchesSearch,
+    moreChoices,
+    moreCount,
+    NO_MORE,
+    ordered,
+    personLabel,
+    readView,
+    rowMenu,
+    rowStatus,
+    takeLabel,
+    viewCounts,
+    VIEWS,
+} from "@/lib/services/all-bookings";
+import type { DiaryBooking } from "@/lib/services/booking-calendar";
+import type { BookingOutcome } from "@/lib/services/booking-state";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
+import { whoFor } from "@/lib/services/diary";
+import { zoneShortName } from "@/lib/services/time-picker";
 import type { ShareLink } from "@/lib/sites/share-links";
 
 /**
- * The schedule as a register.
+ * All bookings (U11; BKMAllBookings on a phone, BKDAllBookings at a desk):
+ * the register behind the calendar, kept whole because its views answer
+ * questions a diary does not — what's coming, what's waiting to be
+ * marked, what's awaiting payment.
  *
- * Bookings were a list of cards grouped by day, which read well and sorted
- * badly: there was no way to ask "which of these are unconfirmed" or "who books
- * the most" without scrolling the whole thing. A table sorts, filters and
- * compares; the day axis survives as the `when` column's heading line and as
- * the Today / This week filters, which is where it was actually doing work.
- *
- * Every time on this screen is rendered in the BOOKING'S OWN timezone — the one
- * the booker saw — not the viewer's. That is why `formatTimeRange` takes a zone
- * explicitly and why the zone travels on every row.
+ * - The views are chips with counts (Upcoming, Needs an outcome, Awaiting
+ *   payment, Today, Next 7 days, All), after the search; More filters
+ *   narrows by service, by who it is with and by status. `?view=` names
+ *   the view, as Home's links do.
+ * - Rows sit under day headings ("Today · Mon 19 Oct", "Earlier today"),
+ *   every time in the business's zone, labelled ("When · IST", Q10).
+ * - A booking that has ended unmarked asks "Did they come?" on its row:
+ *   Came or Didn't come, held ten seconds with Undo.
+ * - Each row's menu: Mark arrived, Take ₹X, Move to another time, Open the
+ *   booking, Open their page, Cancel booking. Every cancel goes through the
+ *   one cancel sheet (U3), which asks about the money (BA-01).
  */
 
-const EMPTY_NOTE = "They show here when a customer books, or when you add one.";
-
-const FILTERS: DataFilter<BookingWithService>[] = [
-    // Upcoming leads, because the schedule is mostly read forwards. "Needs an
-    // outcome" is the one that earns its place beside it: those appointments
-    // are finished, invisible to every other view, and only a person can
-    // resolve them (#241).
-    { id: "upcoming", label: "Upcoming", predicate: (b) => !hasEnded(b) },
-    {
-        id: "outcome",
-        label: "Needs an outcome",
-        predicate: (b) => needsOutcome(b),
-    },
-    { id: "all", label: "All" },
-    {
-        id: "today",
-        label: "Today",
-        predicate: (b) =>
-            formatDate(b.startAt, b.timezone, {
-                weekday: "short",
-                relative: true,
-                now: new Date(),
-            }) === "Today",
-    },
-    {
-        id: "week",
-        label: "Next 7 days",
-        predicate: (b) => isInNextWeek(b),
-    },
-    {
-        id: "unconfirmed",
-        label: "To confirm",
-        predicate: (b) => b.status === "PENDING",
-    },
-];
-
-/**
- * Who the booking is for.
- *
- * The linked CRM contact wins over the name typed into the public form: the
- * contact is the record the business keeps, the typed name is whatever the
- * booker happened to enter. Email is the last resort before admitting we do not
- * know — and "Unknown booker" is only reached for a walk-in with no contact and
- * no details, which is a real state and not a rendering failure.
- */
-function bookerLabel(booking: BookingWithService): string {
-    const contact = booking.contact;
-    if (contact) {
-        const full = [contact.firstName, contact.lastName]
-            .filter(Boolean)
-            .join(" ")
-            .trim();
-        if (full) return full;
-        if (contact.email) return contact.email;
-    }
-    const name = booking.bookerName?.trim();
-    if (name) return name;
-    const email = booking.bookerEmail?.trim();
-    if (email) return email;
-    return "Unknown booker";
+/** The business's zone, the viewer's permissions and the desk's ways to pay. */
+export interface AllBookingsCan extends RowAbilities {
+    /** `payment:manage`: may refund what the policy keeps. */
+    refund: boolean;
+    /** `order:read`: a treatment's visit links to its order. */
+    readOrder: boolean;
+    /** A payment link may be sent from Take ₹X. */
+    link: boolean;
+    /** The plan takes payment online. */
+    online: boolean;
 }
+
+const EMPTY_LINE =
+    "They show here when a customer books from your booking page, or when you add one.";
+
+const ORDERS = [
+    { value: "soonest", label: "Soonest first" },
+    { value: "latest", label: "Latest first" },
+] as const;
 
 export function BookingsView({
     bookings,
+    timezone,
+    now,
     initialView,
+    can,
     share = null,
 }: {
-    bookings: BookingWithService[];
+    bookings: DiaryBooking[];
+    /** The business's zone: every time is read in it (Q10). */
+    timezone: string;
+    /** The server's now, so the first render and the browser agree. */
+    now: number;
     initialView?: string;
+    can: AllBookingsCan;
     /**
      * A business with no bookings yet is offered "Share your booking page"
-     * while the page is live (DEC-069, L8); null leaves the plain empty
-     * line, with nothing to share.
+     * while the page is live (DEC-069, L8); null leaves it out.
      */
     share?: ShareLink | null;
 }) {
-    const now = new Date();
+    const router = useRouter();
+    const [view, setViewState] = useState<ViewId>(() => readView(initialView));
+    const [term, setTerm] = useState("");
+    const [searchKey, setSearchKey] = useState(0);
+    const [more, setMore] = useState<MoreFilters>(NO_MORE);
+    const [orderPick, setOrderPick] = useState<Order | null>(null);
+    const order = orderPick ?? defaultOrder(view);
 
-    const columns: DataColumn<BookingWithService>[] = [
-        {
-            id: "when",
-            header: "When",
-            priority: "primary",
-            sortValue: (b) => new Date(b.startAt).getTime(),
-            cell: (b) => (
-                <span className="block whitespace-nowrap">
-                    <span className="block text-xs text-muted-foreground">
-                        {formatDate(b.startAt, b.timezone, {
-                            weekday: "short",
-                            relative: true,
-                            now,
-                        })}
-                    </span>
-                    <span className="block whitespace-nowrap font-medium tabular-nums">
-                        {formatTimeRange(b.startAt, b.endAt, b.timezone)}
-                    </span>
-                </span>
+    // Came / Didn't come, shown at once and held ten seconds with Undo.
+    const { hold, send, undo, pending } = useHold();
+    const [marks, setMarks] = useState<Partial<Record<string, BookingOutcome>>>(
+        {},
+    );
+    const [cancelling, setCancelling] = useState<DiaryBooking | null>(null);
+    const [moving, setMoving] = useState<DiaryBooking | null>(null);
+    const [taking, setTaking] = useState<DiaryBooking | null>(null);
+    const triggers = useRef(new Map<string, HTMLButtonElement>());
+    // The row whose menu opened the sheet: the keyboard goes back to its
+    // ⋯ when the sheet closes (read after the sheet's own state is gone).
+    const lastRow = useRef<string | null>(null);
+    const backToRow = () =>
+        lastRow.current ? triggers.current.get(lastRow.current) : null;
+
+    const zoneLabel = zoneShortName(timezone, now);
+
+    const setView = (next: ViewId) => {
+        setViewState(next);
+        setOrderPick(null);
+        // The address keeps the view, without a trip to the server.
+        const url = new URL(window.location.href);
+        if (next === "upcoming") url.searchParams.delete("view");
+        else url.searchParams.set("view", next);
+        window.history.replaceState(null, "", url.toString());
+    };
+
+    const narrowed = useMemo(
+        () =>
+            bookings.filter(
+                (b) => matchesSearch(b, term) && matchesMore(b, more),
             ),
-        },
-        {
-            id: "service",
-            header: "Service",
-            priority: "secondary",
-            sortValue: (b) => (b.service?.name ?? "").toLowerCase(),
-            cell: (b) => b.service?.name ?? "Service",
-        },
-        {
-            id: "booker",
-            // Who it is for — not always who made it, since a booking can be
-            // made by hand (#384).
-            header: "Who",
-            priority: "secondary",
-            sortValue: (b) => bookerLabel(b).toLowerCase(),
-            cell: (b) =>
-                // A linked contact is a destination — their Customer Detail,
-                // as from the peek (E5); a typed-in name is not.
-                b.contact ? (
-                    <Link
-                        href={personHref(b.contact.id)}
-                        className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                    >
-                        {bookerLabel(b)}
-                    </Link>
-                ) : (
-                    <span className="text-muted-foreground">
-                        {bookerLabel(b)}
-                    </span>
-                ),
-        },
-        {
-            id: "timezone",
-            header: "Timezone",
-            priority: "detail",
-            sortValue: (b) => b.timezone,
-            // Shown because the times above are NOT the viewer's: without the
-            // zone stated, a merchant reading "9:00 AM" has no way to know
-            // whose nine it is.
-            cell: (b) => (
-                <span className="whitespace-nowrap text-xs text-muted-foreground">
-                    {b.timezone}
-                </span>
+        [bookings, term, more],
+    );
+    const counts = useMemo(
+        () => viewCounts(narrowed, now, timezone),
+        [narrowed, now, timezone],
+    );
+    const shown = useMemo(
+        () =>
+            ordered(
+                narrowed.filter((b) => inView(view, b, now, timezone)),
+                order,
             ),
-        },
-        {
-            id: "outcome",
-            header: "How it went",
-            priority: "secondary",
-            sortValue: (b) => b.outcome ?? "",
-            // Only meaningful once an appointment is over, and deliberately
-            // blank rather than "—" for a future one: there is nothing to
-            // report yet, which is different from nobody having said.
-            cell: (b) =>
-                b.outcome ? (
-                    <span
-                        className={cn(
-                            b.outcome === "NO_SHOW"
-                                ? "text-warning-subtle-foreground"
-                                : "text-muted-foreground",
-                        )}
-                    >
-                        {b.outcome === "ATTENDED" ? "Attended" : "No-show"}
-                    </span>
-                ) : needsOutcome(b) ? (
-                    <span className="text-muted-foreground">Not said yet</span>
-                ) : null,
-        },
-        {
-            id: "status",
-            header: "Status",
-            priority: "secondary",
-            sortValue: (b) => b.status,
-            cell: (b) => (
-                <Badge
-                    variant={
-                        b.status === "CONFIRMED"
-                            ? "success"
-                            : b.status === "CANCELLED"
-                              ? "neutral"
-                              : "warning"
-                    }
-                >
-                    {bookingStatus(b.status)}
-                </Badge>
-            ),
-        },
-    ];
+        [narrowed, view, now, timezone, order],
+    );
+    const choices = useMemo(() => moreChoices(bookings), [bookings]);
+    const { rows: pageRows, paging } = useLocalPages("bookings", shown, {
+        label: "Pages of bookings",
+        resetOn: `${view}|${term}|${JSON.stringify(more)}|${order}`,
+    });
+    const groups = useMemo(
+        () => groupByDay(pageRows, timezone, now),
+        [pageRows, timezone, now],
+    );
+
+    const searching = term.trim() !== "";
+    const filtering = moreCount(more) > 0;
+    const clearAll = () => {
+        setTerm("");
+        setSearchKey((k) => k + 1);
+        setMore(NO_MORE);
+    };
+
+    const mark = (b: DiaryBooking, outcome: BookingOutcome) => {
+        const key = `outcome:${b.id}`;
+        const was = marks[b.id];
+        // Undone or refused: back to what it was, unless a newer mark has
+        // been made on top of this one since.
+        const back = () =>
+            setMarks((all) => {
+                if (all[b.id] !== outcome) return all;
+                const next = { ...all };
+                if (was) next[b.id] = was;
+                else delete next[b.id];
+                return next;
+            });
+        setMarks((all) => ({ ...all, [b.id]: outcome }));
+        const first = firstName(whoFor(b));
+        hold(
+            key,
+            outcome === "ATTENDED"
+                ? `${first || "They"} ${BOOKING_WORDS.came.toLowerCase()}.`
+                : `Marked ${first || "them"} as ${BOOKING_WORDS.didntCome.toLowerCase()}.`,
+            async () => {
+                try {
+                    return await recordBookingOutcome(b.id, outcome);
+                } finally {
+                    router.refresh();
+                }
+            },
+            back,
+        );
+    };
+
+    const whenLine = (b: DiaryBooking) =>
+        `${formatDateTime(b.startAt, timezone, { weekday: "short", relative: true, now })} · ${b.service.name}${b.staff ? ` with ${b.staff.name}` : ""}`;
+
+    if (bookings.length === 0) {
+        return (
+            <EmptyState
+                icon={<CalendarDays />}
+                title="No bookings yet"
+                description={EMPTY_LINE}
+                action={share ? <ShareLinkButton link={share} /> : undefined}
+            />
+        );
+    }
+
+    const empty = emptyView(view, bookings.length);
 
     return (
-        <DataView
-            viewId="bookings"
-            rows={bookings}
-            columns={columns}
-            rowKey={(b) => b.id}
-            // A row is a destination now (#121): the detail screen is where a
-            // booking is moved, and where the two questions a merchant is
-            // asked on the phone — who is this, can we move it — are answered.
-            rowHref={(b) => `/bookings/${b.id}`}
-            modes={["table", "list"]}
-            defaultMode="table"
-            noun={{ one: "booking", other: "bookings" }}
-            showTotal={false}
-            filters={FILTERS}
-            initialFilterId={initialView ?? "upcoming"}
-            searchableColumnIds={["service", "booker"]}
-            emptyState={{
-                icon: <CalendarDays />,
-                title: "No bookings yet",
-                note: EMPTY_NOTE,
-                action: share ? <ShareLinkButton link={share} /> : undefined,
-            }}
-            rowActions={(b) =>
-                // Not for an appointment that already happened: cancelling one
-                // is meaningless, and the detail screen offers an outcome
-                // instead (#241). A row must not offer what the screen behind
-                // it refuses.
-                b.status === "CONFIRMED" && !hasEnded(b) ? (
-                    <CancelBookingControl bookingId={b.id} />
-                ) : null
-            }
+        <div className="grid gap-3.5">
+            <ListToolbar
+                search={
+                    <ListSearch
+                        key={searchKey}
+                        placeholder="Search bookings"
+                        describe="By name, phone or service"
+                        onSearch={setTerm}
+                    />
+                }
+                filters={
+                    // A flex item is as wide as its chips unless told it
+                    // may shrink: without min-w-0 the strip set the page
+                    // 816px wide on a phone, which then zoomed out.
+                    <div className="min-w-0 max-[759px]:w-full">
+                        <ScrollX
+                            bare
+                            label="Show"
+                            current='[aria-checked="true"]'
+                            revealKey={view}
+                            className="max-[759px]:-mx-4 max-[759px]:px-4 min-[760px]:overflow-visible"
+                        >
+                            <div className="flex items-center gap-1.5 max-[759px]:w-max min-[760px]:flex-wrap">
+                                <ChipGroup
+                                    label="Show"
+                                    value={view}
+                                    onChange={setView}
+                                    className="flex-nowrap max-[759px]:w-max min-[760px]:flex-wrap"
+                                    choices={VIEWS.map((v) => ({
+                                        value: v.id,
+                                        label: (
+                                            <>
+                                                {v.label}
+                                                {/* A real space: it is named "Upcoming 18". */}{" "}
+                                                <span className="tabular-nums opacity-70">
+                                                    {counts[v.id]}
+                                                </span>
+                                            </>
+                                        ),
+                                    }))}
+                                />
+                                <MoreBookingFilters
+                                    value={more}
+                                    onChange={setMore}
+                                    services={choices.services}
+                                    staff={choices.staff}
+                                    showing={shown.length}
+                                />
+                            </div>
+                        </ScrollX>
+                    </div>
+                }
+                onClear={searching || filtering ? clearAll : undefined}
+                clearLabel={filtering ? "Clear filters" : "Clear search"}
+                end={
+                    <ListFilter
+                        label="Order"
+                        value={order}
+                        onValueChange={(v) => setOrderPick(v)}
+                        options={ORDERS}
+                        narrowed={false}
+                    />
+                }
+                count={
+                    searching || filtering
+                        ? `${narrowed.length} of ${bookings.length} bookings`
+                        : undefined
+                }
+            />
+
+            {shown.length === 0 ? (
+                searching || filtering ? (
+                    <EmptyState
+                        kind="no-results"
+                        things="bookings"
+                        cause={filtering ? "filters" : "search"}
+                        query={term}
+                        onClear={clearAll}
+                    />
+                ) : (
+                    <EmptyState
+                        kind="no-results"
+                        things="bookings"
+                        cause="view"
+                        data-ph-unmask=""
+                        title={empty.title}
+                        description={empty.line}
+                        onClear={() => setView("all")}
+                    />
+                )
+            ) : (
+                <>
+                    {/* One card with day bands at a desk; on a phone each
+                        day is its own card under its heading (BKMAllBookings). */}
+                    <ListTable className="max-[759px]:grid max-[759px]:gap-4 max-[759px]:overflow-visible max-[759px]:rounded-none max-[759px]:border-0 max-[759px]:bg-transparent">
+                        <ListTableHead
+                            className={`${ROW_GRID} max-[759px]:hidden`}
+                        >
+                            <span>When · {zoneLabel}</span>
+                            <span>Customer</span>
+                            <span>Service · with</span>
+                            <span>Did they come?</span>
+                            <span>Status</span>
+                            <span className="sr-only">Actions</span>
+                        </ListTableHead>
+                        {groups.map((g) => (
+                            <section
+                                key={g.key}
+                                aria-label={g.label}
+                                className="min-[760px]:border-b min-[760px]:border-border min-[760px]:last:border-b-0"
+                            >
+                                <h2
+                                    className={cn(
+                                        listTable.group,
+                                        "max-[759px]:border-0 max-[759px]:px-0 max-[759px]:pt-0",
+                                    )}
+                                >
+                                    {g.label}
+                                </h2>
+                                <ul className="max-[759px]:overflow-hidden max-[759px]:rounded-[12px] max-[759px]:border max-[759px]:border-border max-[759px]:bg-card">
+                                    {g.rows.map((b) => {
+                                        const markKey = `outcome:${b.id}`;
+                                        const markedNow = marks[b.id];
+                                        const items = rowMenu(b, can, now);
+                                        return (
+                                            <BookingRow
+                                                key={b.id}
+                                                booking={b}
+                                                zone={timezone}
+                                                status={rowStatus(b, now)}
+                                                asks={asksOutcome(b, now)}
+                                                canMark={can.book}
+                                                marked={
+                                                    markedNow
+                                                        ? {
+                                                              outcome:
+                                                                  markedNow,
+                                                              undo: pending.includes(
+                                                                  markKey,
+                                                              )
+                                                                  ? () =>
+                                                                        undo(
+                                                                            markKey,
+                                                                        )
+                                                                  : null,
+                                                          }
+                                                        : null
+                                                }
+                                                onMark={(o) => mark(b, o)}
+                                                onUndo={() => undo(markKey)}
+                                                when={whenLine(b)}
+                                                heading={`${whoFor(b)} · ${formatDateTime(b.startAt, timezone, { relative: "lower", now })}`}
+                                                triggerRef={(el) => {
+                                                    if (el)
+                                                        triggers.current.set(
+                                                            b.id,
+                                                            el,
+                                                        );
+                                                    else
+                                                        triggers.current.delete(
+                                                            b.id,
+                                                        );
+                                                }}
+                                                menu={{
+                                                    actions: items,
+                                                    takeLabel: takeLabel(b),
+                                                    personLabel: personLabel(b),
+                                                    openHref: `/bookings/${b.id}`,
+                                                    personHref: b.contact
+                                                        ? personHref(
+                                                              b.contact.id,
+                                                          )
+                                                        : null,
+                                                    cancelling:
+                                                        pending.includes(
+                                                            `cancel-booking:${b.id}`,
+                                                        ),
+                                                    onArrived: () =>
+                                                        mark(b, "ATTENDED"),
+                                                    onTake: () => {
+                                                        lastRow.current = b.id;
+                                                        setTaking(b);
+                                                    },
+                                                    onMove: () => {
+                                                        lastRow.current = b.id;
+                                                        setMoving(b);
+                                                    },
+                                                    onCancel: () => {
+                                                        lastRow.current = b.id;
+                                                        setCancelling(b);
+                                                    },
+                                                }}
+                                            />
+                                        );
+                                    })}
+                                </ul>
+                            </section>
+                        ))}
+                    </ListTable>
+                    {paging}
+                </>
+            )}
+
+            <CancelSheet
+                open={cancelling !== null}
+                booking={{
+                    id: cancelling?.id ?? "",
+                    who: cancelling ? whoFor(cancelling) : "",
+                    when: cancelling ? whenLine(cancelling) : undefined,
+                    freeCancelUntil: null,
+                    timezone,
+                }}
+                canRefund={can.refund}
+                canReadOrder={can.readOrder}
+                send={send}
+                returnFocusTo={backToRow}
+                onClose={() => setCancelling(null)}
+            />
+            <MoveSheet
+                booking={moving}
+                timezone={timezone}
+                returnFocusTo={backToRow}
+                onClose={() => setMoving(null)}
+            />
+            {taking?.take ? (
+                <TakePayment
+                    open
+                    onOpenChange={(o) => {
+                        if (!o) setTaking(null);
+                    }}
+                    bookingId={taking.id}
+                    take={taking.take}
+                    currency={taking.service.currency ?? null}
+                    who={whoFor(taking)}
+                    canLink={can.link}
+                    online={can.online}
+                />
+            ) : null}
+        </div>
+    );
+}
+
+/**
+ * The register couldn't be read: said, with Try again, never "No bookings
+ * yet" (an empty register would be a lie).
+ */
+export function BookingsCouldntLoad() {
+    return (
+        <FailedState
+            title={couldntLoad("your bookings")}
+            retryHref="/bookings/all"
         />
     );
 }

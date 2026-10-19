@@ -41,7 +41,7 @@ describe("what the sheet starts from", () => {
     it("types back as the same link, so an untouched sheet sends nothing", () => {
         expect(socialPatch(socialDraftOf(SAVED), SAVED)).toEqual({});
         expect(socialFieldValue("whatsapp", "https://wa.me/442079460958")).toBe(
-            "+442079460958",
+            "+44 207 946 0958",
         );
     });
 });

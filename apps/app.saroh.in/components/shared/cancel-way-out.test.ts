@@ -28,7 +28,8 @@ const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
     ],
     [
         "a booking",
-        "components/bookings/cancel-booking-control.tsx",
+        // The one cancel sheet every screen opens (U3).
+        "components/bookings/sheets/cancel-sheet.tsx",
         '"Cancel booking"',
         "Keep booking",
     ],

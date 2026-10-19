@@ -3,6 +3,7 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
@@ -10,6 +11,8 @@ import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { errorName } from "../commission/commission-queue";
+import { settleMonthBeforeLinkInTx } from "../commission/commission-settle";
 import type { LinkKind, LinkSource } from "../organizations/account-manager";
 import {
     BILLING_STATES,
@@ -128,6 +131,8 @@ export async function managerOf(
  */
 @Injectable()
 export class AdminAccountManagersService {
+    private readonly logger = new Logger(AdminAccountManagersService.name);
+
     constructor(private readonly audit: AdminAuditService) {}
 
     /**
@@ -220,12 +225,12 @@ export class AdminAccountManagersService {
         staff: PlatformAdminInfo,
         organizationId: string,
         input: { platformAdminId: string; reason: string },
+        now: Date = new Date(),
     ): Promise<{ manager: ManagerView; previous: ManagerView | null }> {
         assertAssigner(staff);
         const reason = requireReason(input.reason);
-        return this.writing(async (tx) => {
+        const done = await this.writing(async (tx) => {
             await lockBusiness(tx, organizationId);
-            const now = new Date();
             await openBusiness(tx, organizationId);
             await assertMayLookAfter(
                 tx,
@@ -282,6 +287,10 @@ export class AdminAccountManagersService {
             if (!manager) throw new Error("The new link did not read back");
             return { manager, previous };
         });
+        // The month counts: this month's payments made with no manager are
+        // theirs now, written once the link is in.
+        await this.settleMonthAfterLink(organizationId, now);
+        return done;
     }
 
     /** End the business's link, with a reason; it then has no manager. */
@@ -345,9 +354,10 @@ export class AdminAccountManagersService {
         const named = input.organizationIds
             ? [...new Set(input.organizationIds)]
             : null;
-        return this.writing(async (tx) => {
+        let now = new Date();
+        const done = await this.writing(async (tx) => {
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"account-managers:share-out"}))`;
-            const now = new Date();
+            now = new Date();
             const managers = await shareOutManagers(tx, now);
             if (managers.length === 0) {
                 throw new ConflictException(
@@ -414,6 +424,40 @@ export class AdminAccountManagersService {
             });
             return { assigned, left: plan.left.length };
         }, SHARE_OUT_TX);
+        // One business at a time, each in its own short transaction, once
+        // every link is in: no business's locks are held over another's.
+        for (const pick of done.assigned) {
+            await this.settleMonthAfterLink(pick.organizationId, now);
+        }
+        return done;
+    }
+
+    /**
+     * The month counts (DEC-169): write the lines of the business's
+     * payments earlier in the month its manager started, in a short
+     * transaction of its own after the link committed. A failure never
+     * undoes the assignment: it is logged, and the commission sweep's
+     * Re-run writes those lines on its next run.
+     */
+    private async settleMonthAfterLink(
+        organizationId: string,
+        startedAt: Date,
+    ): Promise<void> {
+        try {
+            await prisma.$transaction((tx) =>
+                settleMonthBeforeLinkInTx(
+                    tx,
+                    this.logger,
+                    organizationId,
+                    startedAt,
+                    startedAt,
+                ),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `account_manager_month_settle_failed organization=${organizationId}: ${errorName(error)}; the commission sweep writes them`,
+            );
+        }
     }
 
     private async writing<T>(

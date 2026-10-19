@@ -158,7 +158,7 @@ const NO_RECORD =
  * The order is not paid, so the kitchen is blocked (the API offers no next
  * step). Saroh sends no messages, so this says nothing was sent — and offers
  * what the counter can do: record cash taken for it, or, when a payment
- * didn't go through, a pay link to copy and send (B11).
+ * didn't go through, a payment link to copy and send (B11).
  *
  * An order the customer chose to pay at the handover on the website
  * (`handover`) isn't blocked: it is made and brought as usual, and only its
@@ -189,7 +189,7 @@ export function PaymentBanner({
     first: string;
     canRecord: boolean;
     onCash: () => void;
-    /** Make (or replace) the pay link — only when one can be made. */
+    /** Make (or replace) the payment link — only when one can be made. */
     onSendLink?: () => void;
     sending?: boolean;
     /** Paid at the handover: how ("collection" or "delivery"). */
@@ -311,7 +311,7 @@ export function PaymentBanner({
                         className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground"
                     >
                         {failed
-                            ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first}. ${link ? "Send them a pay link" : "Ask them to pay again"}, or take it in cash.`
+                            ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first}. ${link ? "Send them a payment link" : "Ask them to pay again"}, or take it in cash.`
                             : pending
                               ? `${pending.detail}${canRecord ? "" : ` ${NO_RECORD}`}`
                               : canRecord
@@ -326,7 +326,7 @@ export function PaymentBanner({
                         busy={sending}
                         busyLabel="Making a link…"
                     >
-                        Send a pay link
+                        Send a payment link
                     </Button>
                 ) : null}
                 {canRecord ? (

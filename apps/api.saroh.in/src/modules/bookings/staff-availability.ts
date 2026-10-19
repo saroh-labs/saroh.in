@@ -19,6 +19,8 @@ type Db = Pick<
     | "staffTimeOff"
     | "businessClosure"
     | "booking"
+    | "staffMember"
+    | "bookingRules"
 >;
 
 /** Where no business has said otherwise (the product is India-first). */
@@ -109,7 +111,8 @@ export async function loadClosures(
  * Everything the engine needs for these people over `[from, to)` — padded a
  * day either side, like the engine's own windows. The business's closures
  * count as everyone's time off (E3). `excludeBookingId` leaves out a booking
- * being moved, so it does not collide with itself.
+ * being moved, so it does not collide with itself. Each person's gap
+ * between bookings is their own, else the business's (DEC-170, #1038).
  */
 export async function loadPeople(
     db: Db,
@@ -122,7 +125,7 @@ export async function loadPeople(
     if (staffIds.length === 0) return [];
     const padFrom = new Date(from.getTime() - 2 * DAY);
     const padTo = new Date(to.getTime() + 2 * DAY);
-    const [hours, extra, off, busy, closed] = await Promise.all([
+    const [hours, extra, off, busy, closed, gaps] = await Promise.all([
         db.staffHours.findMany({
             where: { staffId: { in: staffIds } },
             select: {
@@ -163,6 +166,7 @@ export async function loadPeople(
             select: { staffId: true, startAt: true, endAt: true },
         }),
         loadClosures(db, organizationId, from, to),
+        loadGaps(db, organizationId, staffIds),
     ]);
     const pick = <T extends { staffId: string | null }>(
         rows: T[],
@@ -186,5 +190,34 @@ export async function loadPeople(
         })),
         timeOff: [...pick(off, id).map(interval), ...closed.map(interval)],
         busy: pick(busy, id).map(interval),
+        gapMinutes: gaps.get(id) ?? 0,
     }));
+}
+
+/**
+ * Each person's gap between bookings: their own, else the business's
+ * "Gap between bookings" (none by default).
+ */
+export async function loadGaps(
+    db: Pick<Db, "staffMember" | "bookingRules">,
+    organizationId: string,
+    staffIds: readonly string[],
+): Promise<Map<string, number>> {
+    const [business, people] = await Promise.all([
+        db.bookingRules.findUnique({
+            where: { organizationId },
+            select: { gapMinutes: true },
+        }),
+        db.staffMember.findMany({
+            where: { organizationId, id: { in: [...staffIds] } },
+            select: { id: true, gapMinutes: true },
+        }),
+    ]);
+    const fallback = business?.gapMinutes ?? 0;
+    const out = new Map<string, number>();
+    for (const id of staffIds) out.set(id, fallback);
+    for (const person of people) {
+        if (person.gapMinutes !== null) out.set(person.id, person.gapMinutes);
+    }
+    return out;
 }

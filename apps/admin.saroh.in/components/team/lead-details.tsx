@@ -4,6 +4,8 @@ import { Button } from "@saroh/ui/button";
 import { DateInput } from "@saroh/ui/date-picker";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
+import { phoneNumberProblem } from "@saroh/ui/lib/phone";
+import { PhoneInput } from "@saroh/ui/phone-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useState, useTransition } from "react";
 
@@ -71,6 +73,10 @@ export function LeadDetailsForm({
                 found[field] = "That email doesn't look right.";
             }
         }
+        if (draft.phone !== before.phone) {
+            const phone = phoneNumberProblem(draft.phone);
+            if (phone) found.phone = phone;
+        }
         setErrors(found);
         if (Object.keys(found).length > 0) return;
 
@@ -134,12 +140,13 @@ export function LeadDetailsForm({
                 />
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Phone" optional>
-                    <Input
+                <Field label="Phone" optional error={errors.phone}>
+                    <PhoneInput
                         name="phone"
-                        type="tel"
                         value={draft.phone}
-                        onChange={set("phone")}
+                        onValueChange={(phone) =>
+                            setDraft((now) => ({ ...now, phone }))
+                        }
                     />
                 </Field>
                 <Field label="City" optional>

@@ -8,7 +8,7 @@ import { StepCard } from "./parts";
 
 /**
  * "Send a payment link" done (B13): the order is made and waits unpaid,
- * and its pay link (B11) is shown this once — only its hash is kept. Saroh
+ * and its payment link (B11) is shown this once — only its hash is kept. Saroh
  * doesn't send it; it is copied and sent to them by hand.
  */
 export function LinkMade({
@@ -35,7 +35,7 @@ export function LinkMade({
                 </code>
                 <ShareLink
                     value={url}
-                    label="Copy pay link"
+                    label="Copy payment link"
                     text="Your link to pay for the order"
                     className="shrink-0"
                 />

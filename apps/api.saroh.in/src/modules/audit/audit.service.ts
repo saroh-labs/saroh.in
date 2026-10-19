@@ -134,6 +134,20 @@ export const AuditAction = {
     // export; metadata is counts and sizes, never a link or a key.
     DataExportRequested: "organization.data_export.requested",
     DataExportDownloaded: "organization.data_export.downloaded",
+    // Booking rules (DEC-170, #1038), each written in the transaction of
+    // the change. The business's: `changes` (each field before and after,
+    // the approval switch and the gap included). A person's own, with the
+    // staff member as the target and their name in `staff`: applied at
+    // once (`via: "direct"`) or by an approval (`via: "approved"`), with
+    // `changes`; and a request's moves — asked (`asked`, the values),
+    // approved, turned down (with `reason` when given) and withdrawn
+    // (`replaced` when a new ask took its place).
+    BookingRulesUpdate: "booking-rules.update",
+    StaffRulesUpdate: "staff.booking-rules.update",
+    StaffRulesRequested: "staff.booking-rules.requested",
+    StaffRulesApproved: "staff.booking-rules.approved",
+    StaffRulesTurnedDown: "staff.booking-rules.turned-down",
+    StaffRulesWithdrawn: "staff.booking-rules.withdrawn",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

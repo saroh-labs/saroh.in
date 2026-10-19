@@ -1,22 +1,24 @@
 // @vitest-environment jsdom
 /**
- * The Service Editor's one Save, which goes in more than one call: the
- * service, then its own weekly hours (`PUT …/rules`).
+ * New and edit service (U16, #1032), at a desk and on a phone.
  *
- * - A new service starts from the business's opening hours where its own
- *   hours are what gives it times, and they are sent with Add service.
- * - When the service is saved and its hours are not, the page says exactly
- *   that, keeps the hours on screen and stays put, and Try again sends
- *   only the hours.
- * - A field says what is wrong once it is left, and Save puts the keyboard
- *   on the first field in error.
+ * New service:
+ * - five plain questions, and a live line saying whether customers could
+ *   book it, for each "Who can book it" mix (neither is paused);
+ * - pressing Add with gaps says how many and which, each at its field,
+ *   and puts the keyboard on the first;
+ * - More details keeps every field, a row each opening its own panel; its
+ *   own hours use the 12-hour editor of Hours and time off;
+ * - a name another service has says so, with the way to it;
+ * - Discard asks "Discard what you typed?";
+ * - one Add in up to three calls: the service, who does it, its hours.
  *
- * And what the Bookings audit (12 Oct 2026) changed on the page:
- *
- * - "When it can be booked" is a card of its own after Time, not a "more"
- *   setting: the service's own hours, or whose hours it books in.
- * - The length is picked from chips, with Custom for any other.
- * - "Taking bookings" is a switch beside Save that acts at once, with Undo.
+ * A saved service:
+ * - "Who can book it" ticks save as they are pressed, with Undo;
+ * - three cards, each opening its panel with one Save; a new length says
+ *   what bookings already made keep;
+ * - More: Pause, and Delete whose confirm offers "Pause it instead";
+ * - a Member reads it, and changes nothing.
  *
  * `react-dom/client` + `act` directly, as the editor's other tests do.
  */
@@ -31,15 +33,11 @@ import type { StaffView } from "@/lib/staff/types";
 
 import { ServiceEditor } from "./service-editor";
 
-// The first test loads the whole page, which takes several seconds on a
-// loaded machine (CI, 12 Oct 2026): past the default five, a timeout there
-// fails it and leaves the page mounted for every test after.
 vi.setConfig({ testTimeout: 20_000 });
 
 const router = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() };
 vi.mock("next/navigation", () => ({
     useRouter: () => router,
-    // `runAction` passes Next's own interrupts on; a plain failure is not one.
     unstable_rethrow: () => undefined,
 }));
 vi.mock("next/link", () => ({
@@ -53,11 +51,14 @@ vi.mock("next/link", () => ({
         </a>
     ),
 }));
+const guard = { release: vi.fn() };
 vi.mock("@/components/shared/use-leave-guard", () => ({
-    useLeaveGuard: () => ({ dialog: null }),
+    useLeaveGuard: () => ({ dialog: null, release: guard.release }),
+    lostNew: (noun: string) => `The ${noun} isn't created yet.`,
 }));
 vi.mock("@/lib/hooks/keyboard-save", () => ({
     useSaveShortcut: () => undefined,
+    submitOnModEnter: () => undefined,
 }));
 
 const api = {
@@ -78,18 +79,20 @@ vi.mock("@/lib/staff/actions", () => ({
         api.setStaffServices(...a) as unknown,
 }));
 
-const toast = { showError: vi.fn(), showSuccess: vi.fn(), showUndo: vi.fn() };
+const toast = {
+    showError: vi.fn(),
+    showSuccess: vi.fn(),
+    showUndo: vi.fn(),
+    dismissToast: vi.fn(),
+};
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
     showSuccess: (...a: unknown[]) => toast.showSuccess(...a) as unknown,
     showUndo: (...a: unknown[]) => toast.showUndo(...a) as unknown,
+    dismissToast: (...a: unknown[]) => toast.dismissToast(...a) as unknown,
 }));
 
 const OPENING = [
-    { dayOfWeek: 1, startMinute: 540, endMinute: 1080 },
-    { dayOfWeek: 2, startMinute: 540, endMinute: 1080 },
-];
-const OPENING_RULES = [
     { dayOfWeek: 1, startMinute: 540, endMinute: 1080 },
     { dayOfWeek: 2, startMinute: 540, endMinute: 1080 },
 ];
@@ -98,11 +101,11 @@ const service = (over: Partial<Service> = {}): Service => ({
     id: "sv_1",
     organizationId: "org_1",
     siteId: null,
-    name: "Glow facial",
-    description: "",
-    durationMinutes: 60,
+    name: "Physio assessment",
+    description: "A first visit.",
+    durationMinutes: 45,
     bufferBeforeMinutes: 0,
-    bufferAfterMinutes: 10,
+    bufferAfterMinutes: 15,
     capacity: 1,
     priceCents: 120_000,
     currency: "INR",
@@ -118,21 +121,14 @@ const service = (over: Partial<Service> = {}): Service => ({
     depositMode: "NONE",
     depositCents: 0,
     showOnBookingPage: true,
+    bookableByTeam: true,
     ...over,
 });
 
-const rule = (dayOfWeek: number): AvailabilityRule => ({
-    id: `r_${dayOfWeek}`,
-    serviceId: "sv_1",
-    dayOfWeek,
-    startMinute: 600,
-    endMinute: 960,
-});
-
 const person = (over: Partial<StaffView> = {}): StaffView => ({
-    id: "st_1",
-    name: "Asha",
-    title: null,
+    id: "st_meera",
+    name: "Meera Iyer",
+    title: "Physiotherapist",
     status: "ACTIVE",
     membership: null,
     serviceIds: [],
@@ -142,48 +138,69 @@ const person = (over: Partial<StaffView> = {}): StaffView => ({
     timeOff: [],
     ...over,
 });
+const MEERA = person();
+const ARJUN = person({ id: "st_arjun", name: "Arjun Rao", title: null });
+const NEHA = person({ id: "st_neha", name: "Neha Kapoor", title: null });
 
 let root: Root;
 let host: HTMLDivElement;
+
+function size(phone: boolean) {
+    window.matchMedia = ((query: string) => ({
+        matches: phone && query.includes("max-width: 759px"),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+}
 
 beforeEach(() => {
     (
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    size(false);
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
-    for (const fn of [...Object.values(api), ...Object.values(toast)]) {
+    for (const fn of [
+        ...Object.values(api),
+        ...Object.values(toast),
+        ...Object.values(router),
+        guard.release,
+    ]) {
         fn.mockReset();
     }
-    for (const fn of Object.values(router)) fn.mockReset();
     api.createService.mockResolvedValue({ ok: true, data: { id: "sv_new" } });
     api.updateService.mockResolvedValue({ ok: true, data: {} });
     api.replaceRules.mockResolvedValue({ ok: true, data: [] });
+    api.archiveService.mockResolvedValue({ ok: true, data: {} });
     api.setStaffServices.mockResolvedValue({ ok: true, data: {} });
-    // jsdom draws nothing, so there is nothing to scroll.
     Element.prototype.scrollIntoView = () => undefined;
 });
 
 afterEach(() => {
     act(() => root.unmount());
-    host.remove();
+    document.body.innerHTML = "";
 });
 
 function open({
     saved = null,
     rules = [],
-    staff = [],
+    staff = [MEERA, ARJUN, NEHA],
     openingHours = OPENING,
-    usage = { thisWeek: 0, comingUp: 0 },
+    usage = { thisWeek: 6, comingUp: 9 },
     canEdit = true,
+    hasPage = true,
+    others = [],
 }: {
     saved?: Service | null;
     rules?: AvailabilityRule[] | null;
-    staff?: StaffView[];
+    staff?: StaffView[] | null;
     openingHours?: typeof OPENING | null;
     usage?: { thisWeek: number; comingUp: number };
     canEdit?: boolean;
+    hasPage?: boolean | null;
+    others?: { id: string; name: string }[];
 } = {}) {
     act(() =>
         root.render(
@@ -196,7 +213,8 @@ function open({
                 timezone="Asia/Kolkata"
                 openingHours={openingHours}
                 canEdit={canEdit}
-                hasPage
+                hasPage={hasPage}
+                others={others}
             />,
         ),
     );
@@ -210,584 +228,566 @@ const settle = async () => {
     }
 };
 
-function button(name: string): HTMLButtonElement {
-    const found = Array.from(host.querySelectorAll("button")).find(
-        (b) => b.textContent.trim() === name,
+const text = () => document.body.textContent;
+
+/** What a query found, or the test stops there. */
+function must<T>(found: T | null | undefined): T {
+    if (found === null || found === undefined) throw new Error("Not found");
+    return found;
+}
+
+function buttonIn(scope: ParentNode, name: string): HTMLButtonElement {
+    const found = Array.from(
+        scope.querySelectorAll<HTMLButtonElement>("button"),
+    ).find(
+        (b) =>
+            b.textContent.trim() === name ||
+            b.getAttribute("aria-label") === name,
     );
     if (!found) throw new Error(`No "${name}" button`);
     return found;
 }
+const button = (name: string) => buttonIn(document.body, name);
 
-async function press(name: string) {
-    act(() => button(name).click());
+async function press(el: HTMLElement) {
+    act(() => el.click());
     await settle();
 }
 
-function field(label: string): HTMLInputElement {
-    const named = Array.from(host.querySelectorAll("label")).find(
+function field(label: string, scope: ParentNode = document.body) {
+    const named = Array.from(scope.querySelectorAll("label")).find(
         (l) => l.textContent.trim() === label,
     );
     const el = named
-        ? host.querySelector<HTMLInputElement>(`[id="${named.htmlFor}"]`)
+        ? document.querySelector<HTMLInputElement>(`[id="${named.htmlFor}"]`)
         : null;
     if (!el) throw new Error(`No "${label}" field`);
     return el;
 }
 
-function type(el: HTMLInputElement, value: string) {
+function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
     act(() => {
-        Object.getOwnPropertyDescriptor(
-            HTMLInputElement.prototype,
-            "value",
-        )?.set?.call(el, value);
+        const proto =
+            el instanceof HTMLTextAreaElement
+                ? HTMLTextAreaElement.prototype
+                : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
         el.dispatchEvent(new Event("input", { bubbles: true }));
     });
 }
 
-function leave(el: HTMLElement) {
-    act(() => {
-        el.focus();
-        el.blur();
+/** A tick by its words. */
+function tick(words: string, scope: ParentNode = document.body) {
+    const label = Array.from(scope.querySelectorAll("label")).find((l) =>
+        l.textContent.includes(words),
+    );
+    const box = label?.querySelector<HTMLButtonElement>('[role="checkbox"]');
+    if (!box) throw new Error(`No "${words}" tick`);
+    return box;
+}
+
+/** On a phone, More details opens under the questions. */
+const moreDetails = () => {
+    const found = Array.from(
+        host.querySelectorAll<HTMLButtonElement>("button[aria-expanded]"),
+    ).find((b) => b.textContent.startsWith("More details"));
+    if (!found) throw new Error("No More details");
+    return found;
+};
+
+/** A frame: what `requestAnimationFrame` waits for. */
+const frame = () =>
+    act(async () => {
+        await new Promise((r) => setTimeout(r, 40));
+    });
+
+const live = () =>
+    document.querySelector("[data-live]")?.textContent.trim() ?? "";
+
+const panel = () => document.querySelector<HTMLElement>('[role="dialog"]');
+
+async function openDetail(label: string) {
+    const row = Array.from(
+        host.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((b) => b.textContent.startsWith(label));
+    if (!row) throw new Error(`No "${label}" row`);
+    await press(row);
+}
+
+async function openMenu() {
+    const trigger = host.querySelector<HTMLButtonElement>(
+        '[aria-haspopup="menu"]',
+    );
+    await act(async () => {
+        trigger?.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+        );
+        await new Promise((r) => setTimeout(r, 20));
     });
 }
 
-/** The hours' rows, as the sentence their Remove button is named by. */
-const windows = () =>
-    Array.from(host.querySelectorAll("button"))
-        .map((b) => b.getAttribute("aria-label") ?? "")
-        .filter((name) => name.startsWith("Remove "));
-
-const alerts = () =>
-    Array.from(host.querySelectorAll('[role="alert"]')).map((a) =>
-        a.textContent.trim(),
-    );
+const menuItem = (name: string) => {
+    const item = Array.from(
+        document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((i) => i.textContent.trim() === name);
+    if (!item) throw new Error(`No "${name}" item`);
+    return item;
+};
 
 function fillNew() {
-    type(field("Name"), "Glow facial");
+    type(field("What is it called?"), "Dry needling");
     type(field("Price"), "1200");
+    act(() => tick("Meera Iyer").click());
 }
 
-describe("a new service starts from the opening hours", () => {
-    it("with nobody on the diary, its own hours are the business's opening hours, and say so", () => {
+describe.each([
+    ["desk", false],
+    ["phone", true],
+] as const)("New service, at a %s", (_size, phone) => {
+    beforeEach(() => size(phone));
+
+    it("asks five plain questions, with the usual lengths as chips", () => {
         open();
-        expect(windows()).toEqual([
-            "Remove Monday, 09:00 to 18:00",
-            "Remove Tuesday, 09:00 to 18:00",
-        ]);
-        expect(host.textContent).toContain(
-            "They start from your opening hours: change them if this runs at other times.",
-        );
-        // No button of their own: they go with the page's Save.
-        expect(host.textContent).not.toContain("Save availability");
-    });
-
-    it("with someone to take it, a one-to-one starts with none, and a class takes the opening hours", async () => {
-        open({ staff: [person()] });
-        expect(windows()).toEqual([]);
-        await press("Class");
-        expect(windows()).toHaveLength(2);
-        await press("One-to-one");
-        expect(windows()).toEqual([]);
-    });
-
-    it("starts with none when the business has no opening hours", () => {
-        open({ openingHours: null });
-        expect(windows()).toEqual([]);
-    });
-});
-
-describe("one Save, in two calls", () => {
-    it("adds the service, then sends its hours, and opens the service's own page", async () => {
-        open();
-        fillNew();
-        await press("Add service");
-
-        expect(api.createService).toHaveBeenCalledTimes(1);
-        expect(api.replaceRules).toHaveBeenCalledTimes(1);
-        expect(api.replaceRules).toHaveBeenCalledWith("sv_new", OPENING_RULES);
-        // The service first: its hours need its id.
-        expect(api.createService.mock.invocationCallOrder[0]).toBeLessThan(
-            api.replaceRules.mock.invocationCallOrder[0] ?? 0,
-        );
-        expect(toast.showSuccess).toHaveBeenCalledWith(
-            "Glow facial added. Customers can book it in its weekly hours.",
-        );
-        expect(router.replace).toHaveBeenCalledWith("/services/sv_new");
-    });
-
-    it("says the service was added and its hours were not, keeps them, and stays on the page", async () => {
-        api.replaceRules.mockResolvedValueOnce({
-            ok: false,
-            error: "Couldn't save the availability.",
-        });
-        open();
-        fillNew();
-        await press("Add service");
-
-        expect(alerts()).toContain(
-            "Glow facial was added, but its weekly hours were not saved.Couldn't save the availability. The hours you chose are still here. Try again, or change them and save.Try again",
-        );
-        // What was chosen is still there, and nothing sent them away.
-        expect(windows()).toHaveLength(2);
-        expect(field("Name").value).toBe("Glow facial");
-        expect(router.replace).not.toHaveBeenCalled();
-        expect(toast.showSuccess).not.toHaveBeenCalled();
-    });
-
-    it("Try again sends only the hours: the service is not added twice", async () => {
-        api.replaceRules.mockResolvedValueOnce({
-            ok: false,
-            error: "Couldn't save the availability.",
-        });
-        open();
-        fillNew();
-        await press("Add service");
-        await press("Try again");
-
-        expect(api.createService).toHaveBeenCalledTimes(1);
-        expect(api.updateService).not.toHaveBeenCalled();
-        expect(api.replaceRules).toHaveBeenCalledTimes(2);
-        expect(api.replaceRules).toHaveBeenLastCalledWith(
-            "sv_new",
-            OPENING_RULES,
-        );
-        expect(alerts()).toEqual([]);
-        expect(router.replace).toHaveBeenCalledWith("/services/sv_new");
-    });
-
-    it("says so when the hours never got an answer at all", async () => {
-        api.replaceRules.mockRejectedValueOnce(new Error("offline"));
-        open();
-        fillNew();
-        await press("Add service");
-        expect(alerts().join(" ")).toContain(
-            "We couldn't confirm that was saved.",
-        );
-        expect(alerts().join(" ")).toContain(
-            "The hours you chose are still here.",
-        );
-        expect(router.replace).not.toHaveBeenCalled();
-    });
-
-    it("a saved service whose hours alone changed sends only the hours", async () => {
-        open({ saved: service(), rules: [rule(1), rule(3)] });
-        act(() =>
-            host
-                .querySelector<HTMLButtonElement>(
-                    '[aria-label="Remove Wednesday, 10:00 to 16:00"]',
-                )
-                ?.click(),
-        );
-        await press("Save");
-
-        expect(api.updateService).not.toHaveBeenCalled();
-        expect(api.replaceRules).toHaveBeenCalledWith("sv_1", [
-            { dayOfWeek: 1, startMinute: 600, endMinute: 960 },
-        ]);
-        expect(router.replace).not.toHaveBeenCalled();
-        expect(router.refresh).toHaveBeenCalled();
-    });
-
-    it("on an edit, says the other changes were saved and the hours were not, then sends only the hours", async () => {
-        api.replaceRules.mockResolvedValueOnce({
-            ok: false,
-            error: "Couldn't save the availability.",
-        });
-        open({ saved: service(), rules: [rule(1), rule(3)] });
-        type(field("Name"), "Glow facial plus");
-        act(() =>
-            host
-                .querySelector<HTMLButtonElement>(
-                    '[aria-label="Remove Wednesday, 10:00 to 16:00"]',
-                )
-                ?.click(),
-        );
-        await press("Save");
-
-        expect(api.updateService).toHaveBeenCalledTimes(1);
-        expect(alerts().join(" ")).toContain(
-            "Your other changes were saved, but its weekly hours were not.",
-        );
-        expect(windows()).toEqual(["Remove Monday, 10:00 to 16:00"]);
-
-        await press("Try again");
-        expect(api.updateService).toHaveBeenCalledTimes(1);
-        expect(api.replaceRules).toHaveBeenCalledTimes(2);
-        expect(alerts()).toEqual([]);
-    });
-
-    it("leaves hours it couldn't read alone", async () => {
-        open({ saved: service(), rules: null });
-        type(field("Name"), "Glow facial plus");
-        await press("Save");
-        expect(api.updateService).toHaveBeenCalledTimes(1);
-        expect(api.replaceRules).not.toHaveBeenCalled();
-    });
-});
-
-describe("what is wrong is said on leaving a field, and on Save", () => {
-    it("says nothing about a field until it has been left", () => {
-        open();
-        expect(alerts()).toEqual([]);
-        leave(field("Name"));
-        expect(alerts()).toEqual(["Add a name."]);
-        expect(field("Name").getAttribute("aria-invalid")).toBe("true");
-        // It clears as it is fixed.
-        type(field("Name"), "Glow facial");
-        expect(alerts()).toEqual([]);
-    });
-
-    it("keeps Add service on, and pressing it says the rest and goes to the first field in error", async () => {
-        open();
-        expect(button("Add service").disabled).toBe(false);
-        await press("Add service");
-
-        expect(api.createService).not.toHaveBeenCalled();
-        expect(alerts()).toContain("Add a name.");
-        expect(alerts()).toContain("Add a price (0 if it's free).");
-        expect(document.activeElement).toBe(field("Name"));
-        // Still on: fixing and pressing again is the way through.
-        expect(button("Add service").disabled).toBe(false);
-    });
-
-    it("opens More settings when what is wrong is in there", async () => {
-        open();
-        fillNew();
-        type(field("SAC code"), "12");
-        expect(button("Show more settings")).toBeTruthy();
-        await press("Add service");
-        expect(alerts()).toContain("A SAC code is 4 to 8 digits.");
-        expect(button("Hide more settings")).toBeTruthy();
-        expect(document.activeElement).toBe(field("SAC code"));
-    });
-});
-
-/** A card of the page, by its heading. */
-function card(title: string): HTMLElement {
-    const heading = Array.from(host.querySelectorAll("h2")).find(
-        (h) => h.textContent.trim() === title,
-    );
-    const section = heading?.closest("section");
-    if (!section) throw new Error(`No "${title}" card`);
-    return section;
-}
-
-const cards = () =>
-    Array.from(host.querySelectorAll("h2")).map((h) => h.textContent.trim());
-
-describe("When it can be booked is its own card", () => {
-    it("sits after Time, and More settings no longer holds the hours", () => {
-        open();
-        expect(cards().slice(0, 5)).toEqual([
-            "What it is",
-            "Time",
-            "When it can be booked",
+        for (const q of [
+            "What is it called?",
+            "Who comes?",
+            "How long does it take?",
             "Price",
-            "Who takes it",
-        ]);
-        // On the page without opening anything.
-        expect(
-            card("When it can be booked").querySelectorAll(
-                '[aria-label^="Remove "]',
-            ),
-        ).toHaveLength(2);
-        const more = card("More settings").textContent;
-        expect(more).toContain("and deleting it.");
-        expect(more).not.toContain("weekly hours");
-        // Nothing sends anyone under More settings for the hours.
-        expect(host.textContent).not.toContain("under More settings");
+            "Who does it?",
+        ]) {
+            expect(text()).toContain(q);
+        }
+        const kinds = Array.from(host.querySelectorAll('[role="radio"]')).map(
+            (r) => r.textContent.trim(),
+        );
+        expect(kinds).toEqual(
+            expect.arrayContaining([
+                "One person",
+                "A group class",
+                "15 min",
+                "30 min",
+                "45 min",
+                "60 min",
+                "90 min",
+                "Other",
+            ]),
+        );
+        expect(field("Price").getAttribute("placeholder")).toBe(
+            "0 if it's free",
+        );
+        // A group class asks how many places, from 8.
+        act(() =>
+            Array.from(host.querySelectorAll<HTMLElement>('[role="radio"]'))
+                .find((r) => r.textContent.trim() === "A group class")
+                ?.click(),
+        );
+        expect(field("How many places?").value).toBe("8");
+        expect(text()).toContain("Add service");
     });
 
-    it("with nobody to take it, says it books in its own hours and shows them", () => {
-        open({ saved: service(), rules: [rule(1)] });
-        const when = card("When it can be booked");
-        expect(when.textContent).toContain(
-            "Nobody takes it yet, so customers book it in its own weekly hours.",
-        );
-        expect(windows()).toEqual(["Remove Monday, 10:00 to 16:00"]);
-        // And the way to put someone on the diary is a plain link.
-        const link = card("Who takes it").querySelector("a");
-        expect(link?.getAttribute("href")).toBe("/bookings/availability");
-        expect(link?.textContent).toBe(
-            "Add yourself or your team in Availability",
-        );
-    });
-
-    it("when someone takes it, says the times come from their hours, with the way to Availability", async () => {
-        open({
-            saved: service(),
-            rules: [],
-            staff: [person({ serviceIds: ["sv_1"] })],
-        });
-        const when = card("When it can be booked");
-        expect(when.textContent).toContain("Its times come from Asha's hours.");
-        const link = when.querySelector("a");
-        expect(link?.getAttribute("href")).toBe("/bookings/availability");
-        expect(link?.textContent).toBe("Change them in Availability");
-        // Its own hours only narrow theirs: asked for, not shown.
-        expect(windows()).toEqual([]);
-        expect(when.textContent).not.toContain("No hours of its own");
-
-        await press("Give it its own hours");
-        expect(when.textContent).toContain("Its own weekly hours");
-        expect(when.textContent).toContain(
-            "Only the free time inside these windows is offered.",
-        );
-        await press("Add a window");
-        expect(windows()).toHaveLength(1);
-    });
-
-    it("keeps showing own hours a service someone takes already has", () => {
-        open({
-            saved: service(),
-            rules: [rule(1)],
-            staff: [person({ serviceIds: ["sv_1"] })],
-        });
-        expect(windows()).toEqual(["Remove Monday, 10:00 to 16:00"]);
-        expect(card("When it can be booked").textContent).toContain(
-            "Its times come from Asha's hours, inside its own weekly hours below.",
-        );
-    });
-
-    it("a class runs at its own times, whoever takes it", () => {
-        open({
-            saved: service({ capacity: 8 }),
-            rules: [rule(2)],
-            staff: [person({ serviceIds: ["sv_1"] })],
-        });
-        const when = card("When it can be booked");
-        expect(when.textContent).toContain(
-            "A class runs at its own weekly times.",
-        );
-        expect(when.textContent).not.toContain("Its times come from");
-        expect(windows()).toEqual(["Remove Tuesday, 10:00 to 16:00"]);
-    });
-
-    it("says hours it couldn't read as such, in the card", () => {
-        open({ saved: service(), rules: null });
-        expect(card("When it can be booked").textContent).toContain(
-            "Couldn't load its weekly hours",
-        );
-    });
-
-    it("says a row that can't be saved where it is, with nothing to open first", async () => {
-        open({
-            saved: service(),
-            rules: [{ ...rule(1), startMinute: 960, endMinute: 600 }],
-        });
-        type(field("Name"), "Glow facial plus");
-        await press("Save");
-        expect(api.updateService).not.toHaveBeenCalled();
-        expect(
-            Array.from(
-                card("When it can be booked").querySelectorAll(
-                    '[role="alert"]',
-                ),
-            ).map((a) => a.textContent.trim()),
-        ).toEqual([
-            "Monday's hours end before they start. Choose a later end.",
-        ]);
-        // Nothing was wrong under More settings: it stays closed.
-        expect(button("Show more settings")).toBeTruthy();
-    });
-});
-
-describe("the length is picked from chips", () => {
-    const chips = () =>
-        Array.from(
-            card("Time")
-                .querySelector('[role="radiogroup"]')
-                ?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
-        );
-    const chosen = () =>
-        chips()
-            .filter((c) => c.getAttribute("aria-checked") === "true")
-            .map((c) => c.textContent.trim());
-
-    it("offers the usual lengths and Custom, with a new service on 30 min", () => {
+    it("says it is not bookable yet, and what is missing, until it is", () => {
         open();
-        expect(chips().map((c) => c.textContent.trim())).toEqual([
-            "15 min",
-            "30 min",
-            "45 min",
-            "60 min",
-            "90 min",
-            "Custom",
-        ]);
-        expect(chosen()).toEqual(["30 min"]);
-        // No number to type until Custom asks for one.
-        expect(host.textContent).not.toContain("Each visit (min)");
-        expect(host.textContent).not.toContain("Custom length (min)");
-        // Gap after and Visits stay fields.
-        expect(field("Gap after (min)").value).toBe("10");
-        expect(field("Visits").value).toBe("1");
+        expect(live()).toContain(
+            "Not bookable yet: add a name and a price, then pick who does it.",
+        );
+        type(field("What is it called?"), "Dry needling");
+        type(field("Price"), "0");
+        expect(live()).toContain("Not bookable yet: pick who does it.");
+        act(() => tick("Meera Iyer").click());
+        expect(live()).toContain(
+            "Customers can book this on your booking page, in Meera's free time, as soon as you add it.",
+        );
     });
 
-    it("a chip sets the same value Save sends", async () => {
+    it("says who can book it for each mix of the two ticks; neither is paused", async () => {
         open();
         fillNew();
-        await press("90 min");
-        expect(chosen()).toEqual(["90 min"]);
-        await press("Add service");
-        expect(api.createService).toHaveBeenCalledWith(
-            expect.objectContaining({ durationMinutes: 90 }),
-        );
-    });
-
-    it("Custom shows the number field with the minutes there were, and takes any length", async () => {
-        open();
-        fillNew();
-        await press("Custom");
-        expect(chosen()).toEqual(["Custom"]);
-        expect(field("Custom length (min)").value).toBe("30");
-        type(field("Custom length (min)"), "75");
-        await press("Add service");
-        expect(api.createService).toHaveBeenCalledWith(
-            expect.objectContaining({ durationMinutes: 75 }),
-        );
-    });
-
-    it("a saved length that is none of the chips opens on Custom", () => {
-        open({ saved: service({ durationMinutes: 20 }) });
-        expect(chosen()).toEqual(["Custom"]);
-        expect(field("Custom length (min)").value).toBe("20");
-    });
-
-    it("keeps the length's own rule: under 5 minutes is said under the field", () => {
-        open();
-        act(() => button("Custom").click());
-        type(field("Custom length (min)"), "2");
-        leave(field("Custom length (min)"));
-        expect(alerts()).toEqual([
-            "Each visit needs a length of at least 5 minutes.",
-        ]);
-        // Back on a chip, there is nothing to fix.
-        act(() => button("45 min").click());
-        expect(alerts()).toEqual([]);
-    });
-});
-
-describe("Taking bookings is a switch beside Save", () => {
-    const toggle = () => {
-        const found = host.querySelector<HTMLButtonElement>('[role="switch"]');
-        if (!found) throw new Error("No switch");
-        return found;
-    };
-    const flip = async () => {
-        act(() => toggle().click());
-        await settle();
-    };
-    const names = () =>
-        Array.from(host.querySelectorAll("button")).map((b) =>
-            b.textContent.trim(),
-        );
-
-    /** The pill beside the title: whether it takes bookings, in a word. */
-    const pill = () =>
-        ["Live", "Paused", "New"].find((word) =>
-            Array.from(host.querySelectorAll("*")).some(
-                (el) =>
-                    el.children.length === 0 && el.textContent.trim() === word,
-            ),
-        );
-
-    it("replaces the Stop taking bookings button, and a new service has none", () => {
-        open({ saved: service() });
-        expect(toggle().getAttribute("aria-checked")).toBe("true");
+        if (phone) await press(moreDetails());
         expect(
-            host.querySelector(`label[for="${toggle().id}"]`)?.textContent,
-        ).toBe("Taking bookings");
-        expect(names()).not.toContain("Stop taking bookings");
-        expect(names()).not.toContain("Take bookings again");
+            tick("Customers, on your booking page").getAttribute(
+                "aria-checked",
+            ),
+        ).toBe("true");
+        expect(
+            tick("Your team, from Bookings").getAttribute("aria-checked"),
+        ).toBe("true");
 
-        open();
-        expect(host.querySelector('[role="switch"]')).toBeNull();
-    });
-
-    it("pauses at once with Undo, says Paused, and leaves nothing unsaved", async () => {
-        open({ saved: service() });
-        await flip();
-
-        expect(api.updateService).toHaveBeenCalledWith("sv_1", {
-            status: "ARCHIVED",
-        });
-        expect(toggle().getAttribute("aria-checked")).toBe("false");
-        expect(pill()).toBe("Paused");
-        expect(toast.showUndo.mock.calls[0]?.[0]).toBe(
-            "Glow facial paused. It's off the booking page. Bookings already made still happen.",
+        // Customers only.
+        act(() => tick("Your team, from Bookings").click());
+        expect(live()).toContain(
+            "Customers can book this on your booking page, in Meera's free time, as soon as you add it. Your team can't book it from Bookings.",
         );
-        // It is saved: Save has nothing to send, and leaving asks nothing.
-        expect(host.textContent).not.toContain("Unsaved changes");
-        expect(button("Save").disabled).toBe(true);
-        expect(names()).not.toContain("Discard changes");
-    });
+        expect(text()).toContain("Customers only");
 
-    it("Undo takes bookings again", async () => {
-        open({ saved: service() });
-        await flip();
-        const undo = toast.showUndo.mock.calls[0]?.[1] as () => Promise<{
-            ok: boolean;
-        }>;
-        await act(async () => {
-            await undo();
-        });
-        expect(api.updateService).toHaveBeenLastCalledWith("sv_1", {
-            status: "ACTIVE",
-        });
-        expect(toggle().getAttribute("aria-checked")).toBe("true");
-        expect(pill()).toBe("Live");
-    });
+        // Team only.
+        act(() => tick("Your team, from Bookings").click());
+        act(() => tick("Customers, on your booking page").click());
+        expect(live()).toContain(
+            "Only your team can book this, from Bookings. It's not on your booking page.",
+        );
+        expect(text()).toContain("Team only");
 
-    it("keeps what else is typed, and Save still sends it with the new state", async () => {
-        open({ saved: service(), rules: [] });
-        type(field("Name"), "Glow facial plus");
-        await flip();
-        expect(field("Name").value).toBe("Glow facial plus");
-        expect(host.textContent).toContain("Unsaved changes");
+        // Neither: paused, with the one line.
+        act(() => tick("Your team, from Bookings").click());
+        expect(live()).toContain(
+            "Paused: nobody can book it until you tick who can.",
+        );
+        expect(text()).toContain("Paused");
+        expect(text()).toContain(
+            "Untick both to pause it. Bookings already made stay.",
+        );
 
-        await press("Save");
-        expect(api.updateService).toHaveBeenLastCalledWith(
-            "sv_1",
+        await press(button("Add service"));
+        expect(api.createService).toHaveBeenCalledWith(
             expect.objectContaining({
-                name: "Glow facial plus",
-                status: "ARCHIVED",
+                showOnBookingPage: false,
+                bookableByTeam: false,
             }),
         );
-    });
-
-    it("is put back, and says why, when the save is refused", async () => {
-        api.updateService.mockResolvedValueOnce({
-            ok: false,
-            error: "Couldn't save the service.",
-        });
-        open({ saved: service() });
-        await flip();
-        expect(toast.showError).toHaveBeenCalledWith(
-            "Couldn't save the service.",
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Dry needling added, paused. Tick who can book it when you're ready.",
         );
-        expect(toggle().getAttribute("aria-checked")).toBe("true");
-        expect(pill()).toBe("Live");
     });
 
-    it("isn't offered to a role that can't change services", () => {
-        open({ saved: service(), canEdit: false });
-        expect(host.querySelector('[role="switch"]')).toBeNull();
+    it("pressing Add with gaps says how many and which, at each field, and goes to the first", async () => {
+        open();
+        await press(button("Add service"));
+        expect(text()).toContain(
+            "3 things to fill in before it can be added: a name, a price (0 if it's free), and who does it.",
+        );
+        expect(text()).toContain("Add a name.");
+        expect(text()).toContain("Add a price, or 0 if it's free.");
+        expect(text()).toContain("Pick who does it.");
+        await frame();
+        expect(document.activeElement).toBe(field("What is it called?"));
+        expect(api.createService).not.toHaveBeenCalled();
+        // The button is never off for it.
+        expect(button("Add service").disabled).toBe(false);
+    });
+
+    it("keeps every other field under More details, a row each", async () => {
+        open();
+        if (phone) {
+            // On a phone it opens under the questions, in their place.
+            const more = moreDetails();
+            expect(more.getAttribute("aria-expanded")).toBe("false");
+            await press(more);
+            expect(more.getAttribute("aria-expanded")).toBe("true");
+        }
+        for (const row of [
+            "What to tell customers",
+            "Break after",
+            "Break before",
+            "Where",
+            "Visits in a package",
+            "When it can be booked",
+            "At booking, they pay",
+            "GST and SAC code",
+            "Time zone",
+        ]) {
+            expect(text()).toContain(row);
+        }
+        await openDetail("Break after");
+        expect(panel()?.textContent).toContain("Break after");
+        type(field("Break after (min)"), "20");
+        await press(buttonIn(must(panel()), "Use this"));
+        expect(panel()).toBeNull();
+        expect(text()).toContain("20 min kept free after each visit");
+    });
+
+    it("gives it hours of its own in the 12-hour editor of Hours and time off", async () => {
+        // Nobody does it: its own hours are what give it times, from the
+        // business's opening hours.
+        open({ staff: [] });
+        if (phone) await press(moreDetails());
+        await openDetail("When it can be booked");
+        const sheet = must(panel());
+        expect(sheet.textContent).toContain("When it can be booked");
+        expect(sheet.textContent).toContain("9:00 am to 6:00 pm");
+        expect(sheet.textContent).toContain(
+            "Times are 12-hour, in 15-minute steps",
+        );
+        // A window opens to its day and two 12-hour pickers.
+        await press(buttonIn(sheet, "Monday9:00 am to 6:00 pm"));
+        expect(sheet.textContent).toContain("Opens");
+        expect(sheet.textContent).toContain("Closes");
+        await press(
+            must(
+                Array.from(
+                    sheet.querySelectorAll<HTMLButtonElement>("button"),
+                ).find((b) => b.textContent.startsWith("Closes")),
+            ),
+        );
+        await press(buttonIn(sheet, "7 o'clock"));
+        expect(sheet.textContent).toContain("9:00 am to 7:00 pm");
+        await press(buttonIn(sheet, "Use these hours"));
+
+        type(field("What is it called?"), "Open gym");
+        type(field("Price"), "0");
+        await press(button("Add service"));
+        expect(api.replaceRules).toHaveBeenCalledWith("sv_new", [
+            { dayOfWeek: 1, startMinute: 540, endMinute: 1140 },
+            { dayOfWeek: 2, startMinute: 540, endMinute: 1080 },
+        ]);
+        expect(router.replace).toHaveBeenCalledWith("/services/sv_new");
+    });
+
+    it("says a name another service has, with the way to it, and won't add it", async () => {
+        open({ others: [{ id: "sv_9", name: "Physio assessment" }] });
+        type(field("What is it called?"), "physio assessment ");
+        expect(text()).toContain("You already have Physio assessment. Open it");
+        const link = Array.from(host.querySelectorAll("a")).find(
+            (a) => a.textContent === "Open it",
+        );
+        expect(link?.getAttribute("href")).toBe("/services/sv_9");
+        type(field("Price"), "100");
+        act(() => tick("Meera Iyer").click());
+        await press(button("Add service"));
+        expect(api.createService).not.toHaveBeenCalled();
+    });
+
+    it("asks 'Discard what you typed?' before dropping what was typed", async () => {
+        open();
+        type(field("What is it called?"), "Dry needling");
+        await press(button("Discard"));
+        const ask = document.querySelector('[role="alertdialog"]');
+        expect(ask?.textContent).toContain("Discard what you typed?");
+        await press(buttonIn(ask as HTMLElement, "Discard"));
+        expect(guard.release).toHaveBeenCalled();
+        expect(router.push).toHaveBeenCalledWith("/services");
     });
 });
 
-describe("true words under the title", () => {
-    it("says Nothing coming up, never Nothing booked yet, for a service with none to come", () => {
-        // Booked this week, all of it past: it has been booked before.
-        open({ saved: service(), usage: { thisWeek: 5, comingUp: 0 } });
-        const status = host.querySelector('[role="status"]');
-        expect(status?.textContent).toBe("Nothing coming up");
-        expect(host.textContent).not.toContain("Nothing booked yet");
+describe("New service, adding it", () => {
+    it("adds the service, who does it, and opens its own page", async () => {
+        open();
+        fillNew();
+        await press(button("Add service"));
+        expect(api.createService).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: "Dry needling",
+                durationMinutes: 60,
+                bufferAfterMinutes: 15,
+                priceCents: 120_000,
+                showOnBookingPage: true,
+                bookableByTeam: true,
+            }),
+        );
+        expect(api.setStaffServices).toHaveBeenCalledWith("st_meera", [
+            "sv_new",
+        ]);
+        // Someone does it: no hours of its own to send.
+        expect(api.replaceRules).not.toHaveBeenCalled();
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Dry needling added. Customers can book it in the free time of who does it.",
+        );
+        expect(router.replace).toHaveBeenCalledWith("/services/sv_new");
     });
 
-    it("counts what is still to come", () => {
-        open({ saved: service(), usage: { thisWeek: 1, comingUp: 2 } });
-        expect(host.querySelector('[role="status"]')?.textContent).toBe(
-            "2 bookings still to come",
+    it("says it was added and its hours were not, stays, and Try again sends only the hours", async () => {
+        api.replaceRules.mockResolvedValueOnce({
+            ok: false,
+            error: "Couldn't save the availability.",
+        });
+        open({ staff: [] });
+        type(field("What is it called?"), "Open gym");
+        type(field("Price"), "0");
+        await press(button("Add service"));
+        expect(text()).toContain(
+            "Open gym was added, but its weekly hours were not saved.",
         );
+        expect(router.replace).not.toHaveBeenCalled();
+
+        await press(button("Try again"));
+        expect(api.createService).toHaveBeenCalledTimes(1);
+        expect(api.replaceRules).toHaveBeenCalledTimes(2);
+        expect(router.replace).toHaveBeenCalledWith("/services/sv_new");
+    });
+});
+
+describe.each([
+    ["desk", false],
+    ["phone", true],
+] as const)("A saved service, at a %s", (_size, phone) => {
+    beforeEach(() => size(phone));
+    const saved = service();
+    const staff = [person({ serviceIds: ["sv_1"] }), ARJUN];
+
+    it("leads with Who can book it; each tick saves at once, with Undo", async () => {
+        open({ saved, staff });
+        expect(text()).toContain("Customers and team");
+        expect(text()).toContain(
+            "Customers book it on your booking page, and your team books it from Bookings. 9 bookings to come.",
+        );
+        await press(tick("Your team, from Bookings"));
+        expect(api.updateService).toHaveBeenCalledWith("sv_1", {
+            status: "ACTIVE",
+            showOnBookingPage: true,
+            bookableByTeam: false,
+        });
+        expect(toast.showUndo).toHaveBeenCalledWith(
+            "Physio assessment: only customers can book it now, on your booking page.",
+            expect.any(Function),
+        );
+        expect(text()).toContain("Your team can't book it from Bookings.");
+        expect(text()).toContain("Customers only");
+    });
+
+    it("Undo of an earlier tick puts back only that tick, and the later Undo goes", async () => {
+        toast.showUndo.mockReturnValueOnce("toast_a");
+        open({ saved, staff });
+        await press(tick("Your team, from Bookings"));
+        await press(tick("Customers, on your booking page"));
+        expect(toast.dismissToast).toHaveBeenCalledWith("toast_a");
+        expect(
+            tick("Your team, from Bookings").getAttribute("aria-checked"),
+        ).toBe("false");
+        expect(
+            tick("Customers, on your booking page").getAttribute(
+                "aria-checked",
+            ),
+        ).toBe("false");
+        // The first toast's Undo, pressed late.
+        const undoTeam = toast.showUndo.mock
+            .calls[0]?.[1] as () => Promise<unknown>;
+        await act(async () => {
+            await undoTeam();
+        });
+        expect(api.updateService).toHaveBeenLastCalledWith("sv_1", {
+            bookableByTeam: true,
+        });
+        expect(
+            tick("Your team, from Bookings").getAttribute("aria-checked"),
+        ).toBe("true");
+        expect(
+            tick("Customers, on your booking page").getAttribute(
+                "aria-checked",
+            ),
+        ).toBe("false");
+    });
+
+    it("reads as three cards, each opening its own panel", async () => {
+        open({ saved, staff });
+        for (const card of ["What it is", "Time and place", "Money"]) {
+            expect(text()).toContain(card);
+        }
+        if (phone) {
+            // A row's pencil opens its card's panel.
+            const row = Array.from(
+                host.querySelectorAll<HTMLButtonElement>("button"),
+            ).find((b) =>
+                (b.getAttribute("aria-label") ?? "").startsWith("How long:"),
+            );
+            await press(must(row));
+        } else {
+            await press(button("Edit Time and place"));
+        }
+        const sheet = must(panel());
+        expect(sheet.textContent).toContain("Time and place");
+        expect(sheet.textContent).toContain("Physio assessment");
+        // Keyboard: it starts in the panel's first field.
+        expect(sheet.contains(document.activeElement)).toBe(true);
+    });
+
+    it("a new length says what bookings already made keep, and saves", async () => {
+        open({ saved, staff });
+        if (phone) {
+            await press(
+                must(
+                    Array.from(
+                        host.querySelectorAll<HTMLButtonElement>("button"),
+                    ).find((b) =>
+                        (b.getAttribute("aria-label") ?? "").startsWith(
+                            "How long:",
+                        ),
+                    ),
+                ),
+            );
+        } else {
+            await press(button("Edit Time and place"));
+        }
+        const sheet = must(panel());
+        await press(
+            must(
+                Array.from(
+                    sheet.querySelectorAll<HTMLElement>('[role="radio"]'),
+                ).find((r) => r.textContent.trim() === "60 min"),
+            ),
+        );
+        expect(sheet.textContent).toContain(
+            "With the 15 min break after, each visit takes 60 min + 15 min break of Meera's time. 9 bookings already made keep 45 min.",
+        );
+        await press(buttonIn(sheet, "Save"));
+        expect(api.updateService).toHaveBeenCalledWith(
+            "sv_1",
+            expect.objectContaining({ durationMinutes: 60 }),
+        );
+        expect(api.updateService.mock.calls[0]?.[1]).not.toHaveProperty(
+            "showOnBookingPage",
+        );
+        expect(toast.showSuccess).toHaveBeenCalledWith(
+            "Saved: 60 min. New bookings use it, and 9 already made keep 45 min.",
+        );
+        expect(panel()).toBeNull();
+    });
+
+    it("More pauses it: both ticks off, with Undo", async () => {
+        open({ saved, staff });
+        await openMenu();
+        await press(menuItem("Pause: untick both, nobody can book it"));
+        expect(api.updateService).toHaveBeenCalledWith("sv_1", {
+            showOnBookingPage: false,
+            bookableByTeam: false,
+        });
+        expect(text()).toContain(
+            "Untick both to pause it. Bookings already made stay.",
+        );
+    });
+
+    it("Delete asks first, and offers Pause it instead", async () => {
+        open({ saved, staff });
+        await openMenu();
+        await press(menuItem("Delete service"));
+        const ask = must(document.querySelector('[role="alertdialog"]'));
+        expect(ask.textContent).toContain("Delete Physio assessment?");
+        expect(ask.textContent).toContain(
+            "To stop bookings for a while, untick both under Who can book it instead.",
+        );
+        await press(buttonIn(ask, "Pause it instead"));
+        expect(api.archiveService).not.toHaveBeenCalled();
+        expect(api.updateService).toHaveBeenCalledWith("sv_1", {
+            showOnBookingPage: false,
+            bookableByTeam: false,
+        });
+
+        await openMenu();
+        await press(menuItem("Delete service"));
+        await press(
+            buttonIn(
+                must(document.querySelector('[role="alertdialog"]')),
+                "Delete service",
+            ),
+        );
+        expect(api.archiveService).toHaveBeenCalledWith("sv_1");
+        expect(router.push).toHaveBeenCalledWith("/services");
+    });
+
+    it("a Member reads it and changes nothing", async () => {
+        open({ saved, staff, canEdit: false });
+        expect(text()).toContain(
+            "Your role can see services but not change them.",
+        );
+        expect(tick("Your team, from Bookings").disabled).toBe(true);
+        expect(
+            Array.from(host.querySelectorAll("button")).some((b) =>
+                (b.getAttribute("aria-label") ?? "").startsWith("Edit "),
+            ),
+        ).toBe(false);
+        await openMenu();
+        expect(
+            Array.from(document.querySelectorAll('[role="menuitem"]')).map(
+                (i) => i.textContent.trim(),
+            ),
+        ).toEqual(["See its bookings"]);
     });
 });

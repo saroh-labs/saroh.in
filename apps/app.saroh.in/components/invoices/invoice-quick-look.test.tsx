@@ -85,7 +85,7 @@ describe("TaxRows' seller (DEC-082)", () => {
 });
 
 describe("ShownLink (UX-048)", () => {
-    it("shows the pay link's address in place, selectable, with a copy button", () => {
+    it("shows the payment link's address in place, selectable, with a copy button", () => {
         const html = renderToStaticMarkup(
             <ShownLink
                 url="https://rye.saroh.app/pay/tok_1"
@@ -94,7 +94,7 @@ describe("ShownLink (UX-048)", () => {
         );
         expect(html).toContain("https://rye.saroh.app/pay/tok_1");
         expect(html).toContain("select-all");
-        expect(html).toContain('aria-label="Copy the pay link"');
+        expect(html).toContain('aria-label="Copy the payment link"');
         expect(html).toContain("doesn&#x27;t");
     });
 });

@@ -35,7 +35,7 @@ const ROUTES = ["/", "/bookings", "/commerce", "/contacts"] as const;
 const LANDMARK: Record<(typeof ROUTES)[number], (page: Page) => Locator> = {
     "/": (page) => page.getByRole("region", { name: "Needs you" }),
     "/bookings": (page) =>
-        page.getByRole("navigation", { name: "Bookings view" }),
+        page.getByRole("button", { name: /Change the day or the view$/ }),
     // Sell lands on its location, titled with its own name; its first card
     // is the same whatever it is called.
     "/commerce": (page) => page.getByRole("region", { name: "The place" }),
@@ -289,9 +289,9 @@ test.describe("touch targets", () => {
         await signIn(page);
         await page.goto("/bookings");
         // The calendar itself, not its failed or locked state: measuring a
-        // page without the layout switch passes vacuously.
+        // page without header C's date title passes vacuously.
         await expect(
-            page.getByRole("navigation", { name: "Bookings view" }),
+            page.getByRole("button", { name: /Change the day or the view$/ }),
         ).toBeVisible();
 
         // Guard the guard: if `pointer: coarse` does not match, every

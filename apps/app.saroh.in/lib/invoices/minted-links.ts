@@ -1,7 +1,7 @@
 /**
- * The pay links made in this browser tab, by invoice (UX-048).
+ * The payment links made in this browser tab, by invoice (UX-048).
  *
- * The API keeps only a pay link's hash, so its address is shown once, when
+ * The API keeps only a payment link's hash, so its address is shown once, when
  * it is made: it can't be read back. A link copied while the clipboard was
  * blocked, or from a quick look since closed, would be lost, and copying
  * again makes a new one and retires it. So the address is kept here, in
@@ -158,11 +158,11 @@ export function copyLinkLabel(state: {
     if (state.busy) return "Making…";
     if (state.shown) return "Copy link";
     if (state.linkOut) return UNSEEN_LINK.action;
-    return "Copy pay link";
+    return "Copy payment link";
 }
 
 /**
- * How an invoice's pay link stands from this tab (UX-048):
+ * How an invoice's payment link stands from this tab (UX-048):
  * - `none`: no link is out;
  * - `held`: one is out and this tab made it, so "Show link again";
  * - `unseen`: one is out that this tab didn't make — after a reload, on
@@ -184,7 +184,7 @@ export function linkSight(state: {
 /** The words for a link that is out but can't be shown (UX-048). */
 export const UNSEEN_LINK = {
     action: "Make a new link",
-    confirmTitle: "Make a new pay link?",
+    confirmTitle: "Make a new payment link?",
     confirmLabel: "Make a new link",
     keepLabel: "Keep the old link",
 } as const;
@@ -200,8 +200,8 @@ export function unseenLinkLine(state: {
     madeOn?: string | null;
 }): string {
     const lead = state.madeOn
-        ? `A pay link was made on ${state.madeOn} and still works.`
-        : "A pay link is out and still works.";
+        ? `A payment link was made on ${state.madeOn} and still works.`
+        : "A payment link is out and still works.";
     return `${lead} Its full address is shown only once, when it's made, so it can't be shown again here or on another device. ${
         state.sendable
             ? "Making a new link, or sending the invoice, ends the old one."

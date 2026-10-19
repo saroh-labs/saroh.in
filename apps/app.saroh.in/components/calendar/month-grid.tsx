@@ -29,7 +29,10 @@ const DOWS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DESK_CHIPS = 3;
 const PHONE_DOTS = 5;
 
-const cellEdge = "border-b border-r border-foreground/10";
+/** A phone's rows are ruled across; the desk's days are boxed. */
+const PHONE_EDGE = "border-t border-foreground/[0.06] min-[760px]:border-t-0";
+const DESK_EDGE =
+    "min-[760px]:border-b min-[760px]:border-r min-[760px]:border-foreground/10";
 
 /**
  * A day a key moved to in another month: that month loads as a new page, and
@@ -45,13 +48,14 @@ export function dayButton(date: string): HTMLButtonElement | null {
 }
 
 /**
- * The month: a week a row from Monday, each day a button with its chips —
- * its named problem first ("1 late order", "2 need you"; E22), then a count
- * per layer — and, for a role that
+ * The month: a week a row from Monday, each day a button with a line per
+ * layer — its named problem first ("1 late order", "2 need you"; E22), then
+ * a square of the layer's colour and its count — and, for a role that
  * reads money (`payment:read`, E23), what came in and went out that day:
- * "+₹3.8k" over "−₹200".
- * Below 760px each chip is a dot per layer, red when something needs acting
- * on, and the tapped day is listed under the month. A day the calendar does
+ * "+₹3.8k" over "−₹200" (BKDCalMonth).
+ * Below 760px the date sits in a ring — filled for the day picked, outlined
+ * for today — over a dot per layer, red when something needs acting on
+ * (BKMOverviewMonth); a tap opens the day in a sheet. A day the calendar does
  * not reach — before the business joined, or past what can be planned — is
  * greyed and cannot be picked. A day off says so under its date — "Closed",
  * "Dr. Pillai off", "2 off" (E24) — and is striped when the business is
@@ -128,20 +132,24 @@ export function MonthGrid({
             role="gridcell"
             aria-hidden
             className={cn(
-                cellEdge,
-                "min-h-[54px] bg-neutral-50 dark:bg-muted min-[760px]:min-h-[92px]",
+                PHONE_EDGE,
+                "h-[52px] min-[760px]:h-auto min-[760px]:min-h-[104px] min-[760px]:bg-neutral-50 dark:min-[760px]:bg-muted",
+                DESK_EDGE,
             )}
         />
     );
 
     return (
-        <div className="min-w-0 flex-[3_1_460px] overflow-hidden rounded-xl border border-border bg-card">
+        <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
             <div
                 aria-hidden
-                className="grid grid-cols-7 border-b border-border"
+                className="grid grid-cols-7 pb-1 pt-1.5 min-[760px]:border-b min-[760px]:border-border min-[760px]:p-0"
             >
                 {DOWS.map((d) => (
-                    <div key={d} className="label px-2.5 py-2">
+                    <div
+                        key={d}
+                        className="min-[760px]:label text-center text-[11.5px] font-semibold text-muted-foreground min-[760px]:px-2.5 min-[760px]:pb-2 min-[760px]:pt-2.5 min-[760px]:text-left"
+                    >
                         <span className="min-[760px]:hidden">{d[0]}</span>
                         <span className="max-[759px]:hidden">{d}</span>
                     </div>
@@ -199,13 +207,19 @@ export function MonthGrid({
                                 aria-selected={outside ? undefined : on}
                                 aria-current={isToday ? "date" : undefined}
                                 className={cn(
-                                    cellEdge,
-                                    "block min-h-[54px] w-full min-w-0 px-[5px] py-1.5 text-left align-top font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring min-[760px]:min-h-[92px] min-[760px]:px-2 min-[760px]:py-[7px]",
+                                    PHONE_EDGE,
+                                    DESK_EDGE,
+                                    // A phone: the date in a ring, its dots
+                                    // under it (BKMOverviewMonth).
+                                    "flex h-[52px] w-full min-w-0 flex-col items-center gap-1 pt-1.5 font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                                    // The desk: the date, the day's money and
+                                    // a line per layer (BKDCalMonth).
+                                    "min-[760px]:h-auto min-[760px]:min-h-[104px] min-[760px]:items-stretch min-[760px]:gap-[3px] min-[760px]:p-2 min-[760px]:text-left",
                                     outside
-                                        ? "cursor-default bg-neutral-50 dark:bg-muted"
+                                        ? "cursor-default min-[760px]:bg-neutral-50 dark:min-[760px]:bg-muted"
                                         : on
-                                          ? "bg-muted ring-2 ring-inset ring-foreground"
-                                          : "bg-card hover:bg-muted active:bg-muted/70",
+                                          ? "cursor-pointer bg-card min-[760px]:ring-2 min-[760px]:ring-inset min-[760px]:ring-foreground"
+                                          : "cursor-pointer bg-card hover:bg-muted active:bg-muted/70",
                                     // Closed, or the person picked is off:
                                     // stripes over the day's own fill, so
                                     // hover still shows (E24).
@@ -218,22 +232,30 @@ export function MonthGrid({
                                 <span className="flex items-baseline gap-1.5">
                                     <span
                                         className={cn(
-                                            "text-[13px]",
+                                            "grid size-7 place-items-center rounded-full text-[14px]",
+                                            "min-[760px]:block min-[760px]:size-auto min-[760px]:rounded-none min-[760px]:font-display min-[760px]:text-[15px] min-[760px]:font-semibold",
                                             outside
                                                 ? "font-medium text-neutral-400 dark:text-muted-foreground"
-                                                : isToday
-                                                  ? "font-bold text-foreground"
-                                                  : past
-                                                    ? "font-medium text-muted-foreground"
-                                                    : "font-medium text-foreground",
+                                                : on
+                                                  ? "bg-primary font-bold text-primary-foreground min-[760px]:bg-transparent min-[760px]:text-foreground"
+                                                  : isToday
+                                                    ? "font-bold text-foreground shadow-[inset_0_0_0_1.5px_hsl(var(--foreground))] min-[760px]:shadow-none"
+                                                    : past
+                                                      ? "font-medium text-muted-foreground"
+                                                      : "font-medium text-foreground",
+                                            // The desk marks today in red,
+                                            // picked or not (the board).
+                                            isToday &&
+                                                !outside &&
+                                                "min-[760px]:text-destructive",
                                         )}
                                     >
                                         {Number(day.date.slice(8))}
                                     </span>
-                                    <span className="flex-1" />
+                                    <span className="flex-1 max-[759px]:hidden" />
                                     {cash.in || cash.out ? (
-                                        // In over out, as the design stacks
-                                        // them; the cell's label says both.
+                                        // In over out; the cell's label says
+                                        // both.
                                         <span
                                             aria-hidden
                                             title={
@@ -241,13 +263,13 @@ export function MonthGrid({
                                                     ? `Money in ${minorMoney(sum.in, currency)}${sum.out ? `, out ${minorMoney(sum.out, currency)}` : ""}`
                                                     : undefined
                                             }
-                                            className="grid flex-none justify-items-end whitespace-nowrap text-[11px] font-semibold tabular-nums leading-[1.25] max-[759px]:hidden"
+                                            className="grid flex-none justify-items-end whitespace-nowrap text-[11px] tabular-nums leading-[1.25] max-[759px]:hidden"
                                         >
-                                            <span className="text-neutral-600 dark:text-muted-foreground">
+                                            <span className="text-muted-foreground">
                                                 {cash.in}
                                             </span>
                                             {cash.out ? (
-                                                <span className="font-medium text-destructive-subtle-foreground">
+                                                <span className="text-destructive-subtle-foreground">
                                                     {cash.out}
                                                 </span>
                                             ) : null}
@@ -256,37 +278,42 @@ export function MonthGrid({
                                 </span>
                                 {dayOff ? (
                                     // Said in the label too; a phone's cell
-                                    // has no room for it (the design).
+                                    // has no room for it (the boards).
                                     <span
                                         aria-hidden
                                         title={dayOff.title}
-                                        className="mt-0.5 block truncate text-[10.5px] font-semibold text-muted-foreground max-[759px]:hidden"
+                                        className="block truncate text-[11px] text-muted-foreground max-[759px]:hidden"
                                     >
                                         {dayOff.text}
                                     </span>
                                 ) : null}
-                                {/* Desk: chips in words. */}
+                                {/* Desk: a line per layer, a square of its
+                                    colour and its count. */}
                                 <span
                                     aria-hidden
-                                    className="mt-[3px] flex flex-col gap-0.5 max-[759px]:hidden"
+                                    className="flex flex-col gap-[3px] max-[759px]:hidden"
                                 >
                                     {chips.slice(0, DESK_CHIPS).map((chip) => (
                                         <span
                                             key={chip.key}
                                             className={cn(
-                                                "block truncate rounded-[4px] px-[5px] py-px text-[11px]",
+                                                "flex min-w-0 items-center gap-[5px] text-[11.5px]",
                                                 chip.tone === "act"
-                                                    ? "bg-destructive-subtle font-bold text-destructive-subtle-foreground"
-                                                    : cn(
-                                                          "font-semibold text-layer-foreground",
-                                                          TONE_FILL[chip.tone],
-                                                          // Past is quieter in colour, not see-through:
-                                                          // 80% opacity took the words under 4.5:1.
-                                                          past && "saturate-50",
-                                                      ),
+                                                    ? "font-semibold text-destructive-subtle-foreground"
+                                                    : "text-neutral-700 dark:text-muted-foreground",
                                             )}
                                         >
-                                            {chip.text}
+                                            <span
+                                                className={cn(
+                                                    "size-[7px] shrink-0 rounded-[2px]",
+                                                    chip.tone === "act"
+                                                        ? "bg-destructive-subtle-foreground"
+                                                        : TONE_FILL[chip.tone],
+                                                )}
+                                            />
+                                            <span className="truncate">
+                                                {chip.text}
+                                            </span>
                                         </span>
                                     ))}
                                 </span>
@@ -294,18 +321,19 @@ export function MonthGrid({
                                 something needs you. */}
                                 <span
                                     aria-hidden
-                                    className="mt-1.5 flex flex-wrap gap-[3px] min-[760px]:hidden"
+                                    className="flex h-1.5 gap-[3px] min-[760px]:hidden"
                                 >
                                     {chips.slice(0, PHONE_DOTS).map((chip) => (
                                         <span
                                             key={chip.key}
                                             className={cn(
-                                                "block size-[7px] rounded-full",
+                                                "block size-1.5 rounded-full",
                                                 chip.tone === "act"
-                                                    ? "bg-destructive-subtle-foreground ring-2 ring-destructive-subtle"
+                                                    ? "bg-destructive-subtle-foreground"
                                                     : cn(
                                                           TONE_FILL[chip.tone],
-                                                          past && "opacity-70",
+                                                          past &&
+                                                              "opacity-[.55]",
                                                       ),
                                             )}
                                         />

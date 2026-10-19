@@ -170,6 +170,10 @@ describe("a list draws the one toolbar", () => {
                     "a picker inside a sheet: it searches the catalogue to add products, with its own results list",
                 "components/customers/customer-picker.tsx":
                     "a picker inside a form: it finds one customer to choose, not a list to browse",
+                "components/bookings/calendar/header/people-sheet.tsx":
+                    "Whose bookings, in header C's picker: it finds one person to show, not a list to browse",
+                "components/bookings/sheets/customer-step.tsx":
+                    "the booking sheets' customer step (U3): it finds one customer to book, not a list to browse",
             },
         );
     });
@@ -287,6 +291,10 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
                 /aria-current=\{[^}]*\}\s*className=\{chipClass\(/.test(code) ||
                 (listScreen(code) &&
                     /<(?:Chip|ChipGroup)\b|chipClass\(/.test(code)),
+            {
+                "components/bookings/bookings-view.tsx":
+                    "All bookings (U11): its six views are chips with counts in the toolbar's one row, as the boards the owner signed off on 19 Oct draw them (BKMAllBookings, BKDAllBookings; DEC-170)",
+            },
         );
     });
 

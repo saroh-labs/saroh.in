@@ -21,9 +21,9 @@ import type { FulfilmentType, KitchenStage, OrderRead } from "./read";
 export interface OrderAbilities {
     /** Move steps and print (`order:stage`). */
     stage: boolean;
-    /** Take a new order, and make its pay link (`order:create`). */
+    /** Take a new order, and make its payment link (`order:create`). */
     create: boolean;
-    /** Make or replace a pay link (`order:create` or `order:edit`). */
+    /** Make or replace a payment link (`order:create` or `order:edit`). */
     payLink: boolean;
     /** Refund and cancel (`order:refund`). */
     refund: boolean;
@@ -248,7 +248,7 @@ export function rowMenu(row: MenuRow, can: OrderAbilities): RowMenuItem[] {
             Number(row.unpaidAmount ?? 0) > 0;
         items.push({
             kind: "pay-link",
-            label: replaces ? "New pay link" : "Make a pay link",
+            label: replaces ? "New payment link" : "Make a payment link",
             replaces,
             disabled: !owed
                 ? "Nothing is owed on it."
@@ -296,7 +296,7 @@ export function rowMenu(row: MenuRow, can: OrderAbilities): RowMenuItem[] {
  * What the pay-link item does. A link already out is replaced, after the
  * confirm ("the link you sent before stops working"), even when this menu
  * made it a moment ago — re-copying the old address would leave the item
- * saying "New pay link" and making none. With none out, one is made.
+ * saying "New payment link" and making none. With none out, one is made.
  */
 export function payLinkAction(item: { replaces: boolean }): "replace" | "make" {
     return item.replaces ? "replace" : "make";

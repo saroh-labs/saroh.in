@@ -4,6 +4,7 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
 import * as React from "react";
+import { nameInitials } from "../../lib/names";
 import { cn } from "../../lib/utils";
 
 /*
@@ -154,18 +155,7 @@ function RoleDot({
 }
 
 /** Two letters from a name, or the first of an email when there is no name. */
-function avatarInitials(name: string | null | undefined, email?: string) {
-    // Words that start with a letter: "Priya (reviewer)" is "PR", not "P(".
-    const words = (name ?? "")
-        .trim()
-        .split(/[\s&]+/)
-        .filter((w) => /^[A-Za-zÀ-ÿ]/.test(w));
-    const first = words.at(0) ?? "";
-    const last = words.at(-1) ?? "";
-    if (words.length >= 2) return `${first[0]}${last[0]}`.toUpperCase();
-    if (first) return first.slice(0, 2).toUpperCase();
-    return (email ?? "?").slice(0, 1).toUpperCase();
-}
+const avatarInitials = nameInitials;
 
 const Avatar = React.forwardRef<
     React.ElementRef<typeof AvatarPrimitive.Root>,

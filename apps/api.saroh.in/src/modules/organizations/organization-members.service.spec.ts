@@ -1161,8 +1161,13 @@ describe("invented roles on the roster", () => {
             "booking:read",
             "service:read",
             "contact:read",
-            // A Member moves kitchen stages (DEC-024).
+            // A Member moves kitchen stages (DEC-024), and works the front
+            // desk: bookings and hours (DEC-170).
             "order:stage",
+            "booking:write",
+            "hours:write",
+            // And reads the alerts meant for them alone (DEC-170, #1038).
+            "notification:read-own",
         ]);
         await service.updateRole(lead, "user_x", { role: "stock-clerk" });
         expect(db.membership.update.mock.calls[0][0].data).toEqual({

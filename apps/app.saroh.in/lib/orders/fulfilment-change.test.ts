@@ -55,10 +55,12 @@ describe("differenceNote — what saving does to the money", () => {
         format,
     };
 
-    it("paid online: more is owed by a pay link, less goes back", () => {
+    it("paid online: more is owed by a payment link, less goes back", () => {
         expect(
             differenceNote({ ...base, differenceCents: 4000, paid: "online" }),
-        ).toBe("₹40 more to pay. Saving makes a pay link for it to send Asha.");
+        ).toBe(
+            "₹40 more to pay. Saving makes a payment link for it to send Asha.",
+        );
         expect(
             differenceNote({
                 ...base,
@@ -99,7 +101,7 @@ describe("differenceNote — what saving does to the money", () => {
 });
 
 describe("saveLabel", () => {
-    it("names the refund, or the pay link, or just saves", () => {
+    it("names the refund, or the payment link, or just saves", () => {
         expect(
             saveLabel({
                 differenceCents: -4000,
@@ -115,7 +117,7 @@ describe("saveLabel", () => {
                 linkable: true,
                 format,
             }),
-        ).toBe("Save and make pay link");
+        ).toBe("Save and make payment link");
         expect(
             saveLabel({
                 differenceCents: 4000,

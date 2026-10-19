@@ -1,75 +1,100 @@
-import { PageContainer } from "@/components/shared/page-container";
+"use client";
+
 import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
+import { cn } from "@saroh/ui/lib/utils";
+import type { CSSProperties, ReactElement } from "react";
+import { useId, useState } from "react";
 
 import { BookingPackControl } from "@/components/bookings/booking-pack-control";
-import { CancelBookingControl } from "@/components/bookings/cancel-booking-control";
+import {
+    HistoryCard,
+    MoneyCard,
+    OutcomeCard,
+    PageNote,
+} from "@/components/bookings/booking-page/cards";
+import { CustomerCard } from "@/components/bookings/booking-page/customer-card";
+import { PageHead } from "@/components/bookings/booking-page/head";
+import { MainButton } from "@/components/bookings/booking-page/main-action";
+import type { PageSheet } from "@/components/bookings/booking-page/overlays";
+import { PageOverlays } from "@/components/bookings/booking-page/overlays";
+import { useOutcomeMark } from "@/components/bookings/booking-page/use-outcome-mark";
+import type { MoreRow } from "@/components/bookings/calendar/quick-look-more";
 import { ClassWaitlist } from "@/components/bookings/class-waitlist";
 import { JoinOnline } from "@/components/bookings/join-online";
-import { OutcomeControl } from "@/components/bookings/outcome-control";
-import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
-import { TakePayment } from "@/components/bookings/take-payment";
-import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
+import { useNewBookingLauncher } from "@/components/bookings/new-booking/launcher";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { StatusBadge } from "@/components/shared/status-badge";
-import { readOnlyLine } from "@/components/shared/who-can-change";
+import { PageContainer } from "@/components/shared/page-container";
+import { useHold } from "@/components/shared/use-hold";
 import { personHref } from "@/lib/contacts/person-href";
-import {
-    formatDate,
-    formatDateTime,
-    formatTimeRange,
-} from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
-import { bookingStatus } from "@/lib/format/status";
+import { firstName } from "@/lib/names";
+import type { PageBooking, PageFacts } from "@/lib/services/booking-page";
 import {
-    deadlineText,
-    paidLine,
-    refundLine,
-    refundPolicyLine,
-} from "@/lib/services/booking-money";
+    bookerLabel,
+    bookerPick,
+    outcomeAsk,
+    outcomeLine,
+    pageBadge,
+    pageCanCancel,
+    pageCanMove,
+    pageHeading,
+    pageMain,
+    pageMoreItems,
+    pageOrigin,
+    pageWhat,
+} from "@/lib/services/booking-page";
+import { moneyNotes, moneyRows } from "@/lib/services/booking-page-money";
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
+import { localDateOf } from "@/lib/services/diary";
 import { joinLink } from "@/lib/services/meeting-link";
-import type { BookingDetail, BookingEvent } from "@/lib/services/service";
+import type { PeekPerson } from "@/lib/services/peek";
+import { zoneShortName } from "@/lib/services/time-picker";
 
 /**
- * One booking, and the two things a merchant is asked about it on the phone:
- * who is this, and can we move it (#121).
- *
- * Every time here is rendered in the BOOKING'S OWN timezone — the one the
- * booker saw — never the viewer's, for the same reason the calendar does it:
- * a merchant in Mumbai with a customer in London must read the customer's 9am
- * as the customer booked it. The zone is stated rather than implied, because
- * "9:00 AM" with no zone is a time nobody can act on.
+ * A booking's page (U12, #1028; BKMBookingDetail, BKDBooking), one
+ * component for a phone and a desk. The day and time are the heading, in
+ * the business's zone (Q10). One main action is pinned (the foot of a
+ * phone, the top right of a desk): Take ₹X (locked, saying why once, for
+ * a role that can't take it), then Book their next visit, Book them
+ * again, or Book a new time once cancelled. Move sits beside it; More
+ * holds the rest, Cancel last in red. "Did Kabir come?" waits ten seconds
+ * with Undo. Nothing the page offered before is gone: money, policy and
+ * refund, class pack, a treatment's visits, a class's waitlist, Join
+ * online, the archived and read-only notes, and the history.
  */
 export function BookingDetailView({
     booking,
     past,
+    now: nowProp,
+    timezone: zone,
     packs,
     canWrite = false,
     canRefund = false,
     canReadOrder = false,
     desk,
     waitlist,
+    person = null,
 }: {
-    booking: BookingDetail;
+    booking: PageBooking;
+    /** Whether the slot has ended. Read by the page so "now" stays out of render. */
+    past: boolean;
+    /** The page's clock, for when Came and Didn't come open. */
+    now?: number;
+    /** The business's zone (Q10); the service's when left out. */
+    timezone?: string;
     /**
-     * `booking:write`: may move, cancel or say how it went. A Member reads
-     * bookings without it, and was shown all three as live buttons the API
-     * then refused. Without it none is drawn and the page says it is
-     * read-only. A calendar-only person holds it, and the API sends them
-     * only their own bookings (`own-diary.ts`), so every booking they can
-     * open here is one they may change.
+     * `booking:write`: may mark, move, cancel and book. Without it none is
+     * drawn and the page says it is read-only. A calendar-only person
+     * holds it for the bookings the API sends them (their own).
      */
     canWrite?: boolean;
-    /** `payment:manage`: may refund money a late cancel keeps (E8). */
+    /** `payment:manage`: may change what the policy does with the money. */
     canRefund?: boolean;
     /** `order:read`: a treatment's visit links to its order (E9). */
     canReadOrder?: boolean;
     /**
      * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
-     * and whether a pay link can be sent (a provider connected).
+     * and whether a payment link can be sent (a provider connected).
      */
     desk?: {
         canTake: boolean;
@@ -77,408 +102,301 @@ export function BookingDetailView({
         /** The plan takes payment online (R33); else no link is offered. */
         online?: boolean;
     };
-    /** Whether the slot has ended. Read by the page so "now" stays out of render. */
-    past: boolean;
-    /**
-     * Class packs (ADR-007), read by the page: what pays for it now, and the
-     * person's packs that could. Absent where packs are not for this person.
-     */
+    /** Class packs (ADR-007), read by the page. */
     packs?: {
         paidWith: { name: string } | null;
         usable: { id: string; label: string }[];
         canWrite: boolean;
     };
-    /**
-     * The class's waitlist for this session (A12), read by the page for a
-     * class still to come; null when the read failed. Absent: not a class.
-     */
+    /** A class's waitlist for this session (A12); null: the read failed. */
     waitlist?: ClassWaitlistRow[] | null;
+    /** Their phone, Needs attention and how a change reaches them. */
+    person?: PeekPerson | null;
 }) {
-    const { service, contact, timezone } = booking;
-    const cancelled = booking.status === "CANCELLED";
-    // An archived service is retired from the menu, and its availability is
-    // retired with it — the hours it still carries are hours the merchant has
-    // stopped offering. Moving a booking into one would put a customer in a
-    // slot the business no longer keeps, so the api refuses it and this does
-    // not offer it. Cancelling stays, because winding the booking down is
-    // exactly what a retired service's bookings need.
-    const retired = service.status !== "ACTIVE";
-    const moved = booking.events.filter((e) => e.type === "RESCHEDULED");
-    // `find`, not `moved[0]`: indexing is typed as always-present here, and
-    // this must actually be optional — most bookings have never been moved.
-    const firstMove = booking.events.find((e) => e.type === "RESCHEDULED");
-    // Someone on the team made it by hand (#384): it is FOR the booker, and
-    // BY them. A booker who used the booking page made it themselves.
-    const madeBy = booking.events.find((e) => e.type === "BOOKED")?.actor?.name;
-    // The link it was booked with — frozen on the booking, like its terms.
+    const launcher = useNewBookingLauncher();
+    const ids = { frontDesk: useId() };
+    const { service, contact } = booking;
+    const timezone = zone ?? (service.timezone || booking.timezone);
+    // Without the page's clock: as if just after it ended, or well before.
+    const now =
+        nowProp ??
+        (past
+            ? Date.parse(booking.endAt) + 1
+            : Date.parse(booking.startAt) - 2 * 3_600_000);
+    const who = bookerLabel(booking);
+    const first = firstName(who);
+
+    // Came / Didn't come show at once and wait ten seconds with Undo; a
+    // plain cancel waits too (it tells the customer), and reads as done.
+    const { hold, send, undo, pending } = useHold();
+    const { outcome, markedHere, markOutcome, undoMark } = useOutcomeMark({
+        bookingId: booking.id,
+        saved: booking.outcome,
+        first,
+        hold,
+        undo,
+        pending,
+    });
+    const [open, setOpen] = useState<PageSheet>(null);
+    const status = pending.includes(`cancel-booking:${booking.id}`)
+        ? "CANCELLED"
+        : booking.status;
+    const cancelled = status === "CANCELLED";
+
+    const money = booking.money;
+    const format = (cents: number) =>
+        formatMoney(cents, money?.currency ?? service.currency);
+    const take = money?.take && !cancelled ? money.take : null;
+    const facts: PageFacts = {
+        status,
+        outcome,
+        canBook: canWrite,
+        canLaunch: launcher !== null && bookerPick(booking) !== null,
+        bookedElsewhere: service.capacity > 1 || Boolean(booking.treatment),
+        take,
+        canTake: desk ? desk.canTake : null,
+        ended: past,
+        retired: service.status !== "ACTIVE",
+    };
+    const main = pageMain(facts);
+    const canMove = pageCanMove(facts);
+    const ask = outcomeAsk(booking, outcome, canWrite, now);
+    const frontDesk = canWrite && desk !== undefined && !desk.canTake;
+    const heading = pageHeading(booking, timezone, now);
     const link = joinLink(booking);
-    // What was paid online at booking, what is due, and any refund (E8).
-    const paid = booking.money ? paidLine(booking.money) : null;
-    const refund = booking.money ? refundLine(booking.money) : null;
-    // The business's refund policy, as it is set (E30, DEC-058).
-    const policy = refundPolicyLine(booking.money, !!booking.freeCancelUntil);
-    const showPacks =
+    const markedBy =
+        booking.events.findLast(
+            (e) => e.type === "ATTENDED" || e.type === "NO_SHOW",
+        )?.actor?.name ?? null;
+
+    // Book their next visit, Book them again and Book a new time (U8):
+    // who, what and with whom filled; the day the merchant's (Q16).
+    const book = (nextVisit: boolean) =>
+        launcher?.open({
+            who: bookerPick(booking),
+            serviceId: service.id,
+            staffId: booking.staff?.id ?? null,
+            nextVisit,
+        });
+
+    const moreRows: MoreRow[] = pageMoreItems(facts, {
+        first,
+        hasPerson: contact !== null,
+    }).map((item) => ({
+        key: item.action,
+        label: item.label,
+        icon: item.action,
+        danger: item.danger,
+        ...(item.action === "day"
+            ? {
+                  href: `/bookings?date=${localDateOf(booking.startAt, timezone)}`,
+              }
+            : item.action === "person" && contact
+              ? { href: personHref(contact.id) }
+              : {
+                    onSelect: () =>
+                        item.action === "next"
+                            ? book(true)
+                            : setOpen(
+                                  item.action === "move" ? "move" : "cancel",
+                              ),
+                }),
+    }));
+
+    const mainButton = main ? (
+        <MainButton
+            main={main}
+            amount={take ? format(take.cents) : null}
+            first={first}
+            frontDeskId={ids.frontDesk}
+            onTake={() => setOpen("take")}
+            onBook={() => book(main !== "rebook")}
+        />
+    ) : null;
+    const moveButton = canMove ? (
+        <Button
+            type="button"
+            variant="outline"
+            className="h-12 flex-1 text-[15px] min-[760px]:h-11 min-[760px]:flex-none min-[760px]:text-[14.5px]"
+            onClick={() => setOpen("move")}
+        >
+            Move
+        </Button>
+    ) : null;
+
+    const pack =
         packs !== undefined &&
         (packs.paidWith !== null ||
-            (packs.canWrite && packs.usable.length > 0));
-
-    return (
-        <PageContainer width="default">
-            <PageHeader
-                holdsData
-                // Where it sits (UX-083): Bookings › All bookings › this one.
-                breadcrumb={[
-                    <Link
-                        key="bookings"
-                        href="/bookings"
-                        className="hover:text-foreground"
-                    >
-                        Bookings
-                    </Link>,
-                    <Link
-                        key="all"
-                        href="/bookings/all"
-                        className="hover:text-foreground"
-                    >
-                        All bookings
-                    </Link>,
-                    service.name,
-                ]}
-                title={service.name}
-                description={
-                    madeBy
-                        ? `Booked for ${bookerLabel(booking)} by ${madeBy}.`
-                        : `Booked by ${bookerLabel(booking)}.`
-                }
-                actions={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button asChild variant="ghost" size="sm">
-                            <Link href="/bookings">All bookings</Link>
-                        </Button>
-                        {cancelled || !canWrite ? null : past ? (
-                            // A past appointment cannot be moved and does not
-                            // need cancelling — the only thing left to say
-                            // about it is how it went.
-                            <OutcomeControl
-                                bookingId={booking.id}
-                                outcome={booking.outcome}
-                            />
-                        ) : (
-                            <>
-                                {retired ? null : (
-                                    <RescheduleBooking
-                                        bookingId={booking.id}
-                                        serviceId={service.id}
-                                        timezone={timezone}
-                                        currentStartAt={booking.startAt}
-                                        currentEndAt={booking.endAt}
-                                        freeCancelUntil={
-                                            booking.freeCancelUntil ?? null
-                                        }
-                                    />
-                                )}
-                                <CancelBookingControl
-                                    bookingId={booking.id}
-                                    money={booking.money}
-                                    freeCancelUntil={booking.freeCancelUntil}
-                                    timezone={timezone}
-                                    canRefund={canRefund}
-                                    canReadOrder={canReadOrder}
-                                />
-                            </>
-                        )}
-                    </div>
-                }
+            (packs.canWrite && packs.usable.length > 0)) ? (
+            <BookingPackControl
+                bookingId={booking.id}
+                paidWith={packs.paidWith}
+                usable={packs.usable}
+                canWrite={packs.canWrite}
             />
+        ) : null;
 
-            {canWrite ? null : (
-                <ReadOnlyNote className="mb-0 mt-6">
-                    {readOnlyLine("this booking")}
-                </ReadOnlyNote>
-            )}
-
-            <div className="mt-6 grid gap-6 sm:grid-cols-2">
-                <section className="rounded-lg border border-border p-5">
-                    <h2 className="text-sm font-medium">When</h2>
-                    <p className="mt-2 text-lg font-medium tabular-nums">
-                        {formatTimeRange(
-                            booking.startAt,
-                            booking.endAt,
-                            timezone,
-                        )}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                        {formatDate(booking.startAt, timezone, {
-                            weekday: "short",
-                        })}{" "}
-                        · {timezone}
-                    </p>
-                    {/* The one fact a moved booking must not hide. Without it
-                        a merchant looking at the current time has no way to
-                        know the customer was ever told a different one. */}
-                    {firstMove?.fromStartAt ? (
-                        <p className="mt-3 text-sm text-muted-foreground">
-                            Moved from{" "}
-                            <span className="text-foreground">
-                                {formatDateTime(
-                                    firstMove.fromStartAt,
-                                    timezone,
-                                    { weekday: "short" },
-                                )}
-                            </span>
-                            {moved.length > 1
-                                ? ` · moved ${moved.length} times`
-                                : ""}
-                            .
-                        </p>
-                    ) : null}
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <BookingStatus status={booking.status} />
-                        {booking.outcome ? (
-                            <OutcomeBadge outcome={booking.outcome} />
-                        ) : past && !cancelled ? (
-                            // Said plainly rather than left blank: "nobody has
-                            // said" is a real state, and the merchant is the
-                            // only one who can end it.
-                            <span className="text-sm text-muted-foreground">
-                                Nobody has said how this went yet.
-                            </span>
-                        ) : null}
-                    </div>
-                    {paid || refund ? (
-                        <div className="mt-3 grid gap-1 text-sm">
-                            {paid ? (
-                                <p className="tabular-nums">{paid}</p>
-                            ) : null}
-                            {refund ? (
-                                <p
-                                    className={
-                                        booking.money?.refund?.status ===
-                                        "FAILED"
-                                            ? "text-destructive"
-                                            : "text-muted-foreground"
-                                    }
-                                >
-                                    {refund}
-                                </p>
-                            ) : null}
-                        </div>
-                    ) : null}
-                    {/* "Take ₹X" (P2): what the desk takes now — the
-                        whole price, or what's left after a deposit. */}
-                    {booking.money?.take && desk?.canTake ? (
-                        <div className="mt-3">
-                            <TakePayment
-                                bookingId={booking.id}
-                                take={booking.money.take}
-                                currency={booking.money.currency}
-                                who={bookerLabel(booking)}
-                                canLink={desk.canLink}
-                                online={desk.online}
-                                triggerClassName="h-9"
-                            />
-                        </div>
-                    ) : booking.money?.take && desk ? (
-                        // Shown, disabled, with why (FB-1, DEC-098).
-                        <TakePaymentLocked
-                            className="mt-3"
-                            amount={formatMoney(
-                                booking.money.take.cents,
-                                booking.money.currency,
-                            )}
-                            triggerClassName="h-9"
-                        />
-                    ) : null}
-                    {/* The deadline fixed at booking (DEC-051): moving the
-                        booking never moves it, so it is said here. */}
-                    {!cancelled && !past && booking.freeCancelUntil ? (
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            Free to cancel until{" "}
-                            {deadlineText(booking.freeCancelUntil, timezone)}.
-                        </p>
-                    ) : null}
-                    {!cancelled && !past && policy ? (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {policy}
-                        </p>
-                    ) : null}
-                    {retired && !cancelled && !past && canWrite ? (
-                        // A missing button with no explanation reads as a bug.
-                        <p className="mt-3 text-sm text-muted-foreground">
-                            {service.name} is archived, so this booking cannot
-                            be moved. Make the service active again to move it,
-                            or cancel the booking.
-                        </p>
-                    ) : null}
-                    {link ? <JoinOnline url={link} /> : null}
-                </section>
-
-                <section className="rounded-lg border border-border p-5">
-                    <h2 className="text-sm font-medium">Who</h2>
-                    <dl className="mt-2 grid gap-2 text-sm">
-                        <Row label="Name" value={bookerLabel(booking)} />
-                        <Row
-                            label="Email"
-                            value={contact?.email ?? booking.bookerEmail}
-                        />
-                        <Row
-                            label="Phone"
-                            value={contact?.phone ?? booking.bookerPhone}
-                        />
-                    </dl>
-                    {/* A linked contact is a destination; a typed-in name is
-                        not — the same rule the list row follows. Their page
-                        is Customer Detail, as the peek's link is. */}
-                    {contact ? (
-                        <Button
-                            data-ph-mask=""
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="mt-4"
-                        >
-                            <Link href={personHref(contact.id)}>
-                                Open {firstName(bookerLabel(booking))}&apos;s
-                                page
-                            </Link>
-                        </Button>
-                    ) : null}
-                </section>
-            </div>
-
-            {/* A visit of a treatment (E10): which visit, its order, and
-                the next one to book. */}
-            {booking.treatment ? (
-                <TreatmentVisits
-                    treatment={booking.treatment}
-                    service={service}
-                    who={bookerLabel(booking)}
-                    canReadOrder={canReadOrder}
-                />
-            ) : null}
-
-            {showPacks ? (
-                <section className="mt-6 rounded-lg border border-border p-5">
-                    <h2 className="mb-3 text-sm font-medium">Class pack</h2>
-                    <BookingPackControl
-                        bookingId={booking.id}
-                        paidWith={packs.paidWith}
-                        usable={packs.usable}
-                        canWrite={packs.canWrite}
-                    />
-                </section>
-            ) : null}
-
-            {waitlist !== undefined ? (
-                <ClassWaitlist rows={waitlist} timezone={timezone} />
-            ) : null}
-
-            <section className="mt-6 rounded-lg border border-border p-5">
-                <h2 className="text-sm font-medium">History</h2>
-                <ol className="mt-3 grid gap-3">
-                    {booking.events.map((event) => (
-                        <li
-                            key={event.id}
-                            className="flex flex-wrap items-baseline gap-x-2 text-sm"
-                        >
-                            <span className="font-medium">
-                                {eventTitle(event, timezone)}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                                {formatDate(event.createdAt, timezone, {
-                                    weekday: "short",
-                                })}
-                                {/* Null actor means the booker did it through
-                                    the public form — the difference between
-                                    "they booked" and "we moved it". */}
-                                {event.actor?.name
-                                    ? ` · ${event.actor.name}`
-                                    : " · by the customer"}
-                            </span>
-                        </li>
-                    ))}
-                    {booking.events.length === 0 ? (
-                        <li className="text-sm text-muted-foreground">
-                            This booking predates the history log, so only its
-                            current state is known.
-                        </li>
-                    ) : null}
-                </ol>
-            </section>
-        </PageContainer>
+    // The main column; Customer sits beside it at a desk, and after "Did
+    // Kabir come?" and its line on a phone.
+    const before: ReactElement[] = [];
+    const after: ReactElement[] = [];
+    if (ask) {
+        before.push(
+            <OutcomeCard
+                key="outcome"
+                first={first}
+                outcome={outcome}
+                line={outcomeLine(outcome, markedHere ? null : markedBy)}
+                canDidnt={ask.didnt}
+                asking={past && outcome === null}
+                onMark={markOutcome}
+                onUndo={undoMark}
+            />,
+        );
+    }
+    const note = !canWrite ? "read-only" : frontDesk ? "front-desk" : null;
+    if (note) {
+        before.push(<PageNote key={note} id={ids.frontDesk} kind={note} />);
+    }
+    if (facts.retired && !cancelled && !past && canWrite) {
+        // A missing Move with no explanation reads as a bug.
+        before.push(
+            <PageNote key="retired" kind="retired" service={service.name} />,
+        );
+    }
+    if (money || pack) {
+        after.push(
+            <MoneyCard
+                key="money"
+                rows={money ? moneyRows(money, format, cancelled) : []}
+                lines={
+                    money
+                        ? moneyNotes(money, {
+                              format,
+                              cancelled,
+                              ended: past,
+                              freeCancelUntil: booking.freeCancelUntil,
+                              timezone,
+                          })
+                        : []
+                }
+            >
+                {pack}
+            </MoneyCard>,
+        );
+    }
+    if (booking.treatment) {
+        after.push(
+            <TreatmentVisits
+                key="treatment"
+                treatment={booking.treatment}
+                service={service}
+                who={who}
+                canReadOrder={canReadOrder}
+            />,
+        );
+    }
+    if (waitlist !== undefined) {
+        after.push(
+            <ClassWaitlist
+                key="waitlist"
+                rows={waitlist}
+                timezone={timezone}
+            />,
+        );
+    }
+    after.push(
+        <HistoryCard
+            key="history"
+            events={booking.events}
+            timezone={timezone}
+        />,
     );
-}
-
-function Row({ label, value }: { label: string; value: string | null }) {
-    return (
-        <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className={value ? "" : "text-muted-foreground"}>
-                {value ?? "Not given"}
-            </dd>
+    const inColumn = (el: ReactElement) => (
+        <div key={el.key} className="min-w-0 min-[760px]:col-start-1">
+            {el}
         </div>
     );
-}
 
-function BookingStatus({ status }: { status: BookingDetail["status"] }) {
     return (
-        <StatusBadge
-            size="default"
-            tone={
-                status === "CONFIRMED"
-                    ? "success"
-                    : status === "CANCELLED"
-                      ? "neutral"
-                      : "warning"
-            }
+        <PageContainer
+            width="default"
+            className={cn(main || moveButton ? "max-[759px]:pb-24" : "")}
         >
-            {bookingStatus(status)}
-        </StatusBadge>
+            <PageHead
+                badge={pageBadge({ status, outcome, ended: past })}
+                origin={pageOrigin(booking.events)}
+                day={heading.day}
+                time={heading.time}
+                who={who}
+                what={`${pageWhat(booking)} · times in ${zoneShortName(timezone, now) || timezone}`}
+                more={{
+                    title: first ? `${first}'s booking` : "This booking",
+                    rows: moreRows,
+                }}
+                actions={
+                    <>
+                        {mainButton}
+                        {moveButton}
+                    </>
+                }
+            />
+            {link ? <JoinOnline url={link} /> : null}
+
+            <div className="mt-3.5 grid gap-3 min-[760px]:mt-0 min-[760px]:grid-cols-[minmax(0,1fr)_360px] min-[760px]:items-start min-[760px]:gap-x-[18px] min-[760px]:gap-y-3.5">
+                {before.map(inColumn)}
+                <CustomerCard
+                    who={who}
+                    contactId={contact?.id ?? null}
+                    phone={
+                        [booking.bookerPhone, contact?.phone, person?.phone]
+                            .map((p) => p?.trim())
+                            .find(Boolean) ?? null
+                    }
+                    email={contact?.email ?? booking.bookerEmail ?? null}
+                    person={person}
+                    note={booking.intakeNote?.trim() ?? null}
+                    className="min-[760px]:col-start-2 min-[760px]:[grid-row:1/span_var(--column-rows)]"
+                    style={
+                        {
+                            "--column-rows": before.length + after.length,
+                        } as CSSProperties
+                    }
+                />
+                {after.map(inColumn)}
+            </div>
+
+            {/* Pinned at the foot of a phone, above the tab bar. */}
+            {mainButton || moveButton ? (
+                <div
+                    data-pinned=""
+                    className="fixed inset-x-0 bottom-[var(--tab-bar-inset,0px)] z-30 flex gap-2 border-t border-border bg-card px-4 pb-3 pt-2.5 min-[760px]:hidden print:hidden"
+                >
+                    {mainButton ? (
+                        <span className="flex flex-[2] [&>*]:w-full">
+                            {mainButton}
+                        </span>
+                    ) : null}
+                    {moveButton}
+                </div>
+            ) : null}
+
+            <PageOverlays
+                open={open}
+                onOpen={setOpen}
+                booking={booking}
+                who={who}
+                timezone={timezone}
+                now={nowProp}
+                canMove={canMove}
+                canCancel={pageCanCancel(facts)}
+                canRefund={canRefund}
+                canReadOrder={canReadOrder}
+                take={take && desk?.canTake ? take : null}
+                desk={desk}
+                person={person}
+                send={send}
+            />
+        </PageContainer>
     );
-}
-
-function OutcomeBadge({ outcome }: { outcome: "ATTENDED" | "NO_SHOW" }) {
-    return (
-        <StatusBadge
-            size="default"
-            tone={outcome === "ATTENDED" ? "success" : "warning"}
-        >
-            {outcome === "ATTENDED" ? "Attended" : "No-show"}
-        </StatusBadge>
-    );
-}
-
-/** One history line, in words rather than a state name. */
-function eventTitle(event: BookingEvent, timeZone: string): string {
-    if (event.type === "BOOKED") return "Booked";
-    if (event.type === "CANCELLED") return "Cancelled";
-    if (event.type === "ATTENDED") return "Marked as attended";
-    if (event.type === "NO_SHOW") return "Marked as a no-show";
-    if (event.type === "PAID_AT_DESK") return "Paid at the desk";
-    const from = event.fromStartAt
-        ? formatDateTime(event.fromStartAt, timeZone, { weekday: "short" })
-        : null;
-    const to = event.toStartAt
-        ? formatDateTime(event.toStartAt, timeZone, { weekday: "short" })
-        : null;
-    return from && to ? `Moved from ${from} to ${to}` : "Moved";
-}
-
-/** "Asha" from "Asha Rao"; an email stays whole. */
-function firstName(label: string): string {
-    return label.includes("@") ? label : (label.split(" ")[0] ?? label);
-}
-
-/** The contact's name if the CRM knows them, else whatever was typed in. */
-function bookerLabel(booking: BookingDetail): string {
-    const contact = booking.contact;
-    if (contact) {
-        const name = [contact.firstName, contact.lastName]
-            .filter(Boolean)
-            .join(" ")
-            .trim();
-        if (name) return name;
-        return contact.email;
-    }
-    return booking.bookerName ?? booking.bookerEmail ?? "Unknown booker";
 }

@@ -10,10 +10,19 @@ import {
 } from "@saroh/ui/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import type { Hold } from "@/lib/hold-undo";
 import { startHold } from "@/lib/hold-undo";
 
-type Commit = () => Promise<void> | void;
+/**
+ * What a commit may answer: nothing (it said and put back what it had to
+ * itself), or the action's result. A refused result is said here and the
+ * screen put back, as is a commit that threw.
+ */
+type Commit = () =>
+    | Promise<void | { ok: boolean; error?: string }>
+    | void
+    | { ok: boolean; error?: string };
 
 /**
  * What a held send or cancel said once it ran. `said`: the caller has
@@ -51,6 +60,12 @@ interface Held {
  *
  * Leaving the page makes whatever is still held happen: the person saw it
  * done and did not press Undo.
+ *
+ * A commit that throws (the browser couldn't reach the app) or answers
+ * `{ ok: false }` never leaves the screen showing it done: `onUndo` puts it
+ * back and the failure is said, `UNREACHED` or the API's reason. So
+ * `onUndo` must restore only what this hold changed, never a newer change
+ * made on top of it.
  */
 export function useHold() {
     const held = useRef(new Map<string, Held>());
@@ -93,7 +108,18 @@ export function useHold() {
             void held.current.get(key)?.hold.replace();
             const h: Hold = startHold({
                 commit: async () => {
-                    await commit();
+                    let res: void | { ok: boolean; error?: string };
+                    try {
+                        res = await commit();
+                    } catch {
+                        showError(UNREACHED);
+                        onUndo();
+                        return;
+                    }
+                    if (res && !res.ok) {
+                        showError(res.error ?? UNREACHED);
+                        onUndo();
+                    }
                 },
                 undo: onUndo,
                 onChange: (state) => {

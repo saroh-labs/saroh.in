@@ -4,9 +4,11 @@ import { count as countOf } from "@/lib/format/plural";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import { methodLabel } from "@/lib/payments/method-words";
 import type { Review } from "@/lib/product-reviews/service";
+import { outcomeWord } from "@/lib/services/booking-words";
 import { recurringPrice, subscriptionPay } from "@/lib/subscriptions/view";
 import { absentText } from "@saroh/ui/lib/absent";
 
+import { initials } from "@/lib/names";
 import { addedLine } from "./added";
 import type {
     CustomerDetail,
@@ -171,14 +173,8 @@ export function tabFromQuery(value: string | undefined, tabs: Tab[]): TabKey {
     return tabs.find((t) => t.key === value)?.key ?? "over";
 }
 
-export function initials(name: string): string {
-    return name
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((w) => w[0].toUpperCase())
-        .join("")
-        .slice(0, 2);
-}
+/** The one rule for initials (`lib/names.ts`), for the header's avatar. */
+export { initials };
 
 /** Money per currency, joined: "₹5,370" or "₹5,370 + $40". */
 export function totals(list: MoneyTotal[]): string {
@@ -243,7 +239,7 @@ export function sinceLine(
                 ? `With ${bizName ?? "you"} since ${formatDate(first, tz, { now })}`
                 : "No bookings yet",
             typeof attended === "number"
-                ? `${countOf(attended, "session")} attended`
+                ? `Came to ${countOf(attended, "booking")}`
                 : null,
         ]
             .filter(Boolean)
@@ -552,8 +548,10 @@ export function bookingState(
             ? { label: "Late cancel", tone: "bad" }
             : { label: "Cancelled", tone: "off" };
     }
-    if (b.outcome === "NO_SHOW") return { label: "No-show", tone: "bad" };
-    if (b.outcome === "ATTENDED") return { label: "Attended", tone: "ok" };
+    if (b.outcome === "NO_SHOW")
+        return { label: outcomeWord("NO_SHOW"), tone: "bad" };
+    if (b.outcome === "ATTENDED")
+        return { label: outcomeWord("ATTENDED"), tone: "ok" };
     return upcoming
         ? { label: "Booked", tone: "accent" }
         : { label: "Booked", tone: "off" };
@@ -618,7 +616,7 @@ export function bookingLists(bookings: {
 export const BOOKINGS_EMPTY: Record<BookingFilter, string> = {
     up: "Nothing booked from today.",
     past: "No past bookings.",
-    issue: "No no-shows or late cancels.",
+    issue: "Nobody missed a booking or cancelled late.",
 };
 
 // ----------------------------------------------------------- classes left

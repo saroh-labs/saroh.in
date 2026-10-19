@@ -6,18 +6,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ChangedRow } from "@/components/changed-row";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import type { MemberBusiness } from "@/lib/team-member-words";
 import { cameInWords, SOURCE_LONG } from "@/lib/team-member-words";
+import { useChangeFeedback } from "@/lib/use-change-feedback";
 
 import { LogCallSheet } from "./log-call-sheet";
+import { OwnRateDialog } from "./own-rate-dialog";
 
 /**
  * The Businesses tab (R33): every business they look after now, each with
  * how it came to them (their link, their code, their lead's email, or
  * assigned) and since when, linking to the business's page for staff who
  * may open it (`organization:read`; an Account manager can't). On their
- * own page, Log a call with one; it lands on Activity.
+ * own page, Log a call with one; it lands on Activity. With
+ * `commission:rates`, Set commission… gives a business its own rate for
+ * its manager (#1035); the row lights after.
  */
 export function MemberBusinesses({
     platformAdminId,
@@ -25,6 +30,7 @@ export function MemberBusinesses({
     self,
     canLog,
     canOpen,
+    canSetRate = false,
 }: {
     platformAdminId: string;
     businesses: MemberBusiness[];
@@ -32,9 +38,13 @@ export function MemberBusinesses({
     canLog: boolean;
     /** May the reader open a business's page (`organization:read`). */
     canOpen: boolean;
+    /** Holds `commission:rates`. */
+    canSetRate?: boolean;
 }) {
     const router = useRouter();
+    const feedback = useChangeFeedback();
     const [logging, setLogging] = useState<MemberBusiness | null>(null);
+    const [rating, setRating] = useState<MemberBusiness | null>(null);
 
     if (businesses.length === 0) {
         return (
@@ -61,8 +71,12 @@ export function MemberBusinesses({
             </div>
             <ul aria-label="Businesses they look after">
                 {businesses.map((business) => (
-                    <li
+                    <ChangedRow
+                        as="li"
                         key={business.organizationId}
+                        changed={feedback.isHighlighted(
+                            business.organizationId,
+                        )}
                         data-business={business.organizationId}
                         className="grid gap-2 border-b px-4 py-3 last:border-0 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_9rem] md:items-center md:gap-4"
                     >
@@ -97,7 +111,7 @@ export function MemberBusinesses({
                                 It {SOURCE_LONG[business.source]}.
                             </span>
                         </div>
-                        <div className="md:justify-self-end">
+                        <div className="flex flex-wrap gap-2 md:justify-self-end">
                             {canLog ? (
                                 <Button
                                     type="button"
@@ -108,10 +122,35 @@ export function MemberBusinesses({
                                     Log a call
                                 </Button>
                             ) : null}
+                            {canSetRate ? (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setRating(business)}
+                                >
+                                    Set commission…
+                                </Button>
+                            ) : null}
                         </div>
-                    </li>
+                    </ChangedRow>
                 ))}
             </ul>
+            {rating ? (
+                <OwnRateDialog
+                    organizationId={rating.organizationId}
+                    businessName={rating.name}
+                    onOpenChange={(open) => {
+                        if (!open) setRating(null);
+                    }}
+                    onSaved={(message) =>
+                        feedback.report({
+                            message,
+                            rowId: rating.organizationId,
+                        })
+                    }
+                />
+            ) : null}
             {logging ? (
                 <LogCallSheet
                     business={{

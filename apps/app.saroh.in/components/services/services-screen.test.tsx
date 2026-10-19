@@ -1,18 +1,19 @@
 // @vitest-environment jsdom
 /**
- * Bookings › Services as rows (Bookings audit, 12 Oct 2026).
+ * Bookings › Services, phone and desk (U15, #1031; boards BKMServices and
+ * BKDStates).
  *
- * - A service is a row of the shared list: its name, one line of length,
- *   gap, where and kind, its price, who takes it and how it is booked. The
- *   row opens the service.
- * - "Taking bookings" is a switch, not a button: it acts at once, says so
- *   with Undo, and is put back when the save doesn't go through. A paused
- *   service says Paused in words too.
- * - What is true of several services is said once above the list, with
- *   what fixes it; two zeroes are never written out.
- * - One count beside the heading, one line of introduction.
- * - New service is a link, and a menu with New course once Courses is on.
- *   "Also sell" sits under the list.
+ * - Built once for both sizes: a table at the desk (Service, How long ·
+ *   price · who, This week, Who can book it, Taking bookings) and a row a
+ *   service on a phone. Both are in the markup; CSS shows one, so each
+ *   test reads the one it is about.
+ * - "Who can book it" is a tag for all four mixes of the two boxes;
+ *   neither is Paused (DEC-170, Q5).
+ * - "Taking bookings" is a quick pause: off unticks both boxes, on ticks
+ *   both back; it acts at once, with Undo, and is put back when the save
+ *   doesn't go through.
+ * - A search past 8 services; a Member reads, with one note; the
+ *   Payments-off line and the nobody-to-take-it line; none yet.
  *
  * `react-dom/client` + `act` directly, as the editor's tests do.
  */
@@ -63,15 +64,16 @@ const toast = { showError: vi.fn(), showUndo: vi.fn() };
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
     showUndo: (...a: unknown[]) => toast.showUndo(...a) as unknown,
+    dismissToast: vi.fn(),
 }));
 
 const service = (over: Partial<Service> = {}): Service => ({
     id: "sv_1",
     organizationId: "org_1",
     siteId: null,
-    name: "Glow facial",
+    name: "Physio assessment",
     description: "",
-    durationMinutes: 60,
+    durationMinutes: 45,
     bufferBeforeMinutes: 0,
     bufferAfterMinutes: 10,
     capacity: 1,
@@ -89,12 +91,13 @@ const service = (over: Partial<Service> = {}): Service => ({
     depositMode: "NONE",
     depositCents: 0,
     showOnBookingPage: true,
+    bookableByTeam: true,
     ...over,
 });
 
 const person = (over: Partial<StaffView> = {}): StaffView => ({
     id: "st_1",
-    name: "Asha Rao",
+    name: "Meera Iyer",
     title: null,
     status: "ACTIVE",
     membership: null,
@@ -106,15 +109,26 @@ const person = (over: Partial<StaffView> = {}): StaffView => ({
     ...over,
 });
 
-const FACIAL = service();
-const YOGA = service({
+/** All four mixes of "Who can book it". */
+const BOTH = service();
+const CUSTOMERS = service({
     id: "sv_2",
-    name: "Morning yoga",
-    capacity: 12,
-    priceCents: 0,
-    bufferAfterMinutes: 0,
+    name: "Sports massage",
+    bookableByTeam: false,
+});
+const TEAM = service({
+    id: "sv_3",
+    name: "Online review call",
+    showOnBookingPage: false,
     locationType: "ONLINE",
 });
+const NEITHER = service({
+    id: "sv_4",
+    name: "Hip and back rehab",
+    showOnBookingPage: false,
+    bookableByTeam: false,
+});
+const FOUR = [BOTH, CUSTOMERS, TEAM, NEITHER];
 
 let root: Root;
 let host: HTMLDivElement;
@@ -148,21 +162,21 @@ interface Shown {
     canEdit?: boolean;
     hasPage?: boolean | null;
     payment?: BookingPaymentView | null;
-    alsoSell?: boolean;
     canNewCourse?: boolean;
 }
 
 function show({
-    services = [FACIAL, YOGA],
-    staff = [person({ serviceIds: ["sv_1", "sv_2"] })],
+    services = FOUR,
+    staff = [person({ serviceIds: FOUR.map((s) => s.id) })],
     usage = {
-        sv_1: { thisWeek: 3, comingUp: 5 },
-        sv_2: { thisWeek: 0, comingUp: 0 },
+        sv_1: { thisWeek: 6, comingUp: 9 },
+        sv_2: { thisWeek: 5, comingUp: 7 },
+        sv_3: { thisWeek: 2, comingUp: 3 },
+        sv_4: { thisWeek: 0, comingUp: 2 },
     },
     canEdit = true,
     hasPage = true,
     payment = null,
-    alsoSell = false,
     canNewCourse = false,
 }: Shown = {}) {
     act(() =>
@@ -175,222 +189,224 @@ function show({
                 canEdit={canEdit}
                 hasPage={hasPage}
                 payment={payment}
-                alsoSell={alsoSell ? [] : null}
+                alsoSell={[]}
                 canNewCourse={canNewCourse}
             />,
         ),
     );
 }
 
-const settle = async () => {
+const settle = async (ms = 0) => {
     for (let i = 0; i < 6; i++) {
         await act(async () => {
-            await new Promise((r) => setTimeout(r, 0));
+            await new Promise((r) => setTimeout(r, ms));
         });
     }
 };
 
 const text = () => host.textContent;
+const facts = (...parts: string[]) => parts.join(FACT_DOT);
 
-/** The table's rows, by the service's name. */
-function rowOf(name: string): HTMLTableRowElement {
-    const found = Array.from(host.querySelectorAll("tbody tr")).find((r) =>
-        r.textContent.includes(name),
-    );
-    if (!found) throw new Error(`No row for "${name}"`);
-    return found as HTMLTableRowElement;
+type Size = "desk" | "phone";
+const SCOPE: Record<Size, string> = {
+    desk: "[data-services-table]",
+    phone: "[data-services-list]",
+};
+const ROW: Record<Size, string> = { desk: "[data-service-row]", phone: "li" };
+
+function rowOf(name: string, size: Size = "desk"): HTMLElement {
+    const found = Array.from(
+        host.querySelectorAll<HTMLElement>(`${SCOPE[size]} ${ROW[size]}`),
+    ).find((r) => r.textContent.includes(name));
+    if (!found) throw new Error(`No ${size} row for "${name}"`);
+    return found;
 }
 
-function switchOf(name: string): HTMLButtonElement {
-    const found =
-        rowOf(name).querySelector<HTMLButtonElement>('[role="switch"]');
+function switchOf(name: string, size: Size = "desk"): HTMLButtonElement {
+    const found = rowOf(name, size).querySelector<HTMLButtonElement>(
+        '[role="switch"]',
+    );
     if (!found) throw new Error(`No switch for "${name}"`);
     return found;
 }
 
-async function flip(name: string) {
-    act(() => switchOf(name).click());
+async function flip(name: string, size: Size = "desk") {
+    act(() => switchOf(name, size).click());
     await settle();
 }
 
-describe("services are rows", () => {
-    it("draws the shared list: a table with a head, a row a service, and no cards", () => {
+const checked = (name: string, size: Size) =>
+    switchOf(name, size).getAttribute("aria-checked");
+
+describe("one list, drawn for the desk and for a phone", () => {
+    it("is a table at the desk, with the board's five columns", () => {
         show();
-        expect(host.querySelector("[data-list-table]")).not.toBeNull();
-        expect(host.querySelectorAll("tbody tr")).toHaveLength(2);
-        const heads = Array.from(host.querySelectorAll("thead th")).map((th) =>
-            th.textContent.trim(),
-        );
+        const heads = Array.from(
+            host.querySelectorAll(`${SCOPE.desk} [role="columnheader"]`),
+        ).map((th) => th.textContent.trim());
         expect(heads).toEqual([
             "Service",
-            "Price",
-            "Who takes it",
-            "Bookings",
-            "Actions",
+            "How long · price · who",
+            "This week",
+            "Who can book it",
+            "Taking bookings",
         ]);
-        // A list this small draws no search, filter or view switch.
-        expect(host.querySelector('input[type="search"]')).toBeNull();
-        expect(host.querySelector('[role="combobox"]')).toBeNull();
+        expect(
+            host.querySelectorAll(`${SCOPE.desk} [data-service-row]`),
+        ).toHaveLength(4);
     });
 
-    it("says each service on one line, with its price, who takes it and how it is booked", () => {
+    it("is a row a service on a phone, shown only at a phone's width", () => {
         show();
-        const facial = rowOf("Glow facial").textContent;
-        expect(facial).toContain(
-            ["60 min", "10 min gap after", "In person", "One-to-one"].join(
-                FACT_DOT,
-            ),
-        );
-        expect(facial).toContain("₹1,200");
-        expect(facial).toContain("Asha");
-        expect(facial).toContain(
-            ["3 booked this week", "5 still to come"].join(FACT_DOT),
-        );
-
-        const yoga = rowOf("Morning yoga").textContent;
-        expect(yoga).toContain(
-            ["60 min", "Online", "Class", "12 places"].join(FACT_DOT),
-        );
-        expect(yoga).toContain("Free");
+        expect(host.querySelectorAll(`${SCOPE.phone} li`)).toHaveLength(4);
+        expect(
+            host.querySelector(SCOPE.phone)?.parentElement?.className,
+        ).toContain("min-[760px]:hidden");
+        expect(
+            host
+                .querySelector(SCOPE.desk)
+                ?.closest(".max-\\[759px\\]\\:hidden"),
+        ).not.toBeNull();
     });
 
-    it("never writes out two zeroes: nothing booked is the absent mark", () => {
+    it("says how long, the price and who on one line, and what is booked", () => {
         show();
-        const yoga = rowOf("Morning yoga");
-        expect(yoga.textContent).not.toContain("0 booked this week");
-        expect(yoga.querySelector("[data-absent]")?.textContent).toContain(
-            "None",
+        expect(rowOf("Physio assessment").textContent).toContain(
+            facts("45 min", "₹1,200", "Meera"),
+        );
+        expect(rowOf("Physio assessment").textContent).toContain(
+            facts("6 booked", "9 to come"),
+        );
+        expect(rowOf("Physio assessment", "phone").textContent).toContain(
+            facts("6 booked this week", "9 to come"),
+        );
+        expect(rowOf("Online review call").textContent).toContain(
+            facts("45 min", "online", "₹1,200", "Meera"),
         );
     });
 
-    it("opens the service from its row", () => {
+    it("opens the service from its name, at both sizes", () => {
         show();
-        const link = rowOf("Glow facial").querySelector("a");
-        expect(link?.getAttribute("href")).toBe("/services/sv_1");
-        expect(link?.textContent).toContain("Glow facial");
-        // The full-size Edit and Stop buttons are gone from every item.
-        const names = Array.from(host.querySelectorAll("button, a")).map((b) =>
-            b.textContent.trim(),
-        );
-        expect(names).not.toContain("Edit");
-        expect(names).not.toContain("Stop taking bookings");
-        expect(names).not.toContain("Take bookings again");
+        for (const size of ["desk", "phone"] as const) {
+            const link = rowOf("Physio assessment", size).querySelector("a");
+            expect(link?.getAttribute("href")).toBe("/services/sv_1");
+            expect(link?.textContent).toContain("Physio assessment");
+        }
     });
 
-    it("says a failed read as such, never as a zero or as nobody", () => {
+    it("says None booked, never two zeroes, and a failed read as such", () => {
+        show({ usage: { sv_1: { thisWeek: 0, comingUp: 0 } } });
+        expect(rowOf("Physio assessment").textContent).toContain("None booked");
         show({ staff: null, usage: null });
-        const facial = rowOf("Glow facial").textContent;
-        expect(facial).toContain("Couldn't load");
-        expect(facial).toContain("Bookings couldn't be counted");
-        expect(text()).not.toContain("Nobody");
+        expect(rowOf("Physio assessment").textContent).toContain(
+            "Bookings couldn't be counted",
+        );
+        expect(text()).not.toContain("nobody yet");
+        expect(text()).not.toContain("Nobody takes");
     });
 });
 
-describe("one count, one line of introduction", () => {
-    it("says how many services, once", () => {
+describe("Who can book it", () => {
+    it("tags every row at the desk, for all four mixes", () => {
         show();
-        const count = host.querySelector('[data-slot="page-count"]');
-        expect(count?.textContent).toBe("2 services");
-        expect(text()).not.toContain("on the booking page");
-        expect(text()).toContain("What people can book, and who takes it.");
-        expect(text()).not.toContain("Changing a price only affects");
-    });
-
-    it("adds what the booking page offers only when it differs", () => {
-        show({ services: [FACIAL, { ...YOGA, showOnBookingPage: false }] });
+        const tag = (name: string) =>
+            rowOf(name).querySelectorAll('[role="cell"]').item(3).textContent;
+        expect(tag("Physio assessment")).toBe("Customers and team");
+        expect(tag("Sports massage")).toBe("Customers only");
+        expect(tag("Online review call")).toBe("Team only");
+        expect(tag("Hip and back rehab")).toBe("Paused");
         expect(
-            host.querySelector('[data-slot="page-count"]')?.textContent,
-        ).toBe(["2 services", "1 on the booking page"].join(FACT_DOT));
-    });
-});
-
-describe("nobody takes it yet is said once", () => {
-    it("with nobody on the diary: one line above the list, and the way to Availability", () => {
-        show({ staff: [] });
-        const notes = Array.from(host.querySelectorAll('[role="note"]'));
-        expect(notes).toHaveLength(1);
-        expect(notes[0]?.textContent).toContain(
-            "Nobody takes bookings yet, so each service books in its own hours.",
-        );
-        const link = notes[0]?.querySelector("a");
-        expect(link?.getAttribute("href")).toBe("/bookings/availability");
-        expect(link?.textContent).toBe(
-            "Add yourself or your team in Availability",
-        );
-        // Not once a row: each row says two words.
-        expect(text()).not.toContain("It books in its own hours");
-        expect(rowOf("Glow facial").textContent).toContain("Nobody yet");
-        // And it sits above the list.
-        const list = host.querySelector("[data-list-table]");
-        expect(
-            notes[0] && list
-                ? notes[0].compareDocumentPosition(list) &
-                      Node.DOCUMENT_POSITION_FOLLOWING
-                : 0,
-        ).toBeTruthy();
+            rowOf("Hip and back rehab").querySelector('[data-status="paused"]'),
+        ).not.toBeNull();
     });
 
-    it("with people on the diary: counts the services nobody takes, and each opens to choose", () => {
-        show({ staff: [person({ serviceIds: ["sv_1"] })] });
-        const note = host.querySelector('[role="note"]');
-        expect(note?.textContent).toContain(
-            "1 service has nobody to take it yet, so it books in its own hours. Open it to choose who takes it.",
-        );
-        expect(note?.querySelector("a")).toBeNull();
-    });
-
-    it("says nothing when every service has someone, or who takes them couldn't be read", () => {
+    it("tags a phone row only when it isn't both", () => {
         show();
-        expect(host.querySelector('[role="note"]')).toBeNull();
-        show({ staff: null });
-        expect(host.querySelector('[role="note"]')).toBeNull();
-    });
-});
-
-describe("Taking bookings is a switch", () => {
-    it("is on for a live service and off for a paused one, which says Paused in words", () => {
-        show({ services: [FACIAL, { ...YOGA, status: "ARCHIVED" }] });
-        expect(switchOf("Glow facial").getAttribute("aria-checked")).toBe(
-            "true",
+        expect(rowOf("Physio assessment", "phone").textContent).not.toContain(
+            "Customers and team",
         );
-        expect(switchOf("Glow facial").getAttribute("aria-label")).toBe(
-            "Taking bookings, Glow facial",
+        expect(rowOf("Sports massage", "phone").textContent).toContain(
+            "Customers only",
         );
-        expect(rowOf("Glow facial").textContent).toContain("Taking bookings");
-        expect(rowOf("Glow facial").textContent).not.toContain("Paused");
-
-        const yoga = rowOf("Morning yoga");
-        expect(switchOf("Morning yoga").getAttribute("aria-checked")).toBe(
-            "false",
+        expect(rowOf("Online review call", "phone").textContent).toContain(
+            "Team only",
         );
-        expect(yoga.querySelector('[data-status="paused"]')?.textContent).toBe(
+        expect(rowOf("Hip and back rehab", "phone").textContent).toContain(
             "Paused",
         );
-        expect(yoga.textContent).toContain("Hidden from the booking page");
     });
 
-    it("pauses at once, with a toast and Undo, and asks nothing", async () => {
+    it("says a paused one can't be booked, and that what's to come happens", () => {
         show();
-        await flip("Glow facial");
+        expect(rowOf("Hip and back rehab").textContent).toContain(
+            facts("Nobody can book it", "2 still to come will happen"),
+        );
+        expect(rowOf("Hip and back rehab", "phone").textContent).toContain(
+            facts("Nobody can book it", "2 bookings still to come will happen"),
+        );
+    });
 
+    it("reads a service paused the old way as Paused", () => {
+        show({ services: [service({ status: "ARCHIVED" })] });
+        expect(rowOf("Physio assessment").textContent).toContain("Paused");
+        expect(checked("Physio assessment", "desk")).toBe("false");
+    });
+
+    it("counts what your booking page offers beside the heading", () => {
+        show();
+        expect(
+            host.querySelector('[data-slot="page-count"]')?.textContent,
+        ).toBe(facts("4 services", "2 on your booking page"));
+        expect(text()).toContain(
+            "What customers can book, how long it takes, and who does it.",
+        );
+    });
+});
+
+describe("Taking bookings is a switch with Undo", () => {
+    it("is on unless paused, named for its service, at both sizes", () => {
+        show();
+        for (const size of ["desk", "phone"] as const) {
+            expect(checked("Physio assessment", size)).toBe("true");
+            expect(checked("Online review call", size)).toBe("true");
+            expect(checked("Hip and back rehab", size)).toBe("false");
+            expect(
+                switchOf("Physio assessment", size).getAttribute("aria-label"),
+            ).toBe("Taking bookings, Physio assessment");
+        }
+        expect(rowOf("Physio assessment").textContent).toContain("On");
+        expect(rowOf("Hip and back rehab", "phone").textContent).toContain(
+            "Off",
+        );
+    });
+
+    it("pauses at once: unticks both boxes, says so, offers Undo, asks nothing", async () => {
+        show();
+        await flip("Physio assessment");
         expect(api.updateService).toHaveBeenCalledWith("sv_1", {
-            status: "ARCHIVED",
+            showOnBookingPage: false,
+            bookableByTeam: false,
         });
         expect(host.querySelector('[role="alertdialog"]')).toBeNull();
-        expect(switchOf("Glow facial").getAttribute("aria-checked")).toBe(
-            "false",
-        );
-        expect(rowOf("Glow facial").textContent).toContain("Paused");
+        for (const size of ["desk", "phone"] as const) {
+            expect(checked("Physio assessment", size)).toBe("false");
+            expect(rowOf("Physio assessment", size).textContent).toContain(
+                "Paused",
+            );
+        }
         expect(router.refresh).toHaveBeenCalled();
-        expect(toast.showUndo).toHaveBeenCalledTimes(1);
         expect(toast.showUndo.mock.calls[0]?.[0]).toBe(
-            "Glow facial paused. It's off the booking page. Bookings already made still happen.",
+            "Physio assessment paused. Nobody can book it, and bookings already made stay.",
         );
     });
 
-    it("Undo takes bookings again", async () => {
+    it("Undo puts back exactly the boxes it had", async () => {
         show();
-        await flip("Glow facial");
+        await flip("Online review call", "phone");
+        expect(api.updateService).toHaveBeenCalledWith("sv_3", {
+            showOnBookingPage: false,
+            bookableByTeam: false,
+        });
         const undo = toast.showUndo.mock.calls[0]?.[1] as () => Promise<{
             ok: boolean;
         }>;
@@ -399,22 +415,29 @@ describe("Taking bookings is a switch", () => {
             result = await undo();
         });
         expect(result?.ok).toBe(true);
-        expect(api.updateService).toHaveBeenLastCalledWith("sv_1", {
-            status: "ACTIVE",
+        // Team only again: only the team's box comes back.
+        expect(api.updateService).toHaveBeenLastCalledWith("sv_3", {
+            bookableByTeam: true,
         });
-        expect(switchOf("Glow facial").getAttribute("aria-checked")).toBe(
-            "true",
+        expect(checked("Online review call", "phone")).toBe("true");
+        expect(rowOf("Online review call", "phone").textContent).toContain(
+            "Team only",
         );
     });
 
-    it("takes bookings again for a paused service", async () => {
-        show({ services: [{ ...YOGA, status: "ARCHIVED" }] });
-        await flip("Morning yoga");
-        expect(api.updateService).toHaveBeenCalledWith("sv_2", {
+    it("takes bookings again by ticking both boxes", async () => {
+        show();
+        await flip("Hip and back rehab");
+        expect(api.updateService).toHaveBeenCalledWith("sv_4", {
             status: "ACTIVE",
+            showOnBookingPage: true,
+            bookableByTeam: true,
         });
         expect(toast.showUndo.mock.calls[0]?.[0]).toBe(
-            "Morning yoga is bookable again.",
+            "Hip and back rehab is taking bookings again.",
+        );
+        expect(rowOf("Hip and back rehab").textContent).toContain(
+            "Customers and team",
         );
     });
 
@@ -424,92 +447,212 @@ describe("Taking bookings is a switch", () => {
             error: "Couldn't save the service.",
         });
         show();
-        await flip("Glow facial");
+        await flip("Physio assessment");
         expect(toast.showError).toHaveBeenCalledWith(
             "Couldn't save the service.",
         );
         expect(toast.showUndo).not.toHaveBeenCalled();
-        expect(switchOf("Glow facial").getAttribute("aria-checked")).toBe(
-            "true",
-        );
-        expect(rowOf("Glow facial").textContent).not.toContain("Paused");
+        expect(checked("Physio assessment", "desk")).toBe("true");
     });
 
     it("is put back when the save never got an answer", async () => {
         api.updateService.mockRejectedValueOnce(new Error("offline"));
         show();
-        await flip("Glow facial");
+        await flip("Physio assessment");
         expect(toast.showError).toHaveBeenCalledTimes(1);
-        expect(switchOf("Glow facial").getAttribute("aria-checked")).toBe(
-            "true",
-        );
+        expect(checked("Physio assessment", "desk")).toBe("true");
     });
 
     it("gives way to a fresh read of the list", async () => {
         show();
-        await flip("Glow facial");
-        // Someone else took bookings for it again since: the list wins.
+        await flip("Physio assessment");
         show({
             services: [
-                { ...FACIAL, updatedAt: "2026-10-12T09:00:00.000Z" },
-                YOGA,
+                { ...BOTH, updatedAt: "2026-10-19T09:00:00.000Z" },
+                CUSTOMERS,
             ],
         });
-        expect(switchOf("Glow facial").getAttribute("aria-checked")).toBe(
-            "true",
-        );
+        expect(checked("Physio assessment", "desk")).toBe("true");
     });
 
-    it("isn't offered to a role that can't change services, which still reads Paused", () => {
-        show({
-            canEdit: false,
-            services: [FACIAL, { ...YOGA, status: "ARCHIVED" }],
-        });
-        expect(host.querySelector('[role="switch"]')).toBeNull();
-        expect(rowOf("Morning yoga").textContent).toContain("Paused");
+    it("explains the switch once, under the list", () => {
+        show();
         expect(text()).toContain(
-            "Your role can see these services but not change them.",
+            "The switch on each row is Taking bookings. Off pauses it: neither customers nor your team can book it, and bookings already made stay. Open a service to choose who can book it.",
+        );
+    });
+});
+
+describe("a search once there are more than 8 services", () => {
+    const many = (n: number) =>
+        Array.from({ length: n }, (_, i) =>
+            service({
+                id: `sv_${i + 1}`,
+                name: i === 2 ? "Sports massage" : `Service ${i + 1}`,
+            }),
+        );
+
+    async function search(term: string) {
+        const input = host.querySelector<HTMLInputElement>(
+            'input[type="search"]',
+        );
+        if (!input) throw new Error("No search");
+        act(() => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )?.set?.call(input, term);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await settle(40);
+    }
+
+    it("isn't there with 8 or fewer", () => {
+        show({ services: many(8), staff: [] });
+        expect(host.querySelector('input[type="search"]')).toBeNull();
+        show({ services: many(6), staff: [] });
+        expect(host.querySelector('input[type="search"]')).toBeNull();
+    });
+
+    it("finds by name, says how many of how many, and clears", async () => {
+        show({ services: many(10), staff: [] });
+        const input = host.querySelector('input[type="search"]');
+        expect(input?.getAttribute("aria-label")).toBe("Search services");
+        await search("mass");
+        expect(
+            host.querySelectorAll(`${SCOPE.desk} [data-service-row]`),
+        ).toHaveLength(1);
+        expect(host.querySelectorAll(`${SCOPE.phone} li`)).toHaveLength(1);
+        expect(rowOf("Sports massage").textContent).toContain("Sports massage");
+        expect(text()).toContain("1 of 10 shown");
+
+        const clear = Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent.trim() === "Clear",
+        );
+        act(() => clear?.click());
+        expect(
+            host.querySelectorAll(`${SCOPE.desk} [data-service-row]`),
+        ).toHaveLength(10);
+    });
+
+    it("says nothing matched, with the way back", async () => {
+        show({ services: many(10), staff: [] });
+        await search("zzz");
+        expect(text()).toContain("No services match");
+        expect(host.querySelector(SCOPE.desk)).toBeNull();
+    });
+});
+
+describe("a Member reads the list", () => {
+    it("with one note, no switch, no New service, and On or Off in words", () => {
+        show({ canEdit: false });
+        expect(host.querySelector('[role="switch"]')).toBeNull();
+        expect(text()).toContain(
+            "Your role can see services but not change them.",
         );
         expect(
-            rowOf("Glow facial").querySelector("a")?.getAttribute("href"),
+            Array.from(host.querySelectorAll("a")).some(
+                (a) => a.getAttribute("href") === "/services/new",
+            ),
+        ).toBe(false);
+        expect(
+            rowOf("Physio assessment").querySelectorAll('[role="cell"]').item(4)
+                .textContent,
+        ).toBe("On");
+        expect(rowOf("Hip and back rehab").textContent).toContain("Paused");
+        expect(text()).not.toContain("The switch on each row");
+        // Each row still opens to read.
+        expect(
+            rowOf("Physio assessment", "phone")
+                .querySelector("a")
+                ?.getAttribute("href"),
         ).toBe("/services/sv_1");
     });
 });
 
-describe("a service people can't book online says so in its row", () => {
-    it("with the way to fix it", () => {
+describe("what is said once above or in a row", () => {
+    it("Payments off: a row customers book online says it can't be, with the fix", () => {
         show({
             payment: {
                 bookingPayment: "ONLINE",
-                onlineBlocker: "NO_PROVIDER",
+                onlineBlocker: "PAYMENTS_OFF",
             },
         });
-        const facial = rowOf("Glow facial");
-        expect(facial.textContent).toContain("Can't be booked online");
-        expect(
-            Array.from(facial.querySelectorAll("a")).map((a) =>
-                a.getAttribute("href"),
-            ),
-        ).toContain("/settings/providers");
-        // A free one books with nothing to pay.
-        expect(rowOf("Morning yoga").textContent).not.toContain(
+        for (const size of ["desk", "phone"] as const) {
+            const row = rowOf("Sports massage", size);
+            expect(row.textContent).toContain("Can't be booked online");
+            const fix = Array.from(row.querySelectorAll("a")).find(
+                (a) => a.textContent.trim() === "Turn on Payments",
+            );
+            expect(fix?.getAttribute("href")).toBe("/settings/modules");
+        }
+        // Only the team books it, and nobody books a paused one.
+        expect(rowOf("Online review call").textContent).not.toContain(
+            "Can't be booked online",
+        );
+        expect(rowOf("Hip and back rehab").textContent).not.toContain(
             "Can't be booked online",
         );
     });
+
+    it("nobody on the diary: one line, and Add who takes bookings", () => {
+        show({ staff: [] });
+        expect(text()).toContain(
+            "Nobody takes bookings yet, so each service is booked in its own hours.",
+        );
+        const links = Array.from(host.querySelectorAll("a")).filter(
+            (a) => a.textContent.trim() === "Add who takes bookings",
+        );
+        // The phone's inline link and the desk's button.
+        expect(links).toHaveLength(2);
+        expect(links.map((a) => a.getAttribute("href"))).toEqual([
+            "/bookings/availability",
+            "/bookings/availability",
+        ]);
+        expect(rowOf("Physio assessment").textContent).toContain("nobody yet");
+    });
+
+    it("one service nobody takes: named, and Choose who opens it", () => {
+        show({ staff: [person({ serviceIds: ["sv_1", "sv_2", "sv_4"] })] });
+        expect(text()).toContain(
+            "Online review call has nobody to take it, so it's booked in its own hours.",
+        );
+        const choose = Array.from(host.querySelectorAll("a")).find(
+            (a) => a.textContent.trim() === "Choose who",
+        );
+        expect(choose?.getAttribute("href")).toBe("/services/sv_3");
+    });
+
+    it("a Member is told, with no way to change it", () => {
+        show({ staff: [], canEdit: false });
+        expect(text()).toContain("Nobody takes bookings yet");
+        expect(text()).not.toContain("Add who takes bookings");
+    });
+
+    it("says nothing when everyone is taken, or who couldn't be read", () => {
+        show();
+        expect(text()).not.toContain("nobody to take");
+        show({ staff: null });
+        expect(text()).not.toContain("Nobody takes");
+    });
 });
 
-describe("New service, and what else is sold", () => {
+describe("New service, none yet, and Also sell", () => {
     const newLinks = () =>
         Array.from(host.querySelectorAll("a")).filter(
-            (a) => a.textContent.trim() === "New service",
+            (a) => a.getAttribute("href") === "/services/new",
         );
 
-    it("is one link while Courses is off", () => {
+    it("is a header button at the desk and a floating button on a phone", () => {
         show();
-        expect(newLinks().map((a) => a.getAttribute("href"))).toEqual([
-            "/services/new",
-        ]);
-        expect(host.querySelector('[aria-haspopup="menu"]')).toBeNull();
+        const links = newLinks();
+        expect(links).toHaveLength(2);
+        expect(links.every((a) => a.textContent.trim() === "New service")).toBe(
+            true,
+        );
+        expect(links[1]?.closest(".fixed")?.className).toContain(
+            "min-[760px]:hidden",
+        );
     });
 
     it("is a menu with New course once Courses is on", async () => {
@@ -533,28 +676,35 @@ describe("New service, and what else is sold", () => {
         ]);
     });
 
-    it("isn't offered to a role that can't change services", () => {
-        show({ canEdit: false, canNewCourse: true });
-        expect(newLinks()).toEqual([]);
-        expect(host.querySelector('[aria-haspopup="menu"]')).toBeNull();
+    it("says there are none yet, with the one way to add one", () => {
+        show({ services: [] });
+        expect(text()).toContain("No services yet");
+        expect(text()).toContain(
+            "A service is what customers book: a one-to-one session or a group class.",
+        );
+        const links = newLinks();
+        expect(links.map((a) => a.textContent.trim())).toEqual([
+            "Add your first service",
+        ]);
+        expect(host.querySelector(SCOPE.desk)).toBeNull();
+        expect(host.querySelector('[data-slot="page-count"]')).toBeNull();
     });
 
-    it("puts Also sell under the list, not above it", () => {
-        show({ alsoSell: true });
+    it("says none yet to a Member with nothing to press", () => {
+        show({ services: [], canEdit: false });
+        expect(text()).toContain("No services yet");
+        expect(newLinks()).toEqual([]);
+    });
+
+    it("puts Also sell under the list", () => {
+        show();
         const group = host.querySelector('[aria-label="Also sell"]');
-        const list = host.querySelector("[data-list-table]");
+        const list = host.querySelector(SCOPE.desk);
         expect(
             group && list
                 ? list.compareDocumentPosition(group) &
                       Node.DOCUMENT_POSITION_FOLLOWING
                 : 0,
         ).toBeTruthy();
-    });
-
-    it("says there are none yet, with the one way to add one", () => {
-        show({ services: [] });
-        expect(text()).toContain("No services yet");
-        expect(host.querySelector("[data-list-table]")).toBeNull();
-        expect(host.querySelector('[data-slot="page-count"]')).toBeNull();
     });
 });

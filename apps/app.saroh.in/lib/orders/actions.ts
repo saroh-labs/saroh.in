@@ -100,7 +100,7 @@ export async function retryRefund(orderId: string, refundId: string) {
     return retryOrderRefund(orderId, refundId);
 }
 
-/** Make the order's pay link, or replace it (B11). */
+/** Make the order's payment link, or replace it (B11). */
 export async function makeOrderPayLink(orderId: string) {
     return createOrderPayLink(orderId);
 }

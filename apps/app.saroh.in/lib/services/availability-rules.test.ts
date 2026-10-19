@@ -1,126 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import type { StaffView, WeeklyRange } from "@/lib/staff/types";
-
 import {
-    copyDay,
-    copyMondayToWeekdays,
-    dayRanges,
-    draftFrom,
+    gapLabel,
     outsideHours,
     payWayBlocked,
     payWayHint,
     payWayOf,
-    rangeRefusal,
     refundsInTime,
     ruleBefore,
     ruleChoices,
     rulePatch,
     ruleRows,
-    saveOps,
-    weeklyHours,
+    sameHours,
 } from "./availability-rules";
 
 const MON = { dayOfWeek: 1, startMinute: 360, endMinute: 600 };
 const MON_PM = { dayOfWeek: 1, startMinute: 1020, endMinute: 1260 };
 const SAT = { dayOfWeek: 6, startMinute: 480, endMinute: 720 };
 
-function person(over: Partial<StaffView> = {}): StaffView {
-    return {
-        id: "st_vikram",
-        name: "Vikram",
-        title: "Trainer",
-        status: "ACTIVE",
-        membership: null,
-        serviceIds: [],
-        hours: [MON, MON_PM, SAT],
-        weeklyMinutes: 0,
-        extraHours: [
-            { id: "x1", date: "2026-09-27", startMinute: 480, endMinute: 660 },
-        ],
-        timeOff: [
-            {
-                id: "t1",
-                startAt: "2026-09-27T18:30:00.000Z",
-                endAt: "2026-09-28T18:30:00.000Z",
-                allDay: true,
-                reason: "Wedding",
-            },
-        ],
-        ...over,
-    };
-}
-
 const RULES = {
     bookAheadDays: 28,
     latestBookingMinutes: 120,
     freeCancelHours: 12,
 };
-
-describe("rangeRefusal", () => {
-    it("refuses an end before the start, and overlapping hours", () => {
-        expect(rangeRefusal([MON], { startMinute: 600, endMinute: 540 })).toBe(
-            "The end has to be after the start.",
-        );
-        expect(rangeRefusal([MON], { startMinute: 540, endMinute: 660 })).toBe(
-            "That overlaps hours already set.",
-        );
-        // Touching is not overlapping.
-        expect(
-            rangeRefusal([MON], { startMinute: 600, endMinute: 660 }),
-        ).toBeNull();
-    });
-});
-
-describe("copyDay", () => {
-    const week: WeeklyRange[] = [
-        { dayOfWeek: 1, startMinute: 540, endMinute: 780 },
-        { dayOfWeek: 1, startMinute: 840, endMinute: 1080 },
-        { dayOfWeek: 3, startMinute: 600, endMinute: 660 },
-        { dayOfWeek: 6, startMinute: 600, endMinute: 960 },
-    ];
-
-    it("gives the chosen days the day's hours, replacing what they had", () => {
-        const copied = copyDay(week, 1, [3, 0]);
-        expect(dayRanges(copied, 3)).toEqual([
-            { dayOfWeek: 3, startMinute: 540, endMinute: 780 },
-            { dayOfWeek: 3, startMinute: 840, endMinute: 1080 },
-        ]);
-        expect(dayRanges(copied, 0)).toHaveLength(2);
-        // The day itself and the days not chosen are as they were.
-        expect(dayRanges(copied, 1)).toEqual(dayRanges(week, 1));
-        expect(dayRanges(copied, 6)).toEqual(dayRanges(week, 6));
-    });
-
-    it("copies a day off as a day off, and never onto itself", () => {
-        expect(dayRanges(copyDay(week, 2, [6]), 6)).toEqual([]);
-        expect(copyDay(week, 1, [1])).toEqual(week);
-    });
-});
-
-describe("copyMondayToWeekdays", () => {
-    it("gives Tuesday to Friday Monday's hours and leaves the weekend", () => {
-        const copied = copyMondayToWeekdays([
-            MON,
-            MON_PM,
-            SAT,
-            { dayOfWeek: 3, startMinute: 900, endMinute: 960 },
-        ]);
-        for (const day of [2, 3, 4, 5]) {
-            expect(
-                copied
-                    .filter((h) => h.dayOfWeek === day)
-                    .map((h) => [h.startMinute, h.endMinute]),
-            ).toEqual([
-                [360, 600],
-                [1020, 1260],
-            ]);
-        }
-        expect(copied.filter((h) => h.dayOfWeek === 6)).toEqual([SAT]);
-        // 4h + 4h over five weekdays, plus Saturday's 4h.
-        expect(weeklyHours(copied)).toBe(44);
-    });
-});
 
 describe("outsideHours", () => {
     it("lists kept bookings the new hours no longer cover", () => {
@@ -153,93 +55,6 @@ describe("outsideHours", () => {
     });
 });
 
-describe("saveOps", () => {
-    it("is nothing for an untouched draft", () => {
-        const staff = [person()];
-        expect(saveOps(staff, draftFrom(staff))).toEqual([]);
-    });
-
-    it("turns a draft into the writes, each with what Undo puts back", () => {
-        const staff = [person()];
-        const draft = draftFrom(staff);
-        draft.hours.st_vikram = copyMondayToWeekdays(draft.hours.st_vikram);
-        draft.offRemoved.push("t1");
-        draft.extraRemoved.push("x1");
-        draft.offAdded.push({
-            key: "n1",
-            staffId: "st_vikram",
-            fromDate: "2026-10-02",
-            toDate: "2026-10-02",
-            startMinute: null,
-            endMinute: null,
-            reason: "Physio",
-        });
-        const ops = saveOps(staff, draft);
-        // Never a rule: each saves in its own sheet.
-        expect(ops.map((o) => o.kind)).toEqual([
-            "hours",
-            "removeOff",
-            "removeExtra",
-            "addOff",
-        ]);
-        const hours = ops.at(0);
-        expect(hours?.kind === "hours" && hours.before).toEqual([
-            MON,
-            MON_PM,
-            SAT,
-        ]);
-    });
-
-    it("removes a part-day range and a closure as one write each (E3)", () => {
-        const days = ["2026-11-02", "2026-11-03", "2026-11-04"];
-        const staff = [
-            person({
-                timeOff: days.map((day, i) => ({
-                    id: `p${i}`,
-                    startAt: `${day}T08:30:00.000Z`,
-                    endAt: `${day}T12:30:00.000Z`,
-                    allDay: false,
-                    reason: "Course",
-                })),
-            }),
-        ];
-        const closures = [
-            {
-                id: "c1",
-                startAt: "2026-11-08T18:30:00.000Z",
-                endAt: "2026-11-13T18:30:00.000Z",
-                allDay: true,
-                reason: "Diwali",
-            },
-        ];
-        const draft = draftFrom(staff);
-        draft.offRemoved.push("p0", "p1", "p2", "c1");
-        draft.offAdded.push({
-            key: "n2",
-            staffId: null,
-            fromDate: "2026-12-25",
-            toDate: "2026-12-25",
-            startMinute: null,
-            endMinute: null,
-            reason: "Closed",
-        });
-        const ops = saveOps(staff, draft, closures, "Asia/Kolkata");
-        expect(ops.map((o) => o.kind)).toEqual([
-            "removeClosure",
-            "removeOff",
-            "addOff",
-        ]);
-        const off = ops.find((o) => o.kind === "removeOff");
-        expect(off?.kind === "removeOff" && off.before.ids).toEqual([
-            "p0",
-            "p1",
-            "p2",
-        ]);
-        const add = ops.find((o) => o.kind === "addOff");
-        expect(add?.kind === "addOff" && add.off.staffId).toBeNull();
-    });
-});
-
 describe("the refund policy (E30, DEC-058)", () => {
     it("reads as on when an older API leaves it out, or never set", () => {
         expect(refundsInTime(RULES)).toBe(true);
@@ -260,19 +75,6 @@ describe("the refund policy (E30, DEC-058)", () => {
         expect(ruleBefore("refundInTimeCancels", RULES)).toEqual({
             refundInTimeCancels: true,
         });
-    });
-});
-
-describe("the page's draft no longer holds the rules", () => {
-    it("has hours, time off and extra hours, and no rules", () => {
-        const draft = draftFrom([person()]);
-        expect(Object.keys(draft).sort()).toEqual([
-            "extraRemoved",
-            "hours",
-            "offAdded",
-            "offRemoved",
-        ]);
-        expect(saveOps([person()], draft)).toEqual([]);
     });
 });
 
@@ -347,8 +149,8 @@ describe("ruleRows: each rule as a sentence in a row", () => {
                 bookingPayment: "BOTH",
             }),
         ).toEqual([
-            "Book up to 60 days ahead",
-            "Book up to 2 hours before the start",
+            "Up to 60 days ahead",
+            "Up to 2 hours before the start",
             "Free to cancel up to 12 hours before",
             "Pay online or at the desk",
             "Cancelled in time: refund what they paid online",
@@ -366,13 +168,13 @@ describe("ruleRows: each rule as a sentence in a row", () => {
             }),
         ).toEqual([
             "No limit on how far ahead",
-            "Book up to the start time",
+            "Up to the start time",
             "Free to cancel any time before",
             "Pay at the desk",
             "Cancelled in time: don't refund automatically",
         ]);
         expect(said({ ...RULES, bookAheadDays: 56 })[0]).toBe(
-            "Book up to 8 weeks ahead",
+            "Up to 8 weeks ahead",
         );
     });
 
@@ -418,5 +220,44 @@ describe("ruleRows: each rule as a sentence in a row", () => {
         );
         expect(payWayBlocked("DESK", "NO_PROVIDER")).toBeNull();
         expect(payWayBlocked("ONLINE", null)).toBeNull();
+    });
+});
+
+describe("Gap between bookings (DEC-170, #1038)", () => {
+    it("is a row only when the API has it, after booking late", () => {
+        expect(ruleRows(RULES).map((r) => r.key)).not.toContain("gapMinutes");
+        const rows = ruleRows({ ...RULES, gapMinutes: 15 });
+        expect(rows.map((r) => r.key)).toEqual([
+            "bookAheadDays",
+            "latestBookingMinutes",
+            "gapMinutes",
+            "freeCancelHours",
+            "bookingPayment",
+            "refundInTimeCancels",
+        ]);
+        const gap = rows.find((r) => r.key === "gapMinutes");
+        expect(gap?.sentence).toBe("15 min between bookings");
+        expect(gap?.options.map((o) => o.label)).toEqual([
+            "No gap needed",
+            "10 min between bookings",
+            "15 min between bookings",
+            "30 min between bookings",
+        ]);
+    });
+
+    it("says no gap in words, saves a number, and puts the old one back", () => {
+        expect(gapLabel(0)).toBe("No gap needed");
+        expect(rulePatch("gapMinutes", "30")).toEqual({ gapMinutes: 30 });
+        expect(ruleBefore("gapMinutes", { ...RULES, gapMinutes: 10 })).toEqual({
+            gapMinutes: 10,
+        });
+        expect(ruleBefore("gapMinutes", RULES)).toEqual({ gapMinutes: 0 });
+    });
+});
+
+describe("sameHours", () => {
+    it("is order-blind, so a save that changes nothing is not sent", () => {
+        expect(sameHours([MON, SAT], [SAT, MON])).toBe(true);
+        expect(sameHours([MON], [MON, MON_PM])).toBe(false);
     });
 });

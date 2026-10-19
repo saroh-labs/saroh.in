@@ -19,12 +19,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { personHref } from "@/lib/contacts/person-href";
 import { addCustomerAction } from "@/lib/customer-workspace/actions";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 import { trimmedOr } from "@/lib/forms/values";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
+import { phoneSchema } from "@/lib/organizations/business-phone";
 import { TextLink } from "@saroh/ui/text-link";
 
 const formSchema = z.object({
@@ -35,7 +37,7 @@ const formSchema = z.object({
         .email({ message: "That doesn't look like an email address." }),
     firstName: z.string().optional(),
     lastName: z.string().optional(),
-    phone: z.string().optional(),
+    phone: phoneSchema.optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -161,11 +163,13 @@ export function AddCustomerForm() {
                         <FormItem>
                             <FormLabel>Phone</FormLabel>
                             <FormControl>
-                                <Input
-                                    type="tel"
-                                    autoComplete="tel"
+                                <BusinessPhoneInput
+                                    ref={field.ref}
+                                    name={field.name}
+                                    value={field.value ?? ""}
+                                    onValueChange={field.onChange}
+                                    onBlur={field.onBlur}
                                     disabled={isSubmitting}
-                                    {...field}
                                 />
                             </FormControl>
                             <FormMessage />

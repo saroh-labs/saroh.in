@@ -6,6 +6,7 @@ import {
     HttpCode,
     Param,
     Post,
+    Put,
     Query,
     UseGuards,
 } from "@nestjs/common";
@@ -63,6 +64,18 @@ export class SavedViewsController {
         @Body() dto: CreateSavedViewDto,
     ) {
         return this.views.create(ctx, dto);
+    }
+
+    /**
+     * Set the caller's one view by resource and name, replacing theirs: a
+     * choice kept for one person (where Bookings opens, DEC-170).
+     */
+    @Put()
+    put(
+        @OrgContext() ctx: OrganizationContext,
+        @Body() dto: CreateSavedViewDto,
+    ) {
+        return this.views.put(ctx, dto);
     }
 
     @Delete(":id")

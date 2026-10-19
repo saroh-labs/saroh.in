@@ -66,6 +66,8 @@ export interface WeekColumn {
     cards: WeekCard[];
     /** Things on the day past the cards listed. */
     more: number;
+    /** Everything on the day among the layers switched on. */
+    count: number;
     /** "Nothing" or "Nothing yet" on an empty day; "" when it is off. */
     empty: string;
     /** The day in words for a screen reader, as the month's cell says it. */
@@ -208,6 +210,7 @@ export function weekColumns({
             // The day's true count, past the cards drawn (a layer's list
             // stops at 50 on the API's side too).
             more: Math.max(0, count - cards.length),
+            count,
             empty:
                 count > 0 || offDay?.striped || outside
                     ? ""
@@ -217,34 +220,4 @@ export function weekColumns({
             label,
         };
     });
-}
-
-/**
- * The line beside the week's title, as the design has it: nothing for a
- * money role (the columns carry the money); otherwise a count per layer
- * switched on — "4 bookings · 2 classes" — or that every layer is off.
- */
-export function weekSummary({
-    week,
-    layers,
-    off,
-    money,
-}: {
-    week: CalendarMonth;
-    layers: LayerStyle[];
-    off: Off;
-    money: boolean;
-}): string {
-    const on = layers.filter((l) => !off[l.key]);
-    if (on.length === 0) return "Every layer is off";
-    if (money) return "";
-    return on
-        .map((l) => {
-            const n = week.days.reduce(
-                (sum, d) => sum + (d.layers[l.key]?.count ?? 0),
-                0,
-            );
-            return countOf(n, l.one, l.many);
-        })
-        .join(" · ");
 }

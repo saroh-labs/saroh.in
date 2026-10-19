@@ -10,8 +10,8 @@ import type { InvoiceStanding } from "./service";
  * screen maps each `id` to what it does.
  *
  * A draft is sent, issued, edited or deleted; an unpaid one is sent or
- * reminded, gets its pay link copied, is marked paid, printed or
- * cancelled; a paid one is printed or refunded. "Copy pay link" is offered
+ * reminded, gets its payment link copied, is marked paid, printed or
+ * cancelled; a paid one is printed or refunded. "Copy payment link" is offered
  * only where the link takes payment (`payOnline`, DEC-070): without it the
  * link only shows the invoice, Send says "Send invoice", and "Copy view
  * link" hands the merchant that link to send themselves (#833).
@@ -61,10 +61,10 @@ export interface DetailActionState {
     charging: boolean;
     /** Issued paper has a PDF; a draft has none. */
     hasPdf: boolean;
-    /** A pay link is being made. */
+    /** A payment link is being made. */
     linkBusy: boolean;
     /**
-     * A pay link is out that this tab can't show (UX-048): the button makes
+     * A payment link is out that this tab can't show (UX-048): the button makes
      * a new one, which ends the old one, so it says "Make a new link".
      */
     linkUnseen?: boolean;
@@ -128,12 +128,12 @@ export function detailActions(s: DetailActionState): DetailAction[] {
                     ? "Making…"
                     : s.linkUnseen
                       ? UNSEEN_LINK.action
-                      : "Copy pay link",
+                      : "Copy payment link",
                 primary: !s.sendable,
                 disabled: s.linkBusy,
             });
         } else if (!s.payOnline && !s.charging) {
-            // No pay link can be made (#833): a link that shows the
+            // No payment link can be made (#833): a link that shows the
             // invoice and how to pay, for the merchant to send themselves.
             actions.push({
                 id: "copyViewLink",

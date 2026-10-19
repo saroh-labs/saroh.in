@@ -6,11 +6,12 @@ import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
- * Home › Calendar's Week (plan 005 E25) on Rye & Co., the seeded bakery:
- * Month | Week, Monday to Sunday as card columns, ‹ › by week and "This
- * week", a week crossing into the next month read whole, and a day's
- * header opening the day as a sheet. Read-only: Rye is a film set, so
- * nothing here saves.
+ * Home › Calendar's Week (plan 005 E25; bookings U14, #1030) on Rye & Co.,
+ * the seeded bakery: Month | Week, Monday to Sunday as card columns, ‹ ›
+ * by week and "This week", a week crossing into the next month read whole,
+ * and a day's head opening the day as a sheet. On a phone (Pulse) a strip
+ * of seven days and the picked day's list, never the grid. Read-only: Rye
+ * and Pulse are film sets, so nothing here saves.
  */
 
 const ORG = "seed_sc_rc_org";
@@ -49,6 +50,9 @@ function crossingDay(): string {
 
 test.describe("calendar week", () => {
     test.beforeEach(async ({ page }) => {
+        // The columns are the desk's; a phone gets the strip (its own
+        // describe below), never #calendar-week.
+        await page.setViewportSize({ width: 1440, height: 900 });
         await signIn(page);
     });
 
@@ -65,7 +69,7 @@ test.describe("calendar week", () => {
             page.getByRole("heading", {
                 level: 1,
                 name: new RegExp(
-                    `^\\d{1,2}( (${MONTHS}))?( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
+                    `^\\d{1,2}( (${MONTHS}))?( \\d{4})? to \\d{1,2} (${MONTHS})( \\d{4})?$`,
                 ),
             }),
         ).toBeVisible();
@@ -76,10 +80,9 @@ test.describe("calendar week", () => {
         await expect(
             page.getByRole("button", { name: "This week" }),
         ).toBeDisabled();
-        // Rye has no team: no filter, and the layer switches still apply.
-        await expect(page.getByLabel("Team member")).toHaveCount(0);
+        // Rye has no team: What to show names only the layers (U14).
         await expect(
-            page.getByRole("group", { name: "Show on the calendar" }),
+            page.getByRole("button", { name: /^What to show: [A-Z]/ }),
         ).toBeVisible();
     });
 
@@ -90,7 +93,7 @@ test.describe("calendar week", () => {
         // week's once the week is there.
         await expect(title).toHaveText(
             new RegExp(
-                `^\\d{1,2}( (${MONTHS}))?( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
+                `^\\d{1,2}( (${MONTHS}))?( \\d{4})? to \\d{1,2} (${MONTHS})( \\d{4})?$`,
             ),
         );
         const thisWeek = await title.textContent();
@@ -108,7 +111,7 @@ test.describe("calendar week", () => {
             page.getByRole("heading", {
                 level: 1,
                 name: new RegExp(
-                    `^\\d{1,2} (${MONTHS})( \\d{4})? to \\d{1,2} (${MONTHS}) \\d{4}$`,
+                    `^\\d{1,2} (${MONTHS})( \\d{4})? to \\d{1,2} (${MONTHS})( \\d{4})?$`,
                 ),
             }),
         ).toBeVisible();
@@ -159,6 +162,8 @@ test.describe("calendar week", () => {
 
 test.describe("calendar week, hour grid", () => {
     test.beforeEach(async ({ page }) => {
+        // The hour grid is the desk's; a phone gets the strip.
+        await page.setViewportSize({ width: 1440, height: 900 });
         await signIn(page, PULSE);
     });
 
@@ -170,23 +175,65 @@ test.describe("calendar week, hour grid", () => {
         await expect(grid.getByText("All day")).toBeVisible();
         await expect(grid.getByText("7 am", { exact: true })).toBeVisible();
         await expect(grid.locator("button[data-day]")).toHaveCount(7);
-        // Every block and chip opens its record.
+        // Every block and chip opens its record; Book and Open hours open
+        // the day in Bookings (U14).
         const links = grid.locator("a[href]");
         const n = await links.count();
         for (let i = 0; i < Math.min(n, 10); i++) {
             await expect(links.nth(i)).toHaveAttribute(
                 "href",
-                /^\/(commerce\/orders|billing\/(subscriptions|invoices)|bookings|services)\//,
+                /^\/(commerce\/orders|billing\/(subscriptions|invoices)|bookings|services)(\/|\?date=)/,
             );
         }
     });
 
-    test("the grid scrolls inside its frame on a phone, never the page", async ({
+    test("each day's head offers Book, or says the day is closed", async ({
         page,
     }) => {
-        await page.setViewportSize({ width: 390, height: 844 });
         await page.goto("/calendar?view=week");
-        await expect(page.locator("#calendar-week")).toBeVisible();
+        await expect(page.locator("[data-week-totals=desk]")).toHaveText(
+            /^This week · |^Nothing/,
+        );
+        const today = page
+            .locator(`#calendar-week [data-day="${istDay(0)}"]`)
+            .locator("..");
+        const book = today.getByRole("link", { name: /^Book on / });
+        const closed = today.getByText(/^Closed/);
+        await expect(book.or(closed)).toBeVisible();
+        if (await book.isVisible()) {
+            await expect(book).toHaveAttribute(
+                "href",
+                `/bookings?date=${istDay(0)}&new=1`,
+            );
+        }
+    });
+});
+
+test.describe("calendar week on a phone", () => {
+    test.beforeEach(async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 740 });
+        await signIn(page, PULSE);
+    });
+
+    test("a strip of seven days and the picked day's list, nothing sideways", async ({
+        page,
+    }) => {
+        await page.goto("/calendar?view=week");
+        const strip = page.getByRole("radiogroup", { name: "Pick a day" });
+        await expect(strip.getByRole("radio")).toHaveCount(7);
+        await expect(
+            strip.locator(`[data-strip-day="${istDay(0)}"]`),
+        ).toHaveAttribute("aria-checked", "true");
+        // The old 880px grid is never drawn on a phone.
+        await expect(page.locator("#calendar-week")).toHaveCount(0);
+        await expect(
+            page.getByRole("heading", { level: 2, name: / · today$/ }),
+        ).toBeVisible();
+        const next = page.locator(`[data-strip-day="${istDay(1)}"]`);
+        if (await next.isEnabled()) {
+            await next.click();
+            await expect(next).toHaveAttribute("aria-checked", "true");
+        }
         const doc = await page.evaluate(() => ({
             vw: window.innerWidth,
             sw: document.documentElement.scrollWidth,
@@ -232,10 +279,11 @@ test.describe("calendar orders for the kitchen (E20)", () => {
         }
 
         await page.goto("/calendar");
+        // The month's What to show names the layers on (bookings U13). Rye
+        // has no team, so the label starts with the first layer, from a
+        // capital: "Orders, bookings and …".
         await expect(
-            page
-                .getByRole("group", { name: "Show on the calendar" })
-                .getByRole("button", { name: /Orders/ }),
+            page.getByRole("button", { name: /^What to show: .*\borders\b/i }),
         ).toBeVisible();
         await expect(
             page.getByRole("group", { name: "This month's money" }),
@@ -244,7 +292,7 @@ test.describe("calendar orders for the kitchen (E20)", () => {
 });
 
 /**
- * The month strip's Due counts from today, as the design shows, and what
+ * The month strip's Still due counts from today, as the design shows, and what
  * was due before today is Overdue (E23, DEC-067). Rye is only read.
  */
 test.describe("calendar money: Due from today (E23)", () => {
@@ -272,7 +320,9 @@ test.describe("calendar money: Due from today (E23)", () => {
 
         await page.goto("/calendar");
         const strip = page.getByRole("group", { name: "This month's money" });
-        await expect(strip.getByRole("button", { name: /^Due/ })).toBeVisible();
+        await expect(
+            strip.getByRole("button", { name: /^Still due/ }),
+        ).toBeVisible();
         await expect(
             strip.getByRole("button", { name: /^Overdue/ }),
         ).toHaveCount(overdue ? 1 : 0);

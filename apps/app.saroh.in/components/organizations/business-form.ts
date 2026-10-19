@@ -20,7 +20,7 @@ import {
     nextInvoiceNumber,
     prefixOf,
 } from "@/lib/invoices/invoice-number";
-import { phoneLabel, phoneProblem } from "@/lib/organizations/business-phone";
+import { phoneSchema } from "@/lib/organizations/business-phone";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
 import {
     BUSINESS_TYPE_VALUES,
@@ -57,10 +57,7 @@ export const formSchema = z
         contactEmail: optionalText(z.string().email("Enter a valid email")),
         website: optionalText(z.string().url("Enter a valid URL")),
         // The public phone (DEC-053): E.164 once saved; the API judges it.
-        phone: z.string().superRefine((v, ctx) => {
-            const problem = phoneProblem(v);
-            if (problem) ctx.addIssue({ code: "custom", message: problem });
-        }),
+        phone: phoneSchema,
         // An IANA zone, or "" for none; the API checks it's a real one.
         timezone: z.string(),
         // GST (ADR-008). The API checks the GSTIN's state and check
@@ -211,7 +208,9 @@ export function valuesOf(settings: OrganizationSettings): FormValues {
         taxId: settings.profile?.taxId ?? "",
         contactEmail: settings.profile?.contactEmail ?? "",
         website: settings.profile?.website ?? "",
-        phone: phoneLabel(settings.profile?.phone),
+        // E.164 as stored: `PhoneInput` shows it grouped, and sends it
+        // back unchanged until it is edited (#1036).
+        phone: settings.profile?.phone ?? "",
         timezone: settings.profile?.timezone ?? "",
         gstRegistered: settings.tax?.registered ?? false,
         gstState: settings.tax?.state ?? "",

@@ -14,7 +14,7 @@ import { urls } from "../playwright.config";
  * It runs on Northwind Supply, the base seed — not Rye & Co. or Pulse
  * Fitness, which are kept camera-ready — because an issued invoice is never
  * deleted and takes the next number in the business's series. Northwind has
- * a payment provider connected with test keys, so a pay link can be made;
+ * a payment provider connected with test keys, so a payment link can be made;
  * a test cannot complete a provider's checkout, so the money arriving is
  * recorded by hand, as it is when a customer pays at the counter.
  */
@@ -26,7 +26,7 @@ async function signIn(page: Page) {
 }
 
 test.describe("invoices", () => {
-    test("write one by hand, issue it with a pay link, and see it paid", async ({
+    test("write one by hand, issue it with a payment link, and see it paid", async ({
         page,
         context,
     }, testInfo) => {
@@ -43,7 +43,7 @@ test.describe("invoices", () => {
             page.getByRole("heading", { name: "New invoice" }),
         ).toBeVisible();
         const issue = page.getByRole("button", {
-            name: /^Issue (with pay link|it)$/,
+            name: /^Issue (with payment link|it)$/,
         });
         await expect(issue).toBeDisabled();
 
@@ -59,15 +59,15 @@ test.describe("invoices", () => {
             page.getByRole("radio", { name: "In 7 days" }),
         ).toHaveAttribute("aria-checked", "true");
 
-        // 2. Issue it: numbered, lines locked, the pay link copied.
+        // 2. Issue it: numbered, lines locked, the payment link copied.
         await expect(issue).toBeEnabled();
-        await expect(issue).toHaveText("Issue with pay link");
+        await expect(issue).toHaveText("Issue with payment link");
         await issue.click();
         await page.waitForURL(/\/billing\/invoices\/(?!new)[^/?]+$/, {
             timeout: 30_000,
         });
         await expect(
-            page.getByText(/issued and its pay link copied/).first(),
+            page.getByText(/issued and its payment link copied/).first(),
         ).toBeVisible();
         // The loading shell has a heading too ("Loading the invoice"): read
         // the number once the invoice's own heading is there.
@@ -145,7 +145,7 @@ test.describe("invoices", () => {
             page.getByText("Paid", { exact: true }).first(),
         ).toBeVisible();
         await expect(
-            page.getByRole("button", { name: "Copy pay link" }),
+            page.getByRole("button", { name: "Copy payment link" }),
         ).toHaveCount(0);
 
         // 4b. Its paper as a PDF (D16), named for its number.
@@ -227,11 +227,11 @@ test.describe("invoices", () => {
 });
 
 /*
- * Sending an invoice with its pay link (D17), on Northwind: it has its own
+ * Sending an invoice with its payment link (D17), on Northwind: it has its own
  * email provider connected, so the send flag names email. Every record is
  * made or found through the API — the business by name, a contact and an
  * invoice made for the test — never a showcase id. The email itself goes
- * to an address on example.test, and the pay link is sealed into the send
+ * to an address on example.test, and the payment link is sealed into the send
  * job, so the test proves what Saroh records and what the customer's old
  * link does, not the inbox.
  */
@@ -339,7 +339,7 @@ const action = (page: Page, name: string) =>
         .filter({ visible: true })
         .first();
 
-test.describe("sending an invoice with its pay link (D17)", () => {
+test.describe("sending an invoice with its payment link (D17)", () => {
     test("send an issued invoice: who is told, the old link stops, one reminder a day", async ({
         page,
     }, testInfo) => {
@@ -366,7 +366,7 @@ test.describe("sending an invoice with its pay link (D17)", () => {
         await expect(
             page.getByRole("heading", { level: 1, name: before.number ?? "" }),
         ).toBeVisible();
-        const send = action(page, "Send with pay link");
+        const send = action(page, "Send with payment link");
         await expect(send).toBeVisible();
         await expect(send).toHaveCSS("cursor", "pointer");
         await send.click();
@@ -383,7 +383,7 @@ test.describe("sending an invoice with its pay link (D17)", () => {
         await expect(held.getByRole("button", { name: "Undo" })).toBeVisible();
         // The hold ends by itself, and then it is sent.
         await expect(
-            page.getByText(`Sent to ${email} with a pay link.`).first(),
+            page.getByText(`Sent to ${email} with a payment link.`).first(),
         ).toBeVisible({ timeout: 25_000 });
 
         // Saroh recorded the send to that address.
@@ -431,7 +431,7 @@ test.describe("sending an invoice with its pay link (D17)", () => {
                     )
                     .first(),
             ).toBeVisible();
-            await expect(action(page, "Send with pay link")).toBeVisible();
+            await expect(action(page, "Send with payment link")).toBeVisible();
         }
 
         // The send minted a new link: the one shared before stops working.
@@ -468,14 +468,14 @@ test.describe("sending an invoice with its pay link (D17)", () => {
         );
 
         await page.goto(`/billing/invoices/${id}`);
-        await action(page, "Send with pay link").click();
+        await action(page, "Send with payment link").click();
         const confirm = page.getByRole("alertdialog");
         await expect(confirm).toContainText(
             "It takes the next number and its lines lock.",
         );
         await confirm.getByRole("button", { name: "Issue and send" }).click();
         await expect(
-            page.getByText(`Sent to ${email} with a pay link.`).first(),
+            page.getByText(`Sent to ${email} with a payment link.`).first(),
         ).toBeVisible();
 
         const sent = await call.get<InvoiceRead>(`/invoices/${id}`);
@@ -531,13 +531,13 @@ test.describe("sending an invoice with its pay link (D17)", () => {
             page.getByText(/Autopay charge in progress/).first(),
         ).toBeVisible();
         await expect(
-            page.getByRole("button", { name: "Send with pay link" }),
+            page.getByRole("button", { name: "Send with payment link" }),
         ).toHaveCount(0);
         await expect(
             page.getByRole("button", { name: "Send reminder" }),
         ).toHaveCount(0);
         await expect(
-            page.getByRole("button", { name: "Copy pay link" }),
+            page.getByRole("button", { name: "Copy payment link" }),
         ).toHaveCount(0);
         const refused = await call.postRaw(`/invoices/${id}/send`);
         expect(refused.status()).toBe(409);

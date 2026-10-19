@@ -24,7 +24,6 @@ import {
     orList,
     payCentsOf,
     payChoices,
-    phoneProblem,
     placesText,
     restAfterDeposit,
     rulesText,
@@ -205,12 +204,9 @@ describe("the words on the booking page (U19)", () => {
         expect(placesText(6)).toBe("6 places left");
     });
 
-    it("checks an email, and a phone only if one is given", () => {
+    it("checks an email", () => {
         expect(looksLikeEmail("asha@example.in")).toBe(true);
         expect(looksLikeEmail("asha@")).toBe(false);
-        expect(phoneProblem("")).toBeNull();
-        expect(phoneProblem("+91 98450 12345")).toBeNull();
-        expect(phoneProblem("98450")).toBe("A phone number needs 10 digits.");
     });
 
     it("writes a calendar file in UTC", () => {

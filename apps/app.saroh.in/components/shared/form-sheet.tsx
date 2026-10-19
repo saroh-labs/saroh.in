@@ -11,6 +11,8 @@ import {
 } from "@saroh/ui/sheet";
 import type { ReactElement, ReactNode } from "react";
 
+import { useNarrow } from "@/lib/hooks/use-narrow";
+
 import type { OverlayFootProps, OverlaySubmit } from "./overlay-form";
 import {
     OverlayBody,
@@ -32,6 +34,17 @@ import {
  * and one sentence under it stay put, the fields scroll, and the foot is
  * pinned with a rule above it: the way out, then the sheet's own button,
  * on the right (stacked on a phone, the button on top).
+ *
+ * `bottomOnPhone` (the booking sheets, U3): on a phone it rises from the
+ * foot of the screen as a bottom sheet instead, rounded on top with a
+ * grab handle and at most 92% of the screen tall; at a desk it is the
+ * same right-hand panel. A phone bottom sheet is a desk side panel.
+ *
+ * `flow` (New booking, U8): a journey of steps. On a phone it fills the
+ * screen; at a desk it is a wide right-hand panel (820px) with room for
+ * a step list beside the question. It draws no padding of its own: the
+ * flow lays out its own header, body and foot edge to edge, and the title
+ * and description are kept for a screen reader only (`ownHeader`).
  *
  * Pass `onSubmit` and the fields as children and it draws the rest. A
  * sheet whose draft is a component of its own (so each opening starts
@@ -61,6 +74,9 @@ export function FormSheet({
     children,
     saveLabel = "Save",
     doneOnly,
+    bottomOnPhone = false,
+    flow = false,
+    ownHeader = false,
     ...foot
 }: {
     /** The form's id. */
@@ -98,6 +114,15 @@ export function FormSheet({
     onClose: () => void;
     /** Leave it out to draw `FormSheetBody` and `FormSheetFoot` inside. */
     onSubmit?: OverlaySubmit;
+    /** A bottom sheet on a phone, the right-hand panel at a desk (U3). */
+    bottomOnPhone?: boolean;
+    /** The whole screen on a phone, a wide panel at a desk (U8). */
+    flow?: boolean;
+    /**
+     * The content draws its own header: the title and description are
+     * kept for a screen reader, not seen.
+     */
+    ownHeader?: boolean;
     children: ReactNode;
 } & Omit<OverlayFootProps, "note" | "onSubmit" | "pending" | "className">) {
     const composed = !onSubmit && !doneOnly;
@@ -112,32 +137,55 @@ export function FormSheet({
         onClose,
         onSubmit,
     });
+    const narrow = useNarrow();
+    const bottom = bottomOnPhone && narrow && !flow;
+    const heading = (
+        <>
+            {eyebrow ? (
+                <p className="text-[11.5px] text-muted-foreground">{eyebrow}</p>
+            ) : null}
+            <SheetTitle>{title}</SheetTitle>
+            <SheetDescription>{description}</SheetDescription>
+        </>
+    );
     return (
         <Sheet open={open} onOpenChange={frame.onOpenChange}>
             {trigger ? <SheetTrigger asChild>{trigger}</SheetTrigger> : null}
             <SheetContent
+                side={flow && narrow ? "bottom" : bottom ? "bottom" : "right"}
                 className={cn(
                     // Off the paper: a page printed with a sheet open
                     // prints the page.
                     "flex w-full flex-col gap-0 print:hidden",
-                    wide ? "sm:max-w-lg" : "sm:max-w-md",
+                    flow
+                        ? narrow
+                            ? "h-dvh max-h-dvh rounded-none border-0 p-0"
+                            : "p-0 sm:max-w-[820px]"
+                        : bottom
+                          ? "max-h-[92dvh] rounded-t-[18px] px-4 pb-4 pt-3"
+                          : wide
+                            ? "sm:max-w-lg"
+                            : "sm:max-w-md",
                     className,
                 )}
                 {...frame.contentProps}
             >
-                <SheetHeader>
-                    {eyebrow ? (
-                        <p className="text-[11.5px] text-muted-foreground">
-                            {eyebrow}
-                        </p>
-                    ) : null}
-                    <SheetTitle>{title}</SheetTitle>
-                    <SheetDescription>{description}</SheetDescription>
+                {bottom ? (
+                    <div
+                        aria-hidden
+                        className="mx-auto mb-3 h-[5px] w-10 shrink-0 rounded-full bg-border"
+                    />
+                ) : null}
+                <SheetHeader className={ownHeader ? "sr-only" : undefined}>
+                    {heading}
                 </SheetHeader>
                 <OverlayProvider value={frame.context}>
                     <form
                         id={id}
-                        className="mt-5 flex min-h-0 flex-1 flex-col"
+                        className={cn(
+                            "flex min-h-0 flex-1 flex-col",
+                            !flow && "mt-5",
+                        )}
                         {...frame.formProps}
                     >
                         {composed ? (

@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
+} from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { clearStaleLimitNotices } from "../billing/limit-notice-clear";
-import { allows, authorize } from "../organizations/organization-policy";
+import { allows } from "../organizations/organization-policy";
 import { hiddenNotificationTypes } from "./alert-preferences";
 import { noticeTargetOf } from "./notice-target";
 
@@ -37,6 +42,16 @@ export interface ListNotificationsOptions {
  * Every row is read with its `target` (10 Oct 2026): the kind of thing it
  * opens and that thing's id (`notice-target.ts`), so the inbox draws each
  * row as a link and never has to guess from the type.
+ *
+ * Two audiences (DEC-170, #1038). A notice with no `userId` is the
+ * business's, read with `notification:read` (owners and admins). One with
+ * a `userId` is that person's alone — the answer to the booking rules
+ * request they made — read with `notification:read-own`, which every role
+ * that signs in holds but the Reviewer; nobody else sees it, owners
+ * included, and an id of someone else's is a 404. A Member's inbox is
+ * their own alerts and nothing of the business's. Opening one of your own,
+ * and "Mark all as read" over them, is part of reading them: it needs no
+ * `notification:write`.
  */
 @Injectable()
 export class NotificationsService {
@@ -45,13 +60,12 @@ export class NotificationsService {
         ctx: OrganizationContext,
         options: ListNotificationsOptions = {},
     ) {
-        authorize(ctx, "notification:read");
-        await clearStaleLimitNotices(ctx.organizationId);
+        const seen = this.audience(ctx);
+        if (seen.business) await clearStaleLimitNotices(ctx.organizationId);
         const rows = await prisma.notification.findMany({
             where: {
-                organizationId: ctx.organizationId,
+                ...(await this.visibleTo(ctx, seen)),
                 ...(options.unreadOnly ? { readAt: null } : {}),
-                ...(await this.hiddenFor(ctx)),
             },
             orderBy: { createdAt: "desc" },
         });
@@ -60,26 +74,28 @@ export class NotificationsService {
 
     /** Count the org's unread notifications (for a nav badge). */
     async unreadCount(ctx: OrganizationContext): Promise<{ count: number }> {
-        authorize(ctx, "notification:read");
-        await clearStaleLimitNotices(ctx.organizationId);
+        const seen = this.audience(ctx);
+        if (seen.business) await clearStaleLimitNotices(ctx.organizationId);
         const count = await prisma.notification.count({
-            where: {
-                organizationId: ctx.organizationId,
-                readAt: null,
-                ...(await this.hiddenFor(ctx)),
-            },
+            where: { ...(await this.visibleTo(ctx, seen)), readAt: null },
         });
         return { count };
     }
 
     /**
-     * Mark one notification read. Authorizes `notification:write`, loads the
-     * org's own row (404 for missing OR cross-tenant), and stamps `readAt`.
-     * Idempotent: an already-read row keeps its original `readAt`.
+     * Mark one notification read. A business notice needs
+     * `notification:write`; one's own needs only to be readable. Loads a
+     * row this person may see (404 for missing, cross-tenant or someone
+     * else's), and stamps `readAt`. Idempotent: an already-read row keeps
+     * its original `readAt`.
      */
     async markRead(ctx: OrganizationContext, id: string) {
-        authorize(ctx, "notification:write");
         const existing = await this.requireOwned(ctx, id);
+        if (existing.userId === null && !allows(ctx, "notification:write")) {
+            throw new ForbiddenException(
+                "Your role can't clear the business's notifications.",
+            );
+        }
         if (existing.readAt) return existing;
         return prisma.notification.update({
             where: { id: existing.id },
@@ -88,20 +104,19 @@ export class NotificationsService {
     }
 
     /**
-     * Mark every unread notification in the org read. Authorizes
-     * `notification:write`; scoped to the ctx org. Returns how many were flipped,
-     * and the instant they were stamped with: the handle its Undo gives back.
+     * Mark every unread notification this person sees read: the business's
+     * with `notification:write`, and always their own. Returns how many
+     * were flipped, and the instant they were stamped with: the handle its
+     * Undo gives back.
      */
     async markAllRead(
         ctx: OrganizationContext,
     ): Promise<{ updated: number; readAt: string }> {
-        authorize(ctx, "notification:write");
         const readAt = new Date();
         const res = await prisma.notification.updateMany({
             where: {
-                organizationId: ctx.organizationId,
+                ...(await this.visibleTo(ctx, this.clearable(ctx))),
                 readAt: null,
-                ...(await this.hiddenFor(ctx)),
             },
             data: { readAt },
         });
@@ -119,18 +134,62 @@ export class NotificationsService {
         ctx: OrganizationContext,
         readAt: string,
     ): Promise<{ updated: number }> {
-        authorize(ctx, "notification:write");
+        const seen = this.clearable(ctx);
         const at = new Date(readAt);
         if (Number.isNaN(at.getTime())) return { updated: 0 };
         const res = await prisma.notification.updateMany({
-            where: {
-                organizationId: ctx.organizationId,
-                readAt: at,
-                ...(await this.hiddenFor(ctx)),
-            },
+            where: { ...(await this.visibleTo(ctx, seen)), readAt: at },
             data: { readAt: null },
         });
         return { updated: res.count };
+    }
+
+    /**
+     * Which notices this person reads: the business's (`notification:read`)
+     * and their own (`notification:read-own`). Neither is a 403, as before
+     * #1038 a Member was refused the whole inbox.
+     */
+    private audience(ctx: OrganizationContext): Audience {
+        const seen = {
+            business: allows(ctx, "notification:read"),
+            own: allows(ctx, "notification:read-own"),
+        };
+        if (!seen.business && !seen.own) {
+            throw new ForbiddenException("Your role can't see notifications.");
+        }
+        return seen;
+    }
+
+    /**
+     * What "Mark all as read" and its Undo reach: the business's notices
+     * only with `notification:write`, and one's own whenever they're read.
+     */
+    private clearable(ctx: OrganizationContext): Audience {
+        const seen = this.audience(ctx);
+        const business = seen.business && allows(ctx, "notification:write");
+        if (!business && !seen.own) {
+            throw new ForbiddenException(
+                "Your role can't clear the business's notifications.",
+            );
+        }
+        return { business, own: seen.own };
+    }
+
+    /**
+     * The rows this person sees, as a filter: this business's, the
+     * business-wide ones (less the alert types they turned off, F14) and
+     * those addressed to them; never someone else's.
+     */
+    private async visibleTo(
+        ctx: OrganizationContext,
+        seen: Audience,
+    ): Promise<Prisma.NotificationWhereInput> {
+        const either: Prisma.NotificationWhereInput[] = [];
+        if (seen.business) {
+            either.push({ userId: null, ...(await this.hiddenFor(ctx)) });
+        }
+        if (seen.own) either.push({ userId: ctx.userId });
+        return { organizationId: ctx.organizationId, OR: either };
     }
 
     /**
@@ -157,17 +216,23 @@ export class NotificationsService {
     }
 
     /**
-     * Load a notification and assert it belongs to `ctx.organizationId`. Throws
-     * `NotFoundException` for a missing OR cross-tenant id — a 404 (not 403) so a
-     * caller can't probe which notifications exist in another org.
+     * Load a notification this person sees. Throws `NotFoundException` for a
+     * missing, cross-tenant or someone else's id — a 404 (not 403) so a
+     * caller can't probe which notifications exist elsewhere.
      */
     private async requireOwned(ctx: OrganizationContext, id: string) {
-        const notification = await prisma.notification.findUnique({
-            where: { id },
+        const notification = await prisma.notification.findFirst({
+            where: { id, ...(await this.visibleTo(ctx, this.audience(ctx))) },
         });
-        if (notification?.organizationId !== ctx.organizationId) {
+        if (!notification) {
             throw new NotFoundException("Notification not found");
         }
         return notification;
     }
+}
+
+/** Which notices a person reads: the business's, and their own. */
+interface Audience {
+    business: boolean;
+    own: boolean;
 }

@@ -2,6 +2,11 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { BookingDetailView } from "@/components/bookings/booking-detail";
+import { NewBookingHost } from "@/components/bookings/new-booking/new-booking-host";
+import {
+    flowServices,
+    flowStaff,
+} from "@/components/bookings/new-booking/setup";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packOffer, usablePacks } from "@/lib/class-packs/balance";
@@ -9,7 +14,7 @@ import { readPurchasesFor } from "@/lib/class-packs/service";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
-import { permits } from "@/lib/organizations/permits";
+import { permits, permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
@@ -18,14 +23,18 @@ import {
     canRefundPayments,
     canTakeDeskPayments,
 } from "@/lib/services/booking-money";
+import type { PageBooking } from "@/lib/services/booking-page";
+import { readBookingPage } from "@/lib/services/booking-page-read";
 import { hasEnded } from "@/lib/services/booking-state";
 import { readClassWaitlist } from "@/lib/services/class-waitlist";
-import type { BookingDetail } from "@/lib/services/service";
-import { getBooking } from "@/lib/services/service";
+import { readPeekPerson } from "@/lib/services/peek-person";
+import { listServices, readNow } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
+import { listStaff } from "@/lib/staff/service";
 
 /**
- * One booking (#121).
+ * One booking (#121; U12 of the bookings plan, #1028: BKMBookingDetail
+ * and BKDBooking).
  *
  * Cancelling was the only thing a merchant could do to a booking, and there
  * was nowhere to do anything else from: the calendar was the whole of the
@@ -34,8 +43,10 @@ import { requireSession } from "@/lib/session";
  *
  * The page fetches; the view decides how to render, matching the list.
  */
-// One read for the tab's title and the page (it was read twice).
-const readBooking = cache((bookingId: string) => getBooking(bookingId));
+// One read for the tab's title and the page (it was read twice). A
+// booking that isn't there is a 404; a read that failed throws to this
+// segment's boundary, "Couldn't load this booking" with Try again.
+const readBooking = cache((bookingId: string) => readBookingPage(bookingId));
 
 /** What was booked, in the tab: the service, never who booked it or when. */
 export async function generateMetadata({
@@ -67,32 +78,81 @@ export default async function BookingPage({
     // Read through the data layer, which is where this codebase keeps clock
     // reads. A past appointment offers different controls (#241), but nothing
     // about its OUTCOME is decided by the clock — only a person sets that.
+    const now = readNow();
     const organization = await resolveActiveOrganization();
-    // Taking payment at the desk (P2), and sending a pay link instead when
+    const may = permitsFor(organization);
+    // Taking payment at the desk (P2), and sending a payment link instead when
     // the plan takes online payment and a provider is connected (R33).
     const canTake = canTakeDeskPayments(organization);
+    const online = await onlinePayReady();
     const desk = {
         canTake,
-        canLink:
-            canTake &&
-            !!booking.money?.take?.byLink &&
-            (await onlinePayReady()),
+        canLink: canTake && !!booking.money?.take?.byLink && online,
         online: takesOnlinePayment(await billingAccessOrNull()),
     };
-    return (
+    // Moving, cancelling and the outcome are `booking:write`
+    // (`booking-access.ts`), asked of the resolved permissions as the diary
+    // asks for New booking.
+    const canWrite = permits(organization, "booking:write");
+    // Times in the business's zone, labelled (Q10): the service's.
+    const timezone = booking.service.timezone || booking.timezone;
+    const [packs, waitlist, person] = await Promise.all([
+        packsFor(booking),
+        waitlistFor(booking),
+        // Their phone, Needs attention and how a change reaches them
+        // (`contact:read`); null when it can't be read, and the card then
+        // says only what the booking holds.
+        booking.contact && may("contact:read")
+            ? readPeekPerson(booking.contact.id)
+            : Promise.resolve(null),
+    ]);
+
+    const view = (
         <BookingDetailView
             booking={booking}
-            past={hasEnded(booking)}
-            packs={await packsFor(booking)}
-            // Moving, cancelling and the outcome are `booking:write`
-            // (`booking-access.ts`), asked of the resolved permissions as
-            // the diary asks for New booking.
-            canWrite={permits(organization, "booking:write")}
+            past={hasEnded(booking, now)}
+            now={now}
+            timezone={timezone}
+            packs={packs}
+            canWrite={canWrite}
             canRefund={canRefundPayments(organization)}
             canReadOrder={canReadOrders(organization)}
             desk={desk}
-            waitlist={await waitlistFor(booking)}
+            waitlist={waitlist}
+            person={person}
         />
+    );
+    if (!canWrite) return view;
+
+    // Book their next visit and Book a new time open New booking here
+    // (U8), with who, what and with whom already filled.
+    const [services, staffList] = await Promise.all([
+        listServices().catch(() => []),
+        listStaff().catch(() => null),
+    ]);
+    return (
+        <NewBookingHost
+            setup={{
+                services: flowServices(services),
+                staff: flowStaff(staffList?.staff ?? null),
+                people: {
+                    canSearch: may("contact:read"),
+                    payLink: may("invoice:write") && online,
+                    canTakePayment: canTake,
+                    onlinePay: online,
+                },
+                canUsePacks:
+                    canReadPacks(organization) &&
+                    canUsePacksOnBookings(organization) &&
+                    packsOn(await modulesOrUnknown()),
+                timezone,
+                showMoney: may("payment:read") || canTake,
+                business: organization?.name ?? null,
+                now,
+            }}
+        >
+            {view}
+        </NewBookingHost>
     );
 }
 
@@ -103,7 +163,7 @@ export default async function BookingPage({
  * rather than failing the booking. With Class packs switched off (E12) it
  * still says which pack paid, and offers nothing to spend or take off.
  */
-async function packsFor(booking: BookingDetail) {
+async function packsFor(booking: PageBooking) {
     const [organization, modules] = await Promise.all([
         resolveActiveOrganization(),
         modulesOrUnknown(),
@@ -138,7 +198,7 @@ async function packsFor(booking: BookingDetail) {
  * null when the read failed, and nothing for a one-to-one or a class that
  * has happened.
  */
-async function waitlistFor(booking: BookingDetail) {
+async function waitlistFor(booking: PageBooking) {
     if (booking.service.capacity <= 1 || hasEnded(booking)) return undefined;
     return readClassWaitlist(booking.serviceId, booking.startAt);
 }

@@ -13,7 +13,7 @@ import {
 } from "@/lib/invoices/minted-links";
 
 /**
- * A pay link is out that this tab can't show (UX-048): after a reload, on
+ * A payment link is out that this tab can't show (UX-048): after a reload, on
  * another device, or made by sending. The API keeps only its hash (owner,
  * 8 Oct), so this says plainly why the address isn't here and that a new
  * link ends the old one — before the button is pressed. When the API says
@@ -57,7 +57,7 @@ export function UnseenLinkNote({
 /** Where the date goes in the words, replaced by the <time>. */
 const DATE_SLOT = "{date}";
 
-/** Asked before a new pay link replaces the one out (UX-048). */
+/** Asked before a new payment link replaces the one out (UX-048). */
 export function NewLinkConfirm({
     open,
     onOpenChange,

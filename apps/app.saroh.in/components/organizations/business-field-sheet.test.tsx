@@ -146,3 +146,20 @@ describe("a rule that spans two rows", () => {
         expect(input("addressLine1")).toBeNull();
     });
 });
+
+describe("a phone taken off", () => {
+    it("clearing a saved phone and saving sends it empty", async () => {
+        const withPhone = settings({
+            profile: { ...PROFILE, phone: "+919845012345" },
+        });
+        save.mockResolvedValue({ ok: true, data: settings() });
+        onTab("contact", "&edit=phone");
+        draw(withPhone);
+        expect(input("phone")?.value).toBe("98450 12345");
+        await type(input("phone"), "");
+        expect(input("phone")?.value).toBe("");
+        await press(item("Save"));
+        expect(save).toHaveBeenCalledWith({ profile: { phone: "" } });
+        expect(sheet()).toBeNull();
+    });
+});

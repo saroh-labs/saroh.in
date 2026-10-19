@@ -67,7 +67,7 @@ export async function readDetailsOnFile(): Promise<DetailsOnFile> {
 /**
  * "Add your business details" (DEC-068): the small sheet a merchant meets
  * where an action needs the registered address, or a registered business's
- * GSTIN, before it can go on — Issue, Send, New order with a pay link,
+ * GSTIN, before it can go on — Issue, Send, New order with a payment link,
  * connecting a payment provider. The address fields are Settings ›
  * Business's own (`RegisteredAddressFields`); Save writes them to the
  * business profile, and the caller carries on with what the merchant

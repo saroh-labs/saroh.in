@@ -1,87 +1,63 @@
 // @vitest-environment jsdom
 /**
- * Bookings › Availability. With nobody on the diary the screen still
- * answers "when can people book?": "It's just me" and "Add my team", the
- * week customers can book today, and the booking rules (UX-022). The rules
- * are sentences in rows; Edit opens a sheet that saves that one rule with
- * a toast and Undo, and never raises the page's unsaved bar, which hours
- * and time off still do.
- *
- * `react-dom/client` + `act` directly, as the screen's other tests do.
+ * Bookings › Hours and time off, V2 (U17, DEC-170), at a phone's width and
+ * a desk's: the Whose hours card over a calm weekly list, time off and
+ * More beside it on a desk and under it on a phone, the first-time card,
+ * and who may change what — a Member changes anyone's hours but adds
+ * nobody, Calendar only reads. There is no Save bar and no draft, so
+ * leaving never asks. The sheets' own saves are `hours-sheets.test.tsx`.
  */
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { refresh, actions, toast } = vi.hoisted(() => ({
-    refresh: vi.fn(),
+const { router, actions, toast } = vi.hoisted(() => ({
+    router: { refresh: vi.fn(), replace: vi.fn(), push: vi.fn() },
     actions: {
         addClosure: vi.fn(),
         addExtraHours: vi.fn(),
+        addMyself: vi.fn(),
+        addPerson: vi.fn(),
         addTimeOff: vi.fn(),
+        previewOff: vi.fn(),
+        readOffered: vi.fn(),
         removeClosures: vi.fn(),
         removeExtraHours: vi.fn(),
         removeTimeOffMany: vi.fn(),
         replaceStaffHours: vi.fn(),
         updateBookingRules: vi.fn(),
         updateStaff: vi.fn(),
-        addMyself: vi.fn(),
-        addPerson: vi.fn(),
-        previewOff: vi.fn(),
-        readOffered: vi.fn(),
     },
     toast: {
-        showUndo: vi.fn(),
+        dismissToast: vi.fn(),
         showError: vi.fn(),
         showSuccess: vi.fn(),
+        showUndo: vi.fn(() => "toast"),
         showWarning: vi.fn(),
     },
 }));
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh, push: vi.fn() }),
-}));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/lib/staff/actions", () => actions);
 vi.mock("@saroh/ui/toast", () => toast);
 
 import { mayNavigate } from "@/lib/nav/leave-request";
-import type { BookingRules, StaffView, WeeklyRange } from "@/lib/staff/types";
 
+import type { EditorProps } from "./hours.test-kit";
 import {
-    AvailabilityEditor,
-    joinedText,
-    savedText,
-    unsavedText,
-} from "./availability-editor";
-import { RULE_SAVED } from "./booking-rules-card";
-
-const RULES: BookingRules = {
-    bookAheadDays: 56,
-    latestBookingMinutes: null,
-    freeCancelHours: 12,
-    refundInTimeCancels: true,
-    bookingPayment: "BOTH",
-};
-
-/** Monday to Friday, 9 to 5: what the services' own hours come to. */
-const NINE_TO_FIVE: WeeklyRange[] = [1, 2, 3, 4, 5].map((dayOfWeek) => ({
-    dayOfWeek,
-    startMinute: 540,
-    endMinute: 1020,
-}));
-
-const ASHA: StaffView = {
-    id: "st_asha",
-    name: "Asha",
-    title: null,
-    status: "ACTIVE",
-    membership: null,
-    serviceIds: [],
-    hours: NINE_TO_FIVE,
-    weeklyMinutes: 2400,
-    extraHours: [],
-    timeOff: [],
-};
+    ARJUN,
+    MEERA,
+    NEHA,
+    button,
+    dialog,
+    drawEditor,
+    hasButton,
+    press,
+    radio,
+    said,
+    setWidth,
+} from "./hours.test-kit";
+import { MEMBER_LINE } from "./whose-hours";
 
 let host: HTMLDivElement;
 let root: Root;
@@ -93,437 +69,344 @@ beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
-    for (const m of [...Object.values(actions), ...Object.values(toast)]) {
+    for (const m of [
+        ...Object.values(actions),
+        ...Object.values(toast),
+        ...Object.values(router),
+    ]) {
         m.mockReset();
     }
-    refresh.mockReset();
+    toast.showUndo.mockReturnValue("toast");
     actions.readOffered.mockResolvedValue({ ok: false, why: "failed" });
+    actions.previewOff.mockResolvedValue({ ok: true, data: { affected: [] } });
 });
 afterEach(() => {
     act(() => root.unmount());
     document.body.innerHTML = "";
 });
 
-function draw(
-    over: Partial<Parameters<typeof AvailabilityEditor>[0]> = {},
-): void {
-    act(() =>
-        root.render(
-            <AvailabilityEditor
-                staff={[]}
-                closures={[]}
-                openingHours={NINE_TO_FIVE}
-                rules={RULES}
-                serviceHours={NINE_TO_FIVE}
-                timezone="Asia/Kolkata"
-                today="2026-10-07"
-                kept={[]}
-                bookedOn={{}}
-                takesClasses={[]}
-                canEdit
-                onlineBlocker={null}
-                {...over}
-            />,
+const draw = (over: Partial<EditorProps> = {}) => drawEditor(root, over);
+
+/** The weekly list's rows, as each says itself to a screen reader. */
+const rows = () =>
+    Array.from(
+        host.querySelectorAll<HTMLElement>(
+            "section[aria-labelledby=weekly-hours] li",
         ),
-    );
-}
+    ).map((li) => said(li).trim());
 
-const text = () => host.textContent;
-const sheet = () => document.body.querySelector<HTMLElement>("[role=dialog]");
-function button(name: string, within: ParentNode | null = host) {
-    const hit = Array.from(within?.querySelectorAll("button") ?? []).find(
-        (b) =>
-            b.textContent.trim() === name ||
-            b.getAttribute("aria-label") === name,
-    );
-    if (!hit) throw new Error(`No "${name}" button`);
-    return hit;
-}
-async function press(el: HTMLElement) {
-    await act(async () => {
-        el.click();
-        await new Promise((r) => setTimeout(r, 20));
-    });
-}
-const rule = (key: string) =>
-    host.querySelector(`[data-rule="${key}"]`)?.textContent;
-const unsavedBar = () =>
-    Array.from(host.querySelectorAll('[role="status"]')).find((el) =>
-        el.textContent.startsWith("Unsaved"),
-    );
+describe.each([
+    ["at a desk", false],
+    ["on a phone", true],
+])("Hours and time off %s", (_scene, phone) => {
+    beforeEach(() => setWidth(phone));
 
-describe("Availability with nobody on the diary", () => {
-    it("asks the question and offers the two ways in, yourself first", () => {
-        draw();
-        expect(text()).toContain("When can people book you?");
-        expect(text()).toContain(
-            "Put yourself on the diary with your opening hours, or add your team.",
-        );
-        const names = Array.from(
-            host.querySelectorAll(
-                "#availability-start ~ * button, section button",
-            ),
-        ).map((b) => b.textContent);
-        expect(names.indexOf("It's just me")).toBeGreaterThan(-1);
-        expect(names.indexOf("It's just me")).toBeLessThan(
-            names.indexOf("Add my team"),
-        );
-        // No longer an empty state that asks for "someone".
-        expect(text()).not.toContain("No one takes bookings yet");
-        expect(text()).not.toContain("Add someone");
-    });
-
-    it("says a starting week, not opening hours, when the business has none", () => {
-        draw({ openingHours: null });
-        expect(text()).toContain(
-            "Put yourself on the diary with a starting week, or add your team.",
-        );
-    });
-
-    it("says the week customers can book today, from the services' own hours", () => {
-        draw();
-        const week = host.querySelector('[data-testid="bookable-week"]');
-        expect(
-            Array.from(week?.children ?? []).map((row) =>
-                Array.from(row.children).map((c) => c.textContent),
-            ),
-        ).toEqual([
-            ["Monday to Friday", "9:00 am to 5:00 pm"],
-            ["Saturday and Sunday", "Not bookable"],
+    it("opens on the person in ?person=, with their week as a calm list", () => {
+        draw({ person: "st_arjun" });
+        expect(said(host)).toContain("Whose hours");
+        expect(said(host)).toContain("Arjun Rao · Sports therapist");
+        expect(said(host)).toContain("44 hours a week");
+        expect(rows()).toEqual([
+            "Monday10 am to 6 pm",
+            "Tuesday10 am to 6 pm",
+            "Wednesday10 am to 6 pm",
+            "Thursday10 am to 6 pm",
+            "Friday10 am to 6 pm",
+            "Saturday10 am to 2 pm",
+            "SundayClosed",
         ]);
+        // Each row opens its day, and says whose it is.
+        expect(
+            button("Monday, 10 am to 6 pm. Change Arjun's hours"),
+        ).toBeTruthy();
     });
 
-    it("says so when no service has hours to book in", () => {
-        draw({ serviceHours: null });
-        expect(text()).toContain(
-            "Nothing yet. No service on your booking page has hours.",
-        );
-        expect(host.querySelector('[data-testid="bookable-week"]')).toBeNull();
-    });
-
-    it("still shows the booking rules, as sentences (UX-022)", () => {
+    it("opens on the first person with no ?person=, lunch under the hours", () => {
         draw();
-        expect(host.querySelector("h2#booking-rules")?.textContent).toBe(
-            "Booking rules",
-        );
-        expect(rule("bookAheadDays")).toBe("Book up to 8 weeks ahead");
-        expect(rule("latestBookingMinutes")).toBe("Book up to the start time");
-        expect(rule("freeCancelHours")).toBe(
-            "Free to cancel up to 12 hours before",
-        );
-        expect(rule("bookingPayment")).toBe("Pay online or at the desk");
-        expect(rule("refundInTimeCancels")).toBe(
-            "Cancelled in time: refund what they paid online",
-        );
-        // Read first: no dropdown on the page.
-        expect(host.querySelector('[role="combobox"], select')).toBeNull();
+        expect(said(host)).toContain("Meera Iyer · Physiotherapist");
+        expect(rows()[0]).toBe("Monday9 am to 7 pmLunch 1 to 3 pm");
+        expect(rows()[6]).toBe("SundayClosed");
     });
 
-    it("says it can't be changed to a role that can't, with nothing to press", () => {
-        draw({ canEdit: false });
-        expect(text()).toContain(
-            "Your role can see these rules but not change them.",
-        );
-        expect(text()).toContain("Nobody is on the diary yet.");
-        expect(host.querySelectorAll("button")).toHaveLength(0);
-        // The week and the rules are still read.
-        expect(text()).toContain("Monday to Friday");
-        expect(rule("bookingPayment")).toBe("Pay online or at the desk");
+    it("says a split day's second shift under its first", () => {
+        draw({ person: "st_neha" });
+        expect(rows()[0]).toBe("Monday7 to 11 amand 5 to 8 pm");
+        expect(rows()[1]).toBe("TuesdayClosed");
     });
 
-    it("says when the rules couldn't be read, and offers no Edit on a guess", () => {
-        draw({ rules: null });
-        expect(text()).toContain("Couldn't load the booking rules");
-        expect(host.querySelector("[data-rule]")).toBeNull();
+    it("has no Save bar, and leaving never asks: there is no draft", () => {
+        draw();
+        expect(hasButton("Save")).toBe(false);
+        expect(hasButton("Discard")).toBe(false);
+        expect(said(host)).toContain(
+            "Changes save as you make them, with Undo.",
+        );
+        expect(mayNavigate("/bookings")).toBe(true);
+    });
+
+    it("holds time off and More, with each person's rules between", () => {
+        draw();
+        const sections = Array.from(
+            host.querySelectorAll("section[aria-labelledby], [data-slot]"),
+        ).map(
+            (el) =>
+                el.getAttribute("aria-labelledby") ??
+                el.getAttribute("data-slot"),
+        );
+        expect(sections).toEqual([
+            "weekly-hours",
+            "time-off",
+            "person-rules",
+            "person-rules-title",
+            "hours-more",
+        ]);
+        expect(said(host)).toContain("Meera · 27 to 29 Oct");
+        expect(said(host)).toContain("Leave · all day · 3 days");
+        expect(said(host)).toContain("Extra opening hours");
+        expect(said(host)).toContain("1 coming up");
+        expect(said(host)).toContain("What customers see");
+        expect(said(host)).toContain("Whole business");
+    });
+
+    it("says a booking the hours leave out stays booked, with See it", () => {
+        draw({
+            kept: [
+                {
+                    id: "b1",
+                    staffId: "st_meera",
+                    weekday: 6,
+                    start: 15 * 60,
+                    who: "Sana Qureshi",
+                    date: "2026-10-24",
+                    href: "/bookings/b1",
+                },
+            ],
+        });
+        const note = Array.from(host.querySelectorAll("[role=status]")).find(
+            (el) => said(el).includes("Sana Qureshi"),
+        );
+        expect(said(note)).toContain(
+            "Sana Qureshi is booked on Sat 24 Oct at 3:00 pm. It stays booked.",
+        );
+        expect(note?.querySelector("a")?.getAttribute("href")).toBe(
+            "/bookings/b1",
+        );
+    });
+
+    it("picks whose hours from the card, and keeps it in the address", async () => {
+        draw();
+        await press(button(/Whose hours/));
+        expect(dialog()?.textContent).toContain("Whose hours?");
+        expect(dialog()?.textContent).toContain(
+            "Add someone who takes bookings",
+        );
+        await press(radio("Everyone"));
+        expect(router.replace).toHaveBeenCalledWith(
+            "/bookings/availability?person=all",
+            { scroll: false },
+        );
+        expect(said(host)).toContain("Everyone · the whole team");
+        expect(said(host)).toContain("3 people");
+        // Everyone's week: from the first in to the last out, and who works.
+        expect(rows()[0]).toBe("Monday7 am to 8 pmMeera, Arjun, Neha");
+        // The chips change one person's days, not everyone's.
+        expect(hasButton("Mon to Fri")).toBe(false);
+    });
+
+    it("opens everyone's day, and a person's day from it", async () => {
+        draw({ person: "all" });
+        await press(button(/^Monday, 7 am to 8 pm/));
+        expect(dialog()?.textContent).toContain("Who works, and when.");
+        expect(dialog()?.textContent).toContain(
+            phone ? "Tap a person" : "Click a person",
+        );
+        await press(button(/^Arjun Rao: 10 am to 6 pm/));
+        expect(dialog()?.textContent).toContain(
+            "Arjun's hours · saves as you change it",
+        );
+        expect(dialog()?.textContent).toContain("Open on Monday");
+    });
+
+    it("draws each sheet from the foot of a phone, at the right of a desk", async () => {
+        draw();
+        await press(button(/^Saturday, 9 am to 1 pm/));
+        const panel = document.body.querySelector("[data-hours-panel]");
+        expect(panel?.className.includes("rounded-t-[18px]")).toBe(phone);
+        // At a desk the row being changed stays marked beside its panel.
+        const row = button(/^Saturday, 9 am to 1 pm/);
+        expect(row.hasAttribute("data-selected")).toBe(!phone);
+    });
+
+    it("gives the keyboard back to the day's row when its sheet closes", async () => {
+        draw();
+        const row = button(/^Saturday, 9 am to 1 pm/);
+        row.focus();
+        await press(row);
+        expect(dialog()).not.toBeNull();
+        await act(async () => {
+            document.activeElement?.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+            );
+            await new Promise((r) => setTimeout(r, 20));
+        });
+        expect(dialog()).toBeNull();
+        expect(document.activeElement).toBe(button(/^Saturday, 9 am to 1 pm/));
     });
 });
 
-describe("It's just me", () => {
-    it("puts the signed-in person on the diary in one press, with Undo", async () => {
+describe("who may change what", () => {
+    beforeEach(() => setWidth(false));
+
+    it("a Member changes anyone's hours and time off, and adds nobody", async () => {
+        draw({ canManage: false, person: "st_arjun" });
+        expect(said(host)).toContain(MEMBER_LINE);
+        // Their hours are theirs to change, anyone's.
+        await press(button(/^Monday, 10 am to 6 pm/));
+        expect(dialog()?.textContent).toContain("Open on Monday");
+        act(() => root.unmount());
+        root = createRoot(host);
+        draw({ canManage: false });
+        await press(button(/Whose hours/));
+        expect(dialog()?.textContent).not.toContain(
+            "Add someone who takes bookings",
+        );
+        expect(hasButton("Add time off")).toBe(true);
+    });
+
+    it("a Member adds time off for someone, but can't close the business", async () => {
+        draw({ canManage: false });
+        await press(button("Add time off"));
+        expect(dialog()?.textContent).toContain("Add time off");
+        expect(dialog()?.textContent).not.toContain("The business is closed");
+    });
+
+    it("Calendar only reads the hours, and is told so in one line", async () => {
+        draw({ canEdit: false, canManage: false });
+        expect(said(host)).toContain(
+            "Your role can see these hours but not change them.",
+        );
+        expect(said(host)).not.toContain(MEMBER_LINE);
+        expect(hasButton(/^Monday, 9 am to 7 pm/)).toBe(false);
+        expect(rows()[0]).toContain("Monday");
+        expect(hasButton("Add time off")).toBe(false);
+        expect(hasButton("Mon to Fri")).toBe(false);
+        await press(button(/^Extra opening hours/));
+        expect(dialog()?.textContent).toContain("Sat 24 Oct · 2 to 5 pm");
+        expect(hasButton("Add extra hours", dialog() ?? undefined)).toBe(false);
+        expect(hasButton(/^Close extra hours/, dialog() ?? undefined)).toBe(
+            false,
+        );
+    });
+
+    it("an owner's business rules are read-only to everyone else", async () => {
+        draw({ canManage: false });
+        await press(button(/^Booking rules, Whole business/));
+        expect(dialog()?.textContent).toContain(
+            "Only owners and admins change the business's rules.",
+        );
+        expect(hasButton(/^Cancelling:/, dialog() ?? undefined)).toBe(false);
+    });
+});
+
+describe.each([
+    ["at a desk", false],
+    ["on a phone", true],
+])("nobody's hours set yet, %s", (_scene, phone) => {
+    beforeEach(() => setWidth(phone));
+
+    it("asks when customers can book them, with the week they'd start with", () => {
+        draw({ staff: [], serviceHours: MEERA.hours });
+        expect(said(host)).toContain("When can customers book Mohit?");
+        expect(said(host)).toContain(
+            "Nobody's hours are set yet. Start with these, then change any day.",
+        );
+        expect(said(host)).toContain("Monday to Saturday10 am to 7 pm");
+        expect(said(host)).toContain("SundayClosed");
+        expect(said(host)).toContain(
+            "Each service is booked in its own hours. Together they cover Mon to Fri 9 am to 1 pm and 3 to 7 pm, and Sat 9 am to 1 pm.",
+        );
+        expect(hasButton("Set Mohit's hours")).toBe(true);
+        expect(hasButton("Choose different hours")).toBe(true);
+        expect(hasButton(/^Add someone else who takes bookings/)).toBe(true);
+        expect(hasButton(/^Booking rules, Whole business/)).toBe(true);
+    });
+
+    it("sets their hours in one press, with Undo taking them off again", async () => {
+        draw({ staff: [] });
         actions.addMyself.mockResolvedValue({
             ok: true,
-            data: { staff: { ...ASHA, id: "st_me" }, week: "opening" },
+            data: {
+                staff: {
+                    ...MEERA,
+                    id: "st_me",
+                    name: "Mohit Mehta",
+                    hours: [],
+                },
+                week: "opening",
+            },
         });
-        actions.updateStaff.mockResolvedValue({ ok: true, data: ASHA });
-        draw();
-        await press(button("It's just me"));
-        // One press: no dialog, no name to type.
-        expect(sheet()).toBeNull();
-        expect(actions.addMyself).toHaveBeenCalledTimes(1);
-        expect(refresh).toHaveBeenCalled();
-        const [said, undo, options] = toast.showUndo.mock.calls[0] as [
+        await press(button("Set Mohit's hours"));
+        expect(actions.addMyself).toHaveBeenCalledWith(undefined);
+        const [said0, undo] = toast.showUndo.mock.calls.at(-1) as unknown as [
             string,
             () => Promise<unknown>,
-            { description: string },
         ];
-        expect(said).toBe("You're on the diary with your opening hours.");
-        expect(options.description).toBe(
-            "Your week is below. Change it any time.",
-        );
-        // Undo takes them off the diary again.
-        await expect(undo()).resolves.toEqual({ ok: true });
+        expect(said0).toMatch(/^Mohit's hours are set: /);
+        actions.updateStaff.mockResolvedValue({ ok: true, data: MEERA });
+        await act(async () => {
+            await undo();
+        });
         expect(actions.updateStaff).toHaveBeenCalledWith("st_me", {
             status: "ARCHIVED",
         });
     });
 
-    it("says a starting week when there were no opening hours to use", () => {
-        expect(joinedText("default")).toBe(
-            "You're on the diary with a starting week.",
+    it("chooses different hours in Change several days", async () => {
+        draw({ staff: [] });
+        await press(button("Choose different hours"));
+        expect(dialog()?.textContent).toContain("Change several days");
+        expect(dialog()?.textContent).toContain("for Mohit");
+    });
+
+    it("says what nothing on the page can be booked in without service hours", () => {
+        draw({ staff: [], serviceHours: null });
+        expect(said(host)).toContain(
+            "No service on your booking page has hours, so nothing can be booked yet.",
         );
     });
 
-    it("says a refusal and leaves the screen as it was", async () => {
-        actions.addMyself.mockResolvedValue({
-            ok: false,
-            error: "Your role can't change the diary.",
-        });
-        draw();
-        await press(button("It's just me"));
-        expect(toast.showError).toHaveBeenCalledWith(
-            "Your role can't change the diary.",
+    it("tells someone who can't put people on the diary who can", () => {
+        draw({ staff: [], canManage: false, canEdit: false });
+        expect(said(host)).toContain(
+            "Nobody's hours are set yet. An owner or admin puts people on the diary.",
         );
-        expect(toast.showUndo).not.toHaveBeenCalled();
-        expect(text()).toContain("When can people book you?");
-    });
-
-    it("opens the add-person dialog from Add my team", async () => {
-        draw();
-        await press(button("Add my team"));
-        expect(sheet()?.textContent).toContain("New person who takes bookings");
-        expect(sheet()?.textContent).toContain(
-            "They start with your opening hours.",
-        );
-        expect(actions.addMyself).not.toHaveBeenCalled();
+        expect(hasButton("Set Mohit's hours")).toBe(false);
+        expect(hasButton(/^Add someone else/)).toBe(false);
     });
 });
 
-describe("Booking rules: a row each, saved in its own sheet", () => {
-    it("opens the rule's sheet with the choices it always had", async () => {
+describe("adding someone who takes bookings", () => {
+    beforeEach(() => setWidth(false));
+
+    it("opens the add sheet from whose hours, named on its button", async () => {
         draw();
-        await press(button("Edit: How far ahead people can book"));
-        expect(sheet()?.textContent).toContain("How far ahead people can book");
-        expect(
-            Array.from(sheet()?.querySelectorAll('[role="radio"]') ?? []).map(
-                (r) => r.closest("label")?.textContent,
-            ),
-        ).toEqual(["1 week", "2 weeks", "4 weeks", "8 weeks", "No limit"]);
-        expect(
-            sheet()?.querySelector('[role="radio"][aria-checked="true"]')
-                ?.parentElement?.textContent,
-        ).toBe("8 weeks");
+        await press(button(/Whose hours/));
+        await press(button("Add someone who takes bookings"));
+        expect(dialog()?.textContent).toContain(
+            "They start with your opening hours and don't need a sign-in.",
+        );
+        expect(hasButton("Add person", dialog() ?? undefined)).toBe(true);
     });
 
-    it("keeps the help each way of paying had", async () => {
-        draw({ onlineBlocker: "NO_PROVIDER" });
-        await press(button("Edit: How people pay when they book"));
-        expect(sheet()?.textContent).toContain(
-            "Nobody pays on the booking page. They pay when they come, a deposit too.",
-        );
-        expect(sheet()?.textContent).toContain(
-            "Right now no payment provider is connected, so nobody can book a service with a price online.",
-        );
-    });
-
-    it("saves that one rule by itself, with a toast and Undo, and no unsaved bar", async () => {
-        actions.updateBookingRules.mockImplementation(
-            (patch: Partial<BookingRules>) =>
-                Promise.resolve({ ok: true, data: { ...RULES, ...patch } }),
-        );
-        draw();
-        await press(button("Edit: How far ahead people can book"));
-        const noLimit = Array.from(
-            sheet()?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
-        ).at(-1);
-        if (!noLimit) throw new Error("No choices");
-        await press(noLimit);
-        // Choosing is not saving, and nothing on the page is waiting.
-        expect(actions.updateBookingRules).not.toHaveBeenCalled();
-        expect(unsavedBar()).toBeUndefined();
-
-        await press(button("Save", sheet()));
-        // Only the rule that changed is sent.
-        expect(actions.updateBookingRules).toHaveBeenCalledWith({
-            bookAheadDays: null,
-        });
-        expect(rule("bookAheadDays")).toBe("No limit on how far ahead");
-        expect(unsavedBar()).toBeUndefined();
-        expect(button("Edit: How far ahead people can book")).toBeTruthy();
-        expect(() => button("Save")).toThrow();
-
-        const [said, undo] = toast.showUndo.mock.calls[0] as [
-            string,
-            () => Promise<unknown>,
-        ];
-        expect(said).toBe(RULE_SAVED);
-        expect(said).not.toMatch(/Hours saved/);
-        // Undo puts back that one rule.
-        await act(async () => {
-            await undo();
-        });
-        expect(actions.updateBookingRules).toHaveBeenLastCalledWith({
-            bookAheadDays: 56,
-        });
-        expect(rule("bookAheadDays")).toBe("Book up to 8 weeks ahead");
-    });
-
-    it("keeps the sheet open with what was chosen when the save is refused", async () => {
-        actions.updateBookingRules.mockResolvedValue({
-            ok: false,
-            error: "Couldn't save the booking rules.",
-        });
-        draw();
-        await press(button("Edit: Cancelled in time"));
-        const keep = Array.from(
-            sheet()?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
-        ).at(-1);
-        if (!keep) throw new Error("No choices");
-        await press(keep);
-        await press(button("Save", sheet()));
-        expect(toast.showError).toHaveBeenCalledWith(
-            "Couldn't save the booking rules.",
-        );
-        expect(sheet()).not.toBeNull();
-        expect(keep.getAttribute("aria-checked")).toBe("true");
-        expect(rule("refundInTimeCancels")).toBe(
-            "Cancelled in time: refund what they paid online",
-        );
-    });
-});
-
-describe("Availability with people on the diary", () => {
-    it("asks before a way off the page loses unsaved hours", async () => {
-        draw({ staff: [ASHA] });
-        // Nothing unsaved: a way off is not held.
-        expect(mayNavigate("/services")).toBe(true);
-        await press(button("Bookable on Monday"));
-        let free = true;
-        await act(async () => {
-            free = mayNavigate("/services");
-            await new Promise((r) => setTimeout(r, 20));
-        });
-        // Held, and the question is on screen to answer: without it the
-        // link would just do nothing.
-        expect(free).toBe(false);
-        const ask = document.body.querySelector('[role="alertdialog"]');
-        expect(ask?.textContent).toContain("Leave without saving?");
-        expect(ask?.textContent).toContain(
-            "Your changes to hours or time off aren't saved, and will be lost.",
-        );
-    });
-
-    it("puts the rules under the week, and What customers see beside it", () => {
-        draw({ staff: [ASHA] });
-        const week = host.querySelector("#weekly-hours");
-        const rules = host.querySelector("#booking-rules");
-        const preview = Array.from(host.querySelectorAll("h2")).find(
-            (h) => h.textContent === "What customers see",
-        );
-        expect(week && rules && preview).toBeTruthy();
-        if (!week || !rules || !preview) return;
-        // Document order: the week, the preview, then the rules.
-        expect(
-            week.compareDocumentPosition(preview) &
-                Node.DOCUMENT_POSITION_FOLLOWING,
-        ).toBeTruthy();
-        expect(
-            preview.compareDocumentPosition(rules) &
-                Node.DOCUMENT_POSITION_FOLLOWING,
-        ).toBeTruthy();
-        // The rules are not in the week's row of columns.
-        expect(week.closest("section")?.parentElement).not.toBe(
-            rules.closest("section")?.parentElement,
-        );
-    });
-
-    it("raises the unsaved bar for hours, and says what Save will do", async () => {
-        draw({ staff: [ASHA] });
-        expect(unsavedBar()).toBeUndefined();
-        await press(button("Bookable on Monday"));
-        expect(unsavedBar()?.textContent).toBe(unsavedText());
-        expect(unsavedText()).toMatch(/New free times show on the calendar/);
-        expect(unsavedText()).not.toMatch(/rules/);
-        expect(savedText()).toBe(
-            "Saved. The calendar and booking page use them now.",
-        );
-    });
-
-    it("does not raise it for a rule saved while hours are untouched", async () => {
-        actions.updateBookingRules.mockResolvedValue({
-            ok: true,
-            data: { ...RULES, bookingPayment: "DESK" },
-        });
-        draw({ staff: [ASHA] });
-        await press(button("Edit: How people pay when they book"));
-        const desk = Array.from(
-            sheet()?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
-        ).at(-1);
-        if (!desk) throw new Error("No choices");
-        await press(desk);
-        await press(button("Save", sheet()));
-        expect(rule("bookingPayment")).toBe("Pay at the desk");
-        expect(unsavedBar()).toBeUndefined();
-        expect(actions.replaceStaffHours).not.toHaveBeenCalled();
-    });
-
-    it("says they take no service when none on the booking page is theirs", () => {
-        draw({ staff: [ASHA], services: [{ id: "svc_1", name: "Cut" }] });
-        expect(text()).toContain("Asha takes no service on the booking page");
-        expect(actions.readOffered).not.toHaveBeenCalled();
-    });
-
-    it("shows the times the booking page offers for a service they take", async () => {
-        actions.readOffered.mockResolvedValue({
-            ok: true,
-            data: {
-                timezone: "Asia/Kolkata",
-                kind: "one",
-                days: [
-                    {
-                        date: "2026-10-07",
-                        open: true,
-                        closed: false,
-                        starts: [],
-                    },
-                    {
-                        date: "2026-10-08",
-                        open: true,
-                        closed: false,
-                        starts: [
-                            {
-                                // 9:00 am and 9:30 am in Kolkata.
-                                startAt: "2026-10-08T03:30:00.000Z",
-                                endAt: "2026-10-08T04:00:00.000Z",
-                                staffId: "st_asha",
-                                staffName: "Asha",
-                                placesLeft: null,
-                            },
-                            {
-                                startAt: "2026-10-08T04:00:00.000Z",
-                                endAt: "2026-10-08T04:30:00.000Z",
-                                staffId: "st_asha",
-                                staffName: "Asha",
-                                placesLeft: null,
-                            },
-                        ],
-                    },
-                ],
-            },
-        });
+    it("keeps the people the rest of the screen reads", () => {
         draw({
-            staff: [{ ...ASHA, serviceIds: ["svc_1"] }],
-            services: [{ id: "svc_1", name: "Cut" }],
+            staff: [
+                MEERA,
+                ARJUN,
+                NEHA,
+                { ...NEHA, id: "st_old", status: "ARCHIVED" },
+            ],
         });
-        await act(async () => {
-            await new Promise((r) => setTimeout(r, 20));
-        });
-        // The booking page's own read, for this person.
-        expect(actions.readOffered).toHaveBeenCalledWith("svc_1", "st_asha");
-        // Today has nothing: the next day with a time is shown.
-        const times = host.querySelector('ul[aria-label^="Times offered on"]');
-        expect(times?.getAttribute("aria-label")).toContain("Thursday");
-        expect(
-            Array.from(times?.children ?? []).map((li) => li.textContent),
-        ).toEqual(["9:00 am", "9:30 am"]);
+        expect(said(host)).not.toContain("st_old");
     });
 });

@@ -112,6 +112,8 @@ export default async function OverviewTab({ params }: BusinessTabProps) {
                     team={overview.team}
                     accountManager={overview.accountManager}
                     canAssign={can(staff, "accounts:assign")}
+                    canSeeRate={can(staff, "team:pay")}
+                    canSetRate={can(staff, "commission:rates")}
                 />
                 <ActivityCard
                     organizationId={organizationId}

@@ -74,7 +74,7 @@ recorded grant (the API refuses it otherwise).
   `lib/business-words.ts`, `lib/offer-words.ts`, `lib/saroh-lead-words.ts`,
   `lib/home-words.ts`, `lib/search-words.ts`, `lib/team-words.ts`,
   `lib/roles-matrix.ts`, `lib/commission-words.ts`,
-  `lib/team-member-words.ts`.
+  `lib/own-rate-words.ts`, `lib/team-member-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -204,7 +204,33 @@ recorded grant (the API refuses it otherwise).
   `EarningsCard` (`earnings.tsx`, with `readEarnings(id)`) for a member's
   Earnings tab. All need `team:pay` (rates `commission:rates`); writes
   go through `lib/commission-actions.ts`. No rate or default is ever
-  written in the console.
+  written in the console. **A business's own rate** (#1035,
+  `GET|POST /admin/organizations/:id/commission-rate`, `…/preview`,
+  `…/end`): `OwnRateDialog` (`components/team/own-rate-dialog.tsx`,
+  Set commission…, `commission:rates`) on the business's Team card
+  (`own-rate-block.tsx`, which shows "Own rate … from ‹day›" only to
+  `team:pay` and `commission:rates`, with End own rate…) and on each row
+  of a teammate's Businesses tab: a percentage, Earns from with one-tap
+  days, and an optional last day, and the API's dry run ("3 payments
+  since 10 Sep get commission") before Set rate. The earliest Earns from
+  is the later of the first paid plan and the 1st of the month the
+  manager took it on (owner, 19 Oct): "businesses joined without any
+  manager, the commission won't be paid to any manager until they are
+  added to the business, and it will only be paid for the month they are
+  added", and the month counts: a payment earlier in that month (India
+  time) is theirs too. A business that joins on 1 Nov on Pro and gets a
+  manager on 1 Jan, after its 00:05 renewal, or on 20 Jan, earns them
+  January, paid on 31 Jan, and nothing for November or December. So the
+  chips are "From 1 Jan, the month Arjun took it on" and "First paid
+  plan" only when a rate may start then, and "Joined" off, saying why; an
+  earlier typed day is refused ("Arjun took it on in Jan. A rate can start
+  from 1 Jan, the start of that month.",
+  `earliestDay`). Commission is only on what the business paid, before
+  GST and after any offer; free months and refunded payments earn
+  nothing. Saving back-pays that manager's NO_RATE payments in its window,
+  once; the Rates sheet lists the own rates running. A line it priced
+  reads "own rate for ‹business›" (`lineRateWords`). Words in
+  `lib/own-rate-words.ts`.
 - **A teammate's page (`/team/[platformAdminId]`, DEC-169, admin plan
   U22, R33)** opens from a name on the Team list (table or card; an invite
   has no page) and, for anyone with a team record, from **Your page**

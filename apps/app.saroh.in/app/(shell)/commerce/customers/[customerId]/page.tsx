@@ -17,6 +17,7 @@ import { getCustomer, listCustomers } from "@/lib/customers/service";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { OrderStanding } from "@/lib/orders/business-service";
 import { listAllOrderRows } from "@/lib/orders/business-service";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { requireSession } from "@/lib/session";
 import type { BusinessStore as Store } from "@/lib/stores/service";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -257,7 +258,7 @@ function detailRows(customer: Customer): { label: string; value: string }[] {
             value: join([customer.firstName, customer.lastName], " "),
         },
         { label: "Email", value: customer.email },
-        { label: "Phone", value: customer.phone?.trim() ?? "" },
+        { label: "Phone", value: phoneLabel(customer.phone) },
         {
             label: "Address",
             value: join(

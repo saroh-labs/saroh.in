@@ -35,7 +35,7 @@ export function useOrderChanges({
     refundTo: string;
     setPanel: (p: Panel) => void;
     startHold: (h: PendingHold) => void;
-    /** More is owed after a change: make the pay link for it (B11). */
+    /** More is owed after a change: make the payment link for it (B11). */
     onOwed?: () => void;
 }) {
     const router = useRouter();

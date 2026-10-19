@@ -11,6 +11,7 @@
 
 import { plural } from "@/lib/format/plural";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { absentText } from "@saroh/ui/lib/absent";
 
 export type AttentionKind = "ALLERGY" | "MEDICAL" | "ACCESS" | "OTHER";
@@ -97,10 +98,10 @@ export function phoneText({
     person: PeekPerson | undefined;
 }): string {
     const typed = bookerPhone?.trim();
-    if (typed) return typed;
+    if (typed) return phoneLabel(typed);
     if (!hasContact) return NO_PHONE;
     if (!person) return absentText();
     const theirs = person.phone?.trim();
-    if (theirs) return theirs;
+    if (theirs) return phoneLabel(theirs);
     return NO_PHONE_ON_PAGE;
 }

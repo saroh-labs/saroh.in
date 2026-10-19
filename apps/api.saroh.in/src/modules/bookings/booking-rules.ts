@@ -19,6 +19,15 @@ import type { Prisma } from "@saroh/database";
  * `bookingPayment` is how people pay when they book on the booking page
  * (DEC-088): online, at the desk, or both. Both by default — what every
  * business had before — so nothing changes until a merchant chooses.
+ *
+ * `gapMinutes` is "Gap between bookings" (DEC-170, #1038): minutes kept
+ * clear either side of a person's bookings, none by default.
+ * `memberRuleChangesNeedApproval` is the business's switch: on — for every
+ * business, and one with no rules row — a change someone makes to their
+ * own booking rules waits for an owner or admin (`person-rules.ts`).
+ *
+ * Each person may have their own book-ahead, latest-booking, free-cancel
+ * and gap, falling back to these field by field (`rulesForPerson`).
  */
 export interface BookingRulesValue {
     bookAheadDays: number | null;
@@ -26,6 +35,8 @@ export interface BookingRulesValue {
     freeCancelHours: number | null;
     refundInTimeCancels: boolean;
     bookingPayment: BookingPayment;
+    gapMinutes: number;
+    memberRuleChangesNeedApproval: boolean;
 }
 
 /**
@@ -44,6 +55,8 @@ export const NO_BOOKING_RULES: BookingRulesValue = {
     freeCancelHours: null,
     refundInTimeCancels: true,
     bookingPayment: "BOTH",
+    gapMinutes: 0,
+    memberRuleChangesNeedApproval: true,
 };
 
 /** A stored value read as a way to pay; anything unknown reads as BOTH. */
@@ -162,7 +175,8 @@ export function isLateCancel(
     return deadline !== null && now.getTime() > deadline.getTime();
 }
 
-function describeMinutes(minutes: number): string {
+/** "2 hours", "1 day", "45 minutes": a length of time in words. */
+export function describeMinutes(minutes: number): string {
     if (minutes % 1440 === 0) {
         const days = minutes / 1440;
         return `${days} ${days === 1 ? "day" : "days"}`;
@@ -176,6 +190,26 @@ function describeMinutes(minutes: number): string {
 
 type Db = Pick<Prisma.TransactionClient, "bookingRules">;
 
+/** The columns a rules row is read with. */
+export const BOOKING_RULES_SELECT = {
+    bookAheadDays: true,
+    latestBookingMinutes: true,
+    freeCancelHours: true,
+    refundInTimeCancels: true,
+    bookingPayment: true,
+    gapMinutes: true,
+    memberRuleChangesNeedApproval: true,
+} as const;
+
+/** A stored rules row as the value the rest of the API reads. */
+export function bookingRulesOf(
+    row: Omit<BookingRulesValue, "bookingPayment"> & {
+        bookingPayment: string;
+    },
+): BookingRulesValue {
+    return { ...row, bookingPayment: bookingPaymentOf(row.bookingPayment) };
+}
+
 /** The business's rules, or none. */
 export async function loadBookingRules(
     db: Db,
@@ -183,14 +217,8 @@ export async function loadBookingRules(
 ): Promise<BookingRulesValue> {
     const row = await db.bookingRules.findUnique({
         where: { organizationId },
-        select: {
-            bookAheadDays: true,
-            latestBookingMinutes: true,
-            freeCancelHours: true,
-            refundInTimeCancels: true,
-            bookingPayment: true,
-        },
+        select: BOOKING_RULES_SELECT,
     });
     if (!row) return NO_BOOKING_RULES;
-    return { ...row, bookingPayment: bookingPaymentOf(row.bookingPayment) };
+    return bookingRulesOf(row);
 }

@@ -51,6 +51,11 @@ export interface StaffView {
      * takes no new bookings; theirs are kept. Absent when not paused.
      */
     paused?: true;
+    /**
+     * Their own booking rules (DEC-170, #1038); a null is "same as the
+     * business". Absent from an API older than them.
+     */
+    rules?: PersonRules;
 }
 
 /**
@@ -101,6 +106,96 @@ export interface BookingRules {
      * both, which is what every business had.
      */
     bookingPayment?: BookingPayment;
+    /**
+     * "Gap between bookings" (DEC-170, #1038): minutes kept clear either
+     * side of a person's bookings; 0 is no gap. Absent from an older API.
+     */
+    gapMinutes?: number;
+    /**
+     * "Members' rule changes need approval" (DEC-170, #1038): on for every
+     * business unless an owner or admin turns it off.
+     */
+    memberRuleChangesNeedApproval?: boolean;
+}
+
+/**
+ * A person's own booking rules (DEC-170, #1038): their timing rules, each
+ * null when it is the same as the business's. Paying and refunds stay
+ * business-wide.
+ */
+export interface PersonRules {
+    bookAheadDays: number | null;
+    latestBookingMinutes: number | null;
+    freeCancelHours: number | null;
+    gapMinutes: number | null;
+}
+
+/** Some of a person's rules: only the fields that change. */
+export type RuleChanges = Partial<PersonRules>;
+
+/** The timing rules a diary keeps, with nothing left to fall back to. */
+export interface TimingRules {
+    bookAheadDays: number | null;
+    latestBookingMinutes: number | null;
+    freeCancelHours: number | null;
+    gapMinutes: number;
+}
+
+export type RuleRequestStatus =
+    "WAITING" | "APPROVED" | "TURNED_DOWN" | "WITHDRAWN";
+
+/** Someone a request names, as they are now. */
+export interface RulePerson {
+    userId: string;
+    name: string | null;
+}
+
+/**
+ * A request to change someone's own booking rules (#1038), from
+ * `GET booking-rule-requests` and the request's moves.
+ */
+export interface RuleRequest {
+    id: string;
+    staffId: string;
+    staffName: string;
+    status: RuleRequestStatus;
+    /** The asked values; a null is "same as the business". */
+    changes: RuleChanges;
+    /** The same, in words ("Booking late: up to 12 hours before the start"). */
+    words: string[];
+    /** Why it was turned down, when the owner said. */
+    reason: string | null;
+    requestedBy: RulePerson;
+    createdAt: string;
+    decidedAt: string | null;
+    decidedBy: RulePerson | null;
+}
+
+/** `GET staff/:id/booking-rules`: one person's rules, and what you may do. */
+export interface PersonRulesView {
+    staffId: string;
+    name: string;
+    own: PersonRules;
+    business: TimingRules;
+    /** Theirs, else the business's, field by field. */
+    effective: TimingRules;
+    /** Whether you may change them at all. */
+    canChange: boolean;
+    /** Whether a change you make waits for an owner or admin. */
+    needsApproval: boolean;
+    /** The request waiting, or the last decided until its person says OK. */
+    request: RuleRequest | null;
+}
+
+/**
+ * `PUT staff/:id/booking-rules`: applied at once, or waiting
+ * (`rules.request`). Undo of an applied change sends `previous` back:
+ * only the fields this save changed, as they were before it.
+ */
+export interface PersonRulesSaved {
+    applied: boolean;
+    previous: RuleChanges;
+    rules: PersonRulesView;
 }
 
 /** How people pay when they book (DEC-088). */
@@ -156,7 +251,7 @@ export interface OfferedDay {
 /**
  * The booking page's next two weeks for one service, as the public API
  * answers them (`GET public/services/:id/days`): the read the booking page
- * itself draws from, so the preview on Availability can't disagree with it.
+ * itself draws from, so the preview on Hours and time off can't disagree with it.
  */
 export interface OfferedDays {
     timezone: string;

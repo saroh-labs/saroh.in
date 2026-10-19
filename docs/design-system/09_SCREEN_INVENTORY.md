@@ -215,9 +215,9 @@ and referenced by exception below):
 ### Bookings — list `[read via extraction]`
 
 - **Route / file:** `/bookings` · `.../bookings/page.tsx`
-- **Purpose:** upcoming reservations grouped by day. **Main action:** cancel a CONFIRMED booking (`CancelBookingControl`). **Secondary:** "Services" (`variant="outline"`).
+- **Purpose:** upcoming reservations grouped by day. **Main action:** cancel a CONFIRMED booking (`CancelSheet`, `components/bookings/sheets/cancel-sheet.tsx`). **Secondary:** "Services" (`variant="outline"`).
 - **Layout:** `<main class="mx-auto max-w-3xl p-8">`; `<h1>Bookings`; per-day `<h2 class="text-sm font-semibold text-muted-foreground">` group headers over `grid gap-3` card lists. Empty = dashed card. Heavy `Intl` date/tz formatting.
-- **Components:** `Badge`, `Button`, `Card` family, `CancelBookingControl`.
+- **Components:** `Badge`, `Button`, `Card` family, `CancelSheet`.
 - **UX problems:** read-only except cancel; no filter/range, no "past bookings" view; `max-w-3xl` narrower than services. **A11y:** `<section>` per day relies on visual `<h2>`; `truncate`/`min-w-0` guard overflow. **Opportunity:** date filtering; align width with services.
 
 ---

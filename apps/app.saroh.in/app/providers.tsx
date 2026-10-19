@@ -18,11 +18,16 @@ import { isRoleRefusal } from "@/lib/api/role-denied";
  * need for a second, dark one hidden with CSS — which drew every toast twice
  * and had screen readers announce it twice.
  */
+/*
+ * An open sheet's pinned foot on a phone sets `--overlay-foot-inset`
+ * (`overlay-form.tsx`), so a toast said while it is open sits above its
+ * buttons rather than over them (BA-23, U3).
+ */
 const offset = {
-    bottom: "calc(var(--tab-bar-inset) + var(--bottom-bar-inset, 0px) + 24px)",
+    bottom: "calc(max(var(--tab-bar-inset) + var(--bottom-bar-inset, 0px), var(--overlay-foot-inset, 0px)) + 24px)",
 };
 const mobileOffset = {
-    bottom: "calc(var(--tab-bar-inset) + var(--bottom-bar-inset, 0px) + 16px)",
+    bottom: "calc(max(var(--tab-bar-inset) + var(--bottom-bar-inset, 0px), var(--overlay-foot-inset, 0px)) + 16px)",
 };
 
 export function Providers({ children }: { children: React.ReactNode }) {

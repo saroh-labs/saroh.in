@@ -365,7 +365,7 @@ describe("the header", () => {
         });
         expect(tagFor(d)?.label).toBe("Member");
         expect(sinceLine(d, "Pulse Fitness", NOW)).toBe(
-            "With Pulse Fitness since 4 Jan · 3 sessions attended",
+            "With Pulse Fitness since 4 Jan · Came to 3 bookings",
         );
     });
 

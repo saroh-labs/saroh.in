@@ -14,8 +14,13 @@ import { allows } from "../organizations/organization-policy";
  * | --------------------------------------------------------- | --------------- |
  * | GET services, :id, rules, availability, staff, closures,  | `service:read`  |
  * | booking-rules                                             |                 |
- * | POST/PATCH/PUT/DELETE services, rules, staff, hours,      | `service:write` |
- * | time off, closures, booking-rules                         |                 |
+ * | POST/PATCH/PUT/DELETE services, rules, staff and their    | `service:write` |
+ * | services, closures, booking-rules                         |                 |
+ * | PUT staff/:id/hours, extra hours, time off (DEC-170)      | `hours:write`   |
+ * | GET staff/:id/booking-rules, booking-rule-requests (#1038) | `service:read`  |
+ * | PUT staff/:id/booking-rules: one's own (a request while    | `hours:write`   |
+ * | the approval switch is on); withdraw, dismiss one's own    |                 |
+ * | PUT staff/:id/booking-rules: anyone's; approve, turn down  | `service:write` |
  * | GET services/bookings, bookings/:id, :id/bookings,        | `booking:read`  |
  * | :id/waitlist                                              |                 |
  * | POST :id/bookings, PATCH/DELETE bookings/:id, outcome,    | `booking:write` |
@@ -27,7 +32,8 @@ import { allows } from "../organizations/organization-policy";
  * | POST/PATCH/DELETE class-packs, drafts, publish, discard,  | `pack:write`    |
  * | archive, restore, purchases/:id/extend                    |                 |
  *
- * `booking:write` implies `booking:read`, `service:write` `service:read`,
+ * `booking:write` implies `booking:read`, `service:write` `service:read`
+ * and `hours:write`, `hours:write` `service:read`,
  * `pack:write` `pack:sell`, and `pack:sell` `pack:read`
  * (`resolveCapabilities`).
  */
@@ -37,6 +43,7 @@ const REFUSALS: Partial<Record<OrgAction, string>> = {
     "service:read": "Your role can't see services.",
     "service:write":
         "Your role can't change services, hours, time off or booking rules.",
+    "hours:write": "Your role can't change hours or time off.",
     "pack:read": "Your role can't see class packs.",
     "pack:sell": "Your role can't sell class packs.",
     "pack:write": "Your role can't change class packs.",

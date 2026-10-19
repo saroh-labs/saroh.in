@@ -20,6 +20,11 @@ insufficient" (PRODUCT_STRATEGY §18).
   `.localhost` hostname the app ships as. Bare ports break CORS and the shared
   session (`docs/architecture/LOCAL_DEV.md`). Check by hand in the persistent Chrome window
   described there, never a throwaway `playwright test` browser.
+- **Current** — **Empty a field by hand the way a person does** (2026-10-19):
+  click it, Select all, Backspace. chrome-devtools `fill("")` (Puppeteer's
+  `Locator.fill`) sets the value with no `input` event, so React never hears
+  it and a form saves nothing; it looks like a "clearing doesn't save" bug
+  that a person never meets (DEV_LEARNINGS, 19 Oct).
 - **Adopted** — **Check the four scenes at real widths:** 320px (the floor),
   390px (a phone) and 1440px (the desk), in light and dark, with a touch pointer
   for the phone. Emulate the viewport — resizing a Chrome window stops at about

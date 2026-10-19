@@ -82,12 +82,12 @@ describe("renewalChangeLines", () => {
     it("says who pays by autopay with a limit below the new amount", () => {
         expect(renewalChangeLines(change({ aboveAutopayLimit: 3 }))).toEqual([
             "12 members' next renewal changes from ₹2,000 to ₹2,360.",
-            "3 of them pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a pay link.",
+            "3 of them pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a payment link.",
         ]);
         expect(
             renewalChangeLines(change({ aboveAutopayLimit: 1 })).at(-1),
         ).toBe(
-            "1 of them pays by autopay with a limit below the new amount. Their renewal goes out as an invoice with a pay link.",
+            "1 of them pays by autopay with a limit below the new amount. Their renewal goes out as an invoice with a payment link.",
         );
         // The only member on the plan.
         expect(
@@ -107,7 +107,7 @@ describe("renewalChangeLines", () => {
                 }),
             ).at(-1),
         ).toBe(
-            "They pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a pay link.",
+            "They pay by autopay with a limit below the new amount. Their renewal goes out as an invoice with a payment link.",
         );
     });
 

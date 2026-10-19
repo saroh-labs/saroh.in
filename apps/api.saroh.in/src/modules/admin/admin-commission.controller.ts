@@ -7,11 +7,15 @@ import { IdempotencyService } from "../../common/idempotency/idempotency.service
 import {
     CommissionMonthQueryDto,
     MarkPayoutPaidDto,
+    OwnRatePreviewDto,
     SetCommissionRateDto,
+    SetOwnRateDto,
 } from "./admin-commission.dto";
 import { AdminCommissionService } from "./admin-commission.service";
+import { AdminOwnRateService } from "./admin-own-rate.service";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
+import { OperatorReasonDto } from "./dto";
 
 /**
  * Commission (DEC-169, admin console U21): statements, Mark paid, a
@@ -20,11 +24,16 @@ import { AdminRoutes } from "./admin-routes.decorator";
  * service checks each again. Writes take a reason and an idempotency key
  * and are on the admin ledger. No support session: it is Saroh's own
  * money, not a business's data.
+ *
+ * A business's own rate (#1035): read with `team:pay` (the service also
+ * admits `commission:rates`); its dry run, set and end with
+ * `commission:rates`.
  */
 @AdminRoutes()
 export class AdminCommissionController {
     constructor(
         private readonly commission: AdminCommissionService,
+        private readonly ownRates: AdminOwnRateService,
         private readonly idempotency: IdempotencyService,
     ) {}
 
@@ -101,6 +110,69 @@ export class AdminCommissionController {
             },
             input,
             () => this.commission.setRate(staff, input),
+        );
+    }
+
+    /** A business's own rate: in force, to come, every one, and the chip dates. */
+    @Get("organizations/:organizationId/commission-rate")
+    @RequireAdminPermission(AdminPermission.TeamPay)
+    ownRate(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+    ) {
+        return this.ownRates.read(staff, organizationId);
+    }
+
+    /** What setting it would do (which payments it prices); writes nothing. */
+    @Post("organizations/:organizationId/commission-rate/preview")
+    @RequireAdminPermission(AdminPermission.CommissionRates)
+    previewOwnRate(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: OwnRatePreviewDto,
+    ) {
+        return this.ownRates.preview(staff, organizationId, dto);
+    }
+
+    /** Set it, back-paying the manager's unpriced payments in its window once. */
+    @Post("organizations/:organizationId/commission-rate")
+    @RequireAdminPermission(AdminPermission.CommissionRates)
+    setOwnRate(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: SetOwnRateDto,
+    ) {
+        const { idempotencyKey, ...input } = dto;
+        return this.idempotency.run(
+            {
+                scope: "admin.commission.own-rate",
+                key: idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { organizationId, ...input },
+            () => this.ownRates.set(staff, organizationId, input),
+        );
+    }
+
+    /** End it now (or, not started yet, before it starts). */
+    @Post("organizations/:organizationId/commission-rate/end")
+    @RequireAdminPermission(AdminPermission.CommissionRates)
+    endOwnRate(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.commission.own-rate.end",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { organizationId, reason: dto.reason },
+            () =>
+                this.ownRates.end(staff, organizationId, {
+                    reason: dto.reason,
+                }),
         );
     }
 }

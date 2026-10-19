@@ -12,6 +12,7 @@ import {
 } from "@/lib/business-report";
 import { cn } from "@/lib/cn";
 import { readAddress } from "@/lib/page-address";
+import { PhoneInput } from "@saroh/ui/phone-input";
 
 const copy = CUSTOMERS.form;
 
@@ -274,27 +275,26 @@ export function ReportForm() {
                 >
                     {copy.phoneLabel}
                 </label>
-                <input
+                <PhoneInput
                     ref={(el) => {
                         fields.current.phone = el;
                     }}
                     id="report-phone"
                     name="phone"
-                    type="tel"
-                    autoComplete="tel"
-                    inputMode="tel"
+                    autoComplete="tel-national"
                     aria-required
                     maxLength={REPORT_LIMITS.phone}
                     value={phone}
-                    onChange={(e) => {
-                        setPhone(e.target.value);
+                    onValueChange={(v) => {
+                        setPhone(v);
                         clear();
                     }}
                     aria-invalid={wrong("phone") || undefined}
                     aria-describedby={describedBy("phone", "report-phone-hint")}
-                    className={cn(
+                    boxClassName={cn(
                         INPUT,
-                        "h-[46px]",
+                        // The page's own focus outline, not the app's ring.
+                        "h-[46px] focus-visible:ring-0 focus-visible:ring-offset-0",
                         wrong("phone")
                             ? "border-destructive"
                             : "border-border-strong",

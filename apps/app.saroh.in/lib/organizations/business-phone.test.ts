@@ -41,9 +41,9 @@ describe("the business's public phone (DEC-053)", () => {
         );
     });
 
-    it("reads an Indian number in groups, any other as stored", () => {
+    it("reads a saved number in groups (#1036)", () => {
         expect(phoneLabel("+919845012345")).toBe("+91 98450 12345");
-        expect(phoneLabel("+441134960000")).toBe("+441134960000");
+        expect(phoneLabel("+441134960000")).toBe("+44 113 496 0000");
         expect(phoneLabel(null)).toBe("");
         expect(phoneLabel(undefined)).toBe("");
     });

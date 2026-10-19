@@ -19,6 +19,8 @@ import {
 
 import type { GstPriceMode } from "../invoices/gst-price";
 import { GST_PRICE_MODES } from "../invoices/gst-price";
+import type { DeskMethod } from "./desk-take";
+import { DESK_METHODS } from "./desk-take";
 
 /** Service lifecycle statuses. ACTIVE is bookable; ARCHIVED is not. */
 export const SERVICE_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
@@ -227,6 +229,14 @@ export class CreateServiceDto {
     @IsOptional()
     @IsBoolean()
     showOnBookingPage?: boolean;
+
+    /**
+     * Whether the team books it by hand (DEC-170, Q5): Who can book it's
+     * "Your team". Neither this nor `showOnBookingPage` reads as paused.
+     */
+    @IsOptional()
+    @IsBoolean()
+    bookableByTeam?: boolean;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -350,6 +360,14 @@ export class UpdateServiceDto {
     @IsOptional()
     @IsBoolean()
     showOnBookingPage?: boolean;
+
+    /**
+     * Whether the team books it by hand (DEC-170, Q5): Who can book it's
+     * "Your team". Neither this nor `showOnBookingPage` reads as paused.
+     */
+    @IsOptional()
+    @IsBoolean()
+    bookableByTeam?: boolean;
 }
 
 /**
@@ -461,9 +479,11 @@ export class BookServiceDto {
 
 /**
  * A booking the merchant makes for someone (#384). The org and the service
- * come from the route; the booker is either a contact (`contactId`) or someone
- * new (`bookerEmail`, optionally a name and phone). The service checks that
- * one of the two is given.
+ * come from the route; the booker is a contact (`contactId`), someone by
+ * their email (`bookerEmail`, optionally a name and phone), or someone by
+ * their phone alone (`bookerPhone` and a name, DEC-170): the contact with
+ * that phone, else a new one kept by it. The service checks that one of the
+ * three is given (`hand-booker.ts`).
  */
 export class BookByHandDto {
     @IsISO8601()
@@ -525,6 +545,16 @@ export class BookByHandDto {
     @IsOptional()
     @IsIn(PAID_WITH)
     paidWith?: PaidWith;
+
+    /**
+     * How "Paid now" was paid at the desk (DEC-170): cash, UPI or card.
+     * Only with `paidWith: "PAID"`; the booking and its desk payment are
+     * written in one transaction, so neither is left without the other.
+     * Taking money needs `invoice:write` (DEC-098).
+     */
+    @IsOptional()
+    @IsIn(DESK_METHODS)
+    paidBy?: DeskMethod;
 
     @IsOptional()
     @IsString()

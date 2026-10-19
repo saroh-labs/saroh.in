@@ -194,14 +194,14 @@ export interface Subscription {
     /**
      * An autopay charge is under way on one of its unpaid invoices (D13):
      * "Autopay charge in progress · ‹date›", `at` being when the debit is
-     * asked for. No Retry and no pay link meanwhile. Only Subscription
+     * asked for. No Retry and no payment link meanwhile. Only Subscription
      * Detail's read has it; absent from an API older than D13.
      */
     autopayCharge?: { at: string } | null;
     /**
      * How Retry goes now (D13): `MANDATE` charges their autopay again,
-     * `PAY_LINK` makes a new pay link. Null: nothing to retry, or a charge
-     * is under way. Absent from an API older than D13 (a pay link).
+     * `PAY_LINK` makes a new payment link. Null: nothing to retry, or a charge
+     * is under way. Absent from an API older than D13 (a payment link).
      */
     retryVia?: RetryVia | null;
     /**
@@ -746,9 +746,9 @@ export function cancelSubscription(id: string, when: "now" | "periodEnd") {
     );
 }
 /**
- * Retry a failed renewal (`POST :id/retry`). By pay link (the default): the
+ * Retry a failed renewal (`POST :id/retry`). By payment link (the default): the
  * old link stops, nothing is charged or sent, and the link comes back once
- * for the merchant to copy (Home's "Retry by pay link", F4). By autopay
+ * for the merchant to copy (Home's "Retry by payment link", F4). By autopay
  * (D13): a new charge on their mandate, with no link (`url` null); `paid`
  * when the provider had already collected it.
  */
@@ -763,7 +763,7 @@ export function retrySubscription(id: string, via: RetryVia = "PAY_LINK") {
         "POST",
         via === "PAY_LINK" ? {} : { via },
         via === "PAY_LINK"
-            ? "Couldn't make a new pay link. Nothing changed."
+            ? "Couldn't make a new payment link. Nothing changed."
             : "Autopay wasn't charged. Nothing changed.",
     );
 }

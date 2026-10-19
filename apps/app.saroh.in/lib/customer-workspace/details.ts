@@ -7,6 +7,7 @@
  * `contact-edit.ts`); these checks say the same thing sooner.
  */
 import { GST_STATES } from "@/lib/invoices/gst";
+import { phoneProblem } from "@/lib/organizations/business-phone";
 import { PIN_SHAPE } from "@/lib/organizations/registered-address";
 
 import type { CustomerDetail } from "./detail";
@@ -101,9 +102,14 @@ export function draftFrom(c: CustomerDetail["contact"]): DetailsDraft {
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** What the sheet refuses before saving, by field. */
+/**
+ * What the sheet refuses before saving, by field. A phone is checked once
+ * it is changed from `initial`'s: one saved before numbers were checked
+ * never stops the rest saving.
+ */
 export function detailsProblems(
     d: DetailsDraft,
+    initial?: Pick<DetailsDraft, "phone">,
 ): Partial<Record<DetailsKey, string>> {
     const out: Partial<Record<DetailsKey, string>> = {};
     if (!d.firstName.trim() && !d.lastName.trim()) {
@@ -112,6 +118,8 @@ export function detailsProblems(
     if (!EMAIL_SHAPE.test(d.email.trim())) {
         out.email = "That doesn't look like an email address.";
     }
+    const phone = d.phone !== initial?.phone ? phoneProblem(d.phone) : null;
+    if (phone) out.phone = phone;
     const pin = d.postalCode.replace(/\s+/g, "");
     if (d.country === "IN" && pin && !PIN_SHAPE.test(pin)) {
         out.postalCode = "A PIN code is six digits, like 560038.";

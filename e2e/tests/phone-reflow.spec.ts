@@ -540,7 +540,7 @@ test.describe("phone reflow: invoices", () => {
             ).toContainText(who.email);
             await noSidewaysScroll(page, "a draft invoice with a long email");
             await page
-                .getByRole("button", { name: "Send with pay link" })
+                .getByRole("button", { name: "Send with payment link" })
                 .filter({ visible: true })
                 .first()
                 .click();

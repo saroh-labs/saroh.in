@@ -236,6 +236,20 @@
   (`mergedIntoId: null`). Every relation to `Contact` needs a rule in
   `merge-plan.ts` `MERGE_RULES`; `merge.relations.spec.ts` fails a new one
   without.
+- **Current** — **A write that can race is guarded where it lands, and
+  its spec runs the race.** Read-then-write by id at Read Committed
+  re-checks only the id after a lock wait: lock the row first
+  (`FOR UPDATE`), or guard the write on the state read (`updateMany where
+{ id, status: "WAITING" }`) and act on `count`. A save re-reads its row
+  under the lock and writes only the columns it changes; an Undo answer
+  (`previous`) carries only those. A replace (deleteMany + create) takes a
+  `pg_advisory_xact_lock` on its key. In a Serializable transaction the
+  snapshot predates any lock taken inside it, so a Read Committed writer's
+  commit stays invisible: read again on a connection of its own
+  (`outsideOrgContext`, since the ambient client joins the transaction)
+  and retry (`bookings/phone-booker.ts`). Specs hold one writer on the
+  lock in a test transaction, or `Promise.allSettled` the two
+  (DEV_LEARNINGS, 19 Oct 2026).
 - **Current** — **A privacy removal anonymises in place; a new personal
   field needs a rule** (DEC-042, round-2 C11). "Remove their details"
   (`customer-workspace/privacy-removal.service.ts`) keeps the contact row

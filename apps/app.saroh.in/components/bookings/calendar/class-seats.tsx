@@ -11,6 +11,7 @@ import type {
     DiaryBooking,
 } from "@/lib/services/booking-calendar";
 import { canCheckIn } from "@/lib/services/booking-state";
+import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import {
     bookingState,
     paidText,
@@ -25,6 +26,7 @@ import type {
     QuickLookActions,
     QuickLookContext,
 } from "./quick-look-types";
+import { freeCancelOf } from "./quick-look-types";
 
 const HOUR = 3_600_000;
 
@@ -61,7 +63,7 @@ export function ClassSeats({
 }) {
     if (session.bookings.length === 0) return null;
     const start = Date.parse(session.startAt);
-    const rule = ctx.rules?.freeCancelHours ?? null;
+    const rule = freeCancelOf(ctx, session.staff?.id);
     let note = "";
     if (rule !== null && ctx.now < start) {
         const mark = new Date(start - rule * HOUR);
@@ -80,7 +82,7 @@ export function ClassSeats({
     return (
         <div className="rounded-[12px] border border-border bg-card px-4 py-[13px]">
             <div className="mb-1 flex flex-wrap items-baseline gap-2">
-                <span className="label">Booked by name</span>
+                <span className="label">Who&apos;s booked</span>
                 {note ? (
                     <span className="ml-auto text-[11.5px] text-muted-foreground">
                         {note}
@@ -157,16 +159,20 @@ export function ClassSeats({
                                             variant="outline"
                                             onClick={() => act.checkIn(b)}
                                         >
-                                            Check in
+                                            {BOOKING_WORDS.markArrived}
                                         </Button>
                                     ) : null}
                                     <Button
                                         size="sm"
-                                        variant="outline"
-                                        className="text-destructive hover:text-destructive"
+                                        variant="link"
+                                        className="min-h-11 px-1 text-[13px] font-semibold text-destructive underline decoration-destructive/30 underline-offset-4 hover:text-destructive"
                                         onClick={() => act.cancel(b)}
                                     >
-                                        Cancel
+                                        Cancel a place
+                                        <span className="sr-only">
+                                            {" "}
+                                            for {whoFor(b)}
+                                        </span>
                                     </Button>
                                 </>
                             ) : null}

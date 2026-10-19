@@ -27,6 +27,8 @@ export const CALENDAR_ONLY_ACTIONS: readonly OrgAction[] = [
     "booking:read",
     "booking:write",
     "service:read",
+    // Their own alerts (DEC-170, #1038), never the business's.
+    "notification:read-own",
 ];
 
 /** Whether a role key is the Calendar only role. */

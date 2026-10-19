@@ -164,7 +164,7 @@ function Body({
                 : sub.startsAt
                   ? `Starts ${formatDate(sub.startsAt, tz, { now })}. Nothing is charged before then.`
                   : sub.nextRenewalAt
-                    ? `On ${formatDate(sub.nextRenewalAt, tz, { now })} · invoiced with a pay link`
+                    ? `On ${formatDate(sub.nextRenewalAt, tz, { now })} · invoiced with a payment link`
                     : "Nothing is due to renew."
             : tab === "failed"
               ? sub.failedCharge?.dueAt
@@ -220,7 +220,7 @@ function Body({
                     </div>
                     <div className="mt-[3px] text-[12px] text-foreground/75">
                         Saroh doesn&apos;t charge cards. Open it to send a new
-                        pay link, record a payment, pause or cancel.
+                        payment link, record a payment, pause or cancel.
                     </div>
                 </Notice>
             ) : null}

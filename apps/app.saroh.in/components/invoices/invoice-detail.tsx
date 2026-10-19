@@ -62,7 +62,7 @@ type Dialog =
  * happened to it.
  *
  * Actions by status — a draft is issued, edited or deleted; an unpaid one
- * gets its pay link copied, is marked paid, printed or cancelled; a paid one
+ * gets its payment link copied, is marked paid, printed or cancelled; a paid one
  * is printed or refunded (an order's refund is made on the order, so stock
  * and the kitchen stay right). Any issued paper, whatever its status, has
  * "Download PDF" beside Print (D16): the same paper, drawn by the API. A
@@ -70,12 +70,12 @@ type Dialog =
  *
  * Sending (D17): where the API's `send` flag names a channel — the
  * business's own email, and later the customer's account thread — a draft
- * gets "Send with pay link" (issue and send), an unpaid one "Send with pay
+ * gets "Send with payment link" (issue and send), an unpaid one "Send with pay
  * link" and then "Send reminder", once a day. Where it names none, Saroh
- * doesn't send it: the pay link is copied for the merchant to send.
+ * doesn't send it: the payment link is copied for the merchant to send.
  *
  * Without online payment (`payOnline` false, DEC-070) the link only shows
- * the invoice: Send reads "Send invoice", and there is no pay link to copy.
+ * the invoice: Send reads "Send invoice", and there is no payment link to copy.
  * "Copy view link" copies that link instead (#833): the invoice on the
  * business's site with no Pay button and with "How to pay us", for a
  * business that can't email it. Where the plan is what keeps online
@@ -124,7 +124,7 @@ export function InvoiceDetail({
         payLinkActive: boolean;
         /** When the link out was made (#870); absent from an older API. */
         payLinkMadeAt?: string | null;
-        /** An autopay charge under way (D13): the pay link is held. */
+        /** An autopay charge under way (D13): the payment link is held. */
         autopayCharge?: { at: string } | null;
         /** Why its link can't take payment (#835); absent from an older API. */
         onlineBlocker?: OnlineBlocker | null;
@@ -154,9 +154,9 @@ export function InvoiceDetail({
     emailNote?: EmailNote | null;
 }) {
     const [open, setOpen] = useState<Dialog | null>(null);
-    // A pay link waits for the registered address (DEC-068): asked here.
+    // A payment link waits for the registered address (DEC-068): asked here.
     const details = useBusinessDetailsStep({
-        then: "make its pay link",
+        then: "make its payment link",
         continueLabel: "Save and make link",
     });
     // A view link just made (#833): shown until something replaces it.
@@ -169,12 +169,12 @@ export function InvoiceDetail({
         // It went with a fresh link: the one shown is dead.
         onSent: () => setViewUrl(null),
     });
-    // A pay link is kept outside React (UX-048); this redraws once it is.
+    // A payment link is kept outside React (UX-048); this redraws once it is.
     const [, redraw] = useReducer((n: number) => n + 1, 0);
     const [busy, setBusy] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const s = invoice.standing;
-    // A pay link made for it earlier in this tab, shown again (UX-048): its
+    // A payment link made for it earlier in this tab, shown again (UX-048): its
     // address can't be read back from the API. Not once it is paid or void,
     // or changed since (#870): then it isn't the link that is out.
     const payUrl = mintedLink(invoice.id, {
@@ -183,7 +183,7 @@ export function InvoiceDetail({
         payLinkMadeAt: online?.payLinkMadeAt,
     });
     const url = viewUrl ?? payUrl;
-    // A view link (#833) or a pay link: what the copied address opens.
+    // A view link (#833) or a payment link: what the copied address opens.
     const urlKind: "pay" | "view" = viewUrl ? "view" : "pay";
     const credit = invoice.kind === "CREDIT_NOTE";
     const owed = owedHere({ standing: s, credit, fromOrder: !!orderHref });
@@ -209,14 +209,14 @@ export function InvoiceDetail({
         redraw();
         showSuccess(
             (await copyText(res.data.url))
-                ? `Pay link copied. Send it to ${invoice.who}.`
-                : "Pay link ready. Copy it from the Payment panel.",
+                ? `Payment link copied. Send it to ${invoice.who}.`
+                : "Payment link ready. Copy it from the Payment panel.",
         );
     }
 
-    /** No pay link can be made (#833): a link to view it and how to pay. */
+    /** No payment link can be made (#833): a link to view it and how to pay. */
     async function makeViewLink(): Promise<ConfirmResult> {
-        // It replaces the pay link this tab made, which is forgotten.
+        // It replaces the payment link this tab made, which is forgotten.
         const res = await runAction(
             () => details.run(() => newViewLink(invoice.id)),
             { setBusy },
@@ -238,7 +238,9 @@ export function InvoiceDetail({
         void copyText(url).then((ok) =>
             ok
                 ? showSuccess(
-                      urlKind === "view" ? "Link copied." : "Pay link copied.",
+                      urlKind === "view"
+                          ? "Link copied."
+                          : "Payment link copied.",
                   )
                 : showError(copyFailedMessage()),
         );
@@ -301,7 +303,9 @@ export function InvoiceDetail({
                 size="sm"
                 onClick={copyShown}
                 aria-label={
-                    urlKind === "view" ? "Copy the link" : "Copy the pay link"
+                    urlKind === "view"
+                        ? "Copy the link"
+                        : "Copy the payment link"
                 }
             >
                 <Copy aria-hidden className="size-4" />
@@ -314,7 +318,7 @@ export function InvoiceDetail({
                     what:
                         urlKind === "view"
                             ? "this invoice's link"
-                            : "this invoice's pay link",
+                            : "this invoice's payment link",
                     opens: urlKind === "view" ? "invoice" : "pay",
                     fileName:
                         urlKind === "view" ? "invoice-link-qr" : "pay-link-qr",
@@ -431,7 +435,7 @@ export function InvoiceDetail({
                                     Autopay charge in progress ·{" "}
                                     <ViewerDate iso={charging.at} />
                                 </span>
-                                . The pay link and reminders are held until{" "}
+                                . The payment link and reminders are held until{" "}
                                 {invoice.who}&apos;s bank answers, so
                                 they&apos;re never charged twice.
                             </p>

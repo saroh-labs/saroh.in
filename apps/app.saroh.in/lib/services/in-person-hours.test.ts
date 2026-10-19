@@ -18,7 +18,7 @@ const range = (startMinute: number, endMinute: number) => ({
     endMinute,
 });
 
-describe("opening hours on Availability (DEC-087)", () => {
+describe("opening hours on Hours and time off (DEC-087)", () => {
     it("finds the parts of a person's day outside opening hours", () => {
         expect(outsideOpening([range(480, 1200)], OPEN, 1)).toEqual([
             range(480, 540),

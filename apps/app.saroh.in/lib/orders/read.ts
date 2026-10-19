@@ -288,7 +288,7 @@ export interface OrderRead extends FulfilmentFields {
     notes: string | null;
     trackingUrl: string | null;
     /**
-     * When the order's pay link was made (B11); null when it has none.
+     * When the order's payment link was made (B11); null when it has none.
      * Never the link: only its hash is kept, so it is shown once, to whoever
      * makes it. Only with `order:read`; absent from an API before B11.
      */

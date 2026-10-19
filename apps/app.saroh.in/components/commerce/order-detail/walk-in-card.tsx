@@ -3,6 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import type { Shipment } from "@/lib/orders/courier";
 import type { OrderRead } from "@/lib/orders/read";
 
+import { phoneLabel } from "@/lib/organizations/business-phone";
 import { initials, TrackingRow } from "./customer-card";
 import { FOCUS, Panel } from "./parts";
 
@@ -69,7 +70,7 @@ export function NoCustomerCard({
                                 "self-start rounded-sm text-foreground underline-offset-4 hover:underline active:opacity-80",
                             )}
                         >
-                            {phone}
+                            {phoneLabel(phone)}
                         </a>
                     ) : (
                         <span>No phone</span>

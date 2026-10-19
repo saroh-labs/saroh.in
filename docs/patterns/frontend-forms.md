@@ -22,27 +22,33 @@ save bar, the header's hint, the jump dots, Save all and the leave dialog.
 Section patches send only their own fields; the API judges the whole product
 after the patch.
 
-**Current** — **A short editor saves once** (E2): the Service Editor
-(`components/services/service-editor/`) has one Save in its sticky header,
-as its design draws. The page holds one draft; its rules, the problems
-strip, what Save sends and the leave dialog's section names are pure
-functions in `lib/services/service-editor.ts`, tested with vitest. It
-replaced the service dialog and the two react-hook-form service forms.
-What takes effect as it is flipped is not part of that Save: "Taking
-bookings" is a switch beside it (`use-taking-bookings.ts`, 12 Oct 2026)
-that saves at once with Undo and moves the saved state and the draft
-together, so the page is never "unsaved" because of it. A length people
-mostly pick from a few values is chips with Custom (`length-field.tsx`),
-over the same string the number field held.
+**Current** — **A short create saves once; a saved record is changed a
+part at a time** (E2, U16 #1032). New service
+(`components/services/service-editor/new-service.tsx`) asks five plain
+questions with a live line saying whether customers could book it, keeps
+everything else under More details (a row each, opening its own panel
+whose button puts the panel's draft back into the page's: "Use this"), and
+has one sticky Discard / Add service; Discard asks "Discard what you
+typed?" once something is typed. A saved service (`edit-service.tsx`) is
+read first: three cards, each opening a side panel (`detail-panel.tsx`, a
+`FormSheet bottomOnPhone`) with its own Save, so there is never a page of
+unsaved changes. What takes effect as it is pressed is not part of any
+Save: "Who can book it" (DEC-170, Q5) is two ticks that save at once with
+Undo (`use-taking-bookings.ts` `setBookers`), and More's Pause unticks
+both. The rules, the live line, the rows and what Save sends are pure, in
+`lib/services/service-editor.ts` and `lib/services/service-form.ts`. A
+length people mostly pick from a few values is chips with Other
+(`length-field.tsx`), over the same string the number field held.
 
 **Current** — **One Save may be several calls, and says so when one
 fails** (10 Oct). The Service Editor's Save sends the service, then who
 takes it, then its own weekly hours (`PUT …/rules`, which replaces the
 set). The hours are rows of the same draft
-(`lib/services/service-hours-draft.ts`, `hours-field.tsx`): there is no
-"Save availability". They sit in a card of their own, "When it can be
-booked" (`hours-card.tsx`), which says whose hours a one-to-one someone
-takes books in, with the way to Availability. A new service starts from the business's opening
+(`lib/services/service-hours-draft.ts`, `hours-field.tsx`, the 12-hour
+picker of Hours and time off): there is no "Save availability". They sit
+under "When it can be booked" (a More details row on a new service, the
+Time and place panel on a saved one), which says whose hours a one-to-one
+someone does books in, with the way to Hours and time off. A new service starts from the business's opening
 hours where its own hours are what gives it times (nobody on the diary
 takes it, or it is a class); a one-to-one someone takes starts with none,
 because its own hours only narrow that person's. When the service is saved
@@ -116,7 +122,7 @@ The sheet and the dialog share one set of rules
   full width with the button on top. **This replaces "Save then Cancel on
   the left".**
 - **Labels.** "Save" for an edit, on a page as in an overlay (the Service
-  Editor, the discount code form, Availability, the QR maker). Verb and
+  Editor, the discount code form, the QR maker). Verb and
   thing for a create or an action
   ("Add note", "Send invite"). Never "Save changes", "Update" or "Done",
   except `doneOnly` on a sheet that only lists things. The way out is
@@ -207,11 +213,18 @@ ten seconds (a refund, a cancel) closes its sheet into the hold card on
 the page, where its Undo is.
 
 The same goes for adding to a list: the list, then one button that opens
-the sheet, never fields left open under the rows. Where the screen has its
-own Save bar (Availability's Time off, `add-time-off-sheet.tsx`), the
-sheet's button adds to the page's draft and the sheet says so. One or two
-short choices inside a dense grid (a time range in a week's row,
-`weekly-hours.tsx`) open in a popover over the row, so no other row moves.
+the sheet, never fields left open under the rows. One or two short
+choices inside a dense grid open in a popover over the row, so no other
+row moves.
+
+**Current** — **Hours and time off save as they change** (U17, DEC-170):
+no Save bar and no draft on the page. A day row opens its sheet
+(`components/bookings/availability/hours-panel.tsx`: a bottom sheet on a
+phone, a right-hand panel on a desk), each control in it saves the
+person's week at once with a toast and Undo (`use-hours.ts`), and "Done"
+closes it; a save that is refused puts the control back and says nothing
+has changed. Adding something with several fields (time off, several days
+at once) is still a `FormSheet` whose button saves, with Undo after.
 Two addresses that show the same records are one screen with a segmented
 switch on both (`bookings-view-switch.tsx`, `leads-view-switch.tsx`), not a
 loose button to the other. And a small job is finished where it started:
@@ -360,6 +373,23 @@ preview under its fields, from the draft.
   moment (a new order before its location is read) the box is a plain
   decimal `Input` until it is. Gap: a lead's Worth has no sign, because a
   lead has no currency (the Leads list draws none either).
+- **Current** — **One phone field** (#1036): `PhoneInput`
+  (`@saroh/ui/phone-input`) in the workspace, accounts, admin and saroh.in,
+  and `SitePhoneInput` (`packages/site-blocks/src/phone-input.tsx`) on a
+  merchant's site, drawn with the `--site-*` tokens only. Both are a
+  country-code picker (the business's country, else India) and the number
+  as typed; a whole number pasted ("+44 …", "0091 …", "098765 43210")
+  picks its country. The value is E.164 ("+919876543210") or "". In
+  `app.saroh.in` use `BusinessPhoneInput`
+  (`components/shared/business-phone-input.tsx`), which starts on the
+  active business's country. What a number means is one pure module,
+  `packages/block-contract/src/phone.ts` (`normalisePhoneNumber`,
+  `phoneNumberProblem`, `phoneLabel`), which the API's
+  `normalisePublicPhone` re-exports; `PHONE_CASES` there pins the API and
+  both fields to the same answers. A saved number is shown with
+  `phoneLabel`, grouped ("+91 98765 43210"). An edit checks a phone only
+  once it is changed (`phoneSchemaKeeping`), so one saved before numbers
+  were checked never stops the rest saving. Never a bare `type="tel"`.
 - **Current** — **Saving from the keyboard**
   (`lib/hooks/keyboard-save.ts`): Cmd/Ctrl+Enter sends the form the
   keyboard is in (`submitOnModEnter` on a `<form>`; the overlay frames

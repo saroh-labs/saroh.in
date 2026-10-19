@@ -21,6 +21,8 @@ export interface StatementLine {
     kind: RateKind;
     baseAmountPaise: number;
     basisPoints: number | null;
+    /** Priced by the business's own rate (#1035), not the kind's. */
+    ownRate: boolean;
     amountPaise: number | null;
     periodEnd: string;
     status: LineStatus;
@@ -110,10 +112,27 @@ export interface RateView {
     createdAt: string;
 }
 
+/** A business's own rate running now or later (#1035). */
+export interface OwnRateRow {
+    id: string;
+    organizationId: string;
+    businessName: string;
+    platformAdminId: string;
+    managerName: string;
+    basisPoints: number;
+    earnsFrom: string;
+    /** Exclusive end; null while it runs on. */
+    until: string | null;
+    /** Its first and last days in India; last null while it runs on. */
+    earnsFromDay: string;
+    lastDay: string | null;
+}
+
 export interface RatesView {
     current: Record<RateKind, RateView | null>;
     upcoming: RateView[];
     history: RateView[];
+    ownRates: OwnRateRow[];
 }
 
 export const KIND_LABEL: Record<RateKind, string> = {
@@ -171,6 +190,14 @@ export function rateLabel(basisPoints: number | null): string {
     const rest = basisPoints % 100;
     if (rest === 0) return `${whole}%`;
     return `${whole}.${String(rest).padStart(2, "0").replace(/0$/, "")}%`;
+}
+
+/** A line's rate, saying when it is the business's own: "<rate> (own rate for Asha's)". */
+export function lineRateWords(
+    line: Pick<StatementLine, "basisPoints" | "ownRate" | "businessName">,
+): string {
+    const rate = rateLabel(line.basisPoints);
+    return line.ownRate ? `${rate} (own rate for ${line.businessName})` : rate;
 }
 
 /**

@@ -204,11 +204,13 @@ describe("weekHours: blocks and the All day row", () => {
         );
         const [noShow, gone] = days[1].blocks;
         expect(noShow).toMatchObject({
-            flag: { label: "No-show", tone: "bad" },
+            flag: { label: "Didn't come", tone: "bad" },
             bad: true,
             struck: false,
         });
-        expect(noShow.full).toBe("9:00 to 9:30 am Check-up · Asha · No-show");
+        expect(noShow.full).toBe(
+            "9:00 to 9:30 am Check-up · Asha · Didn't come",
+        );
         expect(gone).toMatchObject({
             flag: { label: "Cancelled", tone: "bad" },
             bad: true,

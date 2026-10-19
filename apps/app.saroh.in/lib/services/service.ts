@@ -87,8 +87,13 @@ export interface Service {
      * of the amount to pay; null for none.
      */
     depositCents: number | null;
-    /** Whether the booking page offers it; staff book it either way. */
+    /** Whether the booking page offers it: Who can book it's "Customers". */
     showOnBookingPage: boolean;
+    /**
+     * Whether the team books it by hand (DEC-170): Who can book it's "Your
+     * team". Neither ticked reads as paused; bookings already made stay.
+     */
+    bookableByTeam: boolean;
 }
 
 /** One recurring weekly availability window (in the Service's timezone). */
@@ -204,6 +209,13 @@ export interface BookingDetail extends Omit<Booking, "contact"> {
 export interface Slot {
     startAt: string;
     endAt: string;
+    /**
+     * Who is free at that start, for a service somebody takes (U3); a
+     * class's teacher. Absent for a service nobody takes.
+     */
+    staffIds?: string[];
+    /** A class's places still open at that start (U8); absent otherwise. */
+    placesLeft?: number;
 }
 
 /** A booking joined with a light snapshot of its owning Service. */
@@ -246,6 +258,7 @@ export interface CreateServiceInput {
     visits?: number;
     depositMode?: DepositMode;
     showOnBookingPage?: boolean;
+    bookableByTeam?: boolean;
 }
 
 /** Update a Service (PATCH semantics — every field optional). */
@@ -270,6 +283,7 @@ export interface UpdateServiceInput {
     visits?: number;
     depositMode?: DepositMode;
     showOnBookingPage?: boolean;
+    bookableByTeam?: boolean;
 }
 
 /** One availability window to persist (no id — position is not meaningful). */
@@ -480,12 +494,21 @@ const REGISTER_REACH_MS = 365 * 86_400_000;
  * read fails.
  */
 export async function listAllBookings(): Promise<BookingWithService[]> {
+    const calendar = await readBookingsRegister();
+    return calendar ? flattenCalendar(calendar) : [];
+}
+
+/**
+ * The register's read whole (All bookings, U11): a year each way, with the
+ * business's zone and who each is with. Null when it couldn't be read, so
+ * the page says so rather than showing no bookings.
+ */
+export async function readBookingsRegister(): Promise<BookingsCalendar | null> {
     const now = Date.now();
-    const calendar = await readBookingsCalendar(
+    return readBookingsCalendar(
         new Date(now - REGISTER_REACH_MS).toISOString(),
         new Date(now + REGISTER_REACH_MS).toISOString(),
     );
-    return calendar ? flattenCalendar(calendar) : [];
 }
 
 /**
@@ -588,13 +611,21 @@ export type BookByHandInput = {
     idempotencyKey?: string;
     /** Pay with this class pack (ADR-007); needs `pack:sell`. */
     packPurchaseId?: string;
-    /** Who takes it (U3); absent, whoever is free. */
+    /** Who does it (U3); absent, whoever is free. */
     staffId?: string;
-    /** How it is paid (U3). Left out for a pay link (E4): unpaid until paid. */
+    /** How it is paid (U3). Left out for a payment link (E4): unpaid until paid. */
     paidWith?: "PAID" | "DESK";
+    /**
+     * How "Paid now" was paid at the desk (DEC-170), saved with the booking.
+     * Only with `paidWith: "PAID"`; needs payment permission.
+     */
+    paidBy?: "CASH" | "UPI" | "CARD";
 } & (
     | { contactId: string }
     | { bookerEmail: string; bookerName?: string; bookerPhone?: string }
+    // A caller who gave just a name and phone (DEC-170): the customer with
+    // that phone, else a new one kept by it.
+    | { bookerPhone: string; bookerName: string }
 );
 
 /**
@@ -630,7 +661,7 @@ export function bookVisit(
 }
 
 /**
- * "Send a pay link" (E4): issue the booking's invoice and get its pay link,
+ * "Send a payment link" (E4): issue the booking's invoice and get its payment link,
  * to copy and send. Needs `booking:write` and `invoice:write`.
  */
 export function createBookingPayLink(
@@ -640,7 +671,7 @@ export function createBookingPayLink(
         `/bookings/${bookingId}/pay-link`,
         "POST",
         undefined,
-        "Couldn't make the pay link",
+        "Couldn't make the payment link",
     );
 }
 

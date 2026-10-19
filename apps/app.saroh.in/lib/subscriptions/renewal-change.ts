@@ -37,7 +37,7 @@ export interface RenewalChange {
     /**
      * Of those, how many pay by autopay with a limit below the new amount.
      * They are never charged above it: the renewal goes out as an invoice
-     * with a pay link.
+     * with a payment link.
      */
     aboveAutopayLimit: number;
 }
@@ -93,7 +93,7 @@ export function renewalChangeLines(
                 ? "They pay"
                 : `${formatNumber(n)} of them ${plural(n, "pays", "pay")}`;
         lines.push(
-            `${who} by autopay with a limit below the new amount. Their renewal goes out as an invoice with a pay link.`,
+            `${who} by autopay with a limit below the new amount. Their renewal goes out as an invoice with a payment link.`,
         );
     }
     return lines;

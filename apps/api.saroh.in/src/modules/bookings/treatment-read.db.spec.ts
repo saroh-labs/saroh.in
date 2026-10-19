@@ -157,6 +157,34 @@ describe("a treatment's visits on the Bookings screens (E10, real database)", ()
         expect(first.treatment).toMatchObject({ booked: 2, nextVisit: 3 });
     });
 
+    it("a treatment only customers book: the team's Book visit is refused (Q5)", async () => {
+        const visit1 = await treatmentBooked(`noor-${tag}@example.in`);
+        await prisma.service.update({
+            where: { id: whitening },
+            data: { bookableByTeam: false },
+        });
+        try {
+            await expect(
+                bookings.bookVisit(owner, visit1.orderId ?? "", {
+                    visitNumber: 2,
+                    startAt: nextStart(),
+                }),
+            ).rejects.toMatchObject({
+                response: { details: { reason: "not-bookable-by-team" } },
+            });
+            expect(
+                await prisma.booking.count({
+                    where: { orderId: visit1.orderId ?? "" },
+                }),
+            ).toBe(1);
+        } finally {
+            await prisma.service.update({
+                where: { id: whitening },
+                data: { bookableByTeam: true },
+            });
+        }
+    });
+
     it("all visits booked: nothing more is offered", async () => {
         const visit1 = await treatmentBooked(`meera-${tag}@example.in`);
         const orderId = visit1.orderId ?? "";

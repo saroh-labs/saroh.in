@@ -276,14 +276,73 @@ describe("staff and their hours (real database)", () => {
         ]);
     });
 
-    it("refuses a Member writing hours or rules", async () => {
-        const asha = await person("Asha", [ptId]);
-        await expect(
-            staff.replaceHours(member, asha.id, []),
-        ).rejects.toBeInstanceOf(ForbiddenException);
+    it("refuses a Member writing booking rules", async () => {
         await expect(
             staff.updateBookingRules(member, { freeCancelHours: 12 }),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // The front desk keeps anyone's hours (DEC-170, Q13 of 19 Oct).
+    it("lets a Member change Arjun's weekly hours, time off and extra hours", async () => {
+        const arjun = await person("Arjun", [ptId]);
+        const week = [
+            { dayOfWeek: 1, startMinute: 10 * 60, endMinute: 14 * 60 },
+        ];
+        const { staff: changed } = await staff.replaceHours(
+            member,
+            arjun.id,
+            week,
+        );
+        expect(changed.hours).toEqual(week);
+
+        const day = at(20).toISOString().slice(0, 10);
+        const { staff: off } = await staff.addTimeOff(member, arjun.id, {
+            fromDate: day,
+            reason: "Wedding",
+        });
+        expect(off.timeOff).toHaveLength(1);
+        await staff.removeTimeOff(member, arjun.id, off.timeOff[0].id);
+
+        const extra = await staff.addExtraHours(member, arjun.id, {
+            date: at(21).toISOString().slice(0, 10),
+            startMinute: 18 * 60,
+            endMinute: 20 * 60,
+        });
+        expect(extra.extraHours).toHaveLength(1);
+        await staff.removeExtraHours(member, arjun.id, extra.extraHours[0].id);
+
+        const rows = await prisma.staffMember.findUniqueOrThrow({
+            where: { id: arjun.id },
+            select: {
+                hours: { select: { dayOfWeek: true } },
+                timeOff: { select: { id: true } },
+                extraHours: { select: { id: true } },
+            },
+        });
+        expect(rows).toEqual({
+            hours: [{ dayOfWeek: 1 }],
+            timeOff: [],
+            extraHours: [],
+        });
+    });
+
+    it("refuses a Member adding or removing a person, their services or a service", async () => {
+        const arjun = await person("Arjun", [ptId]);
+        for (const write of [
+            () => staff.create(member, { name: "Ben" }),
+            () => staff.archive(member, arjun.id),
+            () => staff.setServices(member, arjun.id, []),
+            () => staff.update(member, arjun.id, { name: "Arjun K" }),
+            () => bookings.updateService(member, ptId, { name: "PT" }),
+        ]) {
+            await expect(write()).rejects.toBeInstanceOf(ForbiddenException);
+        }
+        const after = await prisma.staffMember.findUniqueOrThrow({
+            where: { id: arjun.id },
+            select: { name: true, status: true, services: true },
+        });
+        expect(after).toMatchObject({ name: "Arjun", status: "ACTIVE" });
+        expect(after.services).toHaveLength(1);
     });
 
     it("books a service nobody takes exactly as before, with no person", async () => {

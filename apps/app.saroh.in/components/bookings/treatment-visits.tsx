@@ -38,7 +38,7 @@ export function TreatmentVisits({
     const next = visitToBook(treatment, who);
     const done = visitsDoneText(treatment);
     return (
-        <section className="mt-6 rounded-lg border border-border p-5">
+        <section className="rounded-xl border border-border bg-card p-4 min-[760px]:px-[18px]">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                     <h2 className="text-sm font-medium">

@@ -10,9 +10,11 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { BusinessPhoneInput } from "@/components/shared/business-phone-input";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { createLead } from "@/lib/leads/actions";
+import { phoneProblem } from "@/lib/organizations/business-phone";
 import { Field } from "@saroh/ui/field";
 import { OptionSelect } from "@saroh/ui/option-select";
 import { Segmented } from "@saroh/ui/segmented";
@@ -106,6 +108,8 @@ export function AddLeadDialog({
                 "An email address, so the lead has someone to belong to.";
         }
         if (who === "known" && !contactId) next.contact = "Choose who it is.";
+        const phoneBad = who === "new" ? phoneProblem(phone) : null;
+        if (phoneBad) next.phone = phoneBad;
         if (worth.trim() && !/^\d+(\.\d{1,2})?$/.test(worth.trim())) {
             next.worth = "A number, like 45000 or 1250.50, or leave it empty.";
         }
@@ -225,7 +229,7 @@ export function AddLeadDialog({
                                 onChange={(e) => setName(e.target.value)}
                             />
                         </Field>
-                        <div className="grid grid-cols-[3fr_2fr] gap-3">
+                        <div className="grid gap-3">
                             <Field label="Email">
                                 <Input
                                     id={ids.email}
@@ -236,12 +240,11 @@ export function AddLeadDialog({
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
                             </Field>
-                            <Field label="Phone" optional>
-                                <Input
+                            <Field label="Phone" optional error={errors.phone}>
+                                <BusinessPhoneInput
                                     id={ids.phone}
-                                    type="tel"
                                     value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
+                                    onValueChange={setPhone}
                                 />
                             </Field>
                         </div>

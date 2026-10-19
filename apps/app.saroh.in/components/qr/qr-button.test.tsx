@@ -6,7 +6,7 @@
  * code" to someone who may: an explicit press, so merely opening the panel
  * never writes. A second open reuses the code. Someone who may only look
  * gets a QR of the public link and is told it isn't counted. An instant
- * link (a pay link) is drawn from the link itself: nothing is read and no
+ * link (a payment link) is drawn from the link itself: nothing is read and no
  * code is ever made. Everything is done in the panel; "More options" is
  * only the way to the rest.
  *
@@ -111,7 +111,7 @@ const SITE: QrLink = {
 const PAY: QrLink = {
     mode: "instant",
     url: "https://glow.saroh.app/pay/abc123",
-    what: "this invoice's pay link",
+    what: "this invoice's payment link",
     opens: "pay",
     fileName: "pay-link-qr",
 };
@@ -383,10 +383,10 @@ describe("QrPanel — a saved link", () => {
 });
 
 describe("QrPanel — an instant link", () => {
-    it("draws a pay link without reading or making a code", async () => {
+    it("draws a payment link without reading or making a code", async () => {
         await draw(<QrButton link={PAY} compact="always" env={env} />);
         expect(trigger()?.getAttribute("aria-label")).toBe(
-            "QR code for this invoice's pay link",
+            "QR code for this invoice's payment link",
         );
         await click(trigger());
 

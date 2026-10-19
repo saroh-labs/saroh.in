@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { Service } from "./service";
 import type { ServiceDraft } from "./service-editor";
 import {
-    bookingPageNote,
     changedParts,
     changedSections,
     depositNote,
@@ -25,8 +24,6 @@ import {
     serviceUpdate,
     staffFor,
     staffNote,
-    stateLine,
-    statePill,
     timeNote,
     timesComeFrom,
     toMinor,
@@ -69,6 +66,7 @@ const service = (over: Partial<Service> = {}): Service => ({
     depositMode: "PERCENT_50",
     depositCents: 60_000,
     showOnBookingPage: true,
+    bookableByTeam: true,
     ...over,
 });
 
@@ -107,7 +105,7 @@ describe("draftOf", () => {
             gstPriceMode: "",
             staffIds: ["st_a", "st_b"],
             showOnBookingPage: true,
-            taking: true,
+            bookableByTeam: true,
             timezone: "Asia/Kolkata",
             bufferBefore: "5",
             gstRate: "18",
@@ -116,11 +114,10 @@ describe("draftOf", () => {
         });
     });
 
-    it("reads a class, a paused and hidden service, and an Either link", () => {
+    it("reads a class, a team-only service, and an Either link", () => {
         const d = draftOf(
             service({
                 capacity: 12,
-                status: "ARCHIVED",
                 showOnBookingPage: false,
                 locationType: "EITHER",
                 meetingUrl: "https://meet.example/x",
@@ -131,21 +128,21 @@ describe("draftOf", () => {
         expect(d).toMatchObject({
             kind: "class",
             places: "12",
-            taking: false,
+            bookableByTeam: true,
             showOnBookingPage: false,
             where: "EITHER",
             meetingUrl: "https://meet.example/x",
         });
     });
 
-    it("starts a new one at 30 minutes, a 10-minute gap, in person, shown, in the business's zone", () => {
+    it("starts a new one at 60 minutes, a 15-minute break after, in person, bookable by both, in the business's zone (U16)", () => {
         expect(draftOf(null, [], "Asia/Kolkata")).toMatchObject({
             name: "",
-            minutes: "30",
-            gap: "10",
+            minutes: "60",
+            gap: "15",
             where: "IN_PERSON",
             showOnBookingPage: true,
-            taking: true,
+            bookableByTeam: true,
             timezone: "Asia/Kolkata",
             price: "",
         });
@@ -172,9 +169,9 @@ describe("serviceProblems", () => {
         ).toEqual([
             "Add a name.",
             "Each visit needs a length of at least 5 minutes.",
-            "The gap after has to be a number of minutes.",
-            "Add a price (0 if it's free).",
-            "Pick who takes it.",
+            "The break after has to be a number of minutes.",
+            "Add a price, or 0 if it's free.",
+            "Pick who does it.",
         ]);
     });
 
@@ -227,7 +224,7 @@ describe("serviceProblems", () => {
                 true,
             ),
         ).toEqual([
-            "The buffer before has to be a number of minutes.",
+            "The break before has to be a number of minutes.",
             "Pick a time zone.",
             "A SAC code is 4 to 8 digits.",
         ]);
@@ -289,15 +286,13 @@ describe("the GST rate of a GST-registered business's service", () => {
         expect(gstPlace(null, none)).toBe("more");
     });
 
-    it("names a change to it under Price when that is where it is drawn", () => {
+    it("names a change to it under Money, and the break before under Time and place", () => {
         const saved = draft();
         const changed = { ...saved, gstRate: "5", sacCode: "9997" };
-        expect(changedSections(saved, changed)).toEqual(["More settings"]);
-        expect(changedSections(saved, changed, true)).toEqual(["Price"]);
-        // The rest of More settings is still More settings.
+        expect(changedSections(saved, changed)).toEqual(["Money"]);
         expect(
-            changedSections(saved, { ...changed, bufferBefore: "20" }, true),
-        ).toEqual(["Price", "More settings"]);
+            changedSections(saved, { ...changed, bufferBefore: "20" }),
+        ).toEqual(["Time and place", "Money"]);
     });
 });
 
@@ -323,6 +318,7 @@ describe("serviceInput", () => {
             locationType: "EITHER",
             meetingUrl: "https://meet.x/y",
             showOnBookingPage: true,
+            bookableByTeam: true,
             depositMode: "PERCENT_50",
             visits: 3,
         });
@@ -349,11 +345,24 @@ describe("serviceInput", () => {
         });
     });
 
-    it("an update carries whether it takes bookings", () => {
-        expect(serviceUpdate(draft({ taking: false }), "INR").status).toBe(
-            "ARCHIVED",
+    it("an update leaves who can book it to its ticks, which save on their own (U16)", () => {
+        const update = serviceUpdate(
+            draft({ showOnBookingPage: false, bookableByTeam: false }),
+            "INR",
         );
-        expect(serviceUpdate(draft(), "INR").status).toBe("ACTIVE");
+        expect(update).not.toHaveProperty("status");
+        expect(update).not.toHaveProperty("showOnBookingPage");
+        expect(update).not.toHaveProperty("bookableByTeam");
+        expect(update.name).toBe("Personal training");
+    });
+
+    it("a new one is sent who can book it", () => {
+        expect(
+            serviceInput(
+                draft({ showOnBookingPage: false, bookableByTeam: true }),
+                "INR",
+            ),
+        ).toMatchObject({ showOnBookingPage: false, bookableByTeam: true });
     });
 });
 
@@ -369,46 +378,13 @@ describe("changedSections", () => {
                 price: "1500",
                 name: "PT",
                 timezone: "Europe/London",
-                taking: false,
+                bookableByTeam: false,
             }),
-        ).toEqual(["What it is", "Price", "Taking bookings", "More settings"]);
+        ).toEqual(["What it is", "Time and place", "Money", "Who can book it"]);
     });
 });
 
 describe("the words around the editor", () => {
-    it("says what state it is in", () => {
-        expect(stateLine({ isNew: false, dirty: true, comingUp: 3 })).toBe(
-            "Unsaved changes",
-        );
-        expect(stateLine({ isNew: true, dirty: false, comingUp: 0 })).toBe(
-            "Not saved yet",
-        );
-        expect(stateLine({ isNew: false, dirty: false, comingUp: 1 })).toBe(
-            "1 booking still to come",
-        );
-        // The count is of what is still to come: a service with none may
-        // have been booked many times before, so it never says "yet".
-        expect(stateLine({ isNew: false, dirty: false, comingUp: 0 })).toBe(
-            "Nothing coming up",
-        );
-        expect(stateLine({ isNew: false, dirty: false, comingUp: null })).toBe(
-            "",
-        );
-        expect(statePill(true, true).label).toBe("New");
-        // One word for every kind of thing; the service's own sentence
-        // is the hint.
-        expect(statePill(false, false)).toEqual({
-            label: "Paused",
-            tone: "warning",
-            hint: "Not taking bookings.",
-        });
-        expect(statePill(false, true)).toEqual({
-            label: "Live",
-            tone: "success",
-            hint: "Taking bookings.",
-        });
-    });
-
     it("says what saving did to bookings already made", () => {
         expect(
             savedMessage({
@@ -429,7 +405,7 @@ describe("the words around the editor", () => {
                 hasPerson: true,
             }),
         ).toBe(
-            "Check-up added. Customers can book it in the free time of who takes it.",
+            "Check-up added. Customers can book it in the free time of who does it.",
         );
         expect(
             savedMessage({
@@ -457,7 +433,7 @@ describe("the words around the editor", () => {
         ).toContain("Bookings already made keep their details");
     });
 
-    it("explains time, where, the booking page and who takes it", () => {
+    it("explains time, where, and who does it", () => {
         expect(timeNote("class", true)).toBe(
             "A class runs at set times, and people book a place.",
         );
@@ -468,19 +444,6 @@ describe("the words around the editor", () => {
         );
         expect(whereNote("EITHER")).toBe(
             "They pick when booking. Online visits join by the link below.",
-        );
-        expect(bookingPageNote(false, true)).toBe(
-            "You don't have a booking page yet. Staff can still book it from the calendar.",
-        );
-        expect(bookingPageNote(null, false)).toBe(
-            "Only staff can book it, from the calendar.",
-        );
-        expect(bookingPageNote(true, true)).toBe(
-            "Customers can book it themselves.",
-        );
-        // No hours and nobody to take it: off the page until it has (UX-024).
-        expect(bookingPageNote(true, true, false)).toBe(
-            "It goes on the booking page once it has weekly hours or someone to take it. Staff can book it from the calendar meanwhile.",
         );
         expect(hasBookableHours("one", 0, 0)).toBe(false);
         expect(hasBookableHours("one", 0, 1)).toBe(true);
@@ -558,7 +521,7 @@ describe("At booking, they pay (E8)", () => {
 
     it("works the split out from the price as typed, in the design's words", () => {
         expect(depositNote("NONE", "1200", "INR")).toBe(
-            "No card needed to book. No-shows cost you the time.",
+            "No card needed to book. If they don't come, you lose the time.",
         );
         expect(depositNote("PERCENT_25", "1,200", "INR")).toBe(
             "They pay ₹300 when booking, and the rest (₹900) at the visit. Refunded if they cancel in time.",
@@ -576,10 +539,10 @@ describe("At booking, they pay (E8)", () => {
             "They pay ₹1,200 online when booking: your booking rules take payment online only.",
         );
         expect(depositNote("NONE", "0", "INR", 1, "ONLINE")).toBe(
-            "No card needed to book. No-shows cost you the time.",
+            "No card needed to book. If they don't come, you lose the time.",
         );
         expect(depositNote("NONE", "1200", "INR", 1, "DESK")).toBe(
-            "No card needed to book. No-shows cost you the time.",
+            "No card needed to book. If they don't come, you lose the time.",
         );
     });
 
@@ -611,9 +574,9 @@ describe("At booking, they pay (E8)", () => {
         );
     });
 
-    it("counts a changed deposit as a change to Price", () => {
+    it("counts a changed deposit as a change to Money", () => {
         expect(changedSections(draft(), draft({ deposit: "FULL" }))).toEqual([
-            "Price",
+            "Money",
         ]);
     });
 });
@@ -662,9 +625,9 @@ describe("visits (E10)", () => {
         );
     });
 
-    it("counts a change of visits under Time", () => {
+    it("counts a change of visits under Money, beside the price it divides", () => {
         expect(changedSections(draft(), draft({ visits: "4" }))).toEqual([
-            "Time",
+            "Money",
         ]);
     });
 });
@@ -678,11 +641,11 @@ describe("who takes it, with one person on the diary", () => {
     it("is not asked for when there is nobody to choose between", () => {
         const named = { ...draftOf(null, [], "Asia/Kolkata"), name: "Trim" };
         expect(serviceProblems(named, true, false, true)).not.toContain(
-            "Pick who takes it.",
+            "Pick who does it.",
         );
         // With two or more on the diary it still is.
         expect(serviceProblems(named, true, false, false)).toContain(
-            "Pick who takes it.",
+            "Pick who does it.",
         );
     });
 });
@@ -722,10 +685,10 @@ describe("its own weekly hours are part of the draft (one Save)", () => {
         expect(
             changedParts(saved, { ...saved, name: "Other", staffIds: [] }),
         ).toEqual({ fields: true, who: true, hours: false });
-        // Pausing it is the service's own field.
-        expect(changedParts(saved, { ...saved, taking: false }).fields).toBe(
-            true,
-        );
+        // Who can book it is the service's own field.
+        expect(
+            changedParts(saved, { ...saved, bookableByTeam: false }).fields,
+        ).toBe(true);
     });
 
     it("refuses a window that ends before it starts, by its row", () => {
@@ -781,7 +744,7 @@ describe("its own weekly hours are part of the draft (one Save)", () => {
                 hasHours: true,
             }),
         ).toBe(
-            "Check-up added. Customers can book it in the free time of who takes it.",
+            "Check-up added. Customers can book it in the free time of who does it.",
         );
     });
 

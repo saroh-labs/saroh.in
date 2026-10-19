@@ -68,6 +68,9 @@ export type NavAction =
     | "member:read"
     | "module:read"
     | "notification:read"
+    // The alerts addressed to the person alone (DEC-170, #1038): a Member
+    // has the bell for these, never the business's inbox.
+    | "notification:read-own"
     | "org:settings:read"
     | "provider:read"
     // Settings › Activity: who changed what. Owner and Admin, as the API
@@ -147,6 +150,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "member:read",
         "module:read",
         "notification:read",
+        "notification:read-own",
         "org:settings:read",
         "provider:read",
         "audit:read",
@@ -184,6 +188,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "member:read",
         "module:read",
         "notification:read",
+        "notification:read-own",
         "org:settings:read",
         "provider:read",
         "audit:read",
@@ -223,6 +228,8 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "booking:read",
         "service:read",
         "order:stage",
+        // Their own alerts: the answer to a request they made (#1038).
+        "notification:read-own",
     ],
     REVIEWER: ["site:read"],
 };
@@ -416,14 +423,14 @@ export const NAV_GROUPS: NavGroup[] = [
     {
         items: [
             { href: "/", label: "Home", icon: Home },
-            // Home › Overview (the "Saroh Business Calendar" design): one
-            // month of everything dated. Named Overview so it isn't a second
-            // "Calendar" beside Bookings › Calendar, the diary (UX-039). Not module-gated — it spans
+            // Home › Calendar (the "Saroh Business Calendar" design): one
+            // month of everything dated. Named Overview from UX-039 until the
+            // owner chose Calendar (Q9, DEC-170, 19 Oct). Not module-gated — it spans
             // modules, and each layer on it follows its own module and
             // permission (the API leaves out what the viewer may not see).
             {
                 href: "/calendar",
-                label: "Overview",
+                label: "Calendar",
                 icon: Calendar,
                 action: "org:read",
             },
@@ -523,9 +530,12 @@ export const NAV_GROUPS: NavGroup[] = [
                 label: "Bookings",
                 icon: CalendarClock,
                 children: [
+                    // "Bookings", as the phone's tab bar says: "Calendar" is
+                    // Home's business calendar (owner, 19 Oct), so the
+                    // menu names each once.
                     {
                         href: "/bookings",
-                        label: "Calendar",
+                        label: "Bookings",
                         moduleKey: "APPOINTMENTS",
                     },
                     {
@@ -536,7 +546,7 @@ export const NAV_GROUPS: NavGroup[] = [
                     // Who can be booked when, and the business's rules (U16).
                     {
                         href: "/bookings/availability",
-                        label: "Availability",
+                        label: "Hours and time off",
                         moduleKey: "APPOINTMENTS",
                     },
                     {
@@ -831,8 +841,14 @@ export function navRowsForModule(moduleKey: string): string[] {
             if (own === moduleKey) rows.push(item.label);
             for (const child of children) {
                 // A child that repeats its parent's destination AND name is
-                // the section landing page, not a second row.
-                if (child.href === item.href && child.label === item.label) {
+                // the section landing page, not a second row, when the
+                // section itself is already named. Bookings' diary row is
+                // named for its section, which spans modules and isn't.
+                if (
+                    own === moduleKey &&
+                    child.href === item.href &&
+                    child.label === item.label
+                ) {
                     continue;
                 }
                 rows.push(child.label);
@@ -925,7 +941,7 @@ export function filterNavGroupsByRole(
 /**
  * A section with its children narrowed, still landing somewhere real.
  *
- * Bookings lands on its Calendar, which is also its first child. A business
+ * Bookings lands on its diary, which is also its first child. A business
  * with Courses but not Appointments keeps the section for Courses — and a
  * section row that still pointed at `/bookings` would open a capability it
  * does not have. So when the child that WAS the landing page is gone, the
@@ -1295,13 +1311,15 @@ export const NOTIFICATIONS_HREF = "/notifications";
 /**
  * Notifications lives in the top bar, not the rail (2026-09-25): it is about
  * you, not a part of the business. The bell and the command menu both read
- * it here, with the same permission the rail used.
+ * it here. Either permission opens it (DEC-170, #1038): owners and admins
+ * read the business's notices and their own, a Member only their own —
+ * the API decides which rows each sees.
  */
 export const NOTIFICATIONS_NAV = {
     href: NOTIFICATIONS_HREF,
     label: "Notifications",
     icon: Bell,
-    action: "notification:read",
+    action: ["notification:read", "notification:read-own"],
 } as const satisfies Pick<NavItem, "href" | "label" | "icon" | "action">;
 
 /**

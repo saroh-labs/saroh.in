@@ -26,7 +26,7 @@ describe("orderPowers — each the power its endpoint asks (B16)", () => {
         export: true,
     };
 
-    it("counter staff with order:create take orders and make their pay links, nothing more", () => {
+    it("counter staff with order:create take orders and make their payment links, nothing more", () => {
         expect(
             orderPowers({
                 role: "MEMBER",
@@ -35,7 +35,7 @@ describe("orderPowers — each the power its endpoint asks (B16)", () => {
         ).toEqual({ ...none, create: true, payLink: true });
     });
 
-    it("order:edit changes orders and replaces pay links; no refund, no export", () => {
+    it("order:edit changes orders and replaces payment links; no refund, no export", () => {
         expect(
             orderPowers({ role: "MEMBER", actions: ["order:edit"] }),
         ).toEqual({ ...none, edit: true, payLink: true });

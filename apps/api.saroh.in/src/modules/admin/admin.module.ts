@@ -57,6 +57,7 @@ import { AdminOrganizationViewService } from "./admin-organization-view.service"
 import { AdminOrganizationsController } from "./admin-organizations.controller";
 import { AdminOrganizationsService } from "./admin-organizations.service";
 import { AdminOverridesService } from "./admin-overrides.service";
+import { AdminOwnRateService } from "./admin-own-rate.service";
 import { AdminPeopleController } from "./admin-people.controller";
 import { AdminPeopleService } from "./admin-people.service";
 import { AdminSearchService } from "./admin-search.service";
@@ -167,6 +168,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminAccountManagersService,
         // Commission: statements, Mark paid, earnings, rates (U21).
         AdminCommissionService,
+        AdminOwnRateService,
         AdminPeopleService,
         // Sign-in help (U9): codes through Better Auth, and the end of a
         // changed sign-in email's 24-hour hold.

@@ -22,9 +22,14 @@ describe("walkInPhoneKey", () => {
         expect(walkInPhoneKey(typed)).toBe("9845000002");
     });
 
-    it("keeps a number that isn't twelve digits as typed, digits only", () => {
+    it("keeps a number that isn't India's as typed, digits only", () => {
         expect(walkInPhoneKey("+44 20 7946 0958")).toBe("442079460958");
-        expect(walkInPhoneKey("080 2222 3333")).toBe("08022223333");
+    });
+
+    it("drops India's trunk 0 and 0091, as the shared phone rule reads them", () => {
+        expect(walkInPhoneKey("080 2222 3333")).toBe("8022223333");
+        expect(walkInPhoneKey("+91 80 2222 3333")).toBe("8022223333");
+        expect(walkInPhoneKey("0091 80 2222 3333")).toBe("8022223333");
     });
 
     it("refuses one too short to keep them by", () => {

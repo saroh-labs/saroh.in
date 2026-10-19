@@ -135,7 +135,7 @@ describe("changeWhat", () => {
         expect(what({ kind: "RESUMED", data: { restarted: true } })).toBe(
             "Resumed. A new period started",
         );
-        expect(what({ kind: "RETRIED" })).toBe("Made a new pay link");
+        expect(what({ kind: "RETRIED" })).toBe("Made a new payment link");
     });
 
     it("has words for the kinds later units write, and for one it doesn't know", () => {
@@ -275,7 +275,7 @@ describe("autopay set up by the customer (D12)", () => {
             "Meera, from the Prices page",
         );
         expect(changeWho(setUp("PAY_LINK"), SUB, null)).toBe(
-            "Meera, from the pay link",
+            "Meera, from the payment link",
         );
         expect(changeWho(setUp("ACCOUNT"), SUB, null)).toBe(
             "Meera, from their account",

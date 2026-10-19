@@ -124,6 +124,7 @@ export async function wipeCommission(): Promise<void> {
     await prisma.commissionLine.deleteMany({});
     await prisma.commissionPayout.deleteMany({});
     await prisma.commissionRate.deleteMany({});
+    await prisma.businessCommissionRate.deleteMany({});
     await prisma.accountManagerLink.deleteMany({});
     await prisma.staffProfile.deleteMany({});
     await prisma.platformAdminRoleAssignment.deleteMany({});

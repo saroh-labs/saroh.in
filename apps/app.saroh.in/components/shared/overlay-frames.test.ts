@@ -57,6 +57,10 @@ const NOT_FORMS: Record<string, string> = {
     "components/commerce/product-page/variant-drawer.tsx":
         "a read-only quick look",
     "components/calendar/day-sheet.tsx": "a read-only list of a day",
+    // Hours and time off's sheets (U17, DEC-170): what they hold saves as
+    // it is changed, with Undo, so there is no Save or Cancel, only Done.
+    "components/bookings/availability/hours-panel.tsx":
+        "Hours and time off's frame: each control saves as it changes, Done closes",
     "components/qr/qr-button.tsx": "a code to scan, download and copy",
     // Navigation and pickers.
     "components/shared/tab-bar-sheet.tsx": "the phone's menu",
@@ -65,13 +69,23 @@ const NOT_FORMS: Record<string, string> = {
         "a picker: choosing a section adds it",
     "components/commerce/orders/order-filters-sheet.tsx":
         "filters, applied as they are chosen",
+    // Header C's three pickers (bookings U2): a sheet from the foot of a
+    // phone, a popover under its button on the desk; choosing goes there.
+    "components/bookings/calendar/header/header-overlay.tsx":
+        "header C's frame: a phone sheet or a desk popover, choosing goes there",
+    "components/bookings/calendar/header/date-sheet.tsx":
+        "a picker: a day or a view, in header C's frame",
+    "components/bookings/calendar/header/people-sheet.tsx":
+        "a picker: whose bookings, in header C's frame",
+    "components/bookings/calendar/header/options-sheet.tsx":
+        "the view's options, each kept as it is chosen, in header C's frame",
     // Notices and flows with their own states.
     "components/billing/plan-refusal.tsx":
         "a notice with the way up, not a form",
     "components/settings/plan-billing/change-plan-dialog.tsx":
         "a payment flow with its own waiting states",
     "components/commerce/orders/order-row-menu.tsx":
-        "a pay link shown once, to copy",
+        "a payment link shown once, to copy",
 };
 
 /** Files that only pass a frame's name or type along. */

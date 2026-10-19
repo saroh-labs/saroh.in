@@ -85,13 +85,13 @@ describe("the banner for someone who can't record payments (DEC-106)", () => {
 
 /**
  * An online payment that is waiting for the provider, or wasn't finished
- * (#122): the banner says which in words, and offers a pay link only where
+ * (#122): the banner says which in words, and offers a payment link only where
  * there is something to act on.
  */
 describe("the banner for an online payment (#122)", () => {
     const unpaid = { handover: undefined } as const;
 
-    it("waiting: says so calmly, as a status, with no pay link", () => {
+    it("waiting: says so calmly, as a status, with no payment link", () => {
         const html = render({
             ...unpaid,
             online: {
@@ -104,10 +104,10 @@ describe("the banner for an online payment (#122)", () => {
         expect(html).toContain("Waiting for Razorpay");
         expect(html).toContain("The customer started paying.");
         expect(html).toContain('role="status"');
-        expect(html).not.toContain("Send a pay link");
+        expect(html).not.toContain("Send a payment link");
     });
 
-    it("not finished: says so, and offers a pay link", () => {
+    it("not finished: says so, and offers a payment link", () => {
         const html = render({
             ...unpaid,
             online: {
@@ -119,7 +119,7 @@ describe("the banner for an online payment (#122)", () => {
         });
         expect(html).toContain("Payment not finished");
         expect(html).toContain('role="alert"');
-        expect(html).toContain("Send a pay link");
+        expect(html).toContain("Send a payment link");
     });
 
     it("failed keeps its own words", () => {
@@ -134,6 +134,6 @@ describe("the banner for an online payment (#122)", () => {
             onSendLink: () => undefined,
         });
         expect(html).toContain("Payment didn&#x27;t go through");
-        expect(html).toContain("Send a pay link");
+        expect(html).toContain("Send a payment link");
     });
 });

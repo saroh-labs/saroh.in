@@ -388,7 +388,7 @@ describe("editing in place", () => {
         await type(input("phone"), "+91 98450 12345");
         await press(item("Save"));
         expect(save).toHaveBeenCalledWith({
-            profile: { phone: "+91 98450 12345" },
+            profile: { phone: "+919845012345" },
         });
         expect(sheet()).toBeNull();
         expect(rowText("settings-contact-phone")).toContain("+91 98450 12345");

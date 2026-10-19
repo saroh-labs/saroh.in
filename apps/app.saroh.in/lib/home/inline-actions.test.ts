@@ -47,7 +47,7 @@ describe("runOf", () => {
         expect(runOf(inline({ kind: "MARK_SENT", sends: false }))).toBe("undo");
     });
 
-    it("makes a new pay link at once, with nothing to take back", () => {
+    it("makes a new payment link at once, with nothing to take back", () => {
         expect(
             runOf(
                 inline({
@@ -115,7 +115,7 @@ describe("what is said after", () => {
             "The order wasn't marked sent.",
         );
         expect(failedText(inline({ kind: "RETRY" }))).toBe(
-            "No new pay link was made.",
+            "No new payment link was made.",
         );
         // D13: a retry by autopay.
         expect(failedText(inline({ kind: "RETRY", via: "MANDATE" }))).toBe(

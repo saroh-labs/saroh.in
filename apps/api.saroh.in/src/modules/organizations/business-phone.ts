@@ -1,6 +1,12 @@
 import { BadRequestException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import {
+    E164,
+    normalisePhoneNumber,
+    PHONE_EXAMPLE,
+} from "@saroh/block-contract";
+
 /**
  * The business's public phone (DEC-053, F20): the merchant's own number,
  * shown only on that business's site — the Visit us Call button (G8), the
@@ -10,20 +16,12 @@ import { prisma } from "@saroh/database";
  * Stored as E.164, "+919845012345": a `+`, the country code and the number,
  * digits only, 8 to 15 of them. What `tel:` wants, and what the column's
  * CHECK constraint holds (`20261012100000_business_public_phone`).
+ *
+ * The rule itself is `@saroh/block-contract`'s `phone.ts` (#1036), so the
+ * workspace's and the site's phone fields say exactly what this refuses
+ * (`business-phone.spec.ts` runs the shared cases here).
  */
-export const E164 = /^\+[1-9]\d{7,14}$/;
-
-/** What a merchant may type between the digits: spaces, dashes, dots, brackets. */
-const SEPARATORS = /[\s\-.()]/g;
-
-export const PHONE_EXAMPLE = "+91 98450 12345";
-
-/**
- * An Indian number typed the way people say it, with no `+`: ten digits
- * ("98450 12345"), a trunk 0 ("098450 12345"), or 91 / 0091 in front.
- * Saroh's businesses are in India, so these mean +91.
- */
-const INDIAN_WITHOUT_PLUS = /^(?:0091|91|0)?([1-9]\d{9})$/;
+export { E164, PHONE_EXAMPLE };
 
 /**
  * A typed number as it is stored, or why it can't be: "" clears it (null),
@@ -31,30 +29,7 @@ const INDIAN_WITHOUT_PLUS = /^(?:0091|91|0)?([1-9]\d{9})$/;
  * without the + ("98450 12345") gets +91. Pure; the settings save says the
  * problem on the field.
  */
-export function normalisePublicPhone(
-    raw: string,
-): { phone: string | null } | { problem: string } {
-    const trimmed = raw.trim();
-    if (trimmed === "") return { phone: null };
-    let compact = trimmed.replace(SEPARATORS, "");
-    const indian = INDIAN_WITHOUT_PLUS.exec(compact);
-    if (indian) compact = `+91${indian[1]}`;
-    if (!compact.startsWith("+")) {
-        return {
-            problem: `Start with + and the country code, like ${PHONE_EXAMPLE}.`,
-        };
-    }
-    if (!E164.test(compact)) {
-        return {
-            problem: `That isn't a number a customer can call. Use + and the country code, like ${PHONE_EXAMPLE}.`,
-        };
-    }
-    // India's numbers are ten digits after +91, mobile and landline alike.
-    if (compact.startsWith("+91") && compact.length !== 13) {
-        return { problem: "An Indian number is +91 and then 10 digits." };
-    }
-    return { phone: compact };
-}
+export const normalisePublicPhone = normalisePhoneNumber;
 
 /** The settings save's write: absent leaves it, "" clears it, else E.164. */
 export function phoneWrite(raw: string | undefined): {

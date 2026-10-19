@@ -29,7 +29,7 @@ export interface ProviderConnection {
 /**
  * A connection a customer's checkout window can open with (DEC-054): a
  * Razorpay one needs its public key id, so one still missing it counts as
- * none wherever a pay link is offered — the link could only fail on the
+ * none wherever a payment link is offered — the link could only fail on the
  * customer's phone. The API refuses the same (`OPENS_CHECKOUT`).
  */
 export function opensCheckout(row: ProviderConnection): boolean {

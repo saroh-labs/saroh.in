@@ -1,408 +1,152 @@
 "use client";
 
-import {
-    FormSheet,
-    FormSheetBody,
-    FormSheetFoot,
-} from "@/components/shared/form-sheet";
-import { Refusal } from "@/components/shared/refusal";
-import {
-    formatClock,
-    formatClockRange,
-    formatDay,
-} from "@/lib/format/datetime";
-import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { FormSheet } from "@/components/shared/form-sheet";
+import { formatClock } from "@/lib/format/datetime";
+import { useState } from "react";
 
-import { showPlanRefusal } from "@/components/billing/plan-refusal";
-import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
+import type { BookingPeople } from "@/lib/services/booking-pay";
+import type { LocalDate } from "@/lib/services/diary";
 import {
-    makePayLink,
-    PayLinkPanel,
-} from "@/components/bookings/pay-link-panel";
-import { CustomerPicker } from "@/components/customers/customer-picker";
-import type { CustomerPick } from "@/lib/customers/picker";
-import { pickName } from "@/lib/customers/picker";
-import { formatMoney } from "@/lib/format/money";
-import { bookByHand, listAvailability } from "@/lib/services/actions";
-import type { BookingPeople, PayChoice } from "@/lib/services/booking-pay";
-import {
-    bookerFor,
-    defaultPay,
-    paidWithFor,
-    payChoices,
-    payNote,
-} from "@/lib/services/booking-pay";
-import type { LocalDate, Span } from "@/lib/services/diary";
-import { dayBounds, firstStartIn, zonedInstant } from "@/lib/services/diary";
+    extraHoursAt,
+    freeLine,
+    GAP_STEP_NAME,
+    gapDay,
+} from "@/lib/services/free-time";
 import type { Service } from "@/lib/services/service";
-import { addExtraHours, removeExtraHours } from "@/lib/staff/actions";
-import type { StaffView } from "@/lib/staff/types";
 
-import { ChipGroup } from "@/components/shared/choice-group";
-import { runAction } from "@/lib/api/run-action";
-import { TextLink } from "@saroh/ui/text-link";
-import { Chip, Eyebrow } from "./parts";
+import { useNarrow } from "@/lib/hooks/use-narrow";
+import { firstName } from "@/lib/names";
+import { GapForm } from "./gap-form";
+import type { GapHead, GapTarget } from "./gap-types";
 
-export interface GapTarget {
-    staff: StaffView;
-    date: LocalDate;
-    free: Span;
-}
+export type { GapHead, GapTarget };
 
 /**
- * "New booking" from a free gap (the design): the person and the time are
- * already chosen, so it asks only what, who and how it is paid. Only the
- * one-to-one services this person takes and that fit before their next
- * booking can be picked. Instead of booking, the gap can be blocked — or,
- * inside one-off extra hours, those hours closed again.
+ * A free time on the calendar (U9, BKMNewFromGap, BKDFromGap; Q11 option
+ * A). The person and the time are known, so it asks three short things —
+ * the service (each says whether it fits), who it is for, then a check and
+ * how they pay — and books. A "Book someone · Block this time" switch at
+ * the top blocks the time instead, and a quiet "Close these extra hours"
+ * at the foot closes one-off extra opening hours again, only when the
+ * time is in them. After booking it says so and offers WhatsApp, SMS and
+ * Copy message (Q12): Saroh sends nothing itself.
  *
- * The customer is found with the shared picker (E4): by name or phone, most
- * recent first, or added new, with their Needs attention once picked. A
- * priced booking can be sent a pay link: the booking is made, its invoice
- * issued, and the link shown to copy.
+ * A bottom sheet on a phone, a right-hand panel at a desk (U3). Day,
+ * Week and List all open it for a free time.
  */
 export function NewBookingFromGap({
     target,
     services,
     people,
     timezone,
+    today,
     money,
+    canHours = true,
+    business = null,
     onClose,
-    onBlock,
 }: {
     target: GapTarget | null;
     services: Service[];
     people: BookingPeople;
     timezone: string;
+    /** The business's today, for "today" and "tomorrow". */
+    today: LocalDate;
     money: boolean;
+    /** `hours:write`: may block the time or close extra hours. */
+    canHours?: boolean;
+    /** The business, as its customers know it, for the message. */
+    business?: string | null;
     onClose: () => void;
-    onBlock: (target: GapTarget) => void;
 }) {
+    // The last free time opened stays drawn while the sheet slides away.
+    const [shown, setShown] = useState(target);
+    if (target && target !== shown) setShown(target);
+    const narrow = useNarrow();
+    const [head, setHead] = useState<GapHead | null>(null);
+    const key = shown
+        ? `${shown.staff.id}:${shown.date}:${shown.free[0]}:${shown.free[1]}`
+        : "none";
+    const [headKey, setHeadKey] = useState(key);
+    if (headKey !== key) {
+        setHeadKey(key);
+        setHead(null);
+    }
+
+    const words = shown
+        ? heading(shown, head, { narrow, today })
+        : { eyebrow: "", title: "", line: "" };
+
     return (
         <FormSheet
             open={target !== null}
-            title="New booking"
+            bottomOnPhone
+            eyebrow={
+                words.eyebrow ? (
+                    <span data-ph-mask="">{words.eyebrow}</span>
+                ) : undefined
+            }
+            title={words.title}
             description={
-                target
-                    ? `With ${target.staff.name} on ${formatDay(target.date, { weekday: "short", year: "never" })}. Pick the service, then who it is for.`
-                    : ""
+                words.line ? (
+                    <span className="font-medium text-success">
+                        {words.line}
+                    </span>
+                ) : (
+                    ""
+                )
             }
             onClose={onClose}
         >
-            {target ? (
-                <Form
-                    key={`${target.staff.id}${target.date}${target.free[0]}`}
-                    target={target}
+            {shown ? (
+                <GapForm
+                    key={key}
+                    target={shown}
                     services={services}
                     people={people}
                     timezone={timezone}
+                    today={today}
                     money={money}
+                    canHours={canHours}
+                    business={business}
+                    onHead={setHead}
                     onClose={onClose}
-                    onBlock={onBlock}
                 />
             ) : null}
         </FormSheet>
     );
 }
 
-function Form({
-    target,
-    services,
-    people,
-    timezone,
-    money,
-    onClose,
-    onBlock,
-}: {
-    target: GapTarget;
-    services: Service[];
-    people: BookingPeople;
-    timezone: string;
-    money: boolean;
-    onClose: () => void;
-    onBlock: (target: GapTarget) => void;
-}) {
-    const router = useRouter();
-    const ids = { who: useId() };
+/**
+ * The heading (BKMNewFromGap on a phone, BKDFromGap at a desk): over the
+ * title, the step on a phone and whose time it is at a desk; the title
+ * says what pressing the button will do; under it, how long it is free.
+ */
+export function heading(
+    target: GapTarget,
+    head: GapHead | null,
+    { narrow, today }: { narrow: boolean; today: LocalDate },
+): { eyebrow: string; title: string; line: string } {
     const { staff, date, free } = target;
-    const start = free[0];
-    const [serviceId, setServiceId] = useState<string | null>(null);
-    const [pick, setPick] = useState<CustomerPick | null>(null);
-    const [pay, setPay] = useState<PayChoice>(defaultPay(people.payLink));
-    const [saving, setSaving] = useState(false);
-    const [tried, setTried] = useState(false);
-    const [attempt] = useState(() => crypto.randomUUID());
-    const [error, setError] = useState<string | null>(null);
-    const [done, setDone] = useState<{
-        booked: string;
-        bookingId: string;
-        link: PayLinkResult;
-    } | null>(null);
-
-    const offered = services.filter(
-        (s) =>
-            s.status === "ACTIVE" &&
-            s.capacity <= 1 &&
-            staff.serviceIds.includes(s.id),
-    );
-    // Where each service can start in this gap with this person, as the API
-    // works it out — the person's hours and the service's own rules both.
-    const [starts, setStarts] = useState<Record<string, number | null> | null>(
-        null,
-    );
-    const offeredKey = offered.map((s) => s.id).join(",");
-    useEffect(() => {
-        let live = true;
-        const { from, to } = dayBounds(date, timezone);
-        const ids = offeredKey ? offeredKey.split(",") : [];
-        void Promise.all(
-            ids.map(async (id) => {
-                const minutes =
-                    services.find((s) => s.id === id)?.durationMinutes ?? 0;
-                const slots = await listAvailability(
-                    id,
-                    from.toISOString(),
-                    to.toISOString(),
-                    staff.id,
-                );
-                return [
-                    id,
-                    firstStartIn(slots, free, minutes, date, timezone),
-                ] as const;
-            }),
-        ).then((pairs) => {
-            if (live) setStarts(Object.fromEntries(pairs));
-        });
-        return () => {
-            live = false;
+    const mode = head?.mode ?? "book";
+    const step = head?.step ?? 1;
+    const at = head?.at ?? free[0];
+    const first = firstName(staff.name);
+    const day = gapDay(date, today);
+    const extra = extraHoursAt(staff, date, free[0]) !== null;
+    const who = `${staff.name} · ${extra ? "extra opening hours" : "free time"}`;
+    if (head?.booked) {
+        return { eyebrow: who, title: "Booked", line: "" };
+    }
+    if (mode === "block") {
+        return {
+            eyebrow: narrow ? "" : who,
+            title: `Block ${first}, ${day} from ${formatClock(free[0])}`,
+            line: freeLine(free, extra),
         };
-    }, [offeredKey, services, date, timezone, staff.id, free]);
-    const startOf = (s: Service) => starts?.[s.id] ?? null;
-    const fits = (s: Service) => startOf(s) !== null;
-    const anyTooLong = starts !== null && offered.some((s) => !fits(s));
-    const chosen = offered.find((s) => s.id === serviceId);
-    const at = (chosen ? startOf(chosen) : null) ?? start;
-    const extra = staff.extraHours.find(
-        (x) =>
-            x.date.slice(0, 10) === date &&
-            start >= x.startMinute &&
-            start < x.endMinute,
-    );
-    // A link is for something with a price: until a service is chosen,
-    // offered; an unpriced one takes it away.
-    const offerLink =
-        people.payLink && (!chosen || (chosen.priceCents ?? 0) > 0);
-    const payNow: PayChoice = pay === "LINK" && !offerLink ? "DESK" : pay;
-    const booker = bookerFor(pick);
-    const ready = Boolean(serviceId) && booker !== null;
-    const when = `${staff.name} · ${formatDay(date, { weekday: "short", year: "never" })} at ${formatClock(at)}`;
-
-    async function book() {
-        setTried(true);
-        if (!serviceId || !ready || saving) return;
-        setSaving(true);
-        setError(null);
-        const paidWith = paidWithFor(payNow);
-        const res = await runAction(
-            () =>
-                bookByHand(serviceId, {
-                    startAt: zonedInstant(date, at, timezone).toISOString(),
-                    idempotencyKey: attempt,
-                    staffId: staff.id,
-                    ...(paidWith ? { paidWith } : {}),
-                    ...booker,
-                }),
-            // Said here, where the choice is.
-            { quiet: true, onUnreached: setError },
-        );
-        if (!res) {
-            setSaving(false);
-            return;
-        }
-        if (!res.ok && res.plan) {
-            // At the plan's bookings-a-month limit (U13): its notice.
-            setSaving(false);
-            showPlanRefusal(res.plan);
-            return;
-        }
-        if (!res.ok) {
-            setSaving(false);
-            // Most often the gap filled while this was open: say so here,
-            // where the choice is, and read the calendar again.
-            setError(res.error);
-            router.refresh();
-            return;
-        }
-        const booked = `Booked ${pick ? pickName(pick) : "them"} with ${staff.name} at ${formatClock(at)}.`;
-        if (payNow === "LINK") {
-            // It is booked either way: a link that couldn't be made is
-            // made again from the booking.
-            const link = await runAction(() => makePayLink(res.data.id), {
-                setBusy: setSaving,
-            });
-            router.refresh();
-            if (link) setDone({ booked, bookingId: res.data.id, link });
-            else onClose();
-            return;
-        }
-        setSaving(false);
-        showSuccess(booked);
-        onClose();
-        router.refresh();
     }
-
-    async function closeExtra() {
-        if (!extra) return;
-        const res = await removeExtraHours(staff.id, extra.id);
-        if (!res.ok) return showError(res.error);
-        onClose();
-        router.refresh();
-        showUndo(
-            `Closed the extra ${formatClockRange(extra.startMinute, extra.endMinute)}.`,
-            async () => {
-                const back = await addExtraHours(staff.id, {
-                    date,
-                    startMinute: extra.startMinute,
-                    endMinute: extra.endMinute,
-                });
-                router.refresh();
-                return back;
-            },
-        );
-    }
-
-    if (done) {
-        return (
-            <FormSheetBody className="block">
-                <p className="mb-3 text-[12.5px] text-muted-foreground">
-                    {when}
-                </p>
-                <PayLinkPanel
-                    booked={done.booked}
-                    bookingId={done.bookingId}
-                    first={done.link}
-                    onDone={onClose}
-                />
-            </FormSheetBody>
-        );
-    }
-
-    return (
-        <>
-            <FormSheetBody className="block">
-                <p className="mb-3 text-[12.5px] text-muted-foreground">
-                    {when}
-                </p>
-
-                <Eyebrow id={`${ids.who}-svc`}>Service</Eyebrow>
-                {offered.length ? (
-                    <div
-                        role="radiogroup"
-                        aria-labelledby={`${ids.who}-svc`}
-                        className="mb-3 flex flex-wrap gap-1.5"
-                    >
-                        {offered.map((s) => {
-                            // What a booking of it costs to pay, GST and
-                            // all, as the API charges it.
-                            const price = money
-                                ? formatMoney(
-                                      s.payCents ?? s.priceCents,
-                                      s.currency,
-                                  )
-                                : null;
-                            return (
-                                <Chip
-                                    key={s.id}
-                                    on={serviceId === s.id}
-                                    disabled={!fits(s)}
-                                    onClick={() => setServiceId(s.id)}
-                                >
-                                    {s.name} · {s.durationMinutes} min
-                                    {price ? ` · ${price}` : ""}
-                                    {startOf(s) !== null && startOf(s) !== start
-                                        ? ` · from ${formatClock(startOf(s) ?? start)}`
-                                        : ""}
-                                </Chip>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <p className="mb-3 text-[12.5px] text-muted-foreground">
-                        {staff.name} takes no one-to-one services yet. Choose
-                        who takes each on Services.
-                    </p>
-                )}
-                {starts === null && offered.length ? (
-                    <p
-                        role="status"
-                        className="-mt-1.5 mb-3 text-[11.5px] text-muted-foreground"
-                    >
-                        Finding when each can start…
-                    </p>
-                ) : anyTooLong ? (
-                    <p className="-mt-1.5 mb-3 text-[11.5px] text-muted-foreground">
-                        Greyed out: it can&apos;t start in this free time. It is
-                        longer than the time before {formatClock(free[1])}, or
-                        outside the service&apos;s own hours.
-                    </p>
-                ) : null}
-
-                <Eyebrow id={`${ids.who}-cust`}>Customer</Eyebrow>
-                <CustomerPicker
-                    value={pick}
-                    onPick={setPick}
-                    canSearch={people.canSearch}
-                    labelledBy={`${ids.who}-cust`}
-                />
-
-                <Eyebrow id={`${ids.who}-pay`}>Payment</Eyebrow>
-                <ChipGroup
-                    labelledBy={`${ids.who}-pay`}
-                    value={payNow}
-                    onChange={setPay}
-                    choices={payChoices(offerLink).map((c) => ({
-                        value: c.key,
-                        label: c.label,
-                    }))}
-                />
-                <p className="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">
-                    {payNote(payNow)}
-                </p>
-                <Refusal className="mt-2">{error}</Refusal>
-
-                {tried && !ready ? (
-                    <p
-                        role="alert"
-                        className="mt-2 text-[12.5px] font-medium text-destructive-subtle-foreground"
-                    >
-                        Pick a service and who it is for.
-                    </p>
-                ) : null}
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
-                    {extra ? (
-                        <TextLink
-                            onClick={() => void closeExtra()}
-                            className="text-[12.5px] coarse:min-h-11"
-                        >
-                            Close these extra hours
-                        </TextLink>
-                    ) : null}
-                    <TextLink
-                        onClick={() => onBlock(target)}
-                        className="text-[12.5px] coarse:min-h-11"
-                    >
-                        Block this time instead
-                    </TextLink>
-                </div>
-            </FormSheetBody>
-            <FormSheetFoot
-                saveLabel="Create booking"
-                savingLabel="Booking…"
-                pending={saving}
-                onSubmit={book}
-            />
-        </>
-    );
+    return {
+        eyebrow: narrow ? `Step ${step} of 3 · ${GAP_STEP_NAME[step]}` : who,
+        title: `Book ${first}, ${day} at ${formatClock(at)}`,
+        line: freeLine(free, extra),
+    };
 }

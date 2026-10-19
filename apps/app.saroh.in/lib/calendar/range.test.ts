@@ -114,10 +114,13 @@ describe("dayShortcuts", () => {
         can: { order: true, book: true },
     };
 
-    it('"Book" on the 20th opens Bookings on that date', () => {
+    it('"Book on this day" on the 20th opens New booking on that date', () => {
         expect(dayShortcuts("2026-09-20", both)).toEqual([
             { label: "New order", href: "/commerce/orders/new" },
-            { label: "Book", href: "/bookings?date=2026-09-20" },
+            {
+                label: "Book on this day",
+                href: "/bookings?date=2026-09-20&new=1",
+            },
         ]);
     });
 
@@ -133,7 +136,12 @@ describe("dayShortcuts", () => {
     it("offers only what the business runs", () => {
         expect(
             dayShortcuts("2026-09-20", { ...both, layers: ["bookings"] }),
-        ).toEqual([{ label: "Book", href: "/bookings?date=2026-09-20" }]);
+        ).toEqual([
+            {
+                label: "Book on this day",
+                href: "/bookings?date=2026-09-20&new=1",
+            },
+        ]);
         expect(
             dayShortcuts("2026-09-20", {
                 ...both,
@@ -148,7 +156,7 @@ describe("dayShortcuts", () => {
                 ...both,
                 can: { order: false, book: true },
             }).map((s) => s.label),
-        ).toEqual(["Book"]);
+        ).toEqual(["Book on this day"]);
         expect(
             dayShortcuts("2026-09-20", {
                 ...both,

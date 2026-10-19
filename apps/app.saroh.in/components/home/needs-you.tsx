@@ -46,7 +46,7 @@ import { useInlineActions } from "./use-inline-actions";
  * when every source was read; with a part missing, the list says which part
  * it couldn't check instead (saroh-product-states).
  *
- * A row the API gave an inline action (F4: Mark sent, Retry by pay link,
+ * A row the API gave an inline action (F4: Mark sent, Retry by payment link,
  * Send reminder, Reply) has its button beside the tag; it confirms in the
  * row first, and once done the row stays, struck through, saying what
  * happened (`use-inline-actions.ts`).

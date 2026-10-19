@@ -37,7 +37,7 @@ export interface DoneRow {
     text: string;
     /** Undo, while it can still be undone. */
     undo?: () => void;
-    /** Retry by pay link: the new link, to copy. */
+    /** Retry by payment link: the new link, to copy. */
     link?: string;
 }
 

@@ -54,6 +54,14 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   (#917, `domain-alerts.ts`), queued by the domain's check. `at` is the
  *   check that saw it; told once per incident, on the Your website row.
  *   `actorUserId` pressed "Check now" and isn't emailed.
+ * - `ask`: a permission request to the people who may answer it, and the
+ *   answer back to whoever asked (DEC-170, `ask-alerts.ts`). `about` names
+ *   what was asked; today only a Member's own booking rules (#1038).
+ *   `step` "asked" emails everyone who may approve it; "answered" emails
+ *   the person who asked, with the reason when turned down. The bell's
+ *   notice is written on the request's own transaction and named here
+ *   (`notificationId`), so only the email is left to do. Keyed to the
+ *   request and the step.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -79,6 +87,13 @@ export type TeamAlertPayload =
           change: "down" | "back";
           at: string;
           actorUserId?: string | null;
+      }
+    | {
+          event: "ask";
+          about: "rules";
+          requestId: string;
+          step: "asked" | "answered";
+          notificationId: string;
       }
     | {
           event: "site";
@@ -116,7 +131,11 @@ export async function enqueueTeamAlert(
  * (`uncollected-alert.ts`) can use it without importing the handler back.
  */
 export interface WordedAlert extends NoticeColumns {
-    event: AlertEvent;
+    /**
+     * The alert's row in Settings › Your profile, or "ask": a permission
+     * request or its answer, which has no row and no switch (DEC-170).
+     */
+    event: AlertEvent | "ask";
     /** Unique per business: claimed once, so the alert goes out once. */
     eventKey: string;
     /** The inbox notice already written (a booking's), or null to write one. */
@@ -161,4 +180,12 @@ export interface WordedAlert extends NoticeColumns {
     emailReviewersOf?: string;
     /** The email's button; "Open it in Saroh" when not said. */
     cta?: string;
+    /**
+     * Email exactly these people, still on the team, whatever they chose
+     * (DEC-170): a request goes to everyone who may answer it, its answer
+     * to whoever asked. Set, it stands in for the row's choices.
+     */
+    emailUserIds?: readonly string[];
+    /** Why they got it, when it isn't a row's choice (`emailUserIds`). */
+    footer?: string;
 }

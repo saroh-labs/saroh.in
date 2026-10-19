@@ -5300,3 +5300,46 @@ rule stands for the profile's own fields.
 **Fix.** The test stubs `DATABASE_URL` (`vi.stubEnv`) instead of passing `undefined`. The next CI run then failed `user-menu.test.tsx`, which expected `https://accounts.saroh.in/…` while CI sets `NEXT_PUBLIC_ACCOUNTS_URL` to a local address; it now compares with `billingProfilesUrl`. `scripts/prepush.sh` runs the vitest and seed steps with CI's unit job environment (`CI_UNIT_ENV`), so both read the same values.
 
 **Rule.** Passing `undefined` never tests "not set" for a parameter with a default. A test that depends on an environment variable sets it itself; the local gate runs unit tests with CI's environment.
+
+### Clearing a saved phone "didn't save" in a hand check, and the product was fine (19 Oct 2026)
+
+**Symptom.** Settings › Business › Contact › Phone on your website: with a phone saved, the number box was emptied with chrome-devtools `fill` and Save pressed. The sheet closed with no request and no toast, and the phone stayed. Changing it to another number saved.
+
+**Cause.** The checking tool, not the field. Puppeteer's `Locator.fill(value)` (what chrome-devtools `fill` runs) empties a text box by setting `input.value = ""` in the page and then types what is new; for `""` there is nothing to type, so no `input` event fires. React tracks a controlled input's value through that same property, so it never hears the change: `PhoneInput` keeps its number, react-hook-form stays clean, and the sheet's `!isDirty` path closes it without a request. Any controlled field emptied that way behaves the same; another number "worked" only because it was typed key by key. A person's Select all + Delete or Backspace fires `input` with `""`, and `PhoneInput` sends `""`, the sheet sends `{ profile: { phone: "" } }`, and the API clears it. Every other edit form with a phone was read for the same bug (customer edit sheet, customer form, invoice details, site Contact and CTA fields, accounts billing profile, admin lead and teammate profile, the site's Me sheet): each sends `""` or `null` for an emptied phone.
+
+**Fix.** No product change. Pinned instead: `business-field-sheet.test.tsx` ("clearing a saved phone and saving sends it empty") and `phone-input.test.tsx` (a saved number emptied sends `""` and stays empty after the box is left). The same test with the box emptied the way `fill("")` does it (`el.value = ""`, no event) reproduces the browser's "nothing sent".
+
+**Rule.** In a hand check, empty a field the way a person does: click it, Select all (Meta+A), Backspace (`press_key`), never `fill("")`. Before calling a "clearing doesn't save" bug, read the field's value back from React's side (the form's request, or the field after a re-render), not the box. `docs/patterns/frontend-verification.md`.
+
+### A held Came or cancel that never got there stayed on screen (19 Oct 2026)
+
+**Symptom.** Review of the Bookings rebuild: Came, Didn't come, a cancel and a class cancel on the calendar, All bookings and the booking page are held ten seconds, then written. When the write threw (offline, a deploy mid-request) the row stayed Came or Cancelled with no message and nothing saved; a refused first mark also wiped a newer mark made inside the ten seconds. Several Undos had the same shape: Undo sent a whole snapshot (the week as the sheet opened, all four person rules, every "Who can book it" box) over changes made since.
+
+**Cause.** `startHold` ends a hold whose commit throws as `failed`, and `useHold` only dropped it: no `onUndo`, no toast. Each screen's refusal branch restored its "was" value unconditionally. And Undos were written as "put back the state before", not "take back this change".
+
+**Fix.** `useHold` catches a commit that throws (`UNREACHED`) or answers `{ ok: false }` (the API's reason), says it and runs `onUndo`; callers return the action's result and their `onUndo` restores only while their own mark is still shown (`use-calendar-actions.ts`, `bookings-view.tsx`, `use-outcome-mark.ts`). Undos send only what their change changed: person rules the one key, "Every <weekday>" the week as saved minus its range, "Who can book it" its own fields merged into what is shown; and a new change dismisses the previous Undo toast.
+
+**Rule.** A held commit returns its result to `useHold` and never swallows a throw itself; its `onUndo` takes back only its own change. An Undo sends the inverse of its change, never a snapshot of the whole thing. `docs/patterns/frontend-error-feedback.md` → the ten-second hold.
+
+### Review of the Bookings rebuild: races a sequential spec never sees (19 Oct 2026)
+
+**Symptom.** The code review of batch-2026-10-19-1 found, with every spec green: asking again for a rules change could overwrite an approval or turn-down that committed first (a 500 against the decided-reason check); two people saving different rules of one person lost one change, and Undo put back a change someone else made; two `PUT saved-views` at once left two "opens on" rows; a backdated own rate over a replaced one hit the table's trigger (500); the sweep re-picked an invoice forever when the month's first later manager was off commission; and booking a new phone could make a second contact beside a walk-in order's.
+
+**Cause.** Read-then-write by id at Read Committed (`findFirst` then `update where id`) re-checks only the id after waiting on a lock. Saves wrote a whole object built from a row read outside the transaction. A replace (deleteMany + create) had no lock and no unique index. An ended `BusinessCommissionRate` row is immutable, but the overlap rule still tried to end it. The sweep's SQL and `linkForPaymentInTx` described "the later manager" differently. And in a Serializable transaction the snapshot is taken by its first statement, so an advisory lock taken later in it does not make a Read Committed writer's commit visible; under the RLS proxy, even the ambient `prisma` inside a `$transaction` callback joins that transaction.
+
+**Fix.** Lock the row (`FOR UPDATE`) or guard the write (`updateMany where status = 'WAITING'`, act on `count`); re-read under the lock and write only the changed columns, returning only those as `previous`; `pg_advisory_xact_lock` on the replace's key; refuse a new own rate over an ended one with a 409 naming its days, and only cut (not end) a rate replaced from a day to come; one SQL rule for the sweep equal to `linkForPaymentInTx`; after taking the phone lock, read the phone's contact on its own connection (`outsideOrgContext`) and retry the reservation when it exists. The month's lines on assigning a manager are written after the link commits, one short transaction per business. Each has a db spec that runs the two writers at once or holds one lock by hand (plain and `TEST_RLS=on`).
+
+**Rule.** A spec for a write that can race runs the race: `Promise.allSettled` of the two writers, or one writer held on the lock in a test transaction while the other starts. Two code paths that pick "the same" row (a job and its sweep) share one written rule and a test of its edge case. `docs/patterns/backend-data-and-money.md`.
+
+### A sideways strip in a flex row zooms the phone out (19 Oct 2026)
+
+- **Symptom:** on All bookings on a phone, the floating New booking button and row menus sat in the wrong place; browser specs tapped the wrong thing.
+- **Cause:** the view-chip strip (`overflow-x-auto`) sat in a flex item without `min-w-0`, so the item grew to the chips' full width (816px) and the phone zoomed the whole page out.
+- **Fix:** wrap the strip in a `min-w-0` item (`components/bookings/bookings-view.tsx`).
+- **Rule:** any horizontally scrolling strip inside a flex or grid item needs `min-w-0` on that item; `expectNothingHiddenSideways` in phone specs catches it.
+
+### CI-only unit timeouts on drawn sheets (19 Oct 2026)
+
+- **Symptom:** `profile-list.test.tsx` (accounts) timed out at 5s on CI; 1s locally.
+- **Cause:** the first sheet open in jsdom loads the shared phone field's country picker; CI runners are several times slower.
+- **Fix:** `testTimeout: 15_000` in `apps/accounts.saroh.in/vitest.config.ts`.
