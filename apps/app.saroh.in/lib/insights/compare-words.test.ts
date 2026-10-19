@@ -342,6 +342,15 @@ describe("goingSentence", () => {
         ).toBe(
             "Last 7 days: no bookings, the same as before, and 5 orders, up from 2.",
         );
+        // Seen on Northwind's phone Home: neither moved, one of them at zero.
+        expect(
+            goingSentence({
+                bookings: { count: 3, before: 3 },
+                orders: { count: 0, before: 0 },
+            }),
+        ).toBe(
+            "Last 7 days: 3 bookings and no orders, both the same as the 7 days before.",
+        );
     });
 
     it("says when neither count has anything earlier", () => {

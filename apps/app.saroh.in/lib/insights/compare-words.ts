@@ -280,6 +280,11 @@ function countsSentence(f: GoingFigures, period: ComparePeriod): string | null {
         return `${head}: ${both}. None in ${before}.`;
     }
     const wa = way(a);
+    // Neither moved, zeros included: "3 bookings and no orders, both the
+    // same as the 7 days before", never "the same as before" twice.
+    if (wa === "SAME" && way(b) === "SAME") {
+        return `${head}: ${both}, both the same as ${before}.`;
+    }
     if (wa === way(b) && a.before > 0 && b.before > 0) {
         const how =
             wa === "SAME"

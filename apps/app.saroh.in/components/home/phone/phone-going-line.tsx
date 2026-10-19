@@ -37,7 +37,7 @@ export function PhoneGoingLine({
                 <TextLink
                     href={MONTH_HREF}
                     data-ph-unmask=""
-                    className="justify-self-start text-[13.5px] coarse:min-h-11"
+                    className="inline-flex items-center gap-0.5 justify-self-start text-[13.5px] coarse:min-h-11"
                 >
                     Insights
                     <ChevronRight aria-hidden className="size-4" />
