@@ -25,10 +25,10 @@ import {
     evidenceFacts,
     KIND_LABEL,
     LINE_STATUS_LABEL,
+    lineRateWords,
     markPaidProblem,
     monthLabel,
     partLabel,
-    rateLabel,
     sourceWords,
     stepMonth,
     waitingWords,
@@ -348,7 +348,7 @@ function PersonRow({
                                 <span className="tabular-nums text-muted-foreground">
                                     {KIND_LABEL[line.kind]} ·{" "}
                                     {formatPaise(line.baseAmountPaise)} at{" "}
-                                    {rateLabel(line.basisPoints)} ·{" "}
+                                    {lineRateWords(line)} ·{" "}
                                     <span className="text-foreground">
                                         {line.amountPaise === null
                                             ? "—"

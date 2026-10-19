@@ -25,6 +25,7 @@ export default async function TeamMemberBusinesses({
             self={member.self}
             canLog={memberAccessOf(member, staff.permissions).logCall}
             canOpen={can(staff, "organization:read")}
+            canSetRate={can(staff, "commission:rates")}
         />
     );
 }

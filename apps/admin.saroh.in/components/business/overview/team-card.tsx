@@ -14,24 +14,33 @@ import { useChangeFeedback } from "@/lib/use-change-feedback";
 
 import { ManagerActions } from "./manager-actions";
 import { CardLink, OverviewCard } from "./overview-card";
+import { OwnRateBlock } from "./own-rate-block";
 
 /**
  * Team (U3, R2): who at Saroh looks after the business (U25, DEC-169), then
  * who is in it, by name and role. Never an email: this card is read without
  * a support session. Staff with `accounts:assign` give the business a
- * manager, move it or end the link from here; the card lights after.
+ * manager, move it or end the link from here; the card lights after. Its
+ * own commission rate (#1035) shows under the manager for `team:pay` or
+ * `commission:rates`, and is set or ended there with `commission:rates`.
  */
 export function TeamCard({
     organizationId,
     team,
     accountManager,
     canAssign,
+    canSeeRate = false,
+    canSetRate = false,
 }: {
     organizationId: string;
     team: OverviewPanel<OverviewTeam>;
     accountManager: OverviewPanel<OverviewAccountManager>;
     /** Holds `accounts:assign`. */
     canAssign: boolean;
+    /** Holds `team:pay` or `commission:rates`: sees the own rate. */
+    canSeeRate?: boolean;
+    /** Holds `commission:rates`: sets and ends it. */
+    canSetRate?: boolean;
 }) {
     const feedback = useChangeFeedback();
     // The card stands while either half read; each half says if it didn't.
@@ -56,6 +65,8 @@ export function TeamCard({
                         organizationId={organizationId}
                         accountManager={d.accountManager}
                         canAssign={canAssign}
+                        canSeeRate={canSeeRate || canSetRate}
+                        canSetRate={canSetRate}
                         onDone={(message) =>
                             feedback.report({ message, rowId: "team" })
                         }
@@ -91,11 +102,15 @@ function AccountManagerBlock({
     organizationId,
     accountManager,
     canAssign,
+    canSeeRate,
+    canSetRate,
     onDone,
 }: {
     organizationId: string;
     accountManager: OverviewPanel<OverviewAccountManager>;
     canAssign: boolean;
+    canSeeRate: boolean;
+    canSetRate: boolean;
     onDone: (message: string) => void;
 }) {
     return (
@@ -129,6 +144,13 @@ function AccountManagerBlock({
                         <ManagerActions
                             organizationId={organizationId}
                             manager={accountManager.data.manager}
+                            onDone={onDone}
+                        />
+                    )}
+                    {canSeeRate && accountManager.data.manager && (
+                        <OwnRateBlock
+                            organizationId={organizationId}
+                            canSet={canSetRate}
                             onDone={onDone}
                         />
                     )}

@@ -5,9 +5,9 @@ import type { EarningsSummary } from "@/lib/commission-words";
 import {
     KIND_LABEL,
     LINE_STATUS_LABEL,
+    lineRateWords,
     monthLabel,
     partLabel,
-    rateLabel,
 } from "@/lib/commission-words";
 import { formatDate } from "@/lib/format";
 
@@ -130,7 +130,7 @@ export function EarningsCard({ earnings }: EarningsCardProps) {
                                         ? "—"
                                         : formatPaise(line.amountPaise)}
                                     <span className="block text-[13px] text-muted-foreground">
-                                        {rateLabel(line.basisPoints)} ·{" "}
+                                        {lineRateWords(line)} ·{" "}
                                         {LINE_STATUS_LABEL[line.status]}
                                     </span>
                                 </span>

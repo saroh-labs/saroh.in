@@ -62,3 +62,39 @@ export class SetCommissionRateDto extends OperatorReasonDto {
     @IsISO8601({ strict: true })
     effectiveFrom?: string;
 }
+
+/** "2026-09-10": a day in India. */
+const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+/** A business's own rate, for the dry run (#1035). */
+export class OwnRatePreviewDto {
+    /** Hundredths of a percent. */
+    @IsInt({ message: "A rate is a whole number of basis points" })
+    @Min(0)
+    @Max(MAX_BASIS_POINTS)
+    basisPoints!: number;
+
+    /** The first day it earns, in India. */
+    @Matches(DAY, { message: "A day is written 2026-09-10" })
+    earnsFrom!: string;
+
+    /** Its last day, if it has one. */
+    @IsOptional()
+    @Matches(DAY, { message: "A day is written 2026-09-10" })
+    lastDay?: string;
+}
+
+/** Set a business's own rate (#1035): the dry run's fields, a reason and a key. */
+export class SetOwnRateDto extends OperatorReasonDto {
+    @IsInt({ message: "A rate is a whole number of basis points" })
+    @Min(0)
+    @Max(MAX_BASIS_POINTS)
+    basisPoints!: number;
+
+    @Matches(DAY, { message: "A day is written 2026-09-10" })
+    earnsFrom!: string;
+
+    @IsOptional()
+    @Matches(DAY, { message: "A day is written 2026-09-10" })
+    lastDay?: string;
+}

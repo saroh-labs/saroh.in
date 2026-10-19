@@ -26,7 +26,9 @@ export const MAX_BASIS_POINTS = 10_000;
 /**
  * Lines the job and the sweep still move; CANCELLED, PAID and NO_RATE never
  * change. No back-pay (owner, 19 Oct): a payment made while no rate was set
- * earns nothing, and a rate set later starts from its own date.
+ * earns nothing, and a general rate set later starts from its own date. The
+ * one way out of NO_RATE is a business's own rate (#1035), through
+ * `backPayStatus` and `isLegalBackPay`, never the job or the sweep.
  */
 export const OPEN_STATUSES: readonly LineStatus[] = [
     "PENDING",
@@ -104,7 +106,7 @@ export function installmentEnds(input: {
 }
 
 /** India's offset from UTC; India keeps no summer time. */
-const IST_OFFSET_MS = 330 * 60 * 1000;
+export const IST_OFFSET_MS = 330 * 60 * 1000;
 
 const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/;
 

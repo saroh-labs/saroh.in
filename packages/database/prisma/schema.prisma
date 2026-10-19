@@ -3005,8 +3005,10 @@ model CommissionLine {
   kind            String
   /// This line's share of the invoice's amount before GST, in paise.
   baseAmountPaise Int
-  /// The rate copied from `CommissionRate` (`rateId`); null while NO_RATE.
+  /// The rate copied from `CommissionRate` (`rateId`), or from the
+  /// business's own rate (`businessRateId`, #1035); both null while NO_RATE.
   rateId          String?
+  businessRateId  String?
   basisPoints     Int?
   /// What it earns, in paise; null while NO_RATE.
   amountPaise     Int?
@@ -3029,6 +3031,43 @@ model CommissionLine {
   @@index([platformAdminId, status])
   @@index([status, periodEnd])
   @@index([organizationId])
+  @@index([businessRateId])
+}
+
+// A business's own commission rate for its account manager (DEC-169, #1035):
+// set by a holder of `commission:rates` for the manager who looks after it,
+// it prices that manager's payments from this business made on or after
+// `earnsFrom` (and before `until`) instead of the general rate for the
+// link's kind. `earnsFrom` is never before the business's first paid plan
+// (its first cleared Saroh invoice with an amount before GST). Saving one
+// is the only way a NO_RATE line is ever priced (back-pay, once). One in
+// force per business: a new one ends the one before at its `earnsFrom`.
+// Written once except its end: `until` may only move earlier (End…, or
+// replaced), with who and why. Never a rate in code, tests or docs.
+// Relation-free, like CommissionLine; a business's row, so it carries the
+// org-isolation policy.
+model BusinessCommissionRate {
+  id String @id @default(cuid())
+
+  organizationId  String
+  /// The manager it was set for; only their lines are priced by it.
+  platformAdminId String
+  /// Hundredths of a percent, 0..10000 (CHECKed).
+  basisPoints     Int
+  /// The start of its first day in India.
+  earnsFrom       DateTime
+  /// Exclusive: the start of the day after its last; null while open.
+  until           DateTime?
+  setByUserId     String
+  reason          String
+
+  endedAt       DateTime?
+  endedByUserId String?
+  endedReason   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, earnsFrom])
 }
 
 // A month's commission paid to one teammate (DEC-169, admin console U21):

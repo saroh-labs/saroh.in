@@ -11,11 +11,17 @@ import {
     SheetTitle,
 } from "@saroh/ui/sheet";
 import { showSuccess } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useState } from "react";
 
 import { OperatorDialog } from "@/components/operator-dialog";
 import { setCommissionRateAction } from "@/lib/commission-actions";
-import type { RateKind, RatesView, RateView } from "@/lib/commission-words";
+import type {
+    OwnRateRow,
+    RateKind,
+    RatesView,
+    RateView,
+} from "@/lib/commission-words";
 import {
     KIND_HINT,
     KIND_LABEL,
@@ -24,6 +30,7 @@ import {
     rateLabel,
 } from "@/lib/commission-words";
 import { formatDate } from "@/lib/format";
+import { dayLabel } from "@/lib/own-rate-words";
 
 /**
  * Commission rates (DEC-169, admin console U21), for a Platform owner
@@ -98,7 +105,7 @@ export function RatesSheet({
                         trigger="Set a rate…"
                         triggerVariant="default"
                         title="Set a commission rate?"
-                        effect="Payments from the day it starts earn at this rate. Payments already earned keep the rate they were worked out with, and any waiting for a rate are worked out now."
+                        effect="Payments from the day it starts earn at this rate. Payments already earned keep the rate they were worked out with, and a payment made while no rate was set still earns nothing: only a business's own rate pays for those."
                         fields={<RateFields />}
                         submitLabel="Set rate"
                         onSubmit={async ({
@@ -147,6 +154,8 @@ export function RatesSheet({
                         }}
                     />
 
+                    <OwnRatesList rows={rates.ownRates} />
+
                     <div className="grid gap-1">
                         <h3 className="text-sm font-medium">Every rate set</h3>
                         {rates.history.length === 0 ? (
@@ -160,6 +169,46 @@ export function RatesSheet({
                 </div>
             </SheetContent>
         </Sheet>
+    );
+}
+
+/**
+ * Businesses' own rates (#1035) running now or later: the business, its
+ * manager, from and until. Set and ended on the business's Team card.
+ */
+function OwnRatesList({ rows }: { rows: OwnRateRow[] }) {
+    return (
+        <div className="grid gap-1" data-own-rates>
+            <h3 className="text-sm font-medium">
+                Businesses with their own rate
+            </h3>
+            {rows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    None. Set one from a business&apos;s Team card.
+                </p>
+            ) : (
+                <ul className="grid gap-1.5">
+                    {rows.map((r) => (
+                        <li key={r.id} className="text-sm">
+                            <Link
+                                href={`/businesses/${encodeURIComponent(r.organizationId)}`}
+                                className="font-medium underline-offset-4 hover:underline"
+                            >
+                                {r.businessName}
+                            </Link>{" "}
+                            · {rateLabel(r.basisPoints)}{" "}
+                            <span className="text-muted-foreground">
+                                for {r.managerName}, from{" "}
+                                {dayLabel(r.earnsFromDay)}
+                                {r.lastDay
+                                    ? `, until ${dayLabel(r.lastDay)}`
+                                    : ""}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
     );
 }
 

@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 import { teammateName } from "../saroh-leads/lead-views";
 import type { LineStatus, RateKind } from "./commission-rules";
 import { monthBounds, monthOf, RATE_KINDS } from "./commission-rules";
+import { dayOf } from "./own-rate-rules";
 
 /**
  * What the console reads about commission (DEC-169, admin console U21):
@@ -23,6 +24,8 @@ export interface StatementLine {
     kind: RateKind;
     baseAmountPaise: number;
     basisPoints: number | null;
+    /** Priced by the business's own rate (#1035), not the kind's. */
+    ownRate: boolean;
     amountPaise: number | null;
     periodEnd: Date;
     status: LineStatus;
@@ -154,6 +157,7 @@ export async function viewLines(rows: LineRow[]): Promise<StatementLine[]> {
         kind: r.kind as RateKind,
         baseAmountPaise: r.baseAmountPaise,
         basisPoints: r.basisPoints,
+        ownRate: r.businessRateId !== null,
         amountPaise: r.amountPaise,
         periodEnd: r.periodEnd,
         status: r.status as LineStatus,
@@ -417,6 +421,22 @@ export interface RateView {
     createdAt: Date;
 }
 
+/** A business's own rate running now or later, as the Rates sheet lists it. */
+export interface OwnRateRow {
+    id: string;
+    organizationId: string;
+    businessName: string;
+    platformAdminId: string;
+    managerName: string;
+    basisPoints: number;
+    earnsFrom: Date;
+    /** Exclusive: the start of the day after its last; null while open. */
+    until: Date | null;
+    /** Its first and last days in India ("2026-09-10"); last null while open. */
+    earnsFromDay: string;
+    lastDay: string | null;
+}
+
 export interface RatesView {
     /** The rate in force now for each kind; null where none is set. */
     current: Record<RateKind, RateView | null>;
@@ -424,6 +444,8 @@ export interface RatesView {
     upcoming: RateView[];
     /** Every rate ever set, newest first. */
     history: RateView[];
+    /** Businesses' own rates in force now or starting later (#1035). */
+    ownRates: OwnRateRow[];
 }
 
 export async function readRates(now: Date): Promise<RatesView> {
@@ -452,7 +474,42 @@ export async function readRates(now: Date): Promise<RatesView> {
         current,
         upcoming: views.filter((v) => v.effectiveFrom > now).reverse(),
         history: views,
+        ownRates: await readOwnRates(now),
     };
+}
+
+/** Every business's own rate that hasn't stopped, soonest start first. */
+async function readOwnRates(now: Date): Promise<OwnRateRow[]> {
+    const rows = await prisma.businessCommissionRate.findMany({
+        where: { OR: [{ until: null }, { until: { gt: now } }] },
+        orderBy: [{ earnsFrom: "asc" }, { createdAt: "asc" }],
+        take: 500,
+    });
+    const live = rows.filter(
+        (r) => r.until === null || r.until.getTime() > r.earnsFrom.getTime(),
+    );
+    const [orgs, people] = await Promise.all([
+        prisma.organization.findMany({
+            where: {
+                id: { in: [...new Set(live.map((r) => r.organizationId))] },
+            },
+            select: { id: true, name: true },
+        }),
+        namesOf([...new Set(live.map((r) => r.platformAdminId))]),
+    ]);
+    const orgName = new Map(orgs.map((o) => [o.id, o.name]));
+    return live.map((r) => ({
+        id: r.id,
+        organizationId: r.organizationId,
+        businessName: orgName.get(r.organizationId) ?? "A deleted business",
+        platformAdminId: r.platformAdminId,
+        managerName: people.get(r.platformAdminId)?.name ?? "A former teammate",
+        basisPoints: r.basisPoints,
+        earnsFrom: r.earnsFrom,
+        until: r.until,
+        earnsFromDay: dayOf(r.earnsFrom),
+        lastDay: r.until ? dayOf(new Date(r.until.getTime() - 1)) : null,
+    }));
 }
 
 /** A CSV field, quoted when it must be, and never read as a formula. */

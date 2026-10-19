@@ -15,12 +15,22 @@ import {
     splitEvenly,
     statementMonthFor,
 } from "./commission-rules";
+import { ownRateCovers } from "./own-rate-rules";
 
 type Tx = Prisma.TransactionClient;
 
 /** The lock that serialises everything that writes one invoice's lines. */
 export const invoiceLockKey = (sarohInvoiceId: string) =>
     `commission-invoice:${sarohInvoiceId}`;
+
+/**
+ * The lock that serialises a business's own rate with its payments' lines
+ * (#1035): saving one back-pays under it, and a payment's lines are
+ * written under it, so a payment is priced by the rate or back-paid by it,
+ * never missed between the two. Always taken before the invoice's lock.
+ */
+export const businessRateLockKey = (organizationId: string) =>
+    `commission-business-rate:${organizationId}`;
 
 /**
  * The lock that serialises a teammate's statement: a line put in a month
@@ -61,6 +71,31 @@ interface InvoiceFacts {
     providerAmountPaise: number | null;
 }
 
+/**
+ * The business's own rate pricing a payment its manager `platformAdminId`
+ * earned at `at`, if one does (#1035).
+ */
+export async function ownRateForInTx(
+    tx: Pick<Tx, "businessCommissionRate">,
+    organizationId: string,
+    platformAdminId: string,
+    at: Date,
+): Promise<{ id: string; basisPoints: number } | null> {
+    const rates = await tx.businessCommissionRate.findMany({
+        where: { organizationId, platformAdminId, earnsFrom: { lte: at } },
+        orderBy: [{ earnsFrom: "desc" }, { createdAt: "desc" }],
+        select: {
+            id: true,
+            platformAdminId: true,
+            basisPoints: true,
+            earnsFrom: true,
+            until: true,
+        },
+    });
+    const own = rates.find((r) => ownRateCovers(r, platformAdminId, at));
+    return own ? { id: own.id, basisPoints: own.basisPoints } : null;
+}
+
 /** The rate in force for `kind` at `at`, else the first one set after it. */
 export async function rateForInTx(
     tx: Pick<Tx, "commissionRate">,
@@ -97,7 +132,10 @@ export async function linkAtInTx(
     });
 }
 
-async function refundsInTx(tx: Tx, invoice: InvoiceFacts) {
+export async function refundsInTx(
+    tx: Tx,
+    invoice: Pick<InvoiceFacts, "id" | "provider" | "providerPaymentId">,
+) {
     return tx.billingRefund.findMany({
         where: {
             OR: [
@@ -121,7 +159,10 @@ async function refundsInTx(tx: Tx, invoice: InvoiceFacts) {
  * The provider took a different amount and the Needs-action row for it
  * (`saroh_invoice_amount_mismatch`, once per invoice) isn't resolved.
  */
-async function heldInTx(tx: Tx, invoice: InvoiceFacts): Promise<boolean> {
+export async function heldInTx(
+    tx: Tx,
+    invoice: Pick<InvoiceFacts, "id" | "totalPaise" | "providerAmountPaise">,
+): Promise<boolean> {
     if (
         invoice.providerAmountPaise === null ||
         invoice.providerAmountPaise === invoice.totalPaise
@@ -136,7 +177,7 @@ async function heldInTx(tx: Tx, invoice: InvoiceFacts): Promise<boolean> {
 }
 
 /** The statement a line becoming payable now goes in, under the payout lock. */
-async function statementMonthInTx(
+export async function statementMonthInTx(
     tx: Tx,
     platformAdminId: string,
     periodEnd: Date,
@@ -149,10 +190,10 @@ async function statementMonthInTx(
     return statementMonthFor(periodEnd, new Set(paid.map((p) => p.month)));
 }
 
-const NOTES: Partial<Record<LineStatus, string>> = {
+export const LINE_NOTES: Partial<Record<LineStatus, string>> = {
     HELD: "The billing provider took a different amount from the invoice. Paid once the mismatch is resolved in Billing › Needs action.",
     NO_RATE:
-        "No commission rate was set for this kind of business when it paid, so it earns nothing. A rate set later starts from its own date.",
+        "No commission rate was set for this kind of business when it paid, so it earns nothing. A rate set later starts from its own date; only an own rate for this business can price it.",
     CANCELLED: "The payment was refunded, or a dispute on it was lost.",
 };
 
@@ -176,6 +217,13 @@ export async function settleInvoiceInTx(
     sarohInvoiceId: string,
     now: Date,
 ): Promise<Settled> {
+    const owner = await tx.sarohInvoice.findUnique({
+        where: { id: sarohInvoiceId },
+        select: { organizationId: true },
+    });
+    if (owner) {
+        await lockKeyInTx(tx, businessRateLockKey(owner.organizationId));
+    }
     await lockKeyInTx(tx, invoiceLockKey(sarohInvoiceId));
     const invoice = await tx.sarohInvoice.findUnique({
         where: { id: sarohInvoiceId },
@@ -212,7 +260,7 @@ export async function settleInvoiceInTx(
             data: plan.lines.map((line) => ({
                 ...line,
                 status: line.basisPoints === null ? "NO_RATE" : "PENDING",
-                note: line.basisPoints === null ? NOTES.NO_RATE : null,
+                note: line.basisPoints === null ? LINE_NOTES.NO_RATE : null,
             })),
             skipDuplicates: true,
         });
@@ -279,7 +327,7 @@ export async function settleInvoiceInTx(
             data: {
                 status: to,
                 statementMonth,
-                note: NOTES[to] ?? null,
+                note: LINE_NOTES[to] ?? null,
             },
         });
         moved += count;
@@ -311,7 +359,14 @@ async function planLinesInTx(
     if (!profile?.onCommission) return { noLine: "off-commission" };
 
     const kind = link.kind as RateKind;
-    const rate = await rateForInTx(tx, kind, invoice.issuedAt);
+    // The business's own rate for this manager wins over the kind's (#1035).
+    const own = await ownRateForInTx(
+        tx,
+        invoice.organizationId,
+        link.platformAdminId,
+        invoice.issuedAt,
+    );
+    const rate = own ?? (await rateForInTx(tx, kind, invoice.issuedAt));
     const parts = installmentsOf(invoice.cycle);
     const ends = installmentEnds({
         periodStart: invoice.periodStart ?? invoice.issuedAt,
@@ -335,7 +390,8 @@ async function planLinesInTx(
             installments: parts,
             kind,
             baseAmountPaise: bases[i],
-            rateId: rate?.id ?? null,
+            rateId: own ? null : (rate?.id ?? null),
+            businessRateId: own?.id ?? null,
             basisPoints: rate?.basisPoints ?? null,
             amountPaise: amounts ? amounts[i] : null,
             periodEnd,
