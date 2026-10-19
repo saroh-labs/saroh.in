@@ -2166,3 +2166,24 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Rules: added when built.
 
 - **Receipts are automatic (owner, 20 Oct 2026).** Recording a payment is an event: it is noted on the invoice's history and the receipt email goes to the customer through the business's own email provider, with no tick box. It waits for the Undo window, so a payment removed by Undo sends nothing. Without a provider nothing is sent and the owner can share the receipt on WhatsApp.
+- Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); `docs/patterns/backend-billing-and-classes.md` → "Payments on an invoice are a ledger" (the write path, refusals, remove, cheques, events, U2 #1114); the rest added as each unit is built.
+
+## DEC-174 Automatic notices: customers hear about their bookings, orders, memberships, refunds and packs by the business's own email; staff hear about their own bookings
+
+**Status: Accepted — 2026-10-20, to build** · owner, answering the notifications audit of 20 Oct (D1–D10). Plan: `docs/plans/2026-10-20-002-feat-automatic-notices-plan.md`, epic #1131.
+
+- **D1, yes.** Booking and order notices go to the contact's own email through the business's own provider when one is connected, not only to live site-account holders. Consent is still checked.
+- **Customer notices only ever go through the business's own provider** (DEC-086 reversal). Saroh's own email sends only what DEC-011 and its amendments allow. WhatsApp sends only once #1058 exists; until then, click-to-chat.
+- **Every new default-on notice has a switch the business can turn off,** kept with "Updates in Messages" on Settings › Providers, and starting on:
+    - **Renewals and failed charges:** the renewal invoice is sent automatically (hand-made invoices keep their Send button); a failed autopay charge tells the customer, with the payment link.
+    - **Membership emails** (one switch): joined, paused, resumed, plan changed, cancelled, ending in 7 days. The team is alerted when a member cancels or pauses themselves, or cancels autopay at their bank.
+    - **Refunds:** an online refund is told automatically; a cash refund at the counter sends nothing by default. Cancel notices say whether the money was refunded, kept or the credit returned. The team is alerted when a refund fails or an automatic refund is refused. Booking refunds are written to the booking's history.
+    - **Staff and replies:** the person a booking is with gets their own alerts for new, moved and cancelled bookings, bell and email by default. A team reply in the customer's Messages thread is emailed to the customer.
+    - **Also on:** the enquiry auto-reply where a provider is connected; Delivered and Sent for shipped and digital orders (Collected stays off); pack credits (receipt when bought online, 1 credit left, 7 days before expiry); back-in-stock "Tell me", emailed once when the product is back.
+- **D3, overdue reminders: opt-in.** At most 2 automatic reminders per invoice, 3 and 10 days after the due date, inside the one-a-day rule.
+- **D6, the pre-debit notice for card and eMandate:** to be confirmed in Razorpay test mode (U21) and with the owner's CA. If Razorpay doesn't send it, Saroh must, and card autopay stays off until then.
+- **Already decided:** the invoice payment receipt is automatic (DEC-173, invoices U5 #1117). This decision depends on it and doesn't duplicate it.
+- **Fixes with no decision needed:** the ten untrue messages and the waitlist offer's claim link; "has moved" for a booking awaiting payment; a lapsed hold read as a customer cancel (and the customer told); an online pack purchase's missing "sold" row; the rule-request bell; tracking added after hand-over; invoice history; team alerts for money events; course and class notices.
+- **DEC-086's code is deleted, not fenced** (U3): the flag was never on, and every notice this decision adds would otherwise carry its route and tests. A source scan fails if a customer-notice path imports a Saroh sender.
+- **Defaults taken while open** (the plan's Assumptions A1–A17): D1 has no switch of its own; a renewal with live autopay isn't sent as a pay request; the refund notice goes when the provider accepts it; "Tell the customer" on an order cancel starts ticked; a team reply is held 60 s and coalesced; one enquiry auto-reply per address per day; Delivered, Sent and later tracking share one switch; the pack receipt is DEC-173's receipt with a pack line; staff alerts reach only staff with a login; overdue reminders count only automatic ones; a back-in-stock opt-in makes no contact and is no marketing consent.
+- Rules: added when built (`docs/patterns/backend-jobs.md` → Customer notices and Team alerts; `docs/patterns/saroh-product.md` → Communications).
