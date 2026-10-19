@@ -17,6 +17,7 @@ import {
 } from "../lib/product-grid-read";
 import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
@@ -130,7 +131,7 @@ export default function ProductGridSection({
     feed,
     siteId,
     apiUrl = DEFAULT_API_URL,
-}: {
+}: LookProps & {
     content: RenderedProductGrid;
     /** The products, read by the page that serves the site (live or preview). */
     feed?: ProductGridFeed;

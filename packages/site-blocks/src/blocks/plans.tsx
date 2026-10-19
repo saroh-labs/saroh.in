@@ -17,6 +17,7 @@ import {
     plansPayOnline,
 } from "../lib/plans-read";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import type { PricesActions } from "../prices/api";
 import { PricesDone, useSignInFirst } from "../prices/flow";
 import type { JoinablePlan } from "../prices/join-sheet";
@@ -139,7 +140,7 @@ export default function PlansSection({
     prices = null,
     siteId,
     apiUrl = DEFAULT_API_URL,
-}: {
+}: LookProps & {
     content: RenderedPlans;
     /** The plans, read by the page that serves the site (live or preview). */
     feed?: PlansFeed;

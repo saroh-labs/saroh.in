@@ -2,6 +2,7 @@ import type { RenderedPerson } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import { siteImage } from "../lib/site-image";
+import type { LookProps } from "../look-context";
 import { CtaButton } from "./cta";
 
 /**
@@ -55,7 +56,7 @@ export const PERSON_CREDENTIALS_LABEL = "Qualifications";
 
 export default function PersonSection({
     content,
-}: {
+}: LookProps & {
     content: RenderedPerson;
 }) {
     const name = said(content.name);

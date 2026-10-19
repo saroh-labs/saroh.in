@@ -9,6 +9,7 @@ import { phoneText } from "../lib/phone";
 import type { PublicVisit } from "../lib/public-visit";
 import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 
 /**
  * `visitUs` v1 — one place's address, hours and phone, read live (G8).
@@ -75,7 +76,7 @@ export default function VisitUsSection({
     apiUrl = DEFAULT_API_URL,
     visit: given,
     now,
-}: {
+}: LookProps & {
     content: RenderedVisitUs;
     /**
      * The live site's id — the read resolves the business from it. `null`:

@@ -11,6 +11,7 @@ import type { SignedInCustomer } from "../account/api";
 import type { SendResult } from "../account/messages";
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
+import type { LookProps } from "../look-context";
 import { useTestRelease } from "../test-release/context";
 import { TestReleaseStop } from "../test-release/test-release-stop";
 import { isTestReleaseRefusal } from "../test-release/words";
@@ -155,7 +156,7 @@ export default function EnquirySection({
     content,
     apiUrl = DEFAULT_API_URL,
     thread = null,
-}: {
+}: LookProps & {
     content: RenderedEnquiry;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;

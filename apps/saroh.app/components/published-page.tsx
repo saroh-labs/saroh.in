@@ -86,6 +86,10 @@ export async function PublishedPage({
             reach={reachOf(contact)}
             // For a closing band whose content gives no heading.
             siteName={snapshot.site.name}
+            look={snapshot.site.look}
+            // A customer's page: never the owner's preview, so nothing that
+            // speaks to the owner ("No photo yet") is ever drawn here.
+            isOwnerPreview={false}
         />
     );
 }

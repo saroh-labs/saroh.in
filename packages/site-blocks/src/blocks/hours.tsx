@@ -8,6 +8,7 @@ import { clockText, openState, openStateText } from "../lib/opening-hours";
 import type { PublicVisit } from "../lib/public-visit";
 import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 
 /**
  * `hours` v1 — the week's opening hours on their own, read live (industry
@@ -151,7 +152,7 @@ export default function HoursSection({
     apiUrl = DEFAULT_API_URL,
     visit,
     now,
-}: {
+}: LookProps & {
     content: RenderedHours;
     siteId?: string | null;
     apiUrl?: string;

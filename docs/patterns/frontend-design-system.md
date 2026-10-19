@@ -824,6 +824,16 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   `latin-ext` only for a face that draws ₹ there (checked against the files).
   Every face stays `preload: false`: `next/font` preloads per layout file, not
   per request, so a preloaded look face would reach every Classic site.
+- **Current** (19 Oct 2026, DEC-172 U4) — **A look's ₹ is a sans, from the
+  device.** Prices sit in a look's body face, as the boards draw them. Where
+  that face has no ₹ (Quiet's Jost, Folio's Hanken Grotesk), `SiteTheme`
+  puts a rupee-only face, `"Site Rupee"`, right after it in
+  `--site-font-body`: an `@font-face` with `unicode-range: U+20B9` built
+  from `local()` sans faces that draw one (Arial, Roboto, Segoe UI, Noto
+  Sans, Liberation Sans, DejaVu Sans), regular and bold. No download, no
+  third family; never the look's serif display face. A face whose pair
+  loads `latin-ext` (Live's Figtree) draws its own and gets none, and
+  Classic never has it (`look-theme.ts`).
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app
@@ -853,6 +863,18 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   `ease-linear` and a literal `duration-200` fail the scan. Exit faster than entry, and never animate position and size
   together. Motion only explains a change, so there is no decorative, looping,
   parallax or bounce motion on product surfaces.
+- **Current** (19 Oct 2026, DEC-172 U4) — **A merchant site's motion under a
+  look** is written by `craftRules(at, variables, look)`: fade or rise of 8px
+  or less, 200ms or less, `--site-ease` (no value over 1), no loops. Nothing
+  moves on scroll and nothing is hidden at rest. A block asks for an entrance
+  with `data-site-rise` (fade and rise, 200ms) or `data-site-fade` (140ms);
+  the phone menu takes 200ms and link colours 140ms. Under
+  `prefers-reduced-motion: reduce` every one of them is a 120ms fade. Classic
+  (no look) keeps its own motion unchanged. Corners are `rounded-site`
+  (buttons and inputs), `rounded-site-s` (chips, times) and
+  `rounded-site-photo`; the new colour roles are `site-accent-text`,
+  `site-accent-soft`, `site-rule` and `site-footer-muted`, each falling back
+  to the role it refines on a Classic site.
 - **Adopted** — **Motion comes from the primitives and the shared Tailwind
   config, not per-app `@keyframes`** (15 §3). Gap, and a contradiction to
   resolve rather than copy: `accounts.saroh.in/app/auth.css` defines 8 keyframes

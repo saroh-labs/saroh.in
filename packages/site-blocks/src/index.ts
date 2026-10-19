@@ -16,8 +16,13 @@ export {
     PageSections,
     default as SectionRenderer,
     opensOverPhoto,
+    withLookVariant,
 } from "./section-renderer";
 export type { Section } from "./section-renderer";
+// The look a page is drawn in, and whether it is the owner's preview
+// (DEC-172, U4): handed to every block as props.
+export { lookOf, lookScope } from "./look-context";
+export type { LookProps } from "./look-context";
 // A business's live data given to a whole page (template renders, U14).
 export type { SiteFixtures } from "./site-fixtures";
 // Server-safe: which sections are known to draw nothing, for the menu.

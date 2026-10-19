@@ -3,6 +3,7 @@ import { isSafeHref, resolveVariant } from "@saroh/block-contract";
 
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import { listCard, listPhoto } from "./list-layout";
 import { RhythmGallery } from "./projects-rhythm";
 import { ProjectRows, projectsCount } from "./projects-rows";
@@ -63,7 +64,7 @@ function safeLink(value: string | undefined): string | null {
 
 export default function ProjectsSection({
     content,
-}: {
+}: LookProps & {
     content: RenderedProjects;
 }) {
     const items = Array.isArray(content.items)

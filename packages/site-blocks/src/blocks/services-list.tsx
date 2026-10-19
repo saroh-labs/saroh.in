@@ -12,6 +12,7 @@ import type { GstOnPrice } from "../lib/gst-price";
 import { browsePriceWords, gstOnPriceOf } from "../lib/gst-price";
 import { siteMoney } from "../lib/money";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import { useQrSource, withQrSource } from "../qr-source";
 import { CtaButton, ctaClasses } from "./cta";
 
@@ -121,7 +122,7 @@ export default function ServicesListSection({
     apiUrl = DEFAULT_API_URL,
     services: given,
     bookHref,
-}: {
+}: LookProps & {
     content: RenderedServicesList;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;

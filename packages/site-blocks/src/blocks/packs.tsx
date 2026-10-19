@@ -9,6 +9,7 @@ import type { AccountPackOnSale } from "../account/packs-api";
 import { DEFAULT_API_URL } from "../api-url";
 import { gstUnderWords } from "../lib/gst-price";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import type { PricesActions } from "../prices/api";
 import { PricesDone, useSignInFirst } from "../prices/flow";
 import type { PublicPack } from "../prices/pack-words";
@@ -121,7 +122,7 @@ export default function PacksSection({
     prices = null,
     siteId,
     apiUrl = DEFAULT_API_URL,
-}: {
+}: LookProps & {
     content: RenderedPacks;
     /** The packs, read by the page that serves the site. */
     feed?: PacksFeed;

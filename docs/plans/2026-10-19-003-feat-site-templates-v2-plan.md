@@ -477,6 +477,17 @@ Every unit follows `docs/patterns/00-universal.md` §15 (keep every capability: 
 
 **Verification:** `pnpm run check:blocks` passes. Northwind's published site with no look looks the same at 320, 390 and 1440 px.
 
+**Notes (built 19 Oct, #1090):**
+
+- **Classic is pinned** by `packages/site-blocks/src/classic-pin.test.tsx`, written before any look code: the theme's stylesheet (unstyled, scoped, every template colourway) and every template's every page through `PageSections`. A look absent, null, `"classic"` or unknown draws that exact sheet.
+- **Tokens.** `SiteTheme look` writes the look's rule after the merchant's variables (`look-theme.ts`): `--site-radius`, `--site-radius-s`, `--site-radius-photo`, phone page margin and section padding with the desk values from 768 px, the motion steps (`--site-motion-fast/base/slow`, `--site-rise`), the look's type scale (a template's column or measure it does not set is cleared to `initial`, and its label style is the look's) and the look's faces (`--site-font-mono: initial`). Colours stay the publisher's safe ones. A look never flips to dark for the visitor's preference. The page's root carries `data-site-look` (`lookScope`).
+- **Layout.** `PageSections`/`SectionRenderer` take `look` and `isOwnerPreview` and hand both to every block (`LookProps`). Where a section chose no variant and the look's default differs, the look's variant is written into the content the block gets (`withLookVariant`), so every `resolveVariant` inside a block follows it; the section's own variant always wins.
+- **Owner preview.** True on `saroh.app/preview/<token>` (home and inner pages); `PublishedPage` passes false for every live page. The editor's previews set it in U16.
+- **Motion under a look.** No scroll entrance and no parallax: sections are visible at rest. `site-rise` is a fade and an 8 px rise over 200 ms, asked for with `data-site-rise` (or `data-site-fade` for a fade alone); the phone menu and scrim take 200 ms; link and button colours 140 ms. Reduced motion turns every animation into a 120 ms fade. Classic keeps its scroll entrance (14 px), 180 ms menu and 150 ms colour change.
+- **The ₹ (decision).** Prices stay in the body face, as the boards draw them, and the ₹ comes from a matching sans: for a look whose body face has no ₹ (Quiet's Jost, Folio's Hanken Grotesk) the body stack names a rupee-only face right after the body face, `"Site Rupee"` (`@font-face` with `unicode-range: U+20B9`, built from `local()` Arial, Roboto, Segoe UI, Noto Sans and the Linux sans, regular and bold). No download and no third family; Live's Figtree draws its own and gets none; Classic never has it. `e2e/tests/site-look-renderer.spec.ts` asserts the ₹ is drawn, by a non-serif face.
+- **Corners.** Under Quiet, `--site-radius` is 999 px (a pill) as KD3 sets it for buttons and inputs. Blocks that round cards and photos with it today move to `rounded-site-s` / `rounded-site-photo` (new in the preset, falling back to `--site-radius`) in U5 to U7 and U10 to U12; until then a Quiet card is drawn with pill ends on development.
+- `e2e/tests/site-fonts.spec.ts` no longer treats Bricolage as Saroh's: Saroh's faces are Geist, Space Grotesk and JetBrains Mono.
+
 ---
 
 #### U5. Chrome per look: header, phone menu, one fixed bar, footer and dock

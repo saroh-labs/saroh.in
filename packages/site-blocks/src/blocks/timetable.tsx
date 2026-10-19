@@ -23,6 +23,7 @@ import {
     weekCounts,
 } from "../lib/timetable-read";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 
 /**
  * `timetable` v1 — the week's class sessions, read live (industry templates
@@ -75,7 +76,7 @@ export default function TimetableSection({
     apiUrl = DEFAULT_API_URL,
     bookHref,
     timetable: given,
-}: {
+}: LookProps & {
     content: RenderedTimetable;
     siteId?: string | null;
     apiUrl?: string;

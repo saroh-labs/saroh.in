@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { SiteTheme } from "@saroh/site-blocks";
+import { lookScope, SiteTheme } from "@saroh/site-blocks";
 
 import { PreviewGone } from "@/components/preview-gone";
 import { previewMenu } from "@/lib/in-page-menu";
@@ -80,11 +80,16 @@ export default async function PreviewLayout({
     const navigation = await previewMenu(snapshot, preview.siteId, token);
 
     return (
-        <div className="min-h-screen bg-site-bg text-site-body">
+        <div
+            className="min-h-screen bg-site-bg text-site-body"
+            {...lookScope(snapshot.site.look)}
+        >
             <PreviewBar siteName={siteName} expiresAt={expiresAt} />
             <SiteTheme
                 variables={snapshot.site.styleVariables}
                 faces={SITE_FACES}
+                // The draft's look (DEC-172), as publishing would draw it.
+                look={snapshot.site.look}
             />
             <SiteHeader
                 name={snapshot.site.name}

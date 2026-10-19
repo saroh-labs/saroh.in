@@ -2,6 +2,7 @@ import type { RenderedGallery } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 
 /**
  * `gallery` v1 — an ordered set of images. `carousel` degrades to a horizontal
@@ -10,7 +11,7 @@ import { cn } from "../lib/utils";
  */
 export default function GallerySection({
     content,
-}: {
+}: LookProps & {
     content: RenderedGallery;
 }) {
     /*

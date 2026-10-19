@@ -1,5 +1,6 @@
 import type { RenderedContact } from "@saroh/block-contract";
 import { ctaHref, isSafeHref } from "@saroh/block-contract";
+import type { LookProps } from "../look-context";
 
 /**
  * `contact` v1 — where to find the business and how to reach it (#255).
@@ -34,7 +35,7 @@ const noPage = () => undefined;
 
 export default function ContactSection({
     content,
-}: {
+}: LookProps & {
     content: RenderedContact;
 }) {
     const channels = [

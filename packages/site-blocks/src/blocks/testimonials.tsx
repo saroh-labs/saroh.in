@@ -1,4 +1,5 @@
 import type { RenderedTestimonials } from "@saroh/block-contract";
+import type { LookProps } from "../look-context";
 
 /**
  * `testimonials` v1 — what customers said, under their names (#255).
@@ -11,7 +12,7 @@ import type { RenderedTestimonials } from "@saroh/block-contract";
  */
 export default function TestimonialsSection({
     content,
-}: {
+}: LookProps & {
     content: RenderedTestimonials;
 }) {
     return (

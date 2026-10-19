@@ -2,6 +2,7 @@ import type { RenderedHero } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
 import type { PublicVisit } from "../lib/public-visit";
+import type { LookProps } from "../look-context";
 import FullBleedHero from "./hero-full-bleed";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
@@ -43,7 +44,7 @@ export default function HeroSection({
     now,
     priority = false,
     level = 1,
-}: {
+}: LookProps & {
     content: RenderedHero;
     /**
      * `1`: this is the page's first hero, and its headline is the page's

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { RenderedCta, RenderedCtaSection } from "@saroh/block-contract";
 import { cn } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import { ctaBandWords } from "./cta-words";
 
 /**
@@ -242,7 +243,7 @@ export function CtaButton({
 export default function CtaSection({
     content,
     siteName,
-}: {
+}: LookProps & {
     content: RenderedCtaSection;
     /** Whose site this is, for a band whose content gives no heading. */
     siteName?: string | null;

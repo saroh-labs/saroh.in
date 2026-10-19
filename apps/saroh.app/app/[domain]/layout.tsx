@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import type { SignInOptions } from "@saroh/site-blocks";
 import {
     AccountEntry,
+    lookScope,
     ShopBag,
     SiteChromeFrame,
     SiteTheme,
@@ -361,6 +362,8 @@ export default async function SiteLayout({
             <div
                 className="min-h-screen bg-site-bg text-site-body"
                 data-test-release={resolved.release ? "" : undefined}
+                // The look's mark (DEC-172); nothing for Classic.
+                {...lookScope(snapshot.site.look)}
             >
                 {resolved.release ? (
                     <>
@@ -376,6 +379,9 @@ export default async function SiteLayout({
                 <SiteTheme
                     variables={snapshot.site.styleVariables}
                     faces={SITE_FACES}
+                    // Folio, Quiet or Live (DEC-172); absent is Classic,
+                    // drawn exactly as before.
+                    look={snapshot.site.look}
                 />
                 {/* Page views for Insights (UX-032): live hosts only, never a
                 test release, whose visits are not the business's. */}

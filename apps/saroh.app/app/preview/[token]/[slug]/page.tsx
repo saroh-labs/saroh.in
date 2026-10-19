@@ -91,6 +91,9 @@ export default async function PreviewPage({
             packs={packs}
             productGrids={productGrids}
             siteName={preview.snapshot.site.name}
+            // The business's own view of its draft (DEC-172, R8).
+            look={preview.snapshot.site.look}
+            isOwnerPreview
         />
     );
 }

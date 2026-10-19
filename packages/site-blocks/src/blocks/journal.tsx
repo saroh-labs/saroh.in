@@ -8,6 +8,7 @@ import { resolveVariant } from "@saroh/block-contract";
 import { DEFAULT_API_URL } from "../api-url";
 import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import type { LookProps } from "../look-context";
 import type { ArchiveYear } from "./journal-archive";
 import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
 import { JournalLead } from "./journal-lead";
@@ -312,7 +313,7 @@ export default function JournalSection({
     siteId,
     apiUrl = DEFAULT_API_URL,
     now,
-}: {
+}: LookProps & {
     content: RenderedJournal;
     /** The posts, read by the page that serves the site (live or preview). */
     feed?: JournalFeed;

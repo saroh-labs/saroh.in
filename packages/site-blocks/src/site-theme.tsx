@@ -11,8 +11,15 @@
  */
 
 import type { SiteFontFace, SiteFontPair } from "@saroh/block-contract";
-import { findFontPair, fontFaceKey, fontStack } from "@saroh/block-contract";
+import {
+    findFontPair,
+    fontFaceKey,
+    fontStack,
+    LOOKS,
+} from "@saroh/block-contract";
 
+import { lookOf, lookScope } from "./look-context";
+import { lookRules, lookViewOf } from "./look-theme";
 import { craftRules } from "./site-craft";
 import { SITE_FONT_STACK } from "./tailwind-preset";
 
@@ -109,8 +116,18 @@ export function SiteTheme({
     variables,
     selector = ":root",
     faces,
+    look: lookInput,
 }: {
     variables?: Record<string, string> | null;
+    /**
+     * The site's look (DEC-172): Folio, Quiet or Live, from the
+     * publication (`snapshot.site.look`). Its tokens (corners, spacing,
+     * measure, type, faces, motion) are written after the merchant's
+     * variables, under the business's own colours, which the publisher has
+     * already made safe for it. Absent, or anything this build does not
+     * know, is Classic: the stylesheet is exactly what it always was.
+     */
+    look?: unknown;
     /**
      * The faces this app loaded ({@link LoadedSiteFaces}). The variables name
      * a font pair by key; this is how the key finds the files.
@@ -134,8 +151,15 @@ export function SiteTheme({
 }) {
     const custom = cssVariables(variables, faces);
     const at = safeSelector(selector);
-    const labels = labelRule(at, variables?.[LABEL_STYLE_VARIABLE]);
-    const column = columnRule(at, variables?.[CONTENT_WIDTH_VARIABLE]);
+    const look = lookOf(lookInput);
+    // What the rules below decide from: the merchant's variables, with the
+    // look's type scale in place of the template's under a look.
+    const view = look ? lookViewOf(variables, look) : variables;
+    const labels = labelRule(at, view?.[LABEL_STYLE_VARIABLE]);
+    const column = columnRule(at, view?.[CONTENT_WIDTH_VARIABLE]);
+    const lookTokens = look
+        ? lookRules(at, look, fontPairStacks(LOOKS[look].fontPair, faces))
+        : "";
 
     return (
         <style>{`
@@ -190,7 +214,7 @@ export function SiteTheme({
                 --site-font-body: ${SITE_FONT_STACK};
             }
 ${
-    custom === null
+    custom === null && !look
         ? /*
            * The OS dark preference applies ONLY to an unstyled site.
            *
@@ -199,7 +223,8 @@ ${
            * mode overrides a decision they made deliberately, and it is not a
            * decision this app is entitled to make on their behalf. Sites with
            * no palette keep the old behaviour, which is what they have always
-           * had.
+           * had. A site with a look has chosen its colours too, so it never
+           * flips either.
            */
           `            @media (prefers-color-scheme: dark) {
                 ${at} {
@@ -217,8 +242,10 @@ ${
                     --site-footer-fg: 0 0% 100%;
                 }
             }`
-        : `            ${at} {\n${custom}\n            }`
-}${labels}${column}${sectionRules(at)}${craftRules(at, variables)}
+        : custom === null
+          ? ""
+          : `            ${at} {\n${custom}\n            }`
+}${lookTokens}${labels}${column}${sectionRules(at)}${craftRules(at, view, look)}
         `}</style>
     );
 }
@@ -470,9 +497,12 @@ export function SiteThemeScope({
     variables,
     name,
     faces,
+    look,
     children,
 }: {
     variables?: Record<string, string> | null;
+    /** The look to draw the scope in (DEC-172); absent is Classic. */
+    look?: unknown;
     faces?: LoadedSiteFaces;
     /** Distinguishes this scope from the others on the page. */
     name: string;
@@ -480,11 +510,12 @@ export function SiteThemeScope({
 }) {
     const scope = `site-theme-${name.replace(/[^\w-]/g, "")}`;
     return (
-        <div className={scope}>
+        <div className={scope} {...lookScope(look)}>
             <SiteTheme
                 variables={variables}
                 selector={`.${scope}`}
                 faces={faces}
+                look={look}
             />
             {children}
         </div>
