@@ -2,6 +2,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import {
     aService,
     bookOwn,
@@ -210,6 +211,69 @@ test.describe("bookings calendar", () => {
                 .filter({ hasText: /booked/ })
                 .first(),
         ).toBeVisible();
+    });
+
+    test("the week: counts and fullness per day, the phone's strip agrees with its list (U5)", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto("/bookings?layout=week");
+        if (test.info().project.name.startsWith("phone")) {
+            const strip = page.getByRole("radiogroup", {
+                name: "Pick a day of the week",
+            });
+            await expect(strip.getByRole("radio")).toHaveCount(7);
+            // Wednesday: picked at once, kept in the address, and the
+            // list's count is the strip's.
+            const wed = strip.getByRole("radio", { name: /^Wed / });
+            await wed.click();
+            await expect(wed).toHaveAttribute("aria-checked", "true");
+            await expect(page).toHaveURL(/layout=week/);
+            const label = (await wed.getAttribute("aria-label")) ?? "";
+            const date = label.split(",")[0] ?? "";
+            await expect(page).toHaveURL(
+                new RegExp(
+                    `date=\\d{4}-\\d{2}-${date.split(" ")[1]?.padStart(2, "0")}`,
+                ),
+            );
+            await expect(
+                page.getByRole("heading", {
+                    level: 2,
+                    name: new RegExp(`^${date}`),
+                }),
+            ).toBeVisible();
+            const n = /(\d+) booking/.exec(label)?.[1];
+            if (n !== undefined) {
+                await expect(
+                    page.getByText(new RegExp(`^${n} bookings?( · |$)`)),
+                ).toBeVisible();
+            } else {
+                await expect(
+                    page.getByText("Closed", { exact: true }),
+                ).toBeVisible();
+            }
+            // The 880px grid never draws on a phone, and nothing hides
+            // sideways.
+            await expect(
+                page
+                    .getByRole("button", { name: /Open the day$/ })
+                    .filter({ visible: true }),
+            ).toHaveCount(0);
+            await expectNothingHiddenSideways(page);
+        } else {
+            const headings = page
+                .getByRole("button", { name: /Open the day$/ })
+                .filter({ visible: true });
+            await expect(headings).toHaveCount(7);
+            await expect(headings.first()).toHaveAccessibleName(
+                /^Mon \d+ \w+(, today)?, (closed|\d+ booked)/,
+            );
+            await expect(
+                page.getByText(/The bar under each day shows how full it is\./),
+            ).toBeVisible();
+            await headings.nth(2).click();
+            await expect(page).toHaveURL(/layout=day/);
+        }
     });
 
     test("the peek shows Needs attention and opens the customer's page", async ({

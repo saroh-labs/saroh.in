@@ -274,6 +274,8 @@ describe("the week agrees with the day", () => {
                     hours: { windows: [[540, 1020]], off: [] },
                     today: false,
                     selected: true,
+                    cols: [],
+                    closed: null,
                 },
                 {
                     date: "2026-09-30",
@@ -282,14 +284,21 @@ describe("the week agrees with the day", () => {
                     hours: null,
                     today: false,
                     selected: false,
+                    cols: [],
+                    closed: null,
                 },
             ]}
             span={[480, 1080]}
             timezone="Asia/Kolkata"
             sightKey="week:2026-09-28"
             selected={null}
+            canBook
+            canOpenHours
+            offersFree={() => true}
             onDay={noop}
             onBlock={noop}
+            onFree={noop}
+            onOpenDay={noop}
         />,
     );
 

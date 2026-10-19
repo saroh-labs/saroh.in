@@ -42,8 +42,14 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/diary-block.tsx": ["button"],
     // button: free time on the diary, a cell covered by its button
     "components/bookings/calendar/free-gap.tsx": ["button"],
-    // button: a row or card that is one button
+    // button: a day heading, a cell that is one button
     "components/bookings/calendar/week-view.tsx": ["button"],
+    // button: free time and a booking on the diary, each one button
+    "components/bookings/calendar/week-blocks.tsx": ["button"],
+    // button: a row that is one button (a free time, a booking)
+    "components/bookings/calendar/week-day-rows.tsx": ["button"],
+    // button: a calendar cell (the week strip)
+    "components/bookings/calendar/week-phone.tsx": ["button"],
     // button: a choice in a list
     "components/bookings/reschedule-booking.tsx": ["button"],
     // button: a legend chip in its layer's colour, pressed to show or hide it

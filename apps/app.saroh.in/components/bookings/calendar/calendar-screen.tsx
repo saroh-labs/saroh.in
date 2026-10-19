@@ -48,11 +48,17 @@ import {
     isLive,
     localDateOf,
     localMinuteOf,
+    UNASSIGNED,
     visibleHours,
+    weekdayOf,
     weekStartOf,
     whoFor,
 } from "@/lib/services/diary";
-import { CANCELLED_LINE_MINUTES, hoursAcross } from "@/lib/services/diary-view";
+import {
+    CANCELLED_LINE_MINUTES,
+    closedKind,
+    hoursAcross,
+} from "@/lib/services/diary-view";
 import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 import { Users } from "lucide-react";
@@ -72,6 +78,7 @@ import { NewBookingFromGap } from "./new-booking-from-gap";
 import type { HoursTarget } from "./open-hours-dialog";
 import { OpenHoursDialog } from "./open-hours-dialog";
 import type { QuickLookActions } from "./quick-look-types";
+import { WeekPhone } from "./week-phone";
 import { WeekView } from "./week-view";
 
 // The calendar's address lives in a plain module so the server page can
@@ -315,9 +322,17 @@ export function CalendarScreen({
                 hours: hoursAcross(cols),
                 today: d === today,
                 selected: d === date,
+                // "Closed on Sundays" only when nobody shown works that
+                // weekday at all (U5).
+                closed: closedKind(cols, (key) =>
+                    (staffById.get(key)?.hours ?? []).some(
+                        (h) => h.dayOfWeek === weekdayOf(d),
+                    ),
+                ),
             };
         });
     }, [
+        staffById,
         calendar,
         staff,
         timezone,
@@ -530,7 +545,7 @@ export function CalendarScreen({
 
     // ── Free gaps and closed time ──────────────────────────────────────────
 
-    function bookGap(column: Column, free: Span) {
+    function bookGap(column: Column, free: Span, on: LocalDate = date) {
         const person = staffById.get(column.key);
         if (!person) return;
         // Past the plan's team limit (#800): no new bookings with them, and
@@ -539,8 +554,32 @@ export function CalendarScreen({
             showInfo(diaryPausedWords([person.name]));
             return;
         }
-        setGap({ staff: person, date, free });
+        setGap({ staff: person, date: on, free });
     }
+
+    // A day nobody works, from the week (U5): open hours for whoever is
+    // picked, else the viewer when they take bookings, else the first
+    // person on the diary, from when they usually start.
+    function openDay(on: LocalDate) {
+        const who =
+            staffById.get(person) ??
+            (me ? staffById.get(me.id) : undefined) ??
+            (staff ?? []).find((p) => p.status === "ACTIVE");
+        if (!who) return;
+        const starts = who.hours.map((h) => h.startMinute);
+        setHours({
+            staff: who,
+            date: on,
+            from: starts.length ? Math.min(...starts) : 540,
+            mode: "open",
+            windows: [],
+            blocks: [],
+        });
+    }
+    const offersFree = (c: Column) => {
+        const p = staffById.get(c.key);
+        return c.key !== UNASSIGNED && p !== undefined && !p.paused;
+    };
 
     function openClosed(column: Column, minute: number) {
         const person = staffById.get(column.key);
@@ -773,11 +812,36 @@ export function CalendarScreen({
                                 timezone={timezone}
                                 sightKey={`week:${weekStart}`}
                                 selected={peek}
+                                canBook={can.book}
+                                canOpenHours={can.hours}
+                                offersFree={offersFree}
                                 onDay={(d) => go("day", d)}
                                 onBlock={(b) => setPeek(b.key)}
+                                onFree={bookGap}
+                                onOpenDay={openDay}
                             />
                         </div>
-                        <div className="min-[760px]:hidden">{agendaList}</div>
+                        <div className="min-[760px]:hidden">
+                            <WeekPhone
+                                days={week}
+                                date={date}
+                                person={
+                                    person === EVERYONE
+                                        ? null
+                                        : (staffById.get(person)?.name ??
+                                          columns.at(0)?.name ??
+                                          null)
+                                }
+                                canBook={can.book}
+                                canOpenHours={can.hours}
+                                offersFree={offersFree}
+                                selected={peek}
+                                onPick={(d) => go("week", d)}
+                                onBlock={(b) => setPeek(b.key)}
+                                onFree={bookGap}
+                                onOpenDay={openDay}
+                            />
+                        </div>
                     </>
                 ) : null}
 
