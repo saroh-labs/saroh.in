@@ -26,7 +26,10 @@ export interface HomeInline {
         | "SEND_REMINDER"
         | "REPLY"
         | "REVIEW_REPLY"
-        | "REFUND";
+        | "REFUND"
+        // Needs you's groups (DEC-171): a booking awaiting payment.
+        | "SEND_PAY_LINK"
+        | "TURN_DOWN";
     /** The row's button. */
     label: string;
     /** What will happen, and who is told. */
@@ -41,7 +44,8 @@ export interface HomeInline {
     undoable: boolean;
     /**
      * The order, subscription, invoice, contact or review it acts on; for
-     * REFUND, the payment taken at the wrong amount.
+     * REFUND, the payment taken at the wrong amount; for SEND_PAY_LINK and
+     * TURN_DOWN, the booking.
      */
     target: string;
     /** The customer's first name, for the words after; null without one. */
@@ -88,6 +92,11 @@ export interface HomeNeed {
     moduleKey?: string;
     inline?: HomeInline;
     link?: HomeRowLink;
+    /**
+     * A quiet second action beside `inline` (A7): Turn down beside Send
+     * payment link on a booking awaiting payment.
+     */
+    second?: HomeInline;
 }
 
 /**

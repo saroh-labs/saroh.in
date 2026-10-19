@@ -32,7 +32,7 @@ import {
 } from "./inline-action";
 import { TONE_BADGE } from "./tone";
 import type { DoneRow, InlineActions } from "./use-inline-actions";
-import { useInlineActions } from "./use-inline-actions";
+import { confirmKey, useInlineActions } from "./use-inline-actions";
 
 /**
  * Needs you, as the Home design draws it (round 2, F3): one flat list, one
@@ -152,8 +152,9 @@ export function NeedsYou({
 }
 
 /**
- * One row of Needs you with its inline action. Home A's groups draw their
- * rows with it too (`need-groups.tsx`) until U7's group body replaces it.
+ * One row of the flat Needs you with its inline action, and the quiet one
+ * beside it where the API sent one (A7's Turn down). Home A's groups draw
+ * theirs with `NeedGroupBody` (`need-group-body.tsx`).
  */
 export function NeedRow({
     need,
@@ -174,8 +175,15 @@ export function NeedRow({
 }) {
     const line = needLine(need);
     const buttonRef = useRef<HTMLButtonElement>(null);
-    const inline = need.inline;
-    const open = inline !== undefined && actions.open === need.id && !done;
+    const secondRef = useRef<HTMLButtonElement>(null);
+    const { inline, second } = need;
+    const openFirst =
+        inline !== undefined && actions.open === confirmKey(need.id) && !done;
+    const openSecond =
+        second !== undefined &&
+        actions.open === confirmKey(need.id, "second") &&
+        !done;
+    const open = openFirst || openSecond;
     const arrival = arrivalProps(arrived && !done, onTouch);
     return (
         <li
@@ -225,13 +233,24 @@ export function NeedRow({
                     <InlineButton
                         inline={inline}
                         busy={actions.busy === need.id}
-                        onOpen={() => actions.openFor(need.id)}
+                        onOpen={() => actions.openFor(confirmKey(need.id))}
                         buttonRef={buttonRef}
+                    />
+                ) : null}
+                {second && !done && !open ? (
+                    <InlineButton
+                        inline={second}
+                        busy={actions.busy === need.id}
+                        onOpen={() =>
+                            actions.openFor(confirmKey(need.id, "second"))
+                        }
+                        buttonRef={secondRef}
+                        quiet
                     />
                 ) : null}
                 {done ? <InlineDone row={done} /> : null}
             </div>
-            {open ? (
+            {openFirst ? (
                 <InlineConfirm
                     need={need}
                     inline={inline}
@@ -239,6 +258,17 @@ export function NeedRow({
                     onClose={() =>
                         // The button is back once the confirm has gone.
                         requestAnimationFrame(() => buttonRef.current?.focus())
+                    }
+                />
+            ) : null}
+            {openSecond ? (
+                <InlineConfirm
+                    need={need}
+                    inline={second}
+                    which="second"
+                    actions={actions}
+                    onClose={() =>
+                        requestAnimationFrame(() => secondRef.current?.focus())
                     }
                 />
             ) : null}
