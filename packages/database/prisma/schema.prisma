@@ -2948,6 +2948,111 @@ model AccountManagerLink {
   @@index([platformAdminId, endedAt])
 }
 
+// A commission rate (DEC-169, admin console U21): what share of a payment
+// before GST a manager earns, for one link kind (BROUGHT_IN or ASSIGNED),
+// from `effectiveFrom` on. Set in the console by a holder of
+// `commission:rates`; never written in code, tests, seeds or docs (the repo
+// is public). Append-only: a change is a new row, and a line copies the
+// rate it was worked out with, so a later change never moves it. Saroh's,
+// not a business's.
+model CommissionRate {
+  id String @id @default(cuid())
+
+  /// BROUGHT_IN | ASSIGNED, as `AccountManagerLink.kind`.
+  kind          String
+  /// Hundredths of a percent, 0..10000 (CHECKed).
+  basisPoints   Int
+  effectiveFrom DateTime
+  setByUserId   String
+  reason        String
+
+  createdAt DateTime @default(now())
+
+  @@index([kind, effectiveFrom])
+}
+
+// What one cleared Saroh payment earns its business's manager (DEC-169,
+// admin console U21): written by the `commission.line` job after the
+// payment's transaction has committed, never inside it, so a commission
+// failure can never touch a payment. One line per invoice, or twelve for a
+// year paid at once (one twelfth each month, owner 19 Oct): `installment`
+// of `installments`.
+//
+// - PENDING until the period it pays for (`periodEnd`) ends with no refund
+//   or dispute; then PAYABLE in `statementMonth` (the month the period
+//   ended in India, or the next month not yet paid).
+// - HELD while the provider took a different amount from the invoice.
+// - NO_RATE while no rate was set for the link's kind; worked out once one is.
+// - CANCELLED by a refund, or a dispute lost, before it was paid.
+// - PAID with its month's payout; a refund after that is a Needs action
+//   for the owner, and the line stays as it was.
+//
+// Relation-free, like BillingAction: the invoice, the business and the
+// manager are plain ids, so what the team was paid outlives them. A
+// business's row, so it carries the org-isolation policy.
+model CommissionLine {
+  id String @id @default(cuid())
+
+  organizationId  String
+  platformAdminId String
+  linkId          String
+  sarohInvoiceId  String
+  installment     Int    @default(1)
+  installments    Int    @default(1)
+
+  /// The link's kind when the payment cleared: BROUGHT_IN | ASSIGNED.
+  kind            String
+  /// This line's share of the invoice's amount before GST, in paise.
+  baseAmountPaise Int
+  /// The rate copied from `CommissionRate` (`rateId`); null while NO_RATE.
+  rateId          String?
+  basisPoints     Int?
+  /// What it earns, in paise; null while NO_RATE.
+  amountPaise     Int?
+  /// When it can become payable: the end of the period (or month) it pays for.
+  periodEnd       DateTime
+
+  /// PENDING | HELD | NO_RATE | PAYABLE | CANCELLED | PAID
+  status         String
+  /// "2026-12": the statement it is paid in, once PAYABLE.
+  statementMonth String?
+  payoutId       String?
+  /// Why it is held or was cancelled, in Saroh's words.
+  note           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sarohInvoiceId, installment])
+  @@index([platformAdminId, statementMonth])
+  @@index([platformAdminId, status])
+  @@index([status, periodEnd])
+  @@index([organizationId])
+}
+
+// A month's commission paid to one teammate (DEC-169, admin console U21):
+// marked paid in the console with the bank's reference by someone else
+// with `team:pay`. It locks the month: a line that becomes payable later
+// goes to the next month's statement. Saroh's, not a business's.
+model CommissionPayout {
+  id String @id @default(cuid())
+
+  platformAdminId String
+  /// "2026-12"
+  month           String
+  amountPaise     Int
+  lineCount       Int
+  reference       String
+  reason          String
+  paidAt          DateTime
+  paidByUserId    String
+
+  createdAt DateTime @default(now())
+
+  @@unique([platformAdminId, month])
+  @@index([month])
+}
+
 // Global, append-only history of staff activity in the Saroh control plane.
 // Deliberately relation-free: deleting a User, Organization, or target business
 // record must never cascade into the platform audit trail.

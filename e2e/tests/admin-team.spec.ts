@@ -134,10 +134,11 @@ test.describe("Team on the operator console", () => {
         }
     });
 
-    test("Payouts shows its place for a Platform owner", async ({ page }) => {
+    test("Payouts opens for a Platform owner", async ({ page }) => {
         await page.goto(`${ADMIN}/team/payouts`);
         await expect(
-            page.getByText("Payouts arrive with the commission work"),
+            page.getByRole("heading", { level: 1, name: "Team" }),
         ).toBeVisible();
+        await expect(page.getByText("Not authorized")).toHaveCount(0);
     });
 });

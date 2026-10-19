@@ -1,0 +1,384 @@
+import type { Logger } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
+
+import { raiseBillingActionInTx } from "../billing/billing-actions";
+import type { LineStatus, RateKind } from "./commission-rules";
+import {
+    commissionPaise,
+    installmentEnds,
+    installmentsOf,
+    isLegalLineMove,
+    nextStatus,
+    OPEN_STATUSES,
+    refundAfterPayout,
+    refundSignal,
+    splitEvenly,
+    statementMonthFor,
+} from "./commission-rules";
+
+type Tx = Prisma.TransactionClient;
+
+/** The lock that serialises everything that writes one invoice's lines. */
+export const invoiceLockKey = (sarohInvoiceId: string) =>
+    `commission-invoice:${sarohInvoiceId}`;
+
+/**
+ * The lock that serialises a teammate's statement: a line put in a month
+ * and Mark paid locking that month.
+ */
+export const payoutLockKey = (platformAdminId: string) =>
+    `commission-payout:${platformAdminId}`;
+
+export async function lockKeyInTx(tx: Tx, key: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+}
+
+/** Why a payment made no line. */
+export type NoLine =
+    "gone" | "nothing-earned" | "no-manager" | "off-commission";
+
+export interface Settled {
+    /** Lines written now (0 when they existed already, or none are owed). */
+    written: number;
+    /** Lines that moved. */
+    moved: number;
+    /** Why no line was written, when none exists. */
+    noLine?: NoLine;
+}
+
+interface InvoiceFacts {
+    id: string;
+    organizationId: string;
+    number: string;
+    provider: string;
+    providerPaymentId: string | null;
+    issuedAt: Date;
+    cycle: string;
+    periodStart: Date | null;
+    periodEnd: Date | null;
+    taxablePaise: number;
+    totalPaise: number;
+    providerAmountPaise: number | null;
+}
+
+/** The rate in force for `kind` at `at`, else the first one set after it. */
+export async function rateForInTx(
+    tx: Pick<Tx, "commissionRate">,
+    kind: RateKind,
+    at: Date,
+): Promise<{ id: string; basisPoints: number } | null> {
+    const inForce = await tx.commissionRate.findFirst({
+        where: { kind, effectiveFrom: { lte: at } },
+        orderBy: [{ effectiveFrom: "desc" }, { createdAt: "desc" }],
+        select: { id: true, basisPoints: true },
+    });
+    if (inForce) return inForce;
+    return tx.commissionRate.findFirst({
+        where: { kind, effectiveFrom: { gt: at } },
+        orderBy: [{ effectiveFrom: "asc" }, { createdAt: "asc" }],
+        select: { id: true, basisPoints: true },
+    });
+}
+
+/** The business's link at the moment its payment cleared, if it had one. */
+export async function linkAtInTx(
+    tx: Pick<Tx, "accountManagerLink">,
+    organizationId: string,
+    at: Date,
+) {
+    return tx.accountManagerLink.findFirst({
+        where: {
+            organizationId,
+            startedAt: { lte: at },
+            OR: [{ endedAt: null }, { endedAt: { gt: at } }],
+        },
+        orderBy: { startedAt: "desc" },
+        select: { id: true, platformAdminId: true, kind: true },
+    });
+}
+
+async function refundsInTx(tx: Tx, invoice: InvoiceFacts) {
+    return tx.billingRefund.findMany({
+        where: {
+            OR: [
+                { invoiceId: invoice.id },
+                ...(invoice.providerPaymentId
+                    ? [
+                          {
+                              provider: invoice.provider,
+                              providerPaymentId: invoice.providerPaymentId,
+                          },
+                      ]
+                    : []),
+            ],
+        },
+        select: { id: true, kind: true, status: true, providerRefundId: true },
+        orderBy: { createdAt: "asc" },
+    });
+}
+
+/**
+ * The provider took a different amount and the Needs-action row for it
+ * (`saroh_invoice_amount_mismatch`, once per invoice) isn't resolved.
+ */
+async function heldInTx(tx: Tx, invoice: InvoiceFacts): Promise<boolean> {
+    if (
+        invoice.providerAmountPaise === null ||
+        invoice.providerAmountPaise === invoice.totalPaise
+    ) {
+        return false;
+    }
+    const action = await tx.billingAction.findUnique({
+        where: { dedupeKey: `amount-mismatch:${invoice.id}` },
+        select: { resolvedAt: true },
+    });
+    return !action?.resolvedAt;
+}
+
+/** The statement a line becoming payable now goes in, under the payout lock. */
+async function statementMonthInTx(
+    tx: Tx,
+    platformAdminId: string,
+    periodEnd: Date,
+): Promise<string> {
+    await lockKeyInTx(tx, payoutLockKey(platformAdminId));
+    const paid = await tx.commissionPayout.findMany({
+        where: { platformAdminId },
+        select: { month: true },
+    });
+    return statementMonthFor(periodEnd, new Set(paid.map((p) => p.month)));
+}
+
+const NOTES: Partial<Record<LineStatus, string>> = {
+    HELD: "The billing provider took a different amount from the invoice. Paid once the mismatch is resolved in Billing › Needs action.",
+    NO_RATE:
+        "No commission rate was set for this kind of business when it paid. Worked out once one is.",
+    CANCELLED: "The payment was refunded, or a dispute on it was lost.",
+};
+
+/**
+ * Write a cleared Saroh payment's commission lines if it has none, then
+ * bring every line of it up to date (DEC-169, admin console U21): money
+ * gone back cancels it, no rate leaves it NO_RATE, a mismatch HELD, an
+ * open refund or dispute PENDING, and a period that ended without them
+ * makes it PAYABLE in its month. A line already PAID is never changed: a
+ * refund after payout raises a Needs action for the owner, once.
+ *
+ * Idempotent, and serialised per invoice by `commission-invoice:<id>`:
+ * the line job, the refund job and the sweep can all run it. Called only
+ * outside a payment's transaction, on its own: it reads the invoice, it
+ * never writes one.
+ */
+export async function settleInvoiceInTx(
+    tx: Tx,
+    logger: Pick<Logger, "warn">,
+    sarohInvoiceId: string,
+    now: Date,
+): Promise<Settled> {
+    await lockKeyInTx(tx, invoiceLockKey(sarohInvoiceId));
+    const invoice = await tx.sarohInvoice.findUnique({
+        where: { id: sarohInvoiceId },
+        select: {
+            id: true,
+            organizationId: true,
+            number: true,
+            provider: true,
+            providerPaymentId: true,
+            issuedAt: true,
+            cycle: true,
+            periodStart: true,
+            periodEnd: true,
+            taxablePaise: true,
+            totalPaise: true,
+            providerAmountPaise: true,
+        },
+    });
+    if (!invoice) return { written: 0, moved: 0, noLine: "gone" };
+
+    const refunds = await refundsInTx(tx, invoice);
+    const refund = refundSignal(refunds);
+    const held = await heldInTx(tx, invoice);
+
+    let written = 0;
+    let lines = await tx.commissionLine.findMany({
+        where: { sarohInvoiceId },
+        orderBy: { installment: "asc" },
+    });
+    if (lines.length === 0) {
+        const plan = await planLinesInTx(tx, invoice);
+        if ("noLine" in plan) return { written: 0, moved: 0, ...plan };
+        await tx.commissionLine.createMany({
+            data: plan.lines.map((line) => ({
+                ...line,
+                status: line.basisPoints === null ? "NO_RATE" : "PENDING",
+                note: line.basisPoints === null ? NOTES.NO_RATE : null,
+            })),
+            skipDuplicates: true,
+        });
+        lines = await tx.commissionLine.findMany({
+            where: { sarohInvoiceId },
+            orderBy: { installment: "asc" },
+        });
+        written = plan.lines.length;
+    }
+
+    // A rate for lines written before there was one, worked out for the
+    // whole payment at once so the twelfths still add up.
+    const unrated = lines.filter(
+        (l) => l.status === "NO_RATE" && l.basisPoints === null,
+    );
+    let rated = new Map<
+        string,
+        { rateId: string; bps: number; amount: number }
+    >();
+    if (unrated.length > 0) {
+        const rate = await rateForInTx(
+            tx,
+            lines[0].kind as RateKind,
+            invoice.issuedAt,
+        );
+        if (rate) {
+            const amounts = splitEvenly(
+                commissionPaise(invoice.taxablePaise, rate.basisPoints),
+                lines[0].installments,
+            );
+            rated = new Map(
+                unrated.map((l) => [
+                    l.id,
+                    {
+                        rateId: rate.id,
+                        bps: rate.basisPoints,
+                        amount: amounts[l.installment - 1],
+                    },
+                ]),
+            );
+        }
+    }
+
+    let moved = 0;
+    for (const line of lines) {
+        const status = line.status as LineStatus;
+        const facts = {
+            status,
+            refund,
+            rated: line.basisPoints !== null || rated.has(line.id),
+            held,
+            periodEnded: line.periodEnd.getTime() <= now.getTime(),
+        };
+        if (refundAfterPayout(facts)) {
+            const back = refunds.find(
+                (r) =>
+                    (r.kind === "REFUND" && r.status === "PROCESSED") ||
+                    (r.kind === "DISPUTE" && r.status === "LOST"),
+            );
+            await raiseBillingActionInTx(tx, {
+                organizationId: invoice.organizationId,
+                code: "commission_refund_after_payout",
+                refs: {
+                    invoice: invoice.number,
+                    payment: invoice.providerPaymentId,
+                    refund: back?.providerRefundId,
+                    line: line.id,
+                    payout: line.payoutId,
+                },
+                note: `Saroh invoice ${invoice.number} was refunded after its account manager's commission for it was paid (statement ${line.statementMonth ?? "unknown"}). Nothing was taken back: decide with them whether to.`,
+                dedupeKey: `commission-refund-after-payout:${line.id}`,
+            });
+            continue;
+        }
+        if (!OPEN_STATUSES.includes(status)) continue;
+
+        const to = nextStatus(facts);
+        const rate = rated.get(line.id);
+        if (to === status && !rate) continue;
+        if (!isLegalLineMove(status, to)) {
+            logger.warn(
+                `commission_line_move_refused line=${line.id} from=${status} to=${to}`,
+            );
+            continue;
+        }
+        const statementMonth =
+            to === "PAYABLE"
+                ? status === "PAYABLE" && line.statementMonth
+                    ? line.statementMonth
+                    : await statementMonthInTx(
+                          tx,
+                          line.platformAdminId,
+                          line.periodEnd,
+                      )
+                : null;
+        const { count } = await tx.commissionLine.updateMany({
+            where: { id: line.id, status },
+            data: {
+                status: to,
+                statementMonth,
+                note: NOTES[to] ?? null,
+                ...(rate
+                    ? {
+                          rateId: rate.rateId,
+                          basisPoints: rate.bps,
+                          amountPaise: rate.amount,
+                      }
+                    : {}),
+            },
+        });
+        moved += count;
+    }
+    return { written, moved };
+}
+
+type PlannedLine = Omit<
+    Prisma.CommissionLineCreateManyInput,
+    "status" | "note"
+> & { basisPoints: number | null };
+
+/**
+ * The lines a payment earns, or why it earns none: nothing before GST
+ * (a free month, a fully discounted charge); no manager when it cleared;
+ * a manager not paid by commission. A year paid at once is twelve lines.
+ */
+async function planLinesInTx(
+    tx: Tx,
+    invoice: InvoiceFacts,
+): Promise<{ lines: PlannedLine[] } | { noLine: NoLine }> {
+    if (invoice.taxablePaise <= 0) return { noLine: "nothing-earned" };
+    const link = await linkAtInTx(tx, invoice.organizationId, invoice.issuedAt);
+    if (!link) return { noLine: "no-manager" };
+    const profile = await tx.staffProfile.findUnique({
+        where: { platformAdminId: link.platformAdminId },
+        select: { onCommission: true },
+    });
+    if (!profile?.onCommission) return { noLine: "off-commission" };
+
+    const kind = link.kind as RateKind;
+    const rate = await rateForInTx(tx, kind, invoice.issuedAt);
+    const parts = installmentsOf(invoice.cycle);
+    const ends = installmentEnds({
+        periodStart: invoice.periodStart ?? invoice.issuedAt,
+        periodEnd: invoice.periodEnd ?? invoice.issuedAt,
+        installments: parts,
+    });
+    const bases = splitEvenly(invoice.taxablePaise, parts);
+    const amounts = rate
+        ? splitEvenly(
+              commissionPaise(invoice.taxablePaise, rate.basisPoints),
+              parts,
+          )
+        : null;
+    return {
+        lines: ends.map((periodEnd, i) => ({
+            organizationId: invoice.organizationId,
+            platformAdminId: link.platformAdminId,
+            linkId: link.id,
+            sarohInvoiceId: invoice.id,
+            installment: i + 1,
+            installments: parts,
+            kind,
+            baseAmountPaise: bases[i],
+            rateId: rate?.id ?? null,
+            basisPoints: rate?.basisPoints ?? null,
+            amountPaise: amounts ? amounts[i] : null,
+            periodEnd,
+        })),
+    };
+}

@@ -1,27 +1,30 @@
 import { StatCard } from "@saroh/ui/stat-card";
 
+import { formatPaise } from "@/lib/billing-words";
+import type { PayoutStatement } from "@/lib/commission-words";
 import { plural } from "@/lib/format";
 import type { StaffInvite, StaffMember } from "@/lib/staff";
-
-import { PayoutsSlot } from "./payouts-slot";
 
 /**
  * The Teammates tab's counts (R30): people on the team, account managers,
  * and businesses without a manager (only for staff who may see every
- * business's manager, `accounts:read`). The commission card is the
- * payouts slot, only for `team:pay`.
+ * business's manager, `accounts:read`). The commission card is this
+ * month's statement totals (U21), only for `team:pay`.
  */
 export function SummaryCards({
     members,
     invites,
     unassigned,
     canPay,
+    commission,
 }: {
     members: StaffMember[];
     invites: StaffInvite[];
     /** Null: not shown (no `accounts:read`, or the read failed). */
     unassigned: number | null;
     canPay: boolean;
+    /** This month's statement totals; null when it couldn't be read. */
+    commission?: PayoutStatement["totals"] | null;
 }) {
     const active = members.filter((member) => !member.revokedAt);
     const waiting = invites.filter(
@@ -69,7 +72,21 @@ export function SummaryCards({
                     }
                 />
             )}
-            {canPay && <PayoutsSlot place="summary" />}
+            {canPay && (
+                <StatCard
+                    label="Commission this month"
+                    value={commission ? formatPaise(commission.duePaise) : "—"}
+                    hint={
+                        commission ? (
+                            <a href="/team/payouts" className="underline">
+                                {`${formatPaise(commission.waitingPaise)} not payable yet`}
+                            </a>
+                        ) : (
+                            "Couldn't read this month's payouts."
+                        )
+                    }
+                />
+            )}
         </div>
     );
 }

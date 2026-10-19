@@ -46,14 +46,27 @@ const identity = vi.hoisted(() => ({
     requireSession: vi.fn(),
 }));
 const nav = vi.hoisted(() => ({ pathname: "/team" }));
+const commission = vi.hoisted(() => ({
+    readPayouts: vi.fn(),
+    readRates: vi.fn(),
+    readEarnings: vi.fn(),
+}));
 
 vi.mock("@saroh/ui/toast", () => toast);
 vi.mock("@/lib/account-manager-actions", () => managerActions);
 vi.mock("@/lib/team-actions", () => teamActions);
 vi.mock("@/lib/control-plane", () => ({
     getStaffIdentity: identity.getStaffIdentity,
+    // The Payouts page also reads the team to know who is looking.
+    getJson: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock("@/lib/session", () => ({ requireSession: identity.requireSession }));
+vi.mock("@/lib/commission", () => commission);
+vi.mock("@/components/team/payouts-tab", () => ({
+    PayoutsTab: ({ statement }: { statement: { month: string } }) => (
+        <div>Payouts for {statement.month}</div>
+    ),
+}));
 vi.mock("@/components/admin-shell", () => ({
     AdminShell: ({ children }: { children: ReactNode }) => (
         <div data-testid="shell">{children}</div>
@@ -619,18 +632,30 @@ describe("Payouts and commission need team:pay", () => {
 
     it("answers /team/payouts without team:pay with the no-access panel", async () => {
         identity.getStaffIdentity.mockResolvedValue(staff(["team:read"]));
-        render((await PayoutsPage()) as ReactElement);
+        const params = { searchParams: Promise.resolve({}) };
+        render((await PayoutsPage(params)) as ReactElement);
         expect(screen.getByText("Not authorized")).toBeTruthy();
-        expect(screen.queryByText(/Payouts arrive/)).toBeNull();
+        expect(commission.readPayouts).not.toHaveBeenCalled();
 
         cleanup();
         identity.getStaffIdentity.mockResolvedValue(
             staff(["team:read", "team:pay"]),
         );
-        render((await PayoutsPage()) as ReactElement);
-        expect(
-            screen.getByText("Payouts arrive with the commission work"),
-        ).toBeTruthy();
+        commission.readPayouts.mockResolvedValue({
+            month: "2026-10",
+            current: true,
+            totals: {
+                duePaise: 0,
+                paidPaise: 0,
+                waitingPaise: 0,
+                newBusinesses: 0,
+            },
+            people: [],
+        });
+        render((await PayoutsPage(params)) as ReactElement);
+        expect(screen.getByText("Payouts for 2026-10")).toBeTruthy();
+        // No rates sheet without commission:rates.
+        expect(commission.readRates).not.toHaveBeenCalled();
     });
 });
 

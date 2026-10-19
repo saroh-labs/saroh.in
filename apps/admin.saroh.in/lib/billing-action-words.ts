@@ -143,6 +143,8 @@ export const BILLING_ACTION_CODES = [
     "billing_payment_notes_given_up",
     "billing_profile_owner_left",
     "billing_profile_gone",
+    "commission_line_failed",
+    "commission_refund_after_payout",
 ] as const;
 export type BillingActionCode = (typeof BILLING_ACTION_CODES)[number];
 
@@ -277,6 +279,21 @@ const ACTION_WORDS: Record<BillingActionCode, ActionWords> = {
         what: "The billing profile a plan change needed was removed before the change ran.",
         tone: "warning",
         fix: OPEN_SUBSCRIPTION,
+    },
+    commission_line_failed: {
+        label: "Commission not worked out",
+        what: "A payment and its invoice are recorded, but its account manager's commission couldn't be worked out after several tries, and Saroh tries again every hour.",
+        tone: "warning",
+        fix: {
+            kind: "resolve",
+            label: "Mark resolved once it shows on Payouts",
+        },
+    },
+    commission_refund_after_payout: {
+        label: "Refund after commission paid",
+        what: "A payment was refunded after its account manager's commission on it was paid, and nothing was taken back.",
+        tone: "warning",
+        fix: { kind: "resolve", label: "Decide with them, then mark resolved" },
     },
 };
 

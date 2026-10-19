@@ -36,6 +36,8 @@ import { AdminBillingService } from "./admin-billing.service";
 import { AdminBusinessModulesService } from "./admin-business-modules.service";
 import { AdminBusinessReportsController } from "./admin-business-reports.controller";
 import { AdminBusinessReportsService } from "./admin-business-reports.service";
+import { AdminCommissionController } from "./admin-commission.controller";
+import { AdminCommissionService } from "./admin-commission.service";
 import { AdminConsoleController } from "./admin-console.controller";
 import { AdminContactMessagesController } from "./admin-contact-messages.controller";
 import { AdminContactMessagesService } from "./admin-contact-messages.service";
@@ -142,6 +144,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminConsoleController,
         // Who looks after which business (DEC-169, U25).
         AdminAccountManagersController,
+        // What the team is owed, and the rates (DEC-169, U21).
+        AdminCommissionController,
     ],
     providers: [
         IdempotencyService,
@@ -161,6 +165,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminStaffService,
         // Account managers: assign, reassign, end, share out (U25).
         AdminAccountManagersService,
+        // Commission: statements, Mark paid, earnings, rates (U21).
+        AdminCommissionService,
         AdminPeopleService,
         // Sign-in help (U9): codes through Better Auth, and the end of a
         // changed sign-in email's 24-hour hold.

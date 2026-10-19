@@ -2,6 +2,7 @@ import { FailedPanel } from "@/components/states/failed-panel";
 import { TeamPeople } from "@/components/team/people-table";
 import { SummaryCards } from "@/components/team/summary-cards";
 import { UnassignedBusinesses } from "@/components/team/unassigned-businesses";
+import { readPayouts } from "@/lib/commission";
 import { can, requireStaff } from "@/lib/console";
 import type { StaffInvite, UnassignedList } from "@/lib/staff";
 import { listInvites, listTeam, listUnassigned } from "@/lib/staff";
@@ -21,7 +22,8 @@ export default async function TeammatesPage() {
     const seesInvites = can(staff, "staff:read");
     const seesManagers = can(staff, "accounts:read");
 
-    const [members, invites, unassigned] = await Promise.all([
+    const canPay = can(staff, "team:pay");
+    const [members, invites, unassigned, payouts] = await Promise.all([
         listTeam().catch(() => undefined),
         seesInvites
             ? listInvites().catch(() => null)
@@ -29,6 +31,7 @@ export default async function TeammatesPage() {
         seesManagers
             ? listUnassigned().catch(() => null)
             : Promise.resolve<UnassignedList | null>(null),
+        canPay ? readPayouts().catch(() => null) : Promise.resolve(null),
     ]);
 
     if (!members) return <FailedPanel things="the team" />;
@@ -39,7 +42,8 @@ export default async function TeammatesPage() {
                 members={members}
                 invites={invites ?? []}
                 unassigned={unassigned ? unassigned.total : null}
-                canPay={can(staff, "team:pay")}
+                canPay={canPay}
+                commission={payouts?.totals ?? null}
             />
             <TeamPeople
                 members={members}

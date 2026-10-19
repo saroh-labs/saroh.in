@@ -111,6 +111,9 @@ waits while holding one.
 | `account-manager:<organizationId>`        | Staff changing who looks after one business (DEC-169, admin console U25): assign, move, end, and each business a share-out gives, so two at once can't both start a link                                                                                                                                                                 | `admin/admin-account-managers.service.ts` (`lockBusiness`)                                                                                      |
 | `account-managers:share-out`              | One Share out evenly at a time, so two can't plan from the same loads; taken before the per-business keys                                                                                                                                                                                                                                | `admin/admin-account-managers.service.ts` (`shareOut`)                                                                                          |
 | `job-chain:account-managers.link-sweep`   | Leaving one waiting run of the manager link sweep: "is one waiting? if not, add one" under the lock, in place of a `Job_one_pending_…` index                                                                                                                                                                                             | `admin/manager-link-sweep.job.ts` (`schedule`)                                                                                                  |
+| `commission-invoice:<sarohInvoiceId>`     | Writing and moving one payment's commission lines (DEC-169, admin console U21): the line job, the refund job, the sweep and a rate set all settle through it                                                                                                                                                                             | `commission/commission-settle.ts` (`settleInvoiceInTx`)                                                                                         |
+| `commission-payout:<platformAdminId>`     | Putting a line in a teammate's statement month against Mark paid locking that month, so a line never lands in a month already paid; taken after the invoice's key                                                                                                                                                                        | `commission/commission-settle.ts`; `admin/admin-commission.service.ts` (`markPaid`)                                                             |
+| `job-chain:commission.sweep`              | Leaving one waiting run of the commission sweep, as the manager link sweep does                                                                                                                                                                                                                                                          | `commission/commission-sweep.job.ts` (`schedule`)                                                                                               |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086)                                                                                                                                                                              | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
@@ -305,6 +308,25 @@ the Privacy Policy states both.
   itself), at the moment the role ended (`roleEnded`), with one ledger row
   per business as `system:manager-link-sweep`. At most 200 managers a run;
   a manager whose links fail to end is logged and the rest go on.
+
+## Commission — **Current** (DEC-169, admin console U21)
+
+- **`commission.line`** writes one payment's commission lines; queued by
+  the billing webhook **after** its transaction commits
+  (`CommissionQueue`, a failure only logged), only for an invoice whose
+  business had a manager when it was issued. **`commission.refund`**
+  re-settles a refunded or disputed payment's lines, only when its invoice
+  has some. Both are idempotent (one line per invoice and installment,
+  every move conditional on the status it leaves), retried 8 times; the
+  last try raises `commission_line_failed` in Needs action, once per
+  invoice, and ends.
+- **`commission.sweep`** is hourly and self-rescheduling (one waiting run
+  under `job-chain:commission.sweep`, restarted by the module's six-hour
+  check and at boot): payments of the last 60 days with no line whose
+  manager was on commission, open lines whose period ended or that are
+  HELD, NO_RATE or PAYABLE, and payments whose refund or dispute changed
+  in the last 3 days. Pages of 200 by id, never re-reading one it tried;
+  an invoice that fails is logged and the rest go on.
 
 ## Data export — **Current** (DEC-120)
 

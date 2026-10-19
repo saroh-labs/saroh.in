@@ -64,7 +64,7 @@ recorded grant (the API refuses it otherwise).
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
   `waitlist`, `deployments`, `usage`, `business-reports`, `contact-messages`,
-  `billing`) import `next/headers`; a client component takes types from them,
+  `billing`, `commission`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
   `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
   `lib/deletion-words.ts`, `lib/billing-words.ts`,
@@ -73,7 +73,7 @@ recorded grant (the API refuses it otherwise).
   `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`,
   `lib/business-words.ts`, `lib/offer-words.ts`, `lib/saroh-lead-words.ts`,
   `lib/home-words.ts`, `lib/search-words.ts`, `lib/team-words.ts`,
-  `lib/roles-matrix.ts`.
+  `lib/roles-matrix.ts`, `lib/commission-words.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -184,9 +184,24 @@ recorded grant (the API refuses it otherwise).
   otherwise) and paid by commission: someone with an account is granted at
   once, with the job kept on their profile; anyone else gets the U24
   invite, which carries no end date. The break-glass note and Make me
-  Platform owner live in the shell's banner on every screen. Payouts and
-  the commission card are `components/team/payouts-slot.tsx` until U21's
-  `PayoutsTab` and `EarningsCard` replace it. No rate or amount is ever
+  Platform owner live in the shell's banner on every screen. Payouts mounts
+  U21's `PayoutsTab` and the summary's commission card reads its
+  statement totals (below). No rate or amount is ever
+  written in the console.
+- **Commission (DEC-169, admin plan U21)** is three parts the Team pages
+  mount, each taking its data as props: `PayoutsTab`
+  (`components/team/payouts-tab.tsx`, with `readPayouts(month)` and, for
+  `commission:rates`, `readRates()` from `lib/commission.ts`): the month's
+  statement per teammate (Due / Paid with the reference, what isn't
+  payable yet, the businesses they brought in that month and how each was
+  proved), ‹ › months as `?month=` links, Export CSV, and Mark paid… (an
+  `OperatorDialog` asking the payment's reference; disabled, saying why,
+  on one's own row). `RatesSheet` (`rates-sheet.tsx`, opened from the
+  tab): the rate in force per kind, those to come, every one set, and Set
+  a rate… (an `OperatorDialog`; a percentage, read into basis points).
+  `EarningsCard` (`earnings.tsx`, with `readEarnings(id)`) for a member's
+  Earnings tab. All need `team:pay` (rates `commission:rates`); writes
+  go through `lib/commission-actions.ts`. No rate or default is ever
   written in the console.
 - **A business's Overview needs no support session** (admin plan U3):
   `GET /admin/organizations/:id/overview` (`organization:read`, scoped by

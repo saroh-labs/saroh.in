@@ -5,6 +5,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { env } from "../../env";
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
+import { CommissionModule } from "../commission/commission.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
@@ -117,6 +118,9 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         // nothing itself, so it adds no cycle.
         AnalyticsCoreModule,
         AuditModule,
+        // Commission (DEC-169, U21): the webhook queues a line after its
+        // transaction commits. Imports only the jobs module, so no cycle.
+        CommissionModule,
         FeatureFlagModule,
         JobsModule,
         forwardRef(() => OrganizationsModule),

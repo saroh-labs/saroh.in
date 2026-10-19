@@ -600,8 +600,9 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   4 characters to `team:pay` holders, each read on the ledger. The role
   CHECK in the migrations equals `AdminRole` (`admin-role-check.spec.ts`).
   Team permissions no route requires yet are listed in `AWAITING_ENDPOINT`
-  with the unit that wires them; `admin.controller.permissions.spec.ts`
-  fails on any other unused permission.
+  with the unit that wires them (since U21 only `accounts:read`);
+  `admin.controller.permissions.spec.ts` fails on any other unused
+  permission.
 - **Current** (DEC-169, admin console U19) — **Who brought a business in**
   is decided once, in its create transaction, by `recordManagerInTx`
   (`modules/organizations/account-manager.ts`) under a savepoint: anything
@@ -643,6 +644,21 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   ran out, or a change made outside the console) at the moment the role
   ended, named on the ledger as `system:manager-link-sweep`. A change of
   the role's expiry alone keeps them.
+- **Current** (DEC-169, admin console U21) — **What the team is owed**
+  (`admin-commission.controller.ts`) needs `team:pay` (Platform owner and
+  Billing): the month's statement (`GET admin/team/payouts?month=`), its
+  CSV (`…/export`), Mark paid (`POST admin/team/payouts`, a reference, a
+  reason and an idempotency key) and a teammate's earnings
+  (`GET admin/staff/:id/earnings`). The rates (`GET`/`POST
+admin/commission/rates`) need `commission:rates` (Platform owner only).
+  The service checks each again. Nobody marks their own commission paid
+  (403, the caller's `platformAdminId` is the payee's). Reads are on the
+  ledger as reads (`commission.statement.read`, `.export`,
+  `.earnings.read`, `.rates.read`), writes in their transaction
+  (`commission.payout.paid`, `commission.rate.set`); neither carries a rate
+  or an amount in its metadata. Cross-tenant, with no organization context:
+  `CommissionLine` carries the org-isolation policy, `CommissionRate` and
+  `CommissionPayout` are in `NOT_TENANT_OWNED`.
 - **Current** (DEC-169, admin console U20) — **Saroh's own sales leads**
   (`/admin/saroh-leads`, `modules/saroh-leads/`) belong to no business:
   `SarohLead` is in `NOT_TENANT_OWNED`, and `SarohContactLog` (a call or

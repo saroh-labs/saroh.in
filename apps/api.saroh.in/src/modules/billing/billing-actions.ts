@@ -24,6 +24,10 @@ export const BILLING_ACTION_CODES = [
     "billing_payment_notes_given_up",
     "billing_profile_owner_left",
     "billing_profile_gone",
+    // Commission (DEC-169, admin console U21): a payment's line the job
+    // couldn't write after its tries, and a refund after the line was paid.
+    "commission_line_failed",
+    "commission_refund_after_payout",
 ] as const;
 
 export type BillingActionCode = (typeof BILLING_ACTION_CODES)[number];
