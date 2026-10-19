@@ -284,10 +284,13 @@ export function ScrollX({
                             ? { maskImage: mask, WebkitMaskImage: mask }
                             : undefined
                     }
+                    // relative: an absolutely placed child (a count badge's
+                    // sr-only words) is clipped here too; without it, it
+                    // escaped and widened the whole page on a phone.
                     className={
                         bare
-                            ? "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                            : "overflow-x-auto rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                            ? "relative overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                            : "relative overflow-x-auto rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     }
                 >
                     {children}

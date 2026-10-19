@@ -5260,3 +5260,13 @@ rule stands for the profile's own fields.
 **Fix.** `sameValue` compares by what a value says: key order doesn't count, and a missing field equals null or undefined. `preview.test.tsx` has an add-on read back in another order. The empty draft now says "No changes in this draft yet."
 
 **Rule.** Never compare objects with `JSON.stringify`; a value that made a round trip through the API changes key order. Use a field-by-field or order-blind compare (`sameValue`, `sameCell`, `samePlan`).
+
+### Hidden words for screen readers widened whole pages on a phone (19 Oct 2026)
+
+**Symptom.** At 390px, every admin Billing page measured 420px wide. The tab strip scrolled and clipped correctly, so nothing visible ran off the edge, but the document was wider than the screen.
+
+**Cause.** A tab's count badge carries `sr-only` words ("1 open"). `sr-only` is `position: absolute`. The strip's scroller (`ScrollX`) had `overflow-x: auto` but no positioning of its own, so the absolute text was placed against the page, not the scroller, and its clipping didn't apply.
+
+**Fix.** `ScrollX`'s scroller is `relative` (`packages/ui/src/components/ui/scroll-x.tsx`). That fixes every tab strip and wide table built on it. Found by loading every admin route at 390px and checking `scrollWidth`; the cause was found by hiding one section at a time.
+
+**Rule.** An element that clips with `overflow` must also be the positioning parent (`relative`) if anything inside it can be absolutely positioned, including `sr-only` text. A phone check measures `documentElement.scrollWidth`, not only what looks cut off.
