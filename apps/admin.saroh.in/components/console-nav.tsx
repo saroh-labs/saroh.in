@@ -198,7 +198,7 @@ const GROUPS: ConsoleNavGroup[] = [
                 href: "/team",
                 label: "Team",
                 icon: ShieldCheck,
-                permission: "staff:read",
+                permission: "team:read",
             },
             {
                 href: "/audit",

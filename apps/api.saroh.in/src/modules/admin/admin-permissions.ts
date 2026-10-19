@@ -134,7 +134,6 @@ export const ALL_ADMIN_PERMISSIONS = Object.freeze(
 export const AWAITING_ENDPOINT: Readonly<
     Partial<Record<AdminPermission, string>>
 > = Object.freeze({
-    [AdminPermission.AccountsRead]: "U17/U22: businesses by manager",
     [AdminPermission.CommissionRates]: "U22/U24: the rates sheet",
     // Checked inside the profile read for the tax id (U18) until the
     // earnings and statements routes require it.

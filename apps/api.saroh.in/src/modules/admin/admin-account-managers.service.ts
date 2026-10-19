@@ -49,6 +49,19 @@ export interface ManagerCandidate {
     current: boolean;
 }
 
+/** A business with no account manager, as the Team list shows it (U17). */
+export interface UnassignedBusiness {
+    organizationId: string;
+    name: string;
+    slug: string;
+    /** It pays Saroh: on a priced plan, or billed by the provider. */
+    paying: boolean;
+    createdAt: Date;
+}
+
+/** How many the Team list shows; Share out evenly takes them all. */
+export const UNASSIGNED_SHOWN = 50;
+
 export interface ShareOutResult {
     assigned: { organizationId: string; platformAdminId: string }[];
     /** Businesses nobody could take (everyone full, or they own it). */
@@ -116,6 +129,47 @@ export async function managerOf(
 @Injectable()
 export class AdminAccountManagersService {
     constructor(private readonly audit: AdminAuditService) {}
+
+    /**
+     * Businesses without a manager (R30, U17): the ones Share out evenly
+     * would take, paying ones first, then the oldest, the first
+     * {@link UNASSIGNED_SHOWN} of them and how many there are in all.
+     * `accounts:read` for every business: an Account manager, who sees only
+     * their own, is refused.
+     */
+    async unassigned(
+        staff: PlatformAdminInfo,
+    ): Promise<{ businesses: UnassignedBusiness[]; total: number }> {
+        if (scopeForStaff(staff, AdminPermission.AccountsRead).kind !== "all") {
+            throw new ForbiddenException(
+                "Businesses without a manager are for Support, Billing and Platform owner.",
+            );
+        }
+        const all = await unassignedBusinesses(prisma, null, null);
+        const shown = all.slice(0, UNASSIGNED_SHOWN);
+        const rows = await prisma.organization.findMany({
+            where: { id: { in: shown.map((b) => b.organizationId) } },
+            select: { id: true, name: true, slug: true },
+        });
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        return {
+            total: all.length,
+            businesses: shown.flatMap((b) => {
+                const row = byId.get(b.organizationId);
+                return row
+                    ? [
+                          {
+                              organizationId: row.id,
+                              name: row.name,
+                              slug: row.slug,
+                              paying: b.paying,
+                              createdAt: b.createdAt,
+                          },
+                      ]
+                    : [];
+            }),
+        };
+    }
 
     /** The people a business can be given to, fewest businesses first. */
     async candidates(
@@ -520,8 +574,9 @@ async function shareOutManagers(tx: Tx, now: Date): Promise<ShareOutManager[]> {
  * first, then the oldest, at most {@link SHARE_OUT_MAX}.
  */
 async function unassignedBusinesses(
-    tx: Tx,
+    tx: Pick<Tx, "organization">,
     named: string[] | null,
+    max: number | null = SHARE_OUT_MAX,
 ): Promise<ShareOutBusiness[]> {
     const rows = await tx.organization.findMany({
         where: {
@@ -556,5 +611,6 @@ async function unassignedBusinesses(
         };
     });
     // Paying first across all of them, then at most one share-out's worth.
-    return shareOutOrder(all).slice(0, SHARE_OUT_MAX);
+    const ordered = shareOutOrder(all);
+    return max === null ? ordered : ordered.slice(0, max);
 }

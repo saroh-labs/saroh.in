@@ -20,6 +20,8 @@ const manager = (id: string) =>
 function refresh<T>(organizationId: string, result: ControlPlaneResult<T>) {
     if (result.ok) {
         revalidatePath(`/businesses/${organizationId}`, "layout");
+        // The Team screen's loads and its businesses without a manager.
+        revalidatePath("/team", "layout");
     }
     return result;
 }

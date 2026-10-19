@@ -326,6 +326,15 @@ export class GrantStaffDto {
     @IsISO8601()
     expiresAt?: string;
 
+    /** Add a teammate (U17): what they work as, kept on their profile. */
+    @IsOptional()
+    @IsIn(STAFF_JOBS)
+    worksAs?: StaffJob;
+
+    @IsOptional()
+    @IsBoolean()
+    onCommission?: boolean;
+
     @Transform(trim)
     @IsString()
     @MinLength(8)

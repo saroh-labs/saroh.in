@@ -47,10 +47,26 @@ export class AdminStaffController {
     @Get("staff/roles")
     @RequireAdminPermission(AdminPermission.StaffRead)
     roles() {
-        return Object.values(AdminRole).map((role) => ({
-            role,
-            permissions: permissionsFor([role]),
-        }));
+        return roleDefinitions();
+    }
+
+    /**
+     * The Team screen's list (DEC-169, admin console U17): the same people
+     * as `GET staff`, each with their job, capacity, commission flag and
+     * how many businesses they look after, for everyone who may see the
+     * team (`team:read`: Support and Billing too, who hold no `staff:read`).
+     */
+    @Get("team")
+    @RequireAdminPermission(AdminPermission.TeamRead)
+    team() {
+        return this.staffService.list();
+    }
+
+    /** What each role may do, for the Console roles tab (`team:read`). */
+    @Get("team/roles")
+    @RequireAdminPermission(AdminPermission.TeamRead)
+    teamRoles() {
+        return roleDefinitions();
     }
 
     @Post("staff")
@@ -76,6 +92,8 @@ export class AdminStaffController {
                     expiresAt: dto.expiresAt
                         ? new Date(dto.expiresAt)
                         : undefined,
+                    worksAs: dto.worksAs,
+                    onCommission: dto.onCommission,
                 }),
         );
     }
@@ -287,4 +305,12 @@ export class AdminStaffController {
                 }),
         );
     }
+}
+
+/** Every fixed role and what it may do, from the closed vocabulary. */
+function roleDefinitions() {
+    return Object.values(AdminRole).map((role) => ({
+        role,
+        permissions: permissionsFor([role]),
+    }));
 }

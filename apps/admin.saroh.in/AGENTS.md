@@ -72,7 +72,8 @@ recorded grant (the API refuses it otherwise).
   `lib/sign-in-words.ts`, `lib/user-tabs.ts`, `lib/user-agent.ts`,
   `lib/overview-words.ts`, `lib/module-fix.ts`, `lib/subscription-sheet.ts`,
   `lib/business-words.ts`, `lib/offer-words.ts`, `lib/saroh-lead-words.ts`,
-  `lib/home-words.ts`, `lib/search-words.ts`.
+  `lib/home-words.ts`, `lib/search-words.ts`, `lib/team-words.ts`,
+  `lib/roles-matrix.ts`.
 - **Messages (`/messages`, DEC-137)** lists what people wrote from
   saroh.in/contact, newest first, by topic on asking. Read-only: the reply
   goes from the team's mailbox. Every row is personal data, so the screen
@@ -157,6 +158,36 @@ recorded grant (the API refuses it otherwise).
   refused under the field, saying whose. Writes go through
   `lib/saroh-lead-actions.ts` and light the card (`useChangeFeedback`).
   Not the merchant's own Leads.
+- **Team (`/team`, DEC-169, admin plan U17, R30–R32)** opens with
+  `team:read` (Support, Billing, Auditor and Platform owner; no
+  `team:read` is the no-access panel) and is three tabs, each an address
+  under `app/team/(tabs)/` (a route group, so U22's member page at
+  `/team/[platformAdminId]` doesn't inherit the strip): **Teammates**
+  (`GET /admin/team`: summary cards, the people with their job, roles
+  and each role's end date, since, access end and businesses against
+  capacity on a load bar that fills and says "full" at capacity; a search,
+  the job filter and Table · Cards, the table stacking into a list on a
+  phone; invites waiting, with Resend… and Withdraw…, for `staff:read`;
+  Change and Revoke per person for `staff:grant`; revoked people listed
+  apart; then Businesses without a manager, `GET /admin/team/unassigned`,
+  `accounts:read`, paying first, with each row's Assign…, the U25 picker,
+  and Share out evenly…, both `accounts:assign`; a row just assigned stays
+  lit saying who has it), **Console roles** (`GET /admin/team/roles`: each
+  role with its purpose and how many hold it, then a Change / See / — table
+  in plain words from `lib/roles-matrix.ts`, which `roles-matrix.test.ts`
+  holds to every permission in the API's registry; Show permission codes
+  adds the codes as small text; on a phone one role at a time), and
+  **Payouts** (only with `team:pay`). **Add a teammate** (header,
+  `staff:grant`) replaces Grant access and keeps all of it (email, roles
+  with their purposes, access ends, reason) plus name, works as (which
+  ticks a suggested role: Account manager for both sales jobs, Support
+  otherwise) and paid by commission: someone with an account is granted at
+  once, with the job kept on their profile; anyone else gets the U24
+  invite, which carries no end date. The break-glass note and Make me
+  Platform owner live in the shell's banner on every screen. Payouts and
+  the commission card are `components/team/payouts-slot.tsx` until U21's
+  `PayoutsTab` and `EarningsCard` replace it. No rate or amount is ever
+  written in the console.
 - **A business's Overview needs no support session** (admin plan U3):
   `GET /admin/organizations/:id/overview` (`organization:read`, scoped by
   `scopeForStaff`) returns the cards and the tab badges with no personal

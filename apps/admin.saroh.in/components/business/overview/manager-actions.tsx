@@ -30,8 +30,11 @@ export function ManagerActions({
 }: {
     organizationId: string;
     manager: OverviewManager | null;
-    /** A change was saved: what to say. */
-    onDone: (message: string) => void;
+    /**
+     * A change was saved: what to say, and who looks after it now (null
+     * once ended), so a list can mark the row.
+     */
+    onDone: (message: string, now: OverviewManager | null) => void;
 }) {
     const [open, setOpen] = useState<Open>(null);
     const close = (next: boolean) => {
@@ -108,6 +111,7 @@ export function ManagerActions({
                         }
                         onDone(
                             `${result.data.manager.name} now looks after this business.`,
+                            result.data.manager,
                         );
                         return { ok: true };
                     }}
@@ -132,6 +136,7 @@ export function ManagerActions({
                         }
                         onDone(
                             `${manager.name} no longer looks after this business.`,
+                            null,
                         );
                         return { ok: true };
                     }}

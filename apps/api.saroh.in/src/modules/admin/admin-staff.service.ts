@@ -21,6 +21,7 @@ import {
 import { endManagerLinksInTx } from "./manager-links";
 import type { StaffEngagement, StaffJob } from "./staff-profile";
 import {
+    STAFF_JOBS,
     generateManagerCode,
     normaliseTaxId,
     sealTaxId,
@@ -118,6 +119,18 @@ export interface StaffMember {
     }[];
     /** What those roles allow, in vocabulary order. */
     permissions: string[];
+    /**
+     * What the Team list shows of their profile (DEC-169, U17): their job,
+     * how many businesses they can take and whether they are on commission.
+     * Null until a profile is saved. Never contact details or a tax id.
+     */
+    profile: {
+        worksAs: StaffJob;
+        capacity: number | null;
+        onCommission: boolean;
+    } | null;
+    /** Businesses they look after now (open account-manager links). */
+    businesses: number;
 }
 
 export interface GrantInput {
@@ -126,6 +139,13 @@ export interface GrantInput {
     roles: string[];
     reason: string;
     expiresAt?: Date;
+    /**
+     * Add a teammate (U17): what they work as, kept on their profile with
+     * the grant. Needs `team:write` too. Left out: the profile is untouched.
+     */
+    worksAs?: StaffJob;
+    /** With `worksAs`: whether they are paid by commission. */
+    onCommission?: boolean;
 }
 
 /**
@@ -157,6 +177,13 @@ export class AdminStaffService {
                 revokedAt: true,
                 note: true,
                 user: { select: { email: true, name: true } },
+                staffProfile: {
+                    select: {
+                        worksAs: true,
+                        capacity: true,
+                        onCommission: true,
+                    },
+                },
                 roleAssignments: {
                     where: {
                         revokedAt: null,
@@ -177,6 +204,14 @@ export class AdminStaffService {
                 { grantedAt: "asc" },
             ],
         });
+        const loads = await prisma.accountManagerLink.groupBy({
+            by: ["platformAdminId"],
+            where: { endedAt: null },
+            _count: { _all: true },
+        });
+        const businesses = new Map(
+            loads.map((load) => [load.platformAdminId, load._count._all]),
+        );
 
         return rows.map((row) => {
             const roles = row.roleAssignments.flatMap((assignment) =>
@@ -204,6 +239,14 @@ export class AdminStaffService {
                 permissions: row.revokedAt
                     ? []
                     : permissionsFor(roles.map((r) => r.role)),
+                profile: row.staffProfile
+                    ? {
+                          worksAs: row.staffProfile.worksAs as StaffJob,
+                          capacity: row.staffProfile.capacity,
+                          onCommission: row.staffProfile.onCommission,
+                      }
+                    : null,
+                businesses: businesses.get(row.id) ?? 0,
             };
         });
     }
@@ -217,6 +260,16 @@ export class AdminStaffService {
         const reason = requireReason(input.reason);
         const expiresAt = requireFuture(input.expiresAt);
         const email = input.email.trim().toLowerCase();
+        if (input.worksAs !== undefined) {
+            if (!STAFF_JOBS.includes(input.worksAs)) {
+                throw new BadRequestException("Choose what they work as.");
+            }
+            if (!input.staff.permissions.includes(AdminPermission.TeamWrite)) {
+                throw new ForbiddenException(
+                    "Only a Platform owner sets what a teammate works as.",
+                );
+            }
+        }
 
         const user = await prisma.user.findUnique({
             where: { email },
@@ -268,6 +321,12 @@ export class AdminStaffService {
                     expiresAt: expiresAt ?? null,
                 })),
             });
+            if (input.worksAs !== undefined) {
+                await keepJob(tx, admin.id, {
+                    worksAs: input.worksAs,
+                    onCommission: input.onCommission,
+                });
+            }
 
             await this.audit.write(tx, {
                 actorUserId: input.staff.userId,
@@ -282,6 +341,8 @@ export class AdminStaffService {
                     roles: added,
                     expiresAt: expiresAt?.toISOString() ?? null,
                     reopened: Boolean(admin.revokedAt),
+                    worksAs: input.worksAs ?? null,
+                    onCommission: input.onCommission ?? null,
                 },
             });
             return { platformAdminId: admin.id, added };
@@ -706,6 +767,36 @@ export class AdminStaffService {
  * Serializable, so two changes at once cannot each pass alone. Shared by
  * grants and by an invite's acceptance (`admin-staff-invites.service.ts`).
  */
+/**
+ * Keep what a teammate works as on their profile, with their grant (Add a
+ * teammate, U17): a first profile gets its manager code; one already on
+ * file changes only the job and, when sent, the commission flag. The
+ * grant's own ledger row names both.
+ */
+async function keepJob(
+    tx: Tx,
+    platformAdminId: string,
+    job: { worksAs: StaffJob; onCommission?: boolean },
+): Promise<void> {
+    const data = {
+        worksAs: job.worksAs,
+        ...(job.onCommission === undefined
+            ? {}
+            : { onCommission: job.onCommission }),
+    };
+    const had = await tx.staffProfile.findUnique({
+        where: { platformAdminId },
+        select: { id: true },
+    });
+    if (had) {
+        await tx.staffProfile.update({ where: { platformAdminId }, data });
+        return;
+    }
+    await tx.staffProfile.create({
+        data: { platformAdminId, managerCode: generateManagerCode(), ...data },
+    });
+}
+
 export function guardedStaffChange<T>(
     change: (tx: Tx) => Promise<T>,
 ): Promise<T> {

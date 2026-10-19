@@ -20,6 +20,7 @@ const EVERY: AdminPermission[] = [
     "providers:read",
     "flags:read",
     "staff:read",
+    "team:read",
     "audit:read",
     "pricing:read",
     "deployments:run",
