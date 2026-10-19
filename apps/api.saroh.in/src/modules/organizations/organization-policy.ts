@@ -127,6 +127,9 @@ const MEMBER_ACTIONS: readonly OrgAction[] = [
     "order:stage",
     "booking:write",
     "hours:write",
+    // Their own alerts (DEC-170, #1038): the answer to a request they made,
+    // never the business's inbox.
+    "notification:read-own",
 ];
 
 /**
@@ -472,6 +475,8 @@ const ORDER_POWERS: readonly OrgAction[] = [
  * roles with no extras still skip it and resolve to the shipped map.
  */
 function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
+    // Whoever reads the business's inbox reads what is addressed to them.
+    if (set.has("notification:read")) set.add("notification:read-own");
     if (set.has("store:write")) set.add("inventory:write");
     if (set.has("contact:write")) set.add("contact:read");
     if (set.has("booking:write")) set.add("booking:read");

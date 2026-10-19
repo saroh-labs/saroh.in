@@ -103,6 +103,20 @@ const WRITTEN: {
         href: "/settings/providers",
     },
     { type: "team.joined", kind: "team", id: null, href: "/settings/people" },
+    // A booking rules request and its answer open Hours and time off on
+    // the person (#1038); a row written before it named them, the page.
+    {
+        type: "hours.rule-request",
+        kind: "hours",
+        id: "st_1",
+        href: "/bookings/availability?person=st_1",
+    },
+    {
+        type: "hours.rule-answer",
+        kind: "hours",
+        id: "st_1",
+        href: "/bookings/availability?person=st_1",
+    },
     {
         type: "hours.rule-request",
         kind: "hours",

@@ -68,6 +68,9 @@ export type NavAction =
     | "member:read"
     | "module:read"
     | "notification:read"
+    // The alerts addressed to the person alone (DEC-170, #1038): a Member
+    // has the bell for these, never the business's inbox.
+    | "notification:read-own"
     | "org:settings:read"
     | "provider:read"
     // Settings › Activity: who changed what. Owner and Admin, as the API
@@ -147,6 +150,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "member:read",
         "module:read",
         "notification:read",
+        "notification:read-own",
         "org:settings:read",
         "provider:read",
         "audit:read",
@@ -184,6 +188,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "member:read",
         "module:read",
         "notification:read",
+        "notification:read-own",
         "org:settings:read",
         "provider:read",
         "audit:read",
@@ -223,6 +228,8 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "booking:read",
         "service:read",
         "order:stage",
+        // Their own alerts: the answer to a request they made (#1038).
+        "notification:read-own",
     ],
     REVIEWER: ["site:read"],
 };
@@ -1304,13 +1311,15 @@ export const NOTIFICATIONS_HREF = "/notifications";
 /**
  * Notifications lives in the top bar, not the rail (2026-09-25): it is about
  * you, not a part of the business. The bell and the command menu both read
- * it here, with the same permission the rail used.
+ * it here. Either permission opens it (DEC-170, #1038): owners and admins
+ * read the business's notices and their own, a Member only their own —
+ * the API decides which rows each sees.
  */
 export const NOTIFICATIONS_NAV = {
     href: NOTIFICATIONS_HREF,
     label: "Notifications",
     icon: Bell,
-    action: "notification:read",
+    action: ["notification:read", "notification:read-own"],
 } as const satisfies Pick<NavItem, "href" | "label" | "icon" | "action">;
 
 /**

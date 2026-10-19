@@ -395,6 +395,12 @@ export const CAPABILITIES: readonly Capability[] = [
         label: "See notifications",
     },
     {
+        action: "notification:read-own",
+        group: "messaging",
+        label: "See their own alerts",
+        note: "Answers meant for this person alone, such as whether a change they asked for was approved. Never the business's notifications.",
+    },
+    {
         action: "notification:write",
         group: "messaging",
         label: "Clear notifications",

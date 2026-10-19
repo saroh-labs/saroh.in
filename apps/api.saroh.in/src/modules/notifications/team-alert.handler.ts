@@ -12,6 +12,7 @@ import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
+import { wordAsk } from "./ask-alerts";
 import { wordDomain } from "./domain-alerts";
 import { noticeHeadOf, noticeOf } from "./notice-target";
 import { wordProvider } from "./provider-alerts";
@@ -82,7 +83,9 @@ export interface AlertEmail {
  * (DEC-071, T10), a website order to pay on handover nobody came for in
  * three days (R34, on the New order row), or a live custom domain that
  * stopped reaching the site and came back (#917, on the Your website
- * row), as each person chose in Settings › Your profile.
+ * row), as each person chose in Settings › Your profile; and a permission
+ * request and its answer (DEC-170, `ask-alerts.ts`), to exactly the people
+ * it names, whatever they chose.
  *
  * On one transaction, in the business's RLS context:
  *  1. What it is about is read again now, and worded. Something that no
@@ -207,6 +210,12 @@ async function whoToEmail(
     if (alert.emailReviewersOf) {
         return reviewersToEmail(tx, organizationId, alert);
     }
+    if (alert.emailUserIds) {
+        return namedToEmail(tx, organizationId, alert, alert.emailUserIds);
+    }
+    const event = alert.event;
+    // A request has no row to choose from: it names who is emailed.
+    if (event === "ask") return [];
     const [members, roles, choices, org] = await Promise.all([
         tx.membership.findMany({
             where: { organizationId },
@@ -222,7 +231,7 @@ async function whoToEmail(
             select: { key: true, actions: true },
         }),
         tx.notificationPreference.findMany({
-            where: { organizationId, event: alert.event, channel: "email" },
+            where: { organizationId, event, channel: "email" },
             select: {
                 userId: true,
                 event: true,
@@ -244,7 +253,7 @@ async function whoToEmail(
             m.role,
             roles.find((r) => r.key === m.role)?.actions ?? null,
         );
-        if (!mayHearAbout(alert.event, (a) => actions.has(a), m.role)) {
+        if (!mayHearAbout(event, (a) => actions.has(a), m.role)) {
             return false;
         }
         const own = choices.filter((c) => c.userId === m.userId);
@@ -257,7 +266,7 @@ async function whoToEmail(
         ) {
             return true;
         }
-        return alertOn(own, alert.event, "email");
+        return alertOn(own, event, "email");
     });
     if (recipients.length === 0) return [];
 
@@ -317,12 +326,47 @@ async function reviewersToEmail(
 }
 
 /**
+ * Exactly the people an alert names (DEC-170: a request's approvers, an
+ * answer's asker), still on the team, with an email, never `skipUserId`.
+ * Their alert choices aren't asked: being asked, or having asked, is it.
+ */
+async function namedToEmail(
+    tx: Tx,
+    organizationId: string,
+    alert: WordedAlert,
+    userIds: readonly string[],
+): Promise<AlertEmail[]> {
+    if (userIds.length === 0) return [];
+    const [members, org] = await Promise.all([
+        tx.membership.findMany({
+            where: { organizationId, userId: { in: [...userIds] } },
+            select: { userId: true, user: { select: { email: true } } },
+            orderBy: { userId: "asc" },
+        }),
+        tx.organization.findUnique({
+            where: { id: organizationId },
+            select: { name: true },
+        }),
+    ]);
+    const recipients = members.filter(
+        (m) => m.user.email.trim() && m.userId !== alert.skipUserId,
+    );
+    if (recipients.length === 0) return [];
+    const mail = renderAlertEmail(alert, cleanName(org?.name, "Your business"));
+    return recipients.map((m) => ({
+        userId: m.userId,
+        to: m.user.email.trim(),
+        mail,
+    }));
+}
+
+/**
  * The email: the alert's email words (fixed, with the business's cleaned
  * names), a link, and why they got it. `business` is already cleaned.
  */
 export function renderAlertEmail(
     alert: Pick<WordedAlert, "event" | "mail" | "path"> &
-        Partial<Pick<WordedAlert, "cta" | "emailReviewersOf">>,
+        Partial<Pick<WordedAlert, "cta" | "emailReviewersOf" | "footer">>,
     business: string,
 ): TeamAlertMail {
     return {
@@ -331,10 +375,24 @@ export function renderAlertEmail(
         body: alert.mail.body,
         url: alert.path ? `${appBase()}${alert.path}` : null,
         ...(alert.cta ? { cta: alert.cta } : {}),
-        footer: alert.emailReviewersOf
-            ? `You get this because you review the website of ${business} in Saroh.`
-            : `You get this because email is on for “${ROW_LABEL[alert.event]}” in your alerts at ${business}. You can change it in Saroh, in Settings under Your profile.`,
+        footer: footerOf(alert, business),
     };
+}
+
+/** Why they got it: the alert's own words, a site's review, or a row's choice. */
+function footerOf(
+    alert: Pick<WordedAlert, "event"> &
+        Partial<Pick<WordedAlert, "emailReviewersOf" | "footer">>,
+    business: string,
+): string {
+    if (alert.footer) return alert.footer.replaceAll("{business}", business);
+    if (alert.emailReviewersOf) {
+        return `You get this because you review the website of ${business} in Saroh.`;
+    }
+    if (alert.event === "ask") {
+        return `You get this because you are on the team at ${business}.`;
+    }
+    return `You get this because email is on for “${ROW_LABEL[alert.event]}” in your alerts at ${business}. You can change it in Saroh, in Settings under Your profile.`;
 }
 
 /** What the alert is about, read now and worded; null when it no longer stands. */
@@ -363,6 +421,8 @@ export async function wordAlert(
             return wordReview(tx, organizationId, payload);
         case "domain":
             return wordDomain(tx, organizationId, payload);
+        case "ask":
+            return wordAsk(tx, organizationId, payload);
     }
 }
 
@@ -659,6 +719,13 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("domainId") &&
                 str("at") &&
                 (p.change === "down" || p.change === "back")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "ask":
+            return p.about === "rules" &&
+                str("requestId") &&
+                str("notificationId") &&
+                (p.step === "asked" || p.step === "answered")
                 ? (p as TeamAlertPayload)
                 : null;
         case "site":

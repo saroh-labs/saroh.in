@@ -4821,8 +4821,11 @@ model Notification {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // Recipient. Null = an org-wide notice any member/owner may see; set = a
-  // specific user's inbox item. Informational (no FK cascade wiring needed).
+  // Recipient. Null = the business's notice, read with `notification:read`
+  // (owners and admins); set = one person's alone (DEC-170, #1038: the
+  // answer to their booking rules request), read with
+  // `notification:read-own` and never shown to anyone else, owners
+  // included. Informational (no FK cascade wiring needed).
   userId String?
 
   type  String // "enquiry.new" | ...
@@ -4846,6 +4849,9 @@ model Notification {
   bookingId String?
   invoiceId String?
   siteId    String?
+  // Or someone on the diary (#1038): a booking rules request opens Hours
+  // and time off on that person. Informational, no FK, like leadId.
+  staffId   String?
 
   readAt DateTime? // null = unread
 

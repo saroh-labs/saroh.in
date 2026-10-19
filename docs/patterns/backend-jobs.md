@@ -556,6 +556,16 @@ the Privacy Policy states both.
   to the bell and the Website row (`site.review.*`), and the person who
   asked is emailed whatever they chose. A note by someone who can publish
   queues nothing.
+- **Permission requests and their answers** (`team.alert`
+  `{ event: "ask" }`, `notifications/ask-alerts.ts`, DEC-170): the request's
+  write puts its notice in the inbox — the business's for whoever may
+  answer it, the asker's own (`userId`) for the answer — and queues the
+  email on the same transaction with that notice's id. The run re-reads
+  the request (withdrawn, replaced or decided since says nothing), claims
+  `team:ask:<about>:<id>:<asked|answered>`, and emails exactly the people
+  the wording names (`emailUserIds`: everyone with `service:write` but the
+  asker; or the asker), whatever their alert choices, with the alert's own
+  footer. A booking rules request (#1038) is the only kind today.
 - **Order alerts live on the New order row** (`event: "order"` in
   `alert-preferences.ts`, notice types `order.new` and `order.uncollected`).
   A new order type of alert adds its notice type there, so the bell switch

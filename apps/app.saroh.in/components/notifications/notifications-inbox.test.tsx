@@ -139,7 +139,20 @@ const TITLES: Record<string, string> = {
     booking: "booked a Check-up",
     review: "2-star review",
     read: "Meera joined",
+    answer: "change was turned down",
 };
+
+/**
+ * What the API gives a Member (DEC-170, #1038): only the alerts addressed
+ * to them, here the answer to the booking rules change they asked for.
+ */
+const ANSWER = notice({
+    id: "n-answer",
+    type: "hours.rule-answer",
+    title: "Your booking rules change was turned down",
+    body: "15 min between bookings. Reason: Mornings are busy",
+    target: { kind: "hours", id: "st_1" },
+});
 const press = (el: Element) =>
     act(() => {
         el.dispatchEvent(
@@ -193,6 +206,24 @@ describe("every row opens the thing it is about", () => {
     it("even a row nobody can place goes somewhere", () => {
         draw([notice({ id: "odd", type: "something.new", title: "Odd" })]);
         expect(host.querySelector("a")?.getAttribute("href")).toBe("/");
+    });
+});
+
+describe("a Member's own alerts (DEC-170)", () => {
+    it("shows the answer to their request, opening their Hours and time off", () => {
+        draw([ANSWER]);
+        expect(host.querySelectorAll("li")).toHaveLength(1);
+        expect(host.textContent).toContain("Reason: Mornings are busy");
+        expect(link("answer").getAttribute("href")).toBe(
+            "/bookings/availability?person=st_1",
+        );
+    });
+
+    it("opening it reads it", async () => {
+        draw([ANSWER]);
+        press(link("answer"));
+        await settle();
+        expect(markRead).toHaveBeenCalledWith("n-answer");
     });
 });
 

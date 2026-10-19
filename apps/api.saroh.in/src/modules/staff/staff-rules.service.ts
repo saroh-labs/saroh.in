@@ -26,7 +26,13 @@ import {
     rulesForPerson,
     storedRuleChanges,
 } from "../bookings/person-rules";
+import {
+    answerTitle,
+    RULE_ANSWER_NOTIFICATION_TYPE,
+    RULE_REQUEST_NOTIFICATION_TYPE,
+} from "../notifications/ask-alerts";
 import { noticeOf } from "../notifications/notice-target";
+import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { allows } from "../organizations/organization-policy";
 import type { UpdatePersonRulesDto } from "./dto";
 import { personRuleChanges, recordPersonRulesInTx } from "./rules-history";
@@ -36,9 +42,6 @@ import type {
     RuleRequestView,
 } from "./staff-rules-view";
 import { outcomeWords, requestViews, timing } from "./staff-rules-view";
-
-/** The inbox notice owners and admins get for a request (#1038). */
-export const RULE_REQUEST_NOTIFICATION_TYPE = "hours.rule-request";
 
 const PERSON_SELECT = {
     id: true,
@@ -74,8 +77,11 @@ const DECIDES_REFUSAL =
  *
  * One request waits per person: asking again replaces it (the old one
  * reads as withdrawn). Every change and every move lands in the
- * business's history (`rules-history.ts`); a new request tells owners and
- * admins in the inbox.
+ * business's history (`rules-history.ts`). A new request tells owners and
+ * admins in the inbox and by email; an approval or a turn-down tells the
+ * person who asked, in their own alerts and by email, with the reason
+ * (DEC-170, `notifications/ask-alerts.ts`). The notices are written, and
+ * the emails queued, on the request's own transaction.
  */
 @Injectable()
 export class StaffRulesService {
@@ -257,6 +263,9 @@ export class StaffRulesService {
                 },
                 include: { staff: { select: { name: true } } },
             });
+            if (next === "APPROVED" || next === "TURNED_DOWN") {
+                await this.answerInTx(tx, ctx, row, next, reason);
+            }
             await recordPersonRulesInTx(
                 tx,
                 ctx,
@@ -345,13 +354,23 @@ export class StaffRulesService {
                     },
                     select: { id: true },
                 });
-                await tx.notification.create({
+                const notice = await tx.notification.create({
                     data: {
                         organizationId: ctx.organizationId,
-                        ...noticeOf(RULE_REQUEST_NOTIFICATION_TYPE, {}),
+                        ...noticeOf(RULE_REQUEST_NOTIFICATION_TYPE, {
+                            staffId: person.id,
+                        }),
                         title: `${person.name} asked to change their booking rules`,
                         body: changesWords(changes).join(" · "),
                     },
+                    select: { id: true },
+                });
+                await enqueueTeamAlert(tx, ctx.organizationId, {
+                    event: "ask",
+                    about: "rules",
+                    requestId: created.id,
+                    step: "asked",
+                    notificationId: notice.id,
                 });
                 await recordPersonRulesInTx(tx, ctx, person, {
                     action: AuditAction.StaffRulesRequested,
@@ -368,6 +387,49 @@ export class StaffRulesService {
             }
             throw err;
         }
+    }
+
+    /**
+     * Tell the person who asked how it went: a notice in their own alerts
+     * (`userId`, nobody else's inbox) and an email, queued with it.
+     */
+    private async answerInTx(
+        tx: Prisma.TransactionClient,
+        ctx: OrganizationContext,
+        row: {
+            id: string;
+            staffId: string;
+            requestedByUserId: string;
+            changes: unknown;
+        },
+        outcome: "APPROVED" | "TURNED_DOWN",
+        reason: string | null,
+    ): Promise<void> {
+        const asked = changesWords(storedRuleChanges(row.changes)).join(" · ");
+        const notice = await tx.notification.create({
+            data: {
+                organizationId: ctx.organizationId,
+                userId: row.requestedByUserId,
+                ...noticeOf(RULE_ANSWER_NOTIFICATION_TYPE, {
+                    staffId: row.staffId,
+                }),
+                title: answerTitle(outcome),
+                body:
+                    outcome === "APPROVED"
+                        ? asked
+                        : reason
+                          ? `${asked}. Reason: ${reason}`
+                          : `${asked}. No reason was given.`,
+            },
+            select: { id: true },
+        });
+        await enqueueTeamAlert(tx, ctx.organizationId, {
+            event: "ask",
+            about: "rules",
+            requestId: row.id,
+            step: "answered",
+            notificationId: notice.id,
+        });
     }
 
     private async view(

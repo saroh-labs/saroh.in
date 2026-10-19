@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { NavGroup, NavRole } from "@/components/shared/nav-items";
 import {
     NAV_GROUPS,
+    NOTIFICATIONS_NAV,
     SETTINGS_PAGES,
     filterNavGroups,
     filterNavGroupsByRole,
@@ -120,6 +121,22 @@ describe("navRoleCan", () => {
         expect(navRoleCan("MEMBER", "section:write")).toBe(false);
         expect(navRoleCan("MEMBER", "notification:read")).toBe(false);
         expect(navRoleCan("MEMBER", "provider:read")).toBe(false);
+    });
+
+    it("gives a member the bell for their own alerts, never a reviewer (DEC-170)", () => {
+        expect(navRoleCan("MEMBER", "notification:read-own")).toBe(true);
+        expect(navRoleCan("MEMBER", NOTIFICATIONS_NAV.action)).toBe(true);
+        expect(navRoleCan("REVIEWER", NOTIFICATIONS_NAV.action)).toBe(false);
+        for (const role of ["OWNER", "ADMIN"] as const) {
+            expect(navRoleCan(role, "notification:read-own")).toBe(true);
+        }
+        // An invented role with only its own alerts still has the bell.
+        expect(
+            navCan(
+                { role: "MEMBER", actions: ["notification:read-own"] },
+                NOTIFICATIONS_NAV.action,
+            ),
+        ).toBe(true);
     });
 
     it("holds a reviewer to one thing: reading a site", () => {

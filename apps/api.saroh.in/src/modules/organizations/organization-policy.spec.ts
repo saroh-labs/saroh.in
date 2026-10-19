@@ -57,6 +57,9 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         // and keep anyone's hours and time off. Still no money.
         "booking:write",
         "hours:write",
+        // DEC-170, #1038: the alerts addressed to them alone, never the
+        // business's inbox.
+        "notification:read-own",
     ],
     /*
      * REVIEWER is website-only (#193) and is NOT a narrower MEMBER: it holds

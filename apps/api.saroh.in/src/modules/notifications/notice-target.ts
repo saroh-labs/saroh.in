@@ -39,8 +39,11 @@ export const NOTICE_KINDS = {
     "provider.back": "providers",
     "team.joined": "team",
     // A Member asked to change their own booking rules (#1038): Hours and
-    // time off, where the request is reviewed.
+    // time off on that person, where the request is reviewed.
     "hours.rule-request": "hours",
+    // The answer, to the Member who asked alone (`userId`): approved, or
+    // turned down with the reason. Their own Hours and time off.
+    "hours.rule-answer": "hours",
     "plan.limit": "plan",
     "plan.changed": "plan",
     "plan.ending": "plan",
@@ -64,7 +67,7 @@ interface TargetColumns {
     domain: { siteId: string | null };
     providers: Record<never, never>;
     team: Record<never, never>;
-    hours: Record<never, never>;
+    hours: { staffId: string };
     plan: Record<never, never>;
     products: Record<never, never>;
 }
@@ -83,6 +86,7 @@ export interface NoticeColumns {
     bookingId?: string;
     invoiceId?: string;
     siteId?: string | null;
+    staffId?: string;
 }
 
 /** A notice's type with the target that type requires. */
@@ -114,6 +118,7 @@ const COLUMN_OF: Partial<Record<NoticeKind, keyof NoticeColumns>> = {
     booking: "bookingId",
     invoice: "invoiceId",
     site: "siteId",
+    hours: "staffId",
 };
 
 /**
@@ -154,6 +159,7 @@ const TARGET_COLUMNS = [
     "bookingId",
     "invoiceId",
     "siteId",
+    "staffId",
 ] as const satisfies readonly (keyof NoticeColumns)[];
 
 /** What the inbox is told a row opens: the kind, and the record's id. */
@@ -176,6 +182,7 @@ export interface StoredNotice {
     bookingId?: string | null;
     invoiceId?: string | null;
     siteId?: string | null;
+    staffId?: string | null;
 }
 
 const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
@@ -189,7 +196,8 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     domain: (n) => n.siteId ?? null,
     providers: () => null,
     team: () => null,
-    hours: () => null,
+    // The person, for a row written since #1038; an older one opens the page.
+    hours: (n) => n.staffId ?? null,
     plan: () => null,
     products: () => null,
 };
