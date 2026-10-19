@@ -102,8 +102,16 @@ export function TeamPeople({
                     <div
                         role="radiogroup"
                         aria-label="Works as"
-                        className="flex flex-wrap gap-2"
+                        className="flex flex-wrap items-center gap-2"
                     >
+                        {/* Says the chips are by job, so they read apart
+                            from the summary's role count. */}
+                        <span
+                            aria-hidden
+                            className="text-[12.5px] text-muted-foreground"
+                        >
+                            Works as
+                        </span>
                         {jobChips(counts).map((chip) => (
                             <Chip
                                 key={chip}
@@ -192,7 +200,7 @@ export function TeamPeople({
 }
 
 const COLUMNS =
-    "md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.1fr)_auto] md:items-start md:gap-4";
+    "md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.1fr)_11rem] md:items-start md:gap-4";
 
 /**
  * The table layout: a header and one row per person on a wide screen; on

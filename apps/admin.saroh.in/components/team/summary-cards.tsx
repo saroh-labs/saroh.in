@@ -50,7 +50,7 @@ export function SummaryCards({
                 }
             />
             <StatCard
-                label="Account managers"
+                label="Account manager role"
                 value={managers.length}
                 hint={`${onCommission} on commission`}
             />
