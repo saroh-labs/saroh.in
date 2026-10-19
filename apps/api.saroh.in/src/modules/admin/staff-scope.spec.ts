@@ -1,5 +1,13 @@
 import { ForbiddenException } from "@nestjs/common";
 
+// The open account-manager link (U19): what each test says it is.
+jest.mock("@saroh/database", () => ({
+    outsideOrgContext: jest.fn(<T>(fn: () => T) => fn()),
+    prisma: { accountManagerLink: { findFirst: jest.fn() } },
+}));
+
+import { prisma } from "@saroh/database";
+
 import type { AdminRole } from "./admin-permissions";
 import { AdminPermission, AdminRole as Roles } from "./admin-permissions";
 import {
@@ -123,9 +131,21 @@ describe("scope helpers", () => {
         ).resolves.toBeUndefined();
     });
 
-    // Until the account-manager link lands (U19/U25), own scope sees no
-    // business: the safe default.
-    it("lets own scope see no business until the link table exists", async () => {
+    it("lets own scope see a business only while its open link names them", async () => {
+        const findFirst = prisma.accountManagerLink.findFirst as jest.Mock;
+        findFirst.mockResolvedValueOnce({ id: "link_1" });
+        await expect(maySeeOrganization(own, "org_1")).resolves.toBe(true);
+        expect(findFirst).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                platformAdminId: "pa_1",
+                endedAt: null,
+            },
+            select: { id: true },
+        });
+
+        // Another manager's, an ended link, or none at all.
+        findFirst.mockResolvedValue(null);
         await expect(maySeeOrganization(own, "org_1")).resolves.toBe(false);
         await expect(assertMaySeeOrganization(own, "org_1")).rejects.toThrow(
             ForbiddenException,

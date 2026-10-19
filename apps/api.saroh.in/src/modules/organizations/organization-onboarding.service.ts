@@ -26,6 +26,7 @@ import {
     addressTaken,
     MAX_ADDRESS_LENGTH,
 } from "../sites/site-address";
+import { recordManagerInTx } from "./account-manager";
 import { businessTypeWrite } from "./business-type";
 import { startingZone } from "./business-zone";
 import type { OnboardOrganizationDto } from "./dto";
@@ -167,7 +168,7 @@ export class OrganizationOnboardingService {
                           }
                         : {}),
                 },
-                select: { id: true, slug: true },
+                select: { id: true, slug: true, createdAt: true },
             });
 
             // Every business gets a profile, if only for its time zone
@@ -189,6 +190,24 @@ export class OrganizationOnboardingService {
                     organizationId: organization.id,
                     userId,
                     role: "OWNER",
+                },
+            });
+
+            // Who at Saroh brought it in (DEC-169): the `?am=` link, a
+            // typed code, or the owner's email on a manager's lead from
+            // before now. Under a savepoint: it never stops the setup.
+            const manager = await recordManagerInTx(tx, {
+                organizationId: organization.id,
+                ownerUserId: userId,
+                madeAt: organization.createdAt,
+                claim: {
+                    link: dto.managerLinkCode
+                        ? {
+                              code: dto.managerLinkCode,
+                              setAt: dto.managerLinkSetAt,
+                          }
+                        : null,
+                    code: dto.managerCode,
                 },
             });
 
@@ -215,11 +234,15 @@ export class OrganizationOnboardingService {
                 `Onboarded organization ${organization.id} (${organization.slug}) with OWNER ${userId}`,
             );
 
-            return { id: organization.id, slug: organization.slug };
+            return {
+                id: organization.id,
+                slug: organization.slug,
+                managerSource: manager?.source ?? null,
+            };
         });
         // A new profile whose email lost a race to the database's
         // one-email-per-owner index: the same 409 as asked, not a 500.
-        const onboarded = await raceAsTaken(making);
+        const { managerSource, ...onboarded } = await raceAsTaken(making);
 
         // Emit the audit event AFTER the transaction commits, so we only record
         // an org that actually exists. `record` never throws (it swallows and
@@ -232,7 +255,13 @@ export class OrganizationOnboardingService {
             targetType: "organization",
             targetId: onboarded.id,
             outcome: AuditOutcome.Success,
-            metadata: { slug: onboarded.slug, kind },
+            metadata: {
+                slug: onboarded.slug,
+                kind,
+                // How its account manager was proved, never who: the
+                // link itself is the record (DEC-169).
+                ...(managerSource ? { accountManager: managerSource } : {}),
+            },
         });
 
         // t0 of the activation funnel (#176). Same placement and same tradeoff

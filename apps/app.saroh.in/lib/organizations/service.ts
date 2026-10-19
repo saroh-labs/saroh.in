@@ -110,6 +110,18 @@ export interface CreateOrganizationInput {
      */
     referralCode?: string;
     /**
+     * An account manager's `?am=` link the browser carried from saroh.in
+     * (DEC-169), and when it was kept: added by the create action from its
+     * cookie, never by a form.
+     */
+    managerLinkCode?: string;
+    managerLinkSetAt?: string;
+    /**
+     * The code of the Saroh teammate helping them, typed at setup
+     * (DEC-169). Optional; the API decides whether it names anyone.
+     */
+    managerCode?: string;
+    /**
      * Who Saroh bills for it (DEC-167, R7): one of the owner's billing
      * profiles, or a new one. An owner with a profile must send one; the
      * API names `billingProfile` when they don't.

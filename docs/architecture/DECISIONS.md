@@ -2091,6 +2091,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - The business sees its manager: the app's Help shows the manager's name and work email (an Email button), only while a manager is linked. Nothing shows when there is none. The phone is not shown for now (owner, 18 Oct).
 - A manager's details (phone, city, languages, joined, reports to, engagement, tax id, emergency contact) are kept on their team record. The tax id is shown only to Platform owner and Billing.
 - Rules: added when built (plan 2026-10-18-002 Part 3, local).
+    - Brought in (U19, 19 Oct): decided once, in the business's create transaction, and never in the way of it; first proof wins (the `?am=` link, then a typed code, then the owner's own verified email on the manager's lead recorded before the business was made); only a current Account manager, never for their own business; the link is append-only with its evidence. `backend-auth-and-access.md`.
 
 ## DEC-170 Bookings: a caller with just a name and phone can be booked, the front desk books, hours save themselves
 

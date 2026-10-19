@@ -38,7 +38,7 @@ Meta alike.
 
 | Stays                                                          | Cut                                                                            |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `plan`, `src`, `template` (the page's own choices)             | `ref`, `invite`, `email`, `token`, `next`                                      |
+| `plan`, `src`, `template` (the page's own choices)             | `ref`, `am`, `invite`, `email`, `token`, `next`                                |
 | `utm_…`, `gclid`, `gbraid`, `wbraid`, `fbclid` (campaign data) | anything else, a parameter nobody has listed included (`site`, `url`, `at`, …) |
 |                                                                | a listed parameter whose value holds an `@`                                    |
 
@@ -68,6 +68,12 @@ Meta alike.
   business referred a new one. It is functional, not a tag's: set whatever
   the notice was answered, never passed to `track()`, `fireConversion()` or
   the recorder, and `ref` stays off the allow-list above.
+- **An account manager's link is kept the same way, and no tag is given it**
+  (DEC-169, the same file). A `?am=` on any page, the waitlist included, is
+  kept in the first-party cookie `saroh_am` for 90 days as the manager's
+  code and when it was kept, so setup can record which teammate brought the
+  business in. Functional like `saroh_ref`, never given to a tag, and `am`
+  stays off the allow-list.
 
 One thing a visitor can notice: once they have accepted cookies, the
 address bar no longer shows what was cut. The link preview tool's

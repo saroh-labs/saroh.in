@@ -33,6 +33,7 @@ import {
     NUMBER_SEPARATORS,
 } from "../invoices/numbering";
 
+import { managerCodeOf } from "./account-manager";
 import type { AcceptedBusinessType } from "./business-type";
 import { ACCEPTED_BUSINESS_TYPES } from "./business-type";
 import type { OrganizationKind } from "./organization-kind";
@@ -202,6 +203,41 @@ export class OnboardOrganizationDto {
     @IsOptional()
     @IsString()
     referralCode?: string;
+
+    /**
+     * The account manager's code from the `?am=` link the browser carried
+     * from saroh.in (DEC-169, the `saroh_am` cookie), sent by the
+     * workspace, never typed. Never refused: anything not shaped like a
+     * code is dropped, and one that names no active manager links nobody
+     * (`account-manager.ts`), so a bad link can't stop a business being
+     * made.
+     */
+    @Transform(
+        ({ value }: { value: unknown }) => managerCodeOf(value) ?? undefined,
+    )
+    @IsOptional()
+    @IsString()
+    managerLinkCode?: string;
+
+    /** When that link was kept (ISO 8601), stored as the link's evidence. */
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" && value.length <= 40 ? value : undefined,
+    )
+    @IsOptional()
+    @IsString()
+    managerLinkSetAt?: string;
+
+    /**
+     * The code of the Saroh teammate helping them, typed by the owner at
+     * setup (DEC-169). Dropped like the link's when it isn't shaped like a
+     * code; one that names no active manager links nobody.
+     */
+    @Transform(
+        ({ value }: { value: unknown }) => managerCodeOf(value) ?? undefined,
+    )
+    @IsOptional()
+    @IsString()
+    managerCode?: string;
 
     /**
      * Who Saroh bills for it (DEC-167, R7): one of the caller's own billing

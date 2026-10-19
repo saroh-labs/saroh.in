@@ -68,12 +68,22 @@ jest.mock("./referral", () => ({
     referringBusiness: jest.fn().mockResolvedValue(null),
 }));
 
+// Who brought it in (DEC-169) has its own specs (`account-manager.spec.ts`,
+// `account-manager.db.spec.ts`); here it answers what each test says.
+jest.mock("./account-manager", () => ({
+    ...jest.requireActual<typeof import("./account-manager")>(
+        "./account-manager",
+    ),
+    recordManagerInTx: jest.fn().mockResolvedValue(null),
+}));
+
 import { prisma, startOnFreePlan as startOnFreePlanFn } from "@saroh/database";
 
 import { sendWelcomeEmail as sendWelcomeEmailFn } from "../../common/email";
 
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
+import { recordManagerInTx as recordManagerInTxFn } from "./account-manager";
 import type { OnboardOrganizationDto } from "./dto";
 import { OrganizationOnboardingService } from "./organization-onboarding.service";
 import { referringBusiness as referringBusinessFn } from "./referral";
@@ -92,6 +102,8 @@ const transaction = prisma.$transaction as jest.Mock;
 const startOnFreePlan = startOnFreePlanFn as unknown as jest.Mock;
 const sendWelcomeEmail = sendWelcomeEmailFn as unknown as jest.Mock;
 const referringBusiness = referringBusinessFn as unknown as jest.Mock;
+const recordManagerInTx = recordManagerInTxFn as unknown as jest.Mock;
+const MADE_AT = new Date("2026-11-30T10:00:00.000Z");
 
 describe("OrganizationOnboardingService.onboard", () => {
     // AuditService.record is fire-and-forget (never throws); a jest mock stands
@@ -106,7 +118,12 @@ describe("OrganizationOnboardingService.onboard", () => {
         orgFindUnique.mockResolvedValue(null);
         siteFindUnique.mockResolvedValue(null);
         heldFindUnique.mockResolvedValue(null);
-        orgCreate.mockResolvedValue({ id: "org_1", slug: "acme" });
+        orgCreate.mockResolvedValue({
+            id: "org_1",
+            slug: "acme",
+            createdAt: MADE_AT,
+        });
+        recordManagerInTx.mockResolvedValue(null);
         profileCreate.mockResolvedValue({ id: "bp_1" });
         membershipCreate.mockResolvedValue({ id: "mem_1" });
         referringBusiness.mockResolvedValue(null);
@@ -152,7 +169,7 @@ describe("OrganizationOnboardingService.onboard", () => {
                     kind: "BUSINESS",
                     billingProfileId: "bprof_1",
                 },
-                select: { id: true, slug: true },
+                select: { id: true, slug: true, createdAt: true },
             });
             expect(mockFirstBillingProfile).not.toHaveBeenCalled();
         });
@@ -267,7 +284,7 @@ describe("OrganizationOnboardingService.onboard", () => {
 
             expect(orgCreate).toHaveBeenCalledWith({
                 data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-                select: { id: true, slug: true },
+                select: { id: true, slug: true, createdAt: true },
             });
         });
 
@@ -288,7 +305,7 @@ describe("OrganizationOnboardingService.onboard", () => {
             ).resolves.toEqual({ id: "org_1", slug: "acme" });
             expect(orgCreate).toHaveBeenCalledWith({
                 data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-                select: { id: true, slug: true },
+                select: { id: true, slug: true, createdAt: true },
             });
         });
 
@@ -300,6 +317,78 @@ describe("OrganizationOnboardingService.onboard", () => {
             expect(JSON.stringify(record.mock.calls)).not.toContain(
                 "org_referrer",
             );
+        });
+    });
+
+    describe("who at Saroh brought it in (DEC-169)", () => {
+        it("asks inside the create transaction with the link, the typed code and when the business was made", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                managerLinkCode: "ABCD2345",
+                managerLinkSetAt: "2026-11-29T09:00:00.000Z",
+                managerCode: "WXYZ6789",
+            });
+
+            expect(recordManagerInTx).toHaveBeenCalledTimes(1);
+            const [tx, input] = recordManagerInTx.mock.calls[0] as [
+                unknown,
+                Record<string, unknown>,
+            ];
+            // The transaction's own client: it lands or rolls back with
+            // the business.
+            expect(tx).not.toHaveProperty("$transaction");
+            expect((tx as { membership: unknown }).membership).toBe(
+                prisma.membership,
+            );
+            expect(input).toEqual({
+                organizationId: "org_1",
+                ownerUserId: "user_1",
+                madeAt: MADE_AT,
+                claim: {
+                    link: {
+                        code: "ABCD2345",
+                        setAt: "2026-11-29T09:00:00.000Z",
+                    },
+                    code: "WXYZ6789",
+                },
+            });
+        });
+
+        it("still asks with nothing carried, for a lead's email", async () => {
+            await service.onboard("user_1", { name: "Acme" });
+
+            expect(recordManagerInTx).toHaveBeenCalledWith(expect.anything(), {
+                organizationId: "org_1",
+                ownerUserId: "user_1",
+                madeAt: MADE_AT,
+                claim: { link: null, code: undefined },
+            });
+        });
+
+        it("says how the manager was proved in the audit event, never who", async () => {
+            recordManagerInTx.mockResolvedValue({
+                platformAdminId: "pa_asha",
+                source: "LINK",
+                evidence: {
+                    source: "LINK",
+                    code: "ABCD2345",
+                    cookieSetAt: null,
+                },
+            });
+
+            const made = await service.onboard("user_1", { name: "Acme" });
+
+            expect(made).toEqual({ id: "org_1", slug: "acme" });
+            expect(record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    metadata: {
+                        slug: "acme",
+                        kind: "BUSINESS",
+                        accountManager: "LINK",
+                    },
+                }),
+            );
+            expect(JSON.stringify(record.mock.calls)).not.toContain("pa_asha");
         });
     });
 
@@ -319,7 +408,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(orgCreate).toHaveBeenCalledWith({
             // No kind sent (an app from before DEC-070): a business.
             data: { name: "Acme", slug: "acme", kind: "BUSINESS" },
-            select: { id: true, slug: true },
+            select: { id: true, slug: true, createdAt: true },
         });
         expect(profileCreate).toHaveBeenCalledWith({
             data: {
@@ -522,7 +611,7 @@ describe("OrganizationOnboardingService.onboard", () => {
 
                 expect(orgCreate).toHaveBeenCalledWith({
                     data: { name: "Asha Rao", slug: "asha-rao", kind },
-                    select: { id: true, slug: true },
+                    select: { id: true, slug: true, createdAt: true },
                 });
                 expect(record).toHaveBeenCalledWith(
                     expect.objectContaining({
@@ -651,7 +740,7 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
         expect(orgCreate).toHaveBeenCalledWith({
             data: { name: "  My Shop!  ", slug: "my-shop", kind: "BUSINESS" },
-            select: { id: true, slug: true },
+            select: { id: true, slug: true, createdAt: true },
         });
     });
 

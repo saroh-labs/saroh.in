@@ -593,8 +593,8 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   calls `scopeForStaff(staff, permission)` (`modules/admin/staff-scope.ts`):
   `{kind: "all"}` when any role the person holds grants that permission
   unscoped, `{kind: "own", platformAdminId}` when only the Account manager
-  role grants it. Until the account-manager link lands (U19/U25),
-  `maySeeOrganization` answers no for own scope. Each such route has a spec:
+  role grants it. For own scope, `maySeeOrganization` answers yes only while
+  the business's open `AccountManagerLink` names them (U19). Each such route has a spec:
   an Account manager reading something not theirs gets 403. A teammate's tax
   id is sealed under `STAFF_PII_ENC_KEY` and shown only as set, or its last
   4 characters to `team:pay` holders, each read on the ledger. The role
@@ -602,6 +602,23 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   Team permissions no route requires yet are listed in `AWAITING_ENDPOINT`
   with the unit that wires them; `admin.controller.permissions.spec.ts`
   fails on any other unused permission.
+- **Current** (DEC-169, admin console U19) — **Who brought a business in**
+  is decided once, in its create transaction, by `recordManagerInTx`
+  (`modules/organizations/account-manager.ts`) under a savepoint: anything
+  that fails is rolled back to it and logged (`account_manager_link_failed`),
+  and the business is made with no manager. The first proof wins: the
+  `?am=` link (`saroh_am` cookie, sent by the workspace as
+  `managerLinkCode`/`managerLinkSetAt`), then a code the owner typed
+  (`managerCode`), then the owner's **self**-verified email
+  (`emailVerifiedBySelf`) on a lead the manager owns, recorded before the
+  business's `createdAt`. Only a teammate holding the Account manager role
+  now counts (unrevoked grant, unrevoked and unexpired assignment), never
+  for their own business; an unknown or revoked code names nobody, silently.
+  `AccountManagerLink` is append-only (a trigger lets an open link only be
+  ended), one open link per business (partial unique index), the manager a
+  bare `platformAdminId`, the proof in `evidence` (code, cookie time, lead
+  and when its email was recorded; never an email), and it carries the
+  org-isolation policy. A business referral (DEC-156) is recorded beside it.
 - **Current** (DEC-169, admin console U20) — **Saroh's own sales leads**
   (`/admin/saroh-leads`, `modules/saroh-leads/`) belong to no business:
   `SarohLead` is in `NOT_TENANT_OWNED`, and `SarohContactLog` (a call or

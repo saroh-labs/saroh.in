@@ -176,6 +176,8 @@ model Organization {
   adminAccessSessions AdminAccessSession[]
   // Calls and visits Saroh's team logged with this business (DEC-169).
   sarohContactLogs    SarohContactLog[]
+  // Who at Saroh looks after it, and who did before (DEC-169).
+  accountManagerLinks AccountManagerLink[]
 
   // Optional groupings beneath the org (S1-010). Projects and Teams are NEVER
   // a tenant/ownership/billing root — always org-scoped (ADR-001).
@@ -2899,6 +2901,51 @@ model SarohContactLog {
   @@index([leadId, happenedAt])
   @@index([organizationId, happenedAt])
   @@index([platformAdminId, happenedAt])
+}
+
+// Who at Saroh looks after a business (DEC-169, admin console U19): one
+// account manager at a time, with every earlier one kept. Append-only: a
+// link is written once and only ever ended (`endedAt`, why, by whom); a
+// move to another manager ends the old link and starts a new one. A
+// trigger in the migration refuses any other change, and a partial unique
+// index allows one open link per business.
+//
+// `source` is how it started: LINK (the sign-up carried the manager's
+// `?am=` link), CODE (the owner typed the manager's code), LEAD_EMAIL (the
+// owner's own verified email was on the manager's lead before the business
+// was made) or ASSIGNED (staff gave it). The first three are BROUGHT_IN,
+// the last ASSIGNED (`kind`). All CHECKed (`organizations/account-manager.ts`
+// holds the lists). `evidence` is the proof as it was when the link started:
+// the code, when the link's cookie was set, the lead and when its email was
+// recorded. Never a person's email.
+//
+// The manager is a bare `platformAdminId`, not a foreign key, as on staff
+// invites and role assignments: who looked after a business outlives the
+// teammate's account. A business's row, so it carries the org-isolation
+// policy.
+model AccountManagerLink {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  platformAdminId String
+
+  source   String
+  kind     String
+  evidence Json   @default("{}")
+
+  startedAt       DateTime @default(now())
+  /// Who gave it, for ASSIGNED; null when the business's own sign-up started it.
+  startedByUserId String?
+
+  endedAt       DateTime?
+  endedByUserId String?
+  endedReason   String?
+
+  @@unique([organizationId], map: "AccountManagerLink_one_open_per_business", where: raw("\"endedAt\" IS NULL"))
+  @@index([organizationId, startedAt])
+  @@index([platformAdminId, endedAt])
 }
 
 // Global, append-only history of staff activity in the Saroh control plane.

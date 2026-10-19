@@ -8,14 +8,17 @@
  *
  * The steps themselves are `business-setup-form.test.tsx`.
  */
+import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    button,
     choose,
     host,
     labelled,
     mount,
     press,
+    stepOnShow,
     text,
     toFirst,
     toName,
@@ -143,6 +146,53 @@ describe("the business is made from all three steps (DEC-070)", () => {
         await toFirst();
         expect(createOrganization).not.toHaveBeenCalled();
         expect(startWithGoalAction).not.toHaveBeenCalled();
+    });
+});
+
+describe("Is someone from Saroh helping you? (DEC-169)", () => {
+    const CODE_LABEL = "Code from your Saroh contact";
+    const openCode = async () => {
+        await act(async () => {
+            button("Is someone from Saroh helping you?")?.click();
+            await new Promise((r) => setTimeout(r, 20));
+        });
+    };
+    const named = () =>
+        typeInto(labelled("What is it called?"), "Rye & Co. Bakery");
+
+    it("asks for nothing until it is opened, and sends no code", async () => {
+        await toName();
+        expect(text()).toContain("Is someone from Saroh helping you?");
+        expect(text()).not.toContain(CODE_LABEL);
+        named();
+        await press();
+        await press();
+        expect(
+            (createOrganization.mock.calls[0] as [Record<string, unknown>])[0],
+        ).not.toHaveProperty("managerCode");
+    });
+
+    it("sends the code that was typed with the business", async () => {
+        await toName();
+        named();
+        await openCode();
+        typeInto(labelled(CODE_LABEL), "abcd-2345");
+        await press();
+        await press();
+        expect(createOrganization).toHaveBeenCalledWith(
+            expect.objectContaining({ managerCode: "abcd-2345" }),
+        );
+    });
+
+    it("says what a code looks like, on its step, when it can't be one", async () => {
+        await toName();
+        named();
+        await openCode();
+        typeInto(labelled(CODE_LABEL), "hello");
+        await press();
+        expect(stepOnShow()).toBe("name");
+        expect(text()).toContain("A code is 8 letters and numbers.");
+        expect(createOrganization).not.toHaveBeenCalled();
     });
 });
 

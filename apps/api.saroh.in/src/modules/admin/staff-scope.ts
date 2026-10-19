@@ -1,4 +1,5 @@
 import { ForbiddenException } from "@nestjs/common";
+import { outsideOrgContext, prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { AdminPermission, AdminRole } from "./admin-permissions";
@@ -89,20 +90,26 @@ export function ownerWhere<K extends string>(
  * May this scope see organization `organizationId`?
  *
  * All-scope: yes. Own-scope: only while the business's open account-manager
- * link names this teammate.
- *
- * TODO(U19/U25): the link table (`AccountManagerLink`) does not exist yet,
- * so own-scope answers no for every business. That is the safe default: an
- * Account manager sees no business until the link lands and this reads it
- * (one open link where `platformAdminId` = theirs and `endedAt` is null).
+ * link (`AccountManagerLink`, U19) names this teammate. An ended link is
+ * history and grants nothing. Read outside any organization context: the
+ * console reads across businesses.
  */
-export function maySeeOrganization(
+export async function maySeeOrganization(
     scope: StaffScope,
     organizationId: string,
 ): Promise<boolean> {
-    if (scope.kind === "all") return Promise.resolve(true);
-    void organizationId;
-    return Promise.resolve(false);
+    if (scope.kind === "all") return true;
+    const link = await outsideOrgContext(() =>
+        prisma.accountManagerLink.findFirst({
+            where: {
+                organizationId,
+                platformAdminId: scope.platformAdminId,
+                endedAt: null,
+            },
+            select: { id: true },
+        }),
+    );
+    return link !== null;
 }
 
 /** {@link maySeeOrganization}, refusing with 403 when the answer is no. */

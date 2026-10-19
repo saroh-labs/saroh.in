@@ -122,6 +122,7 @@ function startingAnswers(
         address: "",
         country: "IN",
         goal: defaultGoal("BUSINESS"),
+        managerCode: "",
         ...NO_BILLING,
         ...draft?.values,
         // A name the page came with (an invite) stands until one is typed.

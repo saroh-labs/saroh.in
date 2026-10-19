@@ -83,6 +83,10 @@ export async function createFromSetup(
         // What they chose to do first: the welcome email leads with it.
         ...(values.goal === GOAL_LATER ? {} : { goal: values.goal }),
         ...(billing ? billingSent(values) : {}),
+        // A Saroh teammate's code, when one was typed (DEC-169).
+        ...(values.managerCode?.trim()
+            ? { managerCode: values.managerCode }
+            : {}),
         profile: {
             country: values.country,
             // The browser's zone (UX-008): the business's for a country
