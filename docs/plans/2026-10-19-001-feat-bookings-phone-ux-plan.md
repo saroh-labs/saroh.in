@@ -1,12 +1,14 @@
 ---
-title: "Bookings on a phone: build the improved journey (#1016)"
+title: "Bookings on phone and desktop: build the improved journey (#1016)"
 type: feat
 status: active
 date: 2026-10-19
-origin: "#1016 · design canvas page \"Bookings on a phone: improved journey\" (page-4) · Bookings and Availability UX audit (page 3, BKAudit) · DEC-170"
+origin: '#1016 · design canvas pages "Bookings on a phone: improved journey" (page-4) and "Bookings on desktop: improved journey" (page-6) · Bookings and Availability UX audit (page 3, BKAudit) · DEC-170'
 ---
 
-# Bookings on a phone: build the improved journey (#1016)
+# Bookings on phone and desktop: build the improved journey (#1016)
+
+> **19 Oct, desktop signed off.** Each unit below now builds its screen for **both sizes at once**: the phone boards on page 4 and the desktop boards on page 6 ("Bookings on desktop: improved journey"). See **Desktop: what each unit adds** before the Issues table for the desktop board each unit matches, the two new units (U19, U20) and the revised waves. The rest of the plan reads as before, for the phone.
 
 ## Summary
 
@@ -42,7 +44,7 @@ Canvas: https://claude.ai/artifact/6QDguTRfaKdm7NP5NSytNj
 
 ## Assumptions
 
-*Written without the owner in the loop. Review before code starts.*
+_Written without the owner in the loop. Review before code starts._
 
 - The boards on page 4 are final for the phone (owner, 19 Oct). Where a board
   and the #1016 body disagree, the board wins (for example, New booking now
@@ -141,20 +143,20 @@ Canvas: https://claude.ai/artifact/6QDguTRfaKdm7NP5NSytNj
 
 ### Where each screen lives today
 
-| Screen | Route | Main files |
-| --- | --- | --- |
-| Day / Week / Agenda | `apps/app.saroh.in/app/(shell)/bookings/page.tsx` | `components/bookings/calendar/calendar-screen.tsx`, `calendar-toolbar.tsx`, `day-by-person.tsx`, `week-view.tsx`, `agenda-month.tsx`, `free-gap.tsx`, `diary-block.tsx`, `now-line.tsx`, `parts.tsx`, `geometry.ts`, `components/bookings/bookings-view-switch.tsx`, `lib/services/diary.ts`, `diary-view.ts`, `diary-lanes.ts`, `calendar-href.ts` |
-| Quick look, move, cancel | sheet on `/bookings` | `components/bookings/calendar/booking-quick-look.tsx`, `class-seats.tsx`, `quick-look-types.ts`, `components/bookings/reschedule-booking.tsx`, `cancel-booking-control.tsx`, `outcome-control.tsx`, `take-payment.tsx` |
-| New booking | sheet on `/bookings` | `components/bookings/new-booking-dialog.tsx`, `components/customers/customer-picker.tsx`, `picker-forms.tsx`, `lib/customers/picker.ts`, `lib/services/booking-pay.ts`, `components/bookings/pay-link-panel.tsx`, `booking-pack-control.tsx` |
-| Book from a free time | sheet on `/bookings` | `components/bookings/calendar/new-booking-from-gap.tsx` |
-| Open or block time | sheet on `/bookings` | `components/bookings/calendar/open-hours-dialog.tsx` |
-| All bookings | `app/(shell)/bookings/all/page.tsx` | `components/bookings/bookings-view.tsx` |
-| A booking | `app/(shell)/bookings/[bookingId]/page.tsx` | `components/bookings/booking-detail.tsx`, `take-payment.tsx`, `take-payment-locked.tsx` |
-| Overview month / week | `app/(shell)/calendar/page.tsx` | `components/calendar/business-calendar.tsx`, `business-week.tsx`, `month-grid.tsx`, `day-sheet.tsx`, `day-panel.tsx`, `layer-switches.tsx`, `team-filter.tsx`, `view-switch.tsx`, `week-columns.tsx`, `week-hour-grid.tsx`, `lib/calendar/*` |
-| Services | `app/(shell)/services/page.tsx` | `components/services/services-screen.tsx`, `use-taking-bookings.ts`, `also-sell.tsx` |
-| New / edit service | `app/(shell)/services/new/page.tsx`, `services/[serviceId]/page.tsx` | `components/services/service-editor/*`, `lib/services/service-editor.ts`, `editor-data.ts` |
-| Hours and time off | `app/(shell)/bookings/availability/page.tsx` | `components/bookings/availability/*`, `lib/staff/*`, `lib/services/availability-rules.ts` |
-| Tab bar | all | `components/shared/nav-items.tsx`, `tab-bar-sheet.tsx`; toasts `app/providers.tsx` (`mobileOffset`) |
+| Screen                   | Route                                                                | Main files                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Day / Week / Agenda      | `apps/app.saroh.in/app/(shell)/bookings/page.tsx`                    | `components/bookings/calendar/calendar-screen.tsx`, `calendar-toolbar.tsx`, `day-by-person.tsx`, `week-view.tsx`, `agenda-month.tsx`, `free-gap.tsx`, `diary-block.tsx`, `now-line.tsx`, `parts.tsx`, `geometry.ts`, `components/bookings/bookings-view-switch.tsx`, `lib/services/diary.ts`, `diary-view.ts`, `diary-lanes.ts`, `calendar-href.ts` |
+| Quick look, move, cancel | sheet on `/bookings`                                                 | `components/bookings/calendar/booking-quick-look.tsx`, `class-seats.tsx`, `quick-look-types.ts`, `components/bookings/reschedule-booking.tsx`, `cancel-booking-control.tsx`, `outcome-control.tsx`, `take-payment.tsx`                                                                                                                              |
+| New booking              | sheet on `/bookings`                                                 | `components/bookings/new-booking-dialog.tsx`, `components/customers/customer-picker.tsx`, `picker-forms.tsx`, `lib/customers/picker.ts`, `lib/services/booking-pay.ts`, `components/bookings/pay-link-panel.tsx`, `booking-pack-control.tsx`                                                                                                        |
+| Book from a free time    | sheet on `/bookings`                                                 | `components/bookings/calendar/new-booking-from-gap.tsx`                                                                                                                                                                                                                                                                                             |
+| Open or block time       | sheet on `/bookings`                                                 | `components/bookings/calendar/open-hours-dialog.tsx`                                                                                                                                                                                                                                                                                                |
+| All bookings             | `app/(shell)/bookings/all/page.tsx`                                  | `components/bookings/bookings-view.tsx`                                                                                                                                                                                                                                                                                                             |
+| A booking                | `app/(shell)/bookings/[bookingId]/page.tsx`                          | `components/bookings/booking-detail.tsx`, `take-payment.tsx`, `take-payment-locked.tsx`                                                                                                                                                                                                                                                             |
+| Overview month / week    | `app/(shell)/calendar/page.tsx`                                      | `components/calendar/business-calendar.tsx`, `business-week.tsx`, `month-grid.tsx`, `day-sheet.tsx`, `day-panel.tsx`, `layer-switches.tsx`, `team-filter.tsx`, `view-switch.tsx`, `week-columns.tsx`, `week-hour-grid.tsx`, `lib/calendar/*`                                                                                                        |
+| Services                 | `app/(shell)/services/page.tsx`                                      | `components/services/services-screen.tsx`, `use-taking-bookings.ts`, `also-sell.tsx`                                                                                                                                                                                                                                                                |
+| New / edit service       | `app/(shell)/services/new/page.tsx`, `services/[serviceId]/page.tsx` | `components/services/service-editor/*`, `lib/services/service-editor.ts`, `editor-data.ts`                                                                                                                                                                                                                                                          |
+| Hours and time off       | `app/(shell)/bookings/availability/page.tsx`                         | `components/bookings/availability/*`, `lib/staff/*`, `lib/services/availability-rules.ts`                                                                                                                                                                                                                                                           |
+| Tab bar                  | all                                                                  | `components/shared/nav-items.tsx`, `tab-bar-sheet.tsx`; toasts `app/providers.tsx` (`mobileOffset`)                                                                                                                                                                                                                                                 |
 
 API: `apps/api.saroh.in/src/modules/bookings` (bookings, outcome, move,
 cancel, desk pay, pay link), `modules/staff` (hours, extra hours, time off,
@@ -231,6 +233,7 @@ same-phone check), `BKMNewFromGap.dc.html` (new customer, email optional),
 `BKMBookingDetail.dc.html` and `BKMQuickLook.dc.html` (front desk note).
 
 **Files:**
+
 - Modify: `apps/api.saroh.in/src/modules/bookings/dto.ts` (`BookByHandDto`: a
   name and phone are enough; an optional desk method with `paidWith: "PAID"`)
 - Modify: `apps/api.saroh.in/src/modules/bookings/bookings.service.ts`
@@ -253,6 +256,7 @@ same-phone check), `BKMNewFromGap.dc.html` (new customer, email optional),
   `apps/api.saroh.in/src/modules/organizations/organization-policy.spec.ts`
 
 **Approach:**
+
 - Name and phone, no email: match an existing contact by phone in the
   business first (the same normalisation orders use); if none, make one kept
   by phone. A typed email still matches by email first, as today.
@@ -275,6 +279,7 @@ same-phone check), `BKMNewFromGap.dc.html` (new customer, email optional),
 contracts.
 
 **Test scenarios:**
+
 - Happy: book by hand with a name and `+91` phone only → 201; the contact has
   that phone and no email; the booking shows the name.
 - Happy: same phone as an existing contact → that contact is booked, not a
@@ -285,8 +290,7 @@ contracts.
 - Error: neither a contact, an email nor a phone → 400 naming `bookerPhone`.
 - Permissions: Member books, records Came / Didn't come, moves and cancels →
   allowed; Member takes a desk payment or sends a pay link → 403; Reviewer →
-  403 on all; Calendar-only → 403 on all writes; another business's booking →
-  404.
+  403 on all; Calendar-only → 403 on all writes; another business's booking → 404.
 - Permissions: Member replaces Arjun's weekly hours, adds and removes time
   off and extra hours for Arjun → allowed; Member adds or removes a person or
   changes a service → 403.
@@ -323,6 +327,7 @@ bookings, All bookings, Hours and time off, What the colours mean).
 Reference: `BKMReferences.dc.html` (Fresha chip, Amie sheet, Binance Today).
 
 **Files:**
+
 - Create: `apps/app.saroh.in/components/bookings/calendar/header/calendar-header.tsx`,
   `date-sheet.tsx`, `people-sheet.tsx`, `options-sheet.tsx`
 - Modify: `apps/app.saroh.in/components/bookings/calendar/calendar-toolbar.tsx`,
@@ -333,6 +338,7 @@ Reference: `BKMReferences.dc.html` (Fresha chip, Amie sheet, Binance Today).
   `apps/app.saroh.in/components/bookings/calendar/calendar-screen.test.tsx`
 
 **Approach:**
+
 - The title reads "Today, Mon 19 Oct", "This week · 19 to 25 Oct" or the
   list's day; it opens the date sheet. The chip shows initials and name and
   opens the people sheet. The summary line is one line: "5 booked · 3 free
@@ -356,21 +362,22 @@ Reference: `BKMReferences.dc.html` (Fresha chip, Amie sheet, Binance Today).
 
 **Controls kept (today → new):**
 
-| Today | New home |
-| --- | --- |
-| Breadcrumb Bookings › Calendar | Tab bar Bookings (current) |
-| Previous / next day or week | Swipe, plus Previous / Next in the date sheet |
-| Today button | "Go to today" in the date sheet |
-| Day / Agenda / List switch | "Show as Day · Week · List" in the date sheet |
-| Month grid (agenda) | The month in the date sheet, with dots and Closed |
-| Person switch (row of names with counts) | Person chip → Whose bookings sheet, counts kept |
-| "1 cancelled" toggle | Options sheet: Show cancelled bookings |
-| Colour key | Options sheet: What the colours mean |
-| Link to All bookings | Options sheet, and the search button |
-| Link to Availability | Options sheet: Hours and time off (for the chosen person) |
-| + Add someone | People sheet: Add someone who takes bookings |
+| Today                                    | New home                                                  |
+| ---------------------------------------- | --------------------------------------------------------- |
+| Breadcrumb Bookings › Calendar           | Tab bar Bookings (current)                                |
+| Previous / next day or week              | Swipe, plus Previous / Next in the date sheet             |
+| Today button                             | "Go to today" in the date sheet                           |
+| Day / Agenda / List switch               | "Show as Day · Week · List" in the date sheet             |
+| Month grid (agenda)                      | The month in the date sheet, with dots and Closed         |
+| Person switch (row of names with counts) | Person chip → Whose bookings sheet, counts kept           |
+| "1 cancelled" toggle                     | Options sheet: Show cancelled bookings                    |
+| Colour key                               | Options sheet: What the colours mean                      |
+| Link to All bookings                     | Options sheet, and the search button                      |
+| Link to Availability                     | Options sheet: Hours and time off (for the chosen person) |
+| + Add someone                            | People sheet: Add someone who takes bookings              |
 
 **Test scenarios:**
+
 - Happy: the title shows today's date and opens the date sheet; picking Thu
   22 moves the calendar and the URL to that day.
 - Happy: the chip opens Whose bookings; picking Arjun shows Arjun's day and his
@@ -412,6 +419,7 @@ and `BKMAllBookings.dc.html` (cancel: the deposit, Refund ₹[AMOUNT] or Keep
 the deposit preselected by the policy, Cancel booking, Keep booking).
 
 **Files:**
+
 - Create: `apps/app.saroh.in/components/bookings/sheets/customer-step.tsx`,
   `time-picker.tsx`, `pay-choice.tsx`, `cancel-sheet.tsx`
 - Modify: `apps/app.saroh.in/components/customers/customer-picker.tsx`,
@@ -425,6 +433,7 @@ the deposit preselected by the policy, Cancel booking, Keep booking).
   `apps/app.saroh.in/lib/customers/picker.test.ts`
 
 **Approach:**
+
 - Customer step: search by name or phone, eight recent, "Add “typed” as a new
   customer · Just a name and phone number", inline form (Name, Phone with +91,
   Email optional, "Add it to email them their booking."), same-phone question
@@ -448,6 +457,7 @@ the deposit preselected by the policy, Cancel booking, Keep booking).
 cancel dialog; "Look further ahead" (becomes Pick a date and Next free day).
 
 **Test scenarios:**
+
 - Happy: type "Zara", add with a phone only → picked, the step moves on.
 - Happy: phone already saved for Rohan → the question shows; "Yes" picks
   Rohan, "No" adds Zara.
@@ -490,6 +500,7 @@ yet, Calendar-only role, can't open (Reviewer), couldn't load, loading).
 Was: `BKMWasBookingsDay.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/calendar/day-by-person.tsx`,
   `free-gap.tsx`, `diary-block.tsx`, `now-line.tsx`, `parts.tsx`,
   `geometry.ts`, `calendar-screen.tsx` (phone branch only),
@@ -499,6 +510,7 @@ Was: `BKMWasBookingsDay.dc.html`.
   `e2e/tests/bookings.spec.ts` (phone project)
 
 **Approach:**
+
 - Free gaps long enough for the shortest service show "Free · 4:00 to 5:00 ·
   Book" in green on touch and desk (BA-04); hover stays a desk shortcut only.
 - Closed time reads "Closed · tap to open" and opens U10; time off is shaded
@@ -523,6 +535,7 @@ Home; loading; couldn't load with Try again; Got it help; New booking
 (floating button); everything moved to U2's sheets.
 
 **Test scenarios:**
+
 - Happy: a 60-minute gap with a 45-minute service shows a green Free block;
   tapping it opens U9 with the person and time set.
 - Edge: a 15-minute gap when the shortest service is 30 minutes → no Free
@@ -559,12 +572,14 @@ the list agree (BA-10).
 hours on this day" state). Was: `BKMWasBookingsWeek.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/calendar/week-view.tsx`,
   `calendar-screen.tsx` (phone branch), `apps/app.saroh.in/lib/services/diary-view.ts`
 - Test: `apps/app.saroh.in/components/bookings/calendar/week-view.test.tsx`
   (new), `e2e/tests/bookings.spec.ts` (phone)
 
 **Approach:**
+
 - `?layout=week` on a phone renders the strip and the list; the day picked is
   in the URL. Swipe steps the week.
 - Free rows: "Free · Meera until 5:00 pm · Book" open U9; booking rows open U7.
@@ -577,6 +592,7 @@ and summary (header C); cancelled toggle (options sheet); Day / Agenda / List
 colour key (options sheet); rows → quick look.
 
 **Test scenarios:**
+
 - Happy: tapping Wed shows Wed's bookings and the title count equals the
   strip's Wed count.
 - Edge: Sunday closed → "Closed on Sundays" and "Open hours on this day" opens
@@ -604,6 +620,7 @@ list, empty "The day is open · Book on this day", Proposal · Q4). Was:
 `BKMWasBookingsAgenda.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/calendar/agenda-month.tsx`,
   `calendar-screen.tsx` (phone branch), `apps/app.saroh.in/app/(shell)/bookings/page.tsx`
   (phone default view, if Q4 is yes), `apps/app.saroh.in/lib/services/calendar-href.ts`
@@ -611,6 +628,7 @@ list, empty "The day is open · Book on this day", Proposal · Q4). Was:
   `e2e/tests/bookings.spec.ts` (phone)
 
 **Approach:**
+
 - The month moves into U2's date sheet; the body is Next, free times, then
   booked rows.
 - The phone default needs no server sniffing: the URL without `layout` keeps
@@ -624,6 +642,7 @@ picker with dots (date sheet); free times per person → book (rows); rows →
 quick look; empty state; New booking (floating); view switch (date sheet).
 
 **Test scenarios:**
+
 - Happy: a booking starting in 10 minutes shows in the Next card; Open opens U7.
 - Edge: nothing booked → "The day is open…" and "Book on this day" opens U8 on
   that day.
@@ -652,6 +671,7 @@ their next visit: service and person kept, you pick the day; Q16). Was:
 `BKMWasQuickLook.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/calendar/booking-quick-look.tsx`,
   `class-seats.tsx`, `quick-look-types.ts`,
   `apps/app.saroh.in/components/bookings/outcome-control.tsx`,
@@ -660,6 +680,7 @@ their next visit: service and person kept, you pick the day; Q16). Was:
   (new), `e2e/tests/bookings.spec.ts`
 
 **Approach:**
+
 - Primary button by state: Mark arrived → (after) Take ₹[AMOUNT] now → Book
   their next visit (BA-31). Undo in the toast.
 - Book their next visit (Q16, decided 19 Oct): opens U8 at the day-and-time
@@ -674,22 +695,23 @@ their next visit: service and person kept, you pick the day; Q16). Was:
 
 **Controls kept:**
 
-| Today | New home |
-| --- | --- |
-| Check in | Mark arrived (primary) |
-| Undo check-in | Toast Undo; More: Undo, not arrived yet |
-| Mark attended instead (after no-show) | More: They came after all |
-| (no-show) | More: They didn't come |
-| Move with 8 slots, Keep the current time | Move or cancel → Move to another time (picker), Keep it as it is |
-| Cancel | Move or cancel → Cancel booking (money question) |
-| Undo cancel | More: Undo the cancel; toast Undo |
-| Take ₹[AMOUNT] | Primary after arrival; More: Take ₹[AMOUNT] |
-| Open customer's page | More: Open Kabir's page |
-| The full booking and what happened | More: The full booking and its history |
-| Phone, email, Needs attention, paid line, policy line | Kept in the sheet body; Call added |
-| Class: seats, per-seat Cancel, Cancel class | Who's booked, Cancel a place, Cancel the class |
+| Today                                                 | New home                                                         |
+| ----------------------------------------------------- | ---------------------------------------------------------------- |
+| Check in                                              | Mark arrived (primary)                                           |
+| Undo check-in                                         | Toast Undo; More: Undo, not arrived yet                          |
+| Mark attended instead (after no-show)                 | More: They came after all                                        |
+| (no-show)                                             | More: They didn't come                                           |
+| Move with 8 slots, Keep the current time              | Move or cancel → Move to another time (picker), Keep it as it is |
+| Cancel                                                | Move or cancel → Cancel booking (money question)                 |
+| Undo cancel                                           | More: Undo the cancel; toast Undo                                |
+| Take ₹[AMOUNT]                                        | Primary after arrival; More: Take ₹[AMOUNT]                      |
+| Open customer's page                                  | More: Open Kabir's page                                          |
+| The full booking and what happened                    | More: The full booking and its history                           |
+| Phone, email, Needs attention, paid line, policy line | Kept in the sheet body; Call added                               |
+| Class: seats, per-seat Cancel, Cancel class           | Who's booked, Cancel a place, Cancel the class                   |
 
 **Test scenarios:**
+
 - Happy: Mark arrived → status Came, primary becomes Take ₹[AMOUNT] now, toast
   with Undo restores Booked.
 - Happy: Move to Tue 10:00 → toast "Moved Kabir to Tue 20 Oct at 10:00 am.
@@ -726,6 +748,7 @@ another booking, Done). Journey: `BKMJourneyMap.dc.html`. Was:
 `BKMWasNewBooking.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/new-booking-dialog.tsx` (phone
   becomes the stepped flow; desk keeps one sheet in the same order),
   `apps/app.saroh.in/components/bookings/pay-link-panel.tsx` (inside the done
@@ -737,6 +760,7 @@ another booking, Done). Journey: `BKMJourneyMap.dc.html`. Was:
   `apps/app.saroh.in/lib/services/booking-message.test.ts`, `e2e/tests/bookings.spec.ts`
 
 **Approach:**
+
 - Ways in: the floating New booking, "Book on this day", "Book their next
   visit" (prefilled), Overview "Book", a customer's page. Each prefills what
   it knows and starts at the first unknown step.
@@ -756,6 +780,7 @@ choices, Create booking (now Book), Cancel / Close, pay link panel with Share
 and Done, booked toast; added: With, Back, step count.
 
 **Test scenarios:**
+
 - Happy: new customer by name and phone → Physio assessment → Meera → Tue
   10:00 → Pays at the visit → Book → done screen with the right line.
 - Happy: Anyone free → the booked person is named on the check card and the
@@ -792,6 +817,7 @@ missing something, in extra hours with More open, booked toast with Copy
 message; Q11 and Q12 notes). Was: `BKMWasNewFromGap.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/calendar/new-booking-from-gap.tsx`
   (uses U3's customer step and pay choice)
 - Test: `apps/app.saroh.in/components/bookings/calendar/new-booking-from-gap.test.tsx`
@@ -813,6 +839,7 @@ payment, Close these extra hours, Block this time instead, Create booking
 (Book), Cancel (Close), booked toast.
 
 **Test scenarios:**
+
 - Happy: 4:00 gap → Follow-up session → Kabir → Book → toast with Copy
   message.
 - Edge: a 90-minute service in a 60-minute gap is greyed with "too long for
@@ -843,6 +870,7 @@ how long, repeat, and one button.
 time, done with Undo). Was: `BKMWasOpenHours.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/calendar/open-hours-dialog.tsx`
 - Test: `apps/app.saroh.in/components/bookings/calendar/open-hours-dialog.test.tsx`
   (new)
@@ -856,6 +884,7 @@ gap"), Repeat (Just this day / Every Monday), Save (Open / Block …), Cancel;
 added: the Open / Block switch and Undo.
 
 **Test scenarios:**
+
 - Happy: closed 5:00 pm → Open 1 hour, just today → extra hours exist and the
   calendar shows Free; Undo removes them.
 - Happy: block a free 12:15 gap → time off for that range; customers aren't
@@ -882,6 +911,7 @@ awaiting payment, no bookings yet, row menu open, cancel from a row;
 Proposal · Q10). Was: `BKMWasAllBookings.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/bookings-view.tsx`,
   `apps/app.saroh.in/app/(shell)/bookings/all/page.tsx`
 - Test: `apps/app.saroh.in/components/bookings/bookings-view.test.tsx`,
@@ -900,6 +930,7 @@ states with Share your booking page, Show all bookings, New booking
 (floating), Day / Agenda / List switch (Back to the calendar).
 
 **Test scenarios:**
+
 - Happy: cancel a paid booking from the row menu → the money question → Cancel,
   keep the deposit → toast; the row shows Cancelled.
 - Happy: Needs an outcome → mark Came on the row → it leaves the filter.
@@ -931,6 +962,7 @@ come?, Member (front desk); take payment sheet with Cash given and change,
 Send a payment link instead). Was: `BKMWasBookingDetail.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/booking-detail.tsx`,
   `take-payment.tsx`, `take-payment-locked.tsx`,
   `apps/app.saroh.in/app/(shell)/bookings/[bookingId]/page.tsx`
@@ -953,6 +985,7 @@ sheet (How are they paying, Cash given, change, Send a payment link instead);
 added: See the day, Book their next visit.
 
 **Test scenarios:**
+
 - Happy: past visit not marked → Came → status Came, pinned becomes Book a new
   time.
 - Happy: take ₹[AMOUNT] cash with ₹[AMOUNT] given → change shown → recorded,
@@ -980,6 +1013,7 @@ sheet: Whose, On the calendar layers with this month's totals, Show; Proposal
 · Q9). Was: `BKMWasOverviewMonth.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/calendar/business-calendar.tsx`,
   `month-grid.tsx`, `day-sheet.tsx`, `day-panel.tsx`, `layer-switches.tsx`,
   `team-filter.tsx`, `view-switch.tsx`, `calendar-toolbar.tsx`
@@ -998,6 +1032,7 @@ dots, day panel with In / Out, Book, bookings, classes, invoices, 3 more →
 Bookings.
 
 **Test scenarios:**
+
 - Happy: tap 19 → the sheet lists 8 bookings, 2 classes, 1 invoice; "3 more"
   opens Bookings on 19 Oct.
 - Happy: hide Invoices in What to show → dots and the sheet drop invoices.
@@ -1020,6 +1055,7 @@ count and a list of that day with its money.
 **Boards:** `BKMOverviewWeek.dc.html`. Was: `BKMWasOverviewWeek.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/calendar/business-week.tsx`,
   `week-columns.tsx`, `week-hour-grid.tsx` (desk only),
   `apps/app.saroh.in/lib/calendar/week.ts`
@@ -1036,6 +1072,7 @@ all-day items (top of the day list), items → open, day sheet with Book (the
 day list itself), "Nothing on this day yet" (Closed / Nothing is on this day).
 
 **Test scenarios:**
+
 - Happy: tap Thu → Thu's items and In / Out.
 - Edge: Sunday closed → "Closed on Sundays".
 - Phone: no sideways scroll at 320 (the old grid never renders).
@@ -1057,6 +1094,7 @@ day list itself), "Nothing on this day yet" (Closed / Nothing is on this day).
 read-only (Member), no services yet, toasts). Was: `BKMWasServices.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/services/services-screen.tsx`,
   `use-taking-bookings.ts`, `also-sell.tsx`
 - Test: `apps/app.saroh.in/components/services/services-screen.test.tsx`
@@ -1075,6 +1113,7 @@ with Turn on Payments, Taking bookings switch with Undo toast, Also sell
 (Courses, Class packs), empty state.
 
 **Test scenarios:**
+
 - Happy: turn off Taking bookings → toast "Physio assessment paused. Nobody
   can book it; bookings already made stay." with Undo.
 - Happy: search "mass" → only Sports massage.
@@ -1105,6 +1144,7 @@ delete confirm, just saved). Was: `BKMWasServiceNew.dc.html`,
 `BKMWasServiceEdit.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/services/service-editor/service-editor.tsx`,
   `editor-sections.tsx`, `fields.tsx`, `length-field.tsx`, `visits-field.tsx`,
   `where-field.tsx`, `deposit-field.tsx`, `gst-fields.tsx`, `more-settings.tsx`,
@@ -1115,6 +1155,7 @@ delete confirm, just saved). Was: `BKMWasServiceNew.dc.html`,
   `apps/app.saroh.in/lib/services/service-editor.test.ts`
 
 **Approach:**
+
 - New: Name, Who comes (One person / A group class with places), How long
   (15 / 30 / 45 / 60 / 90 / Other), Price (0 if free), Who does it; the live
   line ("Customers can book this on your booking page, in Meera's free time,
@@ -1143,6 +1184,7 @@ Show on the booking page and Taking bookings (Who can book it, Q5), At a
 glance, Price history, Discard, Add service / Save, Delete with its confirm.
 
 **Test scenarios:**
+
 - Happy: fill the five questions → live line says bookable → Add service →
   toast and the list shows it.
 - Edge: press Add with gaps → "3 things to fill in…" and focus on the first.
@@ -1184,6 +1226,7 @@ changed with Undo), `BKMHoursV2Day.dc.html`, `BKMHoursV2Several.dc.html`,
 `BKMWasAvailability.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/components/bookings/availability/availability-editor.tsx`
   (drop the draft and Save bar), `weekly-hours.tsx` (list rows + day sheet),
   `add-time-off-sheet.tsx` (kind, quick dates, no year cap, its button saves),
@@ -1198,6 +1241,7 @@ changed with Undo), `BKMHoursV2Day.dc.html`, `BKMHoursV2Several.dc.html`,
   `apps/app.saroh.in/lib/staff/time-off.test.ts`, `e2e/tests/bookings.spec.ts`
 
 **Approach:**
+
 - Whose hours card opens a sheet (each person with their week's hours,
   Everyone, Add someone who takes bookings) instead of a chip per person.
 - A day row opens the day sheet: Open on Monday switch, opens / closes, lunch
@@ -1217,25 +1261,26 @@ changed with Undo), `BKMHoursV2Day.dc.html`, `BKMHoursV2Several.dc.html`,
 
 **Controls kept:**
 
-| Today | New home |
-| --- | --- |
-| It's just me / Add my team (first time) | Set Meera's hours / Add someone else who takes bookings |
-| What customers can book now (service hours) | "Until then" note in the first-time state |
-| Opening hours note, Settings › Hours link | "Why isn't a time offered?" step 2 links Opening hours |
-| Person chips, + Add someone | Whose hours card → sheet, Add someone who takes bookings |
-| Weekly hours, + Hours per day, add hours inline | Day row → day sheet (times, another shift) |
+| Today                                           | New home                                                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------ |
+| It's just me / Add my team (first time)         | Set Meera's hours / Add someone else who takes bookings                              |
+| What customers can book now (service hours)     | "Until then" note in the first-time state                                            |
+| Opening hours note, Settings › Hours link       | "Why isn't a time offered?" step 2 links Opening hours                               |
+| Person chips, + Add someone                     | Whose hours card → sheet, Add someone who takes bookings                             |
+| Weekly hours, + Hours per day, add hours inline | Day row → day sheet (times, another shift)                                           |
 | Copy Monday to weekdays; Copy Monday's hours to | "Also use these hours on" in the day sheet; Change several days (Q8, decided 19 Oct) |
-| Booking outside hours note | Same note with See it |
-| What customers see preview | More → What customers see |
-| Time off list, Add time off | Time off · Coming up, Add time off |
-| One-off extra hours list, close | More → Extra opening hours, Close, Add extra hours |
-| Booking rules, Edit each | More → Booking rules, each saves on pick |
-| Free cancellation sheet | Booking rules → Free to cancel until |
-| New person sheet (Name, What they do) | Add someone sheet, same fields |
-| Save bar (Discard, Save) | Removed by DEC-170: each change saves, with Undo |
-| Read-only note | Kept, one line |
+| Booking outside hours note                      | Same note with See it                                                                |
+| What customers see preview                      | More → What customers see                                                            |
+| Time off list, Add time off                     | Time off · Coming up, Add time off                                                   |
+| One-off extra hours list, close                 | More → Extra opening hours, Close, Add extra hours                                   |
+| Booking rules, Edit each                        | More → Booking rules, each saves on pick                                             |
+| Free cancellation sheet                         | Booking rules → Free to cancel until                                                 |
+| New person sheet (Name, What they do)           | Add someone sheet, same fields                                                       |
+| Save bar (Discard, Save)                        | Removed by DEC-170: each change saves, with Undo                                     |
+| Read-only note                                  | Kept, one line                                                                       |
 
 **Test scenarios:**
+
 - Happy: turn Saturday off → "Saturday is now closed for Meera. Saved." with
   Undo; Undo restores the hours.
 - Happy: Change several days Mon–Fri 9 am – 7 pm, lunch 1 – 3 pm → each day
@@ -1270,6 +1315,7 @@ them up, and the word list and checks guard them.
 **Boards:** every page-4 board; the audit's copy table on `BKAudit.dc.html`.
 
 **Files:**
+
 - Modify: `apps/app.saroh.in/lib/format/status.ts` ("To confirm" → "Awaiting
   payment" for bookings), `apps/app.saroh.in/lib/calendar/layers.ts`,
   `apps/app.saroh.in/lib/services/diary.ts`, `apps/app.saroh.in/lib/services/booking-pay.ts`,
@@ -1284,27 +1330,28 @@ them up, and the word list and checks guard them.
 
 **Approach:** Words the boards draw:
 
-| Today | New |
-| --- | --- |
-| To confirm / Waiting for payment / unpaid | Awaiting payment (DEC-170) |
-| Check in / They came / Attended / Checked in | Mark arrived (button), Came (status) |
-| No-show / They didn't | Didn't come |
-| Not said yet / Nobody has said how this went | Not marked yet |
-| Pays at the session | Pays at the visit |
-| Pay link / Send a pay link | Payment link / Send a payment link |
-| Create booking | Book |
-| Day by person | Day |
-| Agenda (phone) | List (Q4) |
-| Availability | Hours and time off |
-| One-off extra hours | Extra opening hours |
-| Gap after / Buffer before (min) | Break after / Break before |
-| Kind · One-to-one · Class | Who comes · One person · A group class |
-| Who takes it | Who does it |
-| Overview | Calendar (Q9, decided 19 Oct) |
+| Today                                        | New                                    |
+| -------------------------------------------- | -------------------------------------- |
+| To confirm / Waiting for payment / unpaid    | Awaiting payment (DEC-170)             |
+| Check in / They came / Attended / Checked in | Mark arrived (button), Came (status)   |
+| No-show / They didn't                        | Didn't come                            |
+| Not said yet / Nobody has said how this went | Not marked yet                         |
+| Pays at the session                          | Pays at the visit                      |
+| Pay link / Send a pay link                   | Payment link / Send a payment link     |
+| Create booking                               | Book                                   |
+| Day by person                                | Day                                    |
+| Agenda (phone)                               | List (Q4)                              |
+| Availability                                 | Hours and time off                     |
+| One-off extra hours                          | Extra opening hours                    |
+| Gap after / Buffer before (min)              | Break after / Break before             |
+| Kind · One-to-one · Class                    | Who comes · One person · A group class |
+| Who takes it                                 | Who does it                            |
+| Overview                                     | Calendar (Q9, decided 19 Oct)          |
 
 "Booking rules" stays (Q9, decided 19 Oct).
 
 **Test scenarios:**
+
 - Happy: a PENDING booking reads "Awaiting payment" in status, the calendar
   pill, the list and quick look.
 - Happy: a NO_SHOW booking reads "Didn't come" everywhere.
@@ -1315,39 +1362,88 @@ them up, and the word list and checks guard them.
 
 ---
 
+## Desktop: what each unit adds (signed off 19 Oct)
+
+The owner signed off desktop and phone together (DEC-170, desktop answers). Every screen unit builds the phone layout below 640px and the desktop layout from it upward, in the same components: no separate desktop screens. One rule runs through all boards: **a phone bottom sheet is a right-hand side panel on desktop, and a phone full-screen flow is a wide side panel.** Desktop boards are on canvas page 6, each beside a `BKDWas…` copy of where it started. Sources are in `~/.saroh-design-drafts/bookings-desktop/`.
+
+| Unit                              | Desktop board(s), page 6                                         | What desktop adds or changes                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| U2 Header C                       | BKDCalendarDay (header, date popover, person popover, ⋯ popover) | ‹ › arrows stay visible (there is no swipe); "Today, Mon 19 Oct ▾" opens a popover with Go to a day, the month, and **Show as** Day / Week / List (no visible switch). The person chip has faces. The ⋯ popover holds show cancelled, All bookings, Hours and time off, **Start Bookings on** and **Show bookings for** (the last person I picked, the default: Everyone until a pick, then the pick / Everyone / Just me), plus what the colours mean. One summary line ends "Times in IST". |
+| U3 Booking sheets                 | BKDFromGap, BKDNewBooking, BKDQuickLook (cancel)                 | The same sheets as right-hand side panels; New booking is a wide panel with a step list on the left that doubles as the check card.                                                                                                                                                                                                                                                                                                                                                           |
+| U4 Day                            | BKDCalendarDay                                                   | Opens on Everyone, a column per person (then the remembered pick). "Free · … + Book"; "Closed · click to open". All its states.                                                                                                                                                                                                                                                                                                                                                               |
+| U5 Week                           | BKDCalendarWeek                                                  | Each day heading shows a count and how full it is; a lane per person on Everyone; closed days read "Closed on Sundays · Open hours on this day".                                                                                                                                                                                                                                                                                                                                              |
+| U6 List                           | BKDCalendarList                                                  | A "Next" card, booked rows, and free times in a right-hand column; the closed-day empty state as Week; "quiet open day" keeps "Book on this day".                                                                                                                                                                                                                                                                                                                                             |
+| U7 Quick look                     | BKDQuickLook                                                     | Side panel, one main action at a time; Move and Cancel (money question preset by the business's policy) as panel steps; Next visit Tomorrow / Next week / Pick a date.                                                                                                                                                                                                                                                                                                                        |
+| U8 New booking                    | BKDNewBooking, BKDAddCustomer                                    | Who, What, With, When, Pay as a wide panel; name and phone enough; every phone state.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| U9 Free time                      | BKDFromGap                                                       | Book someone · Block this time switch; 3 steps; WhatsApp / SMS / Copy message.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| U10 Open or block                 | BKDOpenHours                                                     | Open or Block, how long, just this day or every week; toast with Undo.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| U11 All bookings                  | BKDAllBookings                                                   | Search and More filters stay on the page; rows by day; Came / Didn't come inline; the row menu; every cancel asks about the money; "When" labelled IST.                                                                                                                                                                                                                                                                                                                                       |
+| U12 A booking's page              | BKDBooking                                                       | Date and time as the heading; the main action pinned top; Take payment as a panel (Member sees it locked, saying why).                                                                                                                                                                                                                                                                                                                                                                        |
+| U13 Calendar month (was Overview) | BKDCalMonth                                                      | One filter button ("What to show"); money on one line with Export; a side panel for the picked day; Member sees no amounts.                                                                                                                                                                                                                                                                                                                                                                   |
+| U14 Calendar week                 | BKDCalWeek                                                       | Time grid kept; totals on one line; a Book link per day; closed days as Week.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| U15 Services list                 | BKDStates (services table)                                       | "Who can book it" tag per row; "Taking bookings" switch with Undo; search past 8 services.                                                                                                                                                                                                                                                                                                                                                                                                    |
+| U16 New and edit service          | BKDServiceNew                                                    | Five questions left; live "can customers book it" and the two Who can book it ticks right; sticky Discard / Add service; edit as cards opening side panels; delete offers "Pause it instead".                                                                                                                                                                                                                                                                                                 |
+| U17 Hours and time off            | BKDHours                                                         | V2 list under Whose hours; Time off and More in a right column; no Save bar; Member edits anyone's hours (not adding people).                                                                                                                                                                                                                                                                                                                                                                 |
+| U18 Words                         | all                                                              | Calendar (not Overview) everywhere, including the phone tab bar.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+
+### U19. API: each person's own booking rules, and the approval switch (#1038)
+
+**Goal:** a person who takes bookings can have their own timing rules (notice needed, how far ahead, gap between bookings, cancelling) that override the business's for their diary; the business gains "Gap between bookings" (none by default) and the switch "Members' rule changes need approval" (on by default for new businesses, and set on for existing ones by the migration). A Member changes only their own rules; with the switch on their change is a request (Approve / Turn down with an optional reason / Withdraw), notified to owners and admins, and changes nothing until approved. Paying and refunds stay business-wide. Availability (booking page and by hand) reads the person's rule, else the business's, field by field.
+
+**Files:** schema + migration (per-person rule fields or table, the request table, the business switch and gap), `bookings/` availability and rules, `staff/` (rules endpoints), notifications, history, `organization-actions.ts` / policy (who may change whose rules), DTOs, the app's API types. **Tests:** unit for the fallback and the request states; db specs (plain + `TEST_RLS=on`) for every #1038 checkbox, a pending request leaving slots unchanged, and roles.
+
+**Dependencies:** U1 (done). Wave 1.
+
+### U20. Screens: each person's rules and requests, phone and desktop (#1038)
+
+**Goal:** the boards BKMHoursRules, BKMHoursRuleWaiting, BKMHoursRuleRequest, BKMHoursRuleTurnedDown, BKMHoursApproval (page 4) and their BKD twins (page 6): "Booking rules for ‹person›" under Whose hours, its sheet / panel, the waiting state, the request line and review, turned down, and the switch in the business's Booking rules. **Dependencies:** U17, U19. Wave 3.
+
+### Waves, revised for desktop
+
+| Wave | Units                                                                                | Note                                                                                          |
+| ---- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| 1    | U2 Header C, U3 Booking sheets, U18 Words, U15 Services list, U19 rules API          | U1 is already in the batch. At most five agents at once, with any other unit (#1036) counted. |
+| 2    | U4 Day, U5 Week, U6 List, U13 Calendar month, U17 Hours and time off                 | Build on U2 / U18.                                                                            |
+| 3    | U7 Quick look, U8 New booking, U9 Free time, U11 All bookings, U14 Calendar week     | Build on U3 and U4.                                                                           |
+| 4    | U10 Open or block, U12 A booking's page, U16 New and edit service, U20 rules screens | Build on U4, U7, U15, U17, U19.                                                               |
+
+Every screen unit is checked by the coordinator in a browser at 1440×900 and 390×844 against both boards before it is squashed into the batch.
+
 ## Issues
 
-| Unit | Issue | Title |
-| --- | --- | --- |
-| U1 | #1017 | book a caller with a name and phone, the front desk books, Paid now says how |
-| U2 | #1018 | calendar header with the date, people and options sheets |
-| U3 | #1019 | shared booking sheets: customer, time, payment, cancel |
-| U4 | #1020 | Day calendar |
-| U5 | #1021 | Week |
-| U6 | #1022 | List (agenda) |
-| U7 | #1023 | a booking at a glance, move or cancel |
-| U8 | #1024 | New booking, step by step |
-| U9 | #1025 | book a free time |
-| U10 | #1026 | open or block a time |
-| U11 | #1027 | all bookings |
-| U12 | #1028 | a booking's page |
-| U13 | #1029 | Overview month |
-| U14 | #1030 | Overview week |
-| U15 | #1031 | services list |
-| U16 | #1032 | new and edit service |
-| U17 | #1033 | Hours and time off |
-| U18 | #1034 | one word for each thing |
+| Unit | Issue | Title                                                                        |
+| ---- | ----- | ---------------------------------------------------------------------------- |
+| U1   | #1017 | book a caller with a name and phone, the front desk books, Paid now says how |
+| U2   | #1018 | calendar header with the date, people and options sheets                     |
+| U3   | #1019 | shared booking sheets: customer, time, payment, cancel                       |
+| U4   | #1020 | Day calendar                                                                 |
+| U5   | #1021 | Week                                                                         |
+| U6   | #1022 | List (agenda)                                                                |
+| U7   | #1023 | a booking at a glance, move or cancel                                        |
+| U8   | #1024 | New booking, step by step                                                    |
+| U9   | #1025 | book a free time                                                             |
+| U10  | #1026 | open or block a time                                                         |
+| U11  | #1027 | all bookings                                                                 |
+| U12  | #1028 | a booking's page                                                             |
+| U13  | #1029 | Overview month                                                               |
+| U14  | #1030 | Overview week                                                                |
+| U15  | #1031 | services list                                                                |
+| U16  | #1032 | new and edit service                                                         |
+| U17  | #1033 | Hours and time off                                                           |
+| U18  | #1034 | one word for each thing                                                      |
+| U19  | #1038 | each person's own booking rules, with the approval switch (API)              |
+| U20  | #1038 | each person's rules and requests (screens)                                   |
 
 ---
 
 ## Waves (at most five agents at a time)
 
-| Wave | Units | Why together |
-| --- | --- | --- |
-| 1 | U1 API, U2 Header C, U3 Booking sheets, U18 Words, U15 Services list | Shared pieces and an independent screen; no file overlap |
-| 2 | U4 Day, U5 Week, U6 List, U13 Overview month, U17 Hours and time off | Build on U2 / U18; U2 owns `calendar-screen.tsx`, so U4–U6 touch only its phone branch for their layout |
-| 3 | U7 Quick look, U8 New booking, U9 From a free time, U11 All bookings, U14 Overview week | Build on U3 and U4 |
-| 4 | U10 Open or block, U12 A booking's page, U16 New and edit service | Build on U4, U7, U15 |
+| Wave | Units                                                                                   | Why together                                                                                            |
+| ---- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 1    | U1 API, U2 Header C, U3 Booking sheets, U18 Words, U15 Services list                    | Shared pieces and an independent screen; no file overlap                                                |
+| 2    | U4 Day, U5 Week, U6 List, U13 Overview month, U17 Hours and time off                    | Build on U2 / U18; U2 owns `calendar-screen.tsx`, so U4–U6 touch only its phone branch for their layout |
+| 3    | U7 Quick look, U8 New booking, U9 From a free time, U11 All bookings, U14 Overview week | Build on U3 and U4                                                                                      |
+| 4    | U10 Open or block, U12 A booking's page, U16 New and edit service                       | Build on U4, U7, U15                                                                                    |
 
 Each unit lands in the day's local `batch-<date>-<n>` branch, gated with
 `pnpm prepush --all` before the batch goes up (never a branch or PR per unit).
@@ -1357,19 +1453,19 @@ No agent binds the e2e ports while a gate runs.
 
 ## Decisions from the owner, 19 Oct
 
-| Q | Decided | Where it lands |
-| --- | --- | --- |
-| Q4 | Yes: header C's date sheet has "Show as: Day / Week / List" on every Day, Week and List board. | U2, U6 |
-| Q5 | "Who can book it" is two tick boxes, "Customers, on your booking page" and "Your team, from Bookings", any of the four mixes; neither ticked is paused, with the line "Untick both to pause it. Bookings already made stay." Needs a separate team flag on the service. | U1, U15, U16 |
-| Q8 | "Also use these hours on" (day sheet) and "Change several days" replace Copy Monday. | U17 |
-| Q9 | The Overview tab is renamed "Calendar" (`nav-items.tsx`); "Booking rules" is kept. | U13, U18 |
-| Q10 | Times always show in the business's (store's) time zone, with the zone's short label (IST or another) as already designed. | U11, U12, U3 |
-| Q12 | After booking: WhatsApp, SMS and Copy message, through the phone's own apps; Saroh sends nothing. | U8, U9 |
-| Q13 | Members book, mark arrivals, move and cancel, and set hours and time off for other people too (not read-only). Needs a permission change. | U1, U17 |
-| Q14 | The business's own cancellation and refund policy decides refund or keep; no role gate on it. | U1, U3, U7 |
-| Q11 | Option A: a "Book someone · Block this time" switch at the top of the free-time sheet; "Close these extra hours" a quiet link at the foot, only on extra opening hours. | U9 |
-| Q15 | Option C: remember the last view per device, and "Start Bookings on: Day / Week / List" (or Where I left it) in the "…" sheet, saved for that person. | U2, U4, U6 |
-| Q16 | "Book their next visit" opens the booking flow with the service and person prefilled and the day left to the merchant: Tomorrow / Next week / Pick a date. No fixed week later. | U7, U8 |
+| Q   | Decided                                                                                                                                                                                                                                                                 | Where it lands |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| Q4  | Yes: header C's date sheet has "Show as: Day / Week / List" on every Day, Week and List board.                                                                                                                                                                          | U2, U6         |
+| Q5  | "Who can book it" is two tick boxes, "Customers, on your booking page" and "Your team, from Bookings", any of the four mixes; neither ticked is paused, with the line "Untick both to pause it. Bookings already made stay." Needs a separate team flag on the service. | U1, U15, U16   |
+| Q8  | "Also use these hours on" (day sheet) and "Change several days" replace Copy Monday.                                                                                                                                                                                    | U17            |
+| Q9  | The Overview tab is renamed "Calendar" (`nav-items.tsx`); "Booking rules" is kept.                                                                                                                                                                                      | U13, U18       |
+| Q10 | Times always show in the business's (store's) time zone, with the zone's short label (IST or another) as already designed.                                                                                                                                              | U11, U12, U3   |
+| Q12 | After booking: WhatsApp, SMS and Copy message, through the phone's own apps; Saroh sends nothing.                                                                                                                                                                       | U8, U9         |
+| Q13 | Members book, mark arrivals, move and cancel, and set hours and time off for other people too (not read-only). Needs a permission change.                                                                                                                               | U1, U17        |
+| Q14 | The business's own cancellation and refund policy decides refund or keep; no role gate on it.                                                                                                                                                                           | U1, U3, U7     |
+| Q11 | Option A: a "Book someone · Block this time" switch at the top of the free-time sheet; "Close these extra hours" a quiet link at the foot, only on extra opening hours.                                                                                                 | U9             |
+| Q15 | Option C: remember the last view per device, and "Start Bookings on: Day / Week / List" (or Where I left it) in the "…" sheet, saved for that person.                                                                                                                   | U2, U4, U6     |
+| Q16 | "Book their next visit" opens the booking flow with the service and person prefilled and the day left to the merchant: Tomorrow / Next week / Pick a date. No fixed week later.                                                                                         | U7, U8         |
 
 Nothing is open. Q5 was left open in the morning and decided later the same
 day; Q11 and Q15 were decided after options were drawn (the other options stay

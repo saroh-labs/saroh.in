@@ -2120,3 +2120,10 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - A service's **Who can book it** is two tick boxes, Customers (on the booking page) and Your team (from Bookings), so any of the four combinations works; neither ticked pauses it, and bookings already made stay.
     - Tapping a free time opens one sheet with **Book someone · Block this time** at its top; "Close these extra hours" is a quiet link at its foot, only on extra opening hours.
     - Bookings **remembers the last view** (Day, Week or List) on each device, and a person can pin **Start Bookings on** in the "…" sheet.
+- **Owner answers on the desktop pass and sign-off (19 Oct, canvas page "Bookings on desktop: improved journey"):**
+    - Desktop and phone are signed off together; each screen is built once for both sizes. A phone bottom sheet is a right-hand side panel on desktop.
+    - Day / Week / List stays only under **Show as** in the date popover, on desktop too.
+    - **Whose diary opens is the person's own choice** ("Show bookings for": the last person I picked, Everyone, Just me). It opens on Everyone until they pick someone, then on their last pick.
+    - A closed day says **"Closed on Sundays · Open hours on this day"** in Week and List, on phone and desktop.
+    - **Each person can have their own timing rules** for their diary (notice needed, how far ahead, gap between bookings, cancelling), falling back to the business's. How customers pay and refunds stay business-wide. A Member changes only their own. The business-wide rules gain **"Gap between bookings"** (no gap by default).
+    - **"Members' rule changes need approval"** is the business's switch, on for every new business. When on, a Member's change waits for an owner or admin to Approve or Turn down (with an optional reason), and they can Withdraw it. When off, it applies at once with Undo. Hours, time off and extra hours stay instant for Members (#1038).
