@@ -552,8 +552,10 @@ test.describe("bookings calendar", () => {
                     name: /^How long, from /,
                 });
                 const at = /from (\d{1,2}:\d\d [ap]m)/.exec(
-                    (await dialog.getByText(/^How long, from /).innerText()) ||
-                        "",
+                    // textContent: the eyebrow is drawn in capitals.
+                    (await dialog
+                        .getByText(/^How long, from /)
+                        .textContent()) || "",
                 )?.[1];
                 await lengths.getByRole("radio").first().click();
                 await expect(
