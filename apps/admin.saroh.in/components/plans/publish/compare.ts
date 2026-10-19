@@ -1,6 +1,8 @@
 import type { Catalog, Cell, Plan } from "@saroh/pricing-catalog";
 import { cellOf, formatInr, yearlyPaise } from "@saroh/pricing-catalog";
 
+import { sameCell } from "../plans/catalog-edits";
+
 /**
  * "Live and draft, side by side" (plans catalogue U10), pure: for each plan
  * in the draft, only the rows that differ, as the design words them.
@@ -68,7 +70,9 @@ export function comparePlans(
             const lm = live?.modules.find((x) => x.id === m.id);
             const was = lm ? cellOf(lm, p.id) : null;
             const now = cellOf(m, p.id);
-            if (was && JSON.stringify(was) === JSON.stringify(now)) {
+            // Field by field: a cell read back from the API has its keys in
+            // another order (DEV_LEARNINGS, 19 Oct).
+            if (was && sameCell(was, now)) {
                 same += 1;
                 continue;
             }
