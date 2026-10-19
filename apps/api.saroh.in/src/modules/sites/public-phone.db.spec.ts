@@ -152,13 +152,21 @@ describe("the business's public phone (real database)", () => {
         expect(JSON.stringify(metadata)).not.toContain("98450");
     });
 
-    it("refuses a number without a country code, and keeps the saved one", async () => {
+    it("reads a 10-digit Indian number as +91", async () => {
+        const pulse = await business("Pulse Fitness");
+        await settings.update(pulse.ctx, { profile: { phone: "98450 12345" } });
+        expect((await settings.get(pulse.ctx)).profile?.phone).toBe(
+            "+919845012345",
+        );
+    });
+
+    it("refuses a number too short to call, and keeps the saved one", async () => {
         const pulse = await business("Pulse Fitness");
         await settings.update(pulse.ctx, {
             profile: { phone: "+919845012345" },
         });
         const refusal = await settings
-            .update(pulse.ctx, { profile: { phone: "98450 12345" } })
+            .update(pulse.ctx, { profile: { phone: "1234 5678" } })
             .catch((e: unknown) => e);
         expect(refusal).toBeInstanceOf(BadRequestException);
         expect((refusal as BadRequestException).getResponse()).toMatchObject({
