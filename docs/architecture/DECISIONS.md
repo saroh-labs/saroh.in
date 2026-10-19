@@ -2208,3 +2208,19 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **Defaults taken while open** (the plan's Assumptions A1–A17): D1 has no switch of its own; a renewal with live autopay isn't sent as a pay request; the refund notice goes when the provider accepts it; "Tell the customer" on an order cancel starts ticked; a team reply is held 60 s and coalesced; one enquiry auto-reply per address per day; Delivered, Sent and later tracking share one switch; the pack receipt is DEC-173's receipt with a pack line; staff alerts reach only staff with a login; overdue reminders count only automatic ones; a back-in-stock opt-in makes no contact and is no marketing consent.
 - Rules: added when built (`docs/patterns/backend-jobs.md` → Customer notices and Team alerts; `docs/patterns/saroh-product.md` → Communications).
 - Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); the rest added as each unit is built.
+
+## DEC-172 Merchant sites get three looks on one engine: Folio and Quiet fully, Live for gyms and classes
+
+**Status: Accepted — 2026-10-20, to build** · owner, answering the Website v2 variant audits (VA, VB, VD findings; boards on the Website v2 design canvas). Plan: `docs/plans/2026-10-19-003-feat-site-templates-v2-plan.md`.
+
+- **Looks:** build **A · Folio** and **D · Quiet** fully; **B · Live** is offered for gyms and classes. **C is dropped** (its boards stay, unfixed).
+- **One engine:** the same blocks, one booking flow for services, classes and courses with the step in the URL (Back and deep links work), and one customer account. A, B and D differ only by tokens (colour, type, radius, motion) and a few layout variants per block.
+- **Launch on today's data.** Nothing on a site promises what the product can't do yet; every API gap is a later phase. The first piece is **image resizing with srcset** (photos are served at upload size today, `packages/site-blocks/src/lib/site-image.ts`). Later, in order: staff photo and bio, service pages, service reviews, online course enrolment, pick-up and delivery slots with a cut-off, Order again and Book again, saved addresses, message threads linked to a booking or order, WhatsApp.
+- **Motion stays at** fade or rise, 200 ms or less, no bounce and no loops, reduced motion respected. Longer moments drawn on the boards are cut or shortened to fit.
+- **Data removal:** the customer account gets "Ask to remove my data", a request the business sees and acts on (API, the merchant's Customers requests, the account's Your details). It is not instant deletion.
+- **Live facts** ("Next free", "places left", "Open now") are fetched in the browser on cached pages, with loading, unknown and stale states; the cached page never carries them.
+- **No-photo layouts** for every block; "No photo yet" is shown only in the owner's preview.
+- **Code sign-in** for every email, new or returning, with the same words.
+- **Merchants choose a look per site,** with an industry default: Quiet for salons, clinics and studios; Folio or Live for classes and gyms. Existing sites keep working as they are (Classic) and move by choosing a look and publishing.
+- Consequences: a look is a style choice published with the site; the rollout is behind the API flag `SITE_LOOKS` (per business first); the open questions are listed in the plan.
+- Rules: added when built.
