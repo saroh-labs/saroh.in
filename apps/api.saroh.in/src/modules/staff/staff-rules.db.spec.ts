@@ -682,3 +682,165 @@ describe("the people list", () => {
         });
     });
 });
+
+/** Jobs queued to email the answer to `requestId`. */
+async function answerJobs(requestId: string) {
+    const jobs = await prisma.job.findMany({
+        where: { organizationId: orgId, type: "team.alert" },
+    });
+    return jobs.filter((j) => {
+        const p = j.payload as { requestId?: string; step?: string };
+        return p.requestId === requestId && p.step === "answered";
+    });
+}
+
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe("requests decided and asked at the same time", () => {
+    it("asking again while a turn-down commits leaves it turned down, with its reason", async () => {
+        const first = await rules.update(arjunCtx, arjun, { bookAheadDays: 7 });
+        const id = first.rules.request!.id;
+        let ask: Promise<unknown> | undefined;
+        // The turn-down holds the row, as `move` does, while Arjun asks again.
+        await prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "StaffRuleRequest" WHERE id = ${id} FOR UPDATE`;
+            ask = rules.update(arjunCtx, arjun, { bookAheadDays: 14 });
+            await pause(300);
+            await tx.staffRuleRequest.update({
+                where: { id },
+                data: {
+                    status: "TURNED_DOWN",
+                    reason: "Busy season.",
+                    decidedAt: new Date(),
+                    decidedByUserId: owner.userId,
+                },
+            });
+        });
+        await expect(ask).resolves.toMatchObject({ applied: false });
+        const rows = await prisma.staffRuleRequest.findMany({
+            where: { staffId: arjun },
+            orderBy: { createdAt: "asc" },
+        });
+        expect(rows.map((r) => [r.status, r.reason])).toEqual([
+            ["TURNED_DOWN", "Busy season."],
+            ["WAITING", null],
+        ]);
+        // Nothing withdrew the turned-down one.
+        await expect(
+            history("staff.booking-rules.withdrawn"),
+        ).resolves.toHaveLength(0);
+    });
+
+    it("asking again and approving at once: no overwrite, no error", async () => {
+        const first = await rules.update(arjunCtx, arjun, {
+            latestBookingMinutes: 60,
+        });
+        const id = first.rules.request!.id;
+        const [ask, approve] = await Promise.allSettled([
+            rules.update(arjunCtx, arjun, { latestBookingMinutes: 120 }),
+            rules.approve(admin, id),
+        ]);
+        expect(ask.status).toBe("fulfilled");
+        const row = await prisma.staffRuleRequest.findUniqueOrThrow({
+            where: { id },
+        });
+        if (approve.status === "fulfilled") {
+            // Approved first: it stays approved, and its change applied.
+            expect(row.status).toBe("APPROVED");
+            expect(
+                (await rules.read(arjunCtx, arjun)).own.latestBookingMinutes,
+            ).toBe(60);
+        } else {
+            // Replaced first: the approve is told so, nothing applied.
+            expect(approve.reason).toMatchObject({ status: 409 });
+            expect(row.status).toBe("WITHDRAWN");
+        }
+        await expect(
+            prisma.staffRuleRequest.count({
+                where: { staffId: arjun, status: "WAITING" },
+            }),
+        ).resolves.toBe(1);
+    });
+
+    it("approving and withdrawing at once: exactly one wins, one answer queued at most", async () => {
+        const first = await rules.update(arjunCtx, arjun, { gapMinutes: 10 });
+        const id = first.rules.request!.id;
+        const results = await Promise.allSettled([
+            rules.approve(admin, id),
+            rules.withdraw(arjunCtx, id),
+        ]);
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        const loser = results.find((r) => r.status === "rejected");
+        expect(loser).toMatchObject({ reason: { status: 409 } });
+        const row = await prisma.staffRuleRequest.findUniqueOrThrow({
+            where: { id },
+        });
+        const own = (await rules.read(arjunCtx, arjun)).own;
+        if (row.status === "APPROVED") {
+            expect(own.gapMinutes).toBe(10);
+            await expect(answerJobs(id)).resolves.toHaveLength(1);
+        } else {
+            expect(row.status).toBe("WITHDRAWN");
+            expect(own.gapMinutes).toBeNull();
+            await expect(answerJobs(id)).resolves.toHaveLength(0);
+        }
+    });
+});
+
+describe("saving and undoing a person's rules", () => {
+    it("writes only the fields changed, so two editors keep both", async () => {
+        await Promise.all([
+            rules.update(owner, meera, { bookAheadDays: 7 }),
+            rules.update(admin, meera, { gapMinutes: 15 }),
+        ]);
+        expect((await rules.read(owner, meera)).own).toMatchObject({
+            bookAheadDays: 7,
+            gapMinutes: 15,
+        });
+    });
+
+    it("Undo of one change doesn't put back another made since", async () => {
+        const first = await rules.update(owner, meera, { gapMinutes: 15 });
+        expect(first.previous).toEqual({ gapMinutes: null });
+        // Someone else changes another rule of Meera's.
+        await rules.update(admin, meera, { bookAheadDays: 7 });
+        // Undo of the first sends its previous back.
+        await rules.update(owner, meera, first.previous);
+        expect((await rules.read(owner, meera)).own).toMatchObject({
+            gapMinutes: null,
+            bookAheadDays: 7,
+        });
+    });
+});
+
+describe("who reads a request", () => {
+    it("hides a turn-down's reason from another Member, not from the person or an admin", async () => {
+        const saved = await rules.update(arjunCtx, arjun, {
+            bookAheadDays: 7,
+        });
+        await rules.turnDown(owner, saved.rules.request!.id, "Not this month.");
+        expect((await rules.read(meeraCtx, arjun)).request).toBeNull();
+        expect((await rules.read(arjunCtx, arjun)).request).toMatchObject({
+            reason: "Not this month.",
+        });
+        expect((await rules.read(admin, arjun)).request).toMatchObject({
+            reason: "Not this month.",
+        });
+    });
+
+    it("cleans the reason in the in-app answer as in the email", async () => {
+        const saved = await rules.update(arjunCtx, arjun, {
+            bookAheadDays: 7,
+        });
+        await rules.turnDown(
+            owner,
+            saved.rules.request!.id,
+            "See https://evil.example now",
+        );
+        const notice = await prisma.notification.findFirstOrThrow({
+            where: { organizationId: orgId, userId: arjunCtx.userId },
+        });
+        expect(notice.body).not.toContain("evil.example");
+        expect(notice.body).toContain("Reason: See now");
+    });
+});

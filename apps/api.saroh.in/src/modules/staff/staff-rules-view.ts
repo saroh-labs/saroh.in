@@ -75,10 +75,11 @@ export interface PersonRulesSaved {
     /** True: in force now. False: waiting for approval (`rules.request`). */
     applied: boolean;
     /**
-     * Their own rules before the save — what Undo sends back with the same
-     * `PUT` when it applied at once.
+     * The fields this save changed, as they were before it — what Undo
+     * sends back with the same `PUT` when it applied at once. Only those
+     * fields, so Undo never puts back a rule someone else changed since.
      */
-    previous: PersonRules;
+    previous: RuleChanges;
     rules: PersonRulesView;
 }
 

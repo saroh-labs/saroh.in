@@ -13,7 +13,11 @@ import { AuditAction } from "../audit/audit.service";
 import { requireBookingPower } from "../bookings/booking-access";
 import { loadBookingRules } from "../bookings/booking-rules";
 import { ownDiaryOf } from "../bookings/own-diary";
-import type { RuleChanges, RuleRequestMove } from "../bookings/person-rules";
+import type {
+    PersonRules,
+    RuleChanges,
+    RuleRequestMove,
+} from "../bookings/person-rules";
 import {
     applyRuleChanges,
     changedRules,
@@ -28,6 +32,7 @@ import {
 } from "../bookings/person-rules";
 import {
     answerTitle,
+    cleanReason,
     RULE_ANSWER_NOTIFICATION_TYPE,
     RULE_REQUEST_NOTIFICATION_TYPE,
 } from "../notifications/ask-alerts";
@@ -117,25 +122,35 @@ export class StaffRulesService {
         });
         if (route === "refuse") throw new ForbiddenException(OTHERS_REFUSAL);
 
-        const previous = personRulesOf(person);
-        const changes = changedRules(previous, dto);
+        if (route === "apply") {
+            // Read and written under the person's row lock, and only the
+            // fields this save changes: two people saving different rules
+            // of one person at once both keep theirs.
+            const previous = await prisma.$transaction((tx) =>
+                this.applyInTx(tx, ctx, person.id, dto, "direct"),
+            );
+            return {
+                applied: true,
+                previous,
+                rules: await this.view(
+                    ctx,
+                    await this.requirePerson(ctx, staffId),
+                ),
+            };
+        }
+        const before = personRulesOf(person);
+        const changes = changedRules(before, dto);
         if (!hasChanges(changes)) {
             return {
-                applied: route === "apply",
-                previous,
+                applied: false,
+                previous: {},
                 rules: await this.view(ctx, person),
             };
         }
-        if (route === "apply") {
-            await prisma.$transaction(async (tx) => {
-                await this.applyInTx(tx, ctx, person, changes, "direct");
-            });
-        } else {
-            await this.askInTx(ctx, person, changes);
-        }
+        await this.askInTx(ctx, person, changes);
         return {
-            applied: route === "apply",
-            previous,
+            applied: false,
+            previous: valuesOf(before, changes),
             rules: await this.view(ctx, await this.requirePerson(ctx, staffId)),
         };
     }
@@ -247,7 +262,7 @@ export class StaffRulesService {
                 await this.applyInTx(
                     tx,
                     ctx,
-                    person,
+                    person.id,
                     storedRuleChanges(row.changes),
                     "approved",
                     row.id,
@@ -291,28 +306,43 @@ export class StaffRulesService {
         return (await requestViews([updated]))[0];
     }
 
-    /** Write `changes` over a person's own rules, with its history. */
+    /**
+     * Write `changes` over a person's own rules, with its history: the row
+     * is locked and read again first, and only the fields that differ from
+     * it are written. Answers those fields' values before — what Undo sends
+     * back, so it reverts this change alone.
+     */
     private async applyInTx(
         tx: Prisma.TransactionClient,
         ctx: OrganizationContext,
-        person: PersonRow,
-        changes: RuleChanges,
+        staffId: string,
+        asked: RuleChanges,
         via: "direct" | "approved",
         requestId?: string,
-    ): Promise<void> {
+    ): Promise<RuleChanges> {
+        await tx.$queryRaw`SELECT id FROM "StaffMember" WHERE id = ${staffId} FOR UPDATE`;
+        const person = await tx.staffMember.findFirstOrThrow({
+            where: { id: staffId, organizationId: ctx.organizationId },
+            select: PERSON_SELECT,
+        });
         const before = personRulesOf(person);
-        const after = applyRuleChanges(before, changes);
+        const changes = changedRules(before, asked);
+        if (!hasChanges(changes)) return {};
         await tx.staffMember.update({
             where: { id: person.id },
-            data: after,
+            data: changes,
             select: { id: true },
         });
         await recordPersonRulesInTx(tx, ctx, person, {
             action: AuditAction.StaffRulesUpdate,
             via,
-            changes: personRuleChanges(before, after),
+            changes: personRuleChanges(
+                before,
+                applyRuleChanges(before, changes),
+            ),
             ...(requestId ? { requestId } : {}),
         });
+        return valuesOf(before, changes);
     }
 
     /**
@@ -326,19 +356,25 @@ export class StaffRulesService {
     ): Promise<void> {
         try {
             await prisma.$transaction(async (tx) => {
-                const waiting = await tx.staffRuleRequest.findFirst({
-                    where: { staffId: person.id, status: "WAITING" },
-                    select: { id: true },
-                });
-                if (waiting) {
-                    await tx.staffRuleRequest.update({
-                        where: { id: waiting.id },
-                        data: {
-                            status: "WITHDRAWN",
-                            decidedAt: new Date(),
-                            decidedByUserId: ctx.userId,
-                        },
-                    });
+                // Under the waiting row's lock, as an approve or a turn-down
+                // takes it: one decided first is no longer waiting here, so
+                // it is never overwritten as withdrawn.
+                const locked = await tx.$queryRaw<{ id: string }[]>`
+                    SELECT id FROM "StaffRuleRequest"
+                    WHERE "staffId" = ${person.id} AND status = 'WAITING'
+                    FOR UPDATE`;
+                const waiting = locked.length > 0 ? locked[0] : null;
+                const replaced = waiting
+                    ? await tx.staffRuleRequest.updateMany({
+                          where: { id: waiting.id, status: "WAITING" },
+                          data: {
+                              status: "WITHDRAWN",
+                              decidedAt: new Date(),
+                              decidedByUserId: ctx.userId,
+                          },
+                      })
+                    : { count: 0 };
+                if (waiting && replaced.count === 1) {
                     await recordPersonRulesInTx(tx, ctx, person, {
                         action: AuditAction.StaffRulesWithdrawn,
                         requestId: waiting.id,
@@ -417,8 +453,8 @@ export class StaffRulesService {
                 body:
                     outcome === "APPROVED"
                         ? asked
-                        : reason
-                          ? `${asked}. Reason: ${reason}`
+                        : cleanReason(reason)
+                          ? `${asked}. Reason: ${cleanReason(reason)}`
                           : `${asked}. No reason was given.`,
             },
             select: { id: true },
@@ -467,7 +503,12 @@ export class StaffRulesService {
             effective: timing(rulesForPerson(business, own)),
             canChange: allows(ctx, "hours:write") && route !== "refuse",
             needsApproval: allows(ctx, "hours:write") && route === "request",
-            request: request ? (await requestViews([request]))[0] : null,
+            // A request, and an owner's reason for turning it down, are for
+            // the person it is about and whoever decides them.
+            request:
+                request && (isOwn(ctx, person) || allows(ctx, "service:write"))
+                    ? (await requestViews([request]))[0]
+                    : null,
         };
     }
 
@@ -508,4 +549,13 @@ export class StaffRulesService {
 /** Whether the person on the diary is the caller. */
 function isOwn(ctx: OrganizationContext, person: PersonRow): boolean {
     return person.membership?.userId === ctx.userId;
+}
+
+/** `before`'s values of the fields `changes` names. */
+function valuesOf(before: PersonRules, changes: RuleChanges): RuleChanges {
+    const out: RuleChanges = {};
+    for (const field of Object.keys(changes) as (keyof PersonRules)[]) {
+        out[field] = before[field];
+    }
+    return out;
 }

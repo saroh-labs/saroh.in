@@ -189,11 +189,12 @@ export interface PersonRulesView {
 
 /**
  * `PUT staff/:id/booking-rules`: applied at once, or waiting
- * (`rules.request`). Undo of an applied change sends `previous` back.
+ * (`rules.request`). Undo of an applied change sends `previous` back:
+ * only the fields this save changed, as they were before it.
  */
 export interface PersonRulesSaved {
     applied: boolean;
-    previous: PersonRules;
+    previous: RuleChanges;
     rules: PersonRulesView;
 }
 
