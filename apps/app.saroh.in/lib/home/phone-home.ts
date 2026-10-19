@@ -91,7 +91,12 @@ function figure(
         case "bookings": {
             const b = tiles.bookingsToday;
             if (!b) break;
-            return { key, label, value: String(b.count), href: b.href };
+            return {
+                key,
+                label: b.count === 1 ? "booking" : label,
+                value: String(b.count),
+                href: b.href,
+            };
         }
         case "toPack": {
             const p = tiles.toPack;

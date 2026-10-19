@@ -157,6 +157,17 @@ describe("phoneFigures (A1)", () => {
         expect(figures.map((f) => f.value)).toEqual(["Nothing", "0", "0"]);
     });
 
+    it("says one booking in the singular", () => {
+        const figures = phoneFigures({
+            tiles: { ...TILES, bookingsToday: { ...BOOKINGS, count: 1 } },
+            unavailable: [],
+        });
+        expect(figures.find((f) => f.key === "bookings")).toMatchObject({
+            value: "1",
+            label: "booking",
+        });
+    });
+
     it("draws a dash, never 0, for a figure whose read failed", () => {
         const { moneyIn: _m, ...tiles } = TILES;
         const figures = phoneFigures({
