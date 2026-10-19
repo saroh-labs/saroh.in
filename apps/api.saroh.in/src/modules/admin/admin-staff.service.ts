@@ -18,6 +18,7 @@ import {
     isAdminRole,
     permissionsFor,
 } from "./admin-permissions";
+import { endManagerLinksInTx } from "./manager-links";
 import type { StaffEngagement, StaffJob } from "./staff-profile";
 import {
     generateManagerCode,
@@ -322,7 +323,8 @@ export class AdminStaffService {
     /**
      * Set exactly which roles someone holds, and until when. Roles that go
      * are revoked; roles that come are written new; a role whose expiry
-     * changes is revoked and written again with the new one.
+     * changes is revoked and written again with the new one. Taking the
+     * Account manager role away ends their account-manager links.
      */
     async amend(input: {
         staff: PlatformAdminInfo;
@@ -380,6 +382,24 @@ export class AdminStaffService {
                 })),
             });
 
+            // The Account manager role going ends their links (DEC-169,
+            // U25): the businesses show as having no manager. A change of
+            // its expiry alone keeps them; the sweep ends them when it runs
+            // out.
+            const droppedManager =
+                current.some((row) => row.role === Roles.AccountManager) &&
+                !roles.has(Roles.AccountManager);
+            const linksEnded = droppedManager
+                ? await endManagerLinksInTx(tx, {
+                      platformAdminId: admin.id,
+                      endedAt: now,
+                      cause: "ROLE_REMOVED",
+                      endedByUserId: input.staff.userId,
+                      actorUserId: input.staff.userId,
+                      staffReason: reason,
+                  })
+                : [];
+
             await this.audit.write(tx, {
                 actorUserId: input.staff.userId,
                 permission: AdminPermission.StaffGrant,
@@ -393,6 +413,7 @@ export class AdminStaffService {
                     removed: toRevoke.map((row) => row.role),
                     added: toAdd,
                     expiresAt: expiresAt?.toISOString() ?? null,
+                    managerLinksEnded: linksEnded.length,
                 },
             });
             return { platformAdminId: admin.id, changed: true };
@@ -401,7 +422,8 @@ export class AdminStaffService {
 
     /**
      * Take someone's staff access away entirely. Their open support sessions
-     * close with it, and the next request they make is refused.
+     * close with it, the businesses they look after lose them as manager
+     * (each on the ledger), and the next request they make is refused.
      */
     async revoke(input: {
         staff: PlatformAdminInfo;
@@ -431,6 +453,15 @@ export class AdminStaffService {
                     revocationReason: reason,
                 },
             });
+            // Their businesses lose them as manager (DEC-169, U25).
+            const linksEnded = await endManagerLinksInTx(tx, {
+                platformAdminId: admin.id,
+                endedAt: now,
+                cause: "ACCESS_REVOKED",
+                endedByUserId: input.staff.userId,
+                actorUserId: input.staff.userId,
+                staffReason: reason,
+            });
 
             await this.audit.write(tx, {
                 actorUserId: input.staff.userId,
@@ -440,7 +471,10 @@ export class AdminStaffService {
                 targetId: admin.id,
                 reason,
                 outcome: AdminAuditOutcome.Success,
-                metadata: { closedAccessSessions: closed.count },
+                metadata: {
+                    closedAccessSessions: closed.count,
+                    managerLinksEnded: linksEnded.length,
+                },
             });
             return { platformAdminId: admin.id, changed: true };
         });

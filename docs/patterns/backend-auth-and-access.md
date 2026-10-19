@@ -619,6 +619,30 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   bare `platformAdminId`, the proof in `evidence` (code, cookie time, lead
   and when its email was recorded; never an email), and it carries the
   org-isolation policy. A business referral (DEC-156) is recorded beside it.
+- **Current** (DEC-169, admin console U25) — **Staff give a business its
+  manager; a link ends with the role.** `accounts:assign` (Support and
+  Platform owner only; never an Account manager, refused on the route and
+  again in `AdminAccountManagersService`) gives a business a manager
+  (`POST admin/organizations/:id/manager`), moves it, ends the link
+  (`DELETE …/manager`, a reason) or shares businesses out
+  (`POST admin/team/share-out`). Each takes a reason and an idempotency key
+  and is on the ledger against the business (`account-manager.assigned`,
+  `.reassigned`, `.ended`; `.shared-out` for the whole share-out). A move
+  ends the open link and starts a new ASSIGNED one in one transaction, so a
+  business brought in becomes assigned once moved, and the old link keeps
+  its evidence. Only someone holding the Account manager role now, who
+  doesn't own the business, can be given it; a deleted business takes
+  nobody. Share out evenly gives businesses with no manager that Saroh still
+  bills (active or suspended), paying ones first, to whoever is an Account
+  manager **and** on commission and looks after the fewest, stopping at
+  their capacity (`admin/share-out.ts`). Every write on one business holds
+  its `account-manager:<id>` lock. **A link lasts only while its manager
+  holds the role**: revoking their access, or an amend that takes the role
+  away, ends their links in the same transaction (`manager-links.ts`); the
+  hourly `account-managers.link-sweep` ends any left (an assignment that
+  ran out, or a change made outside the console) at the moment the role
+  ended, named on the ledger as `system:manager-link-sweep`. A change of
+  the role's expiry alone keeps them.
 - **Current** (DEC-169, admin console U20) — **Saroh's own sales leads**
   (`/admin/saroh-leads`, `modules/saroh-leads/`) belong to no business:
   `SarohLead` is in `NOT_TENANT_OWNED`, and `SarohContactLog` (a call or

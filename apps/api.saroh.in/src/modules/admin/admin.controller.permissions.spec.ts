@@ -410,6 +410,11 @@ describe("Team permissions (DEC-169)", () => {
         ["moveLeadStage", AdminPermission.SarohLeadsWrite],
         ["assignLead", AdminPermission.SarohLeadsWrite],
         ["logLeadContact", AdminPermission.SarohLeadsWrite],
+        // Account managers (U25): Support and Platform owner only.
+        ["managerCandidates", AdminPermission.AccountsAssign],
+        ["assignManager", AdminPermission.AccountsAssign],
+        ["endManager", AdminPermission.AccountsAssign],
+        ["shareOut", AdminPermission.AccountsAssign],
     ])("%s needs %s", (name, permission) => {
         expect(perms(name)).toEqual([permission]);
     });

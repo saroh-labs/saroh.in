@@ -168,6 +168,7 @@ const overview: BusinessOverview = {
             invitesOpen: 1,
         },
     },
+    accountManager: { status: "ok", data: { manager: null } },
     activity: {
         status: "ok",
         data: [
@@ -209,7 +210,12 @@ function Overview({ canRaise = true }: { canRaise?: boolean }) {
             />
             <ModulesCard organizationId="org_1" modules={overview.modules} />
             <SiteCard organizationId="org_1" website={overview.website} />
-            <TeamCard organizationId="org_1" team={overview.team} />
+            <TeamCard
+                organizationId="org_1"
+                team={overview.team}
+                accountManager={overview.accountManager}
+                canAssign={false}
+            />
             <ActivityCard
                 organizationId="org_1"
                 activity={overview.activity}
@@ -284,7 +290,12 @@ describe("a business's Overview (U3)", () => {
     it("says a card failed, inside it, and keeps the others", () => {
         render(
             <>
-                <TeamCard organizationId="org_1" team={{ status: "failed" }} />
+                <TeamCard
+                    organizationId="org_1"
+                    team={{ status: "failed" }}
+                    accountManager={overview.accountManager}
+                    canAssign={false}
+                />
                 <ModulesCard
                     organizationId="org_1"
                     modules={overview.modules}

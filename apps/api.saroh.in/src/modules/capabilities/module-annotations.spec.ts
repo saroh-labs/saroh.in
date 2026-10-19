@@ -183,6 +183,8 @@ const NEVER: Record<string, string> = {
         "staff control plane, not a tenant surface",
     "admin/admin-console.controller.ts":
         "staff control plane, not a tenant surface",
+    "admin/admin-account-managers.controller.ts":
+        "staff control plane, not a tenant surface",
     "organizations/organization-members.controller.ts": "tenancy",
     "health/health.controller.ts": "liveness",
     "self-test/self-test.controller.ts": "diagnostics",

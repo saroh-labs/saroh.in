@@ -110,6 +110,8 @@ export default async function OverviewTab({ params }: BusinessTabProps) {
                 <TeamCard
                     organizationId={organizationId}
                     team={overview.team}
+                    accountManager={overview.accountManager}
+                    canAssign={can(staff, "accounts:assign")}
                 />
                 <ActivityCard
                     organizationId={organizationId}

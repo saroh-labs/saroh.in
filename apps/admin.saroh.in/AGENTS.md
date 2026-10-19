@@ -165,6 +165,16 @@ recorded grant (the API refuses it otherwise).
   and who it is billed to only for `saroh-billing:read`. The layout reads
   it once for the badges (`readOverview`); each card's action opens over
   Overview and highlights the card after a write (`useChangeFeedback`).
+  The Team card opens with the business's **account manager** (DEC-169,
+  U25): their name, how they came (brought in through their link, their
+  code or their lead, or given to them by Saroh's team) and since when, or
+  "No account manager". Staff with `accounts:assign` get Assign… / Change…
+  / End… (`manager-actions.tsx`, each an `OperatorDialog`; the picker reads
+  `GET …/manager/candidates` when it opens, fewest businesses first with
+  their load against capacity, and leaves out who has it now). Writes go
+  through `lib/account-manager-actions.ts`. No Undo: ending a brought-in
+  link can't be given back, and the dialog says so. The manager and the
+  business's people are read separately, so one failing leaves the other.
 - **A business's Modules tab (admin plan U4) needs no support session.**
   Its rows are each module's true state (`GET …/modules/state`), and each
   row's one fix opens a sheet listing the gates: Turn on for this business

@@ -25,6 +25,8 @@ import { StaffInvitesModule } from "../staff-invites/staff-invites.module";
 import { WaitlistModule } from "../waitlist/waitlist.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
+import { AdminAccountManagersController } from "./admin-account-managers.controller";
+import { AdminAccountManagersService } from "./admin-account-managers.service";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminBillingActionsService } from "./admin-billing-actions.service";
 import { AdminBillingControlsController } from "./admin-billing-controls.controller";
@@ -68,6 +70,10 @@ import { AdminUsageService } from "./admin-usage.service";
 import { AdminWaitlistController } from "./admin-waitlist.controller";
 import { AdminWaitlistService } from "./admin-waitlist.service";
 import { AdminController } from "./admin.controller";
+import {
+    MANAGER_LINK_SWEEP_TYPE,
+    ManagerLinkSweepJob,
+} from "./manager-link-sweep.job";
 import { OrganizationAccessSessionGuard } from "./organization-access-session.guard";
 import {
     ORGANIZATION_DELETION_CLEANUP_TYPE,
@@ -134,6 +140,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         SarohLeadsController,
         // Home and the header search (admin console redesign U10).
         AdminConsoleController,
+        // Who looks after which business (DEC-169, U25).
+        AdminAccountManagersController,
     ],
     providers: [
         IdempotencyService,
@@ -151,6 +159,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminOverridesService,
         AdminSiteTrackersService,
         AdminStaffService,
+        // Account managers: assign, reassign, end, share out (U25).
+        AdminAccountManagersService,
         AdminPeopleService,
         // Sign-in help (U9): codes through Better Auth, and the end of a
         // changed sign-in email's 24-hour hold.
@@ -182,6 +192,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         OrganizationRetentionEraseHandler,
         // Security logs kept one year (DEC-122).
         SecurityLogRetentionHandler,
+        // Links end with the Account manager role (DEC-169, U25).
+        ManagerLinkSweepJob,
     ],
 })
 export class AdminModule implements OnModuleInit, OnModuleDestroy {
@@ -194,6 +206,7 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
         private readonly retentionErase: OrganizationRetentionEraseHandler,
         private readonly securityLogs: SecurityLogRetentionHandler,
         private readonly signInRelease: SignInEmailReleaseHandler,
+        private readonly managerLinks: ManagerLinkSweepJob,
     ) {}
 
     /**
@@ -222,14 +235,20 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
             SIGN_IN_EMAIL_RELEASE_TYPE,
             this.signInRelease.handle,
         );
+        this.registry.register(
+            MANAGER_LINK_SWEEP_TYPE,
+            this.managerLinks.handle,
+        );
         if (env.NODE_ENV === "test") return;
         await this.deletion.schedule(new Date());
         await this.retentionErase.schedule(new Date());
         await this.securityLogs.schedule(new Date());
+        await this.managerLinks.schedule(new Date());
         this.chainCheck = setInterval(() => {
             void this.deletion.ensureScheduled();
             void this.retentionErase.ensureScheduled();
             void this.securityLogs.ensureScheduled();
+            void this.managerLinks.ensureScheduled();
         }, CHAIN_CHECK_MS);
         this.chainCheck.unref();
     }

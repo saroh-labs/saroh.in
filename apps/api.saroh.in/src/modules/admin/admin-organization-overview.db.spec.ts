@@ -486,6 +486,55 @@ describe("a business's Overview (U3)", () => {
         expect((await get(`/organizations/${org}/overview`)).status).toBe(401);
     });
 
+    it("shows the account manager by name, how they came and since when (U25)", async () => {
+        const org = await business("free");
+        const none = await read(org);
+        expect(ok(none.body.accountManager)).toEqual({ manager: null });
+
+        const amEmail = `am-overview-${tag}@example.com`;
+        const amUser = await user("Asha Manager", amEmail);
+        const admin = await prisma.platformAdmin.create({
+            data: {
+                userId: amUser,
+                roleAssignments: {
+                    create: {
+                        role: "ACCOUNT_MANAGER",
+                        reason: "overview spec",
+                    },
+                },
+            },
+        });
+        const since = new Date(Date.now() - 3 * DAY);
+        const link = await prisma.accountManagerLink.create({
+            data: {
+                organizationId: org,
+                platformAdminId: admin.id,
+                source: "LINK",
+                kind: "BROUGHT_IN",
+                evidence: { source: "LINK", code: "ABCD2345" },
+                startedAt: since,
+            },
+        });
+        const { body, raw } = await read(org, staff.release);
+        expect(ok(body.accountManager).manager).toEqual({
+            platformAdminId: admin.id,
+            name: "Asha Manager",
+            kind: "BROUGHT_IN",
+            source: "LINK",
+            since: since.toISOString(),
+        });
+        // A teammate's name, never their email.
+        expect(raw).not.toContain(amEmail);
+
+        await prisma.accountManagerLink.update({
+            where: { id: link.id },
+            data: { endedAt: new Date(), endedReason: "overview spec" },
+        });
+        expect(ok((await read(org)).body.accountManager)).toEqual({
+            manager: null,
+        });
+    });
+
     it("is 404 for a business that doesn't exist", async () => {
         expect(
             (await get(`/organizations/nope-${tag}/overview`, staff.support))

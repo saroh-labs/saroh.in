@@ -7,6 +7,8 @@ import type { Term } from "../billing/billing-term";
 import { mapEntry } from "../billing/catalogue-access";
 import type { BusinessAccess } from "../billing/catalogue-access.service";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
+import type { ManagerView } from "./admin-account-managers.service";
+import { managerOf } from "./admin-account-managers.service";
 import type { NextChargeHow } from "./admin-billing";
 import { nextChargeOf } from "./admin-billing";
 import { subscriptionTerms } from "./admin-billing-terms";
@@ -116,6 +118,15 @@ export interface OverviewTeam {
     invitesOpen: number;
 }
 
+/**
+ * Who at Saroh looks after the business (DEC-169, U25): the manager's name,
+ * how the link started and since when; `manager` null when nobody does.
+ * A teammate's name only, never their email or phone.
+ */
+export interface OverviewAccountManager {
+    manager: ManagerView | null;
+}
+
 /** What happened, and when: never who wrote what or why. */
 export interface OverviewActivityRow {
     id: string;
@@ -156,6 +167,7 @@ export interface OrganizationOverview {
     modules: Panel<OverviewModules>;
     website: Panel<OverviewWebsite>;
     team: Panel<OverviewTeam>;
+    accountManager: Panel<OverviewAccountManager>;
     activity: Panel<OverviewActivityRow[]>;
     notes: Panel<{ count: number; lastAt: Date | null }>;
     badges: OverviewBadges;
@@ -196,23 +208,35 @@ export class AdminOrganizationOverviewService {
         // Don't let a failure here reject before a card catches it.
         access.catch(() => undefined);
 
-        const [plan, usage, modules, website, team, activity, notes, open] =
-            await Promise.all([
-                this.panel("plan", async () =>
-                    this.plan(organizationId, await access, now),
-                ),
-                this.panel("usage", async () =>
-                    this.usage(organizationId, await access, now),
-                ),
-                this.panel("modules", () => this.modules(organizationId)),
-                this.panel("website", () => this.website(organizationId)),
-                this.panel("team", () => this.team(organizationId)),
-                this.panel("activity", () => this.activity(organizationId)),
-                this.panel("notes", () => this.notes(organizationId)),
-                prisma.billingAction
-                    .count({ where: { organizationId, resolvedAt: null } })
-                    .catch(() => 0),
-            ]);
+        const [
+            plan,
+            usage,
+            modules,
+            website,
+            team,
+            accountManager,
+            activity,
+            notes,
+            open,
+        ] = await Promise.all([
+            this.panel("plan", async () =>
+                this.plan(organizationId, await access, now),
+            ),
+            this.panel("usage", async () =>
+                this.usage(organizationId, await access, now),
+            ),
+            this.panel("modules", () => this.modules(organizationId)),
+            this.panel("website", () => this.website(organizationId)),
+            this.panel("team", () => this.team(organizationId)),
+            this.panel("accountManager", async () => ({
+                manager: await managerOf(prisma, organizationId),
+            })),
+            this.panel("activity", () => this.activity(organizationId)),
+            this.panel("notes", () => this.notes(organizationId)),
+            prisma.billingAction
+                .count({ where: { organizationId, resolvedAt: null } })
+                .catch(() => 0),
+        ]);
 
         return {
             organizationId,
@@ -224,6 +248,7 @@ export class AdminOrganizationOverviewService {
             modules,
             website,
             team,
+            accountManager,
             activity,
             notes,
             badges: {

@@ -91,6 +91,43 @@ export interface OverviewTeam {
     invitesOpen: number;
 }
 
+/** Who at Saroh looks after the business (DEC-169, U25). */
+export interface OverviewManager {
+    platformAdminId: string;
+    name: string;
+    kind: "BROUGHT_IN" | "ASSIGNED";
+    source: "LINK" | "CODE" | "LEAD_EMAIL" | "ASSIGNED";
+    since: string;
+}
+
+/** Someone a business can be given to (`GET …/manager/candidates`). */
+export interface ManagerCandidate {
+    platformAdminId: string;
+    name: string;
+    businesses: number;
+    /** Null: no cap set. */
+    capacity: number | null;
+    /** They look after this business now. */
+    current: boolean;
+}
+
+/** "Asha · 3 of 10 businesses", "Asha · 1 business", with "full" at capacity. */
+export function candidateLine(c: ManagerCandidate): string {
+    const load =
+        c.capacity === null
+            ? c.businesses === 1
+                ? "1 business"
+                : `${c.businesses} businesses`
+            : `${c.businesses} of ${c.capacity} businesses`;
+    const full = c.capacity !== null && c.businesses >= c.capacity;
+    return `${c.name} · ${load}${full ? ", full" : ""}`;
+}
+
+export interface OverviewAccountManager {
+    /** Null: nobody looks after it yet. */
+    manager: OverviewManager | null;
+}
+
 export interface OverviewActivityRow {
     id: string;
     source: "business" | "operator";
@@ -114,6 +151,7 @@ export interface BusinessOverview {
     modules: OverviewPanel<OverviewModules>;
     website: OverviewPanel<OverviewWebsite>;
     team: OverviewPanel<OverviewTeam>;
+    accountManager: OverviewPanel<OverviewAccountManager>;
     activity: OverviewPanel<OverviewActivityRow[]>;
     notes: OverviewPanel<{ count: number; lastAt: string | null }>;
     badges: OverviewBadges;
@@ -142,6 +180,28 @@ export function overviewBadges(
         out.notes = { count: badges.notes.count };
     }
     return out;
+}
+
+/**
+ * How the manager came to look after the business, in plain words: brought
+ * in (their link, their code, or their lead) or given to them by staff.
+ */
+export function managerHow(manager: Pick<OverviewManager, "source">): string {
+    switch (manager.source) {
+        case "LINK":
+            return "Brought in through their link";
+        case "CODE":
+            return "Brought in with their code";
+        case "LEAD_EMAIL":
+            return "Brought in from their lead";
+        default:
+            return "Given to them by Saroh's team";
+    }
+}
+
+/** "Brought in through their link · since 3 Oct 2026". */
+export function managerLine(manager: OverviewManager): string {
+    return `${managerHow(manager)} · since ${formatDate(manager.since)}`;
 }
 
 /** "Plan C until 3 Nov 2026 · base plan Plan A", or "No plan yet". */

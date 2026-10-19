@@ -2092,6 +2092,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A manager's details (phone, city, languages, joined, reports to, engagement, tax id, emergency contact) are kept on their team record. The tax id is shown only to Platform owner and Billing.
 - Rules: added when built (plan 2026-10-18-002 Part 3, local).
     - Brought in (U19, 19 Oct): decided once, in the business's create transaction, and never in the way of it; first proof wins (the `?am=` link, then a typed code, then the owner's own verified email on the manager's lead recorded before the business was made); only a current Account manager, never for their own business; the link is append-only with its evidence. `backend-auth-and-access.md`.
+    - Assigned (U25, 19 Oct): Support and Platform owner give, move and end links and Share out evenly (paying businesses first, to Account managers on commission with the fewest, up to their capacity); a move ends the old link and starts an assigned one, so a business brought in becomes assigned once moved; a link ends when its manager stops holding the role (revoke and amend at once, an expiry by the hourly sweep at the moment it ran out). `backend-auth-and-access.md`.
 
 ## DEC-170 Bookings: a caller with just a name and phone can be booked, the front desk books, hours save themselves
 

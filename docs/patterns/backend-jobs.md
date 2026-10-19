@@ -69,6 +69,11 @@
   and never re-fetches an id it has tried, so a batch that always fails cannot
   starve the rest. Compare `runAt` in UTC: the columns are
   timestamp-without-timezone (`DEV_LEARNINGS.md`).
+  `account-managers.link-sweep` (U25) keeps its one waiting run with an
+  advisory lock around the count and the insert
+  (`job-chain:account-managers.link-sweep`) instead of the partial unique
+  index, so it needed no migration; the index stays the default for a new
+  chain.
 - **Current** — **Payloads carry ids, not data;** the handler re-reads current
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
 - **Current** — **Advisory locks have a registry** (below). A new
@@ -103,6 +108,9 @@ waits while holding one.
 | `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                                                                                                                                                                                                           | `notifications/provider-alerts.ts` (`wordProvider`)                                                                                             |
 | `billing-profile:<billingProfileId>`      | Making (or adopting) a billing profile's one customer at Saroh's billing provider (DEC-167), so the profile's job and a checkout make one. Held across up to three provider calls: `SET LOCAL lock_timeout = '30s'` first, and each id answered is stored at once on its own connection, so a transaction that ends badly never loses it | `billing/billing-customer.ts` (`create`)                                                                                                        |
 | `admin-sign-in-code:<userId>`             | Staff sending one person a sign-in code (admin console U9): the per-person and per-staff hourly counts and the send's ledger row, so two staff pressing at once can't both pass the limit                                                                                                                                                | `admin/admin-sign-in-help.service.ts` (`sendCode`)                                                                                              |
+| `account-manager:<organizationId>`        | Staff changing who looks after one business (DEC-169, admin console U25): assign, move, end, and each business a share-out gives, so two at once can't both start a link                                                                                                                                                                 | `admin/admin-account-managers.service.ts` (`lockBusiness`)                                                                                      |
+| `account-managers:share-out`              | One Share out evenly at a time, so two can't plan from the same loads; taken before the per-business keys                                                                                                                                                                                                                                | `admin/admin-account-managers.service.ts` (`shareOut`)                                                                                          |
+| `job-chain:account-managers.link-sweep`   | Leaving one waiting run of the manager link sweep: "is one waiting? if not, add one" under the lock, in place of a `Job_one_pending_…` index                                                                                                                                                                                             | `admin/manager-link-sweep.job.ts` (`schedule`)                                                                                                  |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086)                                                                                                                                                                              | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
@@ -286,6 +294,17 @@ the Privacy Policy states both.
   `contact-messages/contact-retention.ts`). A new kind of visitor data
   joins this sweep as a function it calls, counted and caught on its own,
   rather than starting a chain (and a partial unique index) of its own.
+
+## Account manager links — **Current** (DEC-169, admin console U25)
+
+- **`account-managers.link-sweep`** (`admin/manager-link-sweep.job.ts`) is
+  an hourly self-rescheduling job, restarted by the admin module's six-hour
+  check and at boot. It ends every open `AccountManagerLink` whose manager
+  doesn't hold the Account manager role now (an assignment that ran out, or
+  a revoke or amend that bypassed `AdminStaffService`, which ends them
+  itself), at the moment the role ended (`roleEnded`), with one ledger row
+  per business as `system:manager-link-sweep`. At most 200 managers a run;
+  a manager whose links fail to end is logged and the rest go on.
 
 ## Data export — **Current** (DEC-120)
 
