@@ -174,6 +174,7 @@ export function InlineConfirm({
                         screen reader hears what the reply is to. */}
                     <Label
                         htmlFor={boxId}
+                        data-ph-mask=""
                         className="text-[13px] font-semibold text-foreground"
                     >
                         {inline.person
