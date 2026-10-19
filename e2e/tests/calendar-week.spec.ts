@@ -232,10 +232,9 @@ test.describe("calendar orders for the kitchen (E20)", () => {
         }
 
         await page.goto("/calendar");
+        // The month's What to show names the layers on (bookings U13).
         await expect(
-            page
-                .getByRole("group", { name: "Show on the calendar" })
-                .getByRole("button", { name: /Orders/ }),
+            page.getByRole("button", { name: /^What to show: .*orders/ }),
         ).toBeVisible();
         await expect(
             page.getByRole("group", { name: "This month's money" }),
@@ -244,7 +243,7 @@ test.describe("calendar orders for the kitchen (E20)", () => {
 });
 
 /**
- * The month strip's Due counts from today, as the design shows, and what
+ * The month strip's Still due counts from today, as the design shows, and what
  * was due before today is Overdue (E23, DEC-067). Rye is only read.
  */
 test.describe("calendar money: Due from today (E23)", () => {
@@ -272,7 +271,9 @@ test.describe("calendar money: Due from today (E23)", () => {
 
         await page.goto("/calendar");
         const strip = page.getByRole("group", { name: "This month's money" });
-        await expect(strip.getByRole("button", { name: /^Due/ })).toBeVisible();
+        await expect(
+            strip.getByRole("button", { name: /^Still due/ }),
+        ).toBeVisible();
         await expect(
             strip.getByRole("button", { name: /^Overdue/ }),
         ).toHaveCount(overdue ? 1 : 0);

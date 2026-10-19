@@ -194,7 +194,7 @@ export function dueSplit(
 }
 
 /**
- * The month strip, after the design: "In so far · Out so far · Net · Due".
+ * The month strip, after the design: "In so far · Out so far · Net · Still due".
  * "So far" only on the current month; a month still to come has nothing in
  * or out yet, so it says "—" rather than a zero. Due counts from today;
  * money due before today is "Overdue", in red, shown only when there is
@@ -220,7 +220,8 @@ export function monthStrip(entries: MoneyEntry[], at: StripAt): StripPart[] {
         { key: "net", label: "Net", value: money(done.net), out: false },
         {
             key: "due",
-            label: "Due",
+            // "Still due" (bookings U13): what is owed from today on.
+            label: "Still due",
             value: minorMoney(due, at.currency),
             out: false,
         },
@@ -241,7 +242,7 @@ const STRIP_TITLE: Record<StripKey, string> = {
     in: "Money in",
     out: "Money out",
     net: "Net",
-    due: "Due",
+    due: "Still due",
     overdue: "Overdue",
 };
 

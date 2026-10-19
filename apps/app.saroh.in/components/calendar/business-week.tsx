@@ -64,7 +64,7 @@ export function BusinessWeek({
     today: string;
     thisMonth: string;
     /** May take an order, a booking, or send a reminder (E22): `*:write`. */
-    can: { order: boolean; book: boolean } & ProblemCan;
+    can: { order: boolean; book: boolean; money?: boolean } & ProblemCan;
     /** `?day=`: the day picked in this week. */
     day?: string;
     /** `?team=`: the person the team filter opens on (E24). */
@@ -235,6 +235,8 @@ export function BusinessWeek({
                         })}
                         can={can}
                         money={cash}
+                        // No amount without the money permission (DEC-098).
+                        amounts={can.money ?? true}
                         offLine={dayOffLine(data, day.date)}
                     />
                 )}

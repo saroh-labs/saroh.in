@@ -77,7 +77,7 @@ describe("monthStrip", () => {
             ["Out so far", "₹200"],
             ["Net", "₹4,800"],
             // Due counts from today, as the design shows (DEC-067).
-            ["Due", "₹900"],
+            ["Still due", "₹900"],
             ["Overdue", "₹300"],
         ]);
         expect(
@@ -93,11 +93,11 @@ describe("monthStrip", () => {
             "In",
             "Out",
             "Net",
-            "Due",
+            "Still due",
             "Overdue",
         ]);
         expect(word(strip).slice(3)).toEqual([
-            ["Due", "₹0"],
+            ["Still due", "₹0"],
             ["Overdue", "₹1,200"],
         ]);
     });
@@ -120,7 +120,7 @@ describe("monthStrip", () => {
             due: 5_000,
         });
         expect(word(monthStrip([today], at("current"))).at(-1)).toEqual([
-            "Due",
+            "Still due",
             "₹50",
         ]);
     });
@@ -130,7 +130,7 @@ describe("monthStrip", () => {
             ["In", "—"],
             ["Out", "—"],
             ["Net", "—"],
-            ["Due", "₹1,200"],
+            ["Still due", "₹1,200"],
         ]);
     });
 

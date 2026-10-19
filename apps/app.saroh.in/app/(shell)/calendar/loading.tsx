@@ -5,7 +5,6 @@ export default function Loading() {
         <PageLoading
             shape="dashboard"
             width="full"
-            breadcrumb={["Home", "Calendar"]}
             label="Loading the calendar"
         />
     );

@@ -110,8 +110,8 @@ const SCREENS: Screen[] = [
         name: "Calendar",
         org: PULSE,
         path: "/calendar",
-        ready: (page) =>
-            page.getByRole("group", { name: "Show on the calendar" }),
+        // The month's one filter button (bookings U13).
+        ready: (page) => page.getByRole("button", { name: /^What to show/ }),
     },
     {
         name: "Bookings",

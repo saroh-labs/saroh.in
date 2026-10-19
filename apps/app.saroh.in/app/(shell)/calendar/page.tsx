@@ -77,6 +77,8 @@ export default async function CalendarPage({
         // A named problem's fix (E22): offered only to whoever may make it.
         remind: may("invoice:write"),
         retry: may("subscription:write"),
+        // Any amount at all (DEC-098): the permission, never the role.
+        money: may("payment:read"),
     };
     // The team filter's person (E24); one the filter doesn't list opens on
     // Everyone.

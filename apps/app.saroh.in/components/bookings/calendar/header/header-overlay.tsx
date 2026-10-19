@@ -45,8 +45,9 @@ export function HeaderOverlay({
     onOpenChange: (open: boolean) => void;
     trigger: ReactElement;
     title: string;
-    /** The line under the title: the day, or what the view holds. */
-    subtitle: string;
+    /** The line under the title: the day, or what the view holds. None:
+     *  the title stands alone (the Calendar's What to show, U13). */
+    subtitle?: string;
     footer?: ReactNode;
     /** The popover's width on the desk, in px (the boards': 360–380). */
     width: number;
@@ -63,6 +64,8 @@ export function HeaderOverlay({
                     side="bottom"
                     closeButton={false}
                     data-header-sheet=""
+                    // No line under the title: Radix is told there is none.
+                    {...(subtitle ? {} : { "aria-describedby": undefined })}
                     className="flex max-h-[calc(100dvh-40px)] flex-col gap-0 rounded-t-[18px] border-0 bg-card p-0 shadow-xl"
                 >
                     <span
@@ -73,9 +76,11 @@ export function HeaderOverlay({
                         <SheetTitle className="text-[18px] leading-tight">
                             {title}
                         </SheetTitle>
-                        <SheetDescription className="text-[13px]">
-                            {subtitle}
-                        </SheetDescription>
+                        {subtitle ? (
+                            <SheetDescription className="text-[13px]">
+                                {subtitle}
+                            </SheetDescription>
+                        ) : null}
                         <SheetClose
                             aria-label="Close"
                             className={cn(
@@ -117,9 +122,11 @@ export function HeaderOverlay({
                         <span className="block font-display text-[17px] font-semibold leading-tight tracking-[-0.02em] text-foreground">
                             {title}
                         </span>
-                        <span className="block text-[12.5px] text-muted-foreground">
-                            {subtitle}
-                        </span>
+                        {subtitle ? (
+                            <span className="block text-[12.5px] text-muted-foreground">
+                                {subtitle}
+                            </span>
+                        ) : null}
                     </span>
                     <Button
                         variant="ghost"

@@ -58,6 +58,9 @@ export const RAW_ALLOWED = {
     "components/calendar/layer-switches.tsx": ["button"],
     // button: a calendar cell
     "components/calendar/month-grid.tsx": ["button"],
+    // button: the filter chip, a chip, a row that is one button (a person,
+    // a layer ticked on or off)
+    "components/calendar/what-to-show.tsx": ["button"],
     // button: a row or card that is one button
     "components/calendar/month-strip.tsx": ["button"],
     // button: a choice in a list

@@ -7,8 +7,9 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 
+import { dayRow } from "@/lib/calendar/day-rows";
 import type { LayerStyle, Off } from "@/lib/calendar/layers";
-import { dayCount, describeItem, itemsTotal } from "@/lib/calendar/layers";
+import { dayCount, itemsTotal } from "@/lib/calendar/layers";
 import type { CalendarCash } from "@/lib/calendar/money";
 import {
     dayMoney,
@@ -23,10 +24,11 @@ import type { CalendarDay, LayerKey } from "@/lib/calendar/types";
 
 import { TONE_FILL } from "./tones";
 
-/** How many of a layer's things the panel lists before pointing onward. */
-const PER_GROUP = 12;
+/** How many of a layer's things the day lists before pointing onward (the
+ *  boards: five, then "3 more"). */
+export const PER_GROUP = 5;
 
-/** Where the rest of a layer lives, when a day holds more than the panel lists. */
+/** Where the rest of a layer lives, when a day holds more than it lists. */
 const LAYER_HOME: Record<LayerKey, string> = {
     orders: "/commerce/orders",
     collections: "/billing/subscriptions",
@@ -37,15 +39,57 @@ const LAYER_HOME: Record<LayerKey, string> = {
     payments: "/billing/invoices",
 };
 
+/** Bookings and classes live in the diary, which opens on the day itself. */
+function moreHref(layer: LayerKey, date: string): string {
+    return layer === "bookings" || layer === "classes"
+        ? `/bookings?date=${encodeURIComponent(date)}&layout=day`
+        : LAYER_HOME[layer];
+}
+
 /**
- * One day, grouped by layer, each thing a link to its record. The side panel
- * on the desk, the sheet between 760 and 1100px, and the list under the month
- * on a phone — one body, so the three cannot say different things. A day
- * from today offers what can be made on it (E21), and a named problem —
- * a failed renewal, a late order, an overdue invoice, a no-show — shows
- * its fix beside it (E22). For a role that reads money (E23) the day
- * says what came in, went out and is due, and each layer what it took.
- * Under the title, who is off or that the business is closed (E24).
+ * What can be made on the day — "Book on this day", "New order" — the
+ * first as the day's one main action, the rest beside it. Under the title
+ * in the desk's side panel; at the foot of a phone's sheet (the boards).
+ */
+export function DayActions({
+    shortcuts,
+    className,
+}: {
+    shortcuts: Shortcut[];
+    className?: string;
+}) {
+    if (shortcuts.length === 0) return null;
+    return (
+        <div className={cn("grid gap-2", className)}>
+            {shortcuts.map((s, i) => (
+                <Button
+                    key={s.label}
+                    asChild
+                    variant={i === 0 ? "default" : "outline"}
+                    className="w-full gap-1.5 max-[759px]:h-12 max-[759px]:text-[15px]"
+                >
+                    <Link href={s.href}>
+                        <Plus aria-hidden className="size-4" />
+                        {s.label}
+                    </Link>
+                </Button>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * One day, grouped by layer, each thing a row that opens its record: its
+ * time, who it is for and what (bookings U13, BKMOverviewMonth's day sheet
+ * and BKDCalMonth's side panel). The side panel on the desk, a sheet from
+ * the right between 760 and 1100px, and a sheet from the foot of a phone —
+ * one body, so the three cannot say different things. Under the title, who
+ * is off or that the business is closed (E24), then one line: how many
+ * things, and — for a role that reads money (`payment:read`, E23, DEC-098)
+ * — what came in and went out. A layer lists five, then "3 more · open the
+ * day in Bookings". A named problem — a failed renewal, a late order, an
+ * overdue invoice, a no-show — shows its fix beside it (E22). Without the
+ * money permission no amount is drawn anywhere on it.
  */
 export function DayPanel({
     day,
@@ -56,8 +100,10 @@ export function DayPanel({
     currency,
     heading,
     shortcuts = [],
+    actions = true,
     can,
     money = null,
+    amounts = true,
     offLine = null,
 }: {
     day: CalendarDay;
@@ -68,19 +114,23 @@ export function DayPanel({
     currency: string | null;
     /** The title's element: a plain heading, or the sheet's own title. */
     heading: (title: string) => React.ReactNode;
-    /** "New order", "Book": what this person may make on this day. */
+    /** "Book on this day", "New order": what this person may make on it. */
     shortcuts?: Shortcut[];
+    /** Draw them under the title; false where the sheet's foot holds them. */
+    actions?: boolean;
     /** The fixes this person may make to a named problem (E22). */
     can: ProblemCan;
     /** `payment:read` only (E23): the month's money. Null: none drawn. */
     money?: CalendarCash | null;
+    /** May see amounts at all (`payment:read`, DEC-098). */
+    amounts?: boolean;
     /** Who is off, or the business closed, that day (E24). */
     offLine?: string | null;
 }) {
     const entries = money?.shown.filter((e) => e.date === day.date) ?? [];
-    const cash = money ? dayMoney(entries, money.currency) : null;
+    const cash = money && amounts ? dayMoney(entries, money.currency) : null;
     const n = dayCount(day, layers, off);
-    // A shop's renewals are subscriptions; a diary's, memberships.
+    // A shop's renewals are subscriptions; a diary, memberships.
     const shop = layers.some((l) => l.key === "orders");
     const ahead = day.date > today;
     const groups = layers.filter(
@@ -102,57 +152,37 @@ export function DayPanel({
                     {offLine}
                 </p>
             ) : null}
-            <p className="mb-2.5 mt-0.5 min-h-[1lh] text-[12.5px] text-muted-foreground">
+            <p
+                data-day-line=""
+                className="mt-0.5 min-h-[1lh] text-[12.5px] text-muted-foreground max-[759px]:text-[13px]"
+            >
                 {n > 0
                     ? `${count(n, "thing")}${ahead ? " coming up" : ""}`
                     : ""}
+                {cash ? (
+                    <>
+                        {n > 0 ? " · " : ""}In{" "}
+                        <span className="tabular-nums">{cash.in}</span> ·{" "}
+                        <span className="text-destructive-subtle-foreground">
+                            Out <span className="tabular-nums">{cash.out}</span>
+                        </span>
+                        {cash.due ? (
+                            <>
+                                {" "}
+                                · Due{" "}
+                                <span className="tabular-nums">{cash.due}</span>
+                            </>
+                        ) : null}
+                    </>
+                ) : null}
             </p>
-            {cash ? (
-                <div className="mb-1 flex flex-wrap gap-x-3.5 border-y border-foreground/10 pb-2.5 pt-2 text-[12.5px]">
-                    <span>
-                        <span className="text-muted-foreground">In </span>
-                        <strong className="font-semibold tabular-nums">
-                            {cash.in}
-                        </strong>
-                    </span>
-                    <span>
-                        <span className="text-muted-foreground">Out </span>
-                        <strong className="font-semibold tabular-nums text-destructive-subtle-foreground">
-                            {cash.out}
-                        </strong>
-                    </span>
-                    {cash.due ? (
-                        <span>
-                            <span className="text-muted-foreground">Due </span>
-                            <strong className="font-semibold tabular-nums">
-                                {cash.due}
-                            </strong>
-                        </span>
-                    ) : null}
-                    {cash.why ? (
-                        <span className="basis-full text-[11.5px] text-muted-foreground">
-                            {cash.why}
-                        </span>
-                    ) : null}
-                </div>
+            {cash?.why ? (
+                <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                    {cash.why}
+                </p>
             ) : null}
-            {shortcuts.length > 0 ? (
-                <div className="mb-1 mt-2 flex flex-wrap gap-1.5">
-                    {shortcuts.map((s) => (
-                        <Button
-                            key={s.label}
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5"
-                        >
-                            <Link href={s.href}>
-                                <Plus aria-hidden className="size-3" />
-                                {s.label}
-                            </Link>
-                        </Button>
-                    ))}
-                </div>
+            {actions ? (
+                <DayActions shortcuts={shortcuts} className="mb-1.5 mt-3" />
             ) : null}
             {groups.length === 0 ? (
                 <EmptyState
@@ -160,7 +190,7 @@ export function DayPanel({
                     className="py-2.5"
                     title={
                         hidden
-                            ? "Nothing on this day for the layers you have on"
+                            ? "Nothing on this day for what you're showing"
                             : day.date >= today
                               ? "Nothing on this day yet"
                               : "Nothing happened on this day"
@@ -171,44 +201,46 @@ export function DayPanel({
                 const cell = day.layers[layer.key];
                 if (!cell) return null;
                 // With money: what the layer took, is due and failed (E23);
-                // without, the amounts the items carry (a booking's price).
-                const total = money
-                    ? groupMoney(
-                          entries.filter((e) => e.layer === layer.key),
-                          money.currency,
-                      )
-                    : null;
+                // without it, the amounts the items carry (a booking's
+                // price) — and nothing at all without the permission.
+                const total =
+                    money && amounts
+                        ? groupMoney(
+                              entries.filter((e) => e.layer === layer.key),
+                              money.currency,
+                          )
+                        : null;
                 const sum =
-                    total === null
+                    amounts && total === null
                         ? itemsTotal(cell.items, cell.count, currency)
                         : null;
                 const more =
                     cell.count - Math.min(cell.items.length, PER_GROUP);
                 return (
-                    <section key={layer.key} className="mt-2">
-                        <h3 className="label mb-1 flex items-center gap-[7px]">
+                    <section key={layer.key} className="mt-3">
+                        <h3 className="label mb-0.5 flex items-center gap-2">
                             <span
                                 aria-hidden
                                 className={cn(
-                                    "inline-block size-[9px] rounded-[3px]",
+                                    "inline-block size-2.5 rounded-[3px]",
                                     TONE_FILL[layer.tone],
                                 )}
                             />
                             {layer.label} · {cell.count}
                             <span className="flex-1" />
                             {total ? (
-                                <span className="font-medium normal-case tabular-nums tracking-normal">
+                                <span className="text-[12.5px] font-semibold normal-case tabular-nums tracking-normal text-foreground">
                                     {total}
                                 </span>
                             ) : sum !== null && currency ? (
-                                <span className="font-medium normal-case tabular-nums tracking-normal">
+                                <span className="text-[12.5px] font-semibold normal-case tabular-nums tracking-normal text-foreground">
                                     {wholeMoney(sum, currency)}
                                 </span>
                             ) : null}
                         </h3>
                         <ul>
                             {cell.items.slice(0, PER_GROUP).map((item) => {
-                                const line = describeItem(layer.key, item, {
+                                const row = dayRow(layer.key, item, {
                                     timeZone,
                                     ahead,
                                 });
@@ -224,30 +256,33 @@ export function DayPanel({
                                 return (
                                     <li key={item.id}>
                                         <Link
-                                            href={line.href}
-                                            className="-mx-2 flex items-baseline gap-2 rounded-lg px-2 py-[7px] text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70"
+                                            href={row.href}
+                                            className="flex min-h-[52px] items-center gap-2.5 border-b border-border/70 py-2 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/70 min-[760px]:min-h-0 min-[760px]:gap-3"
                                         >
+                                            <span className="w-[62px] flex-none text-[13px] font-semibold tabular-nums min-[760px]:font-normal min-[760px]:text-muted-foreground">
+                                                {row.time}
+                                            </span>
                                             <span className="min-w-0 flex-1">
-                                                <span className="block truncate text-[13px] font-semibold">
-                                                    {line.title}
+                                                <span className="block truncate text-[14px] font-semibold min-[760px]:text-[13.5px]">
+                                                    {row.title}
                                                 </span>
-                                                {line.sub ? (
-                                                    <span className="block text-[12px] text-muted-foreground">
-                                                        {line.sub}
+                                                {row.sub ? (
+                                                    <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">
+                                                        {row.sub}
                                                     </span>
                                                 ) : null}
                                             </span>
-                                            {line.flag ? (
+                                            {row.flag ? (
                                                 <Badge
                                                     variant={
-                                                        line.flag.tone === "bad"
+                                                        row.flag.tone === "bad"
                                                             ? "error"
                                                             : "draft"
                                                     }
                                                     size="sm"
                                                     className="shrink-0"
                                                 >
-                                                    {line.flag.label}
+                                                    {row.flag.label}
                                                 </Badge>
                                             ) : null}
                                             {action ? (
@@ -255,9 +290,10 @@ export function DayPanel({
                                                     {action}
                                                 </span>
                                             ) : null}
-                                            {item.amount !== undefined &&
+                                            {amounts &&
+                                            item.amount !== undefined &&
                                             item.currency ? (
-                                                <span className="shrink-0 text-[12.5px] font-semibold tabular-nums">
+                                                <span className="shrink-0 text-[13px] font-semibold tabular-nums">
                                                     {wholeMoney(
                                                         toMajor(item.amount),
                                                         item.currency,
@@ -271,10 +307,13 @@ export function DayPanel({
                         </ul>
                         {more > 0 ? (
                             <Link
-                                href={LAYER_HOME[layer.key]}
-                                className="mt-1 block text-[12px] font-medium text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
+                                href={moreHref(layer.key, day.date)}
+                                className="inline-flex min-h-11 items-center text-[13px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground min-[760px]:min-h-9"
                             >
-                                {more} more. Open {layer.label}
+                                {layer.key === "bookings" ||
+                                layer.key === "classes"
+                                    ? `${more} more · open the day in Bookings`
+                                    : `${more} more · open ${layer.label}`}
                             </Link>
                         ) : null}
                     </section>
