@@ -62,6 +62,7 @@ import type { Service, Slot } from "@/lib/services/service";
 import type { BookingRules, StaffView } from "@/lib/staff/types";
 
 import { useHold } from "@/components/shared/use-hold";
+import { firstName as firstNameOf } from "@/lib/names";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { AgendaList, AgendaMonth } from "./agenda-month";
@@ -408,7 +409,7 @@ export function CalendarScreen({
             return next;
         });
 
-    const firstName = (b: DiaryBooking) => whoFor(b).split(" ")[0] ?? "";
+    const firstName = (b: DiaryBooking) => firstNameOf(whoFor(b));
     const isClassSeat = (b: DiaryBooking) => b.service.capacity > 1;
     const lateNow = (b: DiaryBooking) =>
         rules?.freeCancelHours !== null &&
