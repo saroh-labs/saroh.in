@@ -226,7 +226,7 @@ export function profileRows(
             key: "phone",
             label: "Phone",
             value: p.phone,
-            hint: "Shown to their businesses in Help.",
+            hint: "Only Saroh's team sees this; businesses see the name and work email.",
         },
         { key: "city", label: "City", value: p.city },
         {
@@ -246,7 +246,7 @@ export function profileRows(
         },
         {
             key: "engagement",
-            label: "Working as",
+            label: "Employment",
             value: p.engagement ? ENGAGEMENT_LABEL[p.engagement] : null,
         },
         {

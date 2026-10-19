@@ -269,7 +269,7 @@ function EditDetails({
                         <Field
                             label="Phone"
                             optional
-                            hint="Shown to their businesses in Help."
+                            hint="Only Saroh's team sees this; businesses see the name and work email."
                         >
                             <Input
                                 inputMode="tel"
@@ -324,7 +324,7 @@ function EditDetails({
                         </Field>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label="Working as" htmlFor={`${id}-engagement`}>
+                        <Field label="Employment" htmlFor={`${id}-engagement`}>
                             <OptionSelect<StaffEngagement | "">
                                 id={`${id}-engagement`}
                                 value={draft.engagement}
