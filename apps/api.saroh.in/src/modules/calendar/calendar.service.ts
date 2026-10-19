@@ -17,7 +17,7 @@ import { ownBookingsWhere, ownDiaryOf } from "../bookings/own-diary";
 import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
-import { isPastDue } from "../invoices/invoice-state";
+import { isPastDue, leftToPayCents } from "../invoices/invoice-state";
 import {
     priceTermsFor,
     RATED_SALE_SELECT,
@@ -215,6 +215,20 @@ function minutesBetween(start: Date, end: Date): number {
  * the Invoices layer — the order already counts that money, and the order is
  * the ledger for its payment.
  */
+/**
+ * An invoice's amount on the calendar: what is left to pay while it is
+ * owed (DEC-173: part may be paid already), its total once paid.
+ */
+function dueAmount(invoice: {
+    status: string;
+    total: { toString(): string };
+    paidCents: number;
+}): string {
+    return invoice.status === "ISSUED"
+        ? fromMinor(leftToPayCents(invoice))
+        : toMoneyString(invoice.total);
+}
+
 function isAnOrdersOwn(invoice: { orderId: string | null }): boolean {
     return invoice.orderId !== null;
 }
@@ -940,6 +954,7 @@ export class CalendarService {
                     number: true,
                     status: true,
                     total: true,
+                    paidCents: true,
                     currency: true,
                     dueAt: true,
                     periodStart: true,
@@ -971,7 +986,7 @@ export class CalendarService {
             if (!sub) continue;
             const who = personName(sub.contact) ?? "Customer";
             const amount = {
-                amount: toMoneyString(c.total),
+                amount: dueAmount(c),
                 currency: c.currency,
             };
             // Payment failed: the rule `failedCharge` uses — unpaid past
@@ -1139,6 +1154,7 @@ export class CalendarService {
                 status: true,
                 source: true,
                 total: true,
+                paidCents: true,
                 currency: true,
                 dueAt: true,
                 paidAt: true,
@@ -1159,7 +1175,7 @@ export class CalendarService {
             const title = inv.number ?? "Invoice";
             const subtitle = inv.billToName ?? personName(inv.contact);
             const amount = {
-                amount: toMoneyString(inv.total),
+                amount: dueAmount(inv),
                 currency: inv.currency,
             };
             const link = { type: "invoice" as const, id: inv.id };

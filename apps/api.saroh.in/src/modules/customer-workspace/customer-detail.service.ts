@@ -21,6 +21,7 @@ import type { InvoiceStanding } from "../invoices/invoice-state";
 import {
     invoiceStanding,
     isPastDue,
+    leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
 } from "../invoices/invoice-state";
@@ -448,6 +449,13 @@ class Purse {
         this.byCurrency.set(
             currency,
             (this.byCurrency.get(currency) ?? 0) + toMinor(amount),
+        );
+    }
+
+    addMinor(currency: string, minor: number): void {
+        this.byCurrency.set(
+            currency,
+            (this.byCurrency.get(currency) ?? 0) + minor,
         );
     }
 
@@ -1222,6 +1230,7 @@ export class CustomerDetailService {
                     status: true,
                     dueAt: true,
                     total: true,
+                    paidCents: true,
                     currency: true,
                 },
             }),
@@ -1231,7 +1240,8 @@ export class CustomerDetailService {
         const owed = new Purse();
         let overdueCount = 0;
         for (const r of unpaid) {
-            owed.add(r.currency, r.total);
+            // What is left to pay on it (DEC-173).
+            owed.addMinor(r.currency, leftToPayCents(r));
             if (isPastDue(r, now)) overdueCount += 1;
         }
         return {

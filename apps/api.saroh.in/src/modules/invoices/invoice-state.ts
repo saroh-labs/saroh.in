@@ -262,3 +262,31 @@ export function isPartlyPaid(invoice: {
         leftToPayCents(invoice) > 0
     );
 }
+
+/**
+ * Paid so far on an invoice, in paise, as every read says it (DEC-173):
+ * the ledger's cache, except that a PAID invoice has paid its total. That
+ * covers an order's invoice (the order is its ledger, so it has no rows)
+ * and one paid before the ledger reached its writer.
+ */
+export function paidSoFarCents(invoice: {
+    status: string;
+    total: { toString(): string };
+    paidCents: number;
+}): number {
+    if (invoice.status === "PAID") return toMinor(invoice.total);
+    return invoice.paidCents;
+}
+
+/**
+ * What is still to pay on an invoice now, in paise: what is left on an
+ * issued invoice, and nothing on any other (paid, void, credited, a
+ * draft). What a pay link charges and the public read's `leftToPay`.
+ */
+export function owedNowCents(invoice: {
+    status: string;
+    total: { toString(): string };
+    paidCents: number;
+}): number {
+    return invoice.status === "ISSUED" ? leftToPayCents(invoice) : 0;
+}

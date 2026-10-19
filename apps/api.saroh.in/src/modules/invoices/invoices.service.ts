@@ -42,6 +42,7 @@ import {
     CAPTURED_NEEDS_REFUND,
     DEFAULT_DUE_DAYS,
     isPastDue,
+    leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
     paidSinceFilter,
@@ -383,8 +384,9 @@ export class InvoicesService {
     }
 
     /**
-     * What a person, or one subscription, still owes: issued and unpaid.
-     * Totals are kept per currency rather than added across them.
+     * What a person, or one subscription, still owes: issued and unpaid,
+     * each invoice counted at what is left to pay on it (DEC-173). Totals
+     * are kept per currency rather than added across them.
      */
     async owed(
         ctx: OrganizationContext,
@@ -417,14 +419,21 @@ export class InvoicesService {
                     ? { subscriptionId: who.subscriptionId }
                     : {}),
             },
-            select: { status: true, currency: true, total: true, dueAt: true },
+            select: {
+                status: true,
+                currency: true,
+                total: true,
+                paidCents: true,
+                dueAt: true,
+            },
         });
         const byCurrency = new Map<string, number>();
         let overdueCount = 0;
         for (const r of rows) {
+            // What is left to pay on it (DEC-173), not its whole total.
             byCurrency.set(
                 r.currency,
-                (byCurrency.get(r.currency) ?? 0) + toCents(r.total.toString()),
+                (byCurrency.get(r.currency) ?? 0) + leftToPayCents(r),
             );
             if (isPastDue(r, now)) overdueCount += 1;
         }

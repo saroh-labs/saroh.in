@@ -346,3 +346,169 @@ export function notOwed(status: string): string {
             return "A void invoice cannot be paid.";
     }
 }
+
+/** The audit actor of a payment Saroh recorded as it came in online. */
+export const ONLINE_LEDGER_ACTOR = "system:online-payment";
+
+/**
+ * Why an online payment wasn't applied, when the invoice was ISSUED but had
+ * less left to pay than the payment brought (part of it was paid by hand
+ * while the checkout was open). Recorded on the CAPTURED_NEEDS_REFUND
+ * attempt as its `invoiceStatus`, so Home names it.
+ */
+export const MORE_THAN_LEFT = "MORE_THAN_LEFT";
+
+/**
+ * Money that came in online for an invoice (DEC-173, U3 #1115): one
+ * provider payment, through its intent. The pay link, an autopay charge, a
+ * pack or a plan bought online and a pay-now hold all bring it here.
+ */
+export interface OnlinePayment {
+    /** The intent it came through: one ledger row per intent, ever. */
+    paymentIntentId: string;
+    /** The intent's amount, in paise: what the provider took. */
+    amountCents: number;
+    /** The provider's payment reference. */
+    reference: string | null;
+    /** "Paid online through Razorpay". */
+    note: string;
+    receivedAt: Date;
+}
+
+/**
+ * What became of an online payment. Applied: written to the ledger (or, on
+ * an order's paper, stamped paid), `paid` when the invoice is now paid in
+ * full, `replayed` when this intent's payment was already written. Not
+ * applied: `found` says why (the invoice's status, MISSING, or
+ * {@link MORE_THAN_LEFT}); the caller records the capture as owed back.
+ */
+export type OnlineOutcome =
+    | { applied: true; paid: boolean; replayed: boolean }
+    | { applied: false; found: string };
+
+/**
+ * Apply an online payment to its invoice, under the invoice's ledger lock.
+ * The caller holds the intent's lock (intent → invoice, the lock order).
+ *
+ * - **Once per intent:** a payment whose intent already has its ledger row
+ *   is a replay, applied already, and nothing is written (the
+ *   `paymentIntentId` unique index holds it even if two callers race).
+ * - **Only an ISSUED invoice takes it.** Paid by hand, void or credited
+ *   meanwhile: not applied, so the money is owed back, as before.
+ * - **Never more than is left:** a payment for more than what is left (part
+ *   was recorded by hand while the checkout was open) is not applied either,
+ *   rather than split; the whole capture is owed back (`MORE_THAN_LEFT`).
+ * - **An order's paper** (ADR-008) has the order as its ledger: it is
+ *   stamped paid, as it always was, with no ledger row.
+ * - Otherwise one ONLINE row for the intent's amount, through
+ *   {@link recordLedgerPaymentInTx}: PAID when it settles what was left,
+ *   still ISSUED (partly paid) when it doesn't.
+ */
+export async function recordOnlinePaymentInTx(
+    tx: Tx,
+    organizationId: string,
+    invoiceId: string,
+    payment: OnlinePayment,
+): Promise<OnlineOutcome> {
+    const invoice = await lockInvoiceForLedger(tx, organizationId, invoiceId);
+    if (!invoice) return { applied: false, found: "MISSING" };
+    const already = await tx.invoicePayment.findUnique({
+        where: { paymentIntentId: payment.paymentIntentId },
+        select: { id: true },
+    });
+    if (already) {
+        return {
+            applied: true,
+            paid: invoice.status === "PAID",
+            replayed: true,
+        };
+    }
+    if (invoice.status !== "ISSUED") {
+        return { applied: false, found: invoice.status };
+    }
+    if (invoice.orderNumber) {
+        await stampOrderPaperPaidInTx(tx, invoice, {
+            paidAt: payment.receivedAt,
+            method: ONLINE_PAYMENT_METHOD,
+            reference: payment.reference,
+            note: payment.note,
+        });
+        return { applied: true, paid: true, replayed: false };
+    }
+    if (payment.amountCents > ledgerLeftCents(invoice)) {
+        return { applied: false, found: MORE_THAN_LEFT };
+    }
+    const { settled } = await recordLedgerPaymentInTx(tx, invoice, {
+        amountCents: payment.amountCents,
+        method: ONLINE_PAYMENT_METHOD,
+        reference: payment.reference,
+        note: payment.note,
+        receivedAt: payment.receivedAt,
+        paymentIntentId: payment.paymentIntentId,
+        actor: { userId: null, systemActor: ONLINE_LEDGER_ACTOR },
+    });
+    return { applied: true, paid: settled.paid, replayed: false };
+}
+
+/**
+ * An order's paper paid in full (ADR-008): the order is its ledger, so the
+ * invoice is stamped PAID with how, and no ledger row is written. The one
+ * place outside {@link settleFromLedger} that sets an invoice PAID, for
+ * order paper only (`invoice-ledger.guard.spec.ts`). The caller holds the
+ * invoice's lock.
+ */
+export async function stampOrderPaperPaidInTx(
+    tx: Tx,
+    invoice: Pick<LedgerInvoice, "id" | "orderNumber">,
+    paid: {
+        paidAt: Date;
+        method: string;
+        reference: string | null;
+        note: string | null;
+    },
+): Promise<void> {
+    if (!invoice.orderNumber) {
+        throw new Error(
+            "Only an order's paper is stamped paid; every other invoice is paid through the ledger.",
+        );
+    }
+    await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+            status: "PAID",
+            paidAt: paid.paidAt,
+            paymentMethod: paid.method,
+            paymentReference: paid.reference,
+            paymentNote: paid.note,
+        },
+    });
+}
+
+/**
+ * A draft paid online (a pay-now hold, a pack or a plan bought online),
+ * which its writer has just numbered and issued in this transaction: its
+ * payment goes on the ledger like any other online payment, and must
+ * settle it, since the intent was made for the draft's own total. Anything
+ * else is a broken invariant, and the transaction is rolled back rather
+ * than leave a paid draft half written.
+ */
+export async function payIssuedDraftOnlineInTx(
+    tx: Tx,
+    organizationId: string,
+    invoiceId: string,
+    payment: OnlinePayment,
+): Promise<void> {
+    const outcome = await recordOnlinePaymentInTx(
+        tx,
+        organizationId,
+        invoiceId,
+        payment,
+    );
+    if (!outcome.applied || !outcome.paid) {
+        throw new Error(
+            `The online payment for draft invoice ${invoiceId} did not settle it (${
+                outcome.applied ? "part paid" : outcome.found
+            }).`,
+        );
+    }
+}

@@ -1,9 +1,9 @@
 import type { Prisma, prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { toMinor } from "../../common/money";
 import { whenWords } from "../../common/words-format";
 import { planTakesOnlinePayment } from "../billing/online-payments-plan";
+import { leftToPayCents } from "../invoices/invoice-state";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import { firstNameOf, payLinkWords, turnDownWords } from "./home-inline-words";
 import type {
@@ -103,6 +103,8 @@ export interface AwaitingRow {
     invoices?: {
         status: string;
         total: { toString(): string };
+        /** Part recorded by hand on its ledger (DEC-173); absent is none. */
+        paidCents?: number;
         currency: string;
     }[];
 }
@@ -113,6 +115,14 @@ function ownInvoice(
 ): NonNullable<AwaitingRow["invoices"]>[number] | undefined {
     const list = row.invoices ?? [];
     return list.length > 0 ? list[0] : undefined;
+}
+
+/** What is left to pay on the booking's invoice (DEC-173), in paise. */
+function owedOf(invoice: NonNullable<AwaitingRow["invoices"]>[number]): number {
+    return leftToPayCents({
+        total: invoice.total,
+        paidCents: invoice.paidCents ?? 0,
+    });
 }
 
 /** The text trimmed, or null when there is none. */
@@ -162,7 +172,7 @@ export function awaitingEvidence(
         title: service,
         subtitle: who,
         at: row.startAt.toISOString(),
-        amountMinor: powers.money && owed ? toMinor(owed.total) : null,
+        amountMinor: powers.money && owed ? owedOf(owed) : null,
         currency: powers.money && owed ? owed.currency : null,
         href: `/bookings/${row.id}`,
         tag: "Awaiting payment",
@@ -251,7 +261,12 @@ export async function readAwaitingPayment(
                     status: { in: ["DRAFT", "ISSUED"] },
                 },
                 orderBy: { createdAt: "desc" },
-                select: { status: true, total: true, currency: true },
+                select: {
+                    status: true,
+                    total: true,
+                    paidCents: true,
+                    currency: true,
+                },
             },
         },
     })) as AwaitingRow[];
@@ -278,7 +293,7 @@ export async function readAwaitingPayment(
         if (!owed) continue;
         totals.set(
             owed.currency,
-            (totals.get(owed.currency) ?? 0) + toMinor(owed.total),
+            (totals.get(owed.currency) ?? 0) + owedOf(owed),
         );
     }
     return {

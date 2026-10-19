@@ -146,6 +146,27 @@ describe("deskTake", () => {
         ).toEqual({ cents: 45_000, byLink: true });
     });
 
+    it("takes only what is left on that invoice when part was recorded by hand (DEC-173)", () => {
+        expect(
+            deskTake(
+                { status: "CONFIRMED", paidWith: null },
+                {
+                    ...PRICE,
+                    paper: [
+                        {
+                            ...paper({
+                                status: "ISSUED",
+                                paymentMethod: null,
+                                total: "450.00",
+                            }),
+                            paidCents: 20_000,
+                        },
+                    ],
+                },
+            ),
+        ).toEqual({ cents: 25_000, byLink: true });
+    });
+
     it.each([
         [
             "cancelled",

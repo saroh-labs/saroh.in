@@ -137,6 +137,7 @@ type ListInvoice = Pick<
     | "voidedAt"
     | "issuedAt"
     | "total"
+    | "leftToPay"
     | "currency"
     | "order"
     | "related"
@@ -243,7 +244,13 @@ const cents = (amount: string) => Math.round(Number(amount) * 100);
 export function owedSummary(
     invoices: Pick<
         ListInvoice,
-        "standing" | "kind" | "order" | "source" | "total" | "currency"
+        | "standing"
+        | "kind"
+        | "order"
+        | "source"
+        | "total"
+        | "leftToPay"
+        | "currency"
     >[],
 ): {
     owed: { currency: string; cents: number }[];
@@ -255,13 +262,12 @@ export function owedSummary(
     let overdueCount = 0;
     for (const i of invoices) {
         if (!isOwed(i)) continue;
-        owed.set(i.currency, (owed.get(i.currency) ?? 0) + cents(i.total));
+        // What is left to pay on it (DEC-173), not its whole total.
+        const left = cents(i.leftToPay ?? i.total);
+        owed.set(i.currency, (owed.get(i.currency) ?? 0) + left);
         if (i.standing === "OVERDUE") {
             overdueCount += 1;
-            overdue.set(
-                i.currency,
-                (overdue.get(i.currency) ?? 0) + cents(i.total),
-            );
+            overdue.set(i.currency, (overdue.get(i.currency) ?? 0) + left);
         }
     }
     const list = (m: Map<string, number>) =>

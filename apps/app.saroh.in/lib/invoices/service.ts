@@ -235,6 +235,12 @@ export interface Invoice {
     subtotal: string;
     tax: string;
     total: string;
+    /**
+     * What is left to pay (DEC-173): the total less the payments recorded
+     * so far while it is owed, "0.00" once paid or void. Absent from an API
+     * older than the payments ledger: read the total.
+     */
+    leftToPay?: string;
     issuedAt: string | null;
     dueAt: string | null;
     paidAt: string | null;

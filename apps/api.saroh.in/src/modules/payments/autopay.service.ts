@@ -8,6 +8,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
+import { owedNowCents } from "../invoices/invoice-state";
 import { RATED_SALE_SELECT, saleChargeInTx } from "../invoices/sale-price";
 import type { CheckView } from "./authorisation-check";
 import { CHECK_VIEW_SELECT, checkViewOf } from "./authorisation-check";
@@ -139,6 +140,8 @@ interface InvoiceRow {
     status: string;
     source: string;
     total: Prisma.Decimal;
+    /** The ledger's paid so far (DEC-173): the first charge is what's left. */
+    paidCents: number;
     currency: string;
     subscriptionId: string | null;
 }
@@ -225,6 +228,7 @@ export class AutopayService {
                 status: true,
                 source: true,
                 total: true,
+                paidCents: true,
                 currency: true,
                 subscriptionId: true,
             },
@@ -255,11 +259,14 @@ export class AutopayService {
         );
         await this.assertOffered(organizationId, input.method);
 
+        // The limit covers the whole invoice; the first payment is what is
+        // left of it (DEC-173: part may have been paid by hand).
         const invoiceCents = toMinor(invoice.total);
+        const leftCents = owedNowCents(invoice);
         const pays =
             input.method !== "EMANDATE" &&
             invoice.status === "ISSUED" &&
-            invoiceCents > 0;
+            leftCents > 0;
         const started = await this.setup.createSetup({
             organizationId,
             subscriptionId: subscription.id,
@@ -267,7 +274,7 @@ export class AutopayService {
             maxAmountCents: mandateLimitCents(
                 Math.max(subscription.renewalCents, invoiceCents, 1),
             ),
-            firstAmountCents: pays ? invoiceCents : 0,
+            firstAmountCents: pays ? leftCents : 0,
             source: input.source,
             accountId: input.accountId ?? null,
             ...(input.returnUrl ? { returnUrl: input.returnUrl } : {}),
@@ -283,7 +290,7 @@ export class AutopayService {
             currency: started.currency,
             handoff: {
                 provider: started.provider,
-                amountCents: pays ? invoiceCents : started.checkCents,
+                amountCents: pays ? leftCents : started.checkCents,
                 currency: started.currency,
                 providerIntentId: started.setupReference,
                 publicKey,
@@ -299,7 +306,7 @@ export class AutopayService {
                     invoiceId: invoice.id,
                     provider: started.provider,
                     setupReference: started.setupReference,
-                    amountCents: invoiceCents,
+                    amountCents: leftCents,
                     currency: invoice.currency,
                     idempotencyKey: input.idempotencyKey ?? null,
                     start: view,

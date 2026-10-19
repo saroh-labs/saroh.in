@@ -1,4 +1,4 @@
-import { toMinor, toMoneyString } from "../../common/money";
+import { toMoneyString } from "../../common/money";
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import type { AddedLine } from "./added-line";
 import { addedLine } from "./added-line";
@@ -7,8 +7,9 @@ import type { InvoiceStanding } from "./invoice-state";
 import {
     invoiceStanding,
     isPartlyPaid,
-    leftToPayCents,
     ONLINE_PAYMENT_METHOD,
+    owedNowCents,
+    paidSoFarCents,
 } from "./invoice-state";
 import type { InvoiceTitle } from "./invoice-title";
 import { invoiceTitle, isExemptSupply } from "./invoice-title";
@@ -513,22 +514,6 @@ export function contactName(c: {
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
-/**
- * Paid so far, in paise: the ledger's cache, except that a PAID invoice
- * has paid its total. That covers an order's invoice (the order is its
- * ledger, so it has no rows) and one paid before the ledger reached its
- * writer.
- */
-function paidSoFarCents(row: InvoiceRow): number {
-    if (row.status === "PAID") return toMinor(row.total);
-    return row.paidCents ?? 0;
-}
-
-function leftToPayCentsOf(row: InvoiceRow): number {
-    if (row.status !== "ISSUED") return 0;
-    return leftToPayCents({ total: row.total, paidCents: row.paidCents ?? 0 });
-}
-
 function paymentView(p: PaymentRow, status: string): InvoicePaymentView {
     const removed = p.removedAt
         ? { at: p.removedAt.toISOString(), reason: p.removedReason ?? null }
@@ -663,8 +648,12 @@ export function serializeInvoice(
                   note: row.paymentNote,
               }
             : null,
-        paidSoFar: fromCents(paidSoFarCents(row)),
-        leftToPay: fromCents(leftToPayCentsOf(row)),
+        paidSoFar: fromCents(
+            paidSoFarCents({ ...row, paidCents: row.paidCents ?? 0 }),
+        ),
+        leftToPay: fromCents(
+            owedNowCents({ ...row, paidCents: row.paidCents ?? 0 }),
+        ),
         partlyPaid: isPartlyPaid({ ...row, paidCents: row.paidCents ?? 0 }),
         chequeWaiting: (row.payments ?? []).some(
             (p) => p.removedAt === null && p.bankStatus === "WAITING",

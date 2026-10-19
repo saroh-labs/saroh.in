@@ -11,7 +11,11 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { dayWords, moneyWords, whenWords } from "../../common/words-format";
+import {
+    dayWords,
+    moneyWordsMinor,
+    whenWords,
+} from "../../common/words-format";
 import type { AccountThreadPoster } from "../communications/account-thread";
 import {
     ACCOUNT_THREAD_POSTER,
@@ -30,7 +34,7 @@ import {
     chargeUnderWayOn,
 } from "../payments/charge-under-way";
 import { assertBusinessDetails } from "./business-details";
-import { isPastDue } from "./invoice-state";
+import { isPastDue, leftToPayCents } from "./invoice-state";
 import { InvoicesService } from "./invoices.service";
 import { payLinkUrlFor } from "./pay-link-url";
 import { invoicePayOnline } from "./pay-online";
@@ -72,6 +76,8 @@ const SEND_SELECT = {
     billToName: true,
     currency: true,
     total: true,
+    // What is left to pay is what the message asks for (DEC-173).
+    paidCents: true,
     dueAt: true,
     contact: { select: { firstName: true, lastName: true } },
 } as const;
@@ -291,7 +297,12 @@ export class InvoiceSendService {
                             business: org?.name ?? "",
                             firstName: firstName(row),
                             number: row.number ?? "",
-                            total: moneyWords(row.total, row.currency),
+                            // What is left to pay: a partly paid invoice's
+                            // reminder asks for the rest (DEC-173).
+                            total: moneyWordsMinor(
+                                leftToPayCents(row),
+                                row.currency,
+                            ),
                             dueOn: row.dueAt
                                 ? dayWords(row.dueAt, zone, { year: true })
                                 : null,

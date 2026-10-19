@@ -14,10 +14,21 @@ jest.mock("../invoices/order-invoicing", () => {
     };
 });
 
+// The ledger write is the db specs' (`invoice-other-writers.db.spec.ts`).
+jest.mock("../invoices/invoice-ledger", () => ({
+    lockInvoiceForLedgerOr404: jest
+        .fn()
+        .mockImplementation((_tx, organizationId, id) =>
+            Promise.resolve({ id, organizationId }),
+        ),
+    recordLedgerPaymentInTx: jest.fn().mockResolvedValue({}),
+}));
+
 import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 import { GST_RATE_MISSING } from "../invoices/gst-rate-required";
+import { recordLedgerPaymentInTx } from "../invoices/invoice-ledger";
 import {
     loadTaxProfile,
     writeDocumentLines,
@@ -194,6 +205,12 @@ describe("a desk payment for a booking, and the service's GST rate", () => {
             { invoiceId: "inv_out" },
         );
         expect(c.invoice.create).not.toHaveBeenCalled();
+        // Paid on its ledger (DEC-173), for what the desk took.
+        expect(recordLedgerPaymentInTx).toHaveBeenCalledWith(
+            c,
+            { id: "inv_out", organizationId: "org_1" },
+            expect.objectContaining({ amountCents: 150_000, method: "CASH" }),
+        );
     });
 
     it("is refused for the balance of a tax invoice's deposit, and not for a receipt's", async () => {

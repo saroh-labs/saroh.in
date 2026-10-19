@@ -753,18 +753,21 @@ describe("lists and what is owed", () => {
                 status: "ISSUED",
                 currency: "INR",
                 total: decimal("1200"),
+                paidCents: 0,
                 dueAt: new Date(0),
             },
             {
                 status: "ISSUED",
                 currency: "INR",
                 total: decimal("0.5"),
+                paidCents: 0,
                 dueAt: new Date(Date.now() + 86_400_000),
             },
             {
                 status: "ISSUED",
                 currency: "USD",
                 total: decimal("40"),
+                paidCents: 0,
                 dueAt: null,
             },
         ]);
@@ -777,6 +780,25 @@ describe("lists and what is owed", () => {
                 { currency: "INR", amount: "1200.50" },
                 { currency: "USD", amount: "40.00" },
             ],
+        });
+    });
+
+    it("counts a partly paid invoice at what is left to pay (DEC-173)", async () => {
+        db.invoice.findMany!.mockResolvedValue([
+            {
+                status: "ISSUED",
+                currency: "INR",
+                total: decimal("2500"),
+                paidCents: 100_000,
+                dueAt: null,
+            },
+        ]);
+        await expect(
+            service.owed(owner, { contactId: "c_1" }),
+        ).resolves.toEqual({
+            unpaidCount: 1,
+            overdueCount: 0,
+            totals: [{ currency: "INR", amount: "1500.00" }],
         });
     });
 

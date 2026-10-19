@@ -6,6 +6,8 @@ import { resolveContact } from "../customer-workspace/resolve-contact";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { isGstPriceMode } from "../invoices/gst-price";
+import type { OnlinePayment } from "../invoices/invoice-ledger";
+import { payIssuedDraftOnlineInTx } from "../invoices/invoice-ledger";
 import { buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -286,8 +288,9 @@ async function businessZone(tx: Tx, organizationId: string): Promise<string> {
  * invoice's row lock, after the intent's). The subscription is started from
  * the snapshot — the price, how often and the classes a month shown when the
  * customer started paying — with its first period holding today in the
- * business's timezone, and the invoice takes its number and is written PAID
- * as that period's invoice.
+ * business's timezone, and the invoice takes its number as that period's
+ * invoice and is issued, then paid through its ledger
+ * (`payIssuedDraftOnlineInTx`, DEC-173): one ONLINE payment for the intent.
  *
  * "gone" when it can't be joined any more: the draft is no longer a draft
  * (paid by another intent, or discarded), its snapshot or plan is missing,
@@ -303,11 +306,7 @@ export async function completePlanJoinInTx(
         invoiceId: string;
         organizationId: string;
         now: Date;
-        payment: {
-            paymentMethod: string;
-            paymentReference: string | null;
-            paymentNote: string;
-        };
+        payment: OnlinePayment;
         /**
          * The provider order it was paid on: when it is the draft's autopay
          * authorisation (D12), the mandate starts with the subscription.
@@ -381,18 +380,17 @@ export async function completePlanJoinInTx(
     await tx.invoice.update({
         where: { id: draft.id },
         data: {
-            status: "PAID",
+            status: "ISSUED",
             number,
             issuedAt: now,
             dueAt: now,
-            paidAt: now,
             contactId: member.id,
             subscriptionId: created.id,
             periodStart: period.start,
             periodEnd: period.end,
-            ...input.payment,
         },
     });
+    await payIssuedDraftOnlineInTx(tx, organizationId, draft.id, input.payment);
     // The line names the period, as every period's invoice does.
     await tx.invoiceLine.updateMany({
         where: { invoiceId: draft.id, organizationId },

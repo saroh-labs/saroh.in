@@ -16,10 +16,9 @@ import {
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
-import {
-    CAPTURED_NEEDS_REFUND,
-    ONLINE_PAYMENT_METHOD,
-} from "../invoices/invoice-state";
+import type { OnlinePayment } from "../invoices/invoice-ledger";
+import { recordOnlinePaymentInTx } from "../invoices/invoice-ledger";
+import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import {
     creditNoteForRefund,
     creditRestOfOrder,
@@ -1318,19 +1317,25 @@ export class WebhooksService {
      * Money arrived for an invoice's pay link (U13).
      *
      * Under the invoice's row lock — so a hand-recorded payment or a void
-     * racing this webhook is seen, not overwritten — an ISSUED invoice
-     * becomes PAID, recorded as paid online through the provider. An invoice
-     * that is already PAID (cash at the counter, a second tab) or VOID is
-     * left exactly as it is: the intent still SUCCEEDED, because the money
-     * was taken, and the capture is recorded as needing a refund, which the
-     * workspace surfaces on Home and on the invoice.
+     * racing this webhook is seen, not overwritten — the payment is written
+     * to the invoice's ledger (DEC-173, `recordOnlinePaymentInTx`): one
+     * ONLINE row for the intent's amount, linked by its intent, so a replay
+     * never doubles it. The invoice is PAID once that settles what was
+     * left, and stays ISSUED (partly paid) when it doesn't. An invoice that
+     * is already PAID (cash at the counter, a second tab), VOID, or has less
+     * left to pay than this payment brought (part paid by hand while the
+     * checkout was open) is left exactly as it is: the intent still
+     * SUCCEEDED, because the money was taken, and the capture is recorded
+     * as needing a refund, which the workspace surfaces on Home and on the
+     * invoice.
      *
      * An intent already SUCCEEDED means this payment was settled by an
      * earlier event (Razorpay sends `payment.captured` and `order.paid` for
      * one payment), so it is a no-op — never a second "needs a refund".
      *
-     * A pay-now hold's invoice (U19) arrives here as a DRAFT: the payment
-     * confirms its booking and numbers the invoice (`booking-hold.ts`).
+     * A pay-now hold's invoice (U19), a pack bought online (A11) and a plan
+     * joined online (G20) arrive here as a DRAFT: each is numbered, issued
+     * and paid through the same ledger write by its own module.
      */
     private async applyInvoiceSuccess(
         tx: Tx,
@@ -1361,12 +1366,14 @@ export class WebhooksService {
         });
 
         const providerRef = event.providerPaymentRef ?? null;
-        const payment = {
-            paymentMethod: ONLINE_PAYMENT_METHOD,
-            paymentReference: providerRef ?? intent.providerIntentId ?? null,
-            paymentNote: `Paid online through ${
+        const payment: OnlinePayment = {
+            paymentIntentId: intent.id,
+            amountCents: intent.amountCents,
+            reference: providerRef ?? intent.providerIntentId ?? null,
+            note: `Paid online through ${
                 PROVIDER_LABEL[intent.provider] ?? intent.provider
             }`,
+            receivedAt: new Date(),
         };
         // A pay-now hold's draft (U19): the booking is confirmed and the
         // invoice numbered and paid — unless its place went to someone else
@@ -1376,7 +1383,7 @@ export class WebhooksService {
                 ? await confirmHoldInTx(tx, {
                       invoiceId,
                       organizationId: intent.organizationId,
-                      now: new Date(),
+                      now: payment.receivedAt,
                       payment,
                   })
                 : null;
@@ -1389,7 +1396,7 @@ export class WebhooksService {
                 ? await completePackDraftInTx(tx, {
                       invoiceId,
                       organizationId: intent.organizationId,
-                      now: new Date(),
+                      now: payment.receivedAt,
                       payment,
                   })
                 : null;
@@ -1402,7 +1409,7 @@ export class WebhooksService {
                 ? await completePlanJoinInTx(tx, {
                       invoiceId,
                       organizationId: intent.organizationId,
-                      now: new Date(),
+                      now: payment.receivedAt,
                       payment,
                       // Autopay chosen at join starts with it (D12).
                       providerIntentId: intent.providerIntentId,
@@ -1420,17 +1427,24 @@ export class WebhooksService {
             invoice.bookingId
                 ? await isBookingCancelledInTx(tx, invoice.bookingId)
                 : false;
+        // An issued invoice: the payment goes on its ledger, unless it was
+        // paid, voided or part paid by hand past this payment meanwhile.
+        const recorded =
+            invoice?.status === "ISSUED" && !cancelledBooking
+                ? await recordOnlinePaymentInTx(
+                      tx,
+                      intent.organizationId,
+                      invoiceId,
+                      payment,
+                  )
+                : null;
         if (
-            (invoice?.status === "ISSUED" && !cancelledBooking) ||
+            recorded?.applied ||
             held === "confirmed" ||
             bought === "bought" ||
             joined === "joined"
         ) {
-            if (invoice?.status === "ISSUED") {
-                await tx.invoice.update({
-                    where: { id: invoiceId },
-                    data: { status: "PAID", paidAt: new Date(), ...payment },
-                });
+            if (recorded?.applied && !recorded.replayed) {
                 // Paid by autopay (D13): CHARGED on the subscription's log.
                 if (intent.viaMandateId) {
                     await recordChargeEventInTx(
@@ -1441,8 +1455,13 @@ export class WebhooksService {
                     );
                 }
                 // A booking's pay link (E4): the booking reads as paid
-                // online. The invoice's lock is held, then the booking's.
-                if (invoice.source === "BOOKING" && invoice.bookingId) {
+                // online once its invoice is paid in full. The invoice's
+                // lock is held, then the booking's.
+                if (
+                    recorded.paid &&
+                    invoice?.source === "BOOKING" &&
+                    invoice.bookingId
+                ) {
                     await markBookingPaidInTx(tx, invoice.bookingId);
                 }
             }
@@ -1469,7 +1488,9 @@ export class WebhooksService {
                     ? "PLAN_NOT_JOINED"
                     : cancelledBooking
                       ? "CANCELLED_BOOKING"
-                      : (invoice?.status ?? "MISSING");
+                      : recorded
+                        ? recorded.found
+                        : (invoice?.status ?? "MISSING");
         await tx.paymentAttempt.create({
             data: {
                 organizationId: intent.organizationId,

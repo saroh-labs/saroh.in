@@ -1,10 +1,10 @@
 import type { prisma, Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { toMinor } from "../../common/money";
 import {
     CAPTURED_NEEDS_REFUND,
     isPastDue,
+    leftToPayCents,
     OWED_WHERE,
 } from "../invoices/invoice-state";
 import type { ChargeUnderWay } from "../payments/charge-under-way";
@@ -216,6 +216,7 @@ export async function failedRenewals(
             status: true,
             subscriptionId: true,
             total: true,
+            paidCents: true,
             currency: true,
             issuedAt: true,
             dueAt: true,
@@ -280,7 +281,8 @@ export async function failedRenewals(
             title: inv.subscription.plan.name,
             subtitle: personName(inv.subscription.contact),
             at: inv.dueAt?.toISOString() ?? null,
-            amountMinor: showAmount ? toMinor(inv.total) : null,
+            // What is left to pay on it (DEC-173).
+            amountMinor: showAmount ? leftToPayCents(inv) : null,
             currency: showAmount ? inv.currency : null,
             href: `/billing/subscriptions/${subscriptionId}`,
             tag,
@@ -406,6 +408,7 @@ export async function overdueInvoices(
                 id: true,
                 number: true,
                 total: true,
+                paidCents: true,
                 currency: true,
                 dueAt: true,
                 billToName: true,
@@ -431,7 +434,8 @@ export async function overdueInvoices(
             title: inv.number ?? "Invoice",
             subtitle: billedTo(inv),
             at: inv.dueAt?.toISOString() ?? null,
-            amountMinor: toMinor(inv.total),
+            // What is left to pay on it (DEC-173).
+            amountMinor: leftToPayCents(inv),
             currency: inv.currency,
             href: `/billing/invoices/${inv.id}`,
             // Always set: the where asked for a due date before now.
@@ -484,6 +488,7 @@ export type RefundReason =
     | "VOID"
     | "PAID"
     | "AMOUNT_MISMATCH"
+    | "MORE_THAN_LEFT"
     | "UNKNOWN";
 
 const REFUND_REASONS: readonly RefundReason[] = [
@@ -492,6 +497,7 @@ const REFUND_REASONS: readonly RefundReason[] = [
     "VOID",
     "PAID",
     "AMOUNT_MISMATCH",
+    "MORE_THAN_LEFT",
 ];
 
 /**
@@ -521,6 +527,9 @@ export function refundReasonWords(reason: RefundReason): string {
         // PAY-06: the provider took an amount Saroh didn't ask for.
         case "AMOUNT_MISMATCH":
             return "Paid online at a different amount than asked";
+        // DEC-173: part was recorded by hand while the checkout was open.
+        case "MORE_THAN_LEFT":
+            return "Paid online for more than was left to pay";
         case "UNKNOWN":
             return "Paid online when it couldn't take the payment";
     }

@@ -73,6 +73,12 @@ jest.mock("../bookings/booking-hold", () => ({
 jest.mock("../class-packs/pack-checkout", () => ({
     completePackDraftInTx: jest.fn(),
 }));
+// The ledger write (DEC-173): its own rules are `invoice-payments.db.spec.ts`
+// and `invoice-other-writers.db.spec.ts`; here, what the webhook hands it
+// and what it does with the answer.
+jest.mock("../invoices/invoice-ledger", () => ({
+    recordOnlinePaymentInTx: jest.fn(),
+}));
 // A booking's pay link (E4): its own rules are `booking-pay-link.spec.ts`'s.
 jest.mock("../bookings/booking-pay-link", () => ({
     markBookingPaidInTx: jest.fn().mockResolvedValue(true),
@@ -88,6 +94,7 @@ import { createHmac } from "node:crypto";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
+import { recordOnlinePaymentInTx } from "../invoices/invoice-ledger";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 
 import { encryptSecret } from "../payments/crypto";
@@ -119,6 +126,7 @@ const orderUpdate = prisma.order.update as jest.Mock;
 const invoiceFindFirst = prisma.invoice.findFirst as jest.Mock;
 const invoiceUpdate = prisma.invoice.update as jest.Mock;
 const queryRaw = prisma.$queryRaw as unknown as jest.Mock;
+const recordOnline = recordOnlinePaymentInTx as jest.Mock;
 
 const SECRET = "whsec_test_secret";
 
@@ -188,10 +196,15 @@ beforeEach(() => {
     jest.clearAllMocks();
     providerFindUnique.mockResolvedValue(providerRow());
     whCreate.mockResolvedValue({ id: "wh_1" });
+    recordOnline.mockResolvedValue({
+        applied: true,
+        paid: true,
+        replayed: false,
+    });
 });
 
 describe("webhook success on an invoice intent", () => {
-    it("moves an ISSUED invoice to PAID under its row lock, recorded as paid online", async () => {
+    it("pays an ISSUED invoice on its ledger under its row lock, recorded as paid online", async () => {
         intentFindFirst.mockResolvedValue({ ...INTENT });
         invoiceFindFirst.mockResolvedValue({ status: "ISSUED" });
 
@@ -208,16 +221,21 @@ describe("webhook success on an invoice intent", () => {
             where: { id: "inv_1", organizationId: "org_1" },
             select: { status: true, source: true, bookingId: true },
         });
-        expect(invoiceUpdate).toHaveBeenCalledWith({
-            where: { id: "inv_1" },
-            data: {
-                status: "PAID",
-                paidAt: expect.any(Date),
-                paymentMethod: "ONLINE",
-                paymentReference: "pay_1",
-                paymentNote: "Paid online through Razorpay",
+        // One ONLINE payment on the ledger for the intent's amount (DEC-173),
+        // never a PAID written here.
+        expect(recordOnline).toHaveBeenCalledWith(
+            expect.anything(),
+            "org_1",
+            "inv_1",
+            {
+                paymentIntentId: "pi_inv_1",
+                amountCents: INTENT.amountCents,
+                reference: "pay_1",
+                note: "Paid online through Razorpay",
+                receivedAt: expect.any(Date),
             },
-        });
+        );
+        expect(invoiceUpdate).not.toHaveBeenCalled();
         expect(intentUpdate).toHaveBeenCalledWith({
             where: { id: "pi_inv_1" },
             data: { status: "SUCCEEDED" },
@@ -243,17 +261,13 @@ describe("webhook success on an invoice intent", () => {
 
         await deliver(bodyOf());
 
-        expect(invoiceUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({ status: "PAID" }),
-            }),
-        );
+        expect(recordOnline).toHaveBeenCalledTimes(1);
         expect(markBookingPaidInTx).toHaveBeenCalledWith(
             expect.anything(),
             "bk_1",
         );
         // The invoice first, then the booking (the lock order).
-        const [paidInvoice] = invoiceUpdate.mock.invocationCallOrder;
+        const [paidInvoice] = recordOnline.mock.invocationCallOrder;
         const [paidBooking] = (markBookingPaidInTx as jest.Mock).mock
             .invocationCallOrder;
         expect(paidInvoice).toBeLessThan(paidBooking ?? 0);
@@ -283,12 +297,65 @@ describe("webhook success on an invoice intent", () => {
             data: { status: "SUCCEEDED" },
         });
         expect(invoiceUpdate).not.toHaveBeenCalled();
+        expect(recordOnline).not.toHaveBeenCalled();
         expect(markBookingPaidInTx).not.toHaveBeenCalled();
         expect(attemptCreate).toHaveBeenCalledTimes(1);
         expect(attemptCreate).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 status: "CAPTURED_NEEDS_REFUND",
                 rawResponse: { invoiceStatus: "CANCELLED_BOOKING" },
+            }),
+        });
+    });
+
+    it("leaves a booking unpaid while its invoice is only part paid (DEC-173)", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({
+            status: "ISSUED",
+            source: "BOOKING",
+            bookingId: "bk_1",
+        });
+        recordOnline.mockResolvedValue({
+            applied: true,
+            paid: false,
+            replayed: false,
+        });
+        const result = await deliver(bodyOf());
+        expect(result).toEqual({ status: "processed", changed: true });
+        expect(markBookingPaidInTx).not.toHaveBeenCalled();
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({ status: "CAPTURED" }),
+        });
+    });
+
+    it("owes back a payment for more than was left, part paid by hand while the checkout was open (DEC-173)", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({ status: "ISSUED" });
+        recordOnline.mockResolvedValue({
+            applied: false,
+            found: "MORE_THAN_LEFT",
+        });
+        const result = await deliver(bodyOf());
+        expect(result).toEqual({ status: "processed", changed: true });
+        expect(invoiceUpdate).not.toHaveBeenCalled();
+        expect(attemptCreate).toHaveBeenCalledTimes(1);
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                status: "CAPTURED_NEEDS_REFUND",
+                rawResponse: { invoiceStatus: "MORE_THAN_LEFT" },
+            }),
+        });
+    });
+
+    it("owes back a payment the ledger found already paid by hand (no second payment)", async () => {
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        invoiceFindFirst.mockResolvedValue({ status: "ISSUED" });
+        recordOnline.mockResolvedValue({ applied: false, found: "PAID" });
+        await deliver(bodyOf());
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                status: "CAPTURED_NEEDS_REFUND",
+                rawResponse: { invoiceStatus: "PAID" },
             }),
         });
     });
@@ -395,7 +462,7 @@ describe("webhook success on an invoice intent", () => {
             },
             orderBy: { createdAt: "desc" },
         });
-        expect(invoiceUpdate).toHaveBeenCalled();
+        expect(recordOnline).toHaveBeenCalled();
     });
 });
 
@@ -572,9 +639,11 @@ describe("webhook success on a pay-now hold's invoice (U19)", () => {
             organizationId: "org_1",
             now: expect.any(Date),
             payment: {
-                paymentMethod: "ONLINE",
-                paymentReference: "pay_1",
-                paymentNote: "Paid online through Razorpay",
+                paymentIntentId: "pi_inv_1",
+                amountCents: 120000,
+                reference: "pay_1",
+                note: "Paid online through Razorpay",
+                receivedAt: expect.any(Date),
             },
         });
         // The hold numbers and pays its own invoice; the webhook does not.
@@ -658,9 +727,11 @@ describe("webhook success on an online pack's draft (A11)", () => {
             organizationId: "org_1",
             now: expect.any(Date),
             payment: {
-                paymentMethod: "ONLINE",
-                paymentReference: "pay_1",
-                paymentNote: "Paid online through Razorpay",
+                paymentIntentId: "pi_inv_1",
+                amountCents: 120000,
+                reference: "pay_1",
+                note: "Paid online through Razorpay",
+                receivedAt: expect.any(Date),
             },
         });
         expect(confirmHold).not.toHaveBeenCalled();

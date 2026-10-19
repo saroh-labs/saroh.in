@@ -93,6 +93,7 @@ function row(over: Record<string, unknown> = {}) {
         billToName: "Asha Rao",
         currency: "INR",
         total: decimal("2400"),
+        paidCents: 0,
         dueAt: null,
         contact: { firstName: "Asha", lastName: "Rao" },
         ...over,
@@ -351,6 +352,23 @@ describe("the invoice PDF goes with the email (DEC-083)", () => {
             });
         },
     );
+});
+
+describe("a partly paid invoice's reminder (DEC-173)", () => {
+    it("asks for what is left to pay, not the whole total", async () => {
+        db.invoice!.findFirst!.mockResolvedValue(row({ paidCents: 100_000 }));
+        comms.queueTransactional.mockResolvedValue({
+            id: "m_1",
+            status: "QUEUED",
+            toAddress: "asha@example.com",
+        });
+        db.organization!.findUnique!.mockResolvedValue({ name: "Rye & Co." });
+        await service().remind(owner, "inv_1");
+        expect(comms.queueTransactional.mock.calls[0][2]).toMatchObject({
+            template: "INVOICE_REMINDER",
+            vars: { total: "₹1,400" },
+        });
+    });
 });
 
 describe("the link on the business's own address (DEC-069, L7)", () => {

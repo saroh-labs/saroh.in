@@ -39,6 +39,12 @@ const holding = (actions: OrgAction[]): HomeInput => ({
 });
 
 type Sum = { currency: string; total: string; count: number };
+type Bill = {
+    currency: string;
+    total: string;
+    paidCents: number;
+    dueAt: Date | null;
+};
 const grouped = (rows: Sum[]) =>
     rows.map((r) => ({
         currency: r.currency,
@@ -258,8 +264,8 @@ function db(
         refunded?: Sum[][];
         bookings?: number[];
         orders?: number;
-        owed?: Sum[];
-        overdue?: number;
+        /** The unpaid bills, each read with what is paid on it (DEC-173). */
+        owed?: Bill[];
         billed?: boolean;
     } = {},
 ) {
@@ -272,12 +278,9 @@ function db(
                 if (args.where.kind === "CREDIT_NOTE") {
                     return Promise.resolve(grouped(refunded.shift() ?? []));
                 }
-                if ((args.where as { status?: unknown }).status === "ISSUED") {
-                    return Promise.resolve(grouped(over.owed ?? []));
-                }
                 return Promise.resolve(grouped(paid.shift() ?? []));
             }),
-            count: jest.fn().mockResolvedValue(over.overdue ?? 0),
+            findMany: jest.fn().mockResolvedValue(over.owed ?? []),
             findFirst: jest
                 .fn()
                 .mockResolvedValue(over.billed ? { id: "inv_1" } : null),
@@ -308,8 +311,21 @@ describe("readWeek", () => {
             refunded: [[], []],
             bookings: [14, 11],
             orders: 23,
-            owed: [{ currency: "INR", total: "6400", count: 3 }],
-            overdue: 1,
+            owed: [
+                { currency: "INR", total: "3000", paidCents: 0, dueAt: null },
+                {
+                    currency: "INR",
+                    total: "2000",
+                    paidCents: 0,
+                    dueAt: new Date(NOW.getTime() - 86_400_000),
+                },
+                {
+                    currency: "INR",
+                    total: "1400",
+                    paidCents: 0,
+                    dueAt: new Date(NOW.getTime() + 86_400_000),
+                },
+            ],
             billed: true,
         });
         const week = await readWeek(client as never, "org_1", EVERY, clock);
@@ -407,6 +423,31 @@ describe("readWeek", () => {
         expect(week).not.toHaveProperty("owed");
     });
 
+    it("owes what is left to pay on a partly paid bill, not its total (DEC-173)", async () => {
+        const week = await readWeek(
+            db({
+                billed: true,
+                owed: [
+                    {
+                        currency: "INR",
+                        total: "2500",
+                        paidCents: 100_000,
+                        dueAt: null,
+                    },
+                ],
+            }) as never,
+            "org_1",
+            EVERY,
+            clock,
+        );
+        expect(week.owed).toEqual({
+            totals: [{ currency: "INR", amountMinor: 150_000 }],
+            bills: 1,
+            overdue: 0,
+            href: "/billing/invoices?view=issued",
+        });
+    });
+
     it("links owed to the issued bills when none is overdue", async () => {
         const week = await readWeek(
             db({ billed: true }) as never,
@@ -431,7 +472,7 @@ describe("readWeek", () => {
             clock,
         );
         expect(client.invoice.groupBy).not.toHaveBeenCalled();
-        expect(client.invoice.count).not.toHaveBeenCalled();
+        expect(client.invoice.findMany).not.toHaveBeenCalled();
         expect(client.invoice.findFirst).not.toHaveBeenCalled();
         expect(week).not.toHaveProperty("takings");
         expect(week).not.toHaveProperty("owed");

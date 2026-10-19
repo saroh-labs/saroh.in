@@ -2170,6 +2170,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Rules: added when built.
 
 - **Receipts are automatic (owner, 20 Oct 2026).** Recording a payment is an event: it is noted on the invoice's history and the receipt email goes to the customer through the business's own email provider, with no tick box. It waits for the Undo window, so a payment removed by Undo sends nothing. Without a provider nothing is sent and the owner can share the receipt on WhatsApp.
+- Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); `docs/patterns/backend-billing-and-classes.md` → "Payments on an invoice are a ledger" (the write path, refusals, remove, cheques, events, U2 #1114), "Every other path that pays an invoice writes the ledger" and "Owed is what is left to pay" (U3 #1115), and "Paying an invoice from a link" (the amount is what is left, U3); the rest added as each unit is built.
 - Rules: `docs/patterns/backend-data-and-money.md` → Money (the ledger in integer paise, U1 #1113); `docs/patterns/backend-billing-and-classes.md` → "Payments on an invoice are a ledger" (the write path, refusals, remove, cheques, events, U2 #1114); the rest added as each unit is built.
 
 ## DEC-174 Automatic notices: customers hear about their bookings, orders, memberships, refunds and packs by the business's own email; staff hear about their own bookings

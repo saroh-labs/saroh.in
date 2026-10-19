@@ -331,6 +331,15 @@ describe("owed", () => {
         expect(s.overdueCount).toBe(1);
     });
 
+    it("counts a partly paid invoice at what is left to pay (DEC-173)", () => {
+        const s = owedSummary([
+            inv({ total: "2500.00", leftToPay: "1500.00" }),
+            inv({ standing: "OVERDUE", total: "1000.00", leftToPay: "400.00" }),
+        ]);
+        expect(s.owed).toEqual([{ currency: "INR", cents: 190000 }]);
+        expect(s.overdue).toEqual([{ currency: "INR", cents: 40000 }]);
+    });
+
     it("never counts a credit note or an order's paper as owed", () => {
         expect(isOwed(inv({ kind: "CREDIT_NOTE" }))).toBe(false);
         expect(

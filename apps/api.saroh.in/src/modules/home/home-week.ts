@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
 import {
+    leftToPayCents,
     NOT_A_BOOKING_HOLD,
     OWED_WHERE,
     refundedBetweenWhere,
@@ -275,15 +276,19 @@ export async function readOwed(
         ...OWED_WHERE,
         status: "ISSUED",
     } satisfies Prisma.InvoiceWhereInput;
-    const [sums, overdue, ever] = await Promise.all([
-        db.invoice.groupBy({
-            by: ["currency"],
+    // What is left to pay on each bill (DEC-173), folded through
+    // `leftToPayCents`, the one place it is worked out, as Insights'
+    // owed-by-age does.
+    const [bills, ever] = await Promise.all([
+        db.invoice.findMany({
             where: unpaid,
-            _sum: { total: true },
-            _count: { _all: true },
-            orderBy: { currency: "asc" },
+            select: {
+                currency: true,
+                total: true,
+                paidCents: true,
+                dueAt: true,
+            },
         }),
-        db.invoice.count({ where: { ...unpaid, dueAt: { lt: now } } }),
         // A business that has never billed anyone outside an order has
         // nothing to be owed: no "₹0" row for a shop.
         db.invoice.findFirst({
@@ -292,12 +297,20 @@ export async function readOwed(
         }),
     ]);
     if (!ever) return null;
+    const byCurrency = new Map<string, number>();
+    let overdue = 0;
+    for (const bill of bills) {
+        byCurrency.set(
+            bill.currency,
+            (byCurrency.get(bill.currency) ?? 0) + leftToPayCents(bill),
+        );
+        if (bill.dueAt !== null && bill.dueAt < now) overdue += 1;
+    }
     return {
-        totals: sums.map((row) => ({
-            currency: row.currency,
-            amountMinor: toMinor(row._sum.total ?? 0),
-        })),
-        bills: sums.reduce((n, row) => n + row._count._all, 0),
+        totals: [...byCurrency.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([currency, amountMinor]) => ({ currency, amountMinor })),
+        bills: bills.length,
         overdue,
         href: overdue > 0 ? WEEK_PATHS.OVERDUE : WEEK_PATHS.OWED,
     };

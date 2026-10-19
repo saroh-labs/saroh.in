@@ -60,7 +60,7 @@ requireProvider: false })`), the email says "view it and download a copy",
   doesn't take payment online." Automatic invoicing (renewals, packs,
   courses, subscribe) still stops with Payments off (`payments-on.ts`).
 
-## Payments on an invoice are a ledger — **Current** (DEC-173, #1113, #1114)
+## Payments on an invoice are a ledger — **Current** (DEC-173, #1113, #1114, #1115)
 
 - **One row per payment** (`InvoicePayment`, integer paise): cash, UPI, a
   bank transfer, a card, other, a cheque, or ONLINE (the webhook's alone).
@@ -94,6 +94,23 @@ requireProvider: false })`), the email says "view it and download a copy",
   ids, amounts and the method only. The automatic receipt (owner, 20 Oct)
   hangs from `paymentRecordedInTx`: a delayed job past the Undo window
   (`RECEIPT_HOLD_MS`), added with its handler by U5 (#1117).
+- **Every other path that pays an invoice writes the ledger** (U3, #1115),
+  in its own transaction: the webhook, a mandate charge found by a look-up
+  (`settleCapturedChargeInTx`) and a pay-now hold, a pack or a plan bought
+  online (numbered, issued, then `payIssuedDraftOnlineInTx`) all go through
+  `recordOnlinePaymentInTx`; the desk (`booking-desk-pay.ts`) issues its
+  paper and records its one payment with `recordLedgerPaymentInTx`. An
+  order's paper is stamped paid by `stampOrderPaperPaidInTx` or
+  `order-invoicing.ts`, with no row. `invoice-ledger.guard.spec.ts` reads the
+  sources and fails a write anywhere else that sets an invoice PAID or
+  writes `paidCents`.
+- **Owed is what is left to pay** everywhere money is owed:
+  `leftToPayCents` (`invoice-state.ts`) is the one place it is worked out,
+  and every owed figure folds its bills through it (Home's week and how
+  late, the overdue and failed-renewal rows, awaiting payment, a customer's
+  Owed, `GET /owed`, a subscription's unpaid total, the calendar's due
+  amounts, the reminder email and thread message). Takings and spent are
+  unchanged: they count paid invoices.
 - **A partly paid invoice isn't voided or credited** until its payments
   are removed (409); the void is fenced on `paidCents = 0` and the credit
   checks again under the ledger lock.
@@ -1071,19 +1088,28 @@ options, items, more }` and a sentence with the count, the first
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, currency, status, billed-to name, `payOnline`, and on an owed
+  tax, total, `paidSoFar` and `leftToPay` (DEC-173), currency, status,
+  billed-to name, `payOnline`, and on an owed
   view-only invoice `payInstructions`, R32) served
   server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
   rate-limited per link. With `payOnline` false (DEC-070) the page shows the
   invoice with no Pay button, only "Print or save as PDF", and starting a payment or autopay
   is a 409 (`assertPaysOnline`). An older API without the field means "as
   before": show Pay.
-- **The amount is the stored invoice's.** A payment request carries only a
-  provider and an idempotency key; anything else is ignored.
+- **The amount is what is left to pay** (DEC-173, #1115): the stored total
+  less the ledger's `paidCents`, worked out by the API
+  (`createIntentForInvoicePublic`), so a partly paid invoice is charged its
+  balance and still has a working link. A payment request carries only a
+  provider and an idempotency key; anything else is ignored. An autopay
+  charge and autopay's first payment charge what is left too.
 - **`PaymentIntent` pays an Order or an Invoice** — exactly one (a CHECK in the
   migration). Webhooks find the intent by provider id or by the invoice id
-  echoed back as the merchant reference. Success on an ISSUED invoice marks it
-  PAID (`ONLINE`) under its row lock; success on one already PAID or VOID is
+  echoed back as the merchant reference. Success on an ISSUED invoice writes
+  one `ONLINE` payment on its ledger for the intent's amount
+  (`recordOnlinePaymentInTx`, linked by `paymentIntentId`, unique, so a
+  replay never doubles it): PAID when that settles it, partly paid when not.
+  Success on one already PAID or VOID, or for more than is left (part was
+  paid by hand while the checkout was open: `MORE_THAN_LEFT`), is
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
 

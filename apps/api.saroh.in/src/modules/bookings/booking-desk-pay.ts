@@ -8,6 +8,10 @@ import type { Prisma } from "@saroh/database";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { assertRatesSet } from "../invoices/gst-rate-required";
+import {
+    lockInvoiceForLedgerOr404,
+    recordLedgerPaymentInTx,
+} from "../invoices/invoice-ledger";
 import { buildCorrection, buildManualInvoice } from "../invoices/order-invoice";
 import {
     documentColumns,
@@ -62,6 +66,12 @@ export interface DeskPayment {
     replayed: boolean;
 }
 
+/** The note on a payment taken at the desk, as the invoice shows it. */
+const DESK_NOTE = "Taken at the desk";
+
+/** Who took it, when no person is named: the audit row's actor. */
+const DESK_ACTOR = "system:desk-take";
+
 /**
  * How long a take asked again reads as the same one: a double click, or a
  * retry after a lost answer — not a second payment an hour later.
@@ -76,6 +86,7 @@ const PAPER_SELECT = {
     status: true,
     paymentMethod: true,
     total: true,
+    paidCents: true,
     currency: true,
     paidAt: true,
     createdByUserId: true,
@@ -207,12 +218,6 @@ export async function takeDeskPaymentInTx(
     }
 
     const currency = bookedIn ?? booking.service.currency ?? "INR";
-    const paid = {
-        status: "PAID",
-        paidAt: now,
-        paymentMethod: input.method,
-        paymentNote: "Taken at the desk",
-    } as const;
     let written: { id: string; number: string | null; currency: string };
 
     // Someone is at the desk, so a tax invoice written here never goes
@@ -237,7 +242,7 @@ export async function takeDeskPaymentInTx(
         // link stops working with it.
         const { count } = await tx.invoice.updateMany({
             where: { id: issued.id, organizationId, status: "ISSUED" },
-            data: { ...paid, payTokenHash: null, payLinkCreatedAt: null },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
         });
         if (count === 0) {
             throw new ConflictException("This invoice changed. Reload it.");
@@ -260,7 +265,6 @@ export async function takeDeskPaymentInTx(
             code: booking.service.sacCode,
             priceMode: bookedPriceMode(booking.snapshot),
             actorUserId: input.actorUserId,
-            payment: paid,
             now,
         });
     } else {
@@ -308,7 +312,7 @@ export async function takeDeskPaymentInTx(
                 ...documentColumns(doc),
                 issuedAt: now,
                 dueAt: now,
-                ...paid,
+                status: "ISSUED",
                 createdByUserId: input.actorUserId,
             },
             select: { id: true, number: true },
@@ -316,6 +320,20 @@ export async function takeDeskPaymentInTx(
         await writeDocumentLines(tx, organizationId, created.id, doc);
         written = { ...created, currency };
     }
+    // The money on the invoice's ledger (DEC-173): one payment for what
+    // was taken, which settles it PAID, with how it was paid.
+    const invoice = await lockInvoiceForLedgerOr404(
+        tx,
+        organizationId,
+        written.id,
+    );
+    await recordLedgerPaymentInTx(tx, invoice, {
+        amountCents: take.cents,
+        method: input.method,
+        note: DESK_NOTE,
+        receivedAt: now,
+        actor: { userId: input.actorUserId, systemActor: DESK_ACTOR },
+    });
 
     // Nobody had said how it is paid: it was paid at the desk.
     if (booking.paidWith === null) {
@@ -375,7 +393,8 @@ function sameTake(
  * The rest after a deposit (DEC-023): a supplementary invoice against the
  * deposit's for exactly what is left, on the deposit's paper — a receipt
  * stays a receipt, a tax invoice keeps its place of supply — numbered in
- * its own series, and written PAID with how the desk took it.
+ * its own series, and issued; the caller pays it on its ledger with how
+ * the desk took it.
  */
 async function balanceInvoice(
     tx: Tx,
@@ -389,12 +408,6 @@ async function balanceInvoice(
         code: string | null;
         priceMode: GstPriceMode | null;
         actorUserId: string | null;
-        payment: {
-            status: "PAID";
-            paidAt: Date;
-            paymentMethod: string;
-            paymentNote: string;
-        };
         now: Date;
     },
 ): Promise<{ id: string; number: string; currency: string }> {
@@ -435,7 +448,7 @@ async function balanceInvoice(
             ...documentColumns(doc),
             issuedAt: input.now,
             dueAt: null,
-            ...input.payment,
+            status: "ISSUED",
             createdByUserId: input.actorUserId,
         },
         select: { id: true },
