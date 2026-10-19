@@ -105,9 +105,9 @@ function draw(props: { canWrite?: boolean; past?: boolean }, b = booking()) {
 }
 
 describe("a booking still to come", () => {
-    it("offers Move and Cancel to someone with booking:write", () => {
+    it("offers Move, and Cancel under More, to someone with booking:write", () => {
         draw({ canWrite: true });
-        expect(buttons()).toEqual(expect.arrayContaining(["Move", "Cancel"]));
+        expect(buttons()).toEqual(expect.arrayContaining(["Move", "More"]));
         expect(host.textContent).not.toContain(NOTE);
     });
 
@@ -140,7 +140,7 @@ describe("a booking that has happened", () => {
         draw({ canWrite: false, past: true });
         expect(buttons()).not.toContain("Came");
         expect(buttons()).not.toContain("Didn't come");
-        expect(host.textContent).toContain("Not marked yet.");
+        expect(host.textContent).toContain("Not marked yet");
         expect(host.textContent).toContain(NOTE);
     });
 });

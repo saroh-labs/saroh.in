@@ -16,6 +16,7 @@ import type { BookingMoney } from "@/lib/services/booking-money";
 import type { BookingDetail } from "@/lib/services/service";
 
 import { BookingDetailView } from "./booking-detail";
+import { FRONT_DESK_LINE } from "./calendar/quick-look-one";
 import { TakePayment } from "./take-payment";
 
 const takeDeskPayment = vi.fn();
@@ -321,7 +322,12 @@ function renderDetail(
 ) {
     act(() => {
         root.render(
-            <BookingDetailView booking={booking} past={false} desk={desk} />,
+            <BookingDetailView
+                booking={booking}
+                past={false}
+                desk={desk}
+                canWrite
+            />,
         );
     });
 }
@@ -335,7 +341,7 @@ describe("the booking page's Take ₹X", () => {
     it("shows for a pay-at-the-desk booking, to someone who may take it", () => {
         renderDetail(detail({}), { canTake: true, canLink: true });
         expect(takeButton()?.textContent).toBe("Take ₹500");
-        expect(host.textContent).toContain("₹500 due at the visit");
+        expect(host.textContent).toContain("₹500 to take at the visit");
     });
 
     it("takes only the balance after a deposit", () => {
@@ -350,9 +356,8 @@ describe("the booking page's Take ₹X", () => {
             { canTake: true, canLink: true },
         );
         expect(takeButton()?.textContent).toBe("Take ₹400");
-        expect(host.textContent).toContain(
-            "Deposit ₹400 paid · ₹400 due at the visit",
-        );
+        expect(host.textContent).toContain("₹400 paid online");
+        expect(host.textContent).toContain("₹400 to take at the visit");
     });
 
     it("is shown disabled, with why, to a role that can't take it (FB-1, DEC-098)", () => {
@@ -361,9 +366,8 @@ describe("the booking page's Take ₹X", () => {
         expect(locked?.textContent).toBe("Take ₹500");
         expect(locked?.disabled).toBe(true);
         const why = locked?.getAttribute("aria-describedby") ?? "";
-        expect(document.getElementById(why)?.textContent).toBe(
-            "Your role can't take payments. An owner or admin can change this in Settings › Team.",
-        );
+        // Said once, in the page: the front desk's line (U12).
+        expect(document.getElementById(why)?.textContent).toBe(FRONT_DESK_LINE);
         // No desk at all (an older page): nothing to say.
         renderDetail(detail({}));
         expect(takeButton()).toBeUndefined();

@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/ app:/commerce/orders app:/commerce/customers/new app:/bookings app:/bookings/all app:/services app:/customers app:/analytics app:/settings/billing app:/settings/profile api:organizations api:orders api:bookings api:contacts api:customer-workspace api:capabilities
+// @covers accounts:/login app:/open app:/ app:/commerce/orders app:/commerce/customers/new app:/bookings app:/bookings/all app:/bookings/[bookingId] app:/services app:/customers app:/analytics app:/settings/billing app:/settings/profile api:organizations api:orders api:bookings api:contacts api:customer-workspace api:capabilities
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -264,7 +264,7 @@ test.describe("a Member", () => {
         }
     });
 
-    test("reads a booking, with no way to move or cancel it", async ({
+    test("works a booking's page as the front desk: Move and Cancel, Take locked (U12)", async ({
         page,
         browser,
     }, testInfo) => {
@@ -279,24 +279,31 @@ test.describe("a Member", () => {
         try {
             await openNorthwindAs(page, "northwindMember");
             await page.goto(`/bookings/${booked.id}`);
-            // "Booked by Diary Reads …", or "Booked for … by" whoever made it.
+            // Who is in the Customer card; the heading is when.
             await expect(
-                page.getByText(/^Booked (by|for) Diary Reads /),
+                page
+                    .getByText(`Diary Reads ${tag}`, { exact: true })
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible();
+            // The front desk moves and cancels (DEC-170): no read-only note.
             await expect(
-                page.getByRole("note").filter({
-                    hasText:
-                        "Your role can read this booking but not change it.",
-                }),
-            ).toContainText(WHO_CAN_CHANGE);
+                page.getByText(/^Your role can read this booking/),
+            ).toHaveCount(0);
             await expect(
                 page.getByRole("button", { name: "Move", exact: true }),
-            ).toHaveCount(0);
+            ).toBeVisible();
+            await page
+                .getByRole("button", { name: "More", exact: true })
+                .filter({ visible: true })
+                .first()
+                .click();
             await expect(
-                page.getByRole("button", { name: "Cancel", exact: true }),
-            ).toHaveCount(0);
-            // Money to take is shown to whoever is at the desk, and is off
-            // for a role that can't take it (DEC-098): never a live button.
+                page.getByRole("button", { name: "Cancel booking" }),
+            ).toBeVisible();
+            await page.keyboard.press("Escape");
+            // Money to take is shown, and is off for a role that can't take
+            // it (DEC-098), saying why once: never a live button.
             await expect(
                 page
                     .getByRole("button", { name: /^Take / })

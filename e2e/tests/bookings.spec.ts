@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/bookings app:/bookings/all app:/bookings/availability app:/services app:/services/new app:/customers app:/contacts api:bookings api:staff api:customer-workspace api:contacts
+// @covers accounts:/login app:/open app:/bookings app:/bookings/all app:/bookings/[bookingId] app:/bookings/availability app:/services app:/services/new app:/customers app:/contacts api:bookings api:staff api:customer-workspace api:contacts
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -1337,6 +1337,108 @@ test.describe("All bookings (U11)", () => {
                     },
                 },
             );
+            await northwind(owner).delete(`/contacts/${who.id}`);
+        }
+    });
+});
+
+test.describe("a booking's page (U12)", () => {
+    test("the day and time as the heading, Take, Move and More, nothing sideways", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const owner = page.request;
+        const stamp = ownStamp(test.info());
+        const who = await makeContact(owner, {
+            firstName: "Bkpage",
+            lastName: stamp,
+            email: `bkpage.${stamp}@example.com`,
+        });
+        const booked = await bookOwn(owner, who.id, 2);
+        try {
+            await page.goto(`/bookings/${booked.id}`);
+            // The heading is when; who is in the Customer card.
+            await expect(page.getByRole("heading", { level: 1 })).toContainText(
+                /\d{1,2}:\d{2} (am|pm)/,
+            );
+            await expect(
+                page.getByRole("heading", { name: "Customer" }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole("heading", { name: "What happened" }),
+            ).toBeVisible();
+            await expect(
+                page.getByRole("button", { name: "Move", exact: true }),
+            ).toBeVisible();
+            // More holds Cancel, last.
+            await page
+                .getByRole("button", { name: "More", exact: true })
+                .filter({ visible: true })
+                .first()
+                .click();
+            const cancel = page.getByRole("button", {
+                name: "Cancel booking",
+            });
+            await expect(cancel).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(cancel).toBeHidden();
+            // Take payment opens as a sheet, read only: nothing is taken.
+            const take = page
+                .getByRole("button", { name: /^Take ₹/ })
+                .filter({ visible: true });
+            if ((await take.count()) > 0 && (await take.first().isEnabled())) {
+                await take.first().click();
+                const sheet = page.getByRole("dialog", { name: /^Take ₹/ });
+                await expect(
+                    sheet.getByText("How are they paying?"),
+                ).toBeVisible();
+                await page.keyboard.press("Escape");
+                await expect(sheet).toBeHidden();
+            }
+            await expectNothingHiddenSideways(page);
+        } finally {
+            await northwind(owner).delete(`/services/bookings/${booked.id}`);
+            await northwind(owner).delete(`/contacts/${who.id}`);
+        }
+    });
+
+    test("Move from the page picks a free time and moves it, with Undo on the toast", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${NORTHWIND}`);
+        const owner = page.request;
+        const stamp = ownStamp(test.info());
+        const who = await makeContact(owner, {
+            firstName: "Bkmove",
+            lastName: stamp,
+            email: `bkmove.${stamp}@example.com`,
+        });
+        const booked = await bookOwn(owner, who.id, 2);
+        try {
+            await page.goto(`/bookings/${booked.id}`);
+            await page
+                .getByRole("button", { name: "Move", exact: true })
+                .click();
+            const sheet = page.getByRole("dialog", {
+                name: /^Move .+'s booking$/,
+            });
+            await expect(sheet).toBeVisible();
+            const next = sheet.getByRole("button", { name: /^Next free day/ });
+            if (await next.isVisible().catch(() => false)) await next.click();
+            await sheet
+                .getByRole("radio", { name: /^\d{1,2}:\d{2} (am|pm)/ })
+                .first()
+                .click();
+            await sheet.getByRole("button", { name: /^Move to / }).click();
+            await expect(page.getByText(/^Moved .+ to /)).toBeVisible();
+            const after = await northwind(owner).get<{ startAt: string }>(
+                `/services/bookings/${booked.id}`,
+            );
+            expect(after.startAt).not.toBe(booked.startAt);
+        } finally {
+            await northwind(owner).delete(`/services/bookings/${booked.id}`);
             await northwind(owner).delete(`/contacts/${who.id}`);
         }
     });

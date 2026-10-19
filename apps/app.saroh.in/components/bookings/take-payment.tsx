@@ -1,6 +1,11 @@
 "use client";
 
 import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
+import {
+    FormSheet,
+    FormSheetBody,
+    FormSheetFoot,
+} from "@/components/shared/form-sheet";
 import { Refusal } from "@/components/shared/refusal";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -33,7 +38,9 @@ import {
 } from "@/lib/services/desk-pay";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
+import { Segmented } from "@saroh/ui/segmented";
 import { Tip } from "@saroh/ui/tooltip";
+import { Link2 } from "lucide-react";
 
 /**
  * "Take ₹X" at the desk for a booking (round-2 P2): the walk-in's ways to
@@ -45,6 +52,12 @@ import { Tip } from "@saroh/ui/tooltip";
  *
  * No Undo on the toast: what was taken is an issued invoice, which never
  * changes (DEC-023) — a mistake is corrected on the invoice.
+ *
+ * `panel` (a booking's page, U12; BKMBookingDetail, BKDBooking): a bottom
+ * sheet on a phone and the right-hand panel at a desk, with "How are
+ * they paying?" as Cash · UPI · Card and "Send a payment link instead"
+ * under them. Left out, the dialog with the four as chips (the calendar's
+ * quick look and All bookings).
  */
 export function TakePayment({
     bookingId,
@@ -58,6 +71,7 @@ export function TakePayment({
     onTaken,
     open: openProp,
     onOpenChange,
+    panel = false,
 }: {
     bookingId: string;
     take: DeskTake;
@@ -82,6 +96,8 @@ export function TakePayment({
      */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    /** A sheet with Cash · UPI · Card, not the dialog (U12). */
+    panel?: boolean;
 }) {
     const router = useRouter();
     const ids = { given: useId(), how: useId(), error: useId() };
@@ -171,6 +187,168 @@ export function TakePayment({
         }
     }
 
+    const title = `Take ${amount}`;
+    const description = take.byLink
+        ? `What ${who} pays for this booking.`
+        : `What's left after the deposit ${who} paid online.`;
+    const pick = (next: DeskChoice) => {
+        setChoice(next);
+        setError(null);
+    };
+    const counter = choices.filter((c) => c.key !== "LINK");
+    const linkChoice = choices.find((c) => c.key === "LINK");
+
+    const how = panel ? (
+        <>
+            <div id={ids.how} className="label">
+                How are they paying?
+            </div>
+            <Segmented
+                label="How are they paying?"
+                aria-labelledby={ids.how}
+                block
+                size="md"
+                value={choice}
+                onValueChange={(v) => pick(v)}
+                options={counter.map((c) => ({
+                    value: c.key,
+                    label: c.label,
+                }))}
+            />
+        </>
+    ) : (
+        <>
+            <div id={ids.how} className="text-[12.5px] font-medium">
+                How they pay
+            </div>
+            <div
+                role="radiogroup"
+                aria-labelledby={ids.how}
+                className="flex flex-wrap gap-1.5"
+            >
+                {choices.map((c) => (
+                    <Tip key={c.key} label={c.off ?? undefined}>
+                        <Chip
+                            on={choice === c.key}
+                            disabled={c.off !== null}
+                            onClick={() => pick(c.key)}
+                            className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
+                        >
+                            {c.label}
+                        </Chip>
+                    </Tip>
+                ))}
+            </div>
+        </>
+    );
+
+    const fields = (
+        <div className="grid gap-2.5">
+            {how}
+            {choice === "CASH" ? (
+                <div className="flex flex-wrap items-end gap-2.5">
+                    <Field label="Cash given" className="flex-[1_1_140px]">
+                        {currency ? (
+                            <MoneyInput
+                                currency={currency}
+                                value={given}
+                                onValueChange={(next) => {
+                                    setGiven(next);
+                                    setError(null);
+                                }}
+                                placeholder={amount}
+                                aria-invalid={problem ? true : undefined}
+                                aria-describedby={
+                                    problem ? ids.error : undefined
+                                }
+                                className="bg-card"
+                            />
+                        ) : (
+                            <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={given}
+                                onChange={(e) => {
+                                    setGiven(e.target.value);
+                                    setError(null);
+                                }}
+                                placeholder={amount}
+                                autoComplete="off"
+                                aria-invalid={problem ? true : undefined}
+                                aria-describedby={
+                                    problem ? ids.error : undefined
+                                }
+                                className="bg-card"
+                            />
+                        )}
+                    </Field>
+                    <div
+                        aria-live="polite"
+                        className={cn(
+                            "flex-[1_1_140px] pb-[9px] text-[13px] font-semibold",
+                            change.kind === "short"
+                                ? "text-destructive-subtle-foreground"
+                                : "text-success-subtle-foreground",
+                        )}
+                    >
+                        {change.kind === "change"
+                            ? `Change ${format(change.cents)}`
+                            : change.kind === "short"
+                              ? `Short ${format(change.cents)}`
+                              : ""}
+                    </div>
+                </div>
+            ) : null}
+            <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                {deskNote(choice, amount)}
+            </p>
+            {/* A link bills the whole booking and needs a provider: offered
+                here only when it can be made (the dialog's chip says why
+                it can't). */}
+            {panel && linkChoice?.off === null ? (
+                <Button
+                    type="button"
+                    variant="link"
+                    size="inline"
+                    aria-pressed={choice === "LINK"}
+                    className="gap-1.5 justify-self-start"
+                    onClick={() => pick("LINK")}
+                >
+                    <Link2 aria-hidden className="size-4" />
+                    Send a payment link instead
+                </Button>
+            ) : null}
+            {/* What is wrong with the amount is the field's own line. Why
+                the payment wasn't taken is the save's: calm when the role
+                refused it. */}
+            {problem && (tried || given !== "" || error) ? (
+                <p
+                    id={ids.error}
+                    role="alert"
+                    className="text-[12.5px] font-medium text-destructive-subtle-foreground"
+                >
+                    {problem}
+                </p>
+            ) : (
+                <Refusal>{error}</Refusal>
+            )}
+        </div>
+    );
+    const linkPanel = link ? (
+        <PayLinkPanel
+            booked={`A payment link for ${amount}.`}
+            bookingId={bookingId}
+            first={link}
+            onDone={close}
+        />
+    ) : null;
+    const foot = {
+        saveLabel: deskButton(choice, amount),
+        savingLabel: choice === "LINK" ? "Making the link…" : "Recording…",
+        onSubmit: save,
+    };
+    const onClose = () => (link ? close() : setOpen(false));
+
     return (
         <>
             {controlled ? null : (
@@ -187,143 +365,31 @@ export function TakePayment({
                     Take {amount}
                 </Button>
             )}
-            <FormDialog
-                open={open}
-                size="md"
-                title={`Take ${amount}`}
-                description={
-                    take.byLink
-                        ? `What ${who} pays for this booking.`
-                        : `What's left after the deposit ${who} paid online.`
-                }
-                pending={busy}
-                onClose={() => (link ? close() : setOpen(false))}
-            >
-                {link ? (
-                    <PayLinkPanel
-                        booked={`A payment link for ${amount}.`}
-                        bookingId={bookingId}
-                        first={link}
-                        onDone={close}
-                    />
-                ) : (
-                    <div className="grid gap-2.5">
-                        <div id={ids.how} className="text-[12.5px] font-medium">
-                            How they pay
-                        </div>
-                        <div
-                            role="radiogroup"
-                            aria-labelledby={ids.how}
-                            className="flex flex-wrap gap-1.5"
-                        >
-                            {choices.map((c) => (
-                                <Tip key={c.key} label={c.off ?? undefined}>
-                                    <Chip
-                                        on={choice === c.key}
-                                        disabled={c.off !== null}
-                                        onClick={() => {
-                                            setChoice(c.key);
-                                            setError(null);
-                                        }}
-                                        className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
-                                    >
-                                        {c.label}
-                                    </Chip>
-                                </Tip>
-                            ))}
-                        </div>
-                        {choice === "CASH" ? (
-                            <div className="flex flex-wrap items-end gap-2.5">
-                                <Field
-                                    label="Cash given"
-                                    className="flex-[1_1_140px]"
-                                >
-                                    {currency ? (
-                                        <MoneyInput
-                                            currency={currency}
-                                            value={given}
-                                            onValueChange={(next) => {
-                                                setGiven(next);
-                                                setError(null);
-                                            }}
-                                            placeholder={amount}
-                                            aria-invalid={
-                                                problem ? true : undefined
-                                            }
-                                            aria-describedby={
-                                                problem ? ids.error : undefined
-                                            }
-                                            className="bg-card"
-                                        />
-                                    ) : (
-                                        <Input
-                                            type="text"
-                                            inputMode="decimal"
-                                            value={given}
-                                            onChange={(e) => {
-                                                setGiven(e.target.value);
-                                                setError(null);
-                                            }}
-                                            placeholder={amount}
-                                            autoComplete="off"
-                                            aria-invalid={
-                                                problem ? true : undefined
-                                            }
-                                            aria-describedby={
-                                                problem ? ids.error : undefined
-                                            }
-                                            className="bg-card"
-                                        />
-                                    )}
-                                </Field>
-                                <div
-                                    aria-live="polite"
-                                    className={cn(
-                                        "flex-[1_1_140px] pb-[9px] text-[13px] font-semibold",
-                                        change.kind === "short"
-                                            ? "text-destructive-subtle-foreground"
-                                            : "text-success-subtle-foreground",
-                                    )}
-                                >
-                                    {change.kind === "change"
-                                        ? `Change ${format(change.cents)}`
-                                        : change.kind === "short"
-                                          ? `Short ${format(change.cents)}`
-                                          : ""}
-                                </div>
-                            </div>
-                        ) : null}
-                        <p className="text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                            {deskNote(choice, amount)}
-                        </p>
-                        {/* What is wrong with the amount is the field's
-                            own line. Why the payment wasn't taken is the
-                            save's: calm when the role refused it. */}
-                        {problem && (tried || given !== "" || error) ? (
-                            <p
-                                id={ids.error}
-                                role="alert"
-                                className="text-[12.5px] font-medium text-destructive-subtle-foreground"
-                            >
-                                {problem}
-                            </p>
-                        ) : (
-                            <Refusal>{error}</Refusal>
-                        )}
-                    </div>
-                )}
-                {link ? null : (
-                    <FormDialogFoot
-                        saveLabel={deskButton(choice, amount)}
-                        savingLabel={
-                            choice === "LINK"
-                                ? "Making the link…"
-                                : "Recording…"
-                        }
-                        onSubmit={save}
-                    />
-                )}
-            </FormDialog>
+            {panel ? (
+                <FormSheet
+                    open={open}
+                    bottomOnPhone
+                    title={title}
+                    description={description}
+                    pending={busy}
+                    onClose={onClose}
+                >
+                    <FormSheetBody>{linkPanel ?? fields}</FormSheetBody>
+                    {link ? null : <FormSheetFoot {...foot} />}
+                </FormSheet>
+            ) : (
+                <FormDialog
+                    open={open}
+                    size="md"
+                    title={title}
+                    description={description}
+                    pending={busy}
+                    onClose={onClose}
+                >
+                    {linkPanel ?? fields}
+                    {link ? null : <FormDialogFoot {...foot} />}
+                </FormDialog>
+            )}
             {rates.step}
         </>
     );

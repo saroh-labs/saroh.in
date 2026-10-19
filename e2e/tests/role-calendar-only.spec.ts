@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/ app:/bookings app:/bookings/all app:/services app:/contacts app:/analytics app:/settings/billing app:/settings/profile api:bookings api:staff api:organizations api:capabilities
+// @covers accounts:/login app:/open app:/ app:/bookings app:/bookings/all app:/bookings/[bookingId] app:/services app:/contacts app:/analytics app:/settings/billing app:/settings/profile api:bookings api:staff api:organizations api:capabilities
 import { expect, test } from "@playwright/test";
 
 import { bookOwn, makeContact, northwind, stamp } from "../fixtures/own-data";
@@ -110,15 +110,25 @@ test.describe("someone who is Calendar only", () => {
         try {
             // Her booking opens, and it is hers to move or cancel.
             await page.goto(`/bookings/${HERS.id}`);
+            // Who is in the Customer card (U12); Cancel is last in More.
             await expect(
-                page.getByText(`Booked by ${HERS.booker}.`),
+                page
+                    .getByText(HERS.booker, { exact: true })
+                    .filter({ visible: true })
+                    .first(),
             ).toBeVisible();
             await expect(
                 page.getByRole("button", { name: "Move", exact: true }),
             ).toBeVisible();
+            await page
+                .getByRole("button", { name: "More", exact: true })
+                .filter({ visible: true })
+                .first()
+                .click();
             await expect(
-                page.getByRole("button", { name: "Cancel", exact: true }),
+                page.getByRole("button", { name: "Cancel booking" }),
             ).toBeVisible();
+            await page.keyboard.press("Escape");
             await expect(
                 page.getByText(/^Your role can read this booking/),
             ).toHaveCount(0);

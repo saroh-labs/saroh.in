@@ -18,7 +18,7 @@ import {
     XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { useState } from "react";
 
 import { HeaderOverlay } from "./header/header-overlay";
@@ -74,11 +74,17 @@ export function QuickLookMore({
     title,
     rows,
     className,
+    trigger,
 }: {
     /** "Kabir's booking", "Mat Pilates, 6:00 pm". */
     title: string;
     rows: readonly MoreRow[];
     className?: string;
+    /**
+     * A button of the screen's own to open it (a booking's page puts "…"
+     * in its top row on a phone); left out, the "More" button.
+     */
+    trigger?: ReactElement;
 }) {
     const [open, setOpen] = useState(false);
     if (rows.length === 0) return null;
@@ -90,21 +96,23 @@ export function QuickLookMore({
             width={300}
             align="end"
             trigger={
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(QL_BTN, "gap-2", className)}
-                >
-                    <MoreHorizontal
-                        aria-hidden
-                        className="size-[18px] min-[760px]:hidden"
-                    />
-                    More
-                    <ChevronDown
-                        aria-hidden
-                        className="hidden size-4 min-[760px]:block"
-                    />
-                </Button>
+                trigger ?? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(QL_BTN, "gap-2", className)}
+                    >
+                        <MoreHorizontal
+                            aria-hidden
+                            className="size-[18px] min-[760px]:hidden"
+                        />
+                        More
+                        <ChevronDown
+                            aria-hidden
+                            className="hidden size-4 min-[760px]:block"
+                        />
+                    </Button>
+                )
             }
         >
             <ul className="-mx-1 pb-3 min-[760px]:mx-[-10px] min-[760px]:pb-0">
