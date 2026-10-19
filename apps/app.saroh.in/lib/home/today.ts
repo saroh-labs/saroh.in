@@ -41,6 +41,8 @@ export interface TodayView {
     visible: boolean;
     /** "Nothing booked today.": only when bookings were read. */
     empty: boolean;
+    /** The day had bookings, but none is left to show: "Nothing more today." */
+    dayDone: boolean;
     /** Rows still to come past the ones shown: "3 more later today". */
     laterToday: number;
     /** The whole day, for Home A's heading: "6 bookings, 3 pick-ups". */
@@ -83,7 +85,8 @@ function stateOf(item: HomeTodayItem, started: boolean, next: boolean): string {
 
 /**
  * What Today shows at `now`: the rows that started in the last ninety
- * minutes (still to be marked), then the next five, in time order.
+ * minutes, any booking from earlier today nobody has marked yet (so the
+ * desk can still say who came), then the next five, in time order.
  */
 export function todayView(today: HomeToday | null, now: Date): TodayView {
     if (!today) {
@@ -92,6 +95,7 @@ export function todayView(today: HomeToday | null, now: Date): TodayView {
             count: "",
             visible: false,
             empty: false,
+            dayDone: false,
             laterToday: 0,
             dayCount: "",
         };
@@ -101,7 +105,10 @@ export function todayView(today: HomeToday | null, now: Date): TodayView {
 
     const upcoming = today.items.filter((i) => startOf(i) >= t);
     const recent = today.items.filter(
-        (i) => startOf(i) < t && t - startOf(i) <= RECENT_MINUTES * MINUTE_MS,
+        (i) =>
+            startOf(i) < t &&
+            (t - startOf(i) <= RECENT_MINUTES * MINUTE_MS ||
+                (i.kind === "BOOKING" && i.markable && i.outcome === null)),
     );
     const shown = [...recent, ...upcoming.slice(0, UPCOMING_SHOWN)];
 
@@ -133,7 +140,8 @@ export function todayView(today: HomeToday | null, now: Date): TodayView {
         rows,
         count: said,
         visible: today.bookings || rows.length > 0,
-        empty: today.bookings && rows.length === 0,
+        empty: today.bookings && rows.length === 0 && today.items.length === 0,
+        dayDone: rows.length === 0 && today.items.length > 0,
         laterToday: Math.max(0, upcoming.length - UPCOMING_SHOWN),
         dayCount: dayCountLabel(today.items),
     };

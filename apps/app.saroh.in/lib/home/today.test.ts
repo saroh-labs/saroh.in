@@ -64,9 +64,10 @@ describe("todayView", () => {
         expect(view.count).toBe("1 still to come · 1 came");
     });
 
-    it("keeps the last ninety minutes to be marked, and drops what's older", () => {
+    it("keeps the last ninety minutes, and an earlier booking nobody marked; drops what's older and marked", () => {
         const view = todayView(
             day([
+                item("07:00", { outcome: "ATTENDED", outcomeTime: "07:02" }),
                 item("07:30"),
                 item("08:15"),
                 item("09:00", { outcome: "NO_SHOW" }),
@@ -75,11 +76,12 @@ describe("todayView", () => {
             NOW,
         );
         expect(view.rows.map((r) => [r.time, r.state])).toEqual([
+            ["07:30", "Not here yet"],
             ["08:15", "Not here yet"],
             ["09:00", "Didn't come"],
             ["10:00", "Next"],
         ]);
-        expect(view.count).toBe("1 still to come · 1 not here yet");
+        expect(view.count).toBe("1 still to come · 2 not here yet");
     });
 
     it("shows five still to come; the rest are the calendar's", () => {
@@ -161,6 +163,7 @@ describe("todayView", () => {
             count: "",
             visible: false,
             empty: false,
+            dayDone: false,
             laterToday: 0,
             dayCount: "",
         });
@@ -204,11 +207,28 @@ describe("todayView", () => {
         );
     });
 
-    it("says nothing is left when the day is over", () => {
-        const view = todayView(day([item("07:00")]), NOW);
+    it("says nothing is left when the day is over, never that nothing was booked", () => {
+        const view = todayView(
+            day([item("07:00", { outcome: "ATTENDED", outcomeTime: "07:02" })]),
+            NOW,
+        );
         expect(view.rows).toEqual([]);
-        expect(view.empty).toBe(true);
+        expect(view.empty).toBe(false);
+        expect(view.dayDone).toBe(true);
         expect(view.count).toBe("");
+    });
+
+    it("still offers an unmarked morning booking in the evening", () => {
+        const evening = new Date("2026-09-18T19:30:00+05:30");
+        const view = todayView(day([item("10:00")]), evening);
+        expect(view.rows.map((r) => [r.time, r.state])).toEqual([
+            ["10:00", "Not here yet"],
+        ]);
+        expect(view.rows[0]).toMatchObject({
+            canArrive: true,
+            canNoShow: true,
+        });
+        expect(view.dayDone).toBe(false);
     });
 });
 

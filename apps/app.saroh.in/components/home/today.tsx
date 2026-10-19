@@ -103,7 +103,7 @@ export function Today({
         );
     };
 
-    const allHref = today.bookings ? "/bookings" : "/commerce/orders";
+    const allHref = today.bookings ? "/calendar" : "/commerce/orders";
     const later = desk ? laterTodayLabel(view.laterToday) : "";
 
     return (
@@ -137,6 +137,15 @@ export function Today({
             </div>
 
             <ul className="overflow-hidden rounded-xl border border-border bg-card">
+                {view.dayDone ? (
+                    <li className="px-4 py-3.5">
+                        <EmptyState
+                            size="inline"
+                            title="Nothing more today."
+                            description={desk ? emptyNext : null}
+                        />
+                    </li>
+                ) : null}
                 {view.empty ? (
                     <li className="px-4 py-3.5">
                         <EmptyState
