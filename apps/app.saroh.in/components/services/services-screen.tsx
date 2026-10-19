@@ -24,6 +24,7 @@ import {
     ServicesTable,
 } from "@/components/services/services-rows";
 import { useTakingBookings } from "@/components/services/use-taking-bookings";
+import { ListToolbar } from "@/components/shared/list-toolbar";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import type { MissingRates } from "@/lib/gst-rates/missing";
 import type { ModuleView } from "@/lib/modules/schema";
@@ -293,27 +294,30 @@ export function ServicesScreen({
                         </>
                     ) : null}
                     {searchable ? (
-                        <div className="mb-3 flex flex-wrap items-center gap-3">
-                            <ListSearch
-                                key={searchKey}
-                                placeholder="Search services"
-                                onSearch={setTerm}
-                            />
-                            {needle ? (
-                                <span
-                                    className={`text-[13px] text-muted-foreground ${DESK}`}
-                                >
-                                    {shown.length} of {all.length} shown ·{" "}
-                                    <Button
-                                        variant="link"
-                                        size="inline"
-                                        onClick={clearSearch}
-                                    >
-                                        Clear
-                                    </Button>
-                                </span>
-                            ) : null}
-                        </div>
+                        <ListToolbar
+                            className="mb-3"
+                            search={
+                                <ListSearch
+                                    key={searchKey}
+                                    placeholder="Search services"
+                                    onSearch={setTerm}
+                                />
+                            }
+                            count={
+                                needle ? (
+                                    <span className={DESK}>
+                                        {shown.length} of {all.length} shown ·{" "}
+                                        <Button
+                                            variant="link"
+                                            size="inline"
+                                            onClick={clearSearch}
+                                        >
+                                            Clear
+                                        </Button>
+                                    </span>
+                                ) : undefined
+                            }
+                        />
                     ) : null}
                     {shown.length === 0 ? (
                         <EmptyState

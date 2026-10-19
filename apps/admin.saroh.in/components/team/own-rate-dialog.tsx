@@ -16,6 +16,7 @@ import { percentToBasisPoints, rateLabel } from "@/lib/commission-words";
 import type { OwnRatePreview, OwnRateSummary } from "@/lib/own-rate-words";
 import {
     dayLabel,
+    earliestDay,
     earnsFromChips,
     earnsFromProblem,
     ownRateBlocked,
@@ -193,7 +194,7 @@ export function OwnRateDialog({
                                     value={earnsFrom}
                                     onValueChange={setEarnsFrom}
                                     min={
-                                        loaded.summary.dates.firstPaidPlan ??
+                                        earliestDay(loaded.summary)?.day ??
                                         undefined
                                     }
                                     required
@@ -292,7 +293,7 @@ function EarnsFromChips({
                         disabled={chip.disabled !== null}
                         onClick={() => onPick(chip.day)}
                     >
-                        {chip.label} · {dayLabel(chip.day)}
+                        {chip.text ?? `${chip.label} · ${dayLabel(chip.day)}`}
                     </Button>
                     {chip.disabled ? (
                         <span className="text-[12px] text-muted-foreground">

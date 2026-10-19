@@ -67,7 +67,12 @@ import {
     COMMISSION_REFUND_TYPE,
     CommissionQueue,
 } from "./commission-queue";
-import { commissionPaise, monthOf, splitEvenly } from "./commission-rules";
+import {
+    commissionPaise,
+    monthBounds,
+    monthOf,
+    splitEvenly,
+} from "./commission-rules";
 import { CommissionSweepJob } from "./commission-sweep.job";
 
 const SECRET = "whsec_fake_platform_secret";
@@ -706,26 +711,45 @@ describe("a line for each cleared payment", () => {
         expect(await prisma.commissionLine.count()).toBe(0);
     });
 
-    it("a link that started after the payment, or ended before it, earns nothing for it", async () => {
+    it("a link that started in a later month than the payment, or ended before it, earns nothing for it", async () => {
         await setRate("BROUGHT_IN", randomRate());
         const m = await manager();
         const ctx = await business();
         const { providerSub, periodEnd } = await onPlan(ctx);
+        // The month counts (owner, 19 Oct): one started later the same
+        // month would earn it (commission-month-counts.db.spec.ts); one
+        // started the next month never does.
         await linkTo(
             ctx.organizationId,
             m.platformAdminId,
             "BROUGHT_IN",
-            new Date(),
+            new Date(monthBounds(monthOf(new Date())).to.getTime() + 60_000),
         );
         await runCommission();
         await sweep.sweep(new Date());
         expect(await prisma.commissionLine.count()).toBe(0);
 
+        await prisma.accountManagerLink.deleteMany({
+            where: { organizationId: ctx.organizationId },
+        });
+        await linkTo(ctx.organizationId, m.platformAdminId, "BROUGHT_IN");
         await endLink(ctx.organizationId);
         await renew(providerSub, periodEnd, "pay_after_end");
         await runCommission();
         await sweep.sweep(new Date());
-        expect(await prisma.commissionLine.count()).toBe(0);
+        const afterEnd = await prisma.sarohInvoice.findMany({
+            where: {
+                organizationId: ctx.organizationId,
+                providerPaymentId: "pay_after_end",
+            },
+            select: { id: true },
+        });
+        expect(afterEnd.length).toBeGreaterThan(0);
+        expect(
+            await prisma.commissionLine.count({
+                where: { sarohInvoiceId: { in: afterEnd.map((i) => i.id) } },
+            }),
+        ).toBe(0);
     });
 
     it("no rate set: NO_RATE, and a rate set later never back-pays it", async () => {

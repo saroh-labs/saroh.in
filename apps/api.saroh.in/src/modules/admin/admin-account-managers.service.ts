@@ -3,6 +3,7 @@ import {
     ConflictException,
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
@@ -10,6 +11,7 @@ import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { settleMonthBeforeLinkInTx } from "../commission/commission-settle";
 import type { LinkKind, LinkSource } from "../organizations/account-manager";
 import {
     BILLING_STATES,
@@ -128,6 +130,8 @@ export async function managerOf(
  */
 @Injectable()
 export class AdminAccountManagersService {
+    private readonly logger = new Logger(AdminAccountManagersService.name);
+
     constructor(private readonly audit: AdminAuditService) {}
 
     /**
@@ -259,6 +263,15 @@ export class AdminAccountManagersService {
                 },
                 select: { id: true },
             });
+            // The month counts: this month's payments made with no
+            // manager are theirs now.
+            await settleMonthBeforeLinkInTx(
+                tx,
+                this.logger,
+                organizationId,
+                now,
+                now,
+            );
             await this.audit.write(tx, {
                 actorUserId: staff.userId,
                 permission: AdminPermission.AccountsAssign,
@@ -381,6 +394,13 @@ export class AdminAccountManagersService {
                     },
                     select: { id: true },
                 });
+                await settleMonthBeforeLinkInTx(
+                    tx,
+                    this.logger,
+                    pick.organizationId,
+                    now,
+                    now,
+                );
                 await this.audit.write(tx, {
                     actorUserId: staff.userId,
                     permission: AdminPermission.AccountsAssign,

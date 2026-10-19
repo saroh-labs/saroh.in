@@ -41,8 +41,10 @@ export interface SweepResult {
  * (`settleInvoiceInTx`), so one that fails is logged and the rest go on:
  *
  * 1. **Re-run**: a payment of the last 60 days with no line, whose
- *    business had a manager on commission when it cleared: the line the
- *    job didn't write (its enqueue was lost, or it gave up).
+ *    business had a manager on commission when it cleared, or, with none
+ *    then, gained one later that month in India ("the month counts"): the
+ *    line the job didn't write (its enqueue was lost, or it gave up, or
+ *    the manager came after the payment).
  * 2. **Payable**: every open line whose period has ended, and every one
  *    HELD or PAYABLE: a period that ended clean becomes payable in its
  *    month, a mismatch resolved moves it on, a refund cancels it. A
@@ -140,9 +142,21 @@ export class CommissionSweepJob {
                      FROM "AccountManagerLink" a
                      JOIN "StaffProfile" p ON p."platformAdminId" = a."platformAdminId"
                     WHERE a."organizationId" = i."organizationId"
-                      AND a."startedAt" <= i."issuedAt"
-                      AND (a."endedAt" IS NULL OR a."endedAt" > i."issuedAt")
-                      AND p."onCommission" = true)
+                      AND p."onCommission" = true
+                      AND (
+                          (a."startedAt" <= i."issuedAt"
+                           AND (a."endedAt" IS NULL OR a."endedAt" > i."issuedAt"))
+                          -- "The month counts": with no manager when it
+                          -- cleared, one who took it on later that month
+                          -- in India (linkForPaymentInTx).
+                          OR (a."startedAt" > i."issuedAt"
+                              AND date_trunc('month', a."startedAt" + interval '330 minutes')
+                                = date_trunc('month', i."issuedAt" + interval '330 minutes')
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM "AccountManagerLink" o
+                                   WHERE o."organizationId" = i."organizationId"
+                                     AND o."startedAt" <= i."issuedAt"
+                                     AND (o."endedAt" IS NULL OR o."endedAt" > i."issuedAt")))))
              ORDER BY i."id"
              LIMIT ${PAGE}`;
         return rows.map((r) => r.id);

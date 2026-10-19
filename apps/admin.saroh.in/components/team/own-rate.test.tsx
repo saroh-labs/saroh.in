@@ -59,6 +59,7 @@ import type {
 } from "@/lib/overview-words";
 import type { OwnRateSummary, OwnRateView } from "@/lib/own-rate-words";
 import {
+    earliestDay,
     earnsFromChips,
     earnsFromProblem,
     previewWords,
@@ -145,7 +146,7 @@ afterEach(() => {
 const dialog = () => within(screen.getByRole("dialog"));
 
 describe("Set commission… (the dialog)", () => {
-    it("offers the days as chips, a day before the first paid plan off saying why", async () => {
+    it("offers only the days a rate may start, Joined off saying why", async () => {
         render(
             <OwnRateDialog
                 organizationId="org_1"
@@ -158,13 +159,13 @@ describe("Set commission… (the dialog)", () => {
             name: /^Joined · 1 Aug/,
         });
         expect((joined as HTMLButtonElement).disabled).toBe(true);
-        const took = dialog().getByRole("button", {
-            name: /^Asha took it on · 15 Aug/,
-        });
-        expect((took as HTMLButtonElement).disabled).toBe(true);
+        // Asha took it on before its first paid plan: that day isn't offered.
+        expect(
+            dialog().queryByRole("button", { name: /^Asha took it on/ }),
+        ).toBeNull();
         expect(
             dialog().getAllByText("Before its first paid plan"),
-        ).toHaveLength(2);
+        ).toHaveLength(1);
         const first = dialog().getByRole("button", {
             name: /^First paid plan · 10 Sep/,
         });
@@ -428,6 +429,50 @@ describe("own-rate words", () => {
         expect(
             later.find((c) => c.label === "Asha took it on")?.disabled,
         ).toBeNull();
+    });
+
+    it("a business that joined with no manager earns from the month its manager took it on, never before", () => {
+        // Joined 1 Aug, first paid plan 10 Sep, Asha added 20 Oct: the
+        // month counts, so October from its 1st.
+        const s = summary({
+            dates: {
+                joined: "2026-08-01",
+                firstPaidPlan: "2026-09-10",
+                managerSince: "2026-10-20",
+            },
+        });
+        expect(earliestDay(s)).toEqual({ day: "2026-10-01", by: "manager" });
+        expect(
+            earnsFromChips(s).map((c) => [c.label, c.day, c.disabled]),
+        ).toEqual([
+            ["Joined", "2026-08-01", "Before the month Asha took it on"],
+            ["Asha took it on", "2026-10-01", null],
+        ]);
+        expect(earnsFromChips(s)[1]?.text).toMatch(
+            /^From 1 Oct.*, the month Asha took it on$/,
+        );
+        expect(earnsFromProblem(s, "2026-09-30", "")).toMatch(
+            /^Asha took it on in Oct.*\. A rate can start from 1 Oct.*, the start of that month\.$/,
+        );
+        expect(earnsFromProblem(s, "2026-10-01", "")).toBeNull();
+    });
+
+    it("a manager added in the first paid plan's month: the first paid plan is the floor", () => {
+        const s = summary({
+            dates: {
+                joined: "2026-08-01",
+                firstPaidPlan: "2026-09-10",
+                managerSince: "2026-09-20",
+            },
+        });
+        expect(earliestDay(s)).toEqual({
+            day: "2026-09-10",
+            by: "first-paid",
+        });
+        expect(earnsFromChips(s).map((c) => c.label)).toEqual([
+            "Joined",
+            "First paid plan",
+        ]);
     });
 
     it("a typed day before the first paid plan is refused in the API's words", () => {

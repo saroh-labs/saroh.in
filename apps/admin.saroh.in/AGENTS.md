@@ -211,10 +211,23 @@ recorded grant (the API refuses it otherwise).
   (`own-rate-block.tsx`, which shows "Own rate … from ‹day›" only to
   `team:pay` and `commission:rates`, with End own rate…) and on each row
   of a teammate's Businesses tab: a percentage, Earns from with one-tap
-  days (joined, first paid plan, when the manager took it on; a day before
-  the first paid plan off, saying why), an optional last day, and the
-  API's dry run ("3 payments since 10 Sep get commission") before Set
-  rate. Saving back-pays that manager's NO_RATE payments in its window,
+  days, and an optional last day, and the API's dry run ("3 payments
+  since 10 Sep get commission") before Set rate. The earliest Earns from
+  is the later of the first paid plan and the 1st of the month the
+  manager took it on (owner, 19 Oct): "businesses joined without any
+  manager, the commission won't be paid to any manager until they are
+  added to the business, and it will only be paid for the month they are
+  added", and the month counts: a payment earlier in that month (India
+  time) is theirs too. A business that joins on 1 Nov on Pro and gets a
+  manager on 1 Jan, after its 00:05 renewal, or on 20 Jan, earns them
+  January, paid on 31 Jan, and nothing for November or December. So the
+  chips are "From 1 Jan, the month Arjun took it on" and "First paid
+  plan" only when a rate may start then, and "Joined" off, saying why; an
+  earlier typed day is refused ("Arjun took it on in Jan. A rate can start
+  from 1 Jan, the start of that month.",
+  `earliestDay`). Commission is only on what the business paid, before
+  GST and after any offer; free months and refunded payments earn
+  nothing. Saving back-pays that manager's NO_RATE payments in its window,
   once; the Rates sheet lists the own rates running. A line it priced
   reads "own rate for ‹business›" (`lineRateWords`). Words in
   `lib/own-rate-words.ts`.

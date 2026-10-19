@@ -15,6 +15,7 @@ import {
     nextDay,
     ownRateCovers,
     ownRateEndAt,
+    ownRateFloor,
     ownRateOverlap,
     ownRateWindowProblem,
 } from "./own-rate-rules";
@@ -60,6 +61,7 @@ describe("ownRateWindowProblem: the floor is the first paid plan", () => {
                 earnsFrom: "2030-01-01",
                 lastDay: null,
                 firstPaidAt: null,
+                manager: null,
             }),
         ).toMatch(/hasn't paid for a plan yet/);
     });
@@ -70,6 +72,7 @@ describe("ownRateWindowProblem: the floor is the first paid plan", () => {
                 earnsFrom: "2026-09-09",
                 lastDay: null,
                 firstPaidAt,
+                manager: null,
             }),
         ).toMatch(
             /^It can earn from 10 Sep\w* 2026 at the earliest, the day of its first paid plan\.$/,
@@ -83,6 +86,7 @@ describe("ownRateWindowProblem: the floor is the first paid plan", () => {
                     earnsFrom: day,
                     lastDay: null,
                     firstPaidAt,
+                    manager: null,
                 }),
             ).toBeNull();
         }
@@ -94,6 +98,7 @@ describe("ownRateWindowProblem: the floor is the first paid plan", () => {
                 earnsFrom: "2026-10-01",
                 lastDay: "2026-09-30",
                 firstPaidAt,
+                manager: null,
             }),
         ).toMatch(/last day comes before/);
         expect(
@@ -101,6 +106,7 @@ describe("ownRateWindowProblem: the floor is the first paid plan", () => {
                 earnsFrom: "2026-10-01",
                 lastDay: "2026-10-01",
                 firstPaidAt,
+                manager: null,
             }),
         ).toBeNull();
         expect(
@@ -108,8 +114,100 @@ describe("ownRateWindowProblem: the floor is the first paid plan", () => {
                 earnsFrom: "soon",
                 lastDay: null,
                 firstPaidAt,
+                manager: null,
             }),
         ).toMatch(/Pick the day/);
+    });
+});
+
+describe("ownRateWindowProblem: never before the manager took it on", () => {
+    // Joined 1 Nov on Pro and paid, given Arjun on 1 Jan (owner, 19 Oct).
+    const firstPaidAt = at("2026-11-01T06:00:00Z");
+    const manager = { name: "Arjun", since: at("2027-01-01T05:00:00Z") };
+
+    it("the floor is the later of the first paid plan and the manager's first day", () => {
+        expect(
+            ownRateFloor({ firstPaidAt, managerSince: manager.since }),
+        ).toEqual({ day: "2027-01-01", by: "manager" });
+        expect(
+            ownRateFloor({
+                firstPaidAt,
+                managerSince: at("2026-10-01T05:00:00Z"),
+            }),
+        ).toEqual({ day: "2026-11-01", by: "first-paid" });
+        expect(
+            ownRateFloor({ firstPaidAt: null, managerSince: manager.since }),
+        ).toBeNull();
+    });
+
+    it("refuses November and December, saying when the manager took it on", () => {
+        for (const day of ["2026-11-01", "2026-12-31"]) {
+            expect(
+                ownRateWindowProblem({
+                    earnsFrom: day,
+                    lastDay: null,
+                    firstPaidAt,
+                    manager,
+                }),
+            ).toMatch(
+                /^Arjun took it on in Jan\w* 2027\. A rate can start from 1 Jan\w* 2027, the start of that month\.$/,
+            );
+        }
+    });
+
+    it("allows January from its first day", () => {
+        for (const day of ["2027-01-01", "2027-01-31"]) {
+            expect(
+                ownRateWindowProblem({
+                    earnsFrom: day,
+                    lastDay: null,
+                    firstPaidAt,
+                    manager,
+                }),
+            ).toBeNull();
+        }
+    });
+
+    it("the month counts: a manager added on the 20th earns from the 1st", () => {
+        const mid = { name: "Arjun", since: at("2027-01-20T05:00:00Z") };
+        expect(ownRateFloor({ firstPaidAt, managerSince: mid.since })).toEqual({
+            day: "2027-01-01",
+            by: "manager",
+        });
+        expect(
+            ownRateWindowProblem({
+                earnsFrom: "2027-01-01",
+                lastDay: null,
+                firstPaidAt,
+                manager: mid,
+            }),
+        ).toBeNull();
+        expect(
+            ownRateWindowProblem({
+                earnsFrom: "2026-12-31",
+                lastDay: null,
+                firstPaidAt,
+                manager: mid,
+            }),
+        ).toMatch(/^Arjun took it on in Jan/);
+        // 00:30 on 1 Feb in India is still February there.
+        expect(
+            ownRateFloor({
+                firstPaidAt,
+                managerSince: at("2027-01-31T19:00:00Z"),
+            }),
+        ).toEqual({ day: "2027-02-01", by: "manager" });
+    });
+
+    it("a manager there before the first paid plan leaves the first paid plan the floor", () => {
+        expect(
+            ownRateWindowProblem({
+                earnsFrom: "2026-10-15",
+                lastDay: null,
+                firstPaidAt,
+                manager: { name: "Arjun", since: at("2026-10-01T05:00:00Z") },
+            }),
+        ).toMatch(/the day of its first paid plan\.$/);
     });
 });
 

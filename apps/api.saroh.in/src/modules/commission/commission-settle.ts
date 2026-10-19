@@ -8,6 +8,8 @@ import {
     installmentEnds,
     installmentsOf,
     isLegalLineMove,
+    monthBounds,
+    monthOf,
     nextStatus,
     OPEN_STATUSES,
     refundAfterPayout,
@@ -130,6 +132,71 @@ export async function linkAtInTx(
         orderBy: { startedAt: "desc" },
         select: { id: true, platformAdminId: true, kind: true },
     });
+}
+
+/**
+ * The link a payment's lines are written for (DEC-169, owner 19 Oct):
+ * the link open when it cleared; else, when the business had no manager
+ * then, the first link started later in the same month in India. "The
+ * month counts": a manager who takes a business on earns that month's
+ * payments, even one that came in earlier in it, and nothing from the
+ * months before. A previous manager whose link was open at the payment
+ * keeps it.
+ */
+export async function linkForPaymentInTx(
+    tx: Pick<Tx, "accountManagerLink">,
+    organizationId: string,
+    at: Date,
+) {
+    const open = await linkAtInTx(tx, organizationId, at);
+    if (open) return open;
+    return tx.accountManagerLink.findFirst({
+        where: {
+            organizationId,
+            startedAt: { gt: at, lt: monthBounds(monthOf(at)).to },
+        },
+        orderBy: { startedAt: "asc" },
+        select: { id: true, platformAdminId: true, kind: true },
+    });
+}
+
+/**
+ * A manager just took the business on at `startedAt`: write the lines of
+ * that month's earlier payments that have none, now theirs ("the month
+ * counts"). Each through `settleInvoiceInTx`, so under the business's and
+ * the invoice's locks and once: a payment with lines is left as it is.
+ * The caller holds the business's manager lock, in the link's own
+ * transaction. Returns the lines written.
+ */
+export async function settleMonthBeforeLinkInTx(
+    tx: Tx,
+    logger: Pick<Logger, "warn">,
+    organizationId: string,
+    startedAt: Date,
+    now: Date,
+): Promise<number> {
+    const invoices = await tx.sarohInvoice.findMany({
+        where: {
+            organizationId,
+            taxablePaise: { gt: 0 },
+            issuedAt: {
+                gte: monthBounds(monthOf(startedAt)).from,
+                lt: startedAt,
+            },
+        },
+        orderBy: { issuedAt: "asc" },
+        select: { id: true },
+    });
+    let written = 0;
+    for (const invoice of invoices) {
+        const lined = await tx.commissionLine.count({
+            where: { sarohInvoiceId: invoice.id },
+        });
+        if (lined > 0) continue;
+        written += (await settleInvoiceInTx(tx, logger, invoice.id, now))
+            .written;
+    }
+    return written;
 }
 
 export async function refundsInTx(
@@ -350,7 +417,11 @@ async function planLinesInTx(
     invoice: InvoiceFacts,
 ): Promise<{ lines: PlannedLine[] } | { noLine: NoLine }> {
     if (invoice.taxablePaise <= 0) return { noLine: "nothing-earned" };
-    const link = await linkAtInTx(tx, invoice.organizationId, invoice.issuedAt);
+    const link = await linkForPaymentInTx(
+        tx,
+        invoice.organizationId,
+        invoice.issuedAt,
+    );
     if (!link) return { noLine: "no-manager" };
     const profile = await tx.staffProfile.findUnique({
         where: { platformAdminId: link.platformAdminId },

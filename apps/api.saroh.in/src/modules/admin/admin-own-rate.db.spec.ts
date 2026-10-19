@@ -96,10 +96,12 @@ async function paid(
         periodEnd?: Date;
         taxablePaise?: number;
         cycle?: "month" | "year";
+        /** When it cleared, in place of `daysAgo`. */
+        at?: Date;
     } = {},
 ) {
     seq += 1;
-    const issuedAt = ago(daysAgo);
+    const issuedAt = over.at ?? ago(daysAgo);
     const cycle = over.cycle ?? "month";
     const taxablePaise =
         over.taxablePaise ?? 100_000 + Math.floor(Math.random() * 900_000);
@@ -252,6 +254,109 @@ describe("the floor: the business's first paid plan", () => {
     });
 });
 
+describe("the floor: the month the manager took it on (owner, 19 Oct)", () => {
+    // "A business joins on 1 Nov on Pro, a manager is assigned on 1 Jan,
+    // then the commission for the business is paid for January", and the
+    // month counts: January's renewal at 00:05, before the manager's link
+    // that morning, is theirs. Days are India's.
+    const ist = (local: string) => new Date(`${local}+05:30`);
+
+    it("a business that joined with no manager earns its manager nothing from the months before they were added", async () => {
+        const m = await manager();
+        const org = await business();
+        const nov = await paid(org, 0, { at: ist("2025-11-01T00:05:00") });
+        const dec = await paid(org, 0, { at: ist("2025-12-01T00:05:00") });
+        const jan = await paid(org, 0, { at: ist("2026-01-01T00:05:00") });
+        await linkTo(
+            org,
+            m.platformAdminId,
+            "ASSIGNED",
+            ist("2026-01-01T11:00:00"),
+        );
+        await lines.settle(jan.id);
+
+        expect(await linesOf(nov.id)).toHaveLength(0);
+        expect(await linesOf(dec.id)).toHaveLength(0);
+        expect(
+            (await linesOf(jan.id)).map((l) => [l.platformAdminId, l.status]),
+        ).toEqual([[m.platformAdminId, "NO_RATE"]]);
+
+        const read = await ownRates.read(OWNER(), org);
+        expect(read.dates.firstPaidPlan).toBe("2025-11-01");
+        expect(read.dates.managerSince).toBe("2026-01-01");
+        const name = read.manager?.name ?? "";
+        for (const earnsFrom of ["2025-11-01", "2025-12-01", "2025-12-31"]) {
+            await expect(
+                ownRates.preview(OWNER(), org, {
+                    basisPoints: randomRate(),
+                    earnsFrom,
+                }),
+            ).rejects.toThrow(
+                new RegExp(
+                    `^${name} took it on in Jan\\w* 2026\\. A rate can start from 1 Jan\\w* 2026, the start of that month\\.$`,
+                ),
+            );
+            await expect(
+                ownRates.set(OWNER(), org, {
+                    basisPoints: randomRate(),
+                    earnsFrom,
+                    reason: "back to the start",
+                }),
+            ).rejects.toThrow(BadRequestException);
+        }
+        expect(await prisma.businessCommissionRate.count()).toBe(0);
+
+        // From the 1st of the month they took it on: January, and only it.
+        const bps = randomRate();
+        const saved = await ownRates.set(OWNER(), org, {
+            basisPoints: bps,
+            earnsFrom: "2026-01-01",
+            reason: "took it on",
+        });
+        expect(saved.backPaid).toEqual({
+            payments: 1,
+            amountPaise: commissionPaise(jan.taxablePaise, bps),
+        });
+        expect(await linesOf(nov.id)).toHaveLength(0);
+        expect(await linesOf(dec.id)).toHaveLength(0);
+        expect(
+            await prisma.commissionLine.count({
+                where: { organizationId: org, basisPoints: { not: null } },
+            }),
+        ).toBe(1);
+    });
+
+    it("a manager added on the 20th: a rate can start from the 1st, not the month before", async () => {
+        const m = await manager();
+        const org = await business();
+        const jan = await paid(org, 0, { at: ist("2026-01-01T00:05:00") });
+        await linkTo(
+            org,
+            m.platformAdminId,
+            "ASSIGNED",
+            ist("2026-01-20T10:00:00"),
+        );
+        await lines.settle(jan.id);
+        await expect(
+            ownRates.set(OWNER(), org, {
+                basisPoints: randomRate(),
+                earnsFrom: "2025-12-31",
+                reason: "too early",
+            }),
+        ).rejects.toThrow(/took it on in Jan/);
+        const bps = randomRate();
+        const saved = await ownRates.set(OWNER(), org, {
+            basisPoints: bps,
+            earnsFrom: "2026-01-01",
+            reason: "took it on",
+        });
+        expect(saved.backPaid).toEqual({
+            payments: 1,
+            amountPaise: commissionPaise(jan.taxablePaise, bps),
+        });
+    });
+});
+
 describe("the dry run and the back-pay", () => {
     it("the dry run says what saving would price and writes nothing", async () => {
         const { org } = await looked();
@@ -373,13 +478,29 @@ describe("the dry run and the back-pay", () => {
         const now = await manager();
         const org = await business();
         await linkTo(org, before.platformAdminId, "ASSIGNED", ago(150));
-        const theirs = await paid(org, 80);
+        const theirs = await paid(org, 100);
         await endLink(org, ago(50));
         await linkTo(org, now.platformAdminId, "ASSIGNED", ago(50));
         const mine = await paid(org, 20);
+        // A payment's line follows the link open when it was made; settling
+        // again gives the new manager nothing of the old one's.
+        await lines.settle(theirs.id);
+        expect(
+            (await linesOf(theirs.id)).map((l) => l.platformAdminId),
+        ).toEqual([before.platformAdminId]);
+        // No back-pay to a later manager: their rate starts when they did.
+        await expect(
+            ownRates.set(OWNER(), org, {
+                basisPoints: randomRate(),
+                earnsFrom: dayOf(theirs.issuedAt),
+                reason: "agreed with the new manager",
+            }),
+        ).rejects.toThrow(
+            /took it on in .*\. A rate can start from .*, the start of that month\.$/,
+        );
         const saved = await ownRates.set(OWNER(), org, {
             basisPoints: randomRate(),
-            earnsFrom: dayOf(theirs.issuedAt),
+            earnsFrom: dayOf(ago(50)),
             reason: "agreed with the new manager",
         });
         expect(saved.backPaid.payments).toBe(1);

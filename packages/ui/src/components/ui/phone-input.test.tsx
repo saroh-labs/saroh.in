@@ -149,6 +149,16 @@ describe("PhoneInput (#1036)", () => {
         expect(onValue).not.toHaveBeenCalled();
     });
 
+    it("a saved number emptied sends empty, and stays empty after the box is left", () => {
+        const onValue = vi.fn();
+        render(<Harness initial="+919876543210" onValue={onValue} />);
+        fireEvent.change(box(), { target: { value: "" } });
+        expect(onValue).toHaveBeenLastCalledWith("");
+        fireEvent.blur(box());
+        expect(box()).toHaveValue("");
+        expect(value()).toBe("");
+    });
+
     it("says what is wrong on the field", () => {
         render(<Harness />);
         fireEvent.change(box(), { target: { value: "98765" } });

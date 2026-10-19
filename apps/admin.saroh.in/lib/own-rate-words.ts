@@ -72,18 +72,60 @@ export interface EarnsFromChip {
     day: string;
     /** Why it can't be picked; null when it can. */
     disabled: string | null;
+    /** The chip's words, when not "‹label› · ‹day›". */
+    text?: string;
+}
+
+/** The first day of the month `day` is in ("2027-01-20" → "2027-01-01"). */
+const monthStart = (day: string) => `${day.slice(0, 7)}-01`;
+
+/** "Jan 2027" or "Jan" this year. */
+function monthLabel(day: string, today: string = todayInIndia()): string {
+    const at = new Date(`${monthStart(day)}T00:00:00.000Z`);
+    if (Number.isNaN(at.getTime())) return day;
+    return new Intl.DateTimeFormat("en-IN", {
+        month: "short",
+        ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }),
+        timeZone: "UTC",
+    }).format(at);
 }
 
 /**
- * The one-tap days beside Earns from: when the business joined, its first
- * paid plan, and when this manager took it on. A day before the first paid
- * plan is shown, off, saying why; with no paid plan yet, every day is.
+ * The first day an own rate can earn from, as the API rules it (owner, 19
+ * Oct): the later of the business's first paid plan and the first day of
+ * the month its manager took it on ("the month counts"). A business that
+ * joined with no manager earns that manager nothing from the months before
+ * they were added. Null with no paid plan.
+ */
+export function earliestDay(
+    summary: OwnRateSummary,
+): { day: string; by: "first-paid" | "manager" } | null {
+    const first = summary.dates.firstPaidPlan;
+    if (!first) return null;
+    const since =
+        summary.manager && summary.dates.managerSince
+            ? monthStart(summary.dates.managerSince)
+            : null;
+    return since && since >= first
+        ? { day: since, by: "manager" }
+        : { day: first, by: "first-paid" };
+}
+
+/**
+ * The one-tap days beside Earns from: the start of the month this manager
+ * took it on ("From 1 Jan, the month Arjun took it on") and the first paid
+ * plan, each only when a rate may start then, and when the business
+ * joined, shown off with why when it is earlier than that.
  */
 export function earnsFromChips(summary: OwnRateSummary): EarnsFromChip[] {
-    const first = summary.dates.firstPaidPlan;
+    const floor = earliestDay(summary);
+    const name = summary.manager?.name;
     const why = (day: string): string | null => {
-        if (!first) return "It hasn't paid for a plan yet";
-        return day < first ? "Before its first paid plan" : null;
+        if (!floor) return "It hasn't paid for a plan yet";
+        if (day >= floor.day) return null;
+        return floor.by === "manager" && name
+            ? `Before the month ${name} took it on`
+            : "Before its first paid plan";
     };
     const chips: EarnsFromChip[] = [
         {
@@ -92,14 +134,18 @@ export function earnsFromChips(summary: OwnRateSummary): EarnsFromChip[] {
             disabled: why(summary.dates.joined),
         },
     ];
-    if (first) {
+    const first = summary.dates.firstPaidPlan;
+    if (first && why(first) === null) {
         chips.push({ label: "First paid plan", day: first, disabled: null });
     }
-    if (summary.dates.managerSince && summary.manager) {
+    const since = summary.dates.managerSince;
+    if (since && name && why(monthStart(since)) === null) {
+        const from = monthStart(since);
         chips.push({
-            label: `${summary.manager.name} took it on`,
-            day: summary.dates.managerSince,
-            disabled: why(summary.dates.managerSince),
+            label: `${name} took it on`,
+            day: from,
+            text: `From ${dayLabel(from)}, the month ${name} took it on`,
+            disabled: null,
         });
     }
     return chips;
@@ -123,10 +169,12 @@ export function earnsFromProblem(
     lastDay: string,
 ): string | null {
     if (!earnsFrom) return "Pick the day it earns from.";
-    const first = summary.dates.firstPaidPlan;
-    if (!first) return ownRateBlocked(summary);
-    if (earnsFrom < first) {
-        return `It can earn from ${dayLabel(first)} at the earliest, the day of its first paid plan.`;
+    const floor = earliestDay(summary);
+    if (!floor) return ownRateBlocked(summary);
+    if (earnsFrom < floor.day) {
+        return floor.by === "manager" && summary.manager
+            ? `${summary.manager.name} took it on in ${monthLabel(floor.day)}. A rate can start from ${dayLabel(floor.day)}, the start of that month.`
+            : `It can earn from ${dayLabel(floor.day)} at the earliest, the day of its first paid plan.`;
     }
     if (lastDay && lastDay < earnsFrom) {
         return "Its last day comes before the day it earns from.";

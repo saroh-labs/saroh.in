@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { listTable } from "@saroh/ui/list-table";
+import { ListTable, ListTableHead, listTable } from "@saroh/ui/list-table";
 import { ScrollX } from "@saroh/ui/scroll-x";
 import { TextLink } from "@saroh/ui/text-link";
 import Link from "next/link";
@@ -112,97 +112,123 @@ function TakingSwitch({
 }
 
 /**
+ * The desk table's five columns: Service, "How long · price · who", This
+ * week, Who can book it and Taking bookings. The gap is the two cells'
+ * padding a ruled table had between them.
+ */
+const DESK_GRID =
+    "grid grid-cols-[minmax(180px,1.2fr)_minmax(0,1.4fr)_minmax(0,1fr)_142px_122px] items-center gap-x-[28px]";
+
+/**
  * At the desk (BKDStates): a table of Service, "How long · price · who",
  * This week, Who can book it and Taking bookings. The name opens the
- * service. A role that can't change services reads On or Off.
+ * service. A role that can't change services reads On or Off. Drawn with
+ * the shared list pieces (`ListTable`, `ListTableHead`, `listTable.row`)
+ * and a table's roles, so a screen reader still reads it as one.
  */
 export function ServicesTable({ rows, onTaking, busy }: RowsProps) {
     return (
-        <ScrollX label="Services" className={listTable.frame}>
-            <table
-                data-services-table=""
-                className="w-full border-collapse text-[13.5px]"
-            >
-                <thead data-ph-unmask="">
-                    <tr className={listTable.headRow}>
-                        <th scope="col" className={listTable.th}>
-                            Service
-                        </th>
-                        <th scope="col" className={listTable.th}>
-                            How long · price · who
-                        </th>
-                        <th scope="col" className={listTable.th}>
-                            This week
-                        </th>
-                        <th
-                            scope="col"
-                            className={cn(listTable.th, "w-[170px]")}
-                        >
-                            Who can book it
-                        </th>
-                        <th
-                            scope="col"
-                            className={cn(listTable.th, "w-[150px]")}
-                        >
-                            {TAKING_LABEL}
-                        </th>
-                    </tr>
-                </thead>
-                <tbody data-ph-mask="">
-                    {rows.map((row) => (
-                        <tr key={row.service.id} className={listTable.tr}>
-                            <td className={cn(listTable.td, "min-w-[180px]")}>
-                                <Link
-                                    href={hrefOf(row.service)}
-                                    className="font-semibold text-foreground underline-offset-4 hover:underline"
+        <ListTable scroll>
+            <ScrollX label="Services">
+                <div
+                    role="table"
+                    aria-label="Services"
+                    data-services-table=""
+                    className="min-w-[720px] text-[13.5px]"
+                >
+                    <div role="rowgroup">
+                        <ListTableHead role="row" className={DESK_GRID}>
+                            <span
+                                role="columnheader"
+                                className="whitespace-nowrap"
+                            >
+                                Service
+                            </span>
+                            <span
+                                role="columnheader"
+                                className="whitespace-nowrap"
+                            >
+                                How long · price · who
+                            </span>
+                            <span
+                                role="columnheader"
+                                className="whitespace-nowrap"
+                            >
+                                This week
+                            </span>
+                            <span
+                                role="columnheader"
+                                className="whitespace-nowrap"
+                            >
+                                Who can book it
+                            </span>
+                            <span
+                                role="columnheader"
+                                className="whitespace-nowrap"
+                            >
+                                {TAKING_LABEL}
+                            </span>
+                        </ListTableHead>
+                    </div>
+                    <div role="rowgroup" data-ph-mask="">
+                        {rows.map((row) => (
+                            <div
+                                key={row.service.id}
+                                role="row"
+                                data-service-row=""
+                                className={cn(listTable.row, DESK_GRID)}
+                            >
+                                <div role="cell" className="min-w-0">
+                                    <Link
+                                        href={hrefOf(row.service)}
+                                        className="font-semibold text-foreground underline-offset-4 hover:underline"
+                                    >
+                                        {row.service.name}
+                                    </Link>
+                                    {row.problem ? (
+                                        <Problem
+                                            problem={row.problem}
+                                            className="mt-1 text-[12px]"
+                                        />
+                                    ) : null}
+                                </div>
+                                <div
+                                    role="cell"
+                                    className="min-w-0 text-muted-foreground"
                                 >
-                                    {row.service.name}
-                                </Link>
-                                {row.problem ? (
-                                    <Problem
-                                        problem={row.problem}
-                                        className="mt-1 text-[12px]"
-                                    />
-                                ) : null}
-                            </td>
-                            <td
-                                className={cn(
-                                    listTable.td,
-                                    "text-muted-foreground",
-                                )}
-                            >
-                                {row.line}
-                            </td>
-                            <td
-                                className={cn(
-                                    listTable.td,
-                                    "text-muted-foreground",
-                                )}
-                            >
-                                {row.weekDesk}
-                            </td>
-                            <td className={listTable.td}>
-                                <WhoTag who={row.who} />
-                            </td>
-                            <td className={listTable.td}>
-                                {onTaking ? (
-                                    <TakingSwitch
-                                        row={row}
-                                        onTaking={onTaking}
-                                        busy={busy}
-                                        stacked={false}
-                                    />
-                                ) : (
-                                    <span className="text-[12.5px] text-muted-foreground">
-                                        {row.who === "paused" ? "Off" : "On"}
-                                    </span>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </ScrollX>
+                                    {row.line}
+                                </div>
+                                <div
+                                    role="cell"
+                                    className="min-w-0 text-muted-foreground"
+                                >
+                                    {row.weekDesk}
+                                </div>
+                                <div role="cell" className="min-w-0">
+                                    <WhoTag who={row.who} />
+                                </div>
+                                <div role="cell" className="min-w-0">
+                                    {onTaking ? (
+                                        <TakingSwitch
+                                            row={row}
+                                            onTaking={onTaking}
+                                            busy={busy}
+                                            stacked={false}
+                                        />
+                                    ) : (
+                                        <span className="text-[12.5px] text-muted-foreground">
+                                            {row.who === "paused"
+                                                ? "Off"
+                                                : "On"}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </ScrollX>
+        </ListTable>
     );
 }
 

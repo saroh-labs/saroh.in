@@ -101,7 +101,7 @@ export interface OwnRateInput {
  * #1035): read (`team:pay` or `commission:rates`), the dry run, set and
  * end (`commission:rates`, a Platform owner). Set for the manager who
  * looks after it now; its "Earns from" is never before the business's
- * first paid plan, and saving it back-pays that manager's NO_RATE lines in
+ * first paid plan, nor before that manager took it on, and saving it back-pays that manager's NO_RATE lines in
  * its window, once: the only back-pay there is. Each write holds the
  * business's manager lock and its commission lock, and is on the admin
  * ledger with its reason, in the same transaction. CROSS-TENANT, behind
@@ -314,7 +314,8 @@ function assertRates(staff: PlatformAdminInfo): void {
 
 /**
  * The window the input asks for, checked: a rate 0–100%, a manager now,
- * and days from the business's first paid plan on.
+ * and days from the business's first paid plan and that manager's start,
+ * whichever is later.
  */
 async function windowInTx(
     tx: Tx,
@@ -348,6 +349,7 @@ async function windowInTx(
         earnsFrom: input.earnsFrom,
         lastDay,
         firstPaidAt: await firstPaidAtInTx(tx, organizationId),
+        manager: { name: manager.name, since: manager.since },
     });
     if (problem) throw new BadRequestException(problem);
     return {

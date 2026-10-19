@@ -936,11 +936,11 @@ test.describe("the Service Editor on Northwind (E2)", () => {
             ).toBeVisible();
 
             await page.goto("/services");
-            // A row of the list: a table row at the desk, a list item
+            // A row of the list: a table's row at the desk, a list item
             // on a phone. Taking bookings is a switch on it, on for a
             // service just added.
             const row = page
-                .locator("tr, li")
+                .locator("[data-service-row], li")
                 .filter({ hasText: name })
                 .filter({ visible: true });
             await expect(row).toContainText("in person or online");

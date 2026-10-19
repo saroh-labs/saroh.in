@@ -211,7 +211,7 @@ const SCOPE: Record<Size, string> = {
     desk: "[data-services-table]",
     phone: "[data-services-list]",
 };
-const ROW: Record<Size, string> = { desk: "tbody tr", phone: "li" };
+const ROW: Record<Size, string> = { desk: "[data-service-row]", phone: "li" };
 
 function rowOf(name: string, size: Size = "desk"): HTMLElement {
     const found = Array.from(
@@ -241,7 +241,7 @@ describe("one list, drawn for the desk and for a phone", () => {
     it("is a table at the desk, with the board's five columns", () => {
         show();
         const heads = Array.from(
-            host.querySelectorAll(`${SCOPE.desk} thead th`),
+            host.querySelectorAll(`${SCOPE.desk} [role="columnheader"]`),
         ).map((th) => th.textContent.trim());
         expect(heads).toEqual([
             "Service",
@@ -250,7 +250,9 @@ describe("one list, drawn for the desk and for a phone", () => {
             "Who can book it",
             "Taking bookings",
         ]);
-        expect(host.querySelectorAll(`${SCOPE.desk} tbody tr`)).toHaveLength(4);
+        expect(
+            host.querySelectorAll(`${SCOPE.desk} [data-service-row]`),
+        ).toHaveLength(4);
     });
 
     it("is a row a service on a phone, shown only at a phone's width", () => {
@@ -307,7 +309,7 @@ describe("Who can book it", () => {
     it("tags every row at the desk, for all four mixes", () => {
         show();
         const tag = (name: string) =>
-            rowOf(name).querySelectorAll("td").item(3).textContent;
+            rowOf(name).querySelectorAll('[role="cell"]').item(3).textContent;
         expect(tag("Physio assessment")).toBe("Customers and team");
         expect(tag("Sports massage")).toBe("Customers only");
         expect(tag("Online review call")).toBe("Team only");
@@ -516,7 +518,9 @@ describe("a search once there are more than 8 services", () => {
         const input = host.querySelector('input[type="search"]');
         expect(input?.getAttribute("aria-label")).toBe("Search services");
         await search("mass");
-        expect(host.querySelectorAll(`${SCOPE.desk} tbody tr`)).toHaveLength(1);
+        expect(
+            host.querySelectorAll(`${SCOPE.desk} [data-service-row]`),
+        ).toHaveLength(1);
         expect(host.querySelectorAll(`${SCOPE.phone} li`)).toHaveLength(1);
         expect(rowOf("Sports massage").textContent).toContain("Sports massage");
         expect(text()).toContain("1 of 10 shown");
@@ -525,9 +529,9 @@ describe("a search once there are more than 8 services", () => {
             (b) => b.textContent.trim() === "Clear",
         );
         act(() => clear?.click());
-        expect(host.querySelectorAll(`${SCOPE.desk} tbody tr`)).toHaveLength(
-            10,
-        );
+        expect(
+            host.querySelectorAll(`${SCOPE.desk} [data-service-row]`),
+        ).toHaveLength(10);
     });
 
     it("says nothing matched, with the way back", async () => {
@@ -551,7 +555,7 @@ describe("a Member reads the list", () => {
             ),
         ).toBe(false);
         expect(
-            rowOf("Physio assessment").querySelectorAll("td").item(4)
+            rowOf("Physio assessment").querySelectorAll('[role="cell"]').item(4)
                 .textContent,
         ).toBe("On");
         expect(rowOf("Hip and back rehab").textContent).toContain("Paused");

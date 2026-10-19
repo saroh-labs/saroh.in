@@ -48,28 +48,74 @@ export function dayWords(day: string): string {
     }).format(new Date(`${day}T00:00:00.000Z`));
 }
 
+/** The first day of the month `day` is in ("2027-01-20" → "2027-01-01"). */
+export function monthStartDay(day: string): string {
+    return `${day.slice(0, 7)}-01`;
+}
+
+/** "Jan 2027", for a refusal. */
+export function monthWords(day: string): string {
+    return new Intl.DateTimeFormat("en-IN", {
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+    }).format(new Date(`${monthStartDay(day)}T00:00:00.000Z`));
+}
+
+/**
+ * The earliest day an own rate can earn from (owner, 19 Oct): the later of
+ * the business's first paid plan and the first day of the month (in India)
+ * its manager took it on. A business that joined with no manager earns its
+ * manager nothing until they are added, and "the month counts": one that
+ * joined on 1 Nov on Pro and was given Arjun on 1 Jan (or on 20 Jan) earns
+ * Arjun January, paid on 31 Jan, and nothing for November or December.
+ * Null when it has paid for nothing yet.
+ */
+export function ownRateFloor(input: {
+    firstPaidAt: Date | null;
+    managerSince: Date | null;
+}): { day: string; by: "first-paid" | "manager" } | null {
+    if (!input.firstPaidAt) return null;
+    const paid = dayOf(input.firstPaidAt);
+    const since = input.managerSince
+        ? monthStartDay(dayOf(input.managerSince))
+        : null;
+    return since !== null && since >= paid
+        ? { day: since, by: "manager" }
+        : { day: paid, by: "first-paid" };
+}
+
 /**
  * Why an own rate can't earn over these days, or null when it can. The
- * earliest day is the business's first paid plan (owner, 19 Oct): the day
- * its first Saroh payment with an amount before GST cleared, which is how
- * every commission line is dated (`issuedAt`, `taxablePaise > 0`). A
+ * earliest day is `ownRateFloor`'s: the business's first paid plan (the
+ * day its first Saroh payment with an amount before GST cleared, which is
+ * how every commission line is dated: `issuedAt`, `taxablePaise > 0`), or
+ * the first day of the month the manager the rate is for took it on,
+ * whichever is later. A
  * business with no paid plan yet gets no own rate at all.
  */
 export function ownRateWindowProblem(input: {
     earnsFrom: string;
     lastDay: string | null;
     firstPaidAt: Date | null;
+    /** The manager the rate is for, and when their link started. */
+    manager: { name: string; since: Date } | null;
 }): string | null {
     if (!isDay(input.earnsFrom)) return "Pick the day it earns from.";
     if (input.lastDay !== null && !isDay(input.lastDay)) {
         return "Pick its last day, or leave it empty.";
     }
-    if (!input.firstPaidAt) {
+    const floor = ownRateFloor({
+        firstPaidAt: input.firstPaidAt,
+        managerSince: input.manager?.since ?? null,
+    });
+    if (!floor) {
         return "This business hasn't paid for a plan yet. Its own rate can be set once it has.";
     }
-    const first = dayOf(input.firstPaidAt);
-    if (input.earnsFrom < first) {
-        return `It can earn from ${dayWords(first)} at the earliest, the day of its first paid plan.`;
+    if (input.earnsFrom < floor.day) {
+        return floor.by === "manager" && input.manager
+            ? `${input.manager.name} took it on in ${monthWords(floor.day)}. A rate can start from ${dayWords(floor.day)}, the start of that month.`
+            : `It can earn from ${dayWords(floor.day)} at the earliest, the day of its first paid plan.`;
     }
     if (input.lastDay !== null && input.lastDay < input.earnsFrom) {
         return "Its last day comes before the day it earns from.";
