@@ -10,6 +10,7 @@ import {
     northwind,
     stamp as ownStamp,
 } from "../fixtures/own-data";
+import { asOwner, openNorthwindAs } from "../fixtures/roles";
 import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
@@ -63,6 +64,49 @@ async function diaryOfOne(request: APIRequestContext): Promise<{
         serviceIds: [service.id],
     });
     return { id: made.id, name, service };
+}
+
+interface Staff {
+    id: string;
+    name: string;
+    hours: { dayOfWeek: number; startMinute: number; endMinute: number }[];
+    timeOff: { id: string }[];
+}
+
+/**
+ * A person of this test's own on Northwind's diary for Hours and time off
+ * (U17), one per project so the desk and phone runs never share a week:
+ * Monday to Saturday 9 am to 6 pm, no time off, active. One an earlier run
+ * archived is brought back and reset rather than another made.
+ */
+async function hoursPerson(
+    request: APIRequestContext,
+    who = "owner",
+): Promise<{ id: string; name: string; first: string }> {
+    const nw = northwind(request);
+    const project = test.info().project.name.replace(/[^A-Za-z]/g, "");
+    const first = `Hours${who === "owner" ? "" : "M"}${project}`;
+    const name = `${first} E2E`;
+    const hours = [1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+        dayOfWeek,
+        startMinute: 540,
+        endMinute: 1080,
+    }));
+    const { staff } = await nw.get<{ staff: Staff[] }>("/staff");
+    const found = staff.find((p) => p.name === name);
+    const id = found
+        ? found.id
+        : (await nw.post<{ id: string }>("/staff", { name, hours })).id;
+    if (found) {
+        await nw.patch(`/staff/${id}`, { status: "ACTIVE" });
+        await nw.put(`/staff/${id}/hours`, { hours });
+        if (found.timeOff.length) {
+            await nw.post(`/staff/${id}/time-off/remove`, {
+                ids: found.timeOff.map((t) => t.id),
+            });
+        }
+    }
+    return { id, name, first };
 }
 
 /**
@@ -806,65 +850,185 @@ test.describe("New booking finds the customer (E4)", () => {
 });
 
 test.describe("availability and services", () => {
-    test("new hours refuse an overlap; the draft is discarded, not saved", async ({
-        page,
-    }) => {
-        await signIn(page);
-        await page.goto("/bookings/availability");
-        await expect(
-            page.getByRole("heading", { level: 1, name: "Hours and time off" }),
-        ).toBeVisible();
-        const monday = page.getByRole("listitem").filter({ hasText: "Monday" });
-        // A range reads "9:00 to 11:00 am", or "9:00 am to 6:00 pm".
-        const range = /^(\d{1,2}:\d\d)(?: ([ap]m))? to \d{1,2}:\d\d ([ap]m)$/;
-        const first = monday.getByText(range).first();
-        test.skip(
-            !(await first.count()),
-            "The first person has no Monday hours",
-        );
-        const [, start = "", own = "", shared = ""] =
-            range.exec((await first.innerText()).trim()) ?? [];
-        const from = `${start} ${own || shared}`;
-        // "+ Hours" adds in a small popover over the row, so no day moves.
-        await monday.getByRole("button", { name: "+ Hours" }).click();
-        const adding = page.getByRole("dialog", {
-            name: "Add hours on Monday",
-        });
-        await adding.getByRole("combobox", { name: "From" }).click();
-        await page.getByRole("option", { name: from, exact: true }).click();
-        await expect(adding.getByRole("alert")).toContainText(
-            "That overlaps hours already set.",
-        );
-        await expect(
-            adding.getByRole("button", { name: "Add hours" }),
-        ).toBeDisabled();
-        await adding.getByRole("button", { name: "Cancel" }).click();
-        await expect(adding).toBeHidden();
+    // @serial: each project puts a person of its own on Northwind's diary
+    // (archived again after), which the calendar tests beside it would see.
+    test(
+        "hours and time off save as they change, with Undo, and leaving never asks (U17)",
+        { tag: "@serial" },
+        async ({ page }) => {
+            test.setTimeout(120_000);
+            await useSession(page);
+            await page.goto(`/open/${NORTHWIND}`);
+            const person = await hoursPerson(page.request);
+            const nw = northwind(page.request);
+            try {
+                await page.goto(`/bookings/availability?person=${person.id}`);
+                await expect(
+                    page.getByRole("heading", {
+                        level: 1,
+                        name: "Hours and time off",
+                    }),
+                ).toBeVisible();
+                await expect(page.getByText(person.name).first()).toBeVisible();
+                // No Save bar: every change saves itself.
+                await expect(
+                    page.getByRole("button", { name: "Save", exact: true }),
+                ).toHaveCount(0);
 
-        // Time off is read first: the lines, then "Add time off", which
-        // opens a sheet. Its button adds to the page's draft, not saved
-        // until the Save bar's "Save".
-        const timeOff = page.getByRole("region", { name: "Time off" });
-        await expect(timeOff.getByRole("textbox")).toHaveCount(0);
-        await timeOff.getByRole("button", { name: "Add time off" }).click();
-        const sheet = page.getByRole("dialog", { name: "New time off" });
-        await expect(sheet).toBeVisible();
-        await sheet.getByLabel(/^Reason/).fill("E2E day off");
-        await sheet.getByRole("button", { name: "Add day off" }).click();
-        await expect(sheet).toBeHidden();
-        await expect(
-            timeOff.getByText("E2E day off · not saved yet"),
-        ).toBeVisible();
+                // Close Saturday: saved at once, and Undo puts it back.
+                const saturday = page.getByRole("button", {
+                    name: /^Saturday, 9 am to 6 pm/,
+                });
+                await saturday.click();
+                const day = page.getByRole("dialog", { name: "Saturday" });
+                await day
+                    .getByRole("switch", { name: "Open on Saturday" })
+                    .click();
+                await expect(
+                    page.getByText(
+                        `Saturday is now closed for ${person.first}. Saved.`,
+                    ),
+                ).toBeVisible();
+                await page.getByRole("button", { name: "Undo" }).click();
+                await expect
+                    .poll(async () =>
+                        (await nw.get<Staff>(`/staff/${person.id}`)).hours.some(
+                            (h) => h.dayOfWeek === 6,
+                        ),
+                    )
+                    .toBe(true);
+                await day.getByRole("button", { name: "Done" }).click();
+                await expect(day).toBeHidden();
 
-        await page
-            .getByRole("button", { name: "Copy Monday to weekdays" })
-            .click();
-        const bar = page.getByRole("button", { name: "Save", exact: true });
-        await expect(bar).toBeVisible();
-        await page.getByRole("button", { name: "Discard" }).click();
-        await expect(bar).toBeHidden();
-        await expect(timeOff.getByText("E2E day off")).toHaveCount(0);
-    });
+                // Change several days: Monday to Friday with lunch, one toast.
+                await page.getByRole("button", { name: "Mon to Fri" }).click();
+                const several = page.getByRole("dialog", {
+                    name: "Change several days",
+                });
+                await several
+                    .getByRole("switch", { name: "Lunch break" })
+                    .click();
+                await several
+                    .getByRole("button", { name: "Apply to 5 days" })
+                    .click();
+                await expect(several).toBeHidden();
+                await expect(
+                    page.getByText(
+                        /^Mon, Tue, Wed, Thu, Fri: 9 am to 6 pm, lunch/,
+                    ),
+                ).toBeVisible();
+                await expect(
+                    page.getByRole("button", {
+                        name: /^Monday, 9 am to 6 pm, Lunch/,
+                    }),
+                ).toBeVisible();
+
+                // Time off: added from its sheet, then removed with Undo there.
+                await page
+                    .getByRole("button", { name: "Add time off" })
+                    .click();
+                const off = page.getByRole("dialog", { name: "Add time off" });
+                await off.getByRole("radio", { name: "Tomorrow" }).click();
+                await off.getByLabel(/^Reason/).fill("E2E leave");
+                await off
+                    .getByRole("button", { name: "Add time off", exact: true })
+                    .click();
+                await expect(off).toBeHidden();
+                await expect(page.getByText(/^Time off added\./)).toBeVisible();
+                const line = page.getByRole("button", {
+                    name: new RegExp(`^${person.first}\\s·\\s.*E2E leave`),
+                });
+                await line.click();
+                await page
+                    .getByRole("button", { name: "Remove this time off" })
+                    .click();
+                await expect(page.getByText("Time off removed.")).toBeVisible();
+                await expect(line).toHaveCount(0);
+
+                if (test.info().project.name.startsWith("phone")) {
+                    await expectNothingHiddenSideways(page);
+                }
+
+                // Leaving never asks: there is no draft to lose.
+                await page
+                    .getByRole("navigation", { name: "Breadcrumb" })
+                    .getByRole("link", { name: "Bookings" })
+                    .click();
+                await expect(page).toHaveURL(/\/bookings(\?|$)/);
+                await expect(
+                    page.getByRole("alertdialog", {
+                        name: "Leave without saving?",
+                    }),
+                ).toHaveCount(0);
+            } finally {
+                await nw.patch(`/staff/${person.id}`, { status: "ARCHIVED" });
+            }
+        },
+    );
+
+    // @serial: as above, a person of the test's own on Northwind's diary.
+    test(
+        "a Member changes someone's day and adds their time off, and adds nobody (DEC-170)",
+        { tag: "@serial" },
+        async ({ page, browser }) => {
+            test.setTimeout(120_000);
+            const owner = await asOwner(browser);
+            const person = await hoursPerson(owner.request, "member");
+            const nw = northwind(owner.request);
+            try {
+                await openNorthwindAs(page, "northwindMember");
+                await page.goto(`/bookings/availability?person=${person.id}`);
+                await expect(
+                    page.getByText(
+                        /^As front desk you can change anyone's hours/,
+                    ),
+                ).toBeVisible();
+                await page
+                    .getByRole("button", { name: /^Monday, 9 am to 6 pm/ })
+                    .click();
+                await page
+                    .getByRole("dialog", { name: "Monday" })
+                    .getByRole("switch", { name: "Open on Monday" })
+                    .click();
+                await expect(
+                    page.getByText(
+                        `Monday is now closed for ${person.first}. Saved.`,
+                    ),
+                ).toBeVisible();
+                await expect
+                    .poll(async () =>
+                        (await nw.get<Staff>(`/staff/${person.id}`)).hours.some(
+                            (h) => h.dayOfWeek === 1,
+                        ),
+                    )
+                    .toBe(false);
+                await page.keyboard.press("Escape");
+
+                await page
+                    .getByRole("button", { name: "Add time off" })
+                    .click();
+                const off = page.getByRole("dialog", { name: "Add time off" });
+                // Closing the whole business stays with owners and admins.
+                await expect(
+                    off.getByText("The business is closed"),
+                ).toHaveCount(0);
+                await off
+                    .getByRole("button", { name: "Add time off", exact: true })
+                    .click();
+                await expect(page.getByText(/^Time off added\./)).toBeVisible();
+
+                await page.getByRole("button", { name: /Whose hours/ }).click();
+                await expect(
+                    page.getByRole("button", {
+                        name: "Add someone who takes bookings",
+                    }),
+                ).toHaveCount(0);
+            } finally {
+                await nw.patch(`/staff/${person.id}`, { status: "ARCHIVED" });
+                await owner.close();
+            }
+        },
+    );
 
     test("a class under two places is refused, and leaving asks first (E2)", async ({
         page,

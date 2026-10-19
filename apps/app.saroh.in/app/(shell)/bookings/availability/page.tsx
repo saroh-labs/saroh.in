@@ -9,6 +9,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import type { KeptBooking } from "@/lib/services/availability-rules";
+import { calendarHref } from "@/lib/services/calendar-href";
 import {
     addDays,
     dayBounds,
@@ -35,14 +36,17 @@ import { tidyWeek } from "@/lib/staff/starting-week";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
- * Bookings › Availability (U16): each person's weekly hours, time off and
- * one-off extra hours, and the business's booking rules. Reads the staff
- * (U3) and three weeks of bookings (U4) — the bookings only to say which
- * would fall outside new hours or in extra hours; time off and closures
- * ask the API what they cover (E3). Without them the editor still works
- * and says it could not check. With nobody on the diary it also reads the
- * services' own hours, as the calendar's "Service hours" column does
+ * Bookings › Hours and time off (U16; V2 in U17, DEC-170): each person's
+ * weekly hours, time off and one-off extra hours, and the business's
+ * booking rules, each saved as it is changed. Reads the staff (U3) and
+ * three weeks of bookings (U4) — the bookings only to say which fall
+ * outside the hours or in extra hours; time off and closures ask the API
+ * what they cover (E3). Without them the screen still works and says it
+ * could not check. With nobody on the diary it also reads the services'
+ * own hours, as the calendar's "Service hours" column does
  * (`readServiceHours`), to say the week customers can book today.
+ * `?person=` opens on someone (the calendar's ⋯ "Arjun's hours and time
+ * off"), or `all` on everyone.
  */
 export const metadata = { title: "Hours and time off" };
 
@@ -54,8 +58,16 @@ async function readStaff(): Promise<StaffList | null> {
     }
 }
 
-export default async function AvailabilityPage() {
-    await requireSession();
+export default async function AvailabilityPage({
+    searchParams,
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+    const [session, params] = await Promise.all([
+        requireSession(),
+        searchParams,
+    ]);
+    const person = typeof params.person === "string" ? params.person : null;
     const [organization, staffList, rules, services, payment, plan] =
         await Promise.all([
             resolveActiveOrganization(),
@@ -125,6 +137,8 @@ export default async function AvailabilityPage() {
                         weekday: weekdayOf(date),
                         start: localMinuteOf(b.startAt, timezone),
                         who: whoFor(b),
+                        date,
+                        href: `/bookings/${b.id}`,
                     });
                 }
             }
@@ -140,15 +154,13 @@ export default async function AvailabilityPage() {
                         weekday: weekdayOf(date),
                         start: localMinuteOf(s.startAt, timezone),
                         who: s.service.name,
+                        date,
+                        href: calendarHref("day", date, { person: staffId }),
                     });
                 }
             }
         }
     }
-    const classes = new Set(
-        services.filter((s) => s.capacity > 1).map((s) => s.id),
-    );
-
     return (
         <PageContainer width="full">
             <div>
@@ -181,12 +193,14 @@ export default async function AvailabilityPage() {
                     today={today}
                     kept={kept}
                     bookedOn={bookedOn}
-                    takesClasses={staffList.staff
-                        .filter((p) =>
-                            p.serviceIds.some((id) => classes.has(id)),
-                        )
-                        .map((p) => p.id)}
-                    canEdit={may("service:write")}
+                    person={person}
+                    business={organization?.name ?? "the business"}
+                    me={session.user.name ?? ""}
+                    // A Member keeps anyone's hours, time off and extra
+                    // hours (DEC-170, Q13); who takes bookings, closing
+                    // the business and its rules stay `service:write`.
+                    canEdit={may("hours:write")}
+                    canManage={may("service:write")}
                     onlineBlocker={payment?.onlineBlocker}
                 />
             </div>

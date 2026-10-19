@@ -31,10 +31,6 @@ const FLOWS: [flow: string, file: string][] = [
     ["location (new)", "components/stores/create-store-form.tsx"],
     ["create site", "components/sites/create-site-form.tsx"],
     ["CSV import review", "components/stores/csv-import.tsx"],
-    [
-        "availability",
-        "components/bookings/availability/availability-editor.tsx",
-    ],
     ["stock count", "components/commerce/stock/stock-screen.tsx"],
 ];
 

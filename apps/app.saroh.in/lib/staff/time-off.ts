@@ -1,5 +1,7 @@
-import { formatClockRange, formatDay } from "@/lib/format/datetime";
+import { formatDay } from "@/lib/format/datetime";
+import { joinFacts } from "@/lib/format/join";
 import { count } from "@/lib/format/plural";
+import { firstName } from "@/lib/names";
 import type { LocalDate } from "@/lib/services/diary";
 import {
     addDays,
@@ -8,13 +10,14 @@ import {
     minuteOnDay,
 } from "@/lib/services/diary";
 
+import { spanWords } from "./day-plan";
 import type { Closure, StaffList, TimeOff } from "./types";
 
 /**
- * Time off and closures on the Availability screen (E3), pure so the screen
- * and its tests agree. The API keeps a part-day range as one row per day;
- * the screen shows it as one line — "2 Nov – 6 Nov · 5 days · all day ·
- * business closed" — and removes it whole.
+ * Time off and closures on Hours and time off (E3; V2 in U17), pure so the
+ * screen and its tests agree. The API keeps a part-day range as one row per
+ * day; the screen shows it as one line — "Meera · 27 to 29 Oct", "Leave ·
+ * all day · 3 days" — and removes it whole.
  */
 
 /** One line of time off or closure, and the rows it stands for. */
@@ -99,29 +102,6 @@ export function offLines(
     return lines;
 }
 
-/** "2 Nov" — the day without its weekday. */
-function shortDate(date: LocalDate): string {
-    return formatDay(date, { year: "never" });
-}
-
-/** What a line says: when, how long, what part of the day, and whose. */
-export function offLineLabel(
-    line: Pick<
-        OffLine,
-        "fromDate" | "toDate" | "days" | "startMinute" | "endMinute" | "closed"
-    >,
-): string {
-    const when =
-        line.days > 1
-            ? `${shortDate(line.fromDate)} to ${shortDate(line.toDate)} · ${line.days} days`
-            : formatDay(line.fromDate, { weekday: "short", year: "never" });
-    const part =
-        line.startMinute === null || line.endMinute === null
-            ? "all day"
-            : formatClockRange(line.startMinute, line.endMinute);
-    return `${when} · ${part}${line.closed ? " · business closed" : ""}`;
-}
-
 /** How many local days `from`–`to` covers, inclusive. */
 export function dayCount(from: LocalDate, to: LocalDate): number {
     return (
@@ -130,52 +110,6 @@ export function dayCount(from: LocalDate, to: LocalDate): number {
                 86_400_000,
         ) + 1
     );
-}
-
-/** The add button's words, as the design has them. */
-export function offButtonLabel(input: {
-    days: number;
-    closed: boolean;
-    partOfDay: boolean;
-}): string {
-    if (input.closed) {
-        return input.days > 1
-            ? `Close for ${input.days} days`
-            : "Close that day";
-    }
-    if (input.days > 1) return `Add ${input.days} days off`;
-    return input.partOfDay ? "Add time off" : "Add day off";
-}
-
-/**
- * The line under the form: why it can't be added, the bookings already in
- * that time (kept — nothing is cancelled), or what closing means.
- */
-export function offNote(input: {
-    refusal: string | null;
-    /** Bookings in the time, or null when they couldn't be checked. */
-    taken: number | null;
-    closed: boolean;
-}): { text: string; tone: "danger" | "warn" | "muted" } {
-    if (input.refusal) return { text: input.refusal, tone: "danger" };
-    if (input.taken === null) {
-        return {
-            text: "Bookings then couldn't be checked.",
-            tone: "muted",
-        };
-    }
-    if (input.taken > 0) {
-        return {
-            text: `${count(input.taken, "booking falls", "bookings fall")} in this time. They're kept. Move or cancel them from the calendar.`,
-            tone: "warn",
-        };
-    }
-    return {
-        text: input.closed
-            ? "Nobody can be booked then, and the booking page and calendar show it as closed."
-            : "Nothing booked then.",
-        tone: "muted",
-    };
 }
 
 /**
@@ -192,4 +126,99 @@ export function withClosures(list: StaffList): StaffList {
             timeOff: [...p.timeOff, ...closures],
         })),
     };
+}
+
+// — Hours and time off, V2 (U17) ————————————————————————————————————
+
+/** A reason as written, or `none` when it is blank. */
+function said(reason: string | null, none: string): string {
+    const words = reason?.trim() ?? "";
+    return words === "" ? none : words;
+}
+
+/** "Fri 30 Oct", "27 to 29 Oct", "30 Dec to 2 Jan": the days of a line. */
+export function offDates(
+    from: LocalDate,
+    to: LocalDate,
+    today?: LocalDate,
+): string {
+    if (from === to) {
+        return formatDay(from, { weekday: "short", year: "auto", today });
+    }
+    const a = formatDay(from, { year: "auto", today });
+    const b = formatDay(to, { year: "auto", today });
+    // "27 Oct" and "29 Oct": the month once.
+    const [aDay, aMonth, aYear] = a.split(" ");
+    const [, bMonth, bYear] = b.split(" ");
+    return aMonth === bMonth && aYear === bYear
+        ? `${aDay} to ${b}`
+        : `${a} to ${b}`;
+}
+
+/**
+ * A line of time off in the Time off list: whose and when on top, why,
+ * what part of the day and how long under it. A closure leads with its
+ * reason ("Diwali") and says the whole business is closed.
+ */
+export function offRowWords(
+    line: OffLine,
+    who: string | null,
+    today?: LocalDate,
+): { title: string; sub: string } {
+    const dates = offDates(line.fromDate, line.toDate, today);
+    const part =
+        line.startMinute === null || line.endMinute === null
+            ? "all day"
+            : spanWords(line.startMinute, line.endMinute);
+    if (line.closed) {
+        return {
+            title: joinFacts(said(line.reason, "Closed"), dates),
+            sub: joinFacts(
+                "Whole business closed",
+                line.startMinute === null ? null : part,
+            ),
+        };
+    }
+    return {
+        title: joinFacts(who ? firstName(who) : null, dates),
+        sub: joinFacts(
+            said(line.reason, "Time off"),
+            part,
+            line.days > 1 ? count(line.days, "day") : null,
+        ),
+    };
+}
+
+/** The quick dates on Add time off. */
+export type QuickWhen = "today" | "tomorrow" | "pick";
+
+export function quickDates(
+    when: Exclude<QuickWhen, "pick">,
+    today: LocalDate,
+): { from: LocalDate; to: LocalDate } {
+    const day = when === "today" ? today : addDays(today, 1);
+    return { from: day, to: day };
+}
+
+/** "3 days." under the dates; a closure also says nobody can be booked. */
+export function offSpan(
+    from: LocalDate,
+    to: LocalDate,
+    business: string | null,
+): string {
+    const days = dayCount(from, to);
+    const span = days === 1 ? "One day." : `${count(days, "day")}.`;
+    return business ? `${span} Nobody at ${business} can be booked.` : span;
+}
+
+/** How many bookings fall in the time, as the warning says it. */
+export function clashWords(n: number): string {
+    return `${count(n, "booking falls", "bookings fall")} in this time.`;
+}
+
+/** The toast once time off is added, and what it leaves booked. */
+export function offAdded(affected: number): string {
+    return affected
+        ? `Time off added. ${count(affected, "booking in it stays", "bookings in it stay")} booked.`
+        : "Time off added.";
 }

@@ -1,174 +1,202 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { X } from "lucide-react";
-import { useId, useState } from "react";
+import { ChevronRight, Plus, Store } from "lucide-react";
 
-import type { NewOff } from "@/lib/services/availability-rules";
 import type { LocalDate } from "@/lib/services/diary";
+import { spanWords } from "@/lib/staff/day-plan";
+import type { OffItem } from "@/lib/staff/hours-view";
+import type { TimeOffInput } from "@/lib/staff/service";
 import type { OffLine } from "@/lib/staff/time-off";
-import { dayCount, offLineLabel, offLines } from "@/lib/staff/time-off";
-import type { Closure, StaffView } from "@/lib/staff/types";
-import { EmptyState } from "@saroh/ui/data-state";
+import { offDates, offRowWords } from "@/lib/staff/time-off";
 
-import { ADD_TIME_OFF_ID, AddTimeOffSheet } from "./add-time-off-sheet";
+import { ADD_TIME_OFF_ID } from "./add-time-off-sheet";
+import { Face } from "./face";
 
-const card = "rounded-[12px] border border-border bg-card px-4 py-[13px]";
-const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
+const ROW =
+    "flex min-h-[60px] w-full items-center gap-3 bg-card py-2 pl-3.5 pr-3 text-left text-foreground min-[760px]:min-h-[58px] min-[760px]:px-[18px]";
+const PRESS =
+    "cursor-pointer hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active";
 
 /**
- * Availability's Time off card (E3, the Bookings design), read first: the
- * person's time off and the business's closures as one line each, and
- * "Add time off" by the heading, which opens the sheet with the fields
- * (`add-time-off-sheet.tsx`). Adds and removals are part of the screen's
- * draft until the page's "Save"; a line added and not saved yet says so.
+ * Time off on Hours and time off (U17, BKMAvailability, BKDHours): what is
+ * coming up, one row each — whose and when on top, why, what part of the
+ * day and how long under it; the business closed has its shop sign — and
+ * "Add time off" as the list's last row. A row opens the time off on its
+ * own, where it can be removed with Undo. Read-only roles see the rows.
  */
 export function TimeOffCard({
-    me,
-    closures,
-    timezone,
+    items,
     today,
     canEdit,
-    offAdded,
-    offRemoved,
+    onOpen,
     onAdd,
-    onRemoveSaved,
-    onRemoveNew,
 }: {
-    me: StaffView;
-    closures: Closure[];
-    timezone: string;
+    items: OffItem[];
     today: LocalDate;
     canEdit: boolean;
-    offAdded: NewOff[];
-    offRemoved: string[];
-    onAdd: (off: Omit<NewOff, "key">) => void;
-    onRemoveSaved: (ids: string[]) => void;
-    onRemoveNew: (key: string) => void;
+    onOpen: (item: OffItem) => void;
+    onAdd: () => void;
 }) {
-    const id = useId();
-    const [open, setOpen] = useState(false);
-    // Each opening is a fresh sheet: nothing typed last time comes back.
-    const [opening, setOpening] = useState(0);
-
-    const current = (line: OffLine) =>
-        line.toDate >= today && !line.ids.some((x) => offRemoved.includes(x));
-    const saved = [
-        ...offLines(me.timeOff, timezone, false),
-        ...offLines(closures, timezone, true),
-    ]
-        .filter(current)
-        .sort((a, b) => a.fromDate.localeCompare(b.fromDate));
-    const pending = offAdded.filter(
-        (o) => o.staffId === null || o.staffId === me.id,
-    );
-
     return (
-        <section aria-labelledby={`${id}-title`} className={card}>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-                <h2 id={`${id}-title`} className={cn(cardTitle, "flex-1")}>
+        <section aria-labelledby="time-off" className="min-w-0">
+            <div className="mb-2.5 mt-[26px] flex items-baseline gap-2 min-[760px]:mt-0">
+                <h2
+                    id="time-off"
+                    className="flex-1 font-display text-[16px] font-semibold tracking-[-0.01em] min-[760px]:text-[17px] min-[760px]:tracking-[-0.02em]"
+                >
                     Time off
                 </h2>
-                {canEdit ? (
-                    <Button
-                        size="sm"
-                        id={ADD_TIME_OFF_ID}
-                        variant="outline"
-                        className="shrink-0"
-                        onClick={() => {
-                            setOpening((n) => n + 1);
-                            setOpen(true);
-                        }}
-                    >
-                        Add time off
-                    </Button>
-                ) : null}
+                <span className="text-[12.5px] text-muted-foreground">
+                    Coming up
+                </span>
             </div>
-            <ul>
-                {saved.map((line) => (
-                    <OffRow
-                        key={line.ids[0]}
-                        when={offLineLabel(line)}
-                        why={line.reason ?? "No reason given"}
-                        canEdit={canEdit}
-                        onRemove={() => onRemoveSaved(line.ids)}
-                    />
-                ))}
-                {pending.map((o) => (
-                    <OffRow
-                        key={o.key}
-                        when={offLineLabel({
-                            fromDate: o.fromDate,
-                            toDate: o.toDate,
-                            days: dayCount(o.fromDate, o.toDate),
-                            startMinute: o.startMinute,
-                            endMinute: o.endMinute,
-                            closed: o.staffId === null,
-                        })}
-                        why={`${o.reason === "" ? "No reason given" : o.reason} · not saved yet`}
-                        canEdit={canEdit}
-                        onRemove={() => onRemoveNew(o.key)}
-                    />
-                ))}
+            <ul className="overflow-hidden rounded-[14px] border border-border bg-card min-[760px]:rounded-[12px]">
+                {items.map((item) => {
+                    const words = offRowWords(item.line, item.who, today);
+                    const body = (
+                        <>
+                            {item.staffId ? (
+                                <Face name={item.who ?? ""} />
+                            ) : (
+                                <Face
+                                    tone="amber"
+                                    icon={
+                                        <Store
+                                            aria-hidden
+                                            className="size-[17px]"
+                                        />
+                                    }
+                                />
+                            )}
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[14.5px] font-semibold">
+                                    {words.title}
+                                </span>
+                                <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+                                    {words.sub}
+                                </span>
+                            </span>
+                        </>
+                    );
+                    return (
+                        <li
+                            key={item.line.ids[0]}
+                            className="border-b border-border last:border-b-0"
+                        >
+                            {canEdit ? (
+                                <button
+                                    type="button"
+                                    aria-haspopup="dialog"
+                                    aria-label={`${words.title}, ${words.sub}`}
+                                    onClick={() => onOpen(item)}
+                                    className={cn(ROW, PRESS)}
+                                >
+                                    {body}
+                                    <ChevronRight
+                                        aria-hidden
+                                        className="size-4 shrink-0 text-muted-foreground"
+                                    />
+                                </button>
+                            ) : (
+                                <div className={ROW}>{body}</div>
+                            )}
+                        </li>
+                    );
+                })}
+                {!items.length ? (
+                    <li className="border-b border-border px-3.5 py-3.5 last:border-b-0">
+                        <span className="block text-[14px] font-semibold">
+                            No time off coming up
+                        </span>
+                        <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+                            Leave, holidays and closed days show here.
+                        </span>
+                    </li>
+                ) : null}
+                {canEdit ? (
+                    <li>
+                        <button
+                            id={ADD_TIME_OFF_ID}
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={onAdd}
+                            className={cn(
+                                ROW,
+                                PRESS,
+                                "min-h-[52px] text-[14.5px] font-semibold min-[760px]:min-h-[58px]",
+                            )}
+                        >
+                            <Face
+                                icon={
+                                    <Plus aria-hidden className="size-[18px]" />
+                                }
+                            />
+                            Add time off
+                        </button>
+                    </li>
+                ) : null}
             </ul>
-            {!saved.length && !pending.length ? (
-                <EmptyState size="inline" title="No time off booked." />
-            ) : null}
-            {canEdit ? (
-                <AddTimeOffSheet
-                    key={opening}
-                    open={open}
-                    onClose={() => setOpen(false)}
-                    me={me}
-                    today={today}
-                    onAdd={onAdd}
-                />
-            ) : null}
         </section>
     );
 }
 
-export function OffRow({
-    when,
-    why,
-    warn = false,
-    canEdit,
-    onRemove,
-    removeLabel = "Remove this time off",
+/**
+ * One line of time off, opened from the list: what it is, and "Remove
+ * this time off" at its foot. Time off is added and removed, not edited:
+ * to change one, remove it (Undo puts it back) and add it again.
+ */
+export function OffDetails({
+    item,
+    today,
 }: {
-    when: string;
-    why: string | null;
-    warn?: boolean;
-    canEdit: boolean;
-    onRemove: () => void;
-    removeLabel?: string;
+    item: OffItem;
+    today: LocalDate;
 }) {
+    const { line } = item;
+    const facts: [string, string][] = [
+        ["What", line.closed ? "The business is closed" : "Someone is away"],
+        ...(line.closed ? [] : [["Who", item.who ?? ""] as [string, string]]),
+        ["When", offDates(line.fromDate, line.toDate, today)],
+        [
+            "Hours",
+            line.startMinute === null || line.endMinute === null
+                ? "All day"
+                : spanWords(line.startMinute, line.endMinute),
+        ],
+        ["Reason", line.reason?.trim() ? line.reason.trim() : "None given"],
+    ];
     return (
-        <li className="flex items-center gap-2 border-t border-border/60 py-[7px]">
-            <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold">{when}</div>
-                {why ? (
-                    <div
-                        className={cn(
-                            "text-[12px]",
-                            warn ? "text-foreground" : "text-muted-foreground",
-                        )}
-                    >
-                        {why}
-                    </div>
-                ) : null}
-            </div>
-            {canEdit ? (
-                <button
-                    type="button"
-                    aria-label={removeLabel}
-                    onClick={onRemove}
-                    className="grid size-8 place-items-center rounded-[7px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:size-11"
+        <dl className="mt-1 overflow-hidden rounded-[12px] border border-border bg-card">
+            {facts.map(([k, v]) => (
+                <div
+                    key={k}
+                    className="flex min-h-[52px] items-center gap-3 border-b border-border px-3.5 text-[15px] last:border-b-0"
                 >
-                    <X aria-hidden className="size-4" />
-                </button>
-            ) : null}
-        </li>
+                    <dt className="flex-1">{k}</dt>
+                    <dd className="text-right text-muted-foreground">{v}</dd>
+                </div>
+            ))}
+        </dl>
     );
+}
+
+/** A removed line as the API takes it back, for Undo. */
+export function rangeOfLine(line: OffLine): TimeOffInput {
+    const row = line.rows.at(0);
+    if (!line.closed && !line.allDay && line.rows.length === 1 && row) {
+        return {
+            startAt: row.startAt,
+            endAt: row.endAt,
+            reason: row.reason ?? undefined,
+        };
+    }
+    return {
+        fromDate: line.fromDate,
+        toDate: line.toDate,
+        ...(line.startMinute !== null && line.endMinute !== null
+            ? { startMinute: line.startMinute, endMinute: line.endMinute }
+            : {}),
+        reason: line.reason ?? undefined,
+    };
 }

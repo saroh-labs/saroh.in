@@ -36,15 +36,18 @@ export async function addPerson(input: { name: string; title?: string }) {
  * "It's just me": the signed-in person on the diary in one press, with the
  * opening hours as their week and every service that takes bookings as
  * theirs, so customers can book them at once. Answers with which week they
- * started with, for the toast to say.
+ * started with, for the toast to say. `hours`, when given, is the week they
+ * chose instead (Hours and time off's "Choose different hours", U17).
  */
-export async function addMyself(): Promise<ApiResult<AddedSelf>> {
+export async function addMyself(
+    hours?: WeeklyRange[],
+): Promise<ApiResult<AddedSelf>> {
     const [opening, services] = await Promise.all([
         staff.readOpeningHours(),
         listServices().catch(() => []),
     ]);
     const res = await staff.addSelf({
-        hours: startingWeek(opening),
+        hours: hours ?? startingWeek(opening),
         serviceIds: services
             .filter((s) => s.status === "ACTIVE")
             .map((s) => s.id),

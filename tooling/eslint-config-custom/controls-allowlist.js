@@ -28,10 +28,24 @@ export const RAW_ALLOWED = {
     "components/bookings/all-bookings/more-filters.tsx": ["button"],
     // button: each item of a row's menu sheet on a phone, a row that is one button
     "components/bookings/all-bookings/row-menu.tsx": ["button"],
+    // button: a row that is one button (a rule, opened to change it)
+    "components/bookings/availability/booking-rules-card.tsx": ["button"],
+    // button: a row that opens its time picker under it
+    "components/bookings/availability/clock-select.tsx": ["button"],
+    // button: a row that is one button (a shift, a person's day, add a shift)
+    "components/bookings/availability/day-editor.tsx": ["button"],
+    // button: a row that is one button (a person, opened to change their day)
+    "components/bookings/availability/everyone-day.tsx": ["button"],
+    // button: a row that is one button (add someone else)
+    "components/bookings/availability/first-hours.tsx": ["button"],
+    // button: a row that is one button (More's rows)
+    "components/bookings/availability/more-list.tsx": ["button"],
     // button: a row or card that is one button
     "components/bookings/availability/time-off-card.tsx": ["button"],
     // button: a chip, a row or card that is one button
     "components/bookings/availability/weekly-hours.tsx": ["button"],
+    // button: a card that is one button (whose hours, opened to pick)
+    "components/bookings/availability/whose-hours.tsx": ["button"],
     // button: the List's free times card that opens, and each free time a row
     "components/bookings/calendar/list/list-free-times.tsx": ["button"],
     // button: each booked row of the List, one button

@@ -116,7 +116,7 @@ The sheet and the dialog share one set of rules
   full width with the button on top. **This replaces "Save then Cancel on
   the left".**
 - **Labels.** "Save" for an edit, on a page as in an overlay (the Service
-  Editor, the discount code form, Availability, the QR maker). Verb and
+  Editor, the discount code form, the QR maker). Verb and
   thing for a create or an action
   ("Add note", "Send invite"). Never "Save changes", "Update" or "Done",
   except `doneOnly` on a sheet that only lists things. The way out is
@@ -207,11 +207,18 @@ ten seconds (a refund, a cancel) closes its sheet into the hold card on
 the page, where its Undo is.
 
 The same goes for adding to a list: the list, then one button that opens
-the sheet, never fields left open under the rows. Where the screen has its
-own Save bar (Availability's Time off, `add-time-off-sheet.tsx`), the
-sheet's button adds to the page's draft and the sheet says so. One or two
-short choices inside a dense grid (a time range in a week's row,
-`weekly-hours.tsx`) open in a popover over the row, so no other row moves.
+the sheet, never fields left open under the rows. One or two short
+choices inside a dense grid open in a popover over the row, so no other
+row moves.
+
+**Current** — **Hours and time off save as they change** (U17, DEC-170):
+no Save bar and no draft on the page. A day row opens its sheet
+(`components/bookings/availability/hours-panel.tsx`: a bottom sheet on a
+phone, a right-hand panel on a desk), each control in it saves the
+person's week at once with a toast and Undo (`use-hours.ts`), and "Done"
+closes it; a save that is refused puts the control back and says nothing
+has changed. Adding something with several fields (time off, several days
+at once) is still a `FormSheet` whose button saves, with Undo after.
 Two addresses that show the same records are one screen with a segmented
 switch on both (`bookings-view-switch.tsx`, `leads-view-switch.tsx`), not a
 loose button to the other. And a small job is finished where it started:

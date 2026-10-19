@@ -1,139 +1,74 @@
 "use client";
 
-import { formatClockRange, formatDay } from "@/lib/format/datetime";
-import { count } from "@/lib/format/plural";
-import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import { PageHeader } from "@saroh/ui/page-header";
-import { showError, showUndo, showWarning } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { useLeaveGuard } from "@/components/shared/use-leave-guard";
-import type {
-    AvailabilityDraft,
-    KeptBooking,
-    NewOff,
-    SaveOp,
-} from "@/lib/services/availability-rules";
-import {
-    draftFrom,
-    saveOps,
-    weeklyHours,
-} from "@/lib/services/availability-rules";
+import { count } from "@/lib/format/plural";
+import { useNarrow } from "@/lib/hooks/use-narrow";
+import { firstName } from "@/lib/names";
+import type { KeptBooking } from "@/lib/services/availability-rules";
 import type { LocalDate } from "@/lib/services/diary";
+import type { SeveralChoice } from "@/lib/staff/day-plan";
 import {
-    addClosure,
-    addExtraHours,
-    addMyself,
-    addTimeOff,
-    removeClosures,
-    removeExtraHours,
-    removeTimeOffMany,
-    replaceStaffHours,
-    updateStaff,
-} from "@/lib/staff/actions";
-import type { TimeOffInput } from "@/lib/staff/service";
-import { hasOpening, weekLines } from "@/lib/staff/starting-week";
-import type { OffLine } from "@/lib/staff/time-off";
+    severalRanges,
+    severalSaved,
+    weekMeta,
+    withDays,
+} from "@/lib/staff/day-plan";
+import {
+    comingExtra,
+    comingOff,
+    severalStart,
+    usualDay,
+    weekRows,
+} from "@/lib/staff/hours-view";
+import { startingWeek } from "@/lib/staff/starting-week";
 import type {
-    BookingBrief,
     BookingRules,
     Closure,
     OnlineBlocker,
     StaffView,
     WeeklyRange,
 } from "@/lib/staff/types";
-import { EmptyState } from "@saroh/ui/data-state";
 
-import { ChipGroup } from "@/components/shared/choice-group";
-import { runAction } from "@/lib/api/run-action";
-import { UNREACHED } from "@/lib/api/unreached";
-import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "./add-person-dialog";
-import { BookablePreview } from "./bookable-preview";
-import { BookingRulesCard } from "./booking-rules-card";
-import { OffRow, TimeOffCard } from "./time-off-card";
+import { AddTimeOffSheet } from "./add-time-off-sheet";
+import { useBookingRules } from "./booking-rules-card";
+import { FirstHours, useSetMine } from "./first-hours";
+import { HoursHeader } from "./hours-header";
+import type { Panel } from "./hours-panels";
+import { HoursPanels } from "./hours-panels";
+import { MoreSection, RulesRow } from "./more-list";
+import { OutsideNote } from "./outside-note";
+import { SeveralDaysSheet } from "./several-days-sheet";
+import { TimeOffCard } from "./time-off-card";
+import { useHours } from "./use-hours";
 import { WeeklyHours } from "./weekly-hours";
-
-/** A new line of time off as the API takes it. */
-function rangeOf(off: NewOff): TimeOffInput {
-    return {
-        fromDate: off.fromDate,
-        toDate: off.toDate,
-        ...(off.startMinute !== null && off.endMinute !== null
-            ? { startMinute: off.startMinute, endMinute: off.endMinute }
-            : {}),
-        reason: off.reason || undefined,
-    };
-}
+import { EVERYONE, WhoseRow } from "./whose-hours";
 
 /**
- * A removed line as the API takes it back, for Undo: one part-day row of a
- * person's goes back exactly as it was; anything else as its range.
- */
-function rangeOfLine(line: OffLine, closed: boolean): TimeOffInput {
-    const row = line.rows[0];
-    if (!closed && !line.allDay && line.rows.length === 1) {
-        return {
-            startAt: row.startAt,
-            endAt: row.endAt,
-            reason: row.reason ?? undefined,
-        };
-    }
-    return rangeOf({
-        key: "",
-        staffId: null,
-        fromDate: line.fromDate,
-        toDate: line.toDate,
-        startMinute: line.startMinute,
-        endMinute: line.endMinute,
-        reason: line.reason ?? "",
-    });
-}
-
-const card = "rounded-[12px] border border-border bg-card px-4 py-[13px]";
-
-/**
- * The save bar's line: what saving will do. Only hours, time off and extra
- * hours wait for Save now; a booking rule saves in its own sheet.
- */
-export function unsavedText(): string {
-    return "Unsaved. New free times show on the calendar and the booking page when you save. Bookings already made don't move.";
-}
-
-/** The toast once the page's draft is saved. */
-export function savedText(): string {
-    return "Saved. The calendar and booking page use them now.";
-}
-
-/** "It's just me", once they are on the diary: which week they started with. */
-export function joinedText(week: "opening" | "default"): string {
-    return week === "opening"
-        ? "You're on the diary with your opening hours."
-        : "You're on the diary with a starting week.";
-}
-
-/** Settings › Hours, where the business's opening hours are kept. */
-const HOURS = "/settings/organization?section=hours";
-const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
-
-/**
- * Bookings › Availability (U16, the design's `?view=avail`): when people
- * can book. Each person's weekly hours, time off and one-off extra hours
- * are a draft until "Save"; saving writes what changed, and Undo puts it
- * all back. Hours never move a booking: the ones left outside are listed
- * and kept. Beside the week, "What customers see" shows the times the
- * booking page offers. Under it, the business's booking rules are
- * sentences in rows, each changed in its own sheet, so a rule never
- * raises the page's unsaved bar.
+ * Bookings › Hours and time off (U17, V2; DEC-170): when each person can be
+ * booked. Under the page's header, the "Whose hours" card picks whose
+ * week shows (or everyone's; `?person=` opens on someone, as the calendar's
+ * ⋯ links here). The week is a calm list, a row a day; a row opens that
+ * day's sheet, the chips over it change several days at once. Time off is
+ * on the same screen, and More holds extra opening hours, what customers
+ * see and the business's booking rules. On a desk Time off and More sit in
+ * a column on the right; on a phone they follow the week. Every sheet is a
+ * bottom sheet on a phone and a right-hand panel on a desk.
  *
- * With nobody on the diary the screen still answers the question: "It's
- * just me" puts the signed-in person on it in one press with the opening
- * hours as their week, "Add my team" opens the add-person dialog, and
- * under them is the week customers can book today, from each service's
- * own hours. The booking rules show there too (UX-022).
+ * Every change saves as it is made, with a toast and Undo: there is no
+ * draft, no Save bar, and leaving never asks. A Member changes anyone's
+ * hours, time off and extra hours (`hours:write`), but not who takes
+ * bookings, the business's closures or its rules (`service:write`).
+ * Without either, the page only reads, and says so in one line.
+ *
+ * With nobody on the diary it asks "When can customers book Meera?" with
+ * the week they would start with (`FirstHours`).
+ *
+ * `personRules` is where "Booking rules for ‹person›" (U20, #1038) goes:
+ * under Whose hours, between Time off and More.
  */
 export function AvailabilityEditor({
     staff,
@@ -147,9 +82,13 @@ export function AvailabilityEditor({
     today,
     kept,
     bookedOn,
-    takesClasses,
+    person = null,
+    business,
+    me,
     canEdit,
+    canManage,
     onlineBlocker,
+    personRules = null,
 }: {
     staff: StaffView[];
     /** When the whole business is closed (E3). */
@@ -158,15 +97,11 @@ export function AvailabilityEditor({
     openingHours: WeeklyRange[] | null;
     /** The saved booking rules, or null when they couldn't be read. */
     rules: BookingRules | null;
-    /**
-     * With nobody on the diary: the services' own weekly hours together,
-     * as the calendar's "Service hours" column reads them; null when no
-     * service on the booking page has hours.
-     */
+    /** With nobody on the diary: the services' own hours together. */
     serviceHours?: WeeklyRange[] | null;
     /** The services the booking page offers, for "What customers see". */
     services?: { id: string; name: string }[];
-    /** Said in the add-person dialog only when the plan counts seats. */
+    /** Said when adding someone, only when the plan counts seats. */
     seatNote?: string | null;
     timezone: string;
     today: LocalDate;
@@ -174,530 +109,295 @@ export function AvailabilityEditor({
     kept: KeptBooking[] | null;
     /** Live bookings per `${staffId}|${date}` over the next three weeks. */
     bookedOn: Record<string, number> | null;
-    /** Who teaches a class — their dot is the class colour. */
-    takesClasses: string[];
+    /** `?person=`: whose week to open on, or `all` for everyone's. */
+    person?: string | null;
+    /** The business's name, for "Nobody at Kaya Physio can be booked." */
+    business: string;
+    /** The signed-in person's name, for the first-time card. */
+    me: string;
+    /** May change hours, time off and extra hours (`hours:write`). */
     canEdit: boolean;
-    /**
-     * Why the booking page can't take money online now (DEC-088); null
-     * when it can, undefined when it couldn't be told.
-     */
+    /** May add or remove people, close the business, set its rules. */
+    canManage: boolean;
     onlineBlocker?: OnlineBlocker | null;
+    /** U20's "Booking rules for ‹person›", when it is built. */
+    personRules?: ReactNode;
 }) {
     const router = useRouter();
+    const phone = useNarrow();
     const people = staff.filter((p) => p.status === "ACTIVE");
-    const [who, setWho] = useState(people[0]?.id ?? "");
-    const [draft, setDraft] = useState<AvailabilityDraft | null>(null);
-    const [saving, setSaving] = useState(false);
+    const { weeks, save, outside } = useHours(staff);
+    const rulesState = useBookingRules(rules);
+    const [who, setWho] = useState(() =>
+        person === EVERYONE && people.length > 1
+            ? EVERYONE
+            : people.some((p) => p.id === person)
+              ? (person ?? "")
+              : (people.at(0)?.id ?? ""),
+    );
+    const [panel, setPanel] = useState<Panel | null>(null);
+    const [several, setSeveral] = useState<{
+        open: boolean;
+        days: number[];
+        start: SeveralChoice;
+        opened: number;
+    } | null>(null);
+    const [addingOff, setAddingOff] = useState<{
+        open: boolean;
+        opened: number;
+    } | null>(null);
     const [adding, setAdding] = useState(false);
-    const [joining, setJoining] = useState(false);
+    const mine = useSetMine(setWho);
 
-    const base = draftFrom(staff);
-    const d = draft ?? base;
-    const ops = saveOps(staff, d, closures, timezone);
-    const dirty = ops.length > 0;
-    const me = people.find((p) => p.id === who) ?? people.at(0);
-    const edit = (fn: (x: AvailabilityDraft) => void) => {
-        const next = structuredClone(d);
-        fn(next);
-        setDraft(next);
-    };
+    const everyone = who === EVERYONE && people.length > 0;
+    const shown = everyone
+        ? null
+        : (people.find((p) => p.id === who) ?? people.at(0) ?? null);
+    const shownWeek = shown ? (weeks[shown.id] ?? shown.hours) : [];
+    const whoShort = shown ? firstName(shown.name) : "Everyone";
+    const firstWeek = startingWeek(openingHours);
+    const theirs = people.filter((p) => everyone || p.id === shown?.id);
+    const extraItems = comingExtra(theirs, bookedOn, today);
 
-    async function save() {
-        if (!dirty || saving) return;
-        setSaving(true);
-        const done: { op: SaveOp; addedIds?: string[] }[] = [];
-        const outside: BookingBrief[] = [];
-        const covered = new Set<string>();
-        // Ids already there, so an add's new rows can be told apart for Undo.
-        const known = new Set([
-            ...closures.map((c) => c.id),
-            ...staff.flatMap((p) => p.timeOff.map((t) => t.id)),
-        ]);
-        let failed: string | null = null;
-        for (const op of ops) {
-            const res = await runAction(
-                async () =>
-                    op.kind === "hours"
-                        ? await replaceStaffHours(op.staffId, op.hours)
-                        : op.kind === "addOff"
-                          ? op.off.staffId
-                              ? await addTimeOff(
-                                    op.off.staffId,
-                                    rangeOf(op.off),
-                                )
-                              : await addClosure({
-                                    ...rangeOf(op.off),
-                                    fromDate: op.off.fromDate,
-                                })
-                          : op.kind === "removeOff"
-                            ? await removeTimeOffMany(op.staffId, op.before.ids)
-                            : op.kind === "removeClosure"
-                              ? await removeClosures(op.before.ids)
-                              : await removeExtraHours(
-                                    op.staffId,
-                                    op.before.id,
-                                ),
-                // Said below, with what did save.
-                { quiet: true },
-            );
-            if (!res) {
-                failed = UNREACHED;
-                break;
-            }
-            if (!res.ok) {
-                failed = res.error;
-                break;
-            }
-            let addedIds: string[] | undefined;
-            if (op.kind === "hours") {
-                outside.push(
-                    ...(res.data as { outside: BookingBrief[] }).outside,
-                );
-            }
-            if (op.kind === "addOff") {
-                const data = res.data as {
-                    staff?: StaffView;
-                    closures?: Closure[];
-                    affected: BookingBrief[];
-                };
-                const rows = data.staff?.timeOff ?? data.closures ?? [];
-                addedIds = rows.map((r) => r.id).filter((x) => !known.has(x));
-                for (const x of addedIds) known.add(x);
-                for (const b of data.affected) covered.add(b.id);
-            }
-            done.push({ op, addedIds });
-        }
-        setSaving(false);
-        router.refresh();
-        if (failed) {
-            // What was written stays written; the draft keeps the rest.
-            showError(
-                failed,
-                done.length ? "Some of your changes were saved." : undefined,
-            );
-            return;
-        }
-        setDraft(null);
-        showUndo(savedText(), async () => {
-            await undo(done);
-            router.refresh();
-        });
-        if (outside.length) {
-            showWarning(
-                `${count(outside.length, "booking is", "bookings are")} now outside the hours.`,
-                "They stay booked. Move them from the calendar if you need to.",
-            );
-        }
-        if (covered.size) {
-            showWarning(
-                `${count(covered.size, "booking falls", "bookings fall")} in the time off.`,
-                "They stay booked. Move or cancel them from the calendar.",
-            );
-        }
-    }
-
-    async function undo(done: { op: SaveOp; addedIds?: string[] }[]) {
-        for (const { op, addedIds } of [...done].reverse()) {
-            const res =
-                op.kind === "hours"
-                    ? await replaceStaffHours(op.staffId, op.before)
-                    : op.kind === "addOff"
-                      ? !addedIds?.length
-                          ? null
-                          : op.off.staffId
-                            ? await removeTimeOffMany(op.off.staffId, addedIds)
-                            : await removeClosures(addedIds)
-                      : op.kind === "removeOff"
-                        ? await addTimeOff(
-                              op.staffId,
-                              rangeOfLine(op.before, false),
-                          )
-                        : op.kind === "removeClosure"
-                          ? await addClosure({
-                                ...rangeOfLine(op.before, true),
-                                fromDate: op.before.fromDate,
-                            })
-                          : await addExtraHours(op.staffId, {
-                                date: op.before.date.slice(0, 10),
-                                startMinute: op.before.startMinute,
-                                endMinute: op.before.endMinute,
-                            });
-            if (res && !res.ok) {
-                showError(res.error, "Undo stopped part of the way.");
-                return;
-            }
-        }
-    }
-
-    /**
-     * "It's just me": the signed-in person goes on the diary with the
-     * opening hours as their week, and lands on it here. Undo takes them
-     * off again (archived, as the API has no other way off the diary).
-     */
-    async function justMe() {
-        const res = await runAction(() => addMyself(), {
-            setBusy: setJoining,
-        });
-        if (!res) return;
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        const { staff: mine, week } = res.data;
-        setWho(mine.id);
-        router.refresh();
-        showUndo(
-            joinedText(week),
-            async () => {
-                const back = await updateStaff(mine.id, {
-                    status: "ARCHIVED",
-                });
-                if (!back.ok) return back;
-                router.refresh();
-                return { ok: true };
-            },
-            { description: "Your week is below. Change it any time." },
+    function pickWho(id: string) {
+        setWho(id);
+        setPanel(null);
+        router.replace(
+            `/bookings/availability?person=${encodeURIComponent(id)}`,
+            { scroll: false },
         );
     }
 
-    // Hours, time off and extra hours wait for "Save": a way off the page
-    // asks first. A booking rule saves in its own sheet.
-    const guard = useLeaveGuard({
-        dirty: canEdit && dirty && !saving,
-        lost: "Your changes to hours or time off aren't saved, and will be lost.",
-    });
+    function openSeveral(days: number[], start: SeveralChoice) {
+        setSeveral((s) => ({
+            open: true,
+            days,
+            start,
+            opened: (s?.opened ?? 0) + 1,
+        }));
+    }
 
-    const saveBar = dirty ? (
-        <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-border-strong bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
-            <span
-                role="status"
-                className="flex-[1_1_240px] text-[12.5px] text-foreground"
-            >
-                {unsavedText()}
-            </span>
-            <Button
-                variant="outline"
-                disabled={saving}
-                onClick={() => setDraft(null)}
-            >
-                Discard
-            </Button>
-            <Button
-                onClick={() => void save()}
-                busy={saving}
-                busyLabel="Saving…"
-            >
-                Save
-            </Button>
-        </div>
-    ) : null;
+    const header = <HoursHeader readOnly={!canEdit} />;
 
-    const dialog = (
-        <AddPersonDialog
-            open={adding}
-            onOpenChange={setAdding}
-            onAdded={(id) => setWho(id)}
-            week={hasOpening(openingHours) ? "opening" : "default"}
-            seatNote={seatNote}
-        />
+    // The sheets and dialogs, whichever state the page is in.
+    const tail = (
+        <>
+            <HoursPanels
+                panel={panel}
+                setPanel={setPanel}
+                people={people}
+                weeks={weeks}
+                save={save}
+                shown={shown}
+                everyone={everyone}
+                phone={phone}
+                canEdit={canEdit}
+                canManage={canManage}
+                today={today}
+                timezone={timezone}
+                openingHours={openingHours}
+                extraItems={extraItems}
+                services={services}
+                closures={closures}
+                rulesState={rulesState}
+                onlineBlocker={onlineBlocker}
+                onPickWho={pickWho}
+                onAddPerson={() => setAdding(true)}
+            />
+            {several ? (
+                <SeveralDaysSheet
+                    key={several.opened}
+                    open={several.open}
+                    onClose={() =>
+                        setSeveral((s) => (s ? { ...s, open: false } : s))
+                    }
+                    who={shown ? whoShort : firstName(me) || "you"}
+                    days={several.days}
+                    start={several.start}
+                    onApply={(days, choice) =>
+                        shown
+                            ? save(
+                                  shown.id,
+                                  withDays(
+                                      shownWeek,
+                                      days,
+                                      severalRanges(choice),
+                                  ),
+                                  {
+                                      done: severalSaved(days, choice),
+                                      failed: `Couldn't change those days for ${whoShort}. Nothing has changed.`,
+                                  },
+                              )
+                            : mine.setMine(
+                                  withDays(
+                                      firstWeek,
+                                      days,
+                                      severalRanges(choice),
+                                  ),
+                              )
+                    }
+                />
+            ) : null}
+            {canEdit && addingOff ? (
+                <AddTimeOffSheet
+                    key={addingOff.opened}
+                    open={addingOff.open}
+                    onClose={() =>
+                        setAddingOff((a) => (a ? { ...a, open: false } : a))
+                    }
+                    people={people}
+                    who={shown?.id ?? people.at(0)?.id ?? ""}
+                    today={today}
+                    business={business}
+                    canClose={canManage}
+                    closures={closures}
+                />
+            ) : null}
+            <AddPersonDialog
+                open={adding}
+                onOpenChange={setAdding}
+                onAdded={(id) => setWho(id)}
+                week={openingHours?.length ? "opening" : "default"}
+                seatNote={seatNote}
+                hoursScreen
+                hoursHint="Their week is on Hours and time off. Change any day."
+            />
+        </>
     );
-    const rulesCard = (
-        <BookingRulesCard
-            rules={rules}
-            canEdit={canEdit}
-            onlineBlocker={onlineBlocker}
-        />
-    );
 
-    if (!me) {
-        // Nobody on the diary yet: most often a solo owner, whose services
-        // keep their own hours until they put themselves on it.
-        const week = serviceHours?.length ? weekLines(serviceHours) : null;
+    // — Nobody on the diary yet ————————————————————————————————————
+    if (!people.length) {
         return (
             <>
-                <PageHeader
-                    className="mb-5"
-                    breadcrumb={["Bookings", "Hours and time off"]}
-                    title="Hours and time off"
+                {header}
+                <FirstHours
+                    me={me}
+                    week={firstWeek}
+                    serviceHours={serviceHours}
+                    canStart={canManage}
+                    busy={mine.busy}
+                    onSet={() => void mine.setMine()}
+                    onChoose={() => openSeveral([], usualDay(firstWeek))}
+                    onAdd={() => setAdding(true)}
+                    rules={
+                        <RulesRow onOpen={() => setPanel({ kind: "rules" })} />
+                    }
                 />
-                {canEdit ? null : (
-                    <ReadOnlyNote>
-                        Your role can see these rules but not change them.
-                    </ReadOnlyNote>
-                )}
-                <div className="grid max-w-[760px] gap-5">
-                    <section
-                        aria-labelledby="availability-start"
-                        className="rounded-[12px] border border-border bg-card px-4 py-4 sm:px-5"
-                    >
-                        <h2
-                            id="availability-start"
-                            className="font-display text-[17px] font-semibold tracking-[-0.02em]"
-                        >
-                            When can people book you?
-                        </h2>
-                        <p className="mt-1 max-w-[56ch] text-pretty text-[13px] text-muted-foreground">
-                            {!canEdit
-                                ? "Nobody is on the diary yet."
-                                : hasOpening(openingHours)
-                                  ? "Put yourself on the diary with your opening hours, or add your team."
-                                  : "Put yourself on the diary with a starting week, or add your team."}
-                        </p>
-                        {canEdit ? (
-                            <div className="mt-3.5 flex flex-col gap-2 sm:flex-row">
-                                <Button
-                                    onClick={() => void justMe()}
-                                    busy={joining}
-                                    busyLabel="Adding you…"
-                                >
-                                    It&apos;s just me
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    disabled={joining}
-                                    onClick={() => setAdding(true)}
-                                >
-                                    Add my team
-                                </Button>
-                            </div>
-                        ) : null}
-                        <div className="mt-4 border-t border-border pt-3.5">
-                            <h3 className="text-[13px] font-semibold">
-                                What customers can book now
-                            </h3>
-                            {week ? (
-                                <>
-                                    <p className="mt-0.5 text-pretty text-[12.5px] text-muted-foreground">
-                                        With nobody on the diary, each service
-                                        is booked in its own hours. Together
-                                        they cover:
-                                    </p>
-                                    <dl
-                                        data-testid="bookable-week"
-                                        className="mt-2 grid gap-y-1 text-[13px] tabular-nums"
-                                    >
-                                        {week.map((line) => (
-                                            <div
-                                                key={line.days}
-                                                className="flex flex-wrap gap-x-3"
-                                            >
-                                                <dt className="w-[11rem] shrink-0 font-medium">
-                                                    {line.days}
-                                                </dt>
-                                                <dd
-                                                    className={cn(
-                                                        "min-w-0",
-                                                        !line.hours &&
-                                                            "text-muted-foreground",
-                                                    )}
-                                                >
-                                                    {line.hours ??
-                                                        "Not bookable"}
-                                                </dd>
-                                            </div>
-                                        ))}
-                                    </dl>
-                                </>
-                            ) : (
-                                <EmptyState
-                                    size="inline"
-                                    className="mt-0.5"
-                                    title="Nothing yet"
-                                    description="No service on your booking page has hours."
-                                />
-                            )}
-                        </div>
-                    </section>
-                    {rulesCard}
-                </div>
-                {dialog}
+                {tail}
             </>
         );
     }
 
-    const hours = d.hours[me.id] ?? [];
-    const extraMine = me.extraHours.filter(
-        (x) => !d.extraRemoved.includes(x.id),
-    );
+    // — Someone's week ——————————————————————————————————————————————
+    const selected = phone
+        ? null
+        : panel?.kind === "day" && panel.staffId === shown?.id
+          ? panel.day
+          : panel?.kind === "everyoneDay"
+            ? panel.day
+            : null;
 
     return (
         <>
-            <PageHeader
-                className="mb-5"
-                breadcrumb={["Bookings", "Hours and time off"]}
-                title="Hours and time off"
-                description="When each person can be booked. Customers only ever see free times inside these hours, minus bookings and the break after each. Changing hours never moves a booking that's already made."
-                meta={`${me.name} · ${weeklyHours(hours)} hours a week`}
+            {header}
+            <WhoseRow
+                name={shown ? shown.name : "Everyone"}
+                role={shown ? shown.title : "the whole team"}
+                meta={
+                    everyone
+                        ? count(people.length, "person", "people")
+                        : weekMeta(shownWeek)
+                }
+                everyone={everyone}
+                member={canEdit && !canManage}
+                onOpen={() => setPanel({ kind: "whose" })}
             />
-            {openingHours ? (
-                <p className="-mt-2 mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
-                    In-person bookings are only offered while you&apos;re open,
-                    so hours outside your opening hours aren&apos;t bookable in
-                    person. Opening hours are in{" "}
-                    <TextLink href={HOURS}>Settings › Hours</TextLink>.
-                </p>
-            ) : null}
-            {canEdit ? null : (
-                <ReadOnlyNote>
-                    Your role can see these hours but not change them.
-                </ReadOnlyNote>
-            )}
-            <div className="mb-3.5 flex flex-wrap gap-1.5">
-                <ChipGroup
-                    label="Team member"
-                    value={me.id}
-                    onChange={setWho}
-                    choices={people.map((p) => ({
-                        value: p.id,
-                        label: (
-                            <>
-                                <span
-                                    aria-hidden
-                                    className={cn(
-                                        "mr-[7px] inline-block size-2 rounded-full",
-                                        takesClasses.includes(p.id)
-                                            ? "bg-diary-class"
-                                            : "bg-diary-one",
-                                    )}
-                                />
-                                {p.name}
-                                {p.title ? ` · ${p.title}` : ""}
-                            </>
-                        ),
-                    }))}
-                />
-                {canEdit ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setAdding(true)}
-                        className="h-8 rounded-full border-dashed border-border-strong px-3 text-[12.5px] font-semibold"
-                    >
-                        + Add someone
-                    </Button>
-                ) : null}
-            </div>
 
-            <div className="flex flex-wrap items-start gap-4">
-                <WeeklyHours
-                    key={me.id}
-                    staffId={me.id}
-                    hours={hours}
-                    opening={openingHours}
-                    kept={kept}
-                    canEdit={canEdit}
-                    onChange={(next) =>
-                        edit((x) => {
-                            x.hours[me.id] = next;
-                        })
-                    }
-                />
-                <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3">
-                    <BookablePreview
-                        // Its own key: the card below is keyed by the person
-                        // too, and siblings may not share one.
-                        key={`preview-${me.id}`}
-                        person={me}
-                        services={services.filter((x) =>
-                            me.serviceIds.includes(x.id),
+            <div className="min-[760px]:grid min-[760px]:grid-cols-[minmax(0,1fr)_400px] min-[760px]:items-start min-[760px]:gap-5">
+                <div className="min-w-0">
+                    <WeeklyHours
+                        rows={weekRows(
+                            everyone
+                                ? people.map((p) => ({
+                                      name: p.name,
+                                      hours: weeks[p.id] ?? p.hours,
+                                  }))
+                                : [{ name: whoShort, hours: shownWeek }],
+                            everyone,
                         )}
-                        today={today}
-                        timezone={timezone}
-                        stamp={JSON.stringify([
-                            me.hours,
-                            me.extraHours,
-                            me.timeOff,
-                            closures,
-                            rules,
-                        ])}
-                        dirty={dirty}
+                        canEdit={canEdit}
+                        showChips={!everyone}
+                        whose={
+                            everyone ? "for everyone" : `${whoShort}'s hours`
+                        }
+                        selected={selected}
+                        onOpenDay={(day) =>
+                            setPanel(
+                                everyone
+                                    ? { kind: "everyoneDay", day }
+                                    : {
+                                          kind: "day",
+                                          staffId: shown?.id ?? "",
+                                          day,
+                                      },
+                            )
+                        }
+                        onSeveral={(start) => {
+                            const at = severalStart(start, shownWeek);
+                            openSeveral(at.days, at.choice);
+                        }}
                     />
+                    {shown ? (
+                        <OutsideNote
+                            staffId={shown.id}
+                            briefs={outside[shown.id]}
+                            kept={kept}
+                            week={shownWeek}
+                            timezone={timezone}
+                            today={today}
+                        />
+                    ) : null}
+                    {canEdit ? (
+                        <p className="mt-2.5 hidden text-[12.5px] text-muted-foreground min-[760px]:block">
+                            Click a day to change it. Its hours save as you
+                            change them, and a toast lets you undo.
+                        </p>
+                    ) : null}
+                </div>
+
+                <div className="grid min-w-0 gap-0 min-[760px]:gap-[18px]">
                     <TimeOffCard
-                        key={`off-${me.id}`}
-                        me={me}
-                        closures={closures}
-                        timezone={timezone}
+                        items={comingOff(theirs, closures, timezone, today)}
                         today={today}
                         canEdit={canEdit}
-                        offAdded={d.offAdded}
-                        offRemoved={d.offRemoved}
-                        onAdd={(off) =>
-                            edit((x) => {
-                                x.offAdded.push({
-                                    ...off,
-                                    key: `${off.staffId ?? "all"}${off.fromDate}${x.offAdded.length}`,
-                                });
-                            })
-                        }
-                        onRemoveSaved={(ids) =>
-                            edit((x) => {
-                                x.offRemoved.push(...ids);
-                            })
-                        }
-                        onRemoveNew={(key) =>
-                            edit((x) => {
-                                x.offAdded = x.offAdded.filter(
-                                    (y) => y.key !== key,
-                                );
-                            })
+                        onOpen={(item) => setPanel({ kind: "off", item })}
+                        onAdd={() =>
+                            setAddingOff((a) => ({
+                                open: true,
+                                opened: (a?.opened ?? 0) + 1,
+                            }))
                         }
                     />
-
-                    <section aria-labelledby="extra-hours" className={card}>
-                        <h2 id="extra-hours" className={cn(cardTitle, "mb-1")}>
-                            Extra opening hours
-                        </h2>
-                        <p className="mb-1.5 text-[11.5px] text-muted-foreground">
-                            Opened on the calendar for a single day.
-                        </p>
-                        <ul>
-                            {extraMine.map((x) => {
-                                const n =
-                                    bookedOn?.[
-                                        `${me.id}|${x.date.slice(0, 10)}`
-                                    ] ?? 0;
-                                return (
-                                    <OffRow
-                                        key={x.id}
-                                        when={`${formatDay(x.date.slice(0, 10), { weekday: "short", year: "never" })} · ${formatClockRange(x.startMinute, x.endMinute)}`}
-                                        why={
-                                            n
-                                                ? `${count(n, "booking")} that day, kept if you close these`
-                                                : null
-                                        }
-                                        warn={n > 0}
-                                        canEdit={canEdit}
-                                        removeLabel={`Remove extra hours ${formatClockRange(x.startMinute, x.endMinute)} on ${formatDay(x.date.slice(0, 10), { weekday: "short", year: "never" })}`}
-                                        onRemove={() =>
-                                            edit((y) => {
-                                                y.extraRemoved.push(x.id);
-                                            })
-                                        }
-                                    />
-                                );
-                            })}
-                        </ul>
-                        {!extraMine.length ? (
-                            <EmptyState
-                                size="inline"
-                                title="No extra hours"
-                                description={
-                                    canEdit
-                                        ? "Choose closed time on the calendar to add some."
-                                        : undefined
-                                }
-                            />
-                        ) : null}
-                    </section>
+                    {/* U20: "Booking rules for ‹person›" goes here. */}
+                    {personRules ? (
+                        <div data-slot="person-rules" className="min-w-0">
+                            {personRules}
+                        </div>
+                    ) : null}
+                    <MoreSection
+                        extraLine={
+                            extraItems.length
+                                ? `${extraItems.length} coming up`
+                                : "None"
+                        }
+                        onExtra={() => setPanel({ kind: "extra" })}
+                        onSee={() => setPanel({ kind: "see" })}
+                        onRules={() => setPanel({ kind: "rules" })}
+                    />
                 </div>
             </div>
 
-            {/* Under the week, not beside it: rules are set once and read
-                often, and they aren't availability. */}
-            <div className="mt-6 max-w-[760px]">{rulesCard}</div>
-            {saveBar}
-            {dialog}
-            {guard.dialog}
+            {tail}
         </>
     );
 }
