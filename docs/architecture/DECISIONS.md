@@ -2114,3 +2114,4 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - After booking: WhatsApp, SMS and Copy message through the phone's own apps; Saroh sends nothing.
     - The Overview tab is renamed **Calendar**; "Also use these hours on" and "Change several days" replace Copy Monday.
     - Header C on every calendar screen; Hours and time off is the V2 weekly list under the Whose hours card.
+    - A service's **Who can book it** is two tick boxes, Customers (on the booking page) and Your team (from Bookings), so any of the four combinations works; neither ticked pauses it, and bookings already made stay.
