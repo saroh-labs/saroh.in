@@ -266,10 +266,12 @@ export function OperatorDialog({
     if (trigger === undefined) return dialog;
 
     return (
-        <div className="flex flex-col items-start gap-1">
+        // `w-min`: the reason wraps to the button's width, so a row of
+        // actions keeps its spacing when one of them is switched off.
+        <div className="flex w-min flex-col items-stretch gap-1 [&>button]:whitespace-nowrap">
             {dialog}
             {disabled && disabledReason && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs leading-snug text-muted-foreground">
                     {disabledReason}
                 </p>
             )}

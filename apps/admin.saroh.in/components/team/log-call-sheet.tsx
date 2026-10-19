@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { DateInput } from "@saroh/ui/date-picker";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -16,6 +17,7 @@ import {
 import { Textarea } from "@saroh/ui/textarea";
 import { useState, useTransition } from "react";
 
+import { todayIso } from "@/lib/format";
 import { logLeadContactAction } from "@/lib/saroh-lead-actions";
 import type { ContactKind, LeadContact } from "@/lib/saroh-lead-words";
 import { CONTACT_KINDS, CONTACT_LABEL } from "@/lib/saroh-lead-words";
@@ -141,11 +143,14 @@ export function LogCallSheet({
                             />
                         </Field>
                         <Field label="Next follow-up" optional>
-                            <Input
+                            <DateInput
                                 name="followUpOn"
-                                type="date"
+                                min={todayIso()}
+                                className="w-full"
                                 value={next}
-                                onChange={(e) => setNext(e.target.value)}
+                                onValueChange={setNext}
+                                clearable
+                                placeholder="No follow-up"
                             />
                         </Field>
                     </div>

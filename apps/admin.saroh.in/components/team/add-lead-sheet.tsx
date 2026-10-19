@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { DateInput } from "@saroh/ui/date-picker";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import {
@@ -14,6 +15,7 @@ import {
 import { Textarea } from "@saroh/ui/textarea";
 import { useState, useTransition } from "react";
 
+import { todayIso } from "@/lib/format";
 import { addLeadAction } from "@/lib/saroh-lead-actions";
 import type { LeadCard } from "@/lib/saroh-lead-words";
 
@@ -138,11 +140,14 @@ export function AddLeadSheet({
                         </Field>
                     </div>
                     <Field label="Follow up on" optional>
-                        <Input
+                        <DateInput
                             name="followUpOn"
-                            type="date"
+                            min={todayIso()}
+                            className="w-full"
                             value={followUpOn}
-                            onChange={(e) => setFollowUpOn(e.target.value)}
+                            onValueChange={setFollowUpOn}
+                            clearable
+                            placeholder="No follow-up"
                         />
                     </Field>
                     <Field label="Notes" optional>

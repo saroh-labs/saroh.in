@@ -175,19 +175,20 @@ export function LeadStageControl({
                 </p>
             ) : null}
             <div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={target === stage}
-                    busy={pending}
-                    busyLabel="Moving…"
-                    onClick={move}
-                >
-                    {target === stage
-                        ? `In ${STAGE_LABEL[stage]}`
-                        : `Move to ${STAGE_LABEL[target]}`}
-                </Button>
+                {/* Only once another stage is picked: a greyed "In New"
+                    said nothing the picker didn't. */}
+                {target !== stage || pending ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        busy={pending}
+                        busyLabel="Moving…"
+                        onClick={move}
+                    >
+                        {`Move to ${STAGE_LABEL[target]}`}
+                    </Button>
+                ) : null}
             </div>
         </section>
     );

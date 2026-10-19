@@ -59,8 +59,10 @@ export function UserList({ people }: { people: PersonRow[] }) {
                                     <time dateTime={person.createdAt}>
                                         {formatDate(person.createdAt)}
                                     </time>
-                                    {" · "}seen{" "}
-                                    {formatRelative(person.lastSeenAt)}
+                                    {" · "}
+                                    {person.lastSeenAt
+                                        ? `seen ${formatRelative(person.lastSeenAt)}`
+                                        : "never signed in"}
                                 </span>
                             </div>
                         </Link>
