@@ -19,7 +19,9 @@ working as it is today; the shared pieces are built so the desktop phase
 (canvas page 5, `BKN*`) reuses them next.
 
 Code starts only after the owner signs off this plan and answers, or accepts
-the drawn default for, the open questions at the end.
+the drawn default for, the open questions at the end. The owner answered most
+of them on 19 Oct (see "Decisions from the owner, 19 Oct"), including Q11
+(option A) and Q15 (option C) after options were drawn.
 
 ---
 
@@ -90,8 +92,9 @@ Canvas: https://claude.ai/artifact/6QDguTRfaKdm7NP5NSytNj
   BA-03 year cap, BA-07 save model, words) changes both widths at once.
 - No new booking features: no packages, WhatsApp sending by Saroh, group
   bookings, waitlist changes, or changes to the customer booking page.
-- Saroh still sends nothing itself after a booking: "Send on WhatsApp" and
-  "Send by SMS" open the phone's own app with the message filled in (Q12).
+- Saroh still sends nothing itself after a booking: WhatsApp, SMS and Copy
+  message open the phone's own app with the message filled in, or copy it
+  (Q12, decided 19 Oct).
 
 ### Backend dependencies the boards require (all in U1)
 
@@ -109,6 +112,20 @@ Canvas: https://claude.ai/artifact/6QDguTRfaKdm7NP5NSytNj
 - **"Paid now" records how** (Cash, UPI, Card; BA-20): `paidWith: "PAID"`
   carries no method today; the desk-payment route does
   (`apps/api.saroh.in/src/modules/bookings/desk-pay.dto.ts`).
+- **A Member sets hours and time off for anyone** (Q13, decided 19 Oct):
+  `PUT staff/:staffId/hours`, extra hours and time off are guarded by
+  `service:write` today (`apps/api.saroh.in/src/modules/staff/staff.controller.ts`,
+  checked in `staff.service.ts`), which a Member does not hold. They need a
+  narrower action (for example `hours:write`) that Member gets, while adding
+  or removing people, their services and the services themselves stay
+  `service:write`.
+- **The business's cancellation policy decides refund or keep** (Q14, decided
+  19 Oct): no role gate on the money choice when a Member cancels.
+- **"Your team can book it" is its own flag** (Q5, decided 19 Oct): today
+  `Service.showOnBookingPage` says whether customers can book online and
+  `Service.status` (ACTIVE) gates everyone, so "customers only" cannot be
+  stored. A new `Service` boolean (for example `bookableByTeam`, default true)
+  is checked when someone books by hand; neither ticked is paused.
 
 ### Deferred to Follow-Up Work
 
@@ -220,7 +237,16 @@ same-phone check), `BKMNewFromGap.dc.html` (new customer, email optional),
   (`bookByHand`: find or make the contact by phone like a walk-in; record the
   method in the same transaction)
 - Modify: `apps/api.saroh.in/src/modules/organizations/organization-policy.ts`
-  (Member: book, mark the outcome, move and cancel; see Q13 for the exact set)
+  (Member: book, mark the outcome, move and cancel, and set hours, extra
+  hours and time off for anyone; Q13 decided 19 Oct)
+- Modify: `apps/api.saroh.in/src/modules/staff/staff.controller.ts`,
+  `staff.service.ts` (hours, extra hours and time off checked against the
+  new hours action, not `service:write`)
+- Modify: `packages/database/prisma/schema.prisma` (`Service.bookableByTeam`,
+  default true; migration per the saroh-migrations skill),
+  `apps/api.saroh.in/src/modules/bookings/bookings.service.ts` (create and
+  update take it; `bookByHand` refuses a service the team can't book),
+  `apps/api.saroh.in/src/modules/bookings/reservation.ts` (Q5)
 - Reuse: `apps/api.saroh.in/src/modules/orders/walk-in-customer.ts`
 - Test: `apps/api.saroh.in/src/modules/bookings/booking-permissions.db.spec.ts`,
   `bookings.service.spec.ts`, `booking-desk-pay.db.spec.ts`,
@@ -235,7 +261,13 @@ same-phone check), `BKMNewFromGap.dc.html` (new customer, email optional),
 - Member powers: a narrow set (make a booking, record the outcome, move,
   cancel) rather than the whole `booking:write` if anything else hangs off it;
   money stays with payment permissions (DEC-098). A Member cancelling a paid
-  booking follows the policy for the money (Q14).
+  booking gets the business's own cancellation and refund policy for the
+  money, with no role gate on it (Q14, decided 19 Oct).
+- Hours (Q13, decided 19 Oct): a Member sets weekly hours, extra hours and
+  time off for themselves and for anyone else who takes bookings.
+- Who can book a service (Q5, decided 19 Oct): `showOnBookingPage` stays the
+  customers' tick; `bookableByTeam` is the team's; both false reads as paused
+  in the app (bookings already made stay).
 - "Paid now" with a method writes the booking and its desk payment together,
   so a failure leaves neither.
 
@@ -255,6 +287,14 @@ contracts.
   allowed; Member takes a desk payment or sends a pay link → 403; Reviewer →
   403 on all; Calendar-only → 403 on all writes; another business's booking →
   404.
+- Permissions: Member replaces Arjun's weekly hours, adds and removes time
+  off and extra hours for Arjun → allowed; Member adds or removes a person or
+  changes a service → 403.
+- Edge: a Member cancels a paid booking past the free-cancel time → the
+  business's policy (keep the deposit) applies, same as for an owner.
+- Edge: a service with `bookableByTeam` false → booking by hand is refused
+  with a message naming it; the booking page still offers it when
+  `showOnBookingPage` is true.
 - Integration: `paidWith: "PAID"` with method UPI → the booking is paid, a
   desk payment with UPI exists, both in one transaction; a forced failure on
   the payment leaves no booking.
@@ -299,6 +339,17 @@ Reference: `BKMReferences.dc.html` (Fresha chip, Amie sheet, Binance Today).
   times · ₹[AMOUNT]" (amount only with money permission).
 - Day, person and view stay in the URL (`calendarHref`) so back, refresh and
   links keep their place. On a phone, "List" is the agenda (Q4).
+- The date sheet of Day, Week and List each ends with "Show as: Day / Week /
+  List" (Q4, decided 19 Oct; all three boards include it from the shared
+  `_CSheets` part).
+- Which view Bookings opens on (Q15, decided 19 Oct: option C): Bookings
+  remembers the last view used on each device (the date sheet's Show as), and
+  the "…" sheet of Day, Week and List has "Start Bookings on: Where I left it
+  / Day / Week / List", saved for that person (default Where I left it). The
+  Show as line says which applies. Header C stays. Boards:
+  `BKMStartOptC.dc.html` (chosen) and the "…" sheet on the Day, Week and List
+  boards. Needs a per-person saved preference (the API's user or membership
+  settings; pick the existing store when building).
 - Swipe left and right on the calendar body steps the day or week (U4–U6 wire
   it; U2 provides the handler and the Previous / Next buttons for keyboard and
   screen readers).
@@ -412,8 +463,9 @@ cancel dialog; "Look further ahead" (becomes Pick a date and Next free day).
 - Pay: default is Pays at the visit even when a pay link is offered; Paid now
   without a method → the Book button names the gap.
 - Cancel: in time → Refund preselected; late → Keep the deposit preselected
-  with "You can still refund it."; Member without refund permission → the
-  policy's choice is shown, not changeable (Q14).
+  with "You can still refund it."; a Member gets the same choice, preselected
+  by the business's own cancellation policy, with no role gate (Q14, decided
+  19 Oct).
 - Toast: with a sheet open on a phone the toast sits above the sheet foot,
   not over its buttons.
 
@@ -460,6 +512,9 @@ Was: `BKMWasBookingsDay.dc.html`.
 - Calendar-only: no New booking button; one line "Your role sees the calendar
   only, so you can't book or change bookings. An owner can change this in
   Settings › Team."
+- The "…" (This day) sheet carries "Start Bookings on: Where I left it / Day /
+  Week / List" (Q15, decided 19 Oct, option C; built in U2's sheet). A tap on
+  a free time opens the book-or-block sheet of U9 (Q11 option A).
 
 **Controls kept:** booking blocks → quick look; press free time to book;
 press closed time to open hours; Add who takes bookings; Service hours column
@@ -560,7 +615,9 @@ list, empty "The day is open · Book on this day", Proposal · Q4). Was:
   booked rows.
 - The phone default needs no server sniffing: the URL without `layout` keeps
   Day on desk; on a phone the client picks List on first load (Q4), keeping the
-  URL honest after.
+  URL honest after. Q15 (decided, option C): after the first visit the client
+  opens the view last used on this device, unless the person chose a fixed
+  view under "Start Bookings on" (U2).
 
 **Controls kept:** previous / next day and Today (swipe, date sheet); the month
 picker with dots (date sheet); free times per person → book (rows); rows →
@@ -588,8 +645,11 @@ second step, and the rest under More.
 **Dependencies:** U3, U4; U1 for Member actions.
 
 **Boards:** `BKMQuickLook.dc.html` (states: booked next up, More open, group
-class, didn't come), `BKMQuickLookStep2.dc.html` (Change Kabir's booking?,
-Move Kabir's booking, Cancel Kabir's booking?). Was: `BKMWasQuickLook.dc.html`.
+class, didn't come; after arrival "Book their next visit?" with Tomorrow,
+Next week, Pick a date), `BKMQuickLookStep2.dc.html` (Change Kabir's booking?,
+Move Kabir's booking, Cancel Kabir's booking?), `BKMNextVisit.dc.html` (Book
+their next visit: service and person kept, you pick the day; Q16). Was:
+`BKMWasQuickLook.dc.html`.
 
 **Files:**
 - Modify: `apps/app.saroh.in/components/bookings/calendar/booking-quick-look.tsx`,
@@ -601,8 +661,11 @@ Move Kabir's booking, Cancel Kabir's booking?). Was: `BKMWasQuickLook.dc.html`.
 
 **Approach:**
 - Primary button by state: Mark arrived → (after) Take ₹[AMOUNT] now → Book
-  their next visit (same service and person, a week on, opens U8 prefilled,
-  BA-31). Undo in the toast.
+  their next visit (BA-31). Undo in the toast.
+- Book their next visit (Q16, decided 19 Oct): opens U8 at the day-and-time
+  step with the service and person prefilled and **no day chosen**; quick
+  chips Tomorrow / Next week / Pick a date, then that day's times. Never a
+  fixed week later.
 - Move or cancel: the sheet explains moving keeps the customer and the
   deposit; Move uses U3's picker with "Now: …" and "From … → …"; Cancel uses
   U3's cancel sheet.
@@ -682,7 +745,8 @@ another booking, Done). Journey: `BKMJourneyMap.dc.html`. Was:
   jumps back to it.
 - Done step: "Kabir is booked · With Meera on Tue 20 Oct at 10:00 am", the
   payment line, the payment link card when one was made (Copy link, Share),
-  and the send options as phone links (Q12).
+  and the send options as phone links: WhatsApp, SMS and Copy message (Q12,
+  decided 19 Oct; Saroh sends nothing).
 - "Add a service first" and a New booking button that is never silently
   disabled (BA-18).
 
@@ -697,7 +761,8 @@ and Done, booked toast; added: With, Back, step count.
 - Happy: Anyone free → the booked person is named on the check card and the
   done screen.
 - Edge: from "Book their next visit" → opens at step 4 with customer, service
-  and Meera set, a week on.
+  and Meera set and no day picked; Tomorrow shows tomorrow's times, Pick a
+  date opens the month (Q16).
 - Edge: a group class → step 3 shows the teacher, step 4 places left.
 - Edge: no services → step 2 "Add a service first · Add a service".
 - Error: Book refused (time taken) → back to step 4 with the message.
@@ -734,8 +799,14 @@ message; Q11 and Q12 notes). Was: `BKMWasNewFromGap.dc.html`.
 
 **Approach:** Services that fit say so ("45 min · fits, ends 4:45 pm"), too
 long ones are greyed with the reason; "Meera takes no one-to-one services yet
-· Open Services" when none fit. More holds "Block this time instead" and
-"Close these extra hours" (Q11).
+· Open Services" when none fit. Q11 (decided 19 Oct, option A): a "Book
+someone · Block this time" switch at the top of the sheet (step 1); Block
+shows how long and "Block 4:00 to 5:00 pm"; "Close these extra hours" is a
+quiet link at the foot, only on extra opening hours. No More button. Boards:
+`BKMNewFromGap.dc.html` (now drawn this way), `BKMGapOptA.dc.html`,
+`BKMGapOptABlock.dc.html` (chosen); option B boards stay on the canvas for
+reference. After booking, the toast offers WhatsApp, SMS and Copy message
+(Q12, decided).
 
 **Controls kept:** service list with greyed too-long rows, customer picker,
 payment, Close these extra hours, Block this time instead, Create booking
@@ -746,8 +817,10 @@ payment, Close these extra hours, Block this time instead, Create booking
   message.
 - Edge: a 90-minute service in a 60-minute gap is greyed with "too long for
   this 60 min gap".
-- Edge: the gap is in extra hours → More offers Close these extra hours;
-  bookings already in them are kept.
+- Happy: switch to Block this time → Block 4:00 to 5:00 pm → toast with Undo;
+  the calendar shows time off.
+- Edge: the gap is in extra hours → the foot shows Close these extra hours;
+  bookings already in them are kept. An ordinary gap never shows it.
 - Error: the time is taken meanwhile → message, sheet stays, back to the
   calendar refreshes the gap.
 - Permissions: Calendar-only cannot open it (no Free tap).
@@ -832,7 +905,9 @@ states with Share your booking page, Show all bookings, New booking
 - Happy: Needs an outcome → mark Came on the row → it leaves the filter.
 - Edge: "Awaiting payment" with none → "Nothing awaiting payment · Every
   booking made with a payment link has been paid. · Show all bookings".
-- Edge: different time zone only on a booking made in one (Q10).
+- Times always read in the business's (store's) time zone with its short
+  label (IST, or the zone's own) where the boards draw it (Q10, decided 19
+  Oct).
 - Permissions: Member sees Came / Didn't come and Cancel, no Take payment;
   Calendar-only sees rows read-only.
 - Regression: no Cancel path skips the money question (unit test on every
@@ -987,9 +1062,11 @@ read-only (Member), no services yet, toasts). Was: `BKMWasServices.dc.html`.
 - Test: `apps/app.saroh.in/components/services/services-screen.test.tsx`
 
 **Approach:** Search once there are more than 8 services; row line 2 "45 min ·
-₹[AMOUNT] · Meera", line 3 "6 booked this week · 9 to come"; tags "Staff
+₹[AMOUNT] · Meera", line 3 "6 booked this week · 9 to come"; tags "Team
 only", "Paused"; the switch's label is read as "Taking bookings, Physio
-assessment"; New service as a floating button.
+assessment"; New service as a floating button. The row switch is a quick
+pause: off unticks both "Who can book it" boxes (nobody can book it,
+bookings already made stay), on ticks both back (Q5, decided 19 Oct).
 
 **Controls kept:** count line, New service, read-only note, nobody line and
 its link (now "Add who takes bookings" / "Choose who" → Hours and time off),
@@ -998,8 +1075,8 @@ with Turn on Payments, Taking bookings switch with Undo toast, Also sell
 (Courses, Class packs), empty state.
 
 **Test scenarios:**
-- Happy: turn off Taking bookings → toast "Physio assessment paused. It's off
-  your booking page." with Undo.
+- Happy: turn off Taking bookings → toast "Physio assessment paused. Nobody
+  can book it; bookings already made stay." with Undo.
 - Happy: search "mass" → only Sports massage.
 - Edge: 6 services → no search box.
 - Permissions: Member sees rows read-only with the one-line note; Reviewer
@@ -1045,8 +1122,14 @@ delete confirm, just saved). Was: `BKMWasServiceNew.dc.html`,
   rules `service-editor.ts` uses after save today.
 - More details keeps every field (see list). GST and SAC only when the
   business has a GSTIN; time zone only when it differs (Q10).
-- "Who can book it: Customers and your team · Only your team · Nobody for
-  now" replaces the two switches (Q5); stored as today's two fields.
+- "Who can book it" (Q5, decided 19 Oct): two tick boxes, "Customers, on
+  your booking page" and "Your team, from Bookings", any of the four mixes
+  (both, team only, customers only, neither). With neither ticked, one line:
+  "Untick both to pause it. Bookings already made stay." Customers is
+  `showOnBookingPage`; Your team is the new `bookableByTeam` (U1). On New
+  service it sits at the top of More details (both ticked by default); on
+  Edit service it replaces the Taking bookings card, and More → Pause unticks
+  both.
 - Edit: rows with a pencil open a sheet per group (What it is, Time and
   place, Money); the Save bar appears only with a change; More: See its
   bookings, Pause, Delete service (confirm offers "Pause it instead").
@@ -1064,6 +1147,9 @@ glance, Price history, Discard, Add service / Save, Delete with its confirm.
   toast and the list shows it.
 - Edge: press Add with gaps → "3 things to fill in…" and focus on the first.
 - Edge: nobody does it yet → "Not bookable yet: pick who does it".
+- Edge: Who can book it, team only → the live line says only your team can
+  book it and it is not on the booking page; customers only → the team's
+  New booking does not offer it; neither → "Paused" and the one line.
 - Edge: change How long on a service with bookings → "9 bookings already made
   keep 45 min."
 - Error: duplicate name → "You already have Physio assessment · Open it".
@@ -1138,7 +1224,7 @@ changed with Undo), `BKMHoursV2Day.dc.html`, `BKMHoursV2Several.dc.html`,
 | Opening hours note, Settings › Hours link | "Why isn't a time offered?" step 2 links Opening hours |
 | Person chips, + Add someone | Whose hours card → sheet, Add someone who takes bookings |
 | Weekly hours, + Hours per day, add hours inline | Day row → day sheet (times, another shift) |
-| Copy Monday to weekdays; Copy Monday's hours to | "Also use these hours on" in the day sheet; Change several days (Q8) |
+| Copy Monday to weekdays; Copy Monday's hours to | "Also use these hours on" in the day sheet; Change several days (Q8, decided 19 Oct) |
 | Booking outside hours note | Same note with See it |
 | What customers see preview | More → What customers see |
 | Time off list, Add time off | Time off · Coming up, Add time off |
@@ -1161,8 +1247,10 @@ changed with Undo), `BKMHoursV2Day.dc.html`, `BKMHoursV2Several.dc.html`,
   theirs.
 - Error: a save fails → the control returns to its last saved value and a
   toast says nothing changed, with Try again.
-- Permissions: Member read-only with the line (unless Q13 says otherwise);
-  Reviewer locked; Calendar-only never reaches the page.
+- Permissions: Member sets hours, extra hours and time off for themselves
+  and for anyone else (Q13, decided 19 Oct; needs U1's hours action), but
+  cannot add or remove people; Reviewer locked; Calendar-only never reaches
+  the page.
 - Regression: leaving the page never asks to save (no draft exists).
 
 **Verification:** unit tests and browser specs pass on desk and phone; no Save
@@ -1187,7 +1275,8 @@ them up, and the word list and checks guard them.
   `apps/app.saroh.in/lib/services/diary.ts`, `apps/app.saroh.in/lib/services/booking-pay.ts`,
   `apps/app.saroh.in/lib/services/booking-state.ts`,
   `apps/app.saroh.in/components/bookings/outcome-control.tsx`,
-  `apps/app.saroh.in/components/shared/nav-items.tsx` (only if Q9 is yes),
+  `apps/app.saroh.in/components/shared/nav-items.tsx` (Overview → Calendar,
+  Q9 decided 19 Oct),
   `docs/patterns/saroh-product.md` (word list), `scripts/check-words.mjs`
   (retired words)
 - Test: `apps/app.saroh.in/lib/format/status.test.ts`,
@@ -1211,9 +1300,9 @@ them up, and the word list and checks guard them.
 | Gap after / Buffer before (min) | Break after / Break before |
 | Kind · One-to-one · Class | Who comes · One person · A group class |
 | Who takes it | Who does it |
-| Overview | Calendar, only if Q9 is yes |
+| Overview | Calendar (Q9, decided 19 Oct) |
 
-"Booking rules" stays as drawn (see Q9).
+"Booking rules" stays (Q9, decided 19 Oct).
 
 **Test scenarios:**
 - Happy: a PENDING booking reads "Awaiting payment" in status, the calendar
@@ -1266,36 +1355,76 @@ No agent binds the e2e ports while a gate runs.
 
 ---
 
+## Decisions from the owner, 19 Oct
+
+| Q | Decided | Where it lands |
+| --- | --- | --- |
+| Q4 | Yes: header C's date sheet has "Show as: Day / Week / List" on every Day, Week and List board. | U2, U6 |
+| Q5 | "Who can book it" is two tick boxes, "Customers, on your booking page" and "Your team, from Bookings", any of the four mixes; neither ticked is paused, with the line "Untick both to pause it. Bookings already made stay." Needs a separate team flag on the service. | U1, U15, U16 |
+| Q8 | "Also use these hours on" (day sheet) and "Change several days" replace Copy Monday. | U17 |
+| Q9 | The Overview tab is renamed "Calendar" (`nav-items.tsx`); "Booking rules" is kept. | U13, U18 |
+| Q10 | Times always show in the business's (store's) time zone, with the zone's short label (IST or another) as already designed. | U11, U12, U3 |
+| Q12 | After booking: WhatsApp, SMS and Copy message, through the phone's own apps; Saroh sends nothing. | U8, U9 |
+| Q13 | Members book, mark arrivals, move and cancel, and set hours and time off for other people too (not read-only). Needs a permission change. | U1, U17 |
+| Q14 | The business's own cancellation and refund policy decides refund or keep; no role gate on it. | U1, U3, U7 |
+| Q11 | Option A: a "Book someone · Block this time" switch at the top of the free-time sheet; "Close these extra hours" a quiet link at the foot, only on extra opening hours. | U9 |
+| Q15 | Option C: remember the last view per device, and "Start Bookings on: Day / Week / List" (or Where I left it) in the "…" sheet, saved for that person. | U2, U4, U6 |
+| Q16 | "Book their next visit" opens the booking flow with the service and person prefilled and the day left to the merchant: Tomorrow / Next week / Pick a date. No fixed week later. | U7, U8 |
+
+Nothing is open. Q5 was left open in the morning and decided later the same
+day; Q11 and Q15 were decided after options were drawn (the other options stay
+on the canvas page for reference).
+
+**DEC-170 needs amending** by the coordinator (it lives on
+`batch-2026-10-18-3`, not on this branch): Q13 (a Member also sets hours and
+time off for others), Q14 (the business's policy decides refund or keep, no
+role gate) and Q16 (next visit: the merchant picks the day). Q5 (two tick
+boxes), Q11 (option A) and Q15 (option C) also belong in it or a new DEC.
+
+---
+
 ## Questions for the owner (default = what the boards drew)
 
-- **Q4** Keep both Agenda and List? Default drawn: on a phone the agenda is
-  called List and opens first; All bookings stays one tap away from search.
-- **Q5** "Taking bookings" and "Show on the booking page" as one choice "Who
-  can book it: Customers and your team · Only your team · Nobody for now"?
-  Default drawn: yes, on new and edit service; the row switch on Services
-  stays "Taking bookings".
-- **Q8** Copy Monday: keep both the card-head link and the per-day copy?
+- **Q4** (decided 19 Oct, see above) Keep both Agenda and List? Default
+  drawn: on a phone the agenda is called List and opens first; All bookings
+  stays one tap away from search.
+- **Q5** (decided 19 Oct: two tick boxes, see above; replaces this one-choice
+  proposal) "Taking bookings" and "Show on the booking page" as one choice
+  "Who can book it: Customers and your team · Only your team · Nobody for
+  now"?
+- **Q8** (decided 19 Oct) Copy Monday: keep both the card-head link and the per-day copy?
   Default drawn: neither as today; the day sheet's "Also use these hours on"
   and "Change several days" replace both.
-- **Q9** Words: Overview → "Calendar"; "Booking rules" kept or renamed ("How
+- **Q9** (decided 19 Oct: Calendar; Booking rules kept) Words: Overview → "Calendar"; "Booking rules" kept or renamed ("How
   people book you" / "Booking, paying and cancelling")? Default drawn: the tab
   still says Overview with a Proposal tag; "Booking rules" kept.
-- **Q10** Hide time zones when everything is in the business's zone? Default
+- **Q10** (decided 19 Oct: always the business's zone, with its short label)
+  Hide time zones when everything is in the business's zone? Default
   drawn: yes; a zone shows only on a booking made in another one.
 - **Q11** "Block this time" and "Close these extra hours": behind More in the
-  free-time sheet, or on the gap tap? Default drawn: behind More.
-- **Q12** After booking, open WhatsApp / SMS with the message filled in, and
+  free-time sheet, or on the gap tap? **Decided 19 Oct: option A.** Options
+  drawn (row 5, right): Current `BKMNewFromGap.dc.html` (behind More); option A
+  `BKMGapOptA.dc.html` and `BKMGapOptABlock.dc.html` (a "Book someone · Block
+  this time" switch at the top, Close these extra hours a quiet link at the
+  foot on extra hours only); option B `BKMGapOptB.dc.html` and
+  `BKMGapOptBExtra.dc.html` (a small chooser sheet first).
+- **Q12** (decided 19 Oct) After booking, open WhatsApp / SMS with the message filled in, and
   Copy message? Default drawn: yes; Saroh itself still sends nothing.
-- **Q13 (new)** The front desk (Member): DEC-170 says book and mark arrivals;
+- **Q13 (new, decided 19 Oct: yes, and they set hours for others)** The front desk (Member): DEC-170 says book and mark arrivals;
   the boards also let them **move and cancel**. Can they also change Hours and
   time off? Default drawn: move and cancel yes; hours read-only.
-- **Q14 (new)** When a Member cancels a paid booking, who decides refund or
+- **Q14 (new, decided 19 Oct: the business's policy, no role gate)** When a Member cancels a paid booking, who decides refund or
   keep? Default proposed: the policy's choice is applied and shown; only
   someone with refund permission can change it.
 - **Q15 (new)** Phone default view and the desk: should List also open first
-  on desk? Default: no, desk stays on Day until the desktop phase.
-- **Q16 (new)** "Book their next visit" prefills a week on, same service and
-  person. Default drawn: yes.
+  on desk? **Decided 19 Oct: option C.** Options drawn (row 1, right): option A
+  `BKMStartOptA.dc.html` (remember the last view per device, through the date
+  sheet's Show as), option B `BKMStartOptB.dc.html` ("Start Bookings on: Day /
+  Week / List" in the "…" sheet, saved for that person), option C
+  `BKMStartOptC.dc.html` (both: "Where I left it" by default, or a fixed
+  view).
+- **Q16 (new, decided 19 Oct: the merchant picks the day)** "Book their next
+  visit" prefills a week on, same service and person.
 
 ---
 
