@@ -56,7 +56,7 @@ const noSubscribe = () => () => undefined;
  * browser answers `location.pathname`. `usePathname` is called only so a
  * client navigation re-renders this and the snapshot is read again.
  */
-function useCurrentPath(): string | null {
+export function useCurrentPath(): string | null {
     usePathname();
     return useSyncExternalStore(
         noSubscribe,
@@ -72,7 +72,7 @@ function samePath(a: string, b: string): boolean {
 }
 
 /** Whether `href` (already prefixed) is the page at `current`. */
-function isCurrent(href: string, current: string | null): boolean {
+export function isCurrent(href: string, current: string | null): boolean {
     if (current === null || !href.startsWith("/")) return false;
     // A section of a page is never "the page you are on": on the home page
     // every one of them would be filled at once.

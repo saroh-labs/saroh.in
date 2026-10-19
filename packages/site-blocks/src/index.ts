@@ -545,12 +545,20 @@ export type {
     SiteCredit,
     SiteFooterContent,
     SiteHeaderLogo,
+    SiteSession,
 } from "./site-chrome";
+// A look's chrome (DEC-172, U5): the one fixed bar on a phone and Live's
+// dock, mounted by the site's layout under a look.
+export { dockTabs, withVisitUs } from "./look-chrome";
+export type { DockTab } from "./look-chrome";
+export { StickyActions } from "./sticky-actions";
 // The one thing a site asks of a visitor: the header's main button, and
 // what a template's hero and closing band agree with. Pure.
 export {
     SITE_PRIMARY_ACTIONS,
     SITE_PRIMARY_ORDER,
+    chromeActionShows,
+    chromePageKind,
     contactPageHref,
     opensPrimaryAction,
     sitePrimaryAction,

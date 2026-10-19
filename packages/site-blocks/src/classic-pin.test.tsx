@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { PageSections } from "./section-renderer";
+import { SiteFooter, SiteHeader } from "./site-chrome";
 import { SiteTheme } from "./site-theme";
 
 /**
@@ -94,5 +95,84 @@ describe("Classic's pages are pinned", () => {
                 ).toMatchSnapshot();
             });
         }
+    }
+});
+
+/*
+ * Classic's chrome (DEC-172, plan U5): the header and the footer a site
+ * with no look draws. Written against the code BEFORE the looks' chrome
+ * landed, as the pages above were: the looks' header, menu, bars and
+ * footer must never reach a Classic site.
+ */
+describe("Classic's chrome is pinned", () => {
+    const navigation = [
+        { label: "Home", href: "/" },
+        { label: "About", href: "/about" },
+        { label: "Book a class", href: "/book", kind: "BOOK" },
+        { label: "Visit", href: "/#visit" },
+    ];
+    const contact = {
+        phone: "+919845012345",
+        email: "hello@example.com",
+        address: null,
+        places: [
+            {
+                name: null,
+                address: "27th Main, HSR Layout\nBengaluru 560102",
+                hours: [
+                    {
+                        day: "MON" as const,
+                        open: "06:00",
+                        close: "20:30",
+                        closed: false,
+                    },
+                ],
+            },
+        ],
+        social: [
+            { network: "whatsapp" as const, url: "https://wa.me/919845012345" },
+        ],
+        timeZone: "Asia/Kolkata",
+    };
+
+    it("the header, with its main button, bag and account", () => {
+        expect(
+            renderToStaticMarkup(
+                <SiteHeader
+                    name="Sample Business"
+                    navigation={navigation}
+                    action={{ kind: "book", label: "Book", href: "/book" }}
+                    logo={{ url: "https://media.test/logo.png" }}
+                    bag={<button type="button">Bag</button>}
+                    account={<button type="button">Sign in</button>}
+                    shopServes
+                />,
+            ),
+        ).toMatchSnapshot();
+    });
+
+    for (const layout of ["centre", "left"] as const) {
+        it(`the footer, ${layout}`, () => {
+            expect(
+                renderToStaticMarkup(
+                    <SiteFooter
+                        footer={{
+                            format: "markdown",
+                            value: "Yoga at your pace.",
+                            layout,
+                        }}
+                        name="Sample Business"
+                        contact={contact}
+                        credit={{
+                            href: "https://saroh.in/?ref=x",
+                            reportHref: "https://saroh.in/report",
+                        }}
+                        cookieChoices
+                        navigation={navigation}
+                        now={new Date("2026-10-19T03:00:00Z")}
+                    />,
+                ),
+            ).toMatchSnapshot();
+        });
     }
 });

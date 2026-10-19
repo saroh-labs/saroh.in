@@ -875,6 +875,22 @@ results), mark it `data-ph-mask`; a picture inside it is left out too, and
   `rounded-site-photo`; the new colour roles are `site-accent-text`,
   `site-accent-soft`, `site-rule` and `site-footer-muted`, each falling back
   to the role it refines on a Classic site.
+- **Current** (20 Oct 2026, DEC-172 U5) — **A look's chrome keeps one filled
+  button per view and one fixed bar on a phone, in one place**
+  (`sticky-actions.tsx`). A block marks the page's own main action
+  `data-site-primary` (the accent's fill and the closing band's count too);
+  while one is on screen the page's root says `data-site-primary="shown"`,
+  and the header's Book and the dock's Book stay outlines until it says
+  `"gone"`. On a phone the header scrolls away; the Book bar (Folio, Quiet)
+  or the dock (Live) is the one bar, and it waits while the consent banner
+  (`data-site-consent`), a sheet or the menu (`role="dialog"` with
+  `aria-modal`) is open, and never draws on `/book`, a product or checkout.
+  A new fixed bar on a merchant page goes through it, never beside it.
+  Phone and desk differ by `max-[699px]:` and `min-[700px]:` only. Every
+  control in a look's header, menu, footer, bar and dock is 44×44 on every
+  pointer. Account links in a look's footer and menu are drawn only in the
+  browser (`footer-session-links.tsx`), so a cached page names no one.
+  Classic's chrome is pinned in `classic-pin.test.tsx`.
 - **Adopted** — **Motion comes from the primitives and the shared Tailwind
   config, not per-app `@keyframes`** (15 §3). Gap, and a contradiction to
   resolve rather than copy: `accounts.saroh.in/app/auth.css` defines 8 keyframes

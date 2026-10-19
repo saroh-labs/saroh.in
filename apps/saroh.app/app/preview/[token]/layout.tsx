@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { lookScope, SiteTheme } from "@saroh/site-blocks";
+import {
+    lookOf,
+    lookScope,
+    SiteTheme,
+    StickyActions,
+} from "@saroh/site-blocks";
 
 import { PreviewGone } from "@/components/preview-gone";
 import { previewMenu } from "@/lib/in-page-menu";
@@ -78,6 +83,8 @@ export default async function PreviewLayout({
     const { snapshot, siteName, expiresAt, modules } = preview;
     // Less entries to home sections with nothing to show now (G10, G9…).
     const navigation = await previewMenu(snapshot, preview.siteId, token);
+    // The draft's look (DEC-172): its own header, footer and bars (U5).
+    const look = lookOf(snapshot.site.look);
 
     return (
         <div
@@ -92,6 +99,7 @@ export default async function PreviewLayout({
                 look={snapshot.site.look}
             />
             <SiteHeader
+                look={look}
                 name={snapshot.site.name}
                 navigation={navigation}
                 // The menu the live site would draw now (G19): a module
@@ -103,6 +111,7 @@ export default async function PreviewLayout({
             <div>{children}</div>
 
             <SiteFooter
+                look={look}
                 footer={snapshot.site.footer}
                 name={snapshot.site.name}
                 // The header's menu again at the foot, as the live site
@@ -111,6 +120,11 @@ export default async function PreviewLayout({
                 modules={modules}
                 basePath={base}
             />
+            {/* A preview has no main action, so no Book bar: this keeps the
+                header's and the page's buttons in step (DEC-172, U5). */}
+            {look ? (
+                <StickyActions look={look} action={null} basePath={base} />
+            ) : null}
             <KeepLinksInside base={base} />
         </div>
     );
