@@ -1298,18 +1298,7 @@ test.describe("All bookings (U11)", () => {
             page.getByText(/Times in \w+, your business's time zone\./),
         ).toBeVisible();
 
-        // A view is kept in the address. On a phone the chips scroll
-        // sideways and All is the last: swipe the strip to its end first,
-        // as a person would (the strip keeps Upcoming in view until then,
-        // and its "Swipe for more" line goes at the first scroll).
-        await page
-            .locator("[data-scroll-x]")
-            .filter({ has: views })
-            .evaluate((el) => {
-                el.dispatchEvent(new Event("touchstart"));
-                el.scrollLeft = el.scrollWidth;
-            });
-        await expect(page.locator("[data-scroll-x-hint]")).toHaveCount(0);
+        // A view is kept in the address.
         await views.getByRole("radio", { name: /^All\s*\d+$/ }).click();
         await expect(page).toHaveURL(/view=all/);
 

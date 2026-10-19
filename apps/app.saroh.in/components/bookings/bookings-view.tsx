@@ -251,41 +251,46 @@ export function BookingsView({
                     />
                 }
                 filters={
-                    <ScrollX
-                        bare
-                        label="Show"
-                        current='[aria-checked="true"]'
-                        revealKey={view}
-                        className="max-[759px]:-mx-4 max-[759px]:px-4 min-[760px]:overflow-visible"
-                    >
-                        <div className="flex items-center gap-1.5 max-[759px]:w-max min-[760px]:flex-wrap">
-                            <ChipGroup
-                                label="Show"
-                                value={view}
-                                onChange={setView}
-                                className="flex-nowrap max-[759px]:w-max min-[760px]:flex-wrap"
-                                choices={VIEWS.map((v) => ({
-                                    value: v.id,
-                                    label: (
-                                        <>
-                                            {v.label}
-                                            {/* A real space: it is named "Upcoming 18". */}{" "}
-                                            <span className="tabular-nums opacity-70">
-                                                {counts[v.id]}
-                                            </span>
-                                        </>
-                                    ),
-                                }))}
-                            />
-                            <MoreBookingFilters
-                                value={more}
-                                onChange={setMore}
-                                services={choices.services}
-                                staff={choices.staff}
-                                showing={shown.length}
-                            />
-                        </div>
-                    </ScrollX>
+                    // A flex item is as wide as its chips unless told it
+                    // may shrink: without min-w-0 the strip set the page
+                    // 816px wide on a phone, which then zoomed out.
+                    <div className="min-w-0 max-[759px]:w-full">
+                        <ScrollX
+                            bare
+                            label="Show"
+                            current='[aria-checked="true"]'
+                            revealKey={view}
+                            className="max-[759px]:-mx-4 max-[759px]:px-4 min-[760px]:overflow-visible"
+                        >
+                            <div className="flex items-center gap-1.5 max-[759px]:w-max min-[760px]:flex-wrap">
+                                <ChipGroup
+                                    label="Show"
+                                    value={view}
+                                    onChange={setView}
+                                    className="flex-nowrap max-[759px]:w-max min-[760px]:flex-wrap"
+                                    choices={VIEWS.map((v) => ({
+                                        value: v.id,
+                                        label: (
+                                            <>
+                                                {v.label}
+                                                {/* A real space: it is named "Upcoming 18". */}{" "}
+                                                <span className="tabular-nums opacity-70">
+                                                    {counts[v.id]}
+                                                </span>
+                                            </>
+                                        ),
+                                    }))}
+                                />
+                                <MoreBookingFilters
+                                    value={more}
+                                    onChange={setMore}
+                                    services={choices.services}
+                                    staff={choices.staff}
+                                    showing={shown.length}
+                                />
+                            </div>
+                        </ScrollX>
+                    </div>
                 }
                 onClear={searching || filtering ? clearAll : undefined}
                 clearLabel={filtering ? "Clear filters" : "Clear search"}
