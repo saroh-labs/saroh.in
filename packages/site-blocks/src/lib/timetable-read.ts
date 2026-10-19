@@ -133,12 +133,17 @@ export function dayLabel(date: string, long = false): string {
     return `${names[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
-/** The booking page on this class, that day, that time chosen. */
+/**
+ * The booking page on this class, that day, that time chosen, opened on
+ * the details step (U9): the class is chosen, so what is left is who is
+ * booking and how they'll pay.
+ */
 export function sessionHref(bookHref: string, s: TimetableSession): string {
     const q = new URLSearchParams({
         service: s.serviceId,
         date: s.date,
         start: s.time,
+        step: "details",
     });
     return `${bookHref}?${q.toString()}`;
 }

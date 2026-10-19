@@ -62,6 +62,7 @@ const READS = new Set([
     "savedDeliveryAddress",
     "creditFor",
     "waitlistFor",
+    "findMyBooking",
     "loadSignInOptions",
     "moveTimes",
     "visitTimes",

@@ -237,7 +237,7 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         await time.click();
         await expect(time).toHaveAttribute("aria-checked", "true");
 
-        // The steps never leave the address the scan opened.
+        // The steps stay on the page the scan opened, its tag kept.
         await phone.getByRole("radio", { name: /Pay at the desk/ }).click();
         await phone
             .getByRole("button", { name: "Continue to sign in" })
@@ -249,7 +249,12 @@ test("a booking made on the page a scan opened is counted on the code", async ({
         await expect(
             phone.getByRole("heading", { name: "You're booked, Asha." }),
         ).toBeVisible({ timeout: 15_000 });
-        await expect(phone).toHaveURL(`${LIVE}/book?src=qr-${made.code}`);
+        // The steps move in the address (U9), and the scan's tag stays on
+        // it through every one of them.
+        const landed = new URL(phone.url());
+        expect(landed.pathname).toBe("/book");
+        expect(landed.searchParams.get("src")).toBe(`qr-${made.code}`);
+        expect(landed.searchParams.get("step")).toBe("done");
 
         // The tag was the address's alone: the site kept nothing of it.
         const kept = await phone.evaluate(() =>

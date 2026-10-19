@@ -62,7 +62,8 @@ export interface BookingDraft {
 }
 
 /**
- * The address's query as the draft is kept under: without the tag a QR
+ * The address's query as the draft is kept under: without the step it is
+ * on (U9), and without the tag a QR
  * code's scan adds (`src`, `qr-source.ts`), which is never stored anywhere,
  * and without the tracking tags an ad or a share adds.
  */
@@ -70,6 +71,11 @@ export function draftSearch(search: string): string {
     const params = new URLSearchParams(search);
     for (const name of Array.from(params.keys())) {
         if (
+            // The step and a booked reference are where the page is, not
+            // what was chosen (U9): a reload on another step is the same
+            // booking.
+            name === "step" ||
+            name === "ref" ||
             name === "src" ||
             name.startsWith("utm_") ||
             name === "fbclid" ||

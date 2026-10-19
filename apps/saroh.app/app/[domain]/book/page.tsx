@@ -10,11 +10,12 @@ import {
     modulePageTopOf,
     ModulePageUnavailable,
     MoveClass,
+    parseStepUrl,
     reachOf,
 } from "@saroh/site-blocks";
 
 import { PublishedPage } from "@/components/published-page";
-import { accountAreaOn, getMyBooking } from "@/lib/account-area";
+import { accountAreaOn, getBooking, getMyBooking } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
 import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
@@ -45,6 +46,7 @@ import { moveBooking } from "../account/bookings/actions";
 import {
     bookSignedIn,
     creditFor,
+    findMyBooking,
     joinWaitlist,
     leaveWaitlist,
     waitlistFor,
@@ -72,6 +74,14 @@ import {
  *
  * A full class offers its waitlist (round-2 A12): joined, read and left
  * through `./actions.ts` with the session, like booking.
+ *
+ * **The step is in the address** (site templates v2 U9): `?step=` with the
+ * person asked for (`?staff=`) and, once booked, its reference (`?ref=`).
+ * The flow moves it with the History API, so a step change makes no
+ * request here; this page reads it on a reload or a link, and the flow
+ * opens on that step or the earliest one it can stand on. A booked step is
+ * read again through the customer's own session (`getBooking`), and that
+ * page is never kept by the page cache.
  *
  * `?move=<ref>` (round-2 A6, behind the account area's switch) moves one
  * of the signed-in customer's classes instead: "Moving: ‹class›", its other
@@ -155,10 +165,14 @@ export default async function BookPage({
         date?: string | string[];
         start?: string | string[];
         move?: string | string[];
+        step?: string | string[];
+        staff?: string | string[];
+        ref?: string | string[];
     }>;
 }) {
     const { domain } = await params;
-    const { service, date, start, move } = await searchParams;
+    const query = await searchParams;
+    const { service, date, start, move, step, staff, ref } = query;
     const resolved = await getSiteForHost(domain);
     if (!resolved?.siteId) notFound();
 
@@ -186,7 +200,7 @@ export default async function BookPage({
         resolved.snapshot.pages,
         resolved.modules,
         "BOOK",
-        isBookingDeepLink({ service, date, start }),
+        isBookingDeepLink({ service, date, start, step, staff, ref }),
     );
     if (route.draw === "unavailable") {
         return <ModulePageUnavailable business={resolved.snapshot.site.name} />;
@@ -201,21 +215,43 @@ export default async function BookPage({
         );
     }
 
-    const [lookup, visit, customer, options, facts, catalogue, contact] =
-        await Promise.all([
-            getBookingPage(resolved.siteId),
-            // The header's place, hours and phone (E6); null never blocks booking.
-            getBookingVisit(resolved.siteId),
-            getSignedInCustomer().catch((): SignedInCustomer | null => null),
-            getSignInOptions().catch((): SignInOptions | null => null),
-            // "Sold by" or "Run by ‹legal name›" on the confirmation (DEC-121):
-            // the layout's own reads, shared through `cache`.
-            getFooterFacts(resolved.siteId),
-            getCatalogue(resolved.siteId),
-            // A call and a WhatsApp message, where the page can't find a
-            // time: the layout's own read, shared through `cache`.
-            getSiteContact(resolved.siteId),
-        ]);
+    // The step in the address (U9), each part narrowed: what the flow opens
+    // on. A booked step names its booking, read with the customer's own
+    // session: one visitor's ticket, so never kept by the page cache.
+    const opened = parseStepUrl(
+        new URLSearchParams(
+            Object.entries(query).flatMap(([k, v]) =>
+                typeof v === "string" ? [[k, v]] : [],
+            ),
+        ).toString(),
+    );
+    const bookedRef = opened.step === "done" ? opened.ref : null;
+    if (bookedRef) dontCachePage("a booking's ticket");
+
+    const [
+        lookup,
+        visit,
+        customer,
+        options,
+        facts,
+        catalogue,
+        contact,
+        booked,
+    ] = await Promise.all([
+        getBookingPage(resolved.siteId),
+        // The header's place, hours and phone (E6); null never blocks booking.
+        getBookingVisit(resolved.siteId),
+        getSignedInCustomer().catch((): SignedInCustomer | null => null),
+        getSignInOptions().catch((): SignInOptions | null => null),
+        // "Sold by" or "Run by ‹legal name›" on the confirmation (DEC-121):
+        // the layout's own reads, shared through `cache`.
+        getFooterFacts(resolved.siteId),
+        getCatalogue(resolved.siteId),
+        // A call and a WhatsApp message, where the page can't find a
+        // time: the layout's own read, shared through `cache`.
+        getSiteContact(resolved.siteId),
+        bookedRef ? getBooking(bookedRef) : null,
+    ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
         // A failed read is not kept by the page cache (#863).
@@ -225,7 +261,7 @@ export default async function BookPage({
                 business={resolved.snapshot.site.name}
                 // The address as it was opened, so "Try again" lands on
                 // the same service, day and time.
-                retryHref={bookHref({ service, date, start })}
+                retryHref={bookHref({ service, date, start, staff, step })}
                 reach={reachOf(contact)}
             />
         );
@@ -271,6 +307,8 @@ export default async function BookPage({
                         join: joinWaitlist,
                         leave: leaveWaitlist,
                     },
+                    // The booked step read again after Back and Forward (U9).
+                    booking: findMyBooking,
                 }}
                 apiUrl={publicApiUrl()}
                 soldBy={soldByFor(
@@ -282,6 +320,10 @@ export default async function BookPage({
                 initialServiceId={typeof service === "string" ? service : null}
                 initialDate={initialDateOf(date)}
                 initialStart={initialTimeOf(start)}
+                initialStaff={opened.staff}
+                initialStep={opened.step}
+                initialRef={bookedRef}
+                booked={booked}
             />
         </>
     );
@@ -292,6 +334,8 @@ function bookHref(params: {
     service?: string | string[];
     date?: string | string[];
     start?: string | string[];
+    staff?: string | string[];
+    step?: string | string[];
 }): string {
     const query = new URLSearchParams();
     for (const [name, value] of Object.entries(params)) {

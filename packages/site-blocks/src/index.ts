@@ -259,6 +259,7 @@ export type {
     BookingFlowProps,
 } from "./booking-flow/booking-flow";
 export { initialDateOf, initialTimeOf } from "./booking-flow/initial-start";
+// The booking step in the address (site templates v2 U9).
 export {
     isBookResult,
     isBookingPage,
@@ -270,6 +271,14 @@ export type {
     BookingService,
     CreditAnswer,
 } from "./booking-flow/model";
+export {
+    BOOKING_STEPS,
+    closeHref,
+    parseStepUrl,
+    resolveStep,
+    serializeStepUrl,
+} from "./booking-flow/step-url";
+export type { BookingStep, StepUrl } from "./booking-flow/step-url";
 // Booking signed in (A9): the site's server action books, and answers the
 // page in the page's own terms.
 export { OFFLINE_RESULT, resultOf } from "./booking-flow/api";
