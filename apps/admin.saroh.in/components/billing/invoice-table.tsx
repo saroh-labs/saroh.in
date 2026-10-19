@@ -36,6 +36,7 @@ const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
         id: "number",
         header: "Invoice",
         priority: "primary",
+        width: "140px",
         cell: (row) => (
             <div className="min-w-0">
                 <p className="truncate font-mono text-[13px] font-medium">
@@ -52,7 +53,9 @@ const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
         header: "Business",
         priority: "primary",
         cell: (row) => (
-            <div className="min-w-0">
+            // Capped, so one long "Billed to … · GSTIN …" can't push PDF
+            // and Open off the screen; the full line is the cell's title.
+            <div className="min-w-0 max-w-[15rem]">
                 {/* Without view-as, its subscription in Billing. */}
                 <Link
                     href={
@@ -64,8 +67,30 @@ const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
                 >
                     {row.organization.name}
                 </Link>
-                <p className="truncate text-[12px] text-muted-foreground">
-                    Billed to {row.billToName}
+                {/* Who is billed, only when it isn't the business's own
+                    name, and the buyer's GSTIN (no column of its own: ten
+                    columns didn't fit a desk). */}
+                <p
+                    className="truncate text-[12px] text-muted-foreground"
+                    title={[
+                        row.billToName !== row.organization.name
+                            ? `Billed to ${row.billToName}`
+                            : null,
+                        row.billToGstin ? `GSTIN ${row.billToGstin}` : null,
+                    ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                >
+                    {[
+                        row.billToName !== row.organization.name
+                            ? `Billed to ${row.billToName}`
+                            : null,
+                        row.billToGstin
+                            ? `GSTIN ${row.billToGstin}`
+                            : "No GSTIN",
+                    ]
+                        .filter(Boolean)
+                        .join(" · ")}
                 </p>
             </div>
         ),
@@ -74,6 +99,7 @@ const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
         id: "plan",
         header: "Plan",
         priority: "secondary",
+        width: "140px",
         cell: (row) => (
             <div className="min-w-0">
                 <p className="truncate">
@@ -89,24 +115,32 @@ const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
         id: "status",
         header: "Status",
         priority: "primary",
-        width: "120px",
+        width: "104px",
         cell: (row) => <InvoiceStatusPill row={row} />,
-    },
-    {
-        id: "taxable",
-        header: "Before GST",
-        priority: "detail",
-        width: "120px",
-        numeric: true,
-        cell: (row) => formatPaise(row.taxablePaise, row.currency),
     },
     {
         id: "gst",
         header: "GST",
         priority: "detail",
-        width: "200px",
+        width: "170px",
+        // The GST on one line; how it splits, and what it was charged on,
+        // under it (the long "CGST … + SGST …" wrapped onto four lines).
         cell: (row) => (
-            <span className="text-[13px] tabular-nums">{gstSplit(row)}</span>
+            <span className="grid gap-0.5">
+                <span className="whitespace-nowrap tabular-nums">
+                    {formatPaise(
+                        row.cgstPaise + row.sgstPaise + row.igstPaise,
+                        row.currency,
+                    )}
+                </span>
+                <span
+                    className="whitespace-nowrap text-[12px] text-muted-foreground"
+                    title={gstSplit(row)}
+                >
+                    {row.taxType === "INTER" ? "IGST" : "CGST + SGST"} on{" "}
+                    {formatPaise(row.taxablePaise, row.currency)}
+                </span>
+            </span>
         ),
     },
     {
@@ -118,22 +152,10 @@ const columns = (canViewAs: boolean): DataColumn<SarohInvoiceRow>[] => [
         cell: (row) => formatPaise(row.totalPaise, row.currency),
     },
     {
-        id: "gstin",
-        header: "Buyer GSTIN",
-        priority: "detail",
-        width: "170px",
-        cell: (row) =>
-            row.billToGstin ? (
-                <span className="font-mono text-[12px]">{row.billToGstin}</span>
-            ) : (
-                <span className="text-muted-foreground">None</span>
-            ),
-    },
-    {
         id: "payment",
         header: "Payment",
         priority: "detail",
-        width: "220px",
+        width: "170px",
         cell: (row) => <PaymentCell row={row} />,
     },
     {
@@ -250,7 +272,7 @@ function PaymentCell({ row }: { row: SarohInvoiceRow }) {
             )}
             {row.amountMismatch && row.providerAmountPaise !== null ? (
                 <div>
-                    <Badge variant="warning">
+                    <Badge variant="warning" className="whitespace-normal">
                         Razorpay took{" "}
                         {formatPaise(row.providerAmountPaise, row.currency)}
                     </Badge>
