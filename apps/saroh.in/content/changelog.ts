@@ -197,6 +197,17 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
                 },
             },
             {
+                name: "QR codes",
+                // Released to production on 11 Oct 2026 (#925, #932), so it is
+                // here on day one and no longer in Coming next (DEC-119,
+                // ledger CN2). Settings › Share and the QR button on a
+                // product, an order's pay link, an invoice and the site's
+                // address (`components/qr/`). The logo and colour depend on
+                // the plan (`qr-style-lock.ts`) and scan counts are the
+                // plan's, so neither is claimed here.
+                body: "A QR code for your website, a product, a pay link or an invoice, from Settings › Share or the QR button beside it. Download it, or print it ready for the counter.",
+            },
+            {
                 name: "Your website",
                 // Design: "Start from a template made for your kind of
                 // business…" with "See templates". /templates ships with
@@ -223,6 +234,7 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
  *
  * Every row was checked against the code on `development` on 10 Oct 2026
  * and has its row in the claims ledger (§12, CN1–CN18) before it is here.
+ * A row leaves when it is released, for an entry above (QR codes, 20 Oct).
  * A row promises only what isn't built: nothing a merchant can already do
  * is listed as coming (CSV import; their own Meta Pixel and Google
  * Analytics in Website › Settings › Tracking). No row names a plan or a
@@ -238,16 +250,11 @@ export const COMING_NEXT: readonly ComingNext[] = [
     {
         group: "next",
         // A business can already connect WhatsApp in Settings › Providers
-        // and write to an enquiry by hand; nothing is sent on its own. The
-        // design's "…not just email" is dropped: no booking reminder goes
-        // by email either (ledger BK2, CN1).
+        // and write to an enquiry by hand; nothing is sent on its own. No
+        // booking reminder exists on any channel yet (ledger BK2, CN1;
+        // #1057), so the line doesn't promise one (20 Oct 2026).
         name: "Automatic WhatsApp messages",
-        line: "Booking reminders, order updates and pay links sent to your customers on WhatsApp for you.",
-    },
-    {
-        group: "next",
-        name: "QR codes",
-        line: "A QR for your page, a service or a product, with your logo, ready to print for the counter.",
+        line: "Order updates and pay links sent to your customers on WhatsApp for you.",
     },
     {
         group: "next",
