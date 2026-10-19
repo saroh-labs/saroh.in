@@ -79,7 +79,9 @@ function paste(el: HTMLElement, text: string) {
     });
 }
 
-describe("PhoneInput (#1036)", () => {
+// Opening the country list draws every country in jsdom: well under a
+// second locally, past 5s on a busy CI runner.
+describe("PhoneInput (#1036)", { timeout: 15_000 }, () => {
     it("starts on India, labelled, with the tel keyboard", () => {
         render(<Harness />);
         expect(picker()).toHaveAccessibleName("Country code: India +91");
