@@ -305,6 +305,7 @@ export function MoveStep({
                 )}
                 <Button
                     type="button"
+                    data-ph-unmask=""
                     className={cn(QL_BTN, "w-full min-[760px]:w-auto")}
                     disabled={!picked || busy}
                     onClick={() => void move()}

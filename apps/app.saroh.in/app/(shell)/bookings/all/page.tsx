@@ -125,6 +125,7 @@ export default async function BookingsPage({
             {BACK}
             <PageHeader
                 title="All bookings"
+                holdsData={false}
                 count={rows.length > 0 ? `${rows.length} in all` : null}
                 description={`Times in ${zoneName(timezone)}, your business's time zone.`}
                 actions={

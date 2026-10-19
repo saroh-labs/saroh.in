@@ -83,6 +83,7 @@ export function WhatToShow({
             align="end"
             footer={
                 <Button
+                    data-ph-mask=""
                     className="w-full max-[759px]:h-12 max-[759px]:text-[15px]"
                     onClick={() => setOpen(false)}
                 >

@@ -318,6 +318,7 @@ export function BookingsView({
                         kind="no-results"
                         things="bookings"
                         cause="view"
+                        data-ph-unmask=""
                         title={empty.title}
                         description={empty.line}
                         onClear={() => setView("all")}

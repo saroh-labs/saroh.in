@@ -44,6 +44,7 @@ export function ListDayEmpty({
         const open = onOpenHours && !past;
         return (
             <EmptyState
+                data-ph-unmask=""
                 data-list-empty="closed"
                 icon={<Clock />}
                 title={closed.title}
@@ -74,6 +75,7 @@ export function ListDayEmpty({
     if (past)
         return (
             <EmptyState
+                data-ph-unmask=""
                 data-list-empty="past"
                 icon={<CalendarDays />}
                 title={title}
@@ -83,6 +85,7 @@ export function ListDayEmpty({
     const offerShare = canBook && share;
     return (
         <EmptyState
+            data-ph-unmask=""
             data-list-empty="open"
             icon={<CalendarDays />}
             title={title}

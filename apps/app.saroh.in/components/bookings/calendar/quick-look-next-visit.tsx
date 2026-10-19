@@ -405,6 +405,7 @@ export function NextVisitStep({
                 <span aria-hidden className="hidden flex-1 min-[760px]:block" />
                 <Button
                     type="button"
+                    data-ph-unmask=""
                     className={cn(QL_BTN, "w-full gap-2 min-[760px]:w-auto")}
                     disabled={!time || busy}
                     onClick={() => void book()}
