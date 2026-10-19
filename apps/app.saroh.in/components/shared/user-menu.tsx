@@ -19,6 +19,7 @@ import {
 import {
     CircleHelp,
     LogOut,
+    Mail,
     ReceiptText,
     SunMoon,
     UserRound,
@@ -28,6 +29,7 @@ import Link from "next/link";
 
 import { accountsLoginUrl, billingProfilesUrl } from "@/lib/accounts";
 import { helpHomeUrl } from "@/lib/help/links";
+import type { AccountManager } from "@/lib/organizations/service";
 
 /**
  * All three, including System. Appearance lives only here since the top
@@ -56,6 +58,7 @@ export function UserMenu({
     email,
     businessName,
     ownsABusiness = false,
+    accountManager = null,
 }: {
     name?: string | null;
     email: string;
@@ -66,6 +69,11 @@ export function UserMenu({
      * (DEC-167 step 2): the menu links to them in their account.
      */
     ownsABusiness?: boolean;
+    /**
+     * Who at Saroh looks after this business (DEC-169, U26), shown above
+     * Help centre while one is linked. Null, nothing shows.
+     */
+    accountManager?: AccountManager | null;
 }) {
     const { theme = "system", setTheme } = useTheme();
     // An empty-string name is as good as absent.
@@ -161,6 +169,9 @@ export function UserMenu({
                         </DropdownMenuRadioGroup>
                     </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                {accountManager ? (
+                    <SarohContact manager={accountManager} />
+                ) : null}
                 <DropdownMenuItem asChild>
                     <a href={helpHomeUrl()} target="_blank" rel="noreferrer">
                         <CircleHelp />
@@ -196,5 +207,58 @@ export function UserMenu({
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+}
+
+/**
+ * "Your Saroh contact" (DEC-169, U26): the person at Saroh who looks after
+ * this business, by name, with their work email to write to. The whole row
+ * is the Email action, so it is one comfortable target on a phone. Without
+ * a work email it is the name alone, and nothing to press.
+ */
+function SarohContact({ manager }: { manager: AccountManager }) {
+    const { name, workEmail } = manager;
+    const details = (
+        <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold">
+                {name ?? workEmail}
+            </span>
+            {name && workEmail ? (
+                <span className="block truncate text-[11.5px] text-muted-foreground">
+                    {workEmail}
+                </span>
+            ) : null}
+        </span>
+    );
+    return (
+        <div
+            data-saroh-contact=""
+            // A person's name and email: masked in a session recording.
+            data-ph-mask=""
+            className="my-1 rounded-[9px] border border-muted"
+        >
+            <p className="px-[9px] pt-[7px] text-[11px] text-muted-foreground">
+                Your Saroh contact
+            </p>
+            {workEmail ? (
+                <DropdownMenuItem asChild>
+                    <a
+                        href={`mailto:${workEmail}`}
+                        aria-label={`Email ${name ?? workEmail}, your Saroh contact`}
+                    >
+                        <Mail />
+                        {details}
+                        <span className="text-[11.5px] font-medium text-muted-foreground">
+                            Email
+                        </span>
+                    </a>
+                </DropdownMenuItem>
+            ) : (
+                <div className="flex items-center gap-2.5 px-[9px] pb-[7px] pt-0.5 [&>svg]:size-4">
+                    <UserRound className="text-muted-foreground" />
+                    {details}
+                </div>
+            )}
+        </div>
     );
 }

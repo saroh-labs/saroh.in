@@ -232,6 +232,38 @@ export async function getOrganization(
 }
 
 /**
+ * Who at Saroh looks after the business (DEC-169, U26): their name and the
+ * work email on their staff profile, never the email they sign in with, and
+ * no phone. Both can be null, never both at once.
+ */
+export interface AccountManager {
+    name: string | null;
+    workEmail: string | null;
+}
+
+/**
+ * The business's Saroh contact for the account menu, or null while no
+ * manager is linked. An aid like the shell's other reads: null too when it
+ * can't be read, and the menu then simply doesn't show the card.
+ */
+export async function accountManagerOrNull(
+    organizationId: string,
+): Promise<AccountManager | null> {
+    try {
+        const res = await apiFetch(`/organizations/${organizationId}`);
+        if (!res.ok) return null;
+        const read = (await res.json()) as {
+            accountManager?: AccountManager | null;
+        };
+        const manager = read.accountManager;
+        if (!manager || (!manager.name && !manager.workEmail)) return null;
+        return { name: manager.name, workEmail: manager.workEmail };
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Onboarding: create an organization. The caller becomes OWNER (ownership is
  * derived from the session server-side, never trusted from the client).
  */

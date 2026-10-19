@@ -4,6 +4,10 @@
  * someone who owns a business, "Billing profiles ↗" opens their account on
  * accounts.saroh.in in the same tab; for anyone else (an Admin or Member
  * only) it isn't there. The header decides it from the roles it has.
+ *
+ * And the business's Saroh contact (DEC-169, U26): the card shows only while
+ * a manager is linked, above Help centre, and its Email action writes to the
+ * work email the API gave. With no manager, nothing shows.
  */
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -11,7 +15,7 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Organization } from "@/lib/organizations/service";
+import type { AccountManager, Organization } from "@/lib/organizations/service";
 
 import { AppHeader } from "./app-header";
 import type * as UserMenuModule from "./user-menu";
@@ -61,7 +65,10 @@ afterEach(() => {
     document.body.innerHTML = "";
 });
 
-async function openMenu(ownsABusiness: boolean) {
+async function openMenu(
+    ownsABusiness: boolean,
+    accountManager: AccountManager | null = null,
+) {
     act(() =>
         root.render(
             <UserMenu
@@ -69,6 +76,7 @@ async function openMenu(ownsABusiness: boolean) {
                 email="asha.verma@example.com"
                 businessName="Pulse Fitness Gurugram"
                 ownsABusiness={ownsABusiness}
+                accountManager={accountManager}
             />,
         ),
     );
@@ -129,5 +137,89 @@ describe("the header decides it from the roles", () => {
         expect(draw([org("a", "ADMIN"), org("b", "OWNER")])).toBe(true);
         expect(draw([org("a", "ADMIN")])).toBe(false);
         expect(draw([org("a", "MEMBER")])).toBe(false);
+    });
+});
+
+describe("Your Saroh contact", () => {
+    const meera: AccountManager = {
+        name: "Meera Iyer",
+        workEmail: "meera.iyer@example.com",
+    };
+
+    it("shows the manager's name and work email, with Email writing to it", async () => {
+        const menu = await openMenu(true, meera);
+        const card = menu?.querySelector("[data-saroh-contact]");
+        expect(card?.textContent).toContain("Your Saroh contact");
+        expect(card?.textContent).toContain("Meera Iyer");
+        expect(card?.textContent).toContain("meera.iyer@example.com");
+        const email = card?.querySelector<HTMLAnchorElement>("a");
+        expect(email?.getAttribute("href")).toBe(
+            "mailto:meera.iyer@example.com",
+        );
+        expect(email?.getAttribute("role")).toBe("menuitem");
+        expect(email?.textContent).toContain("Email");
+        expect(card?.textContent).not.toMatch(/\+91|phone/i);
+    });
+
+    it("sits above Help centre, and every other row is still there", async () => {
+        const menu = await openMenu(true, meera);
+        const text = menu?.textContent ?? "";
+        expect(text.indexOf("Your Saroh contact")).toBeGreaterThan(-1);
+        expect(text.indexOf("Your Saroh contact")).toBeLessThan(
+            text.indexOf("Help centre"),
+        );
+        for (const row of [
+            "Your profile",
+            "Billing profiles",
+            "Appearance",
+            "Help centre",
+            "Sign out",
+        ]) {
+            expect(text).toContain(row);
+        }
+    });
+
+    it("with no work email, gives the name and nothing to press", async () => {
+        const menu = await openMenu(false, { ...meera, workEmail: null });
+        const card = menu?.querySelector("[data-saroh-contact]");
+        expect(card?.textContent).toContain("Meera Iyer");
+        expect(card?.querySelector("a")).toBeNull();
+        expect(menu?.querySelector('a[href^="mailto:"]')).toBeNull();
+    });
+
+    it("isn't there without a manager", async () => {
+        const menu = await openMenu(true, null);
+        expect(menu?.textContent).toContain("Help centre");
+        expect(menu?.querySelector("[data-saroh-contact]")).toBeNull();
+        expect(menu?.textContent).not.toContain("Saroh contact");
+        expect(menu?.querySelector('a[href^="mailto:"]')).toBeNull();
+    });
+
+    it("the header hands the active business's manager to the menu", () => {
+        const org = {
+            id: "a",
+            name: "Business a",
+            role: "OWNER",
+        } as Organization;
+        const handed = (accountManager?: AccountManager | null) => {
+            menuProps.mockReset();
+            renderToStaticMarkup(
+                <AppHeader
+                    user={{ name: "Asha", email: "asha.verma@example.com" }}
+                    organizations={[org]}
+                    activeOrg={org}
+                    unread={null}
+                    accountManager={accountManager}
+                />,
+            );
+            return (
+                menuProps.mock.calls[0]?.[0] as {
+                    accountManager?: AccountManager | null;
+                }
+            ).accountManager;
+        };
+        expect(handed(meera)).toEqual(meera);
+        expect(handed(null)).toBeNull();
+        expect(handed(undefined)).toBeNull();
     });
 });
