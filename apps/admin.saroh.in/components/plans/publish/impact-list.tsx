@@ -8,6 +8,8 @@ import { Skeleton } from "@saroh/ui/skeleton";
 
 import type { Impact, ImpactItem, ImpactTone } from "@/lib/pricing-types";
 
+import { businessesWord, reachCounts } from "./reach";
+
 const TONE_BADGE: Record<ImpactTone, "error" | "warning" | "success" | "info"> =
     {
         danger: "error",
@@ -27,7 +29,7 @@ export const PANEL =
     "grid gap-3 rounded-[14px] border border-border-strong bg-background p-4";
 
 /**
- * "What this draft does" (plans catalogue U10): who it touches, what plan
+ * "Who it reaches" (plans catalogue U10; U13): who it touches, what plan
  * revenue does if everyone moves, and each effect with the businesses it
  * reaches. The figures are the API's (`GET /admin/pricing/impact`), only
  * formatted here.
@@ -35,16 +37,23 @@ export const PANEL =
 export function ImpactList({
     state,
     onRetry,
+    priceTitles = new Set<string>(),
 }: {
     state: ImpactState;
     onRetry: () => void;
+    /** The draft's price changes, in the change log's words. */
+    priceTitles?: ReadonlySet<string>;
 }) {
     return (
-        <section aria-label="What this draft does" className={PANEL}>
+        <section aria-label="Who it reaches" className={PANEL}>
             <h2 className="font-display text-base font-semibold">
-                What this draft does
+                Who it reaches
             </h2>
-            <ImpactBody state={state} onRetry={onRetry} />
+            <ImpactBody
+                state={state}
+                onRetry={onRetry}
+                priceTitles={priceTitles}
+            />
         </section>
     );
 }
@@ -52,9 +61,11 @@ export function ImpactList({
 function ImpactBody({
     state,
     onRetry,
+    priceTitles,
 }: {
     state: ImpactState;
     onRetry: () => void;
+    priceTitles: ReadonlySet<string>;
 }) {
     if (state.kind === "none") {
         return (
@@ -111,9 +122,33 @@ function ImpactBody({
 
     const { impact } = state;
     const d = impact.revenue.nextPaise - impact.revenue.nowPaise;
+    const reach = reachCounts(impact, priceTitles);
     return (
         <>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
+                <Stat
+                    label="Better off"
+                    value={businessesWord(reach.better)}
+                    note="Get a module, more room or a lower price"
+                />
+                <Stat
+                    label="Worse off"
+                    value={businessesWord(reach.worse)}
+                    note={
+                        reach.worse === 0
+                            ? "Nobody loses a module or goes over a limit"
+                            : "Lose a module or go over a new limit"
+                    }
+                />
+                <Stat
+                    label="Price changes"
+                    value={businessesWord(reach.price)}
+                    note={
+                        reach.price === 0
+                            ? "Nobody's price changes"
+                            : "Pay a new price once they approve it"
+                    }
+                />
                 <Stat
                     label="Businesses affected"
                     value={String(impact.touched)}

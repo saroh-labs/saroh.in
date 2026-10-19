@@ -15,10 +15,16 @@ import { cn } from "@saroh/ui/lib/utils";
 export function CardPreview({
     catalog,
     planId,
+    live,
     className,
 }: {
     catalog: Catalog;
     planId: string;
+    /**
+     * Live, to mark what the draft changed on the card (the docked preview,
+     * U13); left out, nothing is marked.
+     */
+    live?: Catalog | null;
     className?: string;
 }) {
     const plan = catalog.plans.find((p) => p.id === planId);
@@ -26,6 +32,9 @@ export function CardPreview({
     const paid = plan.pricePaise > 0;
     const { lead, lines } = cardLines(catalog, plan.id);
     const name = plan.name || "Unnamed plan";
+    const was = changedOnCard(live ?? null, catalog, plan.id);
+    const mark =
+        "rounded-[4px] bg-highlight-subtle px-1 text-highlight-subtle-foreground";
     return (
         <section
             aria-label={`Preview of ${name} on the pricing page`}
@@ -45,7 +54,12 @@ export function CardPreview({
                 )}
             >
                 <div className="flex flex-wrap items-center gap-2">
-                    <strong className="font-display text-[20px] font-semibold">
+                    <strong
+                        className={cn(
+                            "font-display text-[20px] font-semibold",
+                            was.name && mark,
+                        )}
+                    >
                         {name}
                     </strong>
                     {plan.featured && (
@@ -54,7 +68,12 @@ export function CardPreview({
                         </span>
                     )}
                 </div>
-                <p className="font-display text-[26px] font-semibold tabular-nums">
+                <p
+                    className={cn(
+                        "font-display text-[26px] font-semibold tabular-nums",
+                        was.price && mark,
+                    )}
+                >
                     {formatInr(plan.pricePaise)}
                     <span className="font-sans text-[13px] font-normal text-muted-foreground">
                         {paid ? " a month + GST" : " · Free for good"}
@@ -73,7 +92,14 @@ export function CardPreview({
                 <ul className="mt-1 grid gap-1.5 border-t border-border pt-3 text-[13px]">
                     {lead && <li className="font-semibold">{lead}</li>}
                     {lines.map((l) => (
-                        <li key={l.t} className="flex gap-2">
+                        <li
+                            key={l.t}
+                            data-changed={was.lines.has(l.t) || undefined}
+                            className={cn(
+                                "flex gap-2",
+                                was.lines.has(l.t) && mark,
+                            )}
+                        >
                             <span
                                 aria-hidden
                                 className="font-bold text-highlight-subtle-foreground"
@@ -81,6 +107,9 @@ export function CardPreview({
                                 ✓
                             </span>
                             {l.t}
+                            {was.lines.has(l.t) && (
+                                <span className="sr-only"> (changed)</span>
+                            )}
                         </li>
                     ))}
                     {!lead && lines.length === 0 && (
@@ -94,8 +123,31 @@ export function CardPreview({
             <p className="text-[12px] leading-[1.45] text-muted-foreground">
                 {plan.retired
                     ? "Retired: this card leaves the pricing page when the draft is published."
-                    : "The card's lines come from each feature's line on the plan card."}
+                    : was.name || was.price || was.lines.size > 0
+                      ? "Marked parts changed in the draft."
+                      : "The card's lines come from each feature's line on the plan card."}
             </p>
         </section>
     );
+}
+
+/** What on a plan's card differs from live: its name, price and lines. */
+export function changedOnCard(
+    live: Catalog | null,
+    catalog: Catalog,
+    planId: string,
+): { name: boolean; price: boolean; lines: Set<string> } {
+    const none = { name: false, price: false, lines: new Set<string>() };
+    if (!live) return none;
+    const was = live.plans.find((p) => p.id === planId);
+    const now = catalog.plans.find((p) => p.id === planId);
+    if (!now) return none;
+    const nowLines = cardLines(catalog, planId).lines.map((l) => l.t);
+    if (!was) return { name: true, price: true, lines: new Set(nowLines) };
+    const before = new Set(cardLines(live, planId).lines.map((l) => l.t));
+    return {
+        name: was.name !== now.name,
+        price: was.pricePaise !== now.pricePaise,
+        lines: new Set(nowLines.filter((t) => !before.has(t))),
+    };
 }

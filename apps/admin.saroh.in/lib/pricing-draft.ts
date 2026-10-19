@@ -37,23 +37,39 @@ export function tabFrom(value: string | string[] | undefined): PlansTab {
         : "plans";
 }
 
-/** The design's tab row: "Versions · N", "Review & publish · N" with a draft. */
+export interface TabLabel {
+    label: string;
+    /** The small count beside it: "3 changed", "2"; null when there is none. */
+    badge: string | null;
+}
+
+/**
+ * The tab row (admin redesign U13, R19): "Plans · 3 changed" while a draft
+ * changes something, "Versions · N", "Review and publish · N" with a draft.
+ */
 export function tabLabels(input: {
     versions: number;
     hasDraft: boolean;
     changes: number;
     /** Nothing is live: there is nothing to count changes against. */
     firstVersion?: boolean;
-}): Record<PlansTab, string> {
+}): Record<PlansTab, TabLabel> {
+    const counted = input.hasDraft && !input.firstVersion;
     return {
-        plans: "Plans",
-        modules: "Modules",
-        offers: "Offers",
-        versions: `Versions · ${input.versions}`,
-        publish:
-            input.hasDraft && !input.firstVersion
-                ? `Review & publish · ${input.changes}`
-                : "Review & publish",
+        plans: {
+            label: "Plans",
+            badge:
+                counted && input.changes > 0
+                    ? `${input.changes} changed`
+                    : null,
+        },
+        modules: { label: "Modules", badge: null },
+        offers: { label: "Offers", badge: null },
+        versions: { label: "Versions", badge: String(input.versions) },
+        publish: {
+            label: "Review and publish",
+            badge: counted ? String(input.changes) : null,
+        },
     };
 }
 

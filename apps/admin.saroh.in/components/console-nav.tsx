@@ -84,7 +84,7 @@ const GROUPS: ConsoleNavGroup[] = [
             },
             {
                 href: "/plans",
-                label: "Plans & modules",
+                label: "Plans and modules",
                 icon: Tags,
                 permission: "pricing:read",
             },

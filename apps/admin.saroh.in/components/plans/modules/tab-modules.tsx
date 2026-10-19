@@ -187,6 +187,13 @@ export function TabModules() {
                     </AddButton>
                 )}
             </div>
+            {catalog.groups.length > 0 && (
+                <p className="text-[12.5px] text-muted-foreground">
+                    What each module is called on the pricing page, its order
+                    and whether it shows. Which plans include it is on Plans,
+                    and whether businesses can use it at all is in Releases.
+                </p>
+            )}
             {canEdit && catalog.groups.length === 0 && (
                 <p
                     id="add-module-why"

@@ -17,6 +17,11 @@ import { OfferYearly } from "./offer-yearly";
 export function TabOffers() {
     return (
         <section aria-label="Offers" className="grid gap-3.5 text-[13.5px]">
+            <p className="text-[12.5px] text-muted-foreground">
+                What a business can get on top of a plan&apos;s price, one card
+                each. These go live with the next published version. Coupons are
+                the exception: they apply as soon as they are saved.
+            </p>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-3.5">
                 <OfferYearly />
                 <OfferGst />
