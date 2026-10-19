@@ -347,6 +347,7 @@ model Organization {
   invoices              Invoice[]
   invoiceLines          InvoiceLine[]
   invoiceSequences      InvoiceSequence[]
+  invoicePayments       InvoicePayment[]
   courses               Course[]
   courseSessions        CourseSession[]
   courseEnrollments     CourseEnrollment[]
@@ -5504,6 +5505,9 @@ model PaymentIntent {
   attempts PaymentAttempt[]
   refunds  PaymentRefund[]
 
+  // The invoice ledger row this payment wrote (DEC-173), if any.
+  invoicePayment InvoicePayment?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -6777,6 +6781,15 @@ model Invoice {
   lines          InvoiceLine[]
   paymentIntents PaymentIntent[]
 
+  // The payments on it (DEC-173): one row per payment, in integer paise. The
+  // order is the ledger for an order's invoice (ADR-008), which has none.
+  // `paidCents` is a cache of the live payments (not removed, not bounced),
+  // recomputed from them in the same transaction as every ledger write and
+  // never written anywhere else. "Partly paid" is ISSUED with paidCents > 0,
+  // derived like Overdue, never stored as a status.
+  payments  InvoicePayment[]
+  paidCents Int              @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -6811,6 +6824,9 @@ model Invoice {
   // the payment reconciliation. Corrections are other kinds.
   @@unique([orderId], map: "Invoice_one_per_order", where: raw("kind = 'INVOICE'"))
   @@unique([bookingId], map: "Invoice_one_per_booking", where: raw("kind = 'INVOICE'"))
+  // The ledger's composite key: a payment can't name another business's
+  // invoice.
+  @@unique([id, organizationId])
   @@index([organizationId, status])
   @@index([contactId])
   @@index([subscriptionId])
@@ -6827,6 +6843,57 @@ model Invoice {
   @@index([createdAt], map: "Invoice_open_pack_drafts_idx", where: raw("status = 'DRAFT' AND source = 'PACK'"))
   // The sweep that discards online plan joins nobody paid (G20).
   @@index([createdAt], map: "Invoice_open_plan_joins_idx", where: raw("status = 'DRAFT' AND source = 'SUBSCRIPTION'"))
+}
+
+/// One payment on an invoice (DEC-173): the ledger the invoice's status and
+/// `paidCents` are worked out from. Never deleted: a payment recorded by
+/// mistake is removed softly (`removedAt`) and stays in the history.
+model InvoicePayment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  // Integer paise: the ledger's exception to "never Int for currency"
+  // (DEC-173), as `PaymentIntent.amountCents` is. Always more than 0.
+  amountCents Int
+  currency    String
+  // CASH | UPI | BANK_TRANSFER | CARD | OTHER | CHEQUE, or ONLINE (written
+  // only for money that came through the pay link).
+  method      String
+  reference   String?
+  note        String?
+  receivedAt  DateTime
+
+  // A cheque: its number and bank, and where it is. `bankStatus` is WAITING,
+  // then CLEARED (`clearedAt`) or BOUNCED (`bouncedAt`, an optional
+  // reason); null for anything but a cheque. A waiting cheque counts as
+  // received; a bounced one doesn't count.
+  chequeNumber String?
+  chequeBank   String?
+  bankStatus   String?
+  clearedAt    DateTime?
+  bouncedAt    DateTime?
+  bounceReason String?
+
+  // Removed by mistake: when, by whom and why. A removed payment doesn't
+  // count, and the row stays.
+  removedAt     DateTime?
+  removedById   String?
+  removedReason String?
+
+  // Who recorded it; null when Saroh did (the webhook, a backfill).
+  recordedById    String?
+  // The online payment it came from, if any: one row per intent.
+  paymentIntentId String?        @unique
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([organizationId, receivedAt])
+  @@index([organizationId, bankStatus])
 }
 
 model InvoiceLine {

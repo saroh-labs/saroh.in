@@ -86,7 +86,11 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         why: "The courier company, not the person.",
     },
 
-    // Issued invoices are the law's paper (DEC-042).
+    // Issued invoices are the law's paper (DEC-042). Their payments
+    // (`InvoicePayment`, DEC-173: a cheque's number and bank, a reference,
+    // a note) are invoice records too (ADR-008) and are kept, by a removal
+    // and by the retention erase alike; none of their columns looks
+    // personal, so they need no entry here.
     "Invoice.billToName": {
         rule: "kept",
         why: "Printed on an issued invoice.",

@@ -17,14 +17,14 @@ import {
 } from "class-validator";
 
 import type {
+    HandPaymentMethod,
     InvoiceSource,
     InvoiceView,
-    PaymentMethod,
 } from "./invoice-state";
 import {
+    HAND_PAYMENT_METHODS,
     INVOICE_SOURCES,
     INVOICE_VIEWS,
-    PAYMENT_METHODS,
 } from "./invoice-state";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -156,8 +156,10 @@ export class VoidInvoiceDto {
 }
 
 export class RecordPaymentDto {
-    @IsIn(PAYMENT_METHODS)
-    method!: PaymentMethod;
+    // A cheque (DEC-173) needs its number, bank and bank status, which the
+    // ledger API (U2) takes; until then the hand methods only.
+    @IsIn(HAND_PAYMENT_METHODS)
+    method!: HandPaymentMethod;
 
     @IsOptional()
     @Transform(trimOrOmit)

@@ -86,7 +86,7 @@ export interface KeptThing {
 /** Everything the eraser leaves, and why. */
 export const RETENTION_KEPT: readonly KeptThing[] = [
     {
-        what: "Invoices and credit notes with their lines, as printed (bill-to name, email and address; the seller's details; amounts and GST)",
+        what: "Invoices and credit notes with their lines, as printed (bill-to name, email and address; the seller's details; amounts and GST), and the payments recorded on them (method, cheque number and bank, reference and note)",
         why: "Tax records, kept eight years (ADR-008).",
     },
     {

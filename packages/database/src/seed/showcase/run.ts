@@ -1,6 +1,10 @@
 import type { Prisma } from "@prisma/client";
 
 import { holdOpenLines } from "../../backfill/held-stock";
+import {
+    backfillInvoicePayments,
+    describeInvoicePaymentsReport,
+} from "../../backfill/invoice-payments";
 import { assertDatabaseTarget } from "../../database-target";
 import { alignOrderNumberSequence } from "../../order-number";
 import {
@@ -352,6 +356,16 @@ export async function seedShowcase(
         prisma,
         businesses.map((b) => b.id).filter((id) => !linksOwnPayers.has(id)),
     );
+    // Every paid invoice but an order's has its payment in the ledger
+    // (DEC-173), written by the same backfill a live database runs.
+    const ledger = await backfillInvoicePayments(prisma, {
+        organizationIds: businesses.map((b) => b.id),
+    });
+    if (ledger.skipped.length > 0) {
+        throw new Error(
+            `The showcase has paid invoices the ledger can't hold: ${describeInvoicePaymentsReport(ledger).join("; ")}`,
+        );
+    }
     const counts = await checkShowcase(prisma, now, businesses);
     const scrubbed = await scrubSeededPhones(prisma);
     if (scrubbed > 0) {

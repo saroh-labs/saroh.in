@@ -58,6 +58,10 @@ export * from "./backfill/pricing-free-subscriptions";
 // The P3 order-number backfill (DEC-066), exported so the API's integration
 // suite can run it twice and check what it did.
 export * from "./backfill/order-numbers";
+// The invoice ledger backfill (DEC-173, #1113), exported so the API's
+// integration suite can run it twice and check what it wrote, and for the
+// showcase seed, which gives its paid invoices their payments with it.
+export * from "./backfill/invoice-payments";
 // Pricing catalogue versions (plan 2026-09-29 U1): store a published
 // snapshot and its Plan rows, and read which one is live.
 export * from "./pricing-catalogue";

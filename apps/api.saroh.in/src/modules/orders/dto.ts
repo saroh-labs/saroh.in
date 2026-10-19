@@ -17,8 +17,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
-import type { PaymentMethod } from "../invoices/invoice-state";
-import { PAYMENT_METHODS } from "../invoices/invoice-state";
+import type { HandPaymentMethod } from "../invoices/invoice-state";
+import { HAND_PAYMENT_METHODS } from "../invoices/invoice-state";
 import type { CounterPayment } from "./new-order.dto";
 import {
     COUNTER_PAYMENTS,
@@ -441,8 +441,8 @@ export class UpdateOrderDto {
      * PAID; an app before #834 sends none.
      */
     @IsOptional()
-    @IsIn(PAYMENT_METHODS, { message: "Pick how it was paid." })
-    paidHow?: PaymentMethod;
+    @IsIn(HAND_PAYMENT_METHODS, { message: "Pick how it was paid." })
+    paidHow?: HandPaymentMethod;
 
     /**
      * Recorded as refunded by hand (UX-061): how the money went back. On
@@ -450,8 +450,8 @@ export class UpdateOrderDto {
      * `paymentStatus` REFUNDED; an app before it sends none.
      */
     @IsOptional()
-    @IsIn(PAYMENT_METHODS, { message: "Pick how it was handed back." })
-    refundedHow?: PaymentMethod;
+    @IsIn(HAND_PAYMENT_METHODS, { message: "Pick how it was handed back." })
+    refundedHow?: HandPaymentMethod;
 
     /**
      * Recorded as refunded by hand, another amount (#865, DEC-116): what

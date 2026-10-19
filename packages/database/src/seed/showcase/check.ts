@@ -499,6 +499,35 @@ export async function checkShowcase(
     // row's stock log adds up to what is on it. A row promising units no
     // line holds is the state that made a cancel give back, or a fulfilment
     // sell, units nobody promised.
+    // The invoice ledger (DEC-173): every paid invoice but an order's has
+    // its payments, and `paidCents` is what its live payments add up to.
+    fail(
+        "paid invoices with no payment in the ledger",
+        await prisma.$queryRaw<Row[]>`
+            SELECT i.id, i."organizationId", i.number FROM "Invoice" i
+            WHERE i."organizationId" = ANY(${orgs})
+              AND i.status = 'PAID' AND i."orderId" IS NULL
+              AND i.kind <> 'CREDIT_NOTE' AND i.total > 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM "InvoicePayment" p
+                  WHERE p."invoiceId" = i.id AND p."removedAt" IS NULL
+              )`,
+    );
+    fail(
+        "invoices whose paidCents is not what their live payments add up to",
+        await prisma.$queryRaw<Row[]>`
+            SELECT i.id, i."paidCents", COALESCE(l.live, 0) AS live
+            FROM "Invoice" i
+            LEFT JOIN (
+                SELECT "invoiceId", SUM("amountCents")::int AS live
+                FROM "InvoicePayment"
+                WHERE "removedAt" IS NULL
+                  AND "bankStatus" IS DISTINCT FROM 'BOUNCED'
+                GROUP BY "invoiceId"
+            ) l ON l."invoiceId" = i.id
+            WHERE i."organizationId" = ANY(${orgs})
+              AND i."paidCents" <> COALESCE(l.live, 0)`,
+    );
     const held = await heldStockMismatches(prisma, orgs);
     fail(
         "shelf rows whose promised is not what open orders hold",
