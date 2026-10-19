@@ -308,7 +308,7 @@ describe("the Next card", () => {
         expect(title?.className).toContain("min-[760px]:text-[19px]");
         // Its row is lit, and on a phone its badge says Next.
         const kabir = rows().find((r) => r.textContent.includes("Kabir"));
-        expect(kabir?.className).toContain("bg-highlight-subtle");
+        expect(kabir?.className).toContain("bg-muted");
         expect(kabir?.textContent).toContain("Next");
     });
 
